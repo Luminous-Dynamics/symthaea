@@ -12,7 +12,7 @@ Four external benchmarks partially address the circular validation concern:
 
 | Benchmark | Result | What It Validates |
 |-----------|--------|-------------------|
-| **Hendrycks ETHICS** (4 domains, 2K samples) | 56.2% (94.5% figure **RETRACTED** as leakage-inflated, 2026-07-15) | Learned HDC moral classification |
+| **Hendrycks ETHICS** | Historical 56.2% aggregate **unqualified** pending task/label/split reconciliation; 94.5% figure **RETRACTED** as leakage-inflated (2026-07-15) | No qualified full-suite accuracy claim yet; see docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md |
 | **Sleep-EDF** (PhysioNet clinical EEG) | 70-80% 5-class | LTC integration on real EEG |
 | **ARC-AGI** (Chollet) | 4% strict; 2-AFC **RETRACTED** (see note) | HDC algebraic rule transfer |
 | **DMC Humanoid** (vs SAC/TD3/D4PG) | Competitive | FEP perturbation recovery |
@@ -29,7 +29,7 @@ unchanged) 13.8% — *below* chance — and reflect_x/reflect_y distractors 64.9
 short of "100%". The 4% strict (pixel-perfect) figure is unaffected and stands. See
 `crates/domains/symthaea-psych-bench/src/benchmarks/reasoning/arc_dataset.rs` and
 `examples/arc_2afc_reaudit.rs` for the full methodology — same inflation class as the
-retracted Hendrycks ETHICS figure below.
+retracted Hendrycks ETHICS headline below. The later task-semantics audit also qualifies the 56.2% aggregate because the current cross-domain pilot applies a wrongness target to tasks with different label semantics.
 
 ## Butlin Consciousness Indicators
 
