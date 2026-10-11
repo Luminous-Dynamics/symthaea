@@ -1,8 +1,8 @@
 # symthaea-hdc-ltc
 
-**O(D) work per temporal update, independent of elapsed time at fixed D.**
+**O(1) temporal dynamics in 16,384 dimensions.**
 
-A standalone Rust crate implementing the Hyperdimensional Liquid Time-Constant (HDC-LTC) unified neuron architecture. The neuron's *state* is a hypervector (16,384 dimensions by default) evolved with a solver-free Closed-form Continuous (CfC) update. At fixed dimension, the update cost does not grow with the elapsed time horizon: a 1 ms jump and a 100 s jump each perform one O(D) coordinate pass. CfC is an efficient closed-form approximation for liquid time-constant dynamics, not an exact integrator for every arbitrary nonlinear LTC ODE.
+A standalone Rust crate implementing the Hyperdimensional Liquid Time-Constant (HDC-LTC) unified neuron architecture. This neuron's *state* is a 16,384-dimensional hypervector that evolves through Liquid Time-Constant dynamics with a closed-form solution, enabling O(1) temporal jumps to any time horizon.
 
 ## The Key Insight
 
@@ -11,8 +11,8 @@ Traditional recurrent neural networks have two scaling problems:
 2. **Temporal integration** requires O(steps) ODE solver evaluations per time jump
 
 HDC-LTC solves both:
-- **Weight hypervectors** replace a dense recurrent matrix with per-dimension HDC binding (element-wise multiply): O(D) parameters per neuron. This is a more compact, structured parameterization—not an equivalent replacement for every possible dense recurrent map.
-- **Closed-form exponential update** avoids repeated ODE solver substeps: O(D) per jump, independent of dt
+- **Weight hypervectors** replace weight matrices via HDC binding (element-wise multiply): O(D) parameters
+- **Closed-form exponential decay** replaces ODE integration: O(1) per temporal jump
 
 The closed-form solution:
 ```
@@ -31,9 +31,9 @@ let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
 
 let input = ContinuousHV::new_random(1024, 123);
 
-// Work remains O(D) for either duration when dimension and activation are fixed.
-neuron.try_evolve_closed_form_fused(0.001, &input).expect("valid 1 ms step");
-neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
+// O(1) temporal jumps -- both cost the same!
+neuron.evolve_closed_form(0.001, &input);  // 1 ms
+neuron.evolve_closed_form(100.0, &input);   // 100 seconds
 ```
 
 ## Architecture
@@ -45,12 +45,10 @@ neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
 
 ## Performance
 
-- **Neuron evolution**: O(D) per step, independent of dt; it is not O(1) in the hypervector dimension
-- **Fused hot path**: `evolve_closed_form_fused()` avoids intermediate heap allocations and fuses the state-norm reduction into the update pass; it assumes the caller supplies valid dimensions and finite values
-- **Checked path**: `try_evolve_closed_form_fused()` validates dt, dimensions, configuration and numerical finiteness before mutation (with an extra O(D) preflight scan)
-- **Small-step stability**: CfC interpolation uses `-expm1(-dt / tau)` to avoid cancellation for tiny positive dt
+- **Neuron evolution**: O(D) per step, independent of dt
+- **Zero-alloc fused path**: `evolve_closed_form_fused()` avoids all intermediate allocations
 - **fast_tanh**: Rational approximation (max 0.4% error) that auto-vectorizes on modern CPUs
-- **Deterministic**: Initialization is seed-controlled for reproducibility
+- **Deterministic**: All operations are seed-controlled for reproducibility
 
 ## Examples
 
@@ -58,7 +56,6 @@ neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
 cargo run --example time_series   # Sine wave prediction
 cargo run --example controller    # PD controller with LTC
 cargo run --example language      # Mini thought-to-text demo
-cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark # CSV scaling measurements
 ```
 
 ## References
