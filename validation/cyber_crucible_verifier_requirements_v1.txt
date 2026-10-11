@@ -1,0 +1,5 @@
+# Pinned runtime/test dependencies for the Cyber Crucible verifier bundle.
+# Install with: python -m pip install -r validation/cyber_crucible_verifier_requirements_v1.txt
+cryptography==50.0.2
+rfc8785==0.1.4
+jsonschema==4.26.0

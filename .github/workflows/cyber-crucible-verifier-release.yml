@@ -1,0 +1,26 @@
+name: Cyber Crucible Verifier Release
+
+on:
+  push:
+    tags:
+      - "cyber-crucible-verifier-v*"
+
+# The caller needs these permission ceilings because the pinned reusable workflow
+# attests the artifact. Its jobs reduce permissions to the minimum they require.
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+concurrency:
+  group: cyber-crucible-verifier-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-test-and-attest:
+    # Security-critical: update this SHA only after review of the trusted reusable workflow.
+    uses: Luminous-Dynamics/symthaea/.github/workflows/cyber-crucible-trusted-build.yml@661af65d4804b3c2f5eeb2d8ff7ff16b60df59b0
+    with:
+      source_ref: ${{ github.ref }}
+      source_commit: ${{ github.sha }}
