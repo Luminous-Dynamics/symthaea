@@ -262,6 +262,9 @@ impl HdcLtcUnifiedNeuron {
         if !self.config.tau_coupling.is_finite() {
             return Err(NeuronStepError::InvalidConfiguration { field: "tau_coupling" });
         }
+        if !self.config.backbone_tau.is_finite() || self.config.backbone_tau < 0.0 {
+            return Err(NeuronStepError::InvalidConfiguration { field: "backbone_tau" });
+        }
         if !self.config.gating_steepness.is_finite() {
             return Err(NeuronStepError::InvalidConfiguration { field: "gating_steepness" });
         }
@@ -355,6 +358,12 @@ impl HdcLtcUnifiedNeuron {
         let tau_max = self.config.tau_max;
         let tau_coupling = self.config.tau_coupling;
         let gating_steepness = self.config.gating_steepness;
+        let state_norm = stable_l2_norm_f64(&self.state.values);
+        // Compute the shared state-complexity factor in f64, then cap before casting so
+        // extreme-but-finite states cannot overflow the per-dimension f32 tau arithmetic.
+        let tau_base_state = ((tau_base as f64)
+            * (1.0 + self.config.backbone_tau as f64 * state_norm))
+            .min(tau_max as f64) as f32;
         let dt_clamped = dt;
 
         // Stable scaled sum-of-squares avoids overflow for large finite components.
@@ -393,7 +402,8 @@ impl HdcLtcUnifiedNeuron {
                     // Per-dim tau: τ_i = τ_base · clamp(σ(τ_mod_i · |h_i| + τ_coupling · |I_i|), min, max)
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
-                    let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
+                    let tau_i =
+                        (tau_base_state * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
                     debug_assert_intermediate!(
                         tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite(),
                         "Tau {} must be finite and within limits [{}, {}]",
@@ -446,7 +456,8 @@ impl HdcLtcUnifiedNeuron {
                     );
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
-                    let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
+                    let tau_i =
+                        (tau_base_state * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
                     debug_assert_intermediate!(
                         tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite()
                     );
@@ -481,7 +492,8 @@ impl HdcLtcUnifiedNeuron {
                     );
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
-                    let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
+                    let tau_i =
+                        (tau_base_state * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
                     debug_assert_intermediate!(
                         tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite()
                     );
@@ -516,7 +528,8 @@ impl HdcLtcUnifiedNeuron {
                     );
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
-                    let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
+                    let tau_i =
+                        (tau_base_state * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
                     debug_assert_intermediate!(
                         tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite()
                     );
@@ -551,7 +564,8 @@ impl HdcLtcUnifiedNeuron {
                     );
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
-                    let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
+                    let tau_i =
+                        (tau_base_state * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
                     debug_assert_intermediate!(
                         tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite()
                     );
@@ -640,11 +654,16 @@ impl HdcLtcUnifiedNeuron {
         let tau_min = self.config.tau_min;
         let tau_max = self.config.tau_max;
         let tau_coupling = self.config.tau_coupling;
+        let state_norm = stable_l2_norm_f64(&self.state.values);
+        let tau_base_state = ((tau_base as f64)
+            * (1.0 + self.config.backbone_tau as f64 * state_norm))
+            .min(tau_max as f64) as f32;
         let mut field = Vec::with_capacity(dim);
         for i in 0..dim {
             let tau_pre = self.tau_modulator.values[i] * self.state.values[i].abs()
                 + tau_coupling * input.values[i].abs();
-            let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
+            let tau_i =
+                (tau_base_state * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
             field.push(tau_i);
         }
         field
@@ -672,6 +691,17 @@ fn sigmoid(x: f32) -> f32 {
 #[inline(always)]
 fn silu(x: f32) -> f32 {
     x * sigmoid(x)
+}
+
+/// Compute a stable L2 norm while allowing the mathematical norm to exceed f32::MAX.
+#[inline]
+fn stable_l2_norm_f64(values: &[f32]) -> f64 {
+    let mut scale = 0.0_f32;
+    let mut sum_squares = 0.0_f32;
+    for &value in values {
+        update_scaled_sum_squares(value, &mut scale, &mut sum_squares);
+    }
+    (scale as f64) * (sum_squares as f64).sqrt()
 }
 
 /// Accumulate a component into a scaled sum-of-squares (LASSQ-style) norm.
@@ -802,6 +832,58 @@ mod tests {
         assert_eq!(
             nonfinite_state.try_evolve_closed_form_fused(0.1, &input),
             Err(NeuronStepError::NonFiniteState { index: 9 })
+        );
+    }
+
+    #[test]
+    fn checked_step_rejects_invalid_backbone_tau_without_mutation() {
+        let input = ContinuousHV::new_random(256, 100);
+        for backbone_tau in [f32::NAN, f32::INFINITY, -0.1] {
+            let config = NeuronConfig {
+                backbone_tau,
+                ..small_config()
+            };
+            let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+            let before = neuron.state().clone();
+
+            assert_eq!(
+                neuron.try_evolve_closed_form_fused(0.1, &input),
+                Err(NeuronStepError::InvalidConfiguration {
+                    field: "backbone_tau"
+                })
+            );
+            assert_eq!(neuron.state(), &before);
+            assert_eq!(neuron.update_count(), 0);
+        }
+    }
+
+    #[test]
+    fn backbone_tau_changes_effective_timescale_for_nonzero_state() {
+        let mut fast = HdcLtcUnifiedNeuron::new(
+            NeuronConfig {
+                backbone_tau: 0.0,
+                ..small_config()
+            },
+            42,
+        );
+        let mut slow = HdcLtcUnifiedNeuron::new(
+            NeuronConfig {
+                backbone_tau: 0.5,
+                ..small_config()
+            },
+            42,
+        );
+        let mut state = vec![0.0_f32; 256];
+        state[0] = 0.5;
+        fast.set_state(ContinuousHV::from_values(state.clone()));
+        slow.set_state(ContinuousHV::from_values(state));
+        let input = ContinuousHV::new(256);
+
+        let fast_tau = fast.mean_tau(&input);
+        let slow_tau = slow.mean_tau(&input);
+        assert!(
+            slow_tau > fast_tau * 1.1,
+            "backbone_tau must increase effective tau as state norm grows: fast={fast_tau}, slow={slow_tau}"
         );
     }
 
