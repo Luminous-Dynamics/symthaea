@@ -84,6 +84,10 @@ pub mod observability;
 /// Narrow Tier-1 observation contract for evidence-gathering consumers (CognitiveObservation).
 #[allow(missing_docs)]
 pub mod observation;
+/// Validated, modality-neutral observation envelope for sensor and evidence-fabric consumers.
+#[allow(missing_docs)]
+pub mod observation_fabric;
+
 /// Integrated Information (Phi) calculation engine.
 #[allow(missing_docs)]
 pub mod phi_engine;
