@@ -1,0 +1,143 @@
+name: QC DFT Molecular Grid Evidence
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-quantum-chemistry/src/dft/**"
+      - "crates/domains/symthaea-quantum-chemistry/src/scf/generalized_eigen.rs"
+      - "crates/domains/symthaea-quantum-chemistry/examples/qc_dft_molecular_grid_evidence.rs"
+      - "crates/core/symthaea-observation-attestation/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/qc-dft-molecular-grid-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qc-dft-molecular-grid-evidence-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  molecular-grid-evidence:
+    name: Checked DFT grid sweep and electron-count diagnostics
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact PR head or dispatched commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact source checkout and record identity
+        shell: bash
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse --verify 'HEAD^{commit}')"
+          if [[ "$actual" != "$EXPECTED_SOURCE_SHA" ]]; then
+            printf 'source HEAD mismatch: expected=%s actual=%s\n' "$EXPECTED_SOURCE_SHA" "$actual" >&2
+            exit 1
+          fi
+          manifest="crates/core/symthaea-observation-attestation/Cargo.toml"
+          test -f "$manifest"
+          {
+            echo "## QC DFT molecular grid evidence"
+            echo
+            printf -- '- Source commit: `%s`\n' "$actual"
+            printf -- '- Source tree: `%s`\n' "$(git rev-parse --verify 'HEAD^{tree}')"
+            printf -- '- Cargo.lock blob: `%s`\n' "$(git rev-parse HEAD:Cargo.lock)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # pinned upstream revision
+        with:
+          toolchain: 1.96.0
+
+      - name: Check formatting of DFT and benchmark sources
+        run: |
+          set -euo pipefail
+          rustfmt --check --edition 2024 --config skip_children=true \
+            crates/domains/symthaea-quantum-chemistry/src/dft/xc.rs \
+            crates/domains/symthaea-quantum-chemistry/src/dft/lda.rs \
+            crates/domains/symthaea-quantum-chemistry/src/dft/grid.rs \
+            crates/domains/symthaea-quantum-chemistry/examples/qc_dft_molecular_grid_evidence.rs
+
+      - name: Preflight the exact workspace manifest
+        run: test -f crates/core/symthaea-observation-attestation/Cargo.toml
+
+      - name: Run checked DFT and quadrature regressions
+        run: cargo test --locked -p symthaea-quantum-chemistry --lib 'dft::'
+
+      - name: Run closed-shell molecular grid sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SYMTHAEA_SOURCE_SHA="$(git rev-parse --verify 'HEAD^{commit}')"
+          export SYMTHAEA_SOURCE_TREE="$(git rev-parse --verify 'HEAD^{tree}')"
+          cargo run --locked -p symthaea-quantum-chemistry \
+            --example qc_dft_molecular_grid_evidence \
+            > /tmp/symthaea-qc-dft-grid-evidence.json
+
+      - name: Summarize grid, SCF, and electron-count evidence
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path("/tmp/symthaea-qc-dft-grid-evidence.json")
+          summary_path = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          lines = ["", "### Native molecular grid evidence", ""]
+          if not report_path.is_file():
+              lines.append("No JSON report was emitted; the Rust example did not complete.")
+          else:
+              report = json.loads(report_path.read_text(encoding="utf-8"))
+              counts = report.get("summary", {})
+              lines += [
+                  f"- Source commit: `{report.get('source_commit')}`",
+                  f"- Source tree: `{report.get('source_tree')}`",
+                  f"- Cases: {counts.get('cases')}",
+                  f"- Solver receipts present for all cases: {counts.get('solver_receipts_present_all_cases')}",
+                  f"- SCF converged for all cases: {counts.get('scf_converged_all_cases')}",
+                  f"- Electron-count integrals finite for all cases: {counts.get('electron_count_integrals_finite_all_cases')}",
+                  f"- Execution gate: **{'PASS' if counts.get('all_cases_passed_execution_gate') else 'FAIL'}**",
+                  "",
+                  "| Molecule | Grid | SCF | Energy (Ha) | Grid electrons | Absolute count error | Points |",
+                  "|---|---|---|---:|---:|---:|---:|",
+              ]
+              for item in report.get("records", []):
+                  energy = item.get("total_energy_hartree")
+                  count = item.get("integrated_electron_count")
+                  count_error = item.get("integrated_electron_count_abs_error")
+                  energy_s = "—" if energy is None else f"{energy:.12f}"
+                  count_s = "—" if count is None else f"{count:.10f}"
+                  error_s = "—" if count_error is None else f"{count_error:.3e}"
+                  lines.append(
+                      f"| {item.get('molecule')} | {item.get('grid_quality')} | "
+                      f"{item.get('status')} | {energy_s} | {count_s} | "
+                      f"{error_s} | {item.get('n_grid_points', '—')} |"
+                  )
+              lines += [
+                  "",
+                  "Grid electron-count error is a quadrature diagnostic, not a chemical-accuracy certificate.",
+                  "This is native Symthaea evidence. Molecular energy agreement against PySCF remains a separate comparison.",
+              ]
+          with summary_path.open("a", encoding="utf-8") as output:
+              output.write("\n".join(lines) + "\n")
+          PY
+
+      - name: Upload native numerical evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qc-dft-molecular-grid-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/symthaea-qc-dft-grid-evidence.json
+          if-no-files-found: warn
+          retention-days: 30
