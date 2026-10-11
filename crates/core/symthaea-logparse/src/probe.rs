@@ -215,7 +215,10 @@ impl LogisticProbe {
             self.biases.len(),
             "model class/bias count mismatch"
         );
-        assert!(!self.class_names.is_empty(), "model must have at least one class");
+        assert!(
+            !self.class_names.is_empty(),
+            "model must have at least one class"
+        );
 
         let mut best_class = 0usize;
         let mut best_score = f32::NEG_INFINITY;
@@ -348,8 +351,8 @@ pub fn selective_accuracy_curve(
 
     let mut points = Vec::with_capacity(target_coverages.len());
     for &target_coverage in target_coverages {
-        let accepted_samples =
-            ((target_coverage * labels.len() as f32).ceil() as usize).clamp(1, labels.len());
+        let accepted_samples = ((target_coverage * labels.len() as f32).ceil() as usize)
+            .clamp(1, labels.len());
         let mut correct = 0usize;
         let mut support_by_class: BTreeMap<&str, usize> = BTreeMap::new();
         let mut correct_by_class: BTreeMap<&str, usize> = BTreeMap::new();
@@ -361,6 +364,8 @@ pub fn selective_accuracy_curve(
                 *correct_by_class.entry(actual).or_insert(0) += 1;
             }
         }
+        // An unrepresented class contributes zero, conservatively penalizing
+        // coverage policies that abstain on every example of a class.
         let accepted_macro_recall = class_names
             .iter()
             .map(|class| {
@@ -968,10 +973,25 @@ mod tests {
         let predictions = vec![0usize];
         let margins = vec![0.2f32];
         let classes = vec!["a".into()];
-        assert!(selective_accuracy_curve(&labels, &predictions, &[], &classes, &[1.0]).is_err());
-        assert!(selective_accuracy_curve(&labels, &predictions, &margins, &classes, &[0.0]).is_err());
-        assert!(selective_accuracy_curve(&labels, &predictions, &[f32::NAN], &classes, &[1.0]).is_err());
-        assert!(selective_accuracy_curve(&["unknown".into()], &predictions, &margins, &classes, &[1.0]).is_err());
+        assert!(
+            selective_accuracy_curve(&labels, &predictions, &[], &classes, &[1.0]).is_err()
+        );
+        assert!(
+            selective_accuracy_curve(&labels, &predictions, &margins, &classes, &[0.0]).is_err()
+        );
+        assert!(
+            selective_accuracy_curve(&labels, &predictions, &[f32::NAN], &classes, &[1.0]).is_err()
+        );
+        assert!(
+            selective_accuracy_curve(
+                &["unknown".into()],
+                &predictions,
+                &margins,
+                &classes,
+                &[1.0]
+            )
+            .is_err()
+        );
         assert!(selective_accuracy_curve(&labels, &[1], &margins, &classes, &[1.0]).is_err());
     }
 
