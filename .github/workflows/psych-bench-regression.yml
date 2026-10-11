@@ -1,0 +1,120 @@
+name: Psych-Bench Full Battery Execution
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/psych-bench-regression.yml'
+      - 'crates/domains/symthaea-psych-bench/**'
+      - 'crates/core/symthaea-core/**'
+      - 'src/cognitive_loop/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/psych-bench-regression.yml'
+      - 'crates/domains/symthaea-psych-bench/**'
+      - 'crates/core/symthaea-core/**'
+      - 'src/cognitive_loop/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  psych-bench-regression:
+    name: Exact-subject full psych-bench execution
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      # The routing theorem is that the real battery on the real crate actually
+      # builds and executes. Keep this independent from the historical baseline
+      # comparator below, whose direction-blind semantics are being migrated
+      # separately under #1091 / #3198.
+      - name: Execute full psych-bench report
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked --test full_battery --release -p symthaea-psych-bench \
+            full_battery_report -- --exact --nocapture \
+            2>&1 | tee "$RUNNER_TEMP/psych-bench-execution.txt"
+
+      - name: Verify baseline corpus coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked --test full_battery --release -p symthaea-psych-bench \
+            baseline_coverage_check -- --exact --nocapture \
+            2>&1 | tee "$RUNNER_TEMP/psych-bench-baseline-coverage.txt"
+
+      # Diagnostic only. RegressionReport::compare is the known historical
+      # direction-blind comparator: decreases in lower-is-better metrics can be
+      # reported as regressions. Preserve its output until the consumer is
+      # migrated to the qualified explicit-policy path; do not use it as this
+      # routing lane's pass/fail authority.
+      - name: Legacy baseline comparator diagnostic
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked --test full_battery --release -p symthaea-psych-bench \
+            regression_against_baseline -- --exact --nocapture \
+            2>&1 | tee "$RUNNER_TEMP/psych-bench-legacy-regression.txt"
+
+      - name: Upload exact-subject results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: psych-bench-results-${{ steps.subject.outputs.sha }}
+          path: |
+            ${{ runner.temp }}/psych-bench-execution.txt
+            ${{ runner.temp }}/psych-bench-baseline-coverage.txt
+            ${{ runner.temp }}/psych-bench-legacy-regression.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Postflight exact-subject immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
