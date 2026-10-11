@@ -78,7 +78,7 @@ The paper's claims are theoretical engineering analysis from 1983. They identify
 
 The scenario contract is now schema/version v2 and requires the scenario-level `initial_path_constraint=circular_reference_path` and checks `abs(r·v)/||r||` against the provenance-backed `acceptance_limits.max_initial_radial_velocity_m_s`. Four regression cases cover valid tangency, excessive radial speed, a missing radial-speed tolerance, and a missing path constraint, and scenario-version mismatch. The limit is a scenario-specific kinematic consistency bound—not an orbit-stability or safety criterion.
 
-The draft-safe workflow also compares the live validator blob/SHA-256 against the committed freshness record before running the suite. It requires 82 unique passing check IDs and byte-identical repeated output, then archives exact output and fingerprints. The corresponding GitHub Actions run is queued; this design does not treat queueing as evidence of a pass.
+The draft-safe workflow also compares the live validator blob/SHA-256 against the committed freshness record before running the suite. It requires 84 unique passing check IDs and byte-identical repeated output, then archives exact output and fingerprints. The corresponding GitHub Actions run is queued; this design does not treat queueing as evidence of a pass.
 
 The reported expected gate is now `Blocked` whenever either field-level blockers or structural/schema errors are present. This avoids contradictory reports in which a malformed manifest says `validation_state=failed_contract_checks` while separately advertising `expected_gate_state=ReadyForIndependentReview`. Regression cases cover a version mismatch, a subset field list, and unexpected provenance keys.
 
