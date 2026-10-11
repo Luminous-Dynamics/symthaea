@@ -641,4 +641,46 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_radial_gaussian_integrals_across_atomic_radius_classes() {
+        // A radial integral's exact value is independent of the atom-centered
+        // grid scale. Exercise every distinct radius branch currently used by
+        // bragg_slater_radius, alongside diffuse and tight Gaussian profiles.
+        // This qualifies quadrature under the current scales; it does not
+        // establish that those approximate radii are chemically optimal.
+        let atomic_numbers = [1_u8, 2, 3, 6, 26];
+        let alphas = [0.25_f64, 0.5, 1.0, 2.0, 4.0];
+        let cases = [
+            (GridQuality::Coarse, 2e-3),
+            (GridQuality::Medium, 2e-6),
+            (GridQuality::Fine, 3e-8),
+        ];
+
+        for (quality, relative_tolerance) in cases {
+            for atomic_number in atomic_numbers {
+                let atom = Atom::new(atomic_number, 0.0, 0.0, 0.0);
+                let grid = DftGrid::build(&[atom], quality);
+
+                for alpha in alphas {
+                    let numerical: f64 = grid
+                        .points
+                        .iter()
+                        .map(|point| {
+                            let r2 =
+                                point.x * point.x + point.y * point.y + point.z * point.z;
+                            point.weight * (-alpha * r2).exp()
+                        })
+                        .sum();
+                    let exact = PI.powf(1.5) / alpha.powf(1.5);
+                    let relative_error = (numerical - exact).abs() / exact;
+
+                    assert!(
+                        relative_error <= relative_tolerance,
+                        "{quality:?}, Z={atomic_number}, alpha={alpha}: integral={numerical}, exact={exact}, relative error={relative_error}, tolerance={relative_tolerance}"
+                    );
+                }
+            }
+        }
+    }
 }
