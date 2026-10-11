@@ -794,11 +794,17 @@ fn load_csv_rows(path: &std::path::Path, max_cols: usize) -> Vec<(Vec<f32>, bool
     rows
 }
 
-fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path) -> EvalResult {
+fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path) -> Option<EvalResult> {
     let n_features = 25;
 
     let train_rows = load_csv_rows(train_path, n_features);
     let test_rows = load_csv_rows(test_path, n_features);
+    if train_rows.is_empty() || test_rows.is_empty() {
+        eprintln!(
+            "[Spacecraft] Skipping evaluation: no valid labelled rows remain in train or test data."
+        );
+        return None;
+    }
 
     // Fit normalization on the training partition only to keep test values held out.
     let train_refs: Vec<&[f32]> = train_rows
@@ -828,6 +834,12 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         normal_train_window_count,
         total_train_windows
     );
+    if ref_windows.is_empty() {
+        eprintln!(
+            "[Spacecraft] Skipping evaluation: no normal-labelled training window is available."
+        );
+        return None;
+    }
 
     // Build healthy reference (subset for speed)
     let mut healthy_hdc: Vec<ContinuousHV> = Vec::new();
@@ -929,7 +941,7 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         })
         .collect();
 
-    EvalResult {
+    Some(EvalResult {
         auc_hdc: compute_auc(&compute_roc_curve(&scored_hdc)),
         auc_cfc: compute_auc(&compute_roc_curve(&scored_cfc)),
         auc_hybrid: compute_auc(&compute_roc_curve(&scored_hybrid)),
@@ -938,7 +950,7 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         f1_cfc: find_best_f1(&scored_cfc),
         f1_hybrid: find_best_f1(&scored_hybrid),
         f1_fused: find_best_f1(&scored_fused),
-    }
+    })
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -1053,8 +1065,7 @@ fn main() {
     println!("  Normalization is fit on training partitions only.");
     println!("  Best-F1 thresholds use evaluation labels and are oracle diagnostics,");
     println!("  not deployable metrics. Select thresholds on a separate validation split.");
-    println!("  Treat AUC/F1 differences as exploratory until the protocol is fixed and repeated");
-    println!("  are preregistered and repeated on independent data.");
+    println!("  Pre-register split, seeds and tuning; repeat on independent data.");
     println!("================================================================");
 }
 
