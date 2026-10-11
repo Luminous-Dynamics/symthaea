@@ -89,13 +89,7 @@ pub fn profile_score(score: &Score) -> ScoreCognitiveProfile {
             note.duration.beats() > 0.0 && note.onset.checked_add(note.duration).is_some()
         })
         .collect();
-    profile_notes(
-        score,
-        &notes,
-        notes.len(),
-        0.0,
-        score.total_beats.beats(),
-    )
+    profile_notes(score, &notes, notes.len(), 0.0, score.total_beats.beats())
 }
 
 /// Observe all notes sounding within `[start, end)`.
@@ -496,9 +490,8 @@ mod tests {
             VoiceRole::Bass,
         ));
 
-        let profile =
-            profile_score_region(&score, Duration::new(2, 1), Duration::new(3, 1))
-                .expect("the observation interval itself is valid");
+        let profile = profile_score_region(&score, Duration::new(2, 1), Duration::new(3, 1))
+            .expect("the observation interval itself is valid");
         assert_eq!(profile.note_count, 0);
         assert_eq!(profile.onset_count, 0);
         assert_eq!(profile.active_voice_count, 0);
