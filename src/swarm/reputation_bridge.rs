@@ -23,6 +23,16 @@ pub enum VouchDecision {
 ///
 /// With the `epistemic` feature, also tracks reputation-modulated learning
 /// rates — high-reputation peers' knowledge is learned from faster.
+///
+/// # Interaction accounting
+///
+/// Capability-card receipt and successful interaction are different events.
+/// New code should use [`Self::inspect_card`] to evaluate a card without
+/// mutating reputation state, and call [`Self::record_successful_interaction`]
+/// only when an interaction outcome has actually been established by the
+/// caller. [`Self::process_card`] preserves the historical receipt-counting
+/// behavior for compatibility with the existing discovery examples/tests;
+/// it must not be used as evidence that a real interaction succeeded.
 pub struct ReputationBridge {
     min_interactions: u64,
     phi_threshold: f64,
@@ -82,33 +92,77 @@ impl ReputationBridge {
         sum / self.reputation_learning_rates.len() as f64
     }
 
-    /// Process a received capability card.
-    /// Returns Rejected if hash is invalid, Accepted if not enough interactions,
-    /// or Vouched if the peer meets all criteria.
+    /// Evaluate a capability card without changing interaction/reputation state.
+    ///
+    /// This is the preferred entry point for discovery and compatibility code.
+    /// A valid card is only an integrity-checked self-description at this layer;
+    /// receiving or inspecting it is not evidence that an interaction succeeded.
+    pub fn inspect_card(&self, card: &CapabilityCard) -> VouchDecision {
+        if !card.verify_hash() {
+            return VouchDecision::Rejected;
+        }
+
+        let interactions = self.successful_interactions(card.agent_key.as_str());
+        self.decision_for(card, interactions)
+    }
+
+    /// Record one caller-established successful interaction for a peer.
+    ///
+    /// This is deliberately separate from card receipt. The caller is
+    /// responsible for establishing the interaction outcome; issue #1293
+    /// tracks replacing this compatibility seam with typed outcome evidence.
+    /// Returns the peer's updated successful-interaction count.
+    pub fn record_successful_interaction(&mut self, peer_id: &str) -> u64 {
+        let count = self.interactions.entry(peer_id.to_string()).or_insert(0);
+        *count = count.saturating_add(1);
+        *count
+    }
+
+    /// Number of explicitly recorded successful interactions for a peer.
+    pub fn successful_interactions(&self, peer_id: &str) -> u64 {
+        self.interactions.get(peer_id).copied().unwrap_or(0)
+    }
+
+    fn decision_for(&self, card: &CapabilityCard, interactions: u64) -> VouchDecision {
+        if card.phi < self.phi_threshold {
+            return VouchDecision::Accepted {
+                interactions,
+                needed: self.min_interactions,
+            };
+        }
+
+        if interactions >= self.min_interactions {
+            VouchDecision::Vouched
+        } else {
+            VouchDecision::Accepted {
+                interactions,
+                needed: self.min_interactions,
+            }
+        }
+    }
+
+    /// Legacy card-processing path.
+    ///
+    /// Historically, every hash-valid card receipt incremented the field named
+    /// `interactions`. Existing discovery examples/tests rely on that behavior,
+    /// so this method preserves it during migration. New production code should
+    /// use [`Self::inspect_card`] plus [`Self::record_successful_interaction`]
+    /// instead; card receipt alone is not successful-interaction evidence.
     pub fn process_card(&mut self, card: &CapabilityCard) -> VouchDecision {
         if !card.verify_hash() {
             return VouchDecision::Rejected;
         }
 
-        let key = card.agent_key.as_str().to_string();
-        let count = self.interactions.entry(key).or_insert(0);
-        *count += 1;
+        let interactions = {
+            let count = self
+                .interactions
+                .entry(card.agent_key.as_str().to_string())
+                .or_insert(0);
+            *count = count.saturating_add(1);
+            *count
+        };
 
-        if card.phi < self.phi_threshold {
-            return VouchDecision::Accepted {
-                interactions: *count,
-                needed: self.min_interactions,
-            };
-        }
-
-        if *count >= self.min_interactions {
-            VouchDecision::Vouched
-        } else {
-            VouchDecision::Accepted {
-                interactions: *count,
-                needed: self.min_interactions,
-            }
-        }
+        self.decision_for(card, interactions)
     }
 }
 
@@ -138,6 +192,7 @@ mod tests {
         let mut card = make_card(0.9);
         card.phi = 0.1; // tamper
         assert_eq!(bridge.process_card(&card), VouchDecision::Rejected);
+        assert_eq!(bridge.inspect_card(&card), VouchDecision::Rejected);
     }
 
     #[test]
@@ -171,5 +226,44 @@ mod tests {
         // Even with enough interactions, low phi prevents vouch
         let result = bridge.process_card(&card);
         assert!(matches!(result, VouchDecision::Accepted { .. }));
+    }
+
+    #[test]
+    fn inspection_does_not_count_card_receipt_as_interaction() {
+        let bridge = ReputationBridge::new(1, 0.5);
+        let card = make_card(0.9);
+
+        let first = bridge.inspect_card(&card);
+        let second = bridge.inspect_card(&card);
+
+        assert!(matches!(
+            first,
+            VouchDecision::Accepted {
+                interactions: 0,
+                needed: 1
+            }
+        ));
+        assert_eq!(second, first);
+        assert_eq!(bridge.successful_interactions(card.agent_key.as_str()), 0);
+    }
+
+    #[test]
+    fn explicit_successful_interaction_enables_non_mutating_vouch() {
+        let mut bridge = ReputationBridge::new(2, 0.5);
+        let card = make_card(0.9);
+        let peer = card.agent_key.as_str();
+
+        assert_eq!(bridge.record_successful_interaction(peer), 1);
+        assert!(matches!(
+            bridge.inspect_card(&card),
+            VouchDecision::Accepted {
+                interactions: 1,
+                needed: 2
+            }
+        ));
+
+        assert_eq!(bridge.record_successful_interaction(peer), 2);
+        assert_eq!(bridge.inspect_card(&card), VouchDecision::Vouched);
+        assert_eq!(bridge.successful_interactions(peer), 2);
     }
 }
