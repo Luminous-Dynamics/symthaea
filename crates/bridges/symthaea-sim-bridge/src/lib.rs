@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::seed_from_name;
 use thiserror::Error;
+use symthaea_types::{ModelMaturity, PhysicalType, TypeJudgement};
 
 /// Simple deterministic text embedding for HDC space.
 pub fn embed_text(text: &str, dimension: usize) -> ContinuousHV {
@@ -82,6 +83,21 @@ pub enum CouplingMode {
 
 /// One stage in a coupled multi-physics workflow.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TypedPhysicalPort {
+    /// Stable signal/field name shared across coupled stages.
+    pub name: String,
+    /// Canonical physical semantics for the signal.
+    pub physical_type: PhysicalType,
+}
+
+impl TypedPhysicalPort {
+    pub fn new(name: impl Into<String>, physical_type: PhysicalType) -> Self {
+        Self { name: name.into(), physical_type }
+    }
+}
+
+/// One stage in a coupled multi-physics workflow.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoupledSimulationStage {
     /// Stage identifier unique within the request.
     pub id: String,
@@ -89,10 +105,16 @@ pub struct CoupledSimulationStage {
     pub domain: EngineeringDomain,
     /// Solver family used by the stage.
     pub solver: SolverKind,
-    /// Outputs from previous stages consumed by this stage.
+    /// Legacy name-only inputs retained for compatibility.
     pub consumes: Vec<String>,
-    /// Metrics or fields emitted for later stages.
+    /// Legacy name-only outputs retained for compatibility.
     pub produces: Vec<String>,
+    /// Typed inputs used for semantic compatibility checking.
+    #[serde(default)]
+    pub typed_consumes: Vec<TypedPhysicalPort>,
+    /// Typed outputs used for semantic compatibility checking.
+    #[serde(default)]
+    pub typed_produces: Vec<TypedPhysicalPort>,
 }
 
 impl CoupledSimulationStage {
@@ -104,6 +126,8 @@ impl CoupledSimulationStage {
             solver,
             consumes: Vec::new(),
             produces: Vec::new(),
+            typed_consumes: Vec::new(),
+            typed_produces: Vec::new(),
         }
     }
 
@@ -116,6 +140,18 @@ impl CoupledSimulationStage {
     /// Declare outputs produced by this stage.
     pub fn produces(mut self, outputs: impl IntoIterator<Item = impl Into<String>>) -> Self {
         self.produces = outputs.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Declare typed physical inputs consumed from previous stages.
+    pub fn typed_consumes(mut self, inputs: impl IntoIterator<Item = TypedPhysicalPort>) -> Self {
+        self.typed_consumes = inputs.into_iter().collect();
+        self
+    }
+
+    /// Declare typed physical outputs emitted by this stage.
+    pub fn typed_produces(mut self, outputs: impl IntoIterator<Item = TypedPhysicalPort>) -> Self {
+        self.typed_produces = outputs.into_iter().collect();
         self
     }
 }
@@ -131,8 +167,36 @@ pub struct MultiPhysicsRequest {
     pub coupling: CouplingMode,
     /// Ordered solver stages.
     pub stages: Vec<CoupledSimulationStage>,
+    /// Explicit typed topology. This is the preferred coupling contract.
+    #[serde(default)]
+    pub typed_connections: Vec<TypedPhysicalConnection>,
     /// Coupling convergence tolerance for iterative/co-simulation workflows.
     pub coupling_tolerance: f64,
+}
+
+/// Explicit typed connection between a producer stage/port and consumer stage/port.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TypedPhysicalConnection {
+    pub producer_stage: String,
+    pub producer_port: String,
+    pub consumer_stage: String,
+    pub consumer_port: String,
+}
+
+impl TypedPhysicalConnection {
+    pub fn new(
+        producer_stage: impl Into<String>,
+        producer_port: impl Into<String>,
+        consumer_stage: impl Into<String>,
+        consumer_port: impl Into<String>,
+    ) -> Self {
+        Self {
+            producer_stage: producer_stage.into(),
+            producer_port: producer_port.into(),
+            consumer_stage: consumer_stage.into(),
+            consumer_port: consumer_port.into(),
+        }
+    }
 }
 
 impl MultiPhysicsRequest {
@@ -147,6 +211,7 @@ impl MultiPhysicsRequest {
             objective: objective.into(),
             coupling,
             stages: Vec::new(),
+            typed_connections: Vec::new(),
             coupling_tolerance: 1e-3,
         }
     }
@@ -155,6 +220,175 @@ impl MultiPhysicsRequest {
     pub fn with_stage(mut self, stage: CoupledSimulationStage) -> Self {
         self.stages.push(stage);
         self
+    }
+
+    /// Append an explicit typed producer-to-consumer connection.
+    pub fn with_typed_connection(mut self, connection: TypedPhysicalConnection) -> Self {
+        self.typed_connections.push(connection);
+        self
+    }
+
+
+    /// Validate explicit stage/port topology. Unknown semantics never pass
+    /// as compatible because an executable coupling requires a known contract.
+    pub fn validate_typed_topology(&self) -> Result<(), SimulationError> {
+        use std::collections::HashMap;
+        let mut stages = HashMap::new();
+        for stage in &self.stages {
+            if stage.id.trim().is_empty() {
+                return Err(SimulationError::InvalidRequest(
+                    "typed topology stage id cannot be empty".into(),
+                ));
+            }
+            if stages.insert(stage.id.as_str(), stage).is_some() {
+                return Err(SimulationError::InvalidRequest(format!(
+                    "typed topology contains duplicate stage id {:?}",
+                    stage.id
+                )));
+            }
+
+            let mut inputs = HashMap::new();
+            for port in &stage.typed_consumes {
+                if port.name.trim().is_empty() {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed input name cannot be empty in stage {:?}",
+                        stage.id
+                    )));
+                }
+                if inputs.insert(port.name.as_str(), port).is_some() {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed stage {:?} contains duplicate input port {:?}",
+                        stage.id, port.name
+                    )));
+                }
+            }
+
+            let mut outputs = HashMap::new();
+            for port in &stage.typed_produces {
+                if port.name.trim().is_empty() {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed output name cannot be empty in stage {:?}",
+                        stage.id
+                    )));
+                }
+                if outputs.insert(port.name.as_str(), port).is_some() {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed stage {:?} contains duplicate output port {:?}",
+                        stage.id, port.name
+                    )));
+                }
+            }
+        }
+
+        for connection in &self.typed_connections {
+            let producer = stages.get(connection.producer_stage.as_str()).ok_or_else(|| {
+                SimulationError::InvalidRequest(format!(
+                    "typed connection references missing producer stage {:?}",
+                    connection.producer_stage
+                ))
+            })?;
+            let consumer = stages.get(connection.consumer_stage.as_str()).ok_or_else(|| {
+                SimulationError::InvalidRequest(format!(
+                    "typed connection references missing consumer stage {:?}",
+                    connection.consumer_stage
+                ))
+            })?;
+
+            let output = producer
+                .typed_produces
+                .iter()
+                .find(|port| port.name == connection.producer_port)
+                .ok_or_else(|| SimulationError::InvalidRequest(format!(
+                    "typed connection references missing producer port {:?}",
+                    connection.producer_port
+                )))?;
+            let input = consumer
+                .typed_consumes
+                .iter()
+                .find(|port| port.name == connection.consumer_port)
+                .ok_or_else(|| SimulationError::InvalidRequest(format!(
+                    "typed connection references missing consumer port {:?}",
+                    connection.consumer_port
+                )))?;
+
+            match output
+                .physical_type
+                .judge_numeric_compatibility(&input.physical_type)
+            {
+                TypeJudgement::Valid(()) => {}
+                TypeJudgement::Invalid(error) => {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed connection {}:{} -> {}:{} is incompatible: {}",
+                        connection.producer_stage,
+                        connection.producer_port,
+                        connection.consumer_stage,
+                        connection.consumer_port,
+                        error.reason
+                    )));
+                }
+                TypeJudgement::Unknown(reason) => {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed connection {}:{} -> {}:{} is unknown: {}",
+                        connection.producer_stage,
+                        connection.producer_port,
+                        connection.consumer_stage,
+                        connection.consumer_port,
+                        reason
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate typed producer/consumer edges. Unknown semantics never pass
+    /// as compatible because an executable coupling requires a known contract.
+    pub fn validate_typed_connections(&self) -> Result<(), SimulationError> {
+        use std::collections::HashMap;
+        let mut producers = HashMap::<&str, &PhysicalType>::new();
+        for stage in &self.stages {
+            for port in &stage.typed_produces {
+                if port.name.trim().is_empty() {
+                    return Err(SimulationError::InvalidRequest("typed output name cannot be empty".into()));
+                }
+                if producers.contains_key(port.name.as_str()) {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed output {:?} has multiple producers",
+                        port.name
+                    )));
+                }
+                producers.insert(port.name.as_str(), &port.physical_type);
+            }
+        }
+        for stage in &self.stages {
+            for port in &stage.typed_consumes {
+                if port.name.trim().is_empty() {
+                    return Err(SimulationError::InvalidRequest("typed input name cannot be empty".into()));
+                }
+                let Some(source) = producers.get(port.name.as_str()) else {
+                    return Err(SimulationError::InvalidRequest(format!(
+                        "typed input {:?} has no declared producer",
+                        port.name
+                    )));
+                };
+                match source.judge_numeric_compatibility(&port.physical_type) {
+                    TypeJudgement::Valid(()) => {}
+                    TypeJudgement::Invalid(error) => {
+                        return Err(SimulationError::InvalidRequest(format!(
+                            "typed coupling {:?} is incompatible: {}",
+                            port.name, error.reason
+                        )));
+                    }
+                    TypeJudgement::Unknown(reason) => {
+                        return Err(SimulationError::InvalidRequest(format!(
+                            "typed coupling {:?} is unknown: {}",
+                            port.name, reason
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -167,6 +401,9 @@ pub struct ModelParameter {
     pub value: f64,
     /// Unit string in the source model's convention.
     pub unit: String,
+    /// Canonical physical semantics when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub physical_type: Option<PhysicalType>,
     /// Source or assumption label for auditability.
     pub provenance: String,
     /// Optional quantified uncertainty for the parameter.
@@ -313,6 +550,27 @@ impl SimulationRequest {
             name: name.into(),
             value,
             unit: unit.into(),
+            physical_type: None,
+            provenance: provenance.into(),
+            uncertainty: None,
+        });
+        self
+    }
+
+    /// Add a parameter with canonical physical semantics.
+    pub fn with_typed_parameter(
+        mut self,
+        name: impl Into<String>,
+        value: f64,
+        unit: impl Into<String>,
+        physical_type: PhysicalType,
+        provenance: impl Into<String>,
+    ) -> Self {
+        self.parameters.push(ModelParameter {
+            name: name.into(),
+            value,
+            unit: unit.into(),
+            physical_type: Some(physical_type),
             provenance: provenance.into(),
             uncertainty: None,
         });
@@ -399,6 +657,9 @@ pub struct SimulationMetric {
     pub value: f64,
     /// Unit string.
     pub unit: String,
+    /// Canonical physical semantics when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub physical_type: Option<PhysicalType>,
     /// Optional uncertainty estimate for this metric.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uncertainty: Option<UncertaintyEstimate>,
@@ -438,6 +699,9 @@ pub struct SimulationEvidence {
     /// Version of the adapter/parser that normalized the result.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parser_version: Option<String>,
+    /// Maturity of the underlying model, independent of execution provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_maturity: Option<ModelMaturity>,
 }
 
 impl SimulationEvidence {
@@ -526,6 +790,12 @@ impl SimulationResult {
     /// Attach provenance for a genuinely parsed external-solver result.
     pub fn with_external_evidence(mut self, evidence: SimulationEvidence) -> Self {
         self.evidence = evidence;
+        self
+    }
+
+    /// Record model maturity separately from solver execution provenance.
+    pub fn with_model_maturity(mut self, maturity: ModelMaturity) -> Self {
+        self.evidence.model_maturity = Some(maturity);
         self
     }
 
@@ -1227,6 +1497,103 @@ mod tests {
     }
 
     #[test]
+    fn explicit_typed_topology_rejects_unit_presence_mismatch() {
+        let metres = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        )
+        .with_unit(symthaea_types::UnitRef {
+            symbol: "m".into(),
+            transform_to_si: symthaea_types::UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+        let unlabelled = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+
+        let producer = CoupledSimulationStage::new(
+            "producer",
+            EngineeringDomain::Mechanical,
+            SolverKind::FiniteElement,
+        )
+        .typed_produces([TypedPhysicalPort::new("length", metres)]);
+
+        let consumer = CoupledSimulationStage::new(
+            "consumer",
+            EngineeringDomain::Mechanical,
+            SolverKind::MultibodyDynamics,
+        )
+        .typed_consumes([TypedPhysicalPort::new("length", unlabelled)]);
+
+        let request = MultiPhysicsRequest::new(
+            "unit-mismatch",
+            "numeric transport must be explicit",
+            CouplingMode::OneWay,
+        )
+        .with_stage(producer)
+        .with_stage(consumer)
+        .with_typed_connection(TypedPhysicalConnection::new(
+            "producer",
+            "length",
+            "consumer",
+            "length",
+        ));
+
+        assert!(request.validate_typed_topology().is_err());
+    }
+
+    #[test]
+    fn explicit_typed_topology_rejects_duplicate_stage_ids() {
+        let producer = CoupledSimulationStage::new(
+            "duplicate",
+            EngineeringDomain::Mechanical,
+            SolverKind::FiniteElement,
+        );
+        let consumer = CoupledSimulationStage::new(
+            "duplicate",
+            EngineeringDomain::Electrical,
+            SolverKind::Circuit,
+        );
+
+        let request = MultiPhysicsRequest::new(
+            "duplicate-stage",
+            "reject ambiguous stage identity",
+            CouplingMode::OneWay,
+        )
+        .with_stage(producer)
+        .with_stage(consumer);
+
+        assert!(request.validate_typed_topology().is_err());
+    }
+
+    #[test]
+    fn explicit_typed_topology_rejects_duplicate_port_names() {
+        let length = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+        let producer = CoupledSimulationStage::new(
+            "producer",
+            EngineeringDomain::Mechanical,
+            SolverKind::FiniteElement,
+        )
+        .typed_produces([
+            TypedPhysicalPort::new("length", length.clone()),
+            TypedPhysicalPort::new("length", length),
+        ]);
+
+        let request = MultiPhysicsRequest::new(
+            "duplicate-port",
+            "reject ambiguous port identity",
+            CouplingMode::OneWay,
+        )
+        .with_stage(producer);
+
+        assert!(request.validate_typed_topology().is_err());
+    }
+
+    #[test]
     fn registry_dispatches_to_matching_backend() {
         let mut registry = SimulationRegistry::new();
         registry.register(MockBackend);
@@ -1355,6 +1722,7 @@ mod tests {
             input_digest: Some("input-digest".into()),
             output_digest: Some("output-digest".into()),
             parser_version: Some("parser-1".into()),
+            model_maturity: Some(ModelMaturity::ValidatedNumerical),
         };
         let valid = SimulationResult::converged("run-1", 0.9)
             .with_metric("stress", 12.0, "MPa")
@@ -1435,6 +1803,145 @@ mod tests {
 
         assert_eq!(request.stages.len(), 2);
         assert_eq!(request.coupling, CouplingMode::Iterative);
+    }
+
+    #[test]
+    fn typed_multiphysics_connections_accept_matching_types() {
+        let pressure = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Pressure,
+            symthaea_types::PhysicalDimension::PRESSURE,
+        );
+        let request = MultiPhysicsRequest::new(
+            "typed-1",
+            "pressure transfer",
+            CouplingMode::OneWay,
+        )
+        .with_stage(
+            CoupledSimulationStage::new(
+                "cfd",
+                EngineeringDomain::Aerospace,
+                SolverKind::ComputationalFluidDynamics,
+            )
+            .typed_produces([TypedPhysicalPort::new("pressure", pressure.clone())]),
+        )
+        .with_stage(
+            CoupledSimulationStage::new(
+                "fea",
+                EngineeringDomain::Materials,
+                SolverKind::FiniteElement,
+            )
+            .typed_consumes([TypedPhysicalPort::new("pressure", pressure)]),
+        );
+        assert!(request.validate_typed_connections().is_ok());
+    }
+
+    #[test]
+    fn typed_multiphysics_connections_reject_dimension_mismatch() {
+        let pressure = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Pressure,
+            symthaea_types::PhysicalDimension::PRESSURE,
+        );
+        let length = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Length,
+            symthaea_types::PhysicalDimension::LENGTH,
+        );
+        let request = MultiPhysicsRequest::new("typed-2", "bad transfer", CouplingMode::OneWay)
+            .with_stage(
+                CoupledSimulationStage::new(
+                    "source",
+                    EngineeringDomain::Aerospace,
+                    SolverKind::ComputationalFluidDynamics,
+                )
+                .typed_produces([TypedPhysicalPort::new("signal", pressure)]),
+            )
+            .with_stage(
+                CoupledSimulationStage::new(
+                    "sink",
+                    EngineeringDomain::Materials,
+                    SolverKind::FiniteElement,
+                )
+                .typed_consumes([TypedPhysicalPort::new("signal", length)]),
+            );
+        assert!(request.validate_typed_connections().is_err());
+    }
+
+    #[test]
+    fn typed_multiphysics_connections_reject_unknown_semantics() {
+        let request = MultiPhysicsRequest::new("typed-3", "unknown transfer", CouplingMode::OneWay)
+            .with_stage(
+                CoupledSimulationStage::new(
+                    "source",
+                    EngineeringDomain::Aerospace,
+                    SolverKind::ComputationalFluidDynamics,
+                )
+                .typed_produces([TypedPhysicalPort::new("signal", PhysicalType::unknown())]),
+            )
+            .with_stage(
+                CoupledSimulationStage::new(
+                    "sink",
+                    EngineeringDomain::Materials,
+                    SolverKind::FiniteElement,
+                )
+                .typed_consumes([TypedPhysicalPort::new("signal", PhysicalType::unknown())]),
+            );
+        assert!(request.validate_typed_connections().is_err());
+    }
+
+    #[test]
+    fn typed_parameter_and_metric_preserve_semantics() {
+        let energy = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Energy,
+            symthaea_types::PhysicalDimension::ENERGY,
+        );
+        let request = SimulationRequest::new(
+            "typed-4",
+            EngineeringDomain::Mechanical,
+            SolverKind::MultibodyDynamics,
+            "energy check",
+        )
+        .with_typed_parameter("energy", 10.0, "J", energy.clone(), "fixture");
+        assert_eq!(request.parameters[0].physical_type, Some(energy.clone()));
+
+        let result = SimulationResult::converged("typed-4", 0.9)
+            .with_typed_metric("energy", 10.0, "J", energy.clone());
+        assert_eq!(result.metrics[0].physical_type, Some(energy));
+    }
+
+    #[test]
+    fn explicit_typed_topology_targets_exact_stage_endpoints() {
+        let pressure = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Pressure,
+            symthaea_types::PhysicalDimension::PRESSURE,
+        );
+        let load = PhysicalType::with_kind(
+            symthaea_types::QuantityKind::Force,
+            symthaea_types::PhysicalDimension::FORCE,
+        );
+        let request = MultiPhysicsRequest::new(
+            "typed-topology",
+            "explicit coupling",
+            CouplingMode::OneWay,
+        )
+        .with_stage(
+            CoupledSimulationStage::new(
+                "cfd",
+                EngineeringDomain::Aerospace,
+                SolverKind::ComputationalFluidDynamics,
+            )
+            .typed_produces([TypedPhysicalPort::new("pressure", pressure)]),
+        )
+        .with_stage(
+            CoupledSimulationStage::new(
+                "fea",
+                EngineeringDomain::Materials,
+                SolverKind::FiniteElement,
+            )
+            .typed_consumes([TypedPhysicalPort::new("load", load)]),
+        )
+        .with_typed_connection(TypedPhysicalConnection::new(
+            "cfd", "pressure", "fea", "load",
+        ));
+        assert!(request.validate_typed_topology().is_err());
     }
 
     #[test]
