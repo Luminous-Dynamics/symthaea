@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-continuity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Evidence and continuity contracts for proof-carrying infrastructure transitions"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
