@@ -783,7 +783,7 @@ mod tests {
                 let recovered_lhs = sum.checked_subtract(rhs, limit).unwrap();
                 assert_eq!(&recovered_lhs, lhs, "addition/subtraction identity");
 
-                if !rhs.value.numer().is_zero() {
+                if rhs.numerator_str() != "0" {
                     let product = lhs.checked_multiply(rhs, limit).unwrap();
                     let recovered_lhs = product.checked_divide(rhs, limit).unwrap();
                     assert_eq!(&recovered_lhs, lhs, "multiplication/division identity");
