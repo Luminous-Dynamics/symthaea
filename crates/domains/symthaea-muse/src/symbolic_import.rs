@@ -416,6 +416,68 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
             root.tag_name().name()
         ));
     }
+    // Score models note pitch, onset, duration, velocity, and structural
+    // emphasis, but not conventional articulations, ornaments, expressive
+    // pauses, octave shifts, or written crescendo/diminuendo wedges. Refuse
+    // source markings whose performance semantics would otherwise disappear.
+    let unsupported_performance_tags = [
+        "accent",
+        "arpeggiate",
+        "bend",
+        "breath-mark",
+        "caesura",
+        "detached-legato",
+        "doit",
+        "fall",
+        "falloff",
+        "fermata",
+        "glissando",
+        "inverted-mordent",
+        "inverted-turn",
+        "mordent",
+        "non-arpeggiate",
+        "octave-shift",
+        "plop",
+        "scoop",
+        "slur",
+        "spiccato",
+        "staccatissimo",
+        "staccato",
+        "strong-accent",
+        "tenuto",
+        "tremolo",
+        "trill-mark",
+        "turn",
+        "wedge",
+    ];
+    if let Some(marking) = document.descendants().find(|node| {
+        unsupported_performance_tags
+            .iter()
+            .any(|tag| node.has_tag_name(*tag))
+    }) {
+        return Err(format!(
+            "MusicXML <{}> performance marking is not represented by Score; refusing to flatten articulation or expressive timing semantics",
+            marking.tag_name().name()
+        ));
+    }
+    if document
+        .descendants()
+        .any(|node| node.has_tag_name("dynamics"))
+    {
+        return Err(
+            "MusicXML notated <dynamics> markings are not mapped to note velocity; only supported <sound dynamics> playback metadata can be imported"
+                .into(),
+        );
+    }
+    if document
+        .descendants()
+        .any(|node| node.has_tag_name("midi-instrument"))
+    {
+        return Err(
+            "MusicXML <midi-instrument> routing/program metadata is not represented by Score"
+                .into(),
+        );
+    }
     // A linear note list cannot preserve repeat traversal, alternate endings,
     // or the elapsed span of a multiple-measure rest. Reject these structures
     // before parsing note positions rather than silently compressing the score.
@@ -1732,6 +1794,42 @@ mod tests {
             );
         let error = parse_musicxml(xml.as_bytes()).unwrap_err();
         assert!(error.contains("<multiple-rest>"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_articulation_is_rejected_instead_of_flattened() {
+        let xml = String::from_utf8(minimal_musicxml().to_vec())
+            .unwrap()
+            .replace(
+                "</note>",
+                "<notations><articulations><staccato/></articulations></notations></note>",
+            );
+        let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+        assert!(error.contains("<staccato>"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_notated_dynamics_are_rejected_until_velocity_mapping_exists() {
+        let xml = String::from_utf8(minimal_musicxml().to_vec())
+            .unwrap()
+            .replace(
+                "<note><pitch>",
+                "<direction><direction-type><dynamics><f/></dynamics></direction-type></direction><note><pitch>",
+            );
+        let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+        assert!(error.contains("notated <dynamics> markings are not mapped"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_midi_instrument_mapping_is_rejected_until_score_can_preserve_it() {
+        let xml = String::from_utf8(minimal_musicxml().to_vec())
+            .unwrap()
+            .replace(
+                "<part id=\"P1\">",
+                "<part-list><score-part id=\"P1\"><part-name>Solo</part-name><midi-instrument id=\"P1-I1\"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument></score-part></part-list><part id=\"P1\">",
+            );
+        let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+        assert!(error.contains("<midi-instrument> routing/program metadata"), "{error}");
     }
 
     #[test]
