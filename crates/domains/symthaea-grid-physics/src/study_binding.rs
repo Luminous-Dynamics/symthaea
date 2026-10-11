@@ -12,6 +12,9 @@
 //! supplied digest came from a trusted producer.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+const BINDING_DIGEST_DOMAIN: &[u8] = b"luminous-dynamics.energy-study-binding.v1\\0";
 
 use crate::qualification::{
     FrozenEnergyScenario, PolicyComparisonReceipt, PolicyRunReceipt, QualificationError,
@@ -57,6 +60,22 @@ impl EnergyStudyBindingV1 {
         }
         Ok(())
     }
+
+    /// Commit to the complete external identity for compact per-step binding.
+    ///
+    /// The three digest fields have a fixed length of 64 validated ASCII bytes,
+    /// so the versioned fixed-order encoding is unambiguous. This is a content
+    /// commitment, not a signature or an authentication mechanism.
+    pub fn digest_sha256(&self) -> Result<String, EnergyStudyBindingError> {
+        self.validate()?;
+        let mut hasher = Sha256::new();
+        hasher.update(BINDING_DIGEST_DOMAIN);
+        hasher.update(self.schema_version.to_be_bytes());
+        hasher.update(self.manifest_sha256.as_bytes());
+        hasher.update(self.case_sha256.as_bytes());
+        hasher.update(self.artifact_set_sha256.as_bytes());
+        Ok(format!("{:x}", hasher.finalize()))
+    }
 }
 
 /// One scheduler step with the external identity explicitly carried beside it.
@@ -68,7 +87,7 @@ impl EnergyStudyBindingV1 {
 #[serde(deny_unknown_fields)]
 pub struct BoundScenarioStepReceiptV1 {
     pub step_ordinal: usize,
-    pub study_binding: EnergyStudyBindingV1,
+    pub study_binding_sha256: String,
     pub scheduler_step_receipt: ScenarioStepReceipt,
 }
 
@@ -155,6 +174,7 @@ pub fn bind_policy_run_receipt(
         .verify_receipt(&run_receipt)
         .map_err(EnergyStudyBindingError::UnderlyingReceipt)?;
 
+    let study_binding_sha256 = study_binding.digest_sha256()?;
     let bound_steps = run_receipt
         .trace
         .steps
@@ -163,7 +183,7 @@ pub fn bind_policy_run_receipt(
         .enumerate()
         .map(|(step_ordinal, scheduler_step_receipt)| BoundScenarioStepReceiptV1 {
             step_ordinal,
-            study_binding: study_binding.clone(),
+            study_binding_sha256: study_binding_sha256.clone(),
             scheduler_step_receipt,
         })
         .collect();
@@ -195,11 +215,12 @@ pub fn verify_bound_policy_receipt(
     if bound.bound_steps.len() != bound.run_receipt.trace.steps.len() {
         return Err(EnergyStudyBindingError::InvalidStepSequence);
     }
+    let expected_binding_sha256 = bound.study_binding.digest_sha256()?;
     for (expected_ordinal, bound_step) in bound.bound_steps.iter().enumerate() {
         if bound_step.step_ordinal != expected_ordinal {
             return Err(EnergyStudyBindingError::InvalidStepSequence);
         }
-        if bound_step.study_binding != bound.study_binding {
+        if bound_step.study_binding_sha256 != expected_binding_sha256 {
             return Err(EnergyStudyBindingError::StepBindingMismatch);
         }
         if bound_step.scheduler_step_receipt != bound.run_receipt.trace.steps[expected_ordinal] {
@@ -330,7 +351,7 @@ mod tests {
         assert_eq!(bound.bound_steps.len(), expected_steps.len());
         for (index, step) in bound.bound_steps.iter().enumerate() {
             assert_eq!(step.step_ordinal, index);
-            assert_eq!(step.study_binding, binding);
+            assert_eq!(step.study_binding_sha256, binding.digest_sha256().unwrap());
             assert_eq!(step.scheduler_step_receipt, expected_steps[index]);
         }
 
@@ -342,8 +363,17 @@ mod tests {
         assert!(packet.contains("manifest_sha256"));
         assert!(packet.contains("case_sha256"));
         assert!(packet.contains("artifact_set_sha256"));
+        assert!(packet.contains("study_binding_sha256"));
         assert!(packet.contains("scheduler_step_receipt"));
         assert!(packet.contains("step_ordinal"));
+    }
+
+    #[test]
+    fn binding_digest_has_a_frozen_known_answer() {
+        assert_eq!(
+            test_binding().digest_sha256().unwrap(),
+            "3392c5e568cf3e24070ddca998bd12a10f6d3e6bfbeac3cbab7338e45460b4f0"
+        );
     }
 
     #[test]
@@ -376,7 +406,7 @@ mod tests {
 
         let raw = run_baseline(&scenario);
         let mut wrong_binding = bind_policy_run_receipt(&scenario, raw, test_binding()).unwrap();
-        wrong_binding.bound_steps[0].study_binding.case_sha256 =
+        wrong_binding.bound_steps[0].study_binding_sha256 =
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into();
         assert_eq!(
             verify_bound_policy_receipt(&scenario, &wrong_binding),
