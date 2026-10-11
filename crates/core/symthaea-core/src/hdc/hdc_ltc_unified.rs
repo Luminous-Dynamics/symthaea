@@ -1269,7 +1269,9 @@ impl HdcLtcUnifiedNeuron {
         // tiny positive time constant can still exceed usize range.
         let requested_steps =
             ((dt as f64) / (self.config.tau_base as f64 / 10.0)).ceil().max(1.0);
-        if requested_steps > max_substeps as f64 {
+        // `usize::MAX as f64` rounds up on 64-bit targets. Reject equality too,
+        // so a rounded 2^64 request cannot pass a `usize::MAX` budget and saturate on cast.
+        if requested_steps >= usize::MAX as f64 || requested_steps > max_substeps as f64 {
             let requested_at_least = requested_steps.min(usize::MAX as f64) as usize;
             return Err(IterativeEvolutionError::SubstepBudgetExceeded {
                 requested_at_least,
