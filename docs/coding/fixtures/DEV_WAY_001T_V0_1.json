@@ -1,0 +1,95 @@
+{
+  "schema": "symthaea-dev-way-studio-v0.1",
+  "authority_class": "candidate-generation-only",
+  "production_acceptance_modified": false,
+  "task_families": [
+    {"id":"api-ergonomics","kind":"api_design","requires_multiple_valid_decompositions":true},
+    {"id":"leptos-interaction","kind":"ui_interaction","requires_multiple_valid_decompositions":true},
+    {"id":"rust-data-model","kind":"data_model","requires_multiple_valid_decompositions":true},
+    {"id":"error-model","kind":"error_semantics","requires_multiple_valid_decompositions":true},
+    {"id":"cli-surface","kind":"interface_design","requires_multiple_valid_decompositions":true},
+    {"id":"visual-explanation","kind":"visualization","requires_multiple_valid_decompositions":true},
+    {"id":"conceptual-refactor","kind":"refactoring","requires_multiple_valid_decompositions":true},
+    {"id":"dependency-subtraction","kind":"dependency_reduction","requires_multiple_valid_decompositions":true},
+    {"id":"domain-naming","kind":"naming_domain_model","requires_multiple_valid_decompositions":true},
+    {"id":"architecture-boundary","kind":"architecture","requires_multiple_valid_decompositions":true},
+    {"id":"fixture-ergonomics","kind":"test_design","requires_multiple_valid_decompositions":true},
+    {"id":"ill-posed-reframe","kind":"reframing","requires_multiple_valid_decompositions":true}
+  ],
+  "studio_dispositions": [
+    "KeepExploring",
+    "PromisingCandidate",
+    "TooComplex",
+    "TechnicallyGoodWrongFeel",
+    "ElegantButUnproven",
+    "SelectedForSpecification",
+    "RejectedForNow"
+  ],
+  "forbidden_positive_aliases": [
+    "Verified",
+    "Correct",
+    "Safe",
+    "Qualified",
+    "ApprovedForEffect"
+  ],
+  "divergence_axes": [
+    "data_model",
+    "interaction_model",
+    "control_flow",
+    "architecture_scale",
+    "state_explicitness",
+    "distribution_assumption",
+    "dependency_strategy",
+    "api_shape",
+    "user_metaphor",
+    "minimal_vs_expressive"
+  ],
+  "subtraction_axes": [
+    "types",
+    "states",
+    "abstractions",
+    "dependencies",
+    "configuration",
+    "interactions",
+    "persistent_state",
+    "external_services"
+  ],
+  "evaluation_dimensions": [
+    "downstream_correctness_state",
+    "human_preference_if_measured",
+    "material_candidate_family_count",
+    "repair_attempts",
+    "compiler_invocations",
+    "direct_dependency_delta",
+    "public_api_surface_delta",
+    "explicit_state_type_delta",
+    "iterations_to_selection",
+    "security_authority_regressions",
+    "reframe_abandonment",
+    "qualitative_notes"
+  ],
+  "adversarial_cases": [
+    {"id":"preferred-but-tests-fail","studio":"SelectedForSpecification","verification":"Fail","expected":"FailedCandidate"},
+    {"id":"current-flow-preferred","expected":"PreserveCurrentFlowWin"},
+    {"id":"cosmetic-variants","candidate_count":5,"material_family_count":1,"expected":"NoDiversityInflation"},
+    {"id":"subtraction-breaks-invariant","expected":"RejectSubtraction"},
+    {"id":"unnecessary-new-dependency","expected":"TradeoffExplicitNotAutomaticReject"},
+    {"id":"unsafe-convenience-preferred","expected":"OrdinarySafetyAuthorityGateStillApplies"},
+    {"id":"model-self-rates-highly","expected":"NoExternalPreferenceEvidence"},
+    {"id":"preference-changes-after-tests","expected":"PreserveBlindAndUnblindedPhasesSeparately"},
+    {"id":"request-reframed-as-unnecessary","expected":"ValidCreativeOutcomeNotAutomaticFailure"},
+    {"id":"rejected-idea-memory-promotion","expected":"RequiresExistingExperiencePromotionEvidence"},
+    {"id":"material-intent-reframe","expected":"NewIntentLineage"},
+    {"id":"studio-disabled","expected":"ExistingCodingAgentPathUnchanged"}
+  ],
+  "nonclaims": [
+    "objective creativity",
+    "objective elegance",
+    "universal developer preference",
+    "code correctness",
+    "production readiness",
+    "security",
+    "effect authority",
+    "qualification"
+  ]
+}
