@@ -42,16 +42,21 @@ jobs:
       - name: Checkout exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Set up pinned Python security release
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.15"
+
       - name: Install pinned verification dependencies
         run: |
-          python3 -m pip install --disable-pip-version-check \
+          python -m pip install --disable-pip-version-check \
             "jsonschema==4.26.0" \
             "cryptography==50.0.2" \
             "rfc8785==0.1.4"
 
       - name: Validate schema and public example
         run: |
-          python3 - <<'PY'
+          python - <<'PY'
           import json
           from pathlib import Path
           from jsonschema import Draft202012Validator
@@ -68,10 +73,10 @@ jobs:
           PY
 
       - name: Verify canonical evidence and receipt bindings
-        run: python3 scripts/validate_cyber_crucible_diagnostic_loop.py
+        run: python scripts/validate_cyber_crucible_diagnostic_loop.py
 
       - name: Exercise fail-closed regressions
-        run: python3 -m unittest discover -s tests -p "test_cyber_crucible_diagnostic_loop.py" -v
+        run: python -m unittest discover -s tests -p "test_cyber_crucible_diagnostic_loop.py" -v
 
       - name: Meta-validate signed receipt schema when present
         run: |
@@ -84,7 +89,7 @@ jobs:
       - name: Exercise signed-receipt trust-boundary regressions when present
         run: |
           if [ -f tests/test_cyber_crucible_signed_receipt.py ]; then
-            python3 -m unittest discover -s tests -p "test_cyber_crucible_signed_receipt.py" -v
+            python -m unittest discover -s tests -p "test_cyber_crucible_signed_receipt.py" -v
           else
             echo "Signed receipt tests are not in this revision; stacked child PR owns them."
           fi
