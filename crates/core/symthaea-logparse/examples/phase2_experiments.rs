@@ -22,7 +22,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use symthaea_logparse::encoder::{Hdv, encode, encode_domain_invariant};
-use symthaea_logparse::probe::{LogisticProbe, TrainConfig};
+use symthaea_logparse::probe::{classification_report, ClassificationReport, LogisticProbe, TrainConfig};
 use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -122,27 +122,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  OOD test accuracy: {ood_test_acc:.3}");
     println!("  (reference: same-distribution test was {test_acc:.3})");
 
-    // Per-class OOD breakdown
-    println!("\n=== Per-class OOD breakdown ===");
-    let preds = scale_up_probe.predict_batch(&otrf_hvs);
-    let class_names = &scale_up_probe.class_names;
-    let name_idx: HashMap<&str, usize> = class_names
-        .iter()
-        .enumerate()
-        .map(|(i, c)| (c.as_str(), i))
-        .collect();
-    let mut per_class: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
-    for (lbl, &pred) in otrf_labels.iter().zip(preds.iter()) {
-        let entry = per_class.entry(lbl.as_str()).or_insert((0, 0));
-        entry.1 += 1;
-        if name_idx.get(lbl.as_str()) == Some(&pred) {
-            entry.0 += 1;
-        }
-    }
-    for (k, (c, t)) in per_class {
-        let a = if t > 0 { c as f32 / t as f32 } else { f32::NAN };
-        println!("  {k:<22} {c:>4}/{t:<4}  ({a:.2})");
-    }
+    // Cross-corpus evaluation includes class-level precision/recall/F1 and
+    // a confusion matrix. OTRF is not a benign baseline, so this is not an
+    // operational benign false-positive rate.
+    println!("\n=== Raw-encoder OOD classification report ===");
+    let raw_ood_predictions = scale_up_probe.predict_batch(&otrf_hvs);
+    let raw_ood_report =
+        classification_report(&otrf_labels, &raw_ood_predictions, &scale_up_probe.class_names)?;
+    print_classification_report("raw encoder OOD", &raw_ood_report);
 
     // ----------------------------------------------------------------
     // Summary
@@ -167,68 +154,63 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
         let di_probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
         let di_in_distribution = di_probe.accuracy(&te_hv, &te_y);
-        let di_ood = di_probe.accuracy(&otrf_di_hvs, &otrf_labels);
-        let di_macro_ood = macro_accuracy(&di_probe, &otrf_di_hvs, &otrf_labels);
-        let raw_macro_ood = macro_accuracy(&scale_up_probe, &otrf_hvs, &otrf_labels);
+        let di_ood_predictions = di_probe.predict_batch(&otrf_di_hvs);
+        let di_ood_report =
+            classification_report(&otrf_labels, &di_ood_predictions, &di_probe.class_names)?;
 
         println!("  baseline raw in-distribution accuracy: {test_acc:.3}");
         println!("  ablation in-distribution accuracy:      {di_in_distribution:.3}");
         println!("  baseline raw OOD accuracy:              {ood_test_acc:.3}");
-        println!("  ablation OOD accuracy:                  {di_ood:.3}");
-        println!("  baseline raw OOD macro recall:          {raw_macro_ood:.3}");
-        println!("  ablation OOD macro recall:              {di_macro_ood:.3}");
-        print_per_class_recall("domain-invariant OOD", &di_probe, &otrf_di_hvs, &otrf_labels);
+        println!("  ablation OOD accuracy:                  {:.3}", di_ood_report.accuracy);
+        println!("  baseline raw OOD macro recall:          {:.3}", raw_ood_report.macro_recall);
+        println!("  ablation OOD macro recall:              {:.3}", di_ood_report.macro_recall);
+        println!("  baseline raw OOD macro F1:              {:.3}", raw_ood_report.macro_f1);
+        println!("  ablation OOD macro F1:                  {:.3}", di_ood_report.macro_f1);
+        print_classification_report("domain-invariant OOD", &di_ood_report);
         println!(
-            "  Compare both accuracy and macro recall; neither alone proves detection quality."
+            "  Class-level FPs measure confusion among these labels, not benign operational false positives."
         );
     }
 
     Ok(())
 }
 
-fn print_per_class_recall(
-    name: &str,
-    probe: &LogisticProbe,
-    hvs: &[Hdv],
-    labels: &[String],
-) {
-    let predictions = probe.predict_batch(hvs);
-    let mut per_class: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
-    for (label, prediction) in labels.iter().zip(predictions.iter()) {
-        let entry = per_class.entry(label.as_str()).or_insert((0, 0));
-        entry.1 += 1;
-        if probe.class_names.get(*prediction).map(String::as_str) == Some(label.as_str()) {
-            entry.0 += 1;
-        }
+fn print_classification_report(name: &str, report: &ClassificationReport) {
+    println!(
+        "  {name}: n={}, accuracy={:.3}, macro precision={:.3}, macro recall={:.3}, macro F1={:.3}",
+        report.samples,
+        report.accuracy,
+        report.macro_precision,
+        report.macro_recall,
+        report.macro_f1
+    );
+    println!("  {:<22} {:>5} {:>5} {:>5} {:>9} {:>9} {:>9}",
+        "class", "TP", "FP", "FN", "precision", "recall", "F1");
+    for (class, metrics) in &report.per_class {
+        println!(
+            "  {class:<22} {:>5} {:>5} {:>5} {:>9.3} {:>9.3} {:>9.3}",
+            metrics.true_positive,
+            metrics.false_positive,
+            metrics.false_negative,
+            metrics.precision,
+            metrics.recall,
+            metrics.f1
+        );
     }
-    println!("  {name} per-class recall:");
-    for (label, (correct, total)) in per_class {
-        let recall = if total == 0 { f32::NAN } else { correct as f32 / total as f32 };
-        println!("    {label:<22} {correct:>4}/{total:<4} ({recall:.3})");
-    }
-}
 
-fn macro_accuracy(probe: &LogisticProbe, hvs: &[Hdv], labels: &[String]) -> f32 {
-    if hvs.is_empty() || hvs.len() != labels.len() {
-        return f32::NAN;
+    println!("  Confusion matrix (rows=actual, columns=predicted):");
+    print!("  {:<22}", "actual");
+    for class in report.confusion_matrix.keys() {
+        print!(" {:>7}", class);
     }
-    let predictions = probe.predict_batch(hvs);
-    let mut per_class: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
-    for (label, prediction) in labels.iter().zip(predictions.iter()) {
-        let entry = per_class.entry(label.as_str()).or_insert((0, 0));
-        entry.1 += 1;
-        if probe.class_names.get(*prediction).map(String::as_str) == Some(label.as_str()) {
-            entry.0 += 1;
+    println!();
+    for (actual, row) in &report.confusion_matrix {
+        print!("  {actual:<22}");
+        for predicted in report.confusion_matrix.keys() {
+            print!(" {:>7}", row[predicted]);
         }
+        println!();
     }
-    if per_class.is_empty() {
-        return f32::NAN;
-    }
-    per_class
-        .values()
-        .map(|(correct, total)| *correct as f32 / *total as f32)
-        .sum::<f32>()
-        / per_class.len() as f32
 }
 
 fn print_distribution(name: &str, labels: &[String]) {
