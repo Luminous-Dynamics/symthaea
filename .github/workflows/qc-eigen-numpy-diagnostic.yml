@@ -2,6 +2,7 @@ name: QC Eigen NumPy Diagnostic
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-quantum-chemistry/src/scf/generalized_eigen.rs"
       - "crates/domains/symthaea-quantum-chemistry/examples/qc_eigen_reference_fixtures.rs"
@@ -21,6 +22,7 @@ concurrency:
 jobs:
   independent-eigen-reference:
     name: Compare native checked Jacobi against NumPy
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
