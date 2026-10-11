@@ -88,12 +88,14 @@ Research links:
 
 ## Execution sequence
 
-1. Resolve source/documentation drift and the legacy worker sample-rate contract.
-2. Add focused tests for the authoritative rate, malformed/empty worker output, and documentation paths; test fail-closed behavior without downloading model weights.
-3. When the actual pinned assets and runtime are available, run the smallest real renderer smoke test and save the exact prerequisite inventory, logs, observed rate, and output digest.
-4. Run the existing frozen 60-case corpus against viable in-tree backends; preserve each WAV, manifest, objective metrics, and concealed listening pack.
-5. Compare independent musical metrics and human ratings; only then select a dominant failure mode and make a targeted runtime change.
-6. Add an external backend adapter only after the capability mapping, licensing, language coverage, model pinning, and host resource budget are recorded.
+1. Keep the production guide synchronized with the in-tree release harness and the exact source HEAD; the guide was updated in this PR.
+2. The performance contract now rejects non-finite pitch-curve values, malformed melisma timing/velocity, invalid phoneme durations, out-of-range expression controls, overflowing note endpoints, and syllables mapped outside their declared phrase; regression tests were added for representative malformed inputs. These tests are authored but not yet executed.
+3. Align the DiffSinger smoke assertion with the worker's declared 44.1 kHz interface, but verify the actual pinned voicebank/vocoder native rate before promoting the path. Interface alignment is not native-rate evidence.
+4. Add focused tests for malformed/empty worker output, protocol identity mismatches, and documentation path consistency; test fail-closed behavior without downloading model weights.
+5. When pinned assets and runtime are available, run the smallest real renderer smoke test and save the prerequisite inventory, logs, observed decoded rate, and output digest.
+6. Run the existing frozen 60-case corpus against viable in-tree backends; preserve each WAV, manifest, objective metrics, and concealed listening pack.
+7. Compare independent musical metrics and human ratings; only then select a dominant failure mode and make a targeted runtime change.
+8. Add an external backend adapter only after capability mapping, licensing, language coverage, model pinning, and host resource budget are recorded.
 
 ## Promotion rule
 
