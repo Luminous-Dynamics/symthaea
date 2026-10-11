@@ -467,7 +467,13 @@ impl EffectEstimate {
         }
     }
 
-    /// Construct an effect estimate suitable for durable/authority use.
+    /// Construct an effect estimate with numerically validated fields.
+    ///
+    /// This does not prove that any seeds were actually executed or that
+    /// `seed_count` matches the run's seed lineage. Before authority use, the
+    /// caller must bind this estimate to the exact intervention/run receipt and
+    /// derive or verify the count from its exact seed identities. A zero count
+    /// is preserved for diagnostics and is not positive evidence.
     pub fn try_new(
         baseline_mean: f64,
         intervention_mean: f64,
