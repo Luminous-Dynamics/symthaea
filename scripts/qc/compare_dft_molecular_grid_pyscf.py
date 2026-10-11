@@ -163,7 +163,9 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
         "total_energy_hartree": expected_total_energy,
         "nuclear_repulsion_hartree": float(mean_field.energy_nuc()),
         "scf_converged": bool(mean_field.converged),
-        "scf_iterations": int(mean_field.cycles),
+        "scf_iterations": (
+            int(mean_field.cycles) if getattr(mean_field, "cycles", None) is not None else None
+        ),
         "n_grid_points": int(mean_field.grids.weights.size),
         "integrated_electron_count": integrated_electron_count,
         "integrated_electron_count_abs_error": abs(integrated_electron_count - expected_electrons),
@@ -177,7 +179,12 @@ def compare_one(native_record: dict[str, Any], reference: dict[str, Any], energy
     energy_error = None if native_energy is None else abs(native_energy - reference_energy)
     native_count_raw = native_record.get("integrated_electron_count")
     native_count = None if native_count_raw is None else require_finite("native integrated electron count", native_count_raw)
-    expected_count = int(native_record["expected_electron_count"])
+    expected_count = int(
+        native_record.get(
+            "expected_electron_count",
+            native_record.get("geometry", {}).get("electron_count"),
+        )
+    )
     reference_count = float(reference["integrated_electron_count"])
     native_count_error_raw = native_record.get("integrated_electron_count_abs_error")
     native_count_error = (
@@ -220,6 +227,13 @@ def compare_one(native_record: dict[str, Any], reference: dict[str, Any], energy
         ),
         "native_grid_points": native_record.get("n_grid_points"),
         "pyscf_grid_points": reference.get("n_grid_points"),
+        "grid_point_count_matches": (
+            native_record.get("n_grid_points") == reference.get("n_grid_points")
+        ),
+        "grid_point_count_note": (
+            "Count equality is diagnostic only: Symthaea omits weights with "
+            "absolute value <= 1e-20, while a reference generator may retain zero-weight points."
+        ),
         "pass": passed,
     }
 
