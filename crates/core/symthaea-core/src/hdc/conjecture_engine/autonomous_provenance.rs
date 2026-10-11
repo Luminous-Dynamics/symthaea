@@ -955,6 +955,8 @@ fn holdout_record_is_consistent(
             && holdout.failure.is_none()
             && holdout.requested_trajectories > 0
             && holdout.trajectories_checked == holdout.requested_trajectories
+            && holdout.max_lie_derivative_variance < f64::MAX
+            && holdout.median_lie_derivative_variance <= holdout.max_lie_derivative_variance
             && holdout.max_lie_derivative_variance <= holdout.threshold
             && holdout.min_gradient_informativeness_fraction
                 >= MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION;
@@ -963,20 +965,43 @@ fn holdout_record_is_consistent(
         Some(AutonomousHoldoutFailure::IdenticalSeeds) => {
             holdout.discovery_seed == holdout.holdout_seed
                 && holdout.trajectories_checked == 0
+                && holdout.max_lie_derivative_variance == f64::MAX
+                && holdout.median_lie_derivative_variance == f64::MAX
+                && holdout.min_gradient_informativeness_fraction == 0.0
         }
         Some(AutonomousHoldoutFailure::ZeroTrajectories) => {
-            holdout.requested_trajectories == 0 && holdout.trajectories_checked == 0
+            holdout.requested_trajectories == 0
+                && holdout.trajectories_checked == 0
+                && holdout.max_lie_derivative_variance == f64::MAX
+                && holdout.median_lie_derivative_variance == f64::MAX
+                && holdout.min_gradient_informativeness_fraction == 0.0
         }
-        Some(AutonomousHoldoutFailure::TrajectoryLimitExceeded) => budget_exceeded,
+        Some(AutonomousHoldoutFailure::TrajectoryLimitExceeded) => {
+            budget_exceeded
+                && holdout.trajectories_checked == 0
+                && holdout.max_lie_derivative_variance == f64::MAX
+                && holdout.median_lie_derivative_variance == f64::MAX
+                && holdout.min_gradient_informativeness_fraction == 0.0
+        }
         Some(AutonomousHoldoutFailure::IncompleteCoverage) => {
             !budget_exceeded
                 && holdout.requested_trajectories > 0
                 && holdout.trajectories_checked < holdout.requested_trajectories
+                && holdout.median_lie_derivative_variance == f64::MAX
+                && if holdout.trajectories_checked == 0 {
+                    holdout.max_lie_derivative_variance == f64::MAX
+                        && holdout.min_gradient_informativeness_fraction == 0.0
+                } else {
+                    holdout.max_lie_derivative_variance < f64::MAX
+                }
         }
         Some(AutonomousHoldoutFailure::InsufficientGradientInformativeness) => {
             !budget_exceeded
                 && holdout.requested_trajectories > 0
                 && holdout.trajectories_checked == holdout.requested_trajectories
+                && holdout.max_lie_derivative_variance < f64::MAX
+                && holdout.median_lie_derivative_variance
+                    <= holdout.max_lie_derivative_variance
                 && holdout.min_gradient_informativeness_fraction
                     < MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION
         }
@@ -984,6 +1009,9 @@ fn holdout_record_is_consistent(
             !budget_exceeded
                 && holdout.requested_trajectories > 0
                 && holdout.trajectories_checked == holdout.requested_trajectories
+                && holdout.max_lie_derivative_variance < f64::MAX
+                && holdout.median_lie_derivative_variance
+                    <= holdout.max_lie_derivative_variance
                 && holdout.max_lie_derivative_variance > holdout.threshold
                 && holdout.min_gradient_informativeness_fraction
                     >= MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION
@@ -993,6 +1021,7 @@ fn holdout_record_is_consistent(
                 && holdout.trajectories_checked == 0
                 && holdout.max_lie_derivative_variance == f64::MAX
                 && holdout.median_lie_derivative_variance == f64::MAX
+                && holdout.min_gradient_informativeness_fraction == 0.0
         }
         None => false,
     }
@@ -1428,6 +1457,44 @@ mod tests {
         ).expect("well-formed receipt should be constructed");
         receipt.holdout_passed = false;
         receipt.holdout_failure = None;
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
+    fn verifier_rejects_resealed_identical_seed_receipt_with_fabricated_metrics() {
+        let config = RegressorConfig { seed: 404, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            &harmonic_system(),
+            &formula,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"],
+            &config,
+            4.0,
+            0.01,
+            3,
+            404,
+            1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            &config,
+            &[],
+            &candidate,
+            &["x", "y", "vx", "vy"],
+            &[1.0, 0.0, 0.0, 1.0],
+            4.0,
+            0.01,
+            &holdout,
+        ).expect("identical-seed failure should remain recordable");
+
+        receipt.max_lie_derivative_variance = 0.0;
+        receipt.median_lie_derivative_variance = 0.0;
+        receipt.min_gradient_informativeness_fraction = 1.0;
         receipt.receipt_blake3 = compute_receipt_digest(&receipt);
         assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
     }
