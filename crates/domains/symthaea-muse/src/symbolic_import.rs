@@ -524,6 +524,47 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
             "MusicXML import exceeds the {MAX_IMPORTED_NOTES}-note limit"
         ));
     }
+    // Score assigns one persistent PartId to each MusicXML <part>. Distinct
+    // voices or staves inside one part would therefore be flattened into one
+    // line and could fabricate line-motion/voice relationships.
+    for part in &parts {
+        let voices: BTreeSet<_> = part
+            .descendants()
+            .filter(|node| node.has_tag_name("voice"))
+            .filter_map(|node| node.text())
+            .map(str::trim)
+            .filter(|voice| !voice.is_empty())
+            .collect();
+        if voices.len() > 1 {
+            return Err(format!(
+                "MusicXML part {:?} contains multiple voices {voices:?}; separate the voices into individual parts before import",
+                part.attribute("id").unwrap_or("unknown")
+            ));
+        }
+
+        let staves: BTreeSet<_> = part
+            .descendants()
+            .filter(|node| node.has_tag_name("staff"))
+            .filter_map(|node| node.text())
+            .map(str::trim)
+            .filter(|staff| !staff.is_empty())
+            .collect();
+        if staves.len() > 1 {
+            return Err(format!(
+                "MusicXML part {:?} contains multiple staves {staves:?}; split staves into individual parts before import",
+                part.attribute("id").unwrap_or("unknown")
+            ));
+        }
+    }
+    if document
+        .descendants()
+        .any(|node| node.has_tag_name("lyric"))
+    {
+        return Err(
+            "MusicXML lyrics are not represented by Score; refusing to discard sung text during symbolic import"
+                .into(),
+        );
+    }
     // Collect metadata before reducing it to Score's single-value fields.
     // Part traversal order is not musical order across the whole score.
     let mut key_events = Vec::<(Duration, (i32, bool))>::new();
@@ -1816,6 +1857,52 @@ mod tests {
             error.contains("<midi-instrument> routing/program metadata"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn musicxml_multiple_voices_in_one_part_are_rejected_instead_of_merged() {
+        let xml = String::from_utf8(minimal_musicxml().to_vec())
+            .unwrap()
+            .replace(
+                "<note><pitch>",
+                "<note><voice>1</voice><pitch>",
+            )
+            .replacen(
+                "<voice>1</voice><pitch>",
+                "<voice>2</voice><pitch>",
+                1,
+            );
+        let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+        assert!(error.contains("contains multiple voices"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_multiple_staves_in_one_part_are_rejected_instead_of_merged() {
+        let xml = String::from_utf8(minimal_musicxml().to_vec())
+            .unwrap()
+            .replace(
+                "</pitch><duration>1</duration>",
+                "</pitch><duration>1</duration><staff>1</staff>",
+            )
+            .replacen(
+                "<staff>1</staff>",
+                "<staff>2</staff>",
+                1,
+            );
+        let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+        assert!(error.contains("contains multiple staves"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_lyrics_are_rejected_until_score_preserves_sung_text() {
+        let xml = String::from_utf8(minimal_musicxml().to_vec())
+            .unwrap()
+            .replace(
+                "</note>",
+                "<lyric><syllabic>single</syllabic><text>Hello</text></lyric></note>",
+            );
+        let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+        assert!(error.contains("lyrics are not represented by Score"), "{error}");
     }
 
     #[test]
