@@ -1,0 +1,386 @@
+name: MATH-BUILD-001 Lock Qualification
+
+on:
+  push:
+    branches:
+      - qualify/math-build-001-lock-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: math-build-001-lock-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_SUBJECT_SHA: e343919b10d760f8b1be4222ee4a67cb43029592
+
+jobs:
+  generate-and-compare-lock:
+    name: Reconcile lock and qualify math-research crate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify qualification-only overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${SOURCE_SUBJECT_SHA}^{commit}"
+          test "$(git merge-base "${SOURCE_SUBJECT_SHA}" "${GITHUB_SHA}")" = "${SOURCE_SUBJECT_SHA}"
+
+          mapfile -t overlay_files < <(
+            git diff --name-only "${SOURCE_SUBJECT_SHA}" "${GITHUB_SHA}"
+          )
+          printf '%s\n' "${overlay_files[@]}"
+          test "${#overlay_files[@]}" -eq 1
+          test "${overlay_files[0]}" = ".github/workflows/math-lock-qualification.yml"
+
+          git diff --exit-code \
+            "${SOURCE_SUBJECT_SHA}" "${GITHUB_SHA}" \
+            -- . ':(exclude).github/workflows/math-lock-qualification.yml'
+
+      - name: Install pinned Rust toolchain action
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+
+      - name: Install pinned Nix action
+        uses: cachix/install-nix-action@7ac1ec25491415c381d9b62f0657c7a028df52a7 # v24
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Record frozen inputs and executor identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p math-lock-evidence
+
+          printf '%s\n' "${SOURCE_SUBJECT_SHA}" \
+            | tee math-lock-evidence/source-subject-sha.txt
+          git rev-parse "${SOURCE_SUBJECT_SHA}^{tree}" \
+            | tee math-lock-evidence/source-subject-tree-sha.txt
+          git rev-parse HEAD \
+            | tee math-lock-evidence/qualification-head-sha.txt
+          git rev-list --reverse "${SOURCE_SUBJECT_SHA}..HEAD" \
+            | tee math-lock-evidence/qualification-overlay-commits.txt
+          git diff --name-only "${SOURCE_SUBJECT_SHA}" HEAD \
+            | tee math-lock-evidence/qualification-overlay-files.txt
+
+          sha256sum \
+            Cargo.lock \
+            rust-toolchain.toml \
+            flake.nix \
+            flake.lock \
+            .github/workflows/math-lock-qualification.yml \
+            | tee math-lock-evidence/input-sha256.txt
+
+          find crates/core/symthaea-math-research -type f -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            | tee math-lock-evidence/math-research-source-sha256.txt
+
+          cat > math-lock-evidence/action-pins.txt <<'EOF'
+          actions/checkout 11d5960a326750d5838078e36cf38b85af677262
+          dtolnay/rust-toolchain ebb3d1676050bfd0971c36c1e215b5751473994d
+          cachix/install-nix-action 7ac1ec25491415c381d9b62f0657c7a028df52a7
+          actions/upload-artifact ea165f8d65b6e75b540449e92b4886f43607fa02
+          EOF
+
+          rustc --version --verbose | tee math-lock-evidence/rustc-version.txt
+          cargo --version --verbose | tee math-lock-evidence/cargo-version.txt
+          nix --version | tee math-lock-evidence/nix-version.txt
+          uname -a | tee math-lock-evidence/uname.txt
+          cat /etc/os-release | tee math-lock-evidence/os-release.txt
+          getconf GNU_LIBC_VERSION | tee math-lock-evidence/libc-version.txt
+
+          nix flake metadata --no-write-lock-file --json \
+            > math-lock-evidence/flake-metadata.json
+          cp Cargo.lock math-lock-evidence/Cargo.lock.before
+
+      - name: Minimally reconcile with pinned Rust 1.96.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 \
+            > math-lock-evidence/metadata.rustup.unlocked.json
+          cargo metadata --format-version 1 --locked \
+            > math-lock-evidence/metadata.rustup.locked.json
+
+          cp Cargo.lock math-lock-evidence/Cargo.lock.rustup
+          git diff -- Cargo.lock \
+            > math-lock-evidence/Cargo.lock.rustup.patch
+          sha256sum Cargo.lock \
+            | tee math-lock-evidence/Cargo.lock.rustup.sha256
+
+          cargo fetch --locked 2>&1 \
+            | tee math-lock-evidence/rustup-fetch.log
+
+      - name: Reconcile independently inside Nix dev shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -- Cargo.lock
+
+          nix develop --command bash -lc '
+            set -euo pipefail
+            rustc --version --verbose > math-lock-evidence/rustc-version.nix.txt
+            cargo --version --verbose > math-lock-evidence/cargo-version.nix.txt
+            cargo metadata --format-version 1 \
+              > math-lock-evidence/metadata.nix.unlocked.json
+            cargo metadata --format-version 1 --locked \
+              > math-lock-evidence/metadata.nix.locked.json
+            cargo fetch --locked 2>&1 \
+              | tee math-lock-evidence/nix-fetch.log
+          '
+
+          cp Cargo.lock math-lock-evidence/Cargo.lock.nix
+          git diff -- Cargo.lock \
+            > math-lock-evidence/Cargo.lock.nix.patch
+          sha256sum Cargo.lock \
+            | tee math-lock-evidence/Cargo.lock.nix.sha256
+
+      - name: Require deterministic minimal lock delta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cmp \
+            math-lock-evidence/Cargo.lock.rustup \
+            math-lock-evidence/Cargo.lock.nix
+
+          grep -Fx 'release: 1.96.0' math-lock-evidence/rustc-version.txt
+          grep -Fx 'release: 1.96.0' math-lock-evidence/rustc-version.nix.txt
+          grep -E '^cargo 1\.96\.0 ' math-lock-evidence/cargo-version.txt
+          grep -E '^cargo 1\.96\.0 ' math-lock-evidence/cargo-version.nix.txt
+
+          python3 - <<'PY'
+          import json
+          import tomllib
+          from pathlib import Path
+
+          evidence = Path("math-lock-evidence")
+          before = tomllib.loads((evidence / "Cargo.lock.before").read_text())
+          after = tomllib.loads((evidence / "Cargo.lock.nix").read_text())
+
+          def keyed(lock):
+              out = {}
+              for pkg in lock.get("package", []):
+                  key = (pkg["name"], pkg["version"], pkg.get("source", ""))
+                  if key in out:
+                      raise SystemExit(f"duplicate lock package identity: {key}")
+                  out[key] = pkg
+              return out
+
+          old = keyed(before)
+          new = keyed(after)
+          removed = sorted(set(old) - set(new))
+          added = sorted(set(new) - set(old))
+          changed = sorted(
+              key for key in set(old) & set(new)
+              if old[key] != new[key]
+          )
+
+          expected_key = ("symthaea-math-research", "0.1.0", "")
+          if removed:
+              raise SystemExit(f"unexpected removed packages: {removed}")
+          if changed:
+              raise SystemExit(
+                  f"unexpected mutations to existing lock packages: {changed}"
+              )
+          if added != [expected_key]:
+              raise SystemExit(
+                  f"expected only {expected_key} to be added, got: {added}"
+              )
+
+          added_pkg = new[expected_key]
+          dep_names = {
+              dep.split()[0]
+              for dep in added_pkg.get("dependencies", [])
+          }
+          expected_deps = {"serde", "serde_json", "sha2"}
+          if dep_names != expected_deps:
+              raise SystemExit(
+                  f"unexpected {expected_key[0]} lock dependencies: "
+                  f"expected={sorted(expected_deps)} "
+                  f"found={sorted(dep_names)}"
+              )
+
+          def text(value):
+              return "" if value is None else str(value)
+
+          def canonical_metadata(path):
+              data = json.loads(path.read_text())
+              packages = {
+                  pkg["id"]: (
+                      pkg["name"],
+                      pkg["version"],
+                      text(pkg.get("source")),
+                      tuple(sorted(
+                          (
+                              dep["name"],
+                              dep["req"],
+                              text(dep.get("kind")),
+                              text(dep.get("rename")),
+                              text(dep.get("target")),
+                              bool(dep.get("optional")),
+                              tuple(sorted(dep.get("features", []))),
+                          )
+                          for dep in pkg.get("dependencies", [])
+                      )),
+                  )
+                  for pkg in data["packages"]
+              }
+
+              resolved = []
+              resolve = data.get("resolve") or {}
+              for node in resolve.get("nodes", []):
+                  subject = packages[node["id"]][:3]
+                  deps = []
+                  for dep in node.get("deps", []):
+                      target = packages[dep["pkg"]][:3]
+                      dep_kinds = tuple(sorted(
+                          (
+                              text(kind.get("kind")),
+                              text(kind.get("target")),
+                          )
+                          for kind in dep.get("dep_kinds", [])
+                      ))
+                      deps.append((dep["name"], target, dep_kinds))
+                  resolved.append((subject, tuple(sorted(deps))))
+
+              workspace = tuple(sorted(
+                  packages[member][:3]
+                  for member in data["workspace_members"]
+              ))
+              return {
+                  "packages": tuple(sorted(packages.values())),
+                  "resolve": tuple(sorted(resolved)),
+                  "workspace_members": workspace,
+              }
+
+          rustup_graph = canonical_metadata(
+              evidence / "metadata.rustup.locked.json"
+          )
+          nix_graph = canonical_metadata(
+              evidence / "metadata.nix.locked.json"
+          )
+          if rustup_graph != nix_graph:
+              raise SystemExit(
+                  "Rust and Nix locked metadata dependency graphs differ"
+              )
+
+          (evidence / "canonical-metadata-graph.json").write_text(
+              json.dumps(rustup_graph, sort_keys=True, indent=2) + "\n"
+          )
+
+          metadata = json.loads(
+              (evidence / "metadata.nix.locked.json").read_text()
+          )
+          packages_by_name = {pkg["name"]: pkg for pkg in metadata["packages"]}
+          required = expected_key[0]
+          if required not in packages_by_name:
+              raise SystemExit(
+                  f"missing workspace package in metadata: {required}"
+              )
+          metadata_deps = {
+              dep["name"]
+              for dep in packages_by_name[required]["dependencies"]
+          }
+          if not expected_deps.issubset(metadata_deps):
+              raise SystemExit(
+                  f"{required} metadata missing dependencies: "
+                  f"{sorted(expected_deps - metadata_deps)}"
+              )
+
+          (evidence / "lock-delta-summary.txt").write_text(
+              "removed=[]\n"
+              "changed=[]\n"
+              f"added={added!r}\n"
+              f"added_dependencies={sorted(dep_names)!r}\n"
+              "cross_environment_lock=byte-identical\n"
+              "cross_environment_metadata=canonical-graph-identical\n"
+          )
+
+          print("minimal lock delta: PASS")
+          print(f"added package: {expected_key}")
+          print("dependencies:", ",".join(sorted(dep_names)))
+          print("cross-environment metadata graph: PASS")
+          PY
+
+          git diff --name-only \
+            | tee math-lock-evidence/generated-diff-files.txt
+          test "$(cat math-lock-evidence/generated-diff-files.txt)" = "Cargo.lock"
+
+      - name: Qualify exact crate bytes with pinned Rust offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+
+          cargo fmt --check -p symthaea-math-research 2>&1 \
+            | tee math-lock-evidence/rustup-fmt.log
+          cargo test \
+            -p symthaea-math-research \
+            --locked \
+            --offline \
+            2>&1 | tee math-lock-evidence/rustup-test.log
+          cargo clippy \
+            -p symthaea-math-research \
+            --all-targets \
+            --locked \
+            --offline \
+            -- -D warnings \
+            2>&1 | tee math-lock-evidence/rustup-clippy.log
+
+      - name: Independently qualify exact crate bytes inside Nix offline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          nix develop --command bash -lc '
+            set -euo pipefail
+            set -o pipefail
+
+            cargo fmt --check -p symthaea-math-research 2>&1 \
+              | tee math-lock-evidence/nix-fmt.log
+            cargo test \
+              -p symthaea-math-research \
+              --locked \
+              --offline \
+              2>&1 | tee math-lock-evidence/nix-test.log
+            cargo clippy \
+              -p symthaea-math-research \
+              --all-targets \
+              --locked \
+              --offline \
+              -- -D warnings \
+              2>&1 | tee math-lock-evidence/nix-clippy.log
+          '
+
+      - name: Seal evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d math-lock-evidence ]; then
+            find math-lock-evidence -type f ! -name SHA256SUMS -print0 \
+              | sort -z \
+              | xargs -0 sha256sum \
+              > math-lock-evidence/SHA256SUMS
+          fi
+
+      - name: Upload lock and crate qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: math-build-001-lock-${{ github.sha }}
+          path: math-lock-evidence/
+          if-no-files-found: error
+          retention-days: 30

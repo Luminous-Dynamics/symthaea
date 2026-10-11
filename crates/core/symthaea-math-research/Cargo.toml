@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-math-research"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Evidence-bearing mathematical research specifications and trusted challenge boundaries for Symthaea"
+
+[dependencies]
+serde = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
