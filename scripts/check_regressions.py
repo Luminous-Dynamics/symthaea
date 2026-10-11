@@ -13,11 +13,12 @@ Uses statistical tests to determine significance.
 
 import argparse
 import json
+import os
 import sys
+from math import isfinite
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
-from statistics import mean, stdev
 
 
 @dataclass
@@ -33,37 +34,65 @@ class RegressionResult:
     effect_size: Optional[float] = None
 
 
-def load_criterion_results(results_path: Path) -> dict:
-    """Load Criterion benchmark results from JSON files."""
-    results = {}
+def _read_estimate(estimate_file: Path) -> dict:
+    """Read and validate Criterion's point-estimate JSON."""
+    with open(estimate_file, encoding="utf-8") as f:
+        data = json.load(f)
 
-    # Find all benchmark estimate files
+    values = {
+        "mean": data.get("mean", {}).get("point_estimate"),
+        "std_dev": data.get("std_dev", {}).get("point_estimate"),
+        "median": data.get("median", {}).get("point_estimate"),
+    }
+    if any(value is None or not isfinite(value) for value in values.values()):
+        raise ValueError(f"Missing or non-finite Criterion estimate in {estimate_file}")
+    if values["mean"] <= 0 or values["median"] <= 0 or values["std_dev"] < 0:
+        raise ValueError(f"Non-positive/invalid Criterion estimate in {estimate_file}")
+    return values
+
+
+def _benchmark_key(estimate_file: Path, root: Path) -> str:
+    """Use the relative benchmark path to avoid collisions between equal leaf names."""
+    return estimate_file.parent.parent.relative_to(root).as_posix()
+
+
+def load_criterion_results(results_path: Path) -> dict:
+    """Load current Criterion results from the standard */new/estimates.json layout."""
+    results = {}
+    if not results_path.exists():
+        return results
+
     for estimate_file in results_path.rglob("*/new/estimates.json"):
-        bench_name = estimate_file.parent.parent.name
-        with open(estimate_file) as f:
-            data = json.load(f)
-            results[bench_name] = {
-                "mean": data.get("mean", {}).get("point_estimate", 0),
-                "std_dev": data.get("std_dev", {}).get("point_estimate", 0),
-                "median": data.get("median", {}).get("point_estimate", 0),
-            }
+        bench_name = _benchmark_key(estimate_file, results_path)
+        results[bench_name] = _read_estimate(estimate_file)
 
     return results
 
 
 def load_baseline(results_path: Path, baseline_name: str = "main") -> dict:
-    """Load baseline results for comparison."""
-    baseline_path = results_path / f"baseline-{baseline_name}"
-    if baseline_path.exists():
-        return load_criterion_results(baseline_path)
+    """Load a named Criterion baseline from each benchmark's standard layout."""
+    results = {}
+    if not results_path.exists():
+        return results
 
-    # Try alternate locations
-    for alt_path in [
+    # Criterion stores a named baseline beside "new", e.g.
+    # target/criterion/my_benchmark/main/estimates.json.
+    for estimate_file in results_path.rglob(f"*/{baseline_name}/estimates.json"):
+        bench_name = _benchmark_key(estimate_file, results_path)
+        results[bench_name] = _read_estimate(estimate_file)
+
+    # Keep support for the legacy exported baseline-directory layout.
+    if results:
+        return results
+    for alt_path in (
+        results_path / f"baseline-{baseline_name}",
         results_path / "baselines" / baseline_name,
         results_path.parent / ".benchmark-baselines" / baseline_name,
-    ]:
+    ):
         if alt_path.exists():
-            return load_criterion_results(alt_path)
+            results = load_criterion_results(alt_path)
+            if results:
+                return results
 
     return {}
 
@@ -245,7 +274,26 @@ def main():
         help="Output format"
     )
 
+    parser.add_argument(
+        "--require-baseline",
+        action="store_true",
+        help="Fail instead of silently skipping when no comparable baseline exists",
+    )
+
     args = parser.parse_args()
+
+    if args.require_baseline:
+        current_results = load_criterion_results(args.results)
+        baseline_results = load_baseline(args.results, args.baseline)
+        if not current_results:
+            parser.error(f"No current Criterion estimates found under {args.results}")
+        if not baseline_results:
+            parser.error(f"Required Criterion baseline '{args.baseline}' was not found under {args.results}")
+        if not (set(current_results) & set(baseline_results)):
+            parser.error(
+                f"No current benchmarks match Criterion baseline '{args.baseline}'; "
+                "refusing to report a clean comparison"
+            )
 
     regressions, has_critical = analyze_regressions(
         args.results,
@@ -300,8 +348,8 @@ def main():
                     print(f"  - {r.benchmark}: {r.change_percent:+.2f}%")
 
     # Set GitHub Actions output if running in CI
-    if "GITHUB_OUTPUT" in sys.environ:
-        with open(sys.environ["GITHUB_OUTPUT"], "a") as f:
+    if "GITHUB_OUTPUT" in os.environ:
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
             f.write(f"critical={str(has_critical).lower()}\n")
             f.write(f"regression_count={sum(1 for r in regressions if r.is_regression)}\n")
 
