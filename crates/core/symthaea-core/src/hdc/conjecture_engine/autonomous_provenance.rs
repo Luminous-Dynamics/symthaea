@@ -25,6 +25,9 @@ pub struct AutonomousHoldoutValidation {
     pub threshold: f64,
     pub passed: bool,
     pub failure: Option<AutonomousHoldoutFailure>,
+    /// Fingerprint of the exact candidate and numerical inputs assessed. This is
+    /// a context-binding digest, not an execution attestation or digital signature.
+    pub assessment_context_blake3: String,
 }
 
 const MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES: usize = 4096;
@@ -53,6 +56,7 @@ fn failed_holdout(
         threshold,
         passed: false,
         failure: Some(failure),
+        assessment_context_blake3: String::new(),
     }
 }
 
@@ -130,7 +134,7 @@ fn checked_rk4_trajectory(
 /// a second seed argument. Identical seeds, invalid inputs, insufficient coverage,
 /// or invalid scores fail closed. A pass denotes numerical holdout generalization
 /// only; it is not symbolic or formal proof.
-pub fn validate_invariant_holdout(
+fn validate_invariant_holdout_inner(
     rhs: fn(&[f64], f64) -> Vec<f64>,
     candidate: &Expr,
     initial_state: &[f64],
@@ -304,7 +308,36 @@ pub fn validate_invariant_holdout(
         } else {
             Some(AutonomousHoldoutFailure::ThresholdExceeded)
         },
+        assessment_context_blake3: String::new(),
     }
+}
+
+/// Validate a candidate on holdout trajectories and bind its exact numerical
+/// evaluation context. The digest prevents a receipt builder from accidentally
+/// reusing the metrics with a different formula, variable list, initial state,
+/// integration horizon, step size, seed, trajectory count, or threshold.
+pub fn validate_invariant_holdout(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    candidate: &Expr,
+    initial_state: &[f64],
+    var_names: &[&str],
+    search_config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+    holdout_trajectories: usize,
+    holdout_seed: u64,
+    threshold: f64,
+) -> AutonomousHoldoutValidation {
+    let mut result = validate_invariant_holdout_inner(
+        rhs, candidate, initial_state, var_names, search_config, t_max, dt,
+        holdout_trajectories, holdout_seed, threshold,
+    );
+    let variable_names: Vec<String> = var_names.iter().map(|name| (*name).to_string()).collect();
+    result.assessment_context_blake3 = assessment_context_digest(
+        &format!("{}", candidate), &variable_names, initial_state, search_config.seed,
+        holdout_seed, t_max, dt, holdout_trajectories, threshold,
+    );
+    result
 }
 
 /// Receipt-construction failures. These are provenance contract violations, not
@@ -345,6 +378,33 @@ fn hash_usize(hasher: &mut blake3::Hasher, value: usize) {
 
 fn hash_f64(hasher: &mut blake3::Hasher, value: f64) {
     hash_u64(hasher, value.to_bits());
+}
+
+fn assessment_context_digest(
+    candidate_formula: &str,
+    variable_names: &[String],
+    initial_state: &[f64],
+    discovery_seed: u64,
+    holdout_seed: u64,
+    t_max: f64,
+    dt: f64,
+    requested_trajectories: usize,
+    threshold: f64,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hash_string(&mut hasher, "symthaea-autonomous-holdout-context-v1");
+    hash_string(&mut hasher, candidate_formula);
+    hash_usize(&mut hasher, variable_names.len());
+    for name in variable_names { hash_string(&mut hasher, name); }
+    hash_usize(&mut hasher, initial_state.len());
+    for value in initial_state { hash_f64(&mut hasher, *value); }
+    hash_u64(&mut hasher, discovery_seed);
+    hash_u64(&mut hasher, holdout_seed);
+    hash_f64(&mut hasher, t_max);
+    hash_f64(&mut hasher, dt);
+    hash_usize(&mut hasher, requested_trajectories);
+    hash_f64(&mut hasher, threshold);
+    hasher.finalize().to_hex().to_string()
 }
 
 fn sanitized_config(config: &RegressorConfig, mode: AutonomousDiscoveryMode) -> RegressorConfig {
@@ -511,6 +571,7 @@ pub struct AutonomousDiscoveryReceiptV1 {
     pub search_config_blake3: String,
     pub candidate_formula: String,
     pub candidate_blake3: String,
+    pub assessment_context_blake3: String,
     pub variable_names: Vec<String>,
     pub initial_state: Vec<f64>,
     pub t_max: f64,
@@ -611,6 +672,15 @@ pub fn build_autonomous_discovery_receipt_v1(
     }
 
     let formula = candidate.formula_str.clone();
+    let receipt_variable_names: Vec<String> =
+        var_names.iter().map(|name| (*name).to_string()).collect();
+    let expected_assessment_context = assessment_context_digest(
+        &formula, &receipt_variable_names, initial_state, config.seed, holdout.holdout_seed,
+        t_max, dt, holdout.requested_trajectories, holdout.threshold,
+    );
+    if holdout.assessment_context_blake3 != expected_assessment_context {
+        return Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord);
+    }
     let candidate_blake3 = blake3::hash(formula.as_bytes()).to_hex().to_string();
     let mut receipt = AutonomousDiscoveryReceiptV1 {
         schema_version: 1,
@@ -624,7 +694,8 @@ pub fn build_autonomous_discovery_receipt_v1(
         search_config,
         candidate_formula: formula,
         candidate_blake3,
-        variable_names: var_names.iter().map(|name| (*name).to_string()).collect(),
+        assessment_context_blake3: holdout.assessment_context_blake3.clone(),
+        variable_names: receipt_variable_names,
         initial_state: initial_state.to_vec(),
         t_max,
         dt,
@@ -660,6 +731,7 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         threshold: receipt.threshold,
         passed: receipt.holdout_passed,
         failure: receipt.holdout_failure,
+        assessment_context_blake3: receipt.assessment_context_blake3.clone(),
     };
     receipt.schema_version == 1
         && matches!(receipt.source_revision.len(), 40 | 64)
@@ -700,6 +772,11 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         )
         && blake3::hash(receipt.candidate_formula.as_bytes()).to_hex().to_string()
             == receipt.candidate_blake3
+        && receipt.assessment_context_blake3 == assessment_context_digest(
+            &receipt.candidate_formula, &receipt.variable_names, &receipt.initial_state,
+            receipt.discovery_seed, receipt.holdout_seed, receipt.t_max, receipt.dt,
+            receipt.requested_trajectories, receipt.threshold,
+        )
         && compute_receipt_digest(receipt) == receipt.receipt_blake3
 }
 
@@ -790,6 +867,7 @@ fn compute_receipt_digest(receipt: &AutonomousDiscoveryReceiptV1) -> String {
     hash_string(&mut hasher, &receipt.search_config_blake3);
     hash_string(&mut hasher, &receipt.candidate_formula);
     hash_string(&mut hasher, &receipt.candidate_blake3);
+    hash_string(&mut hasher, &receipt.assessment_context_blake3);
     hash_usize(&mut hasher, receipt.variable_names.len());
     for name in &receipt.variable_names {
         hash_string(&mut hasher, name);
@@ -1106,6 +1184,24 @@ mod tests {
         receipt.holdout_failure = None;
         receipt.receipt_blake3 = compute_receipt_digest(&receipt);
         assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
+    fn receipt_rejects_holdout_metrics_reused_with_different_initial_state() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
+        );
+        let result = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[2.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        );
+        assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::InvalidHoldoutRecord);
     }
 
     #[test]
