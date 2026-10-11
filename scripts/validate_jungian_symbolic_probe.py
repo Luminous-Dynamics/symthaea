@@ -358,7 +358,7 @@ def main() -> int:
     if args.results:
         try:
             results_data = load_json(args.results)
-        except (OSError, json.JSONDecodeError, ValidationError) as exc:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValidationError) as exc:
             print(f"FAIL: cannot load strict results JSON: {exc}", file=sys.stderr)
             return 2
         result_errors = validate_results(results_data, data, corpus_bytes)
