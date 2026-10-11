@@ -14,7 +14,7 @@
   "execution_note": "Validator suite (84 expected checks) and reference-checker suite (56 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow must verify the exact current hashes, repeat outputs byte-for-byte, and compare the blocked template report. The last executed counts apply only to the exact historical source blobs listed here.",
   "last_executed_reference_check": {
     "checker_git_blob_sha": "7adbaab223517494332711b480bdf37e0b216811",
-    "checker_sha256": "",
+    "checker_sha256": "3ab051fc31ba1b4673c07578cfd047a0ce43339a4f8bf37de86992e8588953dc",
     "checks_failed": 0,
     "checks_passed": 47,
     "verification_state": "passed_for_exact_prior_source_only"
