@@ -33,6 +33,10 @@ use std::sync::OnceLock;
 /// Hypervector dimensionality. Matches `symthaea-core` for direct comparison.
 pub const HDC_DIM: usize = 16_384;
 
+/// Stable identifier for the experimental cross-corpus encoding contract.
+/// Change this value when the namespace map, field canonicalization, or family semantics change.
+pub const DOMAIN_INVARIANT_ENCODER_VERSION: &str = "cyber-logparse-domain-invariant-v1";
+
 /// Bipolar hypervector: each element is -1 or +1, stored as i8 for cache.
 pub type Hdv = Vec<i8>;
 
@@ -333,7 +337,8 @@ pub fn encode_domain_invariant(event: &LogEvent) -> Hdv {
     parts.push(bind(
         role_event_id(),
         &hash_hv(&format!(
-            "EVENT_FAMILY::{}",
+            "{}::EVENT_FAMILY::{}",
+            DOMAIN_INVARIANT_ENCODER_VERSION,
             event_family(&event.provider, &event.component, event.event_id)
         )),
     ));
@@ -344,7 +349,11 @@ pub fn encode_domain_invariant(event: &LogEvent) -> Hdv {
             .iter()
             .map(|(key, value)| {
                 bind(
-                    &hash_hv(&format!("FIELD::{}", canonical_field_key(key))),
+                    &hash_hv(&format!(
+                        "{}::FIELD::{}",
+                        DOMAIN_INVARIANT_ENCODER_VERSION,
+                        canonical_field_key(key)
+                    )),
                     &hash_hv(value),
                 )
             })
