@@ -40,11 +40,14 @@ Reason codes are bounded, redacted classifications rather than free-form attacke
 ## CLI
 
 \`\`\`sh
-python scripts/verify_cyber_crucible_decision_receipt.py \\
-  --receipt decision-receipt.json \\
+python scripts/verify_cyber_crucible_report_decision.py \\
+  --report diagnostic-loop-report.json \\
+  --decision-receipt decision-receipt.json \\
   --trust-policy decision-trust-policy.json \\
   --expected-context trusted-expected-context.json \\
   --replay-db /var/lib/symthaea/cyber-crucible-decisions.sqlite3
+
+The integrated consumer validates the existing diagnostic-loop contract, verifies the report digest and stable run/scenario identity against the independent context, then verifies the signed decision receipt. The lower-level verifier CLI remains available when only a decision receipt needs to be authenticated.
 \`\`\`
 
 Do not place signing private keys in the subject workspace or source repository. The signing service should construct receipts only after it has independently computed the decision and bound context. This repository contains a verifier, not a production decision-signing key or signing service.
