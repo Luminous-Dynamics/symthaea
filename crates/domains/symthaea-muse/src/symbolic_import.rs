@@ -1194,9 +1194,84 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         }
     }
 
-    let motif_len = notes.len().min(6);
+    // Pack up to five signed semitone intervals into one key so candidate
+    // discovery is linear-ish and does not allocate a Vec for every window.
+    // MIDI pitches bound each interval to -127..=127, which fits one byte
+    // after adding 127. The top byte records note count to avoid length clashes.
+    let signature_for = |start: usize, note_len: usize| -> u64 {
+        let mut signature = (note_len as u64) << 56;
+        for (offset, pair) in notes[start..start + note_len].windows(2).enumerate() {
+            let interval = i16::from(pair[1].1.pitch.midi())
+                - i16::from(pair[0].1.pitch.midi());
+            signature |= ((interval + 127) as u64) << (offset * 8);
+        }
+        signature
+    };
+
+    #[derive(Clone, Copy)]
+    struct PatternStats {
+        note_len: usize,
+        first_start: usize,
+        occurrence_count: usize,
+    }
+
+    let mut patterns = HashMap::<u64, PatternStats>::new();
+    for start in 0..notes.len() {
+        let max_len = (notes.len() - start).min(6);
+        if max_len < 3 {
+            continue;
+        }
+        for note_len in 3..=max_len {
+            let signature = signature_for(start, note_len);
+            let stats = patterns.entry(signature).or_insert(PatternStats {
+                note_len,
+                first_start: start,
+                occurrence_count: 0,
+            });
+            stats.occurrence_count += 1;
+        }
+    }
+
+    // Prefer longer repeated contours, then the contour with more instances,
+    // then the earliest first instance. Signature is a final stable tiebreak.
+    let mut selected: Option<(u64, PatternStats)> = None;
+    for (&signature, &stats) in &patterns {
+        if stats.occurrence_count < 2 {
+            continue;
+        }
+        let better = match selected {
+            None => true,
+            Some((best_signature, best)) => {
+                stats.note_len > best.note_len
+                    || (stats.note_len == best.note_len
+                        && (stats.occurrence_count > best.occurrence_count
+                            || (stats.occurrence_count == best.occurrence_count
+                                && (stats.first_start < best.first_start
+                                    || (stats.first_start == best.first_start
+                                        && signature < best_signature)))))
+            }
+        };
+        if better {
+            selected = Some((signature, stats));
+        }
+    }
+    // Preserve a useful provisional summary when no repeated contour exists.
+    // A singleton is evidence of the opening pattern, not a repetition claim.
+    let (selected_signature, selected_stats) = selected.unwrap_or_else(|| {
+        let note_len = notes.len().min(6);
+        (
+            signature_for(0, note_len),
+            PatternStats {
+                note_len,
+                first_start: 0,
+                occurrence_count: 1,
+            },
+        )
+    });
+    let motif_len = selected_stats.note_len;
     let midi_pitches: Vec<u8> = notes
         .iter()
+        .skip(selected_stats.first_start)
         .take(motif_len)
         .map(|(_, note)| note.pitch.midi())
         .collect();
@@ -1208,7 +1283,11 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         return None;
     }
 
-    let representative_notes: Vec<_> = notes.iter().take(motif_len).collect();
+    let representative_notes: Vec<_> = notes
+        .iter()
+        .skip(selected_stats.first_start)
+        .take(motif_len)
+        .collect();
     let mut onset_deltas = Vec::with_capacity(motif_len.saturating_sub(1));
     for pair in representative_notes.windows(2) {
         let delta = pair[1].1.onset.checked_sub(pair[0].1.onset)?;
@@ -1223,14 +1302,8 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
 
     let mut occurrence_count = 0_usize;
     let mut matched_occurrences = Vec::new();
-    for (window_start, window) in notes.windows(motif_len).enumerate() {
-        let intervals_match = window
-            .windows(2)
-            .map(|pair| {
-                i16::from(pair[1].1.pitch.midi()) - i16::from(pair[0].1.pitch.midi())
-            })
-            .eq(pitch_interval_pattern.iter().copied());
-        if !intervals_match {
+    for window_start in 0..=notes.len().saturating_sub(motif_len) {
+        if signature_for(window_start, motif_len) != selected_signature {
             continue;
         }
         occurrence_count += 1;
@@ -1238,8 +1311,13 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
             continue;
         }
 
-        let mut references = Vec::with_capacity(window.len());
-        for (offset, (score_note_index, note)) in window.iter().enumerate() {
+        let mut references = Vec::with_capacity(motif_len);
+        for (offset, (score_note_index, note)) in notes
+            .iter()
+            .skip(window_start)
+            .take(motif_len)
+            .enumerate()
+        {
             references.push(ImportedNoteReference {
                 score_note_index: *score_note_index,
                 part_note_index: window_start + offset,
@@ -1253,13 +1331,16 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         matched_occurrences.push(ImportedMotifOccurrence { notes: references });
     }
 
+    let identity_note = if occurrence_count > 1 {
+        "Longest repeated part-local pitch-interval contour (3–6 notes); musical function remains unspecified; contributor confirmation required"
+    } else {
+        "Opening part-local pitch-interval contour; no repeat of this contour observed; musical function remains unspecified; contributor confirmation required"
+    };
     Some(ImportedMotifSummary {
         source_part_id: Some(part.0),
         occurrence_count,
         midi_pitches,
-        identity_note:
-            "Monophonic part-local pitch-interval pattern; musical function remains unspecified; contributor confirmation required"
-                .into(),
+        identity_note: identity_note.into(),
         confidence: if occurrence_count > 1 { 0.72 } else { 0.42 },
         pitch_interval_pattern,
         onset_deltas,
@@ -1453,6 +1534,42 @@ mod tests {
         assert_eq!(first[0].onset_denominator, 1);
         assert_eq!(first[0].duration_numerator, 5);
         assert_eq!(first[0].duration_denominator, 24);
+    }
+
+    #[test]
+    fn motif_search_finds_a_repeated_contour_after_an_unrelated_opening() {
+        let pitches = [60_u8, 61, 64, 66, 63, 62, 60, 62, 64, 65, 67, 69];
+        let mut track = Vec::new();
+        for pitch in pitches {
+            track.extend_from_slice(&[0, 0x90, pitch, 100, 100, 0x80, pitch, 0]);
+        }
+        track.extend_from_slice(&[0, 0xFF, 0x2F, 0]);
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        let analysis = analyze(&score);
+        assert_eq!(analysis.motifs.len(), 1);
+        let summary = &analysis.motifs[0];
+
+        assert_eq!(summary.midi_pitches, vec![60, 62, 64]);
+        assert_eq!(summary.pitch_interval_pattern, vec![2, 2]);
+        assert_eq!(summary.occurrence_count, 2);
+        assert_eq!(summary.matched_occurrences.len(), 2);
+        assert_eq!(
+            summary.matched_occurrences[0]
+                .notes
+                .iter()
+                .map(|note| note.score_note_index)
+                .collect::<Vec<_>>(),
+            vec![6, 7, 8]
+        );
+        assert_eq!(
+            summary.matched_occurrences[1]
+                .notes
+                .iter()
+                .map(|note| note.score_note_index)
+                .collect::<Vec<_>>(),
+            vec![9, 10, 11]
+        );
+        assert!(summary.identity_note.contains("Longest repeated"));
     }
 
     #[test]
