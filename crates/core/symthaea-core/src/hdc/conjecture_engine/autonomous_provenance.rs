@@ -1352,4 +1352,59 @@ mod tests {
         assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
     }
 
+    #[test]
+    fn holdout_replay_and_receipt_json_roundtrip_are_deterministic() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let initial = [1.0, 0.0, 0.0, 1.0];
+        let names = ["x", "y", "vx", "vy"];
+        let first = validate_invariant_holdout(
+            harmonic_rhs,
+            &formula,
+            &initial,
+            &names,
+            &config,
+            4.0,
+            0.01,
+            3,
+            701,
+            1e-2,
+        );
+        let replay = validate_invariant_holdout(
+            harmonic_rhs,
+            &formula,
+            &initial,
+            &names,
+            &config,
+            4.0,
+            0.01,
+            3,
+            701,
+            1e-2,
+        );
+        assert_eq!(first, replay);
+
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            &config,
+            &[],
+            &candidate,
+            &names,
+            &initial,
+            4.0,
+            0.01,
+            &first,
+        )
+        .expect("well-formed receipt should be constructed");
+        let encoded = serde_json::to_string(&receipt)
+            .expect("receipt should serialize to JSON");
+        let decoded: AutonomousDiscoveryReceiptV1 = serde_json::from_str(&encoded)
+            .expect("receipt should deserialize from JSON");
+        assert_eq!(decoded, receipt);
+        assert!(verify_autonomous_discovery_receipt_v1(&decoded));
+    }
+
 }
