@@ -37,6 +37,7 @@ GRID_SETTINGS = {
     "fine": (50, 50),
     "high_accuracy": (75, 302),
 }
+GRID_ORDER = ("coarse", "medium", "fine", "high_accuracy")
 ELEMENT_SYMBOLS = {1: "H", 2: "He", 8: "O"}
 HARTREE_TO_KCAL_MOL = 627.5094740631
 
@@ -239,6 +240,118 @@ def compare_one(native_record: dict[str, Any], reference: dict[str, Any], energy
     }
 
 
+def _finite_or_none(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _absolute_grid_deltas(energies: dict[str, float | None]) -> dict[str, float | None]:
+    deltas: dict[str, float | None] = {}
+    previous_energy: float | None = None
+    for quality in GRID_ORDER:
+        energy = energies.get(quality)
+        deltas[quality] = (
+            None if energy is None or previous_energy is None
+            else abs(energy - previous_energy)
+        )
+        previous_energy = energy
+    return deltas
+
+
+def build_grid_convergence(native_records: list[dict[str, Any]],
+                           reference_records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Report within-engine grid deltas separately from cross-engine energy errors."""
+    molecule_order = []
+    for record in native_records:
+        name = record.get("molecule")
+        if name not in molecule_order:
+            molecule_order.append(name)
+
+    native_by_key = {
+        (record.get("molecule"), record.get("grid_quality")): record
+        for record in native_records
+    }
+    reference_by_key = {
+        (record.get("molecule"), record.get("grid_quality")): record
+        for record in reference_records
+    }
+    curves = []
+    for molecule_name in molecule_order:
+        native_energy = {
+            quality: _finite_or_none(
+                native_by_key.get((molecule_name, quality), {}).get("total_energy_hartree")
+            )
+            for quality in GRID_ORDER
+        }
+        reference_energy = {
+            quality: _finite_or_none(
+                reference_by_key.get((molecule_name, quality), {}).get("total_energy_hartree")
+            )
+            for quality in GRID_ORDER
+        }
+        native_count_error = {
+            quality: _finite_or_none(
+                native_by_key.get((molecule_name, quality), {}).get(
+                    "integrated_electron_count_abs_error"
+                )
+            )
+            for quality in GRID_ORDER
+        }
+        reference_count_error = {
+            quality: _finite_or_none(
+                reference_by_key.get((molecule_name, quality), {}).get(
+                    "integrated_electron_count_abs_error"
+                )
+            )
+            for quality in GRID_ORDER
+        }
+        native_status = {
+            quality: native_by_key.get((molecule_name, quality), {}).get("status")
+            for quality in GRID_ORDER
+        }
+        reference_converged = {
+            quality: reference_by_key.get((molecule_name, quality), {}).get("scf_converged")
+            for quality in GRID_ORDER
+        }
+
+        native_high = native_energy.get("high_accuracy")
+        reference_high = reference_energy.get("high_accuracy")
+        curves.append({
+            "molecule": molecule_name,
+            "grid_order": list(GRID_ORDER),
+            "native_scf_status_by_grid": native_status,
+            "pyscf_scf_converged_by_grid": reference_converged,
+            "native_energy_hartree_by_grid": native_energy,
+            "pyscf_energy_hartree_by_grid": reference_energy,
+            "native_delta_to_previous_grid_hartree": _absolute_grid_deltas(native_energy),
+            "pyscf_delta_to_previous_grid_hartree": _absolute_grid_deltas(reference_energy),
+            "native_delta_to_high_accuracy_hartree": {
+                quality: (
+                    None if native_energy[quality] is None or native_high is None
+                    else abs(native_energy[quality] - native_high)
+                )
+                for quality in GRID_ORDER
+            },
+            "pyscf_delta_to_high_accuracy_hartree": {
+                quality: (
+                    None if reference_energy[quality] is None or reference_high is None
+                    else abs(reference_energy[quality] - reference_high)
+                )
+                for quality in GRID_ORDER
+            },
+            "native_integrated_electron_count_abs_error_by_grid": native_count_error,
+            "pyscf_integrated_electron_count_abs_error_by_grid": reference_count_error,
+            "interpretation":
+                "Within-engine energy deltas isolate grid sensitivity only for cases whose SCF status is converged; the high-accuracy grid is a reference setting, not exact truth.",
+        })
+    return curves
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-report", required=True, type=Path)
@@ -310,6 +423,7 @@ def main() -> int:
         },
         "pyscf_reference_records": references,
         "comparisons": comparisons,
+        "grid_convergence": build_grid_convergence(native["records"], references),
     }
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     args.output.parent.mkdir(parents=True, exist_ok=True)
