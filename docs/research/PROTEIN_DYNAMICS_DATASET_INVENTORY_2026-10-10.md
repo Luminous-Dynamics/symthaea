@@ -17,6 +17,10 @@ This is a benchmark-reuse candidate, not an endorsement or a qualification pass.
 5. **Ablate the claimed advantage.** Compare fixed/random allocation, conventional allocation, Symthaea without HDC, and Symthaea with HDC/adaptivity. Hold upstream model access and the declared compute budget equal. Report the complete target census, not only successful examples.
 6. **Keep mdCATH as a different lane.** Its trajectories are force-field simulation outputs. A replay/selection pilot tests instrumentation and algorithmic behavior against simulation-derived states, not experimental accuracy or real-time MD savings. The full corpus is multi-terabyte; use a deterministic, stratified metadata-based subset and do not download the full corpus for the first pilot.
 
+## Execution record
+
+The machine-readable [run-record schema](PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json) defines the provenance, target-outcome, metric-role, resource, and artifact fields required for later runs. It is a contract only at this stage; no runtime validator or benchmark execution is claimed.
+
 ## Source facts and limits
 
 ### PeptoneBench
