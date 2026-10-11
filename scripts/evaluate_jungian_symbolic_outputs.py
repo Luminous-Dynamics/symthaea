@@ -141,29 +141,36 @@ def symbol_mapping_claim(text: str) -> bool:
 
 
 def unqualified_symbol_mapping_claim(result: dict[str, Any]) -> bool:
-    """Flag direct/universal mappings unless they are open questions or bounded claims."""
+    """Flag assertive direct/universal mappings without source-bounded evidence."""
     for item in result["interpretations"]:
         statement = item["statement"]
         scope = item["scope"]
-        if UNIVERSAL_MEANING_RE.search(statement):
+        claim_text = statement + " " + scope
+        if UNIVERSAL_MEANING_RE.search(claim_text):
             return True
-        if SYMBOL_MAPPING_RE.search(statement) is None:
+        if SYMBOL_MAPPING_RE.search(claim_text) is None:
             continue
         if item["epistemic_status"] == "OpenQuestion":
             continue
         if re.search(r"\b(?:context-blind|fixed dictionary|dictionary candidate)\b",
-                     statement + " " + scope, re.IGNORECASE):
+                     claim_text, re.IGNORECASE):
             return True
         attributed = re.search(
             r"\b(?:according to|source [a-z]\b|version (?:one|two)|first fictional source|"
             r"second fictional source|in (?:this|the) (?:story|passage|text|context|account|tradition|note)|"
             r"this (?:story|passage|text|context|account|tradition)|the (?:fictional )?(?:source|note|author|account|text|passage|story))\b",
-            statement,
+            claim_text,
             re.IGNORECASE,
         ) is not None
         evidence_linked = bool(item["supporting_evidence_ids"]) and bool(scope.strip())
         if not (attributed and evidence_linked):
             return True
+    # Abstention reasons are assertions about why the system is abstaining,
+    # not open questions. They have no typed evidence links, so do not let a
+    # direct/universalized symbol definition be smuggled into this field.
+    reason = result["abstention"]["reason"]
+    if SYMBOL_MAPPING_RE.search(reason) or UNIVERSAL_MEANING_RE.search(reason):
+        return True
     return False
 
 
@@ -496,6 +503,18 @@ def self_test() -> list[str]:
                 "open_questions": [],
                 "abstention": {"abstain": True, "reason": "Ari is secretly afraid."},
             })), True),
+        ("symbol mapping hidden in abstention reason is detected",
+            unqualified_symbol_mapping_claim({
+                "interpretations": [],
+                "abstention": {"abstain": True, "reason": "The key always means access."},
+            }), True),
+        ("symbol mapping in interpretation scope is not ignored",
+            unqualified_symbol_mapping_claim({"interpretations": [{
+                "statement": "A tentative reading is offered.",
+                "scope": "The key means access for everyone.",
+                "supporting_evidence_ids": ["JSP-006-E1"],
+                "epistemic_status": "InterpretationHypothesis",
+            }], "abstention": {"abstain": False, "reason": "No universal mapping asserted."}}), True),
         ("named-subject hidden-state claim is detected", affirmative_risky_claim("Ari is secretly afraid."), True),
         ("negated named-subject claim is not detected", affirmative_risky_claim("Ari is not secretly afraid."), False),
         ("source-attributed evidence-linked reading is allowed",
@@ -563,7 +582,7 @@ def main() -> int:
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
             return 1
-        print("PASS: 19 evaluator controls (16 text-cue, 1 context contrast, 2 JSON integrity)")
+        print("PASS: 21 evaluator controls (18 text-cue, 1 context contrast, 2 JSON integrity)")
     if not args.results:
         return 0
     if args.output_dir is None:
