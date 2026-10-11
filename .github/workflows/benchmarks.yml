@@ -15,6 +15,8 @@ on:
       - 'Cargo.lock'
       - 'crates/core/symthaea-core/src/hdc/conjecture_engine.rs'
       - 'crates/core/symthaea-core/src/hdc/conjecture_engine/**'
+      - 'scripts/check_regressions.py'
+      - 'scripts/test_check_regressions.py'
       - '.github/workflows/benchmarks.yml'
   pull_request:
     branches: [main]
@@ -58,14 +60,14 @@ env:
   BENCHMARK_SEED: 42  # Reproducibility
 
 jobs:
-  # Quick smoke test on relevant pushes and pull requests
+  # Quick smoke test plus a real main-vs-PR Criterion comparison.
   quick-check:
     name: Quick Benchmark Check
     runs-on: ubuntu-latest
     if: >-
       (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip bench]')) ||
       (github.event_name == 'pull_request' && !contains(github.event.pull_request.title, '[skip bench]'))
-    timeout-minutes: 10
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
@@ -84,19 +86,48 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Reset Criterion results
+        run: rm -rf target/criterion
+
+      - name: Checkout PR base revision
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          clean: false
+
+      - name: Record main baseline
+        if: github.event_name == 'pull_request'
+        run: cargo bench --bench quick -- --noplot --save-baseline main
+
+      - name: Checkout tested revision
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          clean: false
+
       - name: Run quick benchmarks
         run: |
-          cargo bench --bench quick -- \
-            --noplot \
-            --save-baseline quick-${{ github.sha }}
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            cargo bench --bench quick -- --noplot --baseline main
+          else
+            cargo bench --bench quick -- --noplot
+          fi
+
+      - name: Test regression checker
+        run: python3 -m unittest discover -s scripts -p "test_check_regressions.py"
 
       - name: Check for regressions
+        if: github.event_name == 'pull_request'
         run: |
-          if [ -f target/criterion/baseline-comparisons.json ]; then
-            python3 scripts/check_regressions.py \
-              --threshold 10 \
-              --results target/criterion/baseline-comparisons.json
-          fi
+          python3 scripts/check_regressions.py \
+            --threshold 5 \
+            --critical-threshold 10 \
+            --baseline main \
+            --require-baseline \
+            --results target/criterion \
+            --format markdown | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Full benchmark suite (manual dispatch only — requires self-hosted runner)
   full-benchmark:
