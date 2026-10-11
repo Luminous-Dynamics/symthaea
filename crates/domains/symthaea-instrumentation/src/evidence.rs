@@ -67,22 +67,68 @@ impl VerifiedArtifactBytes {
     }
 }
 
+/// Maximum encoded size of a backend's immutable source-version identifier.
+pub const MAX_IMMUTABLE_SOURCE_VERSION_ID_BYTES: usize = 512;
+
+/// A reader pinned to one immutable object version or content snapshot.
+///
+/// Implementations must bind both the returned version ID and all reads to the same
+/// immutable object version. A path, mutable database row, or latest-version alias
+/// does not satisfy this contract.
+pub trait ImmutableArtifactReader: Read {
+    fn immutable_version_id(&self) -> &str;
+}
+
 /// Verify a reader incrementally without retaining a second copy of its bytes.
 ///
-/// The returned digest binds the bytes consumed through EOF. Callers must ensure
-/// the underlying object remains immutable (or persist the same stream) before
-/// using data addressed by this digest; this result does not lock a mutable file.
+/// This digest proves content integrity only. It does not assert that a later read
+/// comes from the same object version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedArtifactDigest {
     reference: ArtifactReference,
     byte_length: u64,
+    immutable_source_version_id: Option<String>,
 }
 
 impl VerifiedArtifactDigest {
     /// Hash a complete reader using a bounded buffer and compare it to the reference.
+    /// Verify bytes against their digest without asserting source immutability.
     pub fn verify_reader<R: Read>(
         reference: ArtifactReference,
+        reader: R,
+    ) -> Result<Self, ArtifactVerificationError> {
+        Self::verify_reader_inner(reference, reader, None)
+    }
+
+    /// Verify bytes and retain the immutable version token associated with that read.
+    ///
+    /// This is the only streaming verification path accepted by ResolvedRawData.
+    pub fn verify_immutable_reader<R: ImmutableArtifactReader>(
+        reference: ArtifactReference,
+        reader: R,
+    ) -> Result<Self, ArtifactVerificationError> {
+        let artifact_id = reference.artifact_id().to_owned();
+        let source_version_id = reader.immutable_version_id();
+        if source_version_id.is_empty()
+            || source_version_id.trim() != source_version_id
+            || source_version_id.len() > MAX_IMMUTABLE_SOURCE_VERSION_ID_BYTES
+            || source_version_id.chars().any(char::is_control)
+        {
+            return Err(ArtifactVerificationError::InvalidImmutableSourceVersion {
+                artifact_id,
+            });
+        }
+        Self::verify_reader_inner(
+            reference,
+            reader,
+            Some(source_version_id.to_owned()),
+        )
+    }
+
+    fn verify_reader_inner<R: Read>(
+        reference: ArtifactReference,
         mut reader: R,
+        immutable_source_version_id: Option<String>,
     ) -> Result<Self, ArtifactVerificationError> {
         let artifact_id = reference.artifact_id().to_owned();
         let mut hasher = Sha256::new();
@@ -133,6 +179,7 @@ impl VerifiedArtifactDigest {
         Ok(Self {
             reference,
             byte_length,
+            immutable_source_version_id,
         })
     }
 
@@ -144,6 +191,11 @@ impl VerifiedArtifactDigest {
     /// Number of bytes consumed through EOF.
     pub fn byte_length(&self) -> u64 {
         self.byte_length
+    }
+
+    /// Version token captured from the immutable reader, if one was supplied.
+    pub fn immutable_source_version_id(&self) -> Option<&str> {
+        self.immutable_source_version_id.as_deref()
     }
 }
 
@@ -159,6 +211,9 @@ pub enum ArtifactVerificationError {
         artifact_id: String,
     },
     LengthOverflow {
+        artifact_id: String,
+    },
+    InvalidImmutableSourceVersion {
         artifact_id: String,
     },
 }
@@ -181,6 +236,9 @@ impl fmt::Display for ArtifactVerificationError {
             Self::LengthOverflow { artifact_id } => {
                 write!(f, "byte length overflow while verifying artifact {artifact_id}")
             }
+            Self::InvalidImmutableSourceVersion { artifact_id } => {
+                write!(f, "invalid immutable source version for artifact {artifact_id}")
+            }
         }
     }
 }
@@ -190,6 +248,33 @@ impl std::error::Error for ArtifactVerificationError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Debug)]
+    struct VersionedCursor {
+        inner: std::io::Cursor<Vec<u8>>,
+        version_id: String,
+    }
+
+    impl VersionedCursor {
+        fn new(version_id: &str, bytes: Vec<u8>) -> Self {
+            Self {
+                inner: std::io::Cursor::new(bytes),
+                version_id: version_id.to_owned(),
+            }
+        }
+    }
+
+    impl Read for VersionedCursor {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            std::io::Read::read(&mut self.inner, buffer)
+        }
+    }
+
+    impl ImmutableArtifactReader for VersionedCursor {
+        fn immutable_version_id(&self) -> &str {
+            &self.version_id
+        }
+    }
 
     fn reference(id: &str, digest: &str) -> ArtifactReference {
         ArtifactReference::new(id, digest).unwrap()
@@ -201,6 +286,44 @@ mod tests {
             sha256_hex(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
+    }
+
+    #[test]
+    fn immutable_reader_verification_retains_source_version_identity() {
+        let bytes = b"snapshot-bound raw acquisition".to_vec();
+        let reference = reference("versioned-raw", &sha256_hex(&bytes));
+        let verified = VerifiedArtifactDigest::verify_immutable_reader(
+            reference.clone(),
+            VersionedCursor::new("object-version-17", bytes.clone()),
+        )
+        .unwrap();
+
+        assert_eq!(verified.reference(), &reference);
+        assert_eq!(verified.immutable_source_version_id(), Some("object-version-17"));
+        assert_eq!(verified.byte_length(), u64::try_from(bytes.len()).unwrap());
+    }
+
+    #[test]
+    fn immutable_reader_rejects_blank_or_noncanonical_version_identifiers() {
+        let bytes = b"raw".to_vec();
+        let reference = reference("versioned-raw", &sha256_hex(&bytes));
+        for version_id in [
+            "",
+            " ",
+            "version\n2",
+            &"v".repeat(MAX_IMMUTABLE_SOURCE_VERSION_ID_BYTES + 1),
+        ] {
+            assert_eq!(
+                VerifiedArtifactDigest::verify_immutable_reader(
+                    reference.clone(),
+                    VersionedCursor::new(version_id, bytes.clone()),
+                )
+                .unwrap_err(),
+                ArtifactVerificationError::InvalidImmutableSourceVersion {
+                    artifact_id: "versioned-raw".to_owned(),
+                }
+            );
+        }
     }
 
     #[test]

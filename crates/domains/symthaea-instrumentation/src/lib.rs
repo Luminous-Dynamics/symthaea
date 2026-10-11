@@ -27,7 +27,8 @@ pub use certificate::{
 };
 mod evidence;
 pub use evidence::{
-    ArtifactVerificationError, VerifiedArtifactBytes, VerifiedArtifactDigest, sha256_hex,
+    ArtifactVerificationError, ImmutableArtifactReader, VerifiedArtifactBytes,
+    VerifiedArtifactDigest, MAX_IMMUTABLE_SOURCE_VERSION_ID_BYTES, sha256_hex,
 };
 mod review;
 pub use review::{
@@ -240,23 +241,22 @@ impl RawDataReference {
     }
 }
 
-/// Raw acquisition metadata returned only after the integration's resolver has
-/// retrieved the artifact and independently verified its bytes against the
-/// referenced content digest. The constructor checks shape; the caller-owned
-/// resolver remains responsible for actual digest verification.
+/// Raw acquisition metadata returned only after an immutable version-bound reader
+/// has been hashed against the referenced digest. A digest-only read from a mutable
+/// path cannot be promoted into resolved evidence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedRawData {
     reference: ArtifactReference,
     byte_length: u64,
+    source_version_id: String,
     media_type: String,
 }
 
 impl ResolvedRawData {
-    /// Build raw-data metadata only from a digest-verified read.
+    /// Build raw-data metadata only from a digest verified against an immutable read.
     ///
-    /// This prevents constructing resolved metadata from a digest string and byte
-    /// count alone. The resolver must still preserve the immutability/identity of
-    /// the referenced source object after verification.
+    /// Integrity-only results from verify_reader carry no source version and cannot
+    /// be promoted into resolved raw evidence.
     pub fn from_verified_digest(
         verified: VerifiedArtifactDigest,
         media_type: impl Into<String>,
@@ -265,9 +265,14 @@ impl ResolvedRawData {
             return Err(ContractError::EmptyRawDataArtifact);
         }
         let media_type = non_empty(media_type.into(), "raw_data_media_type")?;
+        let source_version_id = verified
+            .immutable_source_version_id()
+            .ok_or(ContractError::ImmutableSourceVersionRequired)?
+            .to_owned();
         Ok(Self {
             reference: verified.reference().clone(),
             byte_length: verified.byte_length(),
+            source_version_id,
             media_type,
         })
     }
@@ -278,6 +283,11 @@ impl ResolvedRawData {
 
     pub fn byte_length(&self) -> u64 {
         self.byte_length
+    }
+
+    /// Version token that must be used if the resolver later reopens this artifact.
+    pub fn source_version_id(&self) -> &str {
+        &self.source_version_id
     }
 
     pub fn media_type(&self) -> &str {
@@ -307,6 +317,7 @@ pub enum ContractError {
     EmptyIdentifier(&'static str),
     InvalidSha256,
     EmptyRawDataArtifact,
+    ImmutableSourceVersionRequired,
     InvalidValidityInterval,
     CalibrationReviewMustBeDistinct,
     CalibrationReviewAuthorizationMissing,
@@ -335,6 +346,10 @@ impl fmt::Display for ContractError {
             Self::EmptyRawDataArtifact => {
                 write!(f, "raw-data evidence artifact must not be empty")
             }
+            Self::ImmutableSourceVersionRequired => write!(
+                f,
+                "raw evidence requires an immutable source-version-bound read"
+            ),
             Self::InvalidValidityInterval => {
                 write!(f, "validity interval must satisfy start < end")
             }

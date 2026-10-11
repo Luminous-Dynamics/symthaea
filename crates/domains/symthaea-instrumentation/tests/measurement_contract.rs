@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use ed25519_dalek::{Signer, SigningKey};
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::sync::Mutex;
 use symthaea_instrumentation::{
     sha256_hex, ArtifactReference, AssessmentFailure, CalibrationCertificate,
     CalibrationEvidenceResolver, CalibrationReference, CalibrationReviewPayload,
     ClockDomainId, ContractError,
-    InstrumentIdentity, MeasurementEnvelope, MeasurementInput, MeasurementPolicy,
+    ImmutableArtifactReader, InstrumentIdentity, MeasurementEnvelope, MeasurementInput,
+    MeasurementPolicy,
     MeasurementStreamGuard, Quantity, QualityFlag, RawDataEvidenceResolver, RawDataReference,
     ResolvedCalibration, ResolvedRawData, ReviewTrustKey, ReviewTrustStore,
     ReviewAuthorizationPolicy, ReviewTrustStoreGuard, ReviewVerificationError,
@@ -375,6 +376,32 @@ fn policy() -> MeasurementPolicy {
     MeasurementPolicy::new(500_000_000, Unit::Hertz, 2_000.0, 1_000.0).unwrap()
 }
 
+struct ImmutableFixtureReader {
+    inner: Cursor<Vec<u8>>,
+    version_id: String,
+}
+
+impl ImmutableFixtureReader {
+    fn new(bytes: Vec<u8>, version_id: impl Into<String>) -> Self {
+        Self {
+            inner: Cursor::new(bytes),
+            version_id: version_id.into(),
+        }
+    }
+}
+
+impl Read for ImmutableFixtureReader {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        self.inner.read(buffer)
+    }
+}
+
+impl ImmutableArtifactReader for ImmutableFixtureReader {
+    fn immutable_version_id(&self) -> &str {
+        &self.version_id
+    }
+}
+
 struct MockResolver {
     resolved: Result<ResolvedCalibration, String>,
     raw_bytes: Result<Vec<u8>, String>,
@@ -449,11 +476,15 @@ impl RawDataEvidenceResolver for MockResolver {
             .raw_reference_override
             .clone()
             .unwrap_or_else(|| reference.artifact().clone());
-        let verified = VerifiedArtifactDigest::verify_reader(
+        let version_id = format!(
+            "fixture-object-version:{}:v1",
+            reference_to_verify.artifact_id()
+        );
+        let verified = VerifiedArtifactDigest::verify_immutable_reader(
             reference_to_verify,
-            Cursor::new(bytes),
+            ImmutableFixtureReader::new(bytes, version_id),
         )
-        .map_err(|_| "raw acquisition SHA-256 mismatch".to_owned())?;
+        .map_err(|_| "raw acquisition digest or source version is invalid".to_owned())?;
         ResolvedRawData::from_verified_digest(verified, "application/octet-stream")
             .map_err(|error| error.to_string())
     }
@@ -932,13 +963,31 @@ fn rejects_empty_or_malformed_resolved_raw_data_metadata() {
         ContractError::EmptyRawDataArtifact
     );
 
-    let verified = VerifiedArtifactDigest::verify_reader(
+    let unversioned = VerifiedArtifactDigest::verify_reader(
         raw_artifact(),
         Cursor::new(raw_fixture_bytes()),
     )
     .unwrap();
     assert_eq!(
-        ResolvedRawData::from_verified_digest(verified, " ").unwrap_err(),
+        ResolvedRawData::from_verified_digest(
+            unversioned,
+            "application/octet-stream",
+        )
+        .unwrap_err(),
+        ContractError::ImmutableSourceVersionRequired
+    );
+
+    let versioned_reference = raw_artifact();
+    let versioned = VerifiedArtifactDigest::verify_immutable_reader(
+        versioned_reference,
+        ImmutableFixtureReader::new(
+            raw_fixture_bytes(),
+            "fixture-object-version:raw-acquisition-1:v1",
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        ResolvedRawData::from_verified_digest(versioned, " ").unwrap_err(),
         ContractError::EmptyIdentifier("raw_data_media_type")
     );
 }
