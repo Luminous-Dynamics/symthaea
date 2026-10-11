@@ -881,6 +881,45 @@ mod tests {
     // ── Miller-Rabin tests ──────────────────────────────────────────────
 
     #[test]
+    fn test_is_prime_matches_independent_trial_division_through_10000() {
+        let engine = NumberTheoryEngine::new();
+        for n in 0u64..=10_000 {
+            let expected = if n < 2 {
+                false
+            } else {
+                let mut divisor = 2u64;
+                let mut prime = true;
+                while divisor <= n / divisor {
+                    if n.is_multiple_of(divisor) {
+                        prime = false;
+                        break;
+                    }
+                    divisor += if divisor == 2 { 1 } else { 2 };
+                }
+                prime
+            };
+            assert_eq!(engine.is_prime(n), expected, "n={n}");
+        }
+    }
+
+    #[test]
+    fn test_factorization_reconstructs_small_integers_and_uses_prime_factors() {
+        let engine = NumberTheoryEngine::new();
+        for n in 2u64..=2_000 {
+            let result = engine.factorize(n);
+            let mut product = 1u128;
+            for &(prime, exponent) in &result.factors {
+                assert!(engine.miller_rabin(prime), "factor {prime} of {n} must be prime");
+                assert!(exponent > 0);
+                for _ in 0..exponent {
+                    product *= u128::from(prime);
+                }
+            }
+            assert_eq!(product, u128::from(n), "factorization of {n}: {:?}", result.factors);
+        }
+    }
+
+    #[test]
     fn test_miller_rabin_small_primes() {
         let engine = NumberTheoryEngine::new();
         let primes = [
