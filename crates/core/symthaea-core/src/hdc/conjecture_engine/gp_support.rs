@@ -133,6 +133,10 @@ pub fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[&str]) -> Vec<f64> {
 /// so callers can gate on it, without changing `lie_derivative_variance`
 /// itself (which stays the exact scoring function used during GP
 /// evolution — this is a separate, additive acceptance check).
+/// Relative floor on squared gradient magnitude used by the informative-fraction metric.
+/// A value of 0.01 means 10% of peak gradient amplitude.
+pub const GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR: f64 = 0.01;
+
 pub fn gradient_informativeness_fraction(
     expr: &Expr,
     trajectory: &[Vec<f64>],
@@ -154,12 +158,10 @@ pub fn gradient_informativeness_fraction(
     if max_grad_sq <= 0.0 || !max_grad_sq.is_finite() {
         return 0.0;
     }
-    // 1% of peak squared gradient magnitude (equivalent to 10% amplitude).
-    // This relative threshold applies regardless of the candidate's scale.
-    const INFORMATIVE_RELATIVE_FLOOR: f64 = 0.01;
+    // The relative threshold applies regardless of the candidate's scale.
     let informative = grad_sq_vals
         .iter()
-        .filter(|&&g| g >= INFORMATIVE_RELATIVE_FLOOR * max_grad_sq)
+        .filter(|&&g| g >= GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR * max_grad_sq)
         .count();
     informative as f64 / grad_sq_vals.len() as f64
 }
