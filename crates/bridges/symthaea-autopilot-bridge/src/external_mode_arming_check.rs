@@ -29,6 +29,8 @@ const REGISTRATION_DOMAIN: &[u8] =
     b"symthaea.autopilot.px4.external-mode-registration-binding.v1\0";
 const REQUEST_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-request.v1\0";
 const REPLY_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-reply.v1\0";
+const REPLY_PAYLOAD_DOMAIN: &[u8] =
+    b"symthaea.autopilot.px4.arming-check-reply-payload.v1\0";
 const PROFILE_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-coherence-profile.v1\0";
 const ASSESSMENT_DOMAIN: &[u8] =
     b"symthaea.autopilot.px4.arming-check-coherence-assessment.v1\0";
@@ -446,7 +448,12 @@ pub struct Px4ExternalModeArmingCheckReplyV1 {
     pub mode_req_manual_control: bool,
     /// Companion-clock time the reply was received.
     pub received_at: TimestampV1,
-    /// Content commitment.
+    /// Stable fingerprint of PX4 message fields, excluding companion capture metadata.
+    ///
+    /// Use only for duplicate-payload detection scoped to target, firmware, and boot
+    /// session. This fingerprint is neither an authenticated identity nor a freshness proof.
+    pub source_payload_digest_hex: String,
+    /// Content commitment to this observation, including receiver time and capture context.
     pub reply_digest_hex: String,
 }
 
@@ -512,9 +519,11 @@ impl Px4ExternalModeArmingCheckReplyV1 {
             mode_req_prevent_arming,
             mode_req_manual_control,
             received_at,
+            source_payload_digest_hex: String::new(),
             reply_digest_hex: String::new(),
         };
         item.validate_without_digest()?;
+        item.source_payload_digest_hex = item.compute_source_payload_digest_hex();
         item.reply_digest_hex = item.compute_digest_hex();
         item.validate()?;
         Ok(item)
@@ -523,6 +532,11 @@ impl Px4ExternalModeArmingCheckReplyV1 {
     /// Validate schema, identity, timestamp, and exact content commitment.
     pub fn validate(&self) -> Result<(), Px4ExternalModeArmingCheckError> {
         self.validate_without_digest()?;
+        if self.source_payload_digest_hex != self.compute_source_payload_digest_hex() {
+            return Err(Px4ExternalModeArmingCheckError::DigestMismatch(
+                "arming-check source payload",
+            ));
+        }
         if self.reply_digest_hex != self.compute_digest_hex() {
             return Err(Px4ExternalModeArmingCheckError::DigestMismatch("arming-check reply"));
         }
@@ -536,6 +550,17 @@ impl Px4ExternalModeArmingCheckReplyV1 {
             "symthaea.autopilot.px4.arming-check-reply.v1:{}",
             self.reply_digest_hex
         ))
+    }
+
+    /// Return the stable source-payload fingerprint after validating both commitments.
+    ///
+    /// Equal fingerprints indicate equal decoded PX4 payload fields, not equal capture
+    /// contexts. Callers must scope deduplication to a declared target and boot session.
+    pub fn source_payload_fingerprint_hex(
+        &self,
+    ) -> Result<&str, Px4ExternalModeArmingCheckError> {
+        self.validate()?;
+        Ok(&self.source_payload_digest_hex)
     }
 
     fn validate_without_digest(&self) -> Result<(), Px4ExternalModeArmingCheckError> {
@@ -561,11 +586,50 @@ impl Px4ExternalModeArmingCheckReplyV1 {
         Ok(())
     }
 
+    fn compute_source_payload_digest_hex(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(REPLY_PAYLOAD_DOMAIN);
+        hasher.update(&self.message_version.to_le_bytes());
+        hasher.update(&self.source_timestamp_us_raw.to_le_bytes());
+        hasher.update(&[
+            self.request_id,
+            self.registration_id,
+            self.health_component_index,
+            u8::from(self.health_component_is_present),
+            u8::from(self.health_component_warning),
+            u8::from(self.health_component_error),
+            u8::from(self.can_arm_and_run),
+            self.num_events,
+        ]);
+        for event in &self.events {
+            hasher.update(&event.timestamp_us_raw.to_le_bytes());
+            hasher.update(&event.id.to_le_bytes());
+            hasher.update(&event.event_sequence.to_le_bytes());
+            hasher.update(&event.arguments);
+            hasher.update(&[event.log_levels]);
+        }
+        hasher.update(&[
+            u8::from(self.mode_req_angular_velocity),
+            u8::from(self.mode_req_attitude),
+            u8::from(self.mode_req_local_alt),
+            u8::from(self.mode_req_local_position),
+            u8::from(self.mode_req_local_position_relaxed),
+            u8::from(self.mode_req_global_position),
+            u8::from(self.mode_req_global_position_relaxed),
+            u8::from(self.mode_req_mission),
+            u8::from(self.mode_req_home_position),
+            u8::from(self.mode_req_prevent_arming),
+            u8::from(self.mode_req_manual_control),
+        ]);
+        digest_hex(hasher.finalize().as_bytes())
+    }
+
     fn compute_digest_hex(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(REPLY_DOMAIN);
         hasher.update(&self.schema_version.to_le_bytes());
         hasher.update(&self.message_version.to_le_bytes());
+        feed_str(&mut hasher, &self.source_payload_digest_hex);
         feed_str(&mut hasher, &self.producer_profile_id);
         feed_str(&mut hasher, &self.target_instance_id);
         feed_str(&mut hasher, &self.firmware_profile_id);
