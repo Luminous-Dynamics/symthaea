@@ -92,11 +92,27 @@ fn checked_mi_graph_laplacian(mi_matrix: &[Vec<f64>], n: usize) -> Option<DMatri
 /// supply a candidate instead of fabricating a Fiedler cut.
 fn checked_fiedler_eigenpair(laplacian: &DMatrix<f64>) -> Option<(f64, Vec<f64>)> {
     let n = laplacian.nrows();
-    if n < 3 || n != laplacian.ncols() {
+    let max_iterations = n.saturating_mul(n).saturating_mul(20).max(1);
+    checked_fiedler_eigenpair_with_budget(laplacian, max_iterations)
+}
+
+/// Testable bounded variant: exhausting the symmetric solver budget must abstain.
+fn checked_fiedler_eigenpair_with_budget(
+    laplacian: &DMatrix<f64>,
+    max_iterations: usize,
+) -> Option<(f64, Vec<f64>)> {
+    let n = laplacian.nrows();
+    if n < 3 || n != laplacian.ncols() || max_iterations == 0 {
         return None;
     }
 
-    let eigen = nalgebra::linalg::SymmetricEigen::new(laplacian.clone());
+    // Use the fallible API: a decomposition that exhausts its iteration budget
+    // is a missing candidate, not an apparently verified Fiedler vector.
+    let eigen = nalgebra::linalg::SymmetricEigen::try_new(
+        laplacian.clone(),
+        f64::EPSILON,
+        max_iterations,
+    )?;
     if eigen.eigenvalues.iter().any(|value| !value.is_finite())
         || eigen.eigenvectors.iter().any(|value| !value.is_finite())
     {
