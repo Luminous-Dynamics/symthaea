@@ -201,6 +201,32 @@ class RunRecordValidatorTests(unittest.TestCase):
         errors, _, _ = self.run_validator()
         self.assertTrue(any("escapes artifact root" in x for x in errors))
 
+    def test_wrong_target_id_type_is_rejected(self) -> None:
+        self.record["targets"][0]["target_id"] = ["A"]
+        errors, _, _ = self.run_validator()
+        self.assertTrue(any("missing or non-string target_id" in x for x in errors))
+
+    def test_conformer_counts_must_reconcile(self) -> None:
+        self.record["targets"][0]["candidate_conformers"] = 10
+        errors, _, _ = self.run_validator()
+        self.assertTrue(any("candidate_conformers must equal" in x for x in errors))
+
+    def test_malformed_preregistration_fails_closed_without_crashing(self) -> None:
+        self.record["preregistration"] = None
+        errors, _, _ = self.run_validator()
+        self.assertTrue(errors)
+
+    def test_preregistration_must_precede_record_creation(self) -> None:
+        self.record["preregistration"]["frozen_at"] = "2026-10-12T00:00:00Z"
+        errors, _, _ = self.run_validator()
+        self.assertTrue(any("must not be later than created_at" in x for x in errors))
+
+    def test_nonlocal_artifact_is_not_claimed_verified(self) -> None:
+        self.record["output_artifacts"][0]["uri_or_relative_path"] = "https://example.invalid/score.csv"
+        errors, _, _ = self.run_validator()
+        self.assertTrue(any("local relative paths only" in x for x in errors))
+
+
     def test_complete_run_cannot_contain_not_run_target(self) -> None:
         self.record["run_status"] = "complete"
         row = self.record["targets"][0]
