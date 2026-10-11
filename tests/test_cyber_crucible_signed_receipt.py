@@ -143,6 +143,30 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         with self.assertRaises(InvalidSignature):
             verifier_key.verify(signature, b"changed")
 
+    def test_rfc8785_canonicalization_known_answer(self):
+        # RFC 8785 section 3.2.2 number-serialization example.
+        value = {"numbers": [333333333.3333333, 1e30, 4.5, 0.002, 1e-27]}
+        self.assertEqual(
+            __import__("rfc8785").dumps(value),
+            b'{"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27]}',
+        )
+
+    def test_unhashable_role_and_status_values_fail_closed(self):
+        receipt = signed_receipt()
+        receipt["payload"]["role"] = ["security_verdict"]
+        with self.assertRaisesRegex(verifier.VerificationError, "payload.role is unsupported"):
+            self.verify(receipt)
+        receipt = signed_receipt()
+        receipt["payload"]["status"] = ["pass"]
+        with self.assertRaisesRegex(verifier.VerificationError, "payload.status is unsupported"):
+            self.verify(receipt)
+
+    def test_key_not_after_boundary_is_exclusive(self):
+        trust = policy()
+        trust["keys"][0]["not_after"] = "2026-10-11T00:30:00Z"
+        with self.assertRaisesRegex(verifier.VerificationError, "not currently within its validity interval"):
+            self.verify(trust=trust)
+
     def test_valid_receipt_is_signature_verified_but_non_authorizing(self):
         result = self.verify(replay_ledger=verifier.ReplayLedger(self.replay_db))
         self.assertTrue(result["signature_verified"])
