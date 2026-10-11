@@ -57,6 +57,7 @@ Using mu = 3.986004418e14 m^3/s^2 and an equatorial reference radius of 6,378.13
 | 300 | 6,678.137 | 41,959.97 | 7.72576 | 90.520 | 29.844 |
 | 400 | 6,778.137 | 42,588.29 | 7.66856 | 92.560 | 29.403 |
 | 500 | 6,878.137 | 43,216.61 | 7.61261 | 94.616 | 28.976 |
+| 600 | 6,978.137 | 43,844.93 | 7.55787 | 96.687 | 28.561 |
 
 These numbers are reference fixtures for formula/unit tests only. They omit atmosphere, oblateness, lunar/solar perturbations, inclination, attitude, and all ring-support physics; they are **not** a claim that any listed altitude is suitable for a long-lived infrastructure ring. The table's kinetic-energy column is the ideal orbital specific kinetic energy, not the rotor's energy and not the energy required to build, deploy, or support a ring.
 
@@ -154,7 +155,7 @@ Command from the repository root:
 python3 scripts/engineering/orbital_ring_reference_check.py
 ```
 
-The program emits deterministic JSON and exits nonzero on any failed check. In the local execution used for this update, all **47/47 checks passed**, and a repeat run emitted byte-identical JSON. This is a T0 arithmetic/limiting-case check, not a solver comparison, independent peer review of the physical derivation, or T1 validation. The symbolic derivation and fields required before coupling the model are documented in [the control-volume note](ORBITAL_RING_CONTROL_VOLUME_NOTE.md). The source-audit, failure, structural-stability and debris questions are tracked separately in the [research gap register](ORBITAL_RING_RESEARCH_GAP_REGISTER.md).
+The prior v1 reference-checker source (Git blob `7adbaab223517494332711b480bdf37e0b216811`, SHA-256 `3ab051fc31ba1b4673c07578cfd047a0ce43339a4f8bf37de86992e8588953dc`) ran **47/47 checks passed** with byte-identical repeat output. The v2 source now adds the 600 km row and a source-bound regression for Birch's representative-height statement: current Git blob `1162b0762422cf0f230b9ae556b4c780464d264f`, SHA-256 `f59cb6e5625aba24a9ef69c5bdebef360aaef5e058fda2de0f589c1ecb9d80a8`, **56 checks expected; not yet runtime-verified**. It remains a T0 arithmetic/limiting-case check, not a solver comparison, independent peer review of the physical derivation, or T1 validation. See [the source-bounded historical geometry reference](ORBITAL_RING_HISTORICAL_GEOMETRY_REFERENCE.md). The symbolic derivation and fields required before coupling the model are documented in [the control-volume note](ORBITAL_RING_CONTROL_VOLUME_NOTE.md). The source-audit, failure, structural-stability and debris questions are tracked separately in the [research gap register](ORBITAL_RING_RESEARCH_GAP_REGISTER.md).
 
 ### Increment D — structural/electromagnetic/thermal interfaces
 
@@ -269,7 +270,7 @@ A green manifest-contract result does **not** mean model inputs are physically v
 - Confirmed the crate has no external dependencies and its location matches the root workspace's `crates/domains/*` member glob.
 - Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
-- Independently recomputed the four documented circular-orbit rows and compared all values at published rounding precision via the Python reference checker.
+- The prior reference checker independently recomputed four documented circular-orbit rows; v2 adds the fifth (600 km) row based on Birch's primary-source representative height, with current checks pending execution.
 - Ran the column-aware power-source audit (20/20 checks) and repeated it with byte-identical JSON output; local copy's Git blob SHA matched the branch source.
 - The last executed failure-manifest self-test (73/73) applies only to the prior validator blob. The current source fingerprint and not-run status are recorded in [validator verification freshness status](evidence/orbital_ring_validator_verification_status.json).
 
@@ -288,3 +289,5 @@ Strict JSON parsing rejects duplicate object member names and `NaN`/`Infinity` c
 A dedicated draft-safe Python workflow now lives at `.github/workflows/orbital-ring-manifest-contract.yml`, separate from the broad `.github/workflows/ci.yml` Rust matrix. Before testing, it compares the live validator Git blob and SHA-256 with `evidence/orbital_ring_validator_verification_status.json` and checks the expected 84-test count. It then requires `py_compile`, two byte-identical self-test outputs, 84 unique passing check IDs, and exact equality between generated validation JSON and the committed blocked-template report. The workflow archives raw outputs and source fingerprints. The isolated workflow was discovered and queued as run #3; it is not yet a pass. The eleven regression cases added after the historical 73-check run remain explicitly unverified until it executes.
 
 Structural/schema errors now also force the expected gate state to `Blocked`, rather than allowing a malformed complete-looking manifest to report `ReadyForIndependentReview`. The expanded contract has 84 expected tests; the current source remains unexecuted pending the draft-safe workflow.
+
+The 300 km and 600 km heights are explicitly listed by Birch as representative ORS heights on printed p. 476. The new 600 km two-body fixture is a reference comparator, not a claim that the real ring path is circular or that either altitude is a feasible design. The v2 checker uses NGA WGS 84 constants and its output is verified by the isolated workflow against 56 unique checks; until that job passes on the exact source blob, the count remains expected, not evidence of execution.
