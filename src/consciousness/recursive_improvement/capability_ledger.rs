@@ -533,7 +533,9 @@ impl CapabilityLedger {
             || !non_empty(&receipt.evaluator_revision)
             || !is_hex_digest(&receipt.forecast_commitment_blake3, &[64])
             || !is_hex_digest(&receipt.receipt_sha256, &[64])
-            || receipt.actual_compute_units.is_some_and(|cost| !cost.is_finite() || cost < 0.0)
+            || receipt
+                .actual_compute_units
+                .is_some_and(|cost| !cost.is_finite() || cost < 0.0)
         {
             return Err(CapabilityLedgerError::InvalidOutcomeReceipt);
         }
@@ -547,7 +549,9 @@ impl CapabilityLedger {
             return Err(CapabilityLedgerError::SequenceNotMonotonic);
         }
         {
-            let record = self.forecasts.get(&receipt.forecast_id)
+            let record = self
+                .forecasts
+                .get(&receipt.forecast_id)
                 .ok_or(CapabilityLedgerError::UnknownForecast)?;
             if record.receipt.is_some() {
                 return Err(CapabilityLedgerError::AlreadyResolved);
@@ -1381,7 +1385,7 @@ mod tests {
             ledger
                 .resolve_verified_forecast(test_verified_receipt(&ledger, CapabilityOutcomeReceipt {
                     forecast_id: id,
-            forecast_commitment_blake3: "0".repeat(64),
+                    forecast_commitment_blake3: "0".repeat(64),
                     subject: subject(),
                     sequence: seq + 1,
                     observed_success: true,
@@ -1448,7 +1452,7 @@ mod tests {
                 &ledger,
                 CapabilityOutcomeReceipt {
                     forecast_id: id,
-            forecast_commitment_blake3: "0".repeat(64),
+                    forecast_commitment_blake3: "0".repeat(64),
                     subject: subject(),
                     sequence: forecast_sequence + 1,
                     observed_success: true,
