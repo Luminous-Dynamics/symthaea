@@ -1054,7 +1054,7 @@ def main() -> int:
                 f"replay=byte-identical"
             )
         return 0
-    except (OSError, json.JSONDecodeError, BaselineError, KeyError, TypeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, BaselineError, KeyError, TypeError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
 
