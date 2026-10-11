@@ -31,7 +31,9 @@
       "reply_received_at_ns": 1350000000,
       "assessment_at_ns": 1400000000,
       "config_assessed_at_ns": 1200000000,
-      "duplicate_second_received_at_ns": null
+      "duplicate_second_received_at_ns": null,
+      "previous_request_id": 255,
+      "previous_request_source_timestamp_us": 1250000
     },
     {
       "case_id": "reply_from_previous_capture_window",
