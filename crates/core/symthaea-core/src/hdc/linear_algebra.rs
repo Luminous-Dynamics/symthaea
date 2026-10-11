@@ -1527,64 +1527,73 @@ pub fn preconditioned_conjugate_gradient(
     }
 }
 
-/// Estimate condition number via power iteration (ratio of largest to smallest eigenvalue).
+/// Checked 2-norm condition number from the singular values of a square matrix.
 ///
-/// Uses `iterations` power iteration steps for both max and min eigenvalue estimates.
-pub fn condition_number_estimate(a: &[Vec<f64>], iterations: usize) -> f64 {
+/// This deliberately uses direct SVD rather than one arbitrary vector orthogonal
+/// to a power-iteration estimate of the dominant mode. The latter is not an
+/// estimate of the smallest eigenvalue in general.
+pub fn try_condition_number_estimate(
+    a: &[Vec<f64>],
+    max_iterations: usize,
+) -> Result<f64, String> {
     let n = a.len();
-    if n == 0 {
-        return 1.0;
+    if n == 0 || a.iter().any(|row| row.len() != n) {
+        return Err("condition number requires a non-empty square matrix".to_string());
+    }
+    if max_iterations == 0 {
+        return Err("condition-number SVD iteration budget must be positive".to_string());
+    }
+    if a.iter().flatten().any(|value| !value.is_finite()) {
+        return Err("condition-number input contains a non-finite value".to_string());
     }
 
-    // Estimate largest eigenvalue (power iteration)
-    let mut v = vec![1.0f64; n];
-    let mut lambda_max = 1.0f64;
-    for _ in 0..iterations {
-        let av = mat_vec_mul(a, &v);
-        let norm = vec_norm(&av);
-        if norm < 1e-15 {
-            break;
-        }
-        lambda_max = norm;
-        v = av.iter().map(|&x| x / norm).collect();
+    let scale = a
+        .iter()
+        .flatten()
+        .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+    if scale == 0.0 {
+        return Ok(f64::INFINITY);
     }
 
-    // Estimate smallest eigenvalue via inverse iteration (shift-invert approximation)
-    // Use the deflated matrix A - lambda_max * I and find its most-negative eigenvalue
-    // Simplified: use the Rayleigh quotient on A * v for a near-null vector
-    let mut v2 = vec![1.0f64; n];
-    // Make v2 orthogonal to v (the dominant eigenvector)
-    let proj: f64 = dot(&v2, &v);
-    for i in 0..n {
-        v2[i] -= proj * v[i];
+    // Normalize the input so a finite matrix does not overflow while factorizing.
+    let normalized_data: Vec<f64> = a
+        .iter()
+        .flatten()
+        .map(|value| value / scale)
+        .collect();
+    let matrix = nalgebra::DMatrix::from_row_slice(n, n, &normalized_data);
+    let decomposition = nalgebra::linalg::SVD::try_new(
+        matrix,
+        false,
+        false,
+        f64::EPSILON,
+        max_iterations,
+    )
+    .ok_or_else(|| "condition-number SVD did not converge within its iteration budget".to_string())?;
+    let singular_values: Vec<f64> = decomposition.singular_values.iter().copied().collect();
+
+    if singular_values.len() != n
+        || singular_values.iter().any(|value| !value.is_finite() || *value < 0.0)
+        || singular_values.windows(2).any(|pair| pair[0] < pair[1])
+    {
+        return Err("condition-number SVD returned invalid singular values".to_string());
     }
-    let norm2 = vec_norm(&v2);
-    if norm2 > 1e-10 {
-        for x in &mut v2 {
-            *x /= norm2;
-        }
+
+    let maximum = singular_values[0];
+    let minimum = singular_values[n - 1];
+    let tolerance = n as f64 * SVD_TOLERANCE * maximum;
+    if maximum == 0.0 || minimum <= tolerance {
+        Ok(f64::INFINITY)
     } else {
-        // Fallback: use a simple unit vector orthogonal to v
-        v2 = vec![0.0; n];
-        if n > 1 {
-            v2[1] = 1.0;
-            let proj2: f64 = dot(&v2, &v);
-            for i in 0..n {
-                v2[i] -= proj2 * v[i];
-            }
-            let n2 = vec_norm(&v2);
-            if n2 > 1e-10 {
-                for x in &mut v2 {
-                    *x /= n2;
-                }
-            }
-        }
+        Ok(maximum / minimum)
     }
+}
 
-    let av2 = mat_vec_mul(a, &v2);
-    let lambda_min = dot(&v2, &av2).abs().max(1e-15);
-
-    (lambda_max / lambda_min).max(1.0)
+/// Compatibility wrapper for callers that expect a scalar estimate.
+/// Returns NaN for malformed inputs or solver failure; use
+/// try_condition_number_estimate to distinguish those cases from infinity.
+pub fn condition_number_estimate(a: &[Vec<f64>], iterations: usize) -> f64 {
+    try_condition_number_estimate(a, iterations).unwrap_or(f64::NAN)
 }
 
 // ─── Sparse Matrix (CSR Format) ─────────────────────────────────────────────
