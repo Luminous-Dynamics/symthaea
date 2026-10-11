@@ -16,6 +16,16 @@ const POSITION_ROLE_SEED: u64 = 0x5343_454E_4152_0000;
 /// Version of the experimental relative-record-position encoder.
 pub const ORDERED_SCENARIO_ENCODER_VERSION: &str = "relative-record-position-v1";
 
+/// The semantics of a scenario vector. Keeping this explicit prevents consumers
+/// from accidentally comparing orderless and relative-position representations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScenarioEncodingMode {
+    /// Permutation-invariant bundle; event order is discarded.
+    OrderlessBundle,
+    /// Event vectors are bound to coarse relative parser-record-position roles.
+    RelativeRecordPosition,
+}
+
 /// One independently labeled capture/scenario represented by a bundle of its events.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScenarioEmbedding {
@@ -25,7 +35,9 @@ pub struct ScenarioEmbedding {
     pub label: String,
     /// Number of event vectors bundled into the scenario representation.
     pub event_count: usize,
-    /// Scenario representation. The exact semantics depend on the aggregation mode.
+    /// Mode is metadata, not part of the vector.
+    pub encoding_mode: ScenarioEncodingMode,
+    /// Scenario representation. Its interpretation is defined by encoding_mode.
     pub vector: Hdv,
 }
 
@@ -88,7 +100,7 @@ fn aggregate_with_mode(
     let mut scenarios = Vec::with_capacity(by_group.len());
 
     for (scenario_id, indices) in by_group {
-        let vector = if ordered {
+        let (vector, encoding_mode) = if ordered {
             let roles = position_roles();
             let count = indices.len();
             let position_bound: Vec<Hdv> = indices
@@ -99,17 +111,21 @@ fn aggregate_with_mode(
                     bind(&hvs[index], &roles[bucket])
                 })
                 .collect();
-            bundle(&position_bound)
+            (
+                bundle(&position_bound),
+                ScenarioEncodingMode::RelativeRecordPosition,
+            )
         } else {
             let event_vectors: Vec<Hdv> =
                 indices.iter().map(|&index| hvs[index].clone()).collect();
-            bundle(&event_vectors)
+            (bundle(&event_vectors), ScenarioEncodingMode::OrderlessBundle)
         };
 
         scenarios.push(ScenarioEmbedding {
             scenario_id,
             label: labels[indices[0]].clone(),
             event_count: indices.len(),
+            encoding_mode,
             vector,
         });
     }
@@ -166,6 +182,7 @@ mod tests {
         assert_eq!(scenarios[0].scenario_id, "evtx:a");
         assert_eq!(scenarios[0].label, "persistence");
         assert_eq!(scenarios[0].event_count, 1);
+        assert_eq!(scenarios[0].encoding_mode, ScenarioEncodingMode::OrderlessBundle);
         assert_eq!(scenarios[0].vector, hvs[2]);
         assert_eq!(scenarios[1].scenario_id, "evtx:b");
         assert_eq!(scenarios[1].label, "execution");
@@ -206,6 +223,10 @@ mod tests {
         let first = aggregate_ordered_scenarios(&hvs, &labels, &groups).unwrap();
         let repeated = aggregate_ordered_scenarios(&hvs, &labels, &groups).unwrap();
         assert_eq!(first, repeated);
+        assert_eq!(
+            first[0].encoding_mode,
+            ScenarioEncodingMode::RelativeRecordPosition
+        );
 
         let reversed_hvs: Vec<Hdv> = hvs.iter().rev().cloned().collect();
         let reversed_labels: Vec<String> = labels.iter().rev().cloned().collect();
