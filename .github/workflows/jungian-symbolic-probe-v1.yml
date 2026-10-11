@@ -120,7 +120,7 @@ jobs:
               f"- rust-toolchain.toml SHA-256: `{data['runtime_profile']['rust_toolchain_manifest_sha256']}`",
               f"- Source revision: `{data['source_revision']}`",
               "",
-              "| Baseline | Required-code recall | Required hits | Forbidden flags matching rubric | Cases passing authored rubric | State |",
+              "| Baseline | Declared coverage (not observed behavior) | Declared matches | Declared forbidden claims | Cases declaring complete coverage | State |",
               "|---|---:|---:|---:|---:|---|",
           ]
           for item in data["methods"]:
@@ -132,9 +132,10 @@ jobs:
                   continue
               s = item["summary"]
               lines.append(
-                  f"| {item['method_id']} | {s['required_code_recall']:.3f} | "
-                  f"{s['required_code_hits']}/{s['required_code_total']} | {s['forbidden_code_hits']} | "
-                  f"{s['rubric_case_pass_count']}/14 | executed |"
+                  f"| {item['method_id']} | {s['declared_required_code_claim_coverage']:.3f} | "
+                  f"{s['declared_required_code_matches']}/{s['declared_required_code_total']} | "
+                  f"{s['declared_forbidden_code_claims']} | "
+                  f"{s['cases_declaring_all_required_codes_without_forbidden_claims']}/14 | executed |"
               )
           if data.get("context_pair_diagnostics"):
               lines.extend([
@@ -155,7 +156,7 @@ jobs:
                   )
           lines.extend([
               "",
-              "> These are hand-authored rubric-agreement diagnostics on exposed synthetic development cases. HDC pair metrics are representation geometry only. Neither metric family measures psychological truth, independent human evaluation, holdout performance, or clinical usefulness.",
+              "> The left table measures behavior codes manually declared by the hand-authored baseline implementations; it does not infer behavior from their prose or act as independent output evaluation. HDC pair metrics are representation geometry only. Nothing here measures psychological truth, independent human evaluation, holdout performance, or clinical usefulness.",
               "",
           ])
           with open(sys.argv[2], "a", encoding="utf-8") as f:
