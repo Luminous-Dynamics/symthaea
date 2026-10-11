@@ -1,11 +1,24 @@
 {
+  "current_reference_checker": {
+    "expected_check_count": 56,
+    "git_blob_sha": "1162b0762422cf0f230b9ae556b4c780464d264f",
+    "path": "scripts/engineering/orbital_ring_reference_check.py",
+    "sha256": "f59cb6e5625aba24a9ef69c5bdebef360aaef5e058fda2de0f589c1ecb9d80a8"
+  },
   "current_validator": {
     "expected_self_test_check_count": 84,
     "git_blob_sha": "e6f79e02689da61686af383ebfff470b26549b0c",
     "path": "scripts/engineering/validate_orbital_ring_failure_manifest.py",
     "sha256": "ec7e01912c730df7bd0d9afb3eedced99be30de264cabc5d690278e2c72fbd81"
   },
-  "execution_note": "Current source adds eleven fail-closed regression cases beyond the last executed 73-check source. They remain unexecuted locally; do not mark the 84-check suite passed until the draft-safe workflow runs on this exact source fingerprint. The expected gate now reports Blocked for structural contract failures as well as field-level blockers.",
+  "execution_note": "Validator suite (84 expected checks) and reference-checker suite (56 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow must verify the exact current hashes, repeat outputs byte-for-byte, and compare the blocked template report. The last executed counts apply only to the exact historical source blobs listed here.",
+  "last_executed_reference_check": {
+    "checker_git_blob_sha": "7adbaab223517494332711b480bdf37e0b216811",
+    "checker_sha256": "",
+    "checks_failed": 0,
+    "checks_passed": 47,
+    "verification_state": "passed_for_exact_prior_source_only"
+  },
   "last_executed_self_test": {
     "checks_failed": 0,
     "checks_passed": 73,
