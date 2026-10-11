@@ -309,6 +309,8 @@ pub enum NumericArithmeticError {
     IndeterminatePower,
     /// Zero raised to a negative exponent requires division by zero.
     ZeroToNegativePower,
+    /// A nonzero power underflowed completely to floating-point zero.
+    UnderflowToZero,
     /// An input Real was NaN or infinite.
     NonFiniteOperand,
     /// A finite input operation produced a non-finite floating-point result.
@@ -325,6 +327,7 @@ impl std::fmt::Display for NumericArithmeticError {
             Self::DivisionByZero => write!(f, "division by zero"),
             Self::IndeterminatePower => write!(f, "zero raised to zero is indeterminate"),
             Self::ZeroToNegativePower => write!(f, "zero cannot be raised to a negative exponent"),
+            Self::UnderflowToZero => write!(f, "nonzero power underflowed to floating-point zero"),
             Self::NonFiniteOperand => write!(f, "operand is NaN or infinite"),
             Self::NonFiniteResult => write!(f, "operation produced a non-finite result"),
             Self::ExactResultOutOfRange => {
@@ -905,6 +908,12 @@ impl NumericTower {
 
         let result = self.power(base, exponent);
         Self::validate_checked_result(&result.number)?;
+        if !base.is_zero_exact()
+            && !exponent.is_zero_exact()
+            && matches!(result.number, Number::Real(value) if value == 0.0)
+        {
+            return Err(NumericArithmeticError::UnderflowToZero);
+        }
         let precision = if matches!(result.number, Number::Real(_)) {
             ArithmeticPrecision::Approximate
         } else {
@@ -2376,7 +2385,7 @@ mod tests {
             &Number::Natural(64),
         ).unwrap();
         assert_eq!(result.precision, ArithmeticPrecision::Approximate);
-        assert!(matches!(result.result.number, Number::Real(value) if value.is_finite() && value > u64::MAX as f64));
+        assert!(matches!(result.result.number, Number::Real(value) if value.is_finite() && value >= u64::MAX as f64));
     }
 
     #[test]
@@ -2400,6 +2409,10 @@ mod tests {
         assert_eq!(
             tower.checked_power(&Number::Integer(-4), &Number::Rational { numerator: 1, denominator: 2 }).unwrap_err(),
             NumericArithmeticError::NonFiniteResult
+        );
+        assert_eq!(
+            tower.checked_power(&Number::Natural(2), &Number::Integer(i64::MIN)).unwrap_err(),
+            NumericArithmeticError::UnderflowToZero
         );
     }
 
