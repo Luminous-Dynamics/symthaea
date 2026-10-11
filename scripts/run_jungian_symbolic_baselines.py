@@ -1,0 +1,594 @@
+#!/usr/bin/env python3
+"""Run transparent lexical-foil and context-rule baselines on JUNG-001C.
+
+The lexical foil is intentionally context-blind. The context baseline is a
+small deterministic rule set, not an HDC implementation or psychological
+model. Their metrics indicate agreement with an authored development rubric,
+not psychological truth or clinical validity.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CORPUS = ROOT / "docs/research/data/jungian_symbolic_probe_v1.json"
+CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
+OUTPUT_SCHEMA = "symthaea-jungian-normalized-results-v1"
+REPORT_SCHEMA = "symthaea-jungian-baseline-comparison-v1"
+RESULT_KEYS = {"case_id", "observations", "interpretations", "open_questions", "abstention"}
+OBSERVATION_KEYS = {"evidence_id", "exact_span", "source_scope"}
+INTERPRETATION_KEYS = {"hypothesis_id", "statement", "scope", "supporting_evidence_ids", "contradicting_evidence_ids", "epistemic_status"}
+
+# This dictionary intentionally assigns a single decontextualized association
+# to keywords. It exists as a failure-prone foil, never as a production model.
+LEXICAL_DICTIONARY = {
+    "archetype": "archetypal pattern",
+    "shadow": "unacknowledged aspect of the psyche",
+    "anima": "Jungian anima motif",
+    "animus": "Jungian animus motif",
+    "unconscious": "unconscious-process motif",
+    "hero": "hero-archetype motif",
+    "owl": "wisdom",
+    "key": "access or transition",
+    "bridge": "transition or reconciliation",
+    "garden": "growth or refuge",
+    "red thread": "connection or fate",
+    "cellar": "unconscious depth",
+    "river": "transition",
+}
+TOKEN_RE = re.compile(r"(?<!\w)(" + "|".join(re.escape(x) for x in sorted(LEXICAL_DICTIONARY, key=len, reverse=True)) + r")(?!\w)", re.IGNORECASE)
+JUNG_TERMS = {"archetype", "shadow", "anima", "animus", "unconscious", "hero"}
+
+
+class BaselineError(ValueError):
+    pass
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise BaselineError(message)
+
+
+def strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in out:
+            raise BaselineError(f"duplicate JSON object key: {key}")
+        out[key] = value
+    return out
+
+
+def load_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=strict_object)
+
+
+def canonical_json(value: Any) -> bytes:
+    return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def unique(xs: list[str]) -> list[str]:
+    return list(dict.fromkeys(xs))
+
+
+def observation_rows(case: dict[str, Any]) -> list[dict[str, str]]:
+    return [
+        {
+            "evidence_id": span["id"],
+            "exact_span": span["text"],
+            "source_scope": "Synthetic case input; exact frozen span",
+        }
+        for span in case["evidence_spans"]
+    ]
+
+
+def find_span_ids(case: dict[str, Any], needle: str) -> list[str]:
+    low_needle = needle.casefold()
+    return [
+        span["id"] for span in case["evidence_spans"]
+        if low_needle in span["text"].casefold()
+    ]
+
+
+def find_relevant_span_ids(case: dict[str, Any], terms: list[str]) -> list[str]:
+    selected = []
+    for span in case["evidence_spans"]:
+        low = span["text"].casefold()
+        if any(term.casefold() in low for term in terms):
+            selected.append(span["id"])
+    return selected
+
+
+def make_hypothesis(
+    hypothesis_id: str,
+    statement: str,
+    scope: str,
+    support: list[str],
+    contradict: list[str] | None = None,
+    status: str = "InterpretationHypothesis",
+) -> dict[str, Any]:
+    return {
+        "hypothesis_id": hypothesis_id,
+        "statement": statement,
+        "scope": scope,
+        "supporting_evidence_ids": unique(support),
+        "contradicting_evidence_ids": unique(contradict or []),
+        "epistemic_status": status,
+    }
+
+
+def make_result(
+    case: dict[str, Any],
+    interpretations: list[dict[str, Any]],
+    questions: list[str],
+    abstain: bool,
+    reason: str,
+) -> dict[str, Any]:
+    result = {
+        "case_id": case["id"],
+        "observations": observation_rows(case),
+        "interpretations": interpretations,
+        "open_questions": unique(questions),
+        "abstention": {"abstain": abstain, "reason": reason},
+    }
+    require(set(result) == RESULT_KEYS, f"{case['id']}: internal result schema drift")
+    for item in result["interpretations"]:
+        require(set(item) == INTERPRETATION_KEYS, f"{case['id']}: internal interpretation schema drift")
+    for item in result["observations"]:
+        require(set(item) == OBSERVATION_KEYS, f"{case['id']}: internal observation schema drift")
+    return result
+
+
+def lexical_foil(case: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Emit fixed dictionary candidates regardless of local context."""
+    text = case["input_text"]
+    interpretations: list[dict[str, Any]] = []
+    questions: list[str] = []
+    signals = ["cite_input_evidence"]
+    matches = list(TOKEN_RE.finditer(text))
+    if matches:
+        signals.append("treat_keyword_overlap_as_evidence")
+        signals.append("claim_universal_symbol_meaning")
+    terms_seen: set[str] = set()
+    for index, match in enumerate(matches, start=1):
+        term = match.group(0).casefold()
+        if term in terms_seen:
+            continue
+        terms_seen.add(term)
+        mapped = LEXICAL_DICTIONARY[term]
+        direct_spans = find_span_ids(case, term)
+        if direct_spans:
+            support = direct_spans
+            status = "InterpretationHypothesis"
+            statement = f"Context-blind dictionary candidate: '{term}' maps to '{mapped}'."
+        else:
+            # Do not invent an evidence span if the corpus's selected spans
+            # do not contain the token. Preserve the lexical hit as a question.
+            support = []
+            status = "OpenQuestion"
+            statement = f"The input contains the token '{term}', but no frozen evidence span isolates it; what role does it play here?"
+            questions.append(f"Where and how is '{term}' used in this passage?")
+        interpretations.append(
+            make_hypothesis(
+                f"KW-{index:02d}",
+                statement,
+                "Intentionally context-blind fixed dictionary; development foil only",
+                support,
+                status=status,
+            )
+        )
+    if any(term in terms_seen for term in {"anima", "animus"}):
+        signals.append("infer_gender_identity")
+    if not matches:
+        questions.append("The lexical dictionary found no configured symbol token; context remains unclassified.")
+    abstain = not bool(matches)
+    reason = (
+        "This foil intentionally maps configured words to fixed associations without context; outputs must not be used in user-facing inference."
+        if matches
+        else "No configured lexical trigger was found; no interpretation is emitted."
+    )
+    return make_result(case, interpretations, questions, abstain, reason), unique(signals)
+
+
+def context_rule_baseline(case: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Conservative hand-authored rules using only the input and exact spans."""
+    text = case["input_text"]
+    low = text.casefold()
+    interpretations: list[dict[str, Any]] = []
+    questions: list[str] = []
+    signals = ["cite_input_evidence", "distinguish_observation_from_hypothesis"]
+    abstain = False
+    reason = "A narrow deterministic rule matched local narrative evidence; this is not an empirical psychological inference."
+
+    def add(statement: str, terms: list[str], hid: str = "CTX-01",
+            contradict_terms: list[str] | None = None, scope: str = "This synthetic text only") -> None:
+        support = find_relevant_span_ids(case, terms)
+        contradiction = find_relevant_span_ids(case, contradict_terms or [])
+        interpretations.append(make_hypothesis(hid, statement, scope, support, contradiction))
+
+    # Explicitly literal disambiguation outranks the keyword foil.
+    if "tree's shadow" in low or "lighting effect" in low:
+        add(
+            "The local text uses 'shadow' as a physical shade or lighting term; the passage does not support a Jungian inference from that word alone.",
+            ["shadow", "tree", "lighting effect"],
+        )
+        signals.extend(["treat_literal_usage_literally", "reject_keyword_only_support", "return_context_bound_reading"])
+        if "lighting effect" in low:
+            add(
+                "The text explicitly explains that the phrase refers to a lighting effect in a theater review.",
+                ["lighting effect", "theater review"],
+                hid="CTX-02",
+            )
+    elif "prop-box names" in low or "prop box names" in low:
+        add(
+            "The Jungian terms are explicitly described as prop-box labels, so their occurrence is not evidence for a psychological reading.",
+            ["prop-box names", "simple timetable announcement"],
+        )
+        signals.extend(["reject_keyword_only_support", "treat_literal_usage_literally", "return_context_bound_reading"])
+    # Conflicting source notes must remain separate, with source-specific support.
+    elif (("source a" in low and "source b" in low) or ("version one" in low and "version two" in low)):
+        spans = case["evidence_spans"]
+        if len(spans) >= 2:
+            left_id, right_id = spans[0]["id"], spans[1]["id"]
+            interpretations.append(make_hypothesis(
+                "CTX-A",
+                "The first fictional source associates the symbol with the meaning stated in its own note; retain that attribution rather than generalizing it.",
+                "First fictional source only",
+                [left_id], [right_id],
+            ))
+            interpretations.append(make_hypothesis(
+                "CTX-B",
+                "The second fictional source gives a different account; preserve this as disagreement rather than averaging the meanings.",
+                "Second fictional source only",
+                [right_id], [left_id],
+            ))
+        questions.append("What are the provenance and context of each source? The notes do not establish a universal meaning.")
+        signals.extend(["preserve_source_disagreement", "return_competing_readings", "keep_cultural_scope_explicit", "return_context_bound_reading"])
+        reason = "The available notes conflict; both are retained with source-local scope."
+    elif "dreamed about an owl" in low or ("dream" in low and "what does it mean" in low):
+        questions.extend([
+            "What associations do you personally have with the owl, if any?",
+            "Is there a particular cultural, religious, literary, or personal context you want considered?",
+        ])
+        interpretations.append(make_hypothesis(
+            "CTX-Q1",
+            "A personal-association reading could begin with the dreamer's own associations, but this text does not identify them.",
+            "Possible inquiry frame, not a dream interpretation",
+            [],
+            status="OpenQuestion",
+        ))
+        interpretations.append(make_hypothesis(
+            "CTX-Q2",
+            "A tradition-specific reading would require the relevant source or cultural context; no single reading can be selected from the prompt alone.",
+            "Possible inquiry frame, not a universal symbol dictionary",
+            [],
+            status="OpenQuestion",
+        ))
+        signals.extend(["ask_clarifying_question_or_abstain", "return_competing_readings", "abstain_from_personal_inference"])
+        abstain = True
+        reason = "Personal and cultural context is missing; the baseline asks rather than assigning a dream meaning."
+    elif "grandmother gave me a red thread" in low:
+        questions.extend([
+            "What did the thread mean to you or your grandmother, if anything?",
+            "Would you like a personal, family-history, literary, or specific cultural reading?",
+        ])
+        interpretations.append(make_hypothesis(
+            "CTX-Q1",
+            "The passage establishes a gift and a time of moving away, but not the thread's personal meaning.",
+            "Textual observation; personal meaning undetermined",
+            find_relevant_span_ids(case, ["grandmother", "moved away", "red thread"]),
+        ))
+        signals.extend(["ask_clarifying_question_or_abstain", "abstain_from_personal_inference", "distinguish_observation_from_hypothesis"])
+        abstain = True
+        reason = "The personal association is not specified; no universal meaning is imposed."
+    elif "i am not afraid" in low and "because the recording keeps flickering" in low:
+        add(
+            "Ari explicitly denies fear and gives a practical reason for checking the room; the text supplies no evidence to override that self-report.",
+            ["I am not afraid", "recording keeps flickering"],
+        )
+        signals.extend(["preserve_self_report", "abstain_from_personal_inference", "return_context_bound_reading"])
+    elif "anima" in low and "handout" in low:
+        add(
+            "The word appears in a handout comparing historical theories; the attendee's stated concern is citation quality, not a personal identity disclosure.",
+            ["anima", "historical theories", "clearer citations"],
+        )
+        signals.extend(["abstain_from_personal_inference", "keep_cultural_scope_explicit", "return_context_bound_reading"])
+    elif "turned the key" in low and "interview room" in low:
+        add(
+            "Turning the key is directly linked to entering the interview room; the text supports a concrete access/entry event but does not determine a universal symbolic meaning.",
+            ["turned the key", "entered the interview room", "practiced every evening"],
+        )
+        signals.extend(["return_context_bound_reading", "distinguish_observation_from_hypothesis"])
+    elif "key bent in the lock" in low and "door stayed shut" in low:
+        add(
+            "The key fails mechanically and the door remains closed; that local causal role is sufficient without a fixed symbolic meaning.",
+            ["key bent in the lock", "door stayed shut", "could not retrieve the records"],
+        )
+        signals.extend(["return_context_bound_reading", "treat_literal_usage_literally"])
+    elif "avoids the cellar in three scenes" in low:
+        add(
+            "The fictional character avoids the cellar earlier and later enters to retrieve a notebook; this supports describing a narrative change, not diagnosing a complex or trauma.",
+            ["avoids the cellar", "enters it to retrieve a lost notebook", "leaves when the task is finished"],
+        )
+        signals.extend(["describe_narrative_change_only", "abstain_from_personal_inference", "return_context_bound_reading"])
+    elif "at first" in low and "later" in low and "cross the river" in low:
+        add(
+            "The protagonist changes from refusing to crossing after checking conditions and making a safety marker; report that narrative sequence without assigning a developmental stage.",
+            ["At first", "Later", "checking the current"],
+        )
+        signals.extend(["describe_narrative_change_only", "return_context_bound_reading", "abstain_from_personal_inference"])
+    elif "chair stands beside a window" in low and "room is otherwise empty" in low:
+        questions.append("What context, if any, should guide a reading of this scene?")
+        signals.extend(["ask_clarifying_question_or_abstain", "abstain_from_personal_inference", "reject_keyword_only_support"])
+        abstain = True
+        reason = "The sparse scene does not support an interpretation of hidden motives, pathology, or a personal complex."
+    else:
+        # Generic, fail-closed fallback; state what the passage literally says.
+        signals.extend(["ask_clarifying_question_or_abstain", "abstain_from_personal_inference"])
+        questions.append("What context or interpretive tradition, if any, should guide the reading?")
+        abstain = True
+        reason = "No narrow context rule applied; the baseline abstains rather than inventing a symbolic meaning."
+
+    return make_result(case, interpretations, questions, abstain, reason), unique(signals)
+
+
+def validate_normalized_bundle(bundle: Any, corpus: dict[str, Any]) -> None:
+    require(isinstance(bundle, dict), "normalized result bundle must be an object")
+    required = {"schema", "corpus_id", "corpus_version", "source_revision", "implementation_id", "config_sha256", "results"}
+    require(set(bundle) == required, "normalized result bundle has unexpected keys")
+    require(bundle["schema"] == OUTPUT_SCHEMA, "normalized result schema mismatch")
+    require(bundle["corpus_id"] == corpus["corpus_id"] and bundle["corpus_version"] == corpus["version"], "normalized result corpus identity mismatch")
+    require(isinstance(bundle["source_revision"], str) and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", bundle["source_revision"]), "source_revision must be a full lowercase Git object ID")
+    require(bool(bundle["implementation_id"]), "implementation_id missing")
+    require(re.fullmatch(r"[0-9a-f]{64}", bundle["config_sha256"]) is not None, "config_sha256 must be 64 lowercase hex characters")
+    expected_cases = {case["id"]: case for case in corpus["cases"]}
+    require(isinstance(bundle["results"], list) and len(bundle["results"]) == len(expected_cases), "normalized results case count mismatch")
+    seen: set[str] = set()
+    for result in bundle["results"]:
+        require(set(result) == RESULT_KEYS, "normalized case has unexpected keys")
+        cid = result["case_id"]
+        require(cid in expected_cases and cid not in seen, f"unknown/duplicate normalized case ID: {cid}")
+        seen.add(cid)
+        span_map = {span["id"]: span["text"] for span in expected_cases[cid]["evidence_spans"]}
+        seen_evidence: set[str] = set()
+        require(isinstance(result["observations"], list), "observations must be an array")
+        for obs in result["observations"]:
+            require(set(obs) == OBSERVATION_KEYS, "observation schema mismatch")
+            eid = obs["evidence_id"]
+            require(eid in span_map and eid not in seen_evidence, f"unknown/duplicate evidence id in {cid}: {eid}")
+            seen_evidence.add(eid)
+            require(obs["exact_span"] == span_map[eid], f"tampered evidence span in {cid}: {eid}")
+            require(bool(obs["source_scope"]), f"missing source scope for {cid}:{eid}")
+        require(isinstance(result["interpretations"], list), "interpretations must be an array")
+        hypothesis_ids: set[str] = set()
+        for hypothesis in result["interpretations"]:
+            require(set(hypothesis) == INTERPRETATION_KEYS, "interpretation schema mismatch")
+            hid = hypothesis["hypothesis_id"]
+            require(bool(hid) and hid not in hypothesis_ids, f"missing/duplicate hypothesis ID in {cid}")
+            hypothesis_ids.add(hid)
+            require(hypothesis["epistemic_status"] in {"InterpretationHypothesis", "ScholarlyInterpretation", "OpenQuestion"}, "unknown epistemic status")
+            supports = hypothesis["supporting_evidence_ids"]
+            contradicts = hypothesis["contradicting_evidence_ids"]
+            require(isinstance(supports, list) and isinstance(contradicts, list), "evidence references must be arrays")
+            require(len(supports) == len(set(supports)) and len(contradicts) == len(set(contradicts)), "duplicate hypothesis evidence reference")
+            require(set(supports + contradicts) <= set(span_map), f"unknown evidence reference in {cid}:{hid}")
+            require(set(supports + contradicts) <= seen_evidence, f"cited evidence not emitted as observation in {cid}:{hid}")
+            require(not (set(supports) & set(contradicts)), f"evidence both supports and contradicts {cid}:{hid}")
+            require(bool(hypothesis["statement"]) and bool(hypothesis["scope"]), "empty hypothesis statement or scope")
+            if hypothesis["epistemic_status"] != "OpenQuestion":
+                require(bool(supports), f"non-question hypothesis has no support in {cid}:{hid}")
+        require(isinstance(result["open_questions"], list), "open_questions must be an array")
+        require(len(result["open_questions"]) == len(set(result["open_questions"])), "duplicate open question")
+        require(isinstance(result["abstention"], dict) and set(result["abstention"]) == {"abstain", "reason"}, "abstention schema mismatch")
+        require(isinstance(result["abstention"]["abstain"], bool) and bool(result["abstention"]["reason"]), "bad abstention status/reason")
+
+
+def write_result_bundle(corpus: dict[str, Any], corpus_digest: str, method_id: str,
+                        outputs: list[dict[str, Any]], output_path: Path, config: dict[str, Any]) -> str:
+    bundle = {
+        "schema": OUTPUT_SCHEMA,
+        "corpus_id": corpus["corpus_id"],
+        "corpus_version": corpus["version"],
+        "source_revision": "0000000000000000000000000000000000000000",
+        "implementation_id": method_id,
+        "config_sha256": hashlib.sha256(canonical_json(config)).hexdigest(),
+        "results": outputs,
+    }
+    validate_normalized_bundle(bundle, corpus)
+    raw = canonical_json(bundle)
+    output_path.write_bytes(raw)
+    # Bind the generated bytes, not an assumed CI execution status.
+    return hashlib.sha256(raw).hexdigest()
+
+
+def summarize_method(cases: list[dict[str, Any]], predictions: dict[str, list[str]]) -> dict[str, Any]:
+    required_total = required_hit = forbidden_total = forbidden_hit = 0
+    case_required_misses = case_forbidden_hits = 0
+    per_case = []
+    for case in cases:
+        required = set(case["required_behaviors"])
+        forbidden = set(case["forbidden_behaviors"])
+        emitted = set(predictions[case["id"]])
+        req_hit = required & emitted
+        forb_hit = forbidden & emitted
+        required_total += len(required)
+        required_hit += len(req_hit)
+        forbidden_total += len(forbidden)
+        forbidden_hit += len(forb_hit)
+        case_required_misses += int(bool(required - emitted))
+        case_forbidden_hits += int(bool(forb_hit))
+        per_case.append({
+            "case_id": case["id"],
+            "required_codes": sorted(required),
+            "emitted_codes": sorted(emitted),
+            "required_hits": sorted(req_hit),
+            "required_misses": sorted(required - emitted),
+            "forbidden_codes": sorted(forbidden),
+            "forbidden_hits": sorted(forb_hit),
+            "rubric_case_pass": not bool(required - emitted) and not bool(forb_hit),
+        })
+    return {
+        "required_code_total": required_total,
+        "required_code_hits": required_hit,
+        "required_code_misses": required_total - required_hit,
+        "required_code_recall": required_hit / required_total if required_total else None,
+        "forbidden_code_total": forbidden_total,
+        "forbidden_code_hits": forbidden_hit,
+        "cases_missing_at_least_one_required_code": case_required_misses,
+        "cases_with_at_least_one_forbidden_flag": case_forbidden_hits,
+        "rubric_case_pass_count": sum(row["rubric_case_pass"] for row in per_case),
+        "per_case": per_case,
+    }
+
+
+def run_method(cases: list[dict[str, Any]], method) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
+    results: list[dict[str, Any]] = []
+    signals: dict[str, list[str]] = {}
+    for case in cases:
+        result, emitted = method(case)
+        require(result["case_id"] == case["id"], "method changed case identity")
+        results.append(result)
+        signals[case["id"]] = emitted
+    return results, signals
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
+    parser.add_argument("--output-dir", type=Path, required=True, help="directory for immutable-by-digest output captures")
+    parser.add_argument("--source-revision", required=True, help="exact 40- or 64-character lowercase Git revision under test")
+    args = parser.parse_args()
+
+    try:
+        corpus_bytes = args.corpus.read_bytes()
+        corpus = load_json(args.corpus)
+        require(corpus.get("schema") == CORPUS_SCHEMA, "unexpected corpus schema")
+        require(corpus.get("status") == "DevelopmentProbe" and corpus.get("split") == "ExposedDevelopment", "refusing to treat an exposed set as holdout data")
+        require(re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", args.source_revision) is not None, "--source-revision must be a full lowercase Git object ID")
+        cases = corpus["cases"]
+        require(len(cases) == 14 and len({c["id"] for c in cases}) == len(cases), "unexpected or duplicate corpus case set")
+        corpus_digest = hashlib.sha256(corpus_bytes).hexdigest()
+        runner_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+
+        methods = [
+            ("keyword_dictionary_foil_v0", lexical_foil, {
+                "class": "Intentionally context-blind failure-prone foil",
+                "purpose": "Expose cases where fixed keyword-to-meaning mappings overgeneralize.",
+                "production_use": False,
+            }),
+            ("context_guardrails_rules_v0", context_rule_baseline, {
+                "class": "Hand-authored deterministic context rules",
+                "purpose": "Probe explicit context, attribution, and abstention paths before adding an HDC adapter.",
+                "production_use": False,
+            }),
+        ]
+        capture = {
+            "schema": REPORT_SCHEMA,
+            "corpus_id": corpus["corpus_id"],
+            "corpus_version": corpus["version"],
+            "corpus_status": corpus["status"],
+            "corpus_split": corpus["split"],
+            "corpus_sha256": corpus_digest,
+            "runner_sha256": runner_digest,
+            "source_revision": args.source_revision,
+            "claim_ceiling": "Rule output and rubric agreement only; no psychological truth, archetype validity, clinical efficacy, or consciousness claim.",
+            "metric_warning": "Required/forbidden behavior labels are hand-authored development rubrics. Scores are not blinded human evaluation, scientific accuracy, model generalization, or holdout performance.",
+            "methods": [],
+            "cases": [],
+        }
+        outputs_by_method: dict[str, list[dict[str, Any]]] = {}
+        signals_by_method: dict[str, dict[str, list[str]]] = {}
+        config_hashes: dict[str, str] = {}
+
+        for method_id, method, metadata in methods:
+            outputs, signals = run_method(cases, method)
+            # Re-run immediately to catch hidden nondeterminism in the baseline implementation.
+            outputs_again, signals_again = run_method(cases, method)
+            require(canonical_json(outputs) == canonical_json(outputs_again), f"{method_id} normalized outputs are nondeterministic")
+            require(canonical_json(signals) == canonical_json(signals_again), f"{method_id} behavior signals are nondeterministic")
+            normalized_path = args.output_dir / f"{method_id}.normalized.json"
+            config = {"method_id": method_id, **metadata, "corpus_sha256": corpus_digest}
+            result_digest = write_result_bundle(corpus, corpus_digest, method_id, outputs, normalized_path, config)
+            # Bind the exact tested source revision rather than a placeholder.
+            bundle = load_json(normalized_path)
+            bundle["source_revision"] = args.source_revision
+            normalized_path.write_bytes(canonical_json(bundle))
+            result_digest = hashlib.sha256(normalized_path.read_bytes()).hexdigest()
+            outputs_by_method[method_id] = outputs
+            signals_by_method[method_id] = signals
+            config_hashes[method_id] = hashlib.sha256(canonical_json(config)).hexdigest()
+            summary = summarize_method(cases, signals)
+            capture["methods"].append({
+                "method_id": method_id,
+                **metadata,
+                "state": "executed",
+                "normalized_output_file": normalized_path.name,
+                "normalized_output_sha256": result_digest,
+                "config_sha256": config_hashes[method_id],
+                "execution_replay": "byte-identical within this process",
+                "summary": {k: v for k, v in summary.items() if k != "per_case"},
+            })
+
+        # The actual Glyph/HDC projection has not been called by this runner.
+        capture["methods"].append({
+            "method_id": "glyph_hdc",
+            "class": "Symthaea Glyph/HDC model",
+            "state": "not_run",
+            "reason": "No adapter from glyph_basis/HDC projection to this normalized interpretation contract is implemented in this PR. The deterministic context-rule baseline must not be presented as HDC.",
+            "summary": None,
+        })
+
+        for case in cases:
+            capture["cases"].append({
+                "case_id": case["id"],
+                "annotations": {
+                    "required_behaviors": case["required_behaviors"],
+                    "forbidden_behaviors": case["forbidden_behaviors"],
+                },
+                "methods": [
+                    {
+                        "method_id": method_id,
+                        "emitted_behavior_codes": signals_by_method[method_id][case["id"]],
+                        "required_hits": sorted(set(case["required_behaviors"]) & set(signals_by_method[method_id][case["id"]])),
+                        "required_misses": sorted(set(case["required_behaviors"]) - set(signals_by_method[method_id][case["id"]])),
+                        "forbidden_hits": sorted(set(case["forbidden_behaviors"]) & set(signals_by_method[method_id][case["id"]])),
+                    }
+                    for method_id, _, _ in methods
+                ],
+            })
+
+        report_path = args.output_dir / "baseline_comparison.json"
+        report_path.write_bytes(canonical_json(capture))
+        report_digest = hashlib.sha256(report_path.read_bytes()).hexdigest()
+
+        print(f"corpus_sha256={corpus_digest}")
+        print(f"runner_sha256={runner_digest}")
+        print(f"source_revision={args.source_revision}")
+        print(f"comparison_report={report_path}")
+        print(f"comparison_report_sha256={report_digest}")
+        for item in capture["methods"]:
+            if item["state"] != "executed":
+                print(f"{item['method_id']}: NOT_RUN ({item['reason']})")
+                continue
+            summary = item["summary"]
+            print(
+                f"{item['method_id']}: required_recall={summary['required_code_recall']:.4f}; "
+                f"required_hits={summary['required_code_hits']}/{summary['required_code_total']}; "
+                f"forbidden_hits={summary['forbidden_code_hits']}; "
+                f"rubric_case_pass={summary['rubric_case_pass_count']}/14; "
+                f"replay=byte-identical"
+            )
+        return 0
+    except (OSError, json.JSONDecodeError, BaselineError, KeyError, TypeError) as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
