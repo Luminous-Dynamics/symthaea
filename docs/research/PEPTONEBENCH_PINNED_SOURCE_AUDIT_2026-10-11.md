@@ -16,6 +16,10 @@
   - `src/peptonebench/reweighting.py`: `bda72db8b6b448368b94d2338361c6c702e1c314`
   - `src/peptonebench/config.py`: `4fc13e5c89c96d2bc26c7837d0ea09b22b544c7e`
   - `datasets/downloadDBs.sh`: `ce11ac91fed463b5f8bbb7b408aac7194566eecd`
+  - `forward-models/README.md`: `d4564197bc1fb8f058e26512b1323e8723bce866`
+  - `forward-models/Dockerfile`: `fb5f318a6f647b6e9bbb34de784cd9f09c59960a`
+  - `forward-models/env.yaml`: `b91cef732dcc1168daece666b471cd415a0f76e8`
+  - `forward-models/run_forward_model.py`: `8cb739ca61868d75cd6856821734b4c7b5f1f35a`
   - `LICENSE`: `d4979f5870d4f55ebe12ddc01bad61e05c3a4df0`
 
 The blob hashes identify individual file contents. The commit SHA identifies the source tree revision. Neither verifies a locally downloaded data archive or a runtime environment.
@@ -43,6 +47,16 @@ The CLI defaults `--ess-target` to `10.0`; the current call forwards it as the a
 `pyproject.toml` requires Python >=3.11 and declares scientific dependencies using compatible-release constraints (for example `numpy~=2.3.3`, `scipy~=1.16.2`) rather than exact hashes for every resolved artifact. Forward models have separate setup/Docker instructions. An install that succeeds later may resolve a different environment.
 
 For any reproduction, retain the resolved package inventory, Python/platform details, Docker image digest(s) for forward models, command line, environment variables (including `N_JOBS` and `PEPTONEDB_PATH`), and hashes of all inputs/outputs. Prefer an immutable image digest over a mutable tag.
+
+### Forward-model build is a separate, less-pinned environment
+
+At the pinned revision, the scoring package requires Python >=3.11, while `forward-models/env.yaml` targets Python 3.8 and older numerical packages. Do not combine those environments; build/run the scoring package and forward-model container as separate, versioned stages.
+
+The forward-model Dockerfile uses a base image tag rather than an image digest, runs mutable `apt-get update`, downloads SPARTA+ and Pepsi-SAXS directly, clones Reduce without pinning a commit, and expects UCBShift model weights to be downloaded manually from Dryad as `models.tgz`. It pins a CSpred source commit, but the manually supplied model weights and other external artifacts have no hash check in the inspected build instructions. The image also downloads/extracts PeptoneDBs during build without verifying a publisher checksum.
+
+The upstream README points to a precomputed [`Predictions.tar.gz` archive](https://zenodo.org/records/17306061/files/Predictions.tar.gz) containing generated ensembles and forward-model predictions. This offers a better **score-only reproduction lane** before attempting a full forward-model build. Its current archive size, publisher checksum, and selective-extraction path have not yet been captured in this project's evidence bundle, so do not assume the archive is small or fetch it unbounded.
+
+A metadata-first [verified Zenodo fetcher](../../scripts/research/fetch_verified_zenodo_file.py) has been added. Its default mode reports the exact record/file size and checksum without downloading bytes. Download mode requires an explicit byte cap, verifies the provider-declared checksum and size, retains raw record metadata, computes a local SHA-256, refuses overwrite by default, and never extracts the archive. Thirteen offline/mocked tests cover caps, malformed metadata, checksum/size mismatch, and overwrite/path safety. This fetcher has **not** yet queried Zenodo or downloaded a dataset in the present sandbox.
 
 ### 4. The dataset download helper does not verify archive identity
 
@@ -73,11 +87,14 @@ The normal minimization path is initialized deterministically by the current cal
 3. Build the documented forward-model environment(s) and record immutable image digests and the fully resolved Python dependency list.
 4. Download only the smallest data/asset subset needed; preserve original archives, verify any published checksums, and compute local SHA-256 hashes before extraction/use.
 
-**Gate B — a golden reference case**
-1. Identify one specific labelled protein case and its raw ensemble, forward-model output, and experimental observation files. Hash every input and record the exact CLI/configuration.
-2. Run the unmodified upstream benchmark in a quarantined environment; retain stdout/stderr, exit status, per-target outcome, raw output CSVs, reweight weights, and generated plots if enabled.
-3. Repeat the same case in a fresh environment from the same pinned artifacts. Compare deterministic fields exactly; for numerically variable fields, preregister tolerances and report differences. Verify whether the optimizer enters the randomized retry path.
-4. Reconcile each metric against source-level definitions; do not infer success from file presence or a process exit code alone.
+**Gate B0 — score-only golden reference (preferred first)**
+1. Query Zenodo metadata for `Predictions.tar.gz` before downloading; record the file size, published checksum, record/version DOI, and metadata response hash. Apply an explicit byte cap to any download, preserve the archive, and verify both the publisher-declared digest and local SHA-256. Do not extract the whole archive blindly; list members and select one labelled case plus the exact dataset/observable inputs it needs.
+2. Run the unmodified pinned scoring package over that already-generated case. This isolates score/reweight reproduction from the separate protein-ensemble generator and forward-model stack.
+3. Retain stdout/stderr, exit status, optimizer diagnostics/retry path, target-level outcome, raw output CSVs, weights, environment lock, and hashes. Repeat the case in a fresh environment; compare deterministic outputs exactly and preregister tolerances for numerical variation.
+4. Reconcile every score to source definitions. A command exit or file presence is not a reproduction pass.
+
+**Gate B1 — regenerate forward models (separate, optional before controller work)**
+Only after the score-only evaluator pass, decide whether regenerated forward-model predictions are needed. If so, separately pin the container digest, OS packages, source commits, external binaries, manual model weights, conda/pip resolutions, and data assets. Test prediction regeneration against the published predictions before using it to evaluate Symthaea.
 
 **Gate C — Symthaea controller adapter**
 Only after Gate B is reproduced: expose candidate selection/resource allocation to Symthaea while keeping experimental observables and evaluation-only metadata inaccessible to the controller. The specialist generator/forward model stays identical across arms. Compare uniform/fixed, conventional heuristic, Symthaea without HDC, and full Symthaea under a matched call/compute budget. Evaluate primary held-out evidence once, after targets, splits, code versions, resource caps, metrics, exclusions, and stopping rules are frozen.
