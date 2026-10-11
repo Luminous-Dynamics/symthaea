@@ -1112,6 +1112,67 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "identity")]
+    #[test]
+    fn signed_receipt_requires_pinned_signature_and_exact_evidence_bytes() {
+        use ed25519_dalek::{Signer, SigningKey};
+        use sha2::{Digest, Sha256};
+
+        let key = SigningKey::from_bytes(&[7u8; 32]);
+        let mut pinned_policy = policy();
+        pinned_policy.trusted_evaluator_public_key_hex =
+            hex::encode(key.verifying_key().as_bytes());
+        let mut ledger = setup_claim_with_policy(pinned_policy);
+
+        ledger.record_forecast(CapabilityForecast {
+            forecast_id: "signed-forecast".to_string(),
+            claim_id: "rust-debugging".to_string(),
+            claim_sha256: "f".repeat(64),
+            subject: subject(),
+            sequence: 1,
+            context_id: "signed-context".to_string(),
+            split: CapabilitySplit::HeldOut,
+            predicted_success_probability: 0.9,
+            expected_compute_units: 2.0,
+            predicted_failure_mode: None,
+        }).unwrap();
+
+        let evidence = b"exact evaluator evidence bytes";
+        let receipt = CapabilityOutcomeReceipt {
+            forecast_id: "signed-forecast".to_string(),
+            subject: subject(),
+            sequence: 2,
+            observed_success: true,
+            split: CapabilitySplit::HeldOut,
+            evaluator_identity: "independent-qualification-runner".to_string(),
+            evaluator_revision: "v1".to_string(),
+            receipt_sha256: hex::encode(Sha256::digest(evidence)),
+            actual_compute_units: Some(2.0),
+        };
+        let canonical = receipt_verifier::canonical_payload(&receipt).unwrap();
+        let signature = key.sign(&canonical);
+        let signed = SignedCapabilityOutcomeReceipt {
+            receipt,
+            signature_hex: hex::encode(signature.to_bytes()),
+        };
+
+        assert_eq!(
+            ledger.verify_and_resolve_signed_receipt(signed.clone(), b"different bytes"),
+            Err(CapabilityLedgerError::EvidenceRootMismatch)
+        );
+
+        let mut tampered_claim = signed.clone();
+        tampered_claim.receipt.observed_success = false;
+        assert_eq!(
+            ledger.verify_and_resolve_signed_receipt(tampered_claim, evidence),
+            Err(CapabilityLedgerError::InvalidReceiptSignature)
+        );
+        assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 0);
+
+        ledger.verify_and_resolve_signed_receipt(signed, evidence).unwrap();
+        assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 1);
+    }
+
     #[test]
     fn qualification_policy_is_fixed_before_outcomes_are_recorded() {
         let mut pinned_policy = policy();
