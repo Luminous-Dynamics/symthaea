@@ -119,6 +119,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     let mut meter_events = Vec::<(u64, (u8, u8))>::new();
     let mut key_events = Vec::<(u64, (i8, bool))>::new();
     let mut midi_note_events = Vec::<RawMidiNoteEvent>::new();
+    let mut channels_by_track = vec![BTreeSet::<u8>::new(); smf.tracks.len()];
     let mut notes = Vec::new();
 
     for (track_index, track) in smf.tracks.iter().enumerate() {
@@ -222,6 +223,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                                     .into(),
                             );
                         }
+                        channels_by_track[track_index].insert(channel);
                         midi_note_events.push(RawMidiNoteEvent {
                             tick,
                             track: track_index,
@@ -247,6 +249,19 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 _ => {}
             }
         }
+    }
+
+    // Score assigns one PartId per MIDI track. A single track that carries
+    // multiple note channels would collapse distinct logical parts into one
+    // identity, so reject it until Score can preserve channel-level parts.
+    if let Some((track, channels)) = channels_by_track
+        .iter()
+        .enumerate()
+        .find(|(_, channels)| channels.len() > 1)
+    {
+        return Err(format!(
+            "MIDI track {track} contains multiple note channels {channels:?}; split channels into separate tracks before import"
+        ));
     }
 
     // In Format 1, tracks are simultaneous streams. Pair by absolute tick,
@@ -1457,6 +1472,19 @@ mod tests {
             error.contains("MIDI escape events are not supported"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn midi_multiple_note_channels_in_one_track_are_rejected_instead_of_merged() {
+        let track = [
+            0, 0x90, 60, 100, // channel 1 note-on
+            0, 0x91, 67, 100, // channel 2 note-on
+            1, 0x80, 60, 0,
+            0, 0x81, 67, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("contains multiple note channels"), "{error}");
     }
 
     #[test]
