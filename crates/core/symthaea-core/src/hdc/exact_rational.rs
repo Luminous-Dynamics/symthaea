@@ -639,7 +639,7 @@ mod tests {
         );
 
         let non_reduced = {
-            const PREFIX: &[u8] = b"SYMTHAEA\\0EXACT-RATIONAL\\0V1\\0";
+            const PREFIX: &[u8] = b"SYMTHAEA\0EXACT-RATIONAL\0V1\0";
             let mut encoded = PREFIX.to_vec();
             encoded.extend_from_slice(&1u64.to_be_bytes());
             encoded.extend_from_slice(b"2");
