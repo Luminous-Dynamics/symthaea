@@ -28,6 +28,7 @@
         "scenario_revision",
         "scenario_digest",
         "input_receipt_digest",
+        "report_digest",
         "evaluator_policy_digest",
         "context_digest",
         "verifier_build_digest",
@@ -103,6 +104,10 @@
           "pattern": "^[0-9a-f]{64}$"
         },
         "input_receipt_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "report_digest": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         },
