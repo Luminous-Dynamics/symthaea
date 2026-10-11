@@ -3,10 +3,18 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! ETHICS Ablation Study
 //!
-//! Systematically disables each component to measure its contribution:
-//!   (A) Full system (baseline): 92.9% ETHICS
+//! Legacy exploratory ablation, NOT a qualified ETHICS benchmark.
+//!
+//! This harness loads one ethics.json into `by_category`, then trains the
+//! per-category classifiers from that same file and evaluates on those same
+//! examples. Results from configurations using those classifiers are
+//! in-sample and leakage-prone; they must not be used as held-out accuracy.
+//! Task-specific label meanings and group metrics also need separate adapters.
+//!
+//! Configurations examined:
+//!   (A) Full legacy configuration (historically reported as 92.9%; unqualified)
 //!   (B) No sentiment channel (sw=0.0)
-//!   (C) No per-category dim tuning (all 16384D)
+//!   (C) No per-category dimension tuning (all 16384D)
 //!   (D) No per-category classifiers (ensemble only)
 //!   (E) No learned prototypes (rule-based only)
 //!
