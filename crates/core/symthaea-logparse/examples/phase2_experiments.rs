@@ -17,10 +17,11 @@
 //!
 //! Usage:
 //!   cargo run -p symthaea-logparse --example phase2_experiments --release -- \
-//!     /tmp/evtx-staged /tmp/otrf-staged [--domain-invariant-ablation]
+//!     /tmp/evtx-staged /tmp/otrf-staged [--domain-invariant-ablation] [--scenario-level-evaluation]
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
+use symthaea_logparse::scenario::{ScenarioEmbedding, aggregate_scenarios};
 use symthaea_logparse::encoder::{
     DOMAIN_INVARIANT_ENCODER_VERSION, Hdv, encode, encode_domain_invariant,
 };
@@ -32,8 +33,13 @@ use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let evtx_dir = std::env::args().nth(1).ok_or("need evtx corpus dir")?;
     let otrf_dir = std::env::args().nth(2).ok_or("need otrf corpus dir")?;
-    let run_domain_invariant_ablation =
-        std::env::args().nth(3).as_deref() == Some("--domain-invariant-ablation");
+    let experiment_flags: Vec<String> = std::env::args().skip(3).collect();
+    let run_domain_invariant_ablation = experiment_flags
+        .iter()
+        .any(|flag| flag == "--domain-invariant-ablation");
+    let run_scenario_level_evaluation = experiment_flags
+        .iter()
+        .any(|flag| flag == "--scenario-level-evaluation");
 
     let shared_labels: Vec<&str> = vec![
         "credential_access",
@@ -63,7 +69,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load OTRF (walk the staged dirs, parse every .json file)
     // ----------------------------------------------------------------
     println!("\n[load] OTRF corpus from {otrf_dir}");
-    let otrf_events = load_otrf_corpus(&PathBuf::from(&otrf_dir), &shared_labels, 50)?;
+    let (otrf_events, otrf_groups) =
+        load_otrf_corpus(&PathBuf::from(&otrf_dir), &shared_labels, 50)?;
     let otrf_labels: Vec<String> = otrf_events
         .iter()
         .map(|e| e.label.clone().unwrap())
@@ -181,6 +188,113 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    if run_scenario_level_evaluation {
+        println!("\n=== Capture/scenario-level evaluation ===");
+        println!("  One bundled vector per labeled source file or scenario directory.");
+        println!("  This orderless bag-of-events representation is not temporal correlation.");
+
+        let sbou_raw_scenarios = aggregate_scenarios(&sbou_hvs, &sbou_labels, &sbou_groups)?;
+        let otrf_raw_scenarios = aggregate_scenarios(&otrf_hvs, &otrf_labels, &otrf_groups)?;
+        run_scenario_classifier(
+            "raw encoder",
+            &sbou_raw_scenarios,
+            &otrf_raw_scenarios,
+            cfg,
+        )?;
+
+        if run_domain_invariant_ablation {
+            let sbou_di_hvs: Vec<Hdv> =
+                sbou_events.iter().map(encode_domain_invariant).collect();
+            let otrf_di_hvs: Vec<Hdv> =
+                otrf_events.iter().map(encode_domain_invariant).collect();
+            let sbou_di_scenarios =
+                aggregate_scenarios(&sbou_di_hvs, &sbou_labels, &sbou_groups)?;
+            let otrf_di_scenarios =
+                aggregate_scenarios(&otrf_di_hvs, &otrf_labels, &otrf_groups)?;
+            run_scenario_classifier(
+                "domain-invariant encoder",
+                &sbou_di_scenarios,
+                &otrf_di_scenarios,
+                cfg,
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn run_scenario_classifier(
+    name: &str,
+    source_scenarios: &[ScenarioEmbedding],
+    held_out_scenarios: &[ScenarioEmbedding],
+    cfg: TrainConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let source_hvs: Vec<Hdv> = source_scenarios
+        .iter()
+        .map(|scenario| scenario.vector.clone())
+        .collect();
+    let source_labels: Vec<String> = source_scenarios
+        .iter()
+        .map(|scenario| scenario.label.clone())
+        .collect();
+    let source_groups: Vec<String> = source_scenarios
+        .iter()
+        .map(|scenario| scenario.scenario_id.clone())
+        .collect();
+    let held_out_hvs: Vec<Hdv> = held_out_scenarios
+        .iter()
+        .map(|scenario| scenario.vector.clone())
+        .collect();
+    let held_out_labels: Vec<String> = held_out_scenarios
+        .iter()
+        .map(|scenario| scenario.label.clone())
+        .collect();
+
+    println!("\n--- Scenario-level model: {name} ---");
+    println!(
+        "  source captures/scenarios: {}, held-out corpus scenarios: {}",
+        source_scenarios.len(),
+        held_out_scenarios.len()
+    );
+    println!(
+        "  source event count represented by bundles: {}",
+        source_scenarios
+            .iter()
+            .map(|scenario| scenario.event_count)
+            .sum::<usize>()
+    );
+
+    let fold_accuracies =
+        run_grouped_kfold(&source_hvs, &source_labels, &source_groups, 5, cfg)?;
+    let mean = fold_accuracies.iter().sum::<f32>() / fold_accuracies.len() as f32;
+    let variance = fold_accuracies
+        .iter()
+        .map(|accuracy| (accuracy - mean).powi(2))
+        .sum::<f32>()
+        / fold_accuracies.len() as f32;
+    println!("  grouped scenario 5-fold CV accuracy: {mean:.3} ± {:.3}", variance.sqrt());
+
+    let (train_hvs, train_labels, test_hvs, test_labels) =
+        symthaea_logparse::probe::grouped_stratified_split(
+            &source_hvs,
+            &source_labels,
+            &source_groups,
+            0.8,
+            0x51CE_0001,
+        )?;
+    let probe = LogisticProbe::train(&train_hvs, &train_labels, cfg);
+    let held_out_predictions = probe.predict_batch(&test_hvs);
+    let held_out_report =
+        classification_report(&test_labels, &held_out_predictions, &probe.class_names)?;
+    print_classification_report("source-capture holdout", &held_out_report);
+
+    let ood_predictions = probe.predict_batch(&held_out_hvs);
+    let ood_report = classification_report(
+        &held_out_labels,
+        &ood_predictions,
+        &probe.class_names,
+    )?;
+    print_classification_report("separate-corpus scenario-level OOD", &ood_report);
     Ok(())
 }
 
@@ -313,7 +427,7 @@ fn load_otrf_corpus(
     corpus_dir: &PathBuf,
     keep_labels: &[&str],
     max_per_dir: usize,
-) -> Result<Vec<LogEvent>, Box<dyn std::error::Error>> {
+) -> Result<(Vec<LogEvent>, Vec<String>), Box<dyn std::error::Error>> {
     let labels_path = corpus_dir.join("labels.csv");
     let labels_csv = std::fs::read_to_string(&labels_path)?;
     let mut dir_labels: HashMap<String, String> = HashMap::new();
@@ -329,6 +443,7 @@ fn load_otrf_corpus(
     paths.sort();
 
     let mut out: Vec<LogEvent> = Vec::new();
+    let mut groups: Vec<String> = Vec::new();
     for path in paths {
         if !path.is_dir() {
             continue;
@@ -351,12 +466,14 @@ fn load_otrf_corpus(
                 .take(max_per_dir)
                 .collect()
         };
+        let group_id = format!("otrf:{dname}");
         for mut ev in capped {
             ev.label = Some(label.clone());
             out.push(ev);
+            groups.push(group_id.clone());
         }
     }
-    Ok(out)
+    Ok((out, groups))
 }
 
 /// Stratified k-fold cross-validation with source groups kept intact.
