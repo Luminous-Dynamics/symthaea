@@ -1,0 +1,154 @@
+diff --git a/crates/bridges/symthaea-physics-bridge/examples/ramanujan_showcase.rs b/crates/bridges/symthaea-physics-bridge/examples/ramanujan_showcase.rs
+index a43c81a..0000000 100644
+--- a/crates/bridges/symthaea-physics-bridge/examples/ramanujan_showcase.rs
++++ b/crates/bridges/symthaea-physics-bridge/examples/ramanujan_showcase.rs
+@@ -6,7 +6,7 @@
+ //! # Ramanujan Protocol — Discovery Showcase
+ //!
+ //! End-to-end demonstration of the Automated Physicist:
+ //!
+-//!   ODE → autonomous discovery → symbolic proof → physics catalog recognition →
++//!   ODE → autonomous discovery → symbolic chain-rule check → physics catalog recognition →
+ //!         paper-ready LaTeX table
+ //!
+ //! This example composes Tier 1 (Z3 bridge, LaTeX converter, physics recognition)
+@@ -19,7 +19,8 @@
+ //! Output:
+ //! - Live discovery progress for each canonical problem
+ //! - Per-problem recognition annotation against the 128-equation catalog
+-//! - Per-problem Z3 verification status
++//! - Per-problem symbolic chain-rule verification status
++//! - Fixed-input SMT sample status for the sequence example (not universal proof)
+ //! - One combined LaTeX table ready to paste into papers/latex/ramanujan-protocol/
+@@ -322,7 +323,7 @@ struct DiscoveryResult {
+     name: String,
+     domain: String,
+     best: Option<AutonomousInvariant>,
+-    z3_status: String,
++    verification_status: String,
+     recognition_headline: String,
+     latex_formula: String,
+ }
+@@ -360,17 +361,18 @@ fn run_problem(
+         println!("  ⏵ Best:    {}", inv.formula_str);
+         println!("  ⏵ Variance: {:.2e}", inv.variance);
+ 
+-        // Z3 status (already determined inside discover_invariants_autonomous when
+-        // dynamics were provided — symbolically_proven means the chain rule proof
+-        // succeeded against the supplied dynamics)
+-        let z3_status = if inv.symbolically_proven {
+-            "PROVEN ✓".to_string()
++        // `symbolically_proven` is produced by the autonomous chain-rule path.
++        // It is strong symbolic evidence, but it is not the separate Z3 UNSAT
++        // proof produced by `verify_invariants_formal`.
++        let verification_status = if inv.symbolically_proven {
++            "SYMBOLICALLY CHECKED ✓".to_string()
+         } else if inv.variance < 1e-6 {
+-            "Numerical".to_string()
++            "NUMERICALLY CONSERVED".to_string()
+         } else {
+-            "Approximate".to_string()
++            "APPROXIMATE".to_string()
+         };
+-        println!("  ⏵ Status:   {}", z3_status);
++        println!("  ⏵ Status:   {}", verification_status);
+@@ -400,7 +402,7 @@ fn run_problem(
+             name: name.to_string(),
+             domain: domain.to_string(),
+             best: Some(inv.clone()),
+-            z3_status,
++            verification_status,
+             recognition_headline: headline,
+             latex_formula: latex,
+         }
+@@ -412,7 +414,7 @@ fn run_problem(
+             name: name.to_string(),
+             domain: domain.to_string(),
+             best: None,
+-            z3_status: "—".to_string(),
++            verification_status: "—".to_string(),
+             recognition_headline: "no candidates produced".to_string(),
+             latex_formula: "\\text{none}".to_string(),
+         }
+@@ -437,8 +439,9 @@ fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -> String {
+     out.push_str(
+         "equations alone, the trajectory variance of the discovered quantity, the symbolic ",
+     );
+     out.push_str(&format!(
+-        "verification status (chain rule + Z3), and the closest match in the {}-equation physics catalog.}}\n",
++        "or fixed-input SMT sample-check status, and the closest match in the {}-equation physics catalog. ",
+         catalog_size
+     ));
++    out.push_str("Formal Z3 UNSAT verification is produced separately by \\texttt{verify\\_invariants\\_formal}.}\n");
+@@ -458,10 +461,14 @@ fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -> String {
+             None => "—".to_string(),
+         };
+ 
+-        let status_cell = match (&r.best, r.z3_status.contains("PROVEN")) {
+-            (Some(_), true) => "\\textbf{PROVEN}",
+-            (Some(_), false) => "Numeric",
+-            (None, _) => "—",
++        let status_cell = if r.verification_status.contains("SYMBOLICALLY CHECKED") {
++            "\\textbf{Symbolic}"
++        } else if r.verification_status.contains("SMT SAMPLES CHECKED") {
++            "SMT samples"
++        } else if r.verification_status == "—" {
++            "—"
++        } else {
++            "Numeric"
+         };
+@@ -738,11 +745,11 @@ fn main() {
+-    // ─── Sequence-based discovery: Triangular numbers (with Z3 path) ───
++    // ─── Sequence-based discovery: Triangular numbers (fixed-input SMT path) ───
+     println!("\n╭──────────────────────────────────────────────────────────────────╮");
+     println!(
+         "│ {:65}│",
+-        "Triangular Numbers (sequence + Z3 formal verification)"
++        "Triangular Numbers (sequence + fixed-input Z3 sample checks)"
+     );
+@@ -768,17 +775,27 @@ fn main() {
+     ));
+     seq_engine.generate_conjectures(3);
+     seq_engine.verify_numerical();
+-    seq_engine.auto_prove_via_z3();
++    seq_engine.check_samples_via_z3();
+ 
+     if let Some(best) = seq_engine.best_for("triangular(n)") {
+-        let z3_str = match best.status {
++        let verification_status = match best.status {
+             ConjectureStatus::FormallyVerified { proof_steps } => {
+-                format!("Z3 PROVEN ({} steps) ✓", proof_steps)
++                format!("FORMALLY VERIFIED ({} steps) ✓", proof_steps)
+             }
+-            ConjectureStatus::NumericallyTested { .. } => "Numeric".to_string(),
+-            _ => format!("{:?}", best.status),
++            ConjectureStatus::SmtSamplesChecked { checked_points } => {
++                format!("SMT SAMPLES CHECKED ({checked_points} points)")
++            }
++            ConjectureStatus::BoundedChecked { checked_points, max_n } => {
++                format!("BOUNDED DATA CHECK ({checked_points} points, max n={max_n})")
++            }
++            ConjectureStatus::SymbolicallyChecked => "SYMBOLICALLY CHECKED ✓".to_string(),
++            ConjectureStatus::NumericallyTested { .. } => "NUMERICALLY TESTED".to_string(),
++            ConjectureStatus::Proposed => "PROPOSED".to_string(),
++            ConjectureStatus::Refuted { counterexample } => {
++                format!("REFUTED (counterexample {counterexample})")
++            }
+         };
+         let latex = expr_to_latex(&best.formula);
+         let report = recognize_expr(&bridge, &best.formula, "triangular(n)");
+         println!("  ⏵ Best:    {}", best.formula_str);
+         println!("  ⏵ MSE:     {:.2e}", best.training_mse);
+-        println!("  ⏵ Status:  {}", z3_str);
++        println!("  ⏵ Status:  {}", verification_status);
+         println!("  ⏵ Match:   {}", report.headline());
+         println!("  ⏵ LaTeX:   ${}$", latex);
+@@ -789,7 +806,7 @@ fn main() {
+             name: "Triangular Numbers".to_string(),
+             domain: "Combinatorics".to_string(),
+             best: None, // sequence-based, doesn't fit AutonomousInvariant struct
+-            z3_status: z3_str,
++            verification_status,
+             recognition_headline: report.headline(),
+             latex_formula: latex,
+         });
