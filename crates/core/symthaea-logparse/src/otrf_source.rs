@@ -60,13 +60,12 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
         .and_then(|x| x.as_str())
         .map(|s| s.to_string());
 
+    // Never narrow a 64-bit input with `as u32`: an oversized EventID
+    // could wrap into a legitimate security event ID (e.g. 4624).
     let event_id = obj
         .get("EventID")
-        .and_then(|x| {
-            x.as_u64()
-                .or_else(|| x.as_str().and_then(|s| s.parse::<u64>().ok()))
-        })
-        .unwrap_or(0) as u32;
+        .and_then(parse_event_id)
+        .unwrap_or(0);
 
     let level_str = obj.get("Level").and_then(|x| {
         x.as_str()
@@ -140,6 +139,14 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
     })
 }
 
+/// Parse an EventID without allowing oversized values to wrap into known IDs.
+fn parse_event_id(value: &serde_json::Value) -> Option<u32> {
+    if let Some(number) = value.as_u64() {
+        return u32::try_from(number).ok();
+    }
+    value.as_str().and_then(|text| text.parse::<u32>().ok())
+}
+
 /// Return the longest prefix of `value` that fits within `max_bytes`
 /// without splitting a UTF-8 code point.
 fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
@@ -192,6 +199,28 @@ mod tests {
         assert!(truncated.len() <= 256);
         assert_eq!(truncated.len(), 255);
         assert!(truncated.chars().all(|c| c == '漢'));
+    }
+
+    #[test]
+    fn event_id_parsing_rejects_values_that_would_wrap() {
+        let overflow = u32::MAX as u64 + 4624;
+        assert_eq!(parse_event_id(&serde_json::json!(4624)), Some(4624));
+        assert_eq!(parse_event_id(&serde_json::json!("4624")), Some(4624));
+        assert_eq!(parse_event_id(&serde_json::json!(overflow)), None);
+        assert_eq!(parse_event_id(&serde_json::json!(overflow.to_string())), None);
+
+        for event_id in [
+            serde_json::json!(overflow),
+            serde_json::json!(overflow.to_string()),
+        ] {
+            let value = serde_json::json!({
+                "SourceName": "Microsoft-Windows-Security-Auditing",
+                "Channel": "Security",
+                "EventID": event_id,
+            });
+            let event = json_to_log_event(&value).expect("object should parse");
+            assert_eq!(event.event_id, 0, "invalid IDs fail closed to unknown");
+        }
     }
 
     #[test]
