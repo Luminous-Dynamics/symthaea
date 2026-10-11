@@ -228,6 +228,7 @@ pub fn validate_invariant_holdout(
 pub enum AutonomousDiscoveryReceiptError {
     InvalidSourceRevision,
     EmptySystemId,
+    InvalidSystemDefinitionDigest,
     EmptyCandidate,
     InvalidVariables,
     InvalidInitialState,
@@ -310,6 +311,8 @@ pub struct AutonomousDiscoveryReceiptV1 {
     pub schema_version: u32,
     pub source_revision: String,
     pub system_id: String,
+    /// BLAKE3 of a canonical system definition, including RHS equations/constants.
+    pub system_definition_blake3: String,
     pub discovery_mode: AutonomousDiscoveryMode,
     pub discovery_seed: u64,
     pub holdout_seed: u64,
@@ -338,6 +341,7 @@ pub struct AutonomousDiscoveryReceiptV1 {
 pub fn build_autonomous_discovery_receipt_v1(
     source_revision: &str,
     system_id: &str,
+    system_definition_blake3: &str,
     config: &RegressorConfig,
     extra_seed_templates: &[Expr],
     candidate: &AutonomousInvariant,
@@ -356,6 +360,12 @@ pub fn build_autonomous_discovery_receipt_v1(
     if system_id.trim().is_empty() {
         return Err(AutonomousDiscoveryReceiptError::EmptySystemId);
     }
+    let system_definition_blake3 = system_definition_blake3.to_ascii_lowercase();
+    if system_definition_blake3.len() != 64
+        || !system_definition_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinitionDigest);
+    }
     if candidate.formula_str.trim().is_empty()
         || candidate.formula_str != format!("{}", candidate.formula)
     {
@@ -373,9 +383,6 @@ pub fn build_autonomous_discovery_receipt_v1(
     if !t_max.is_finite() || t_max <= 0.0 || !dt.is_finite() || dt <= 0.0 {
         return Err(AutonomousDiscoveryReceiptError::InvalidTiming);
     }
-    if config.seed == holdout.holdout_seed {
-        return Err(AutonomousDiscoveryReceiptError::IdenticalSeeds);
-    }
     if holdout.discovery_seed != config.seed {
         return Err(AutonomousDiscoveryReceiptError::HoldoutSeedMismatch);
     }
@@ -386,16 +393,7 @@ pub fn build_autonomous_discovery_receipt_v1(
         return Err(AutonomousDiscoveryReceiptError::ColdRunContainsPriors);
     }
     let effective = sanitized_config(config, candidate.discovery_mode);
-    let holdout_valid = holdout.requested_trajectories > 0
-        && holdout.trajectories_checked <= holdout.requested_trajectories
-        && holdout.threshold.is_finite()
-        && holdout.threshold >= 0.0
-        && holdout.max_lie_derivative_variance.is_finite()
-        && holdout.median_lie_derivative_variance.is_finite()
-        && (holdout.passed
-            == (holdout.failure.is_none()
-                && holdout.trajectories_checked == holdout.requested_trajectories
-                && holdout.max_lie_derivative_variance <= holdout.threshold));
+    let holdout_valid = holdout_record_is_consistent(holdout, t_max, dt);
     if !holdout_valid {
         return Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord);
     }
@@ -406,6 +404,7 @@ pub fn build_autonomous_discovery_receipt_v1(
         schema_version: 1,
         source_revision,
         system_id: system_id.trim().to_string(),
+        system_definition_blake3,
         discovery_mode: candidate.discovery_mode,
         discovery_seed: config.seed,
         holdout_seed: holdout.holdout_seed,
@@ -438,11 +437,74 @@ pub fn build_autonomous_discovery_receipt_v1(
 
 /// Verify content integrity only. This is not a signature or execution attestation.
 pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryReceiptV1) -> bool {
+    let seed_pair_consistent = if receipt.discovery_seed == receipt.holdout_seed {
+        !receipt.holdout_passed
+            && receipt.holdout_failure == Some(AutonomousHoldoutFailure::IdenticalSeeds)
+            && receipt.trajectories_checked == 0
+    } else {
+        receipt.holdout_failure != Some(AutonomousHoldoutFailure::IdenticalSeeds)
+    };
     receipt.schema_version == 1
-        && receipt.discovery_seed != receipt.holdout_seed
+        && seed_pair_consistent
+        && receipt.system_definition_blake3.len() == 64
+        && receipt.system_definition_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
         && blake3::hash(receipt.candidate_formula.as_bytes()).to_hex().to_string()
             == receipt.candidate_blake3
         && compute_receipt_digest(receipt) == receipt.receipt_blake3
+}
+
+/// A failure must be recorded explicitly and agree with the census and metric
+/// fields. In particular, a failed score above threshold cannot have no failure
+/// code, and an incomplete census cannot be represented as threshold-only failure.
+fn holdout_record_is_consistent(
+    holdout: &AutonomousHoldoutValidation,
+    t_max: f64,
+    dt: f64,
+) -> bool {
+    if !holdout.threshold.is_finite()
+        || holdout.threshold < 0.0
+        || !holdout.max_lie_derivative_variance.is_finite()
+        || holdout.max_lie_derivative_variance < 0.0
+        || !holdout.median_lie_derivative_variance.is_finite()
+        || holdout.median_lie_derivative_variance < 0.0
+        || holdout.trajectories_checked > holdout.requested_trajectories
+    {
+        return false;
+    }
+    if holdout.passed {
+        return holdout.failure.is_none()
+            && holdout.requested_trajectories > 0
+            && holdout.trajectories_checked == holdout.requested_trajectories
+            && holdout.max_lie_derivative_variance <= holdout.threshold;
+    }
+    match holdout.failure {
+        Some(AutonomousHoldoutFailure::IdenticalSeeds) => {
+            holdout.discovery_seed == holdout.holdout_seed
+                && holdout.trajectories_checked == 0
+        }
+        Some(AutonomousHoldoutFailure::ZeroTrajectories) => {
+            holdout.requested_trajectories == 0 && holdout.trajectories_checked == 0
+        }
+        Some(AutonomousHoldoutFailure::TrajectoryLimitExceeded) => {
+            let estimated_steps = (t_max / dt).ceil();
+            holdout.requested_trajectories > MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES
+                || !estimated_steps.is_finite()
+                || estimated_steps > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
+                || (estimated_steps as usize)
+                    .saturating_mul(holdout.requested_trajectories)
+                    > MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS
+        }
+        Some(AutonomousHoldoutFailure::IncompleteCoverage) => {
+            holdout.requested_trajectories > 0
+                && holdout.trajectories_checked < holdout.requested_trajectories
+        }
+        Some(AutonomousHoldoutFailure::ThresholdExceeded) => {
+            holdout.requested_trajectories > 0
+                && holdout.trajectories_checked == holdout.requested_trajectories
+                && holdout.max_lie_derivative_variance > holdout.threshold
+        }
+        Some(AutonomousHoldoutFailure::InvalidInput) | None => false,
+    }
 }
 
 fn compute_receipt_digest(receipt: &AutonomousDiscoveryReceiptV1) -> String {
@@ -451,6 +513,7 @@ fn compute_receipt_digest(receipt: &AutonomousDiscoveryReceiptV1) -> String {
     hash_u64(&mut hasher, receipt.schema_version as u64);
     hash_string(&mut hasher, &receipt.source_revision);
     hash_string(&mut hasher, &receipt.system_id);
+    hash_string(&mut hasher, &receipt.system_definition_blake3);
     hash_string(&mut hasher, receipt.discovery_mode.as_str());
     hash_u64(&mut hasher, receipt.discovery_seed);
     hash_u64(&mut hasher, receipt.holdout_seed);
@@ -486,6 +549,14 @@ mod tests {
 
     fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
         vec![state[2], state[3], -state[0], -state[1]]
+    }
+
+    fn system_definition_digest() -> String {
+        blake3::hash(
+            b"harmonic-oscillator-v1;xdot=vx;ydot=vy;vxdot=-x;vydot=-y",
+        )
+        .to_hex()
+        .to_string()
     }
 
     fn harmonic_energy() -> Expr {
@@ -570,7 +641,7 @@ mod tests {
         );
         let receipt = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &config, &[], &candidate,
+            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         ).expect("well-formed receipt should be constructed");
@@ -594,7 +665,7 @@ mod tests {
         );
         let result = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &config, &[Expr::Var("x".into())],
+            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[Expr::Var("x".into())],
             &candidate, &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         );
@@ -612,10 +683,76 @@ mod tests {
         );
         let result = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &config, &[], &candidate,
+            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         );
         assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::ComposedCandidateNeedsParentReceipts);
     }
+    
+    #[test]
+    fn receipt_rejects_failed_holdout_without_failure_code() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let mut holdout = validate_invariant_holdout(
+            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
+        );
+        holdout.passed = false;
+        holdout.failure = None;
+        let result = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        );
+        assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::InvalidHoldoutRecord);
+    }
+
+    #[test]
+    fn receipt_preserves_a_valid_negative_result() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let mut holdout = validate_invariant_holdout(
+            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
+        );
+        holdout.passed = false;
+        holdout.failure = Some(AutonomousHoldoutFailure::ThresholdExceeded);
+        holdout.max_lie_derivative_variance = 1.0;
+        holdout.median_lie_derivative_variance = 0.5;
+        holdout.threshold = 0.01;
+        let receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        ).expect("a fully scored negative result should remain recordable");
+        assert!(!receipt.holdout_passed);
+        assert_eq!(receipt.holdout_failure, Some(AutonomousHoldoutFailure::ThresholdExceeded));
+        assert!(verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
+    fn receipt_preserves_identical_seed_failure_without_promoting_it() {
+        let config = RegressorConfig { seed: 404, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 404, 1e-2,
+        );
+        let receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        ).expect("an identical-seed failure should be archivally recordable");
+        assert!(!receipt.holdout_passed);
+        assert_eq!(receipt.holdout_failure, Some(AutonomousHoldoutFailure::IdenticalSeeds));
+        assert!(verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
 }
