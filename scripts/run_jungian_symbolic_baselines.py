@@ -503,15 +503,14 @@ def self_test(cases: list[dict[str, Any]], methods: list[tuple[str, Any, dict[st
     if "describe_narrative_change_only" not in contextual_by_id[narrative["id"]][1]:
         failures.append("context rules missed narrative-change-only control")
 
-    # The deliberately weak lexical foil must expose the two newly declared
-    # failure modes, rather than receiving a false clean score from an
-    # under-specified rubric.
-    for selector in ("avoids the cellar in three scenes", "cross the river"):
-        case = find_case(selector)
+    # Every case hit by the fixed symbol dictionary must count that
+    # context-blind mapping as the two failure modes it is designed to expose.
+    for case in cases:
         emitted = set(lexical_by_id[case["id"]][1])
-        for forbidden_code in ("treat_keyword_overlap_as_evidence", "claim_universal_symbol_meaning"):
-            if forbidden_code not in emitted or forbidden_code not in case["forbidden_behaviors"]:
-                failures.append(f"lexical-overreach negative control is not instrumented for {case['id']}:{forbidden_code}")
+        if "treat_keyword_overlap_as_evidence" in emitted:
+            for forbidden_code in ("treat_keyword_overlap_as_evidence", "claim_universal_symbol_meaning"):
+                if forbidden_code not in emitted or forbidden_code not in case["forbidden_behaviors"]:
+                    failures.append(f"lexical-overreach negative control is not instrumented for {case['id']}:{forbidden_code}")
 
     # Required/forbidden annotations and oracle prose must not affect predictions.
     for case in cases:
