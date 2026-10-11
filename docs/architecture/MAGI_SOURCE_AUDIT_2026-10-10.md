@@ -74,6 +74,19 @@ The ledger computes Brier score and ECE for prospective success probabilities, r
 
 The existing `symthaea-evidence-plane` crate is a measured-counter/integrity contract (`EvidenceCounters`, `Expectation`, `check_integrity`), not an outcome-signature verifier. Its `config_hash` documentation explicitly states that it uses `DefaultHasher` over a debug representation and is not cryptographic or security-sensitive. It may be useful for recording instrumentation counters, but it must not be repurposed as the trust anchor for resolver receipts. Outcome qualification needs authenticated provenance and exact prediction/subject binding.
 
+## Runner-artifact resolver design constraints (researched 2026-10-11)
+
+The new evidence envelope is only a typed binding contract. Its runner/artifact identities and artifact SHA-256 remain claims until a trusted resolver independently retrieves the referenced bytes and verifies the lineage. A digest copied out of the same untrusted response is not independent verification.
+
+For a GitHub Actions adapter, prefer a two-part check rather than treating the Actions artifact ID as provenance:
+
+- Retrieve from the expected repository and exact workflow run/attempt using an immutable artifact identity. GitHub documents uploaded artifacts as immutable from `upload-artifact@v4` onward, unless they are deleted; immutability prevents mutation-in-place but does not by itself establish that the artifact came from an authorized workflow. See the [upload-artifact documentation](https://github.com/actions/upload-artifact/blob/main/README.md).
+- Verify a signed artifact attestation against a reviewed policy: expected source repository, signer workflow, predicate type, source ref, source digest, and subject digest. GitHub's [artifact-attestation guidance](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations) documents the generate/verify flow, and the [GitHub CLI verification contract](https://cli.github.com/manual/gh_attestation_verify) exposes signer-workflow, signer-repository, source-ref, source-digest, predicate-type, and digest-algorithm constraints. These must be explicit policy values; do not accept whichever signer or source is returned by the artifact itself.
+
+The adapter should produce a private verified-lineage result only after checking fetched bytes against the envelope's expected artifact digest and verifying the attestation subject and workflow/source identity against the frozen subject and policy. That verified result—not a public boolean or caller-provided digest—must feed the verification root used to mint the opaque capability token. Keep the adapter outside the pure ledger state machine so the ledger does not acquire ambient credentials or silently trust provider metadata. A generic interface without a policy-pinned implementation is not a security boundary.
+
+This is a concrete implementation direction, not a claim that the resolver has already been implemented or that current receipts possess artifact provenance.
+
 ## Next implementation order
 
 1. Enforce timeouts and unresolved results in both the synchronous resolver and the async runtime subprocess path.
