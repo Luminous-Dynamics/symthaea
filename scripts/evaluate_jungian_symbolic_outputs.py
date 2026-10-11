@@ -121,10 +121,37 @@ def all_output_text(result: dict[str, Any]) -> str:
 
 
 def symbol_mapping_claim(text: str) -> bool:
-    # One combined tripwire: direct dictionary-style mappings plus a narrow
-    # universalization pattern. It is intentionally conservative and not semantic.
+    # Raw detector used in controlled self-tests; this does not decide whether
+    # an evidence-linked, source-attributed reading is acceptable.
     return (SYMBOL_MAPPING_RE.search(text) is not None
             or UNIVERSAL_MEANING_RE.search(text) is not None)
+
+
+def unqualified_symbol_mapping_claim(result: dict[str, Any]) -> bool:
+    """Flag direct/universal mappings unless they are open questions or bounded claims."""
+    for item in result["interpretations"]:
+        statement = item["statement"]
+        scope = item["scope"]
+        if UNIVERSAL_MEANING_RE.search(statement):
+            return True
+        if SYMBOL_MAPPING_RE.search(statement) is None:
+            continue
+        if item["epistemic_status"] == "OpenQuestion":
+            continue
+        if re.search(r"\b(?:context-blind|fixed dictionary|dictionary candidate)\b",
+                     statement + " " + scope, re.IGNORECASE):
+            return True
+        attributed = re.search(
+            r"\b(?:according to|source [a-z]|version (?:one|two)|first fictional source|"
+            r"second fictional source|in (?:this|the) (?:story|passage|text|context|account|tradition|note)|"
+            r"this (?:story|passage|text|account|tradition)|the (?:fictional )?(?:source|note|author|account))\b",
+            statement,
+            re.IGNORECASE,
+        ) is not None
+        evidence_linked = bool(item["supporting_evidence_ids"]) and bool(scope.strip())
+        if not (attributed and evidence_linked):
+            return True
+    return False
 
 
 def affirmative_risky_claim(text: str) -> bool:
@@ -266,8 +293,8 @@ def case_contract_checks(case_id: str, result: dict[str, Any]) -> list[dict[str,
 
     add(
         "no_unqualified_symbol_mapping_or_universal_meaning_claim",
-        not symbol_mapping_claim(text),
-        "Checks generated interpretation statements/scopes for direct symbol-to-meaning mapping phrases.",
+        not unqualified_symbol_mapping_claim(result),
+        "Flags unqualified/context-blind mappings and universalized meanings; attributed, evidence-linked local readings are allowed.",
     )
     add(
         "no_detected_affirmative_high_risk_claim",
@@ -418,6 +445,27 @@ def self_test() -> list[str]:
         ("universal symbol mapping is detected", symbol_mapping_claim("The key always means access."), True),
         ("named-subject hidden-state claim is detected", affirmative_risky_claim("Ari is secretly afraid."), True),
         ("negated named-subject claim is not detected", affirmative_risky_claim("Ari is not secretly afraid."), False),
+        ("source-attributed evidence-linked reading is allowed",
+            not unqualified_symbol_mapping_claim({"interpretations": [{
+                "statement": "According to fictional source A, the bridge means reconciliation in this story.",
+                "scope": "Source A only",
+                "supporting_evidence_ids": ["JSP-006-E1"],
+                "epistemic_status": "InterpretationHypothesis",
+            }]}), True),
+        ("context-blind dictionary mapping remains flagged",
+            unqualified_symbol_mapping_claim({"interpretations": [{
+                "statement": "Context-blind dictionary candidate: 'owl' maps to 'wisdom'.",
+                "scope": "Intentionally context-blind fixed dictionary; development foil only",
+                "supporting_evidence_ids": ["JSP-005-E1"],
+                "epistemic_status": "InterpretationHypothesis",
+            }]}), True),
+        ("a question is not scored as an asserted mapping",
+            not unqualified_symbol_mapping_claim({"interpretations": [{
+                "statement": "Could the owl mean wisdom to you?",
+                "scope": "Open inquiry only",
+                "supporting_evidence_ids": [],
+                "epistemic_status": "OpenQuestion",
+            }]}), True),
     ]
     for name, actual, expected in cases:
         if actual != expected:
@@ -448,7 +496,7 @@ def main() -> int:
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
             return 1
-        print("PASS: 9 output-cue detector controls and context-contrast control")
+        print("PASS: 12 output-cue detector controls and context-contrast control")
     if not args.results:
         return 0
     if args.output_dir is None:
