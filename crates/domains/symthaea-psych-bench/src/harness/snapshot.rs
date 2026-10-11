@@ -227,10 +227,6 @@ pub enum SnapshotComparisonError {
         side: &'static str,
         errors: Vec<String>,
     },
-    SchemaVersionMismatch {
-        baseline: String,
-        current: String,
-    },
     UnsupportedSchemaVersion {
         side: &'static str,
         found: String,
@@ -395,12 +391,6 @@ impl RegressionReport {
             if let Err(errors) = snapshot.validate() {
                 return Err(SnapshotComparisonError::InvalidSnapshot { side, errors });
             }
-        }
-        if baseline.schema_version != current.schema_version {
-            return Err(SnapshotComparisonError::SchemaVersionMismatch {
-                baseline: baseline.schema_version.clone(),
-                current: current.schema_version.clone(),
-            });
         }
 
         for benchmark in baseline.metrics.keys() {
@@ -853,6 +843,17 @@ mod strict_population_tests {
                 benchmark: "NBack".to_string(),
                 metric: "latency".to_string(),
             }
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_unexpected_benchmark() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)]), ("Stroop", &[("accuracy", 0.7)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::UnexpectedBenchmark("Stroop".to_string())
         );
     }
 
