@@ -162,6 +162,18 @@ pub struct SignedCapabilityOutcomeReceipt {
     pub signature_hex: String,
 }
 
+#[cfg(feature = "identity")]
+impl CapabilityOutcomeReceipt {
+    /// Return the exact versioned bytes that an evaluator must sign for this receipt.
+    ///
+    /// Consumers should sign these bytes with the evaluator private key corresponding to
+    /// QualificationPolicy::trusted_evaluator_public_key_hex. The signature also binds the
+    /// receipt to the SHA-256 digest of the evidence payload supplied during verification.
+    pub fn canonical_signing_payload(&self) -> Result<Vec<u8>, CapabilityLedgerError> {
+        receipt_verifier::canonical_payload(self)
+    }
+}
+
 /// Opaque qualification-admission token. It intentionally has private fields and no serde
 /// implementation, so callers cannot create one by supplying a digest or deserializing a claim.
 /// Only this module and its descendants (the future independent verifier and unit tests) can
@@ -1149,7 +1161,7 @@ mod tests {
             receipt_sha256: hex::encode(Sha256::digest(evidence)),
             actual_compute_units: Some(2.0),
         };
-        let canonical = receipt_verifier::canonical_payload(&receipt).unwrap();
+        let canonical = receipt.canonical_signing_payload().unwrap();
         let signature = key.sign(&canonical);
         let signed = SignedCapabilityOutcomeReceipt {
             receipt,
