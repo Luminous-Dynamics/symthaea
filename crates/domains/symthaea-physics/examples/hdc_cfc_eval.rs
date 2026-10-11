@@ -794,7 +794,10 @@ fn load_csv_rows(path: &std::path::Path, max_cols: usize) -> Vec<(Vec<f32>, bool
     rows
 }
 
-fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path) -> Option<EvalResult> {
+fn evaluate_spacecraft(
+    train_path: &std::path::Path,
+    test_path: &std::path::Path,
+) -> Option<EvalResult> {
     let n_features = 25;
 
     let train_rows = load_csv_rows(train_path, n_features);
@@ -1024,7 +1027,7 @@ fn main() {
         match evaluate_spacecraft(&smap_train, &smap_test) {
             Some(r) => {
                 eprintln!("[Spacecraft] Done.");
-                println!("---- Spacecraft (SMAP) -------------------------------------------------");
+                println!("---- Spacecraft (SMAP) ----");
                 println!("  Method                AUC       Best-F1*");
                 println!(
                     "  HDC-Only              {:.3}     {:.3}",
@@ -1057,7 +1060,7 @@ fn main() {
             }
             None => {
                 eprintln!(
-                    "[Spacecraft] Evaluation skipped because valid train/test calibration data is insufficient."
+                    "[Spacecraft] Skipped: valid labelled train/test calibration data is insufficient."
                 );
             }
         }
