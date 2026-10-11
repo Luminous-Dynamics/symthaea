@@ -1,0 +1,51 @@
+name: Inference Contract
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_contract.rs"
+      - "tests/inference_contract.rs"
+      - "docs/architecture/INFERENCE_FABRIC_V1.md"
+      - ".github/workflows/inference-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-contract:
+    name: Inference Contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/inference_contract.rs tests/inference_contract.rs
+
+      - name: Compile and run IF-0 contract regressions
+        run: cargo test --locked --test inference_contract
+
+      - name: Focused contract Clippy
+        run: cargo clippy --locked --test inference_contract -- -D warnings -A dead-code
+
+      - name: Ratchet authority and privacy boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'Successful admission is **not** an execution capability' src/language/inference_contract.rs
+          grep -F 'RawSensitiveDataCannotLeaveDevice' src/language/inference_contract.rs
+          grep -F 'RemoteSafeDerived' src/language/inference_contract.rs
+          grep -F 'Credentials are deliberately absent from admission authority' docs/architecture/INFERENCE_FABRIC_V1.md
+          grep -F 'no permit minting' docs/architecture/INFERENCE_FABRIC_V1.md
