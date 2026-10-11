@@ -1052,7 +1052,13 @@ impl HdcMatrix {
     /// For an m×n matrix of rank r, the null space has dimension n - r.
     /// Returns None if the matrix has full column rank (null space is trivial).
     pub fn null_space(&self) -> Option<HdcMatrix> {
-        let (singular_values, _, v, _) = self.try_svd().ok()?;
+        self.try_null_space().ok().flatten()
+    }
+
+    /// Checked null-space construction. Solver/input errors are distinct from a
+    /// full-column-rank matrix, for which the result is Ok(None).
+    pub fn try_null_space(&self) -> Result<Option<HdcMatrix>, String> {
+        let (singular_values, _, v, _) = self.try_svd()?;
         let n = self.cols;
         let sigma_max = singular_values.iter().copied().fold(0.0_f64, f64::max);
         let tolerance = self.rows.max(self.cols) as f64 * SVD_TOLERANCE * sigma_max;
@@ -1063,7 +1069,7 @@ impl HdcMatrix {
         let null_dim = n.saturating_sub(rank);
 
         if null_dim == 0 {
-            return None;
+            return Ok(None);
         }
 
         // Null space = columns rank..n of V
@@ -1074,7 +1080,7 @@ impl HdcMatrix {
             }
         }
 
-        Some(HdcMatrix::new(null_data, n, null_dim))
+        Ok(Some(HdcMatrix::new(null_data, n, null_dim)))
     }
 
     // ─── Properties ──────────────────────────────────────────────────────
