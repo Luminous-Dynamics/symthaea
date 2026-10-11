@@ -39,6 +39,9 @@ pub enum GridQuality {
     Medium,
     /// Fine: 50 radial × 50 angular = 2500 points/atom
     Fine,
+    /// High accuracy: 75 radial × 302 angular = 22,650 points/atom.
+    /// Uses the degree-29 Lebedev–Laikov angular rule.
+    HighAccuracy,
 }
 
 impl DftGrid {
@@ -48,6 +51,7 @@ impl DftGrid {
             GridQuality::Coarse => (20, lebedev_6()),
             GridQuality::Medium => (35, lebedev_26()),
             GridQuality::Fine => (50, lebedev_50()),
+            GridQuality::HighAccuracy => (75, lebedev_302()),
         };
 
         let mut points = Vec::new();
@@ -326,6 +330,125 @@ fn lebedev_50() -> Vec<(f64, f64, f64, f64)> {
     pts
 }
 
+
+/**
+ * Expand a symmetry orbit from the Lebedev–Laikov tables.
+ * The orbit code follows PySCF's SphGenOh convention: 0 (axes), 2 (cube
+ * corners), 3 (two equal coordinates), 4 (one zero coordinate), and 5
+ * (three distinct coordinates). We emit normalized weights summing to 1;
+ * the radial quadrature supplies the missing 4π solid-angle factor.
+ */
+fn lebedev_orbit(
+    code: u8,
+    a: f64,
+    b: f64,
+    weight: f64,
+) -> Vec<(f64, f64, f64, f64)> {
+    let mut points = Vec::new();
+    let signs = [1.0_f64, -1.0_f64];
+
+    match code {
+        0 => {
+            points.extend([
+                (1.0, 0.0, 0.0, weight),
+                (-1.0, 0.0, 0.0, weight),
+                (0.0, 1.0, 0.0, weight),
+                (0.0, -1.0, 0.0, weight),
+                (0.0, 0.0, 1.0, weight),
+                (0.0, 0.0, -1.0, weight),
+            ]);
+        }
+        2 => {
+            let t = 1.0 / 3.0_f64.sqrt();
+            for &sx in &signs {
+                for &sy in &signs {
+                    for &sz in &signs {
+                        points.push((sx * t, sy * t, sz * t, weight));
+                    }
+                }
+            }
+        }
+        3 => {
+            let c = (1.0 - 2.0 * a * a).sqrt();
+            for &sx in &signs {
+                for &sy in &signs {
+                    for &sz in &signs {
+                        points.push((sx * a, sy * a, sz * c, weight));
+                        points.push((sx * a, sy * c, sz * a, weight));
+                        points.push((sx * c, sy * a, sz * a, weight));
+                    }
+                }
+            }
+        }
+        4 => {
+            let c = (1.0 - a * a).sqrt();
+            for &sa in &signs {
+                for &sb in &signs {
+                    points.extend([
+                        (sa * a, sb * c, 0.0, weight),
+                        (sa * a, 0.0, sb * c, weight),
+                        (0.0, sa * a, sb * c, weight),
+                        (sb * c, sa * a, 0.0, weight),
+                        (sb * c, 0.0, sa * a, weight),
+                        (0.0, sb * c, sa * a, weight),
+                    ]);
+                }
+            }
+        }
+        5 => {
+            let c = (1.0 - a * a - b * b).sqrt();
+            for &sa in &signs {
+                for &sb in &signs {
+                    for &sc in &signs {
+                        points.extend([
+                            (sa * a, sb * b, sc * c, weight),
+                            (sa * a, sb * c, sc * b, weight),
+                            (sa * b, sb * a, sc * c, weight),
+                            (sa * b, sb * c, sc * a, weight),
+                            (sa * c, sb * a, sc * b, weight),
+                            (sa * c, sb * b, sc * a, weight),
+                        ]);
+                    }
+                }
+            }
+        }
+        _ => unreachable!("unsupported Lebedev orbit code"),
+    }
+    points
+}
+
+/// 302-point Lebedev–Laikov degree-29 angular quadrature.
+/// Orbit parameters are tabulated in PySCF's pyscf/dft/LebedevGrid.py
+/// (MakeAngularGrid_302 / SphGenOh) and independently available in
+/// Burkardt's public-domain sphere_lebedev_rule/lebedev_029.txt data.
+/// Angular weights are normalized to sum to 1. This denser rule is opt-in:
+/// it materially increases integration cost compared with the legacy presets.
+fn lebedev_302() -> Vec<(f64, f64, f64, f64)> {
+    // Each tuple is (orbit code, a, b, normalized weight).
+    // Constants are kept at their source-table precision.
+    let orbits: &[(u8, f64, f64, f64)] = &[
+        (0, 0.0, 0.0, 0.8545911725128148e-3),
+        (2, 0.0, 0.0, 0.3599119285025571e-2),
+        (3, 0.3515640345570105e+0, 0.0, 0.3449788424305883e-2),
+        (3, 0.6566329410219612e+0, 0.0, 0.3604822601419882e-2),
+        (3, 0.4729054132581005e+0, 0.0, 0.3576729661743367e-2),
+        (3, 0.9618308522614784e-1, 0.0, 0.2352101413689164e-2),
+        (3, 0.2219645236294178e+0, 0.0, 0.3108953122413675e-2),
+        (3, 0.7011766416089545e+0, 0.0, 0.3650045807677255e-2),
+        (4, 0.2644152887060663e+0, 0.0, 0.2982344963171804e-2),
+        (4, 0.5718955891878961e+0, 0.0, 0.3600820932216460e-2),
+        (5, 0.2510034751770465e+0, 0.8000727494073952e+0, 0.3571540554273387e-2),
+        (5, 0.1233548532583327e+0, 0.4127724083168531e+0, 0.3392312205006170e-2),
+    ];
+
+    let mut points = Vec::with_capacity(302);
+    for &(code, a, b, weight) in orbits {
+        points.extend(lebedev_orbit(code, a, b, weight));
+    }
+    debug_assert_eq!(points.len(), 302);
+    points
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -546,6 +669,7 @@ mod tests {
             (GridQuality::Coarse, 5e-4),
             (GridQuality::Medium, 5e-6),
             (GridQuality::Fine, 1e-7),
+            (GridQuality::HighAccuracy, 1e-8),
         ];
         let alphas = [0.25_f64, 0.5, 1.0, 2.0, 4.0];
 
