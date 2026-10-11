@@ -320,6 +320,9 @@ impl HdcLtcUnifiedNeuron {
         let gating_steepness = self.config.gating_steepness;
         let dt_clamped = dt.max(1e-9);
 
+        // Fuse the post-update L2-bound reduction into the main O(D) update pass.
+        // If the bound is not crossed, this avoids a separate read of the whole state.
+        let mut state_norm_sq = 0.0_f32;
         match self.config.activation {
             Activation::Tanh => {
                 for i in 0..dim {
@@ -367,6 +370,7 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite(), "Evolved state value must be finite");
                     self.state.values[i] = new_h_i;
+                    state_norm_sq += new_h_i * new_h_i;
                 }
             }
             Activation::Sigmoid => {
@@ -391,6 +395,7 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
+                    state_norm_sq += new_h_i * new_h_i;
                 }
             }
             Activation::SiLU => {
@@ -415,6 +420,7 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
+                    state_norm_sq += new_h_i * new_h_i;
                 }
             }
             Activation::Identity => {
@@ -439,6 +445,7 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
+                    state_norm_sq += new_h_i * new_h_i;
                 }
             }
             Activation::BoundedTanh { bound } => {
@@ -464,11 +471,15 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
+                    state_norm_sq += new_h_i * new_h_i;
                 }
             }
         }
 
-        self.apply_state_bounds();
+        let state_norm = state_norm_sq.sqrt();
+        if state_norm > 5.0 {
+            self.state.scale_in_place(5.0 / state_norm);
+        }
         self.update_stats(dt);
     }
 
@@ -535,15 +546,6 @@ impl HdcLtcUnifiedNeuron {
             field.push(tau_i);
         }
         field
-    }
-
-    /// Soft state bounds: rescale if L2 norm exceeds 5.0.
-    #[inline]
-    fn apply_state_bounds(&mut self) {
-        let norm = self.state.norm();
-        if norm > 5.0 {
-            self.state.scale_in_place(5.0 / norm);
-        }
     }
 
     /// Update running statistics.
