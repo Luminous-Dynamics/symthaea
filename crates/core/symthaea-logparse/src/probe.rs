@@ -503,8 +503,22 @@ mod tests {
     #[test]
     fn grouped_split_is_deterministic() {
         let hvs = vec![vec![1], vec![2], vec![3], vec![4], vec![5], vec![6]];
-        let labels = vec!["a".to_string(), "a".into(), "a".into(), "a".into(), "b".into(), "b".into()];
-        let groups = vec!["a1".into(), "a2".into(), "a3".into(), "a4".into(), "b1".into(), "b2".into()];
+        let labels = vec![
+            "a".to_string(),
+            "a".into(),
+            "a".into(),
+            "a".into(),
+            "b".into(),
+            "b".into(),
+        ];
+        let groups = vec![
+            "a1".into(),
+            "a2".into(),
+            "a3".into(),
+            "a4".into(),
+            "b1".into(),
+            "b2".into(),
+        ];
         let a = grouped_stratified_split(&hvs, &labels, &groups, 0.5, 11).unwrap();
         let b = grouped_stratified_split(&hvs, &labels, &groups, 0.5, 11).unwrap();
         assert_eq!(a.0, b.0);
@@ -575,7 +589,14 @@ mod tests {
     #[test]
     fn grouped_fold_assignment_is_deterministic() {
         let labels = vec!["a".into(), "a".into(), "a".into(), "b".into(), "b".into(), "b".into()];
-        let groups = vec!["a1".into(), "a2".into(), "a3".into(), "b1".into(), "b2".into(), "b3".into()];
+        let groups = vec![
+            "a1".into(),
+            "a2".into(),
+            "a3".into(),
+            "b1".into(),
+            "b2".into(),
+            "b3".into(),
+        ];
         assert_eq!(
             grouped_fold_assignment(&labels, &groups, 3, 99).unwrap(),
             grouped_fold_assignment(&labels, &groups, 3, 99).unwrap()
