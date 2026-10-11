@@ -101,6 +101,89 @@ fn verified_reference_standard() -> VerifiedArtifactBytes {
     VerifiedArtifactBytes::verify(reference, reference_standard_fixture_bytes()).unwrap()
 }
 
+fn verified_calibration_with_reference_standard_scope(
+    standard_min: f64,
+    standard_max: f64,
+    standard_valid_from: u64,
+    standard_valid_until: u64,
+) -> Result<VerifiedCalibrationEvidence, ContractError> {
+    let standard_certificate = CalibrationCertificate::new(
+        "reference-standard-01",
+        InstrumentIdentity::new(
+            "frequency-standard-lab-01",
+            "reference-output-a",
+        )
+        .unwrap(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        standard_min,
+        standard_max,
+        standard_valid_from,
+        standard_valid_until,
+        100.0,
+        "primary-metrology-lab-01",
+        "frequency-reference-procedure-v1",
+        artifact(
+            "primary-reference-standard-01",
+            &sha256_hex(&primary_reference_standard_fixture_bytes()),
+        ),
+    )
+    .unwrap();
+    let standard_bytes = standard_certificate.to_canonical_bytes();
+    let standard_reference =
+        artifact("reference-standard-01", &sha256_hex(&standard_bytes));
+    let certificate = CalibrationCertificate::new(
+        "calibration-17",
+        instrument_identity(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+        "calibration-lab-01",
+        "ultrasound-frequency-procedure-v1",
+        standard_reference.clone(),
+    )
+    .unwrap();
+    let certificate_bytes = certificate.to_canonical_bytes();
+    let certificate_reference = artifact(
+        "calibration-certificate",
+        &sha256_hex(&certificate_bytes),
+    );
+    let review_bytes =
+        signed_review_fixture_bytes(&certificate_reference, "calibration-17");
+    let review = verify_review_bytes(
+        review_bytes,
+        &certificate_reference,
+        "calibration-17",
+        "independent-review-receipt",
+    )
+    .unwrap();
+    let resolved = ResolvedCalibration::new(
+        "calibration-17",
+        instrument_identity(),
+        certificate_reference.clone(),
+        review.artifact().reference().clone(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    )
+    .unwrap();
+
+    VerifiedCalibrationEvidence::new(
+        resolved,
+        VerifiedArtifactBytes::verify(certificate_reference, certificate_bytes).unwrap(),
+        VerifiedArtifactBytes::verify(standard_reference, standard_bytes).unwrap(),
+        review,
+    )
+}
+
 const REVIEW_NOW_UNIX_S: u64 = 1_750_000_000;
 
 fn review_signing_key() -> SigningKey {
@@ -1209,6 +1292,34 @@ fn verified_calibration_rejects_reference_standard_with_wrong_quantity() {
         )
         .unwrap_err(),
         ContractError::ReferenceStandardClaimMismatch("quantity")
+    );
+}
+
+#[test]
+fn verified_calibration_rejects_reference_standard_range_that_does_not_cover_calibration() {
+    assert_eq!(
+        verified_calibration_with_reference_standard_scope(
+            4_100_000.0,
+            6_000_000.0,
+            SAMPLE_TIME_NS - 10_000,
+            SAMPLE_TIME_NS + 2_000_000_000,
+        )
+        .unwrap_err(),
+        ContractError::ReferenceStandardClaimMismatch("calibration_range_not_covered")
+    );
+}
+
+#[test]
+fn verified_calibration_rejects_reference_standard_validity_that_does_not_cover_calibration() {
+    assert_eq!(
+        verified_calibration_with_reference_standard_scope(
+            4_000_000.0,
+            6_000_000.0,
+            SAMPLE_TIME_NS,
+            SAMPLE_TIME_NS + 2_000_000_000,
+        )
+        .unwrap_err(),
+        ContractError::ReferenceStandardClaimMismatch("validity_interval_not_covered")
     );
 }
 

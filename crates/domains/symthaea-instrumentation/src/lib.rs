@@ -847,6 +847,24 @@ impl VerifiedCalibrationEvidence {
         if parsed_reference_standard.unit() != parsed_certificate.unit() {
             return Err(ContractError::ReferenceStandardClaimMismatch("unit"));
         }
+        let (standard_min, standard_max) = parsed_reference_standard.range();
+        let (calibration_min, calibration_max) = parsed_certificate.range();
+        if standard_min > calibration_min || standard_max < calibration_max {
+            return Err(ContractError::ReferenceStandardClaimMismatch(
+                "calibration_range_not_covered",
+            ));
+        }
+        let (standard_valid_from, standard_valid_until) =
+            parsed_reference_standard.validity_window_ns();
+        let (calibration_valid_from, calibration_valid_until) =
+            parsed_certificate.validity_window_ns();
+        if standard_valid_from > calibration_valid_from
+            || calibration_valid_until > standard_valid_until
+        {
+            return Err(ContractError::ReferenceStandardClaimMismatch(
+                "validity_interval_not_covered",
+            ));
+        }
         if review_receipt.artifact().reference() != &calibration.review_receipt {
             return Err(ContractError::VerifiedArtifactReferenceMismatch(
                 "calibration_review_receipt",
