@@ -1012,9 +1012,12 @@ pub fn annotate_with_ablation_results(
             push_annotation_once(
                 &mut indicator.annotations,
                 EvidenceAnnotation::KnownConfound(
-                    "legacy ButlinEvidenceBundle lacks typed same-intervention provenance; \\
-                     downstream degradation is retained as diagnostic-only and cannot authorize \\
-                     FunctionallySupported".to_string(),
+                    concat!(
+                        "legacy ButlinEvidenceBundle lacks typed same-intervention provenance; ",
+                        "downstream degradation is retained as diagnostic-only and cannot authorize ",
+                        "FunctionallySupported"
+                    )
+                    .to_string(),
                 ),
             );
             EvidenceOutcome::Supported(SupportTier::CausallySupported)
