@@ -592,8 +592,15 @@ impl ModularRing {
         Self::try_new(modulus).expect("modular arithmetic requires a non-zero modulus")
     }
 
+    // The fields remain public for compatibility, so validate the invariant at
+    // operation boundaries as well as at construction.
+    fn assert_valid_modulus(&self) {
+        assert!(self.modulus > 0, "modular arithmetic requires a non-zero modulus");
+    }
+
     /// Modular addition without u64 intermediate overflow.
     pub fn add(&self, a: u64, b: u64) -> u64 {
+        self.assert_valid_modulus();
         let modulus = u128::from(self.modulus);
         let a = u128::from(a % self.modulus);
         let b = u128::from(b % self.modulus);
@@ -602,6 +609,7 @@ impl ModularRing {
 
     /// Modular multiplication
     pub fn multiply(&self, a: u64, b: u64) -> u64 {
+        self.assert_valid_modulus();
         let a = a % self.modulus;
         let b = b % self.modulus;
         ((a as u128 * b as u128) % self.modulus as u128) as u64
@@ -609,6 +617,7 @@ impl ModularRing {
 
     /// Modular exponentiation by squaring
     pub fn power(&self, base: u64, exp: u64) -> u64 {
+        self.assert_valid_modulus();
         if exp == 0 {
             return 1 % self.modulus;
         }
@@ -633,6 +642,7 @@ impl ModularRing {
     /// Inputs are reduced modulo the ring modulus before the Euclidean algorithm;
     /// no u64-to-i64 casts or signed remainder corrections are used.
     pub fn inverse(&self, a: u64) -> Option<u64> {
+        self.assert_valid_modulus();
         let modulus = i128::from(self.modulus);
         let mut old_r = i128::from(a % self.modulus);
         let mut r = modulus;
@@ -659,12 +669,14 @@ impl ModularRing {
 
     /// Check if element is a unit (has multiplicative inverse)
     pub fn is_unit(&self, a: u64) -> bool {
+        self.assert_valid_modulus();
         let engine = NumberTheoryEngine::new();
         engine.gcd(a, self.modulus) == 1
     }
 
     /// Euler's totient function: count of units in Z/nZ
     pub fn euler_totient(&self) -> u64 {
+        self.assert_valid_modulus();
         (1..self.modulus).filter(|&a| self.is_unit(a)).count() as u64
     }
 }
@@ -767,6 +779,14 @@ mod tests {
     #[should_panic(expected = "modular arithmetic requires a non-zero modulus")]
     fn test_modular_ring_legacy_constructor_fails_on_zero_modulus() {
         let _ = ModularRing::new(0);
+    }
+
+    #[test]
+    #[should_panic(expected = "modular arithmetic requires a non-zero modulus")]
+    fn test_modular_ring_operations_revalidate_public_mutable_modulus() {
+        let mut ring = ModularRing::new(7);
+        ring.modulus = 0;
+        let _ = ring.add(1, 2);
     }
 
     #[test]
