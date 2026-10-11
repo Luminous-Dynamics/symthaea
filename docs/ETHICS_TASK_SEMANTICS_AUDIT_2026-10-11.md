@@ -56,6 +56,18 @@ The live Stage-1 pilot, older HDC classifier, composite benchmark, and ablation 
 
 These source-level findings are enough to invalidate the *unqualified claims*, but not enough to assign a single corrected full-suite score. Preserve each legacy program for investigation; qualify its output and build a new task-matched harness rather than merely adjusting a reported percentage.
 
+## Additional runtime semantic risk: unspecified consent defaults to implied consent
+
+A separate source inspection found a runtime risk beyond benchmark scoring:
+
+- `ParsedMoralScenario::default()` initializes consent to `ConsentState::Implied`.
+- `MoralParser::detect_consent()` also returns `ConsentState::Implied` when neither an absent-consent phrase nor a given-consent phrase is detected.
+- The enum documents `Implied` as “implicit/assumed consent”, while `Absent` means “no consent requested”. Therefore, “the text did not tell us whether consent exists” is currently collapsed into “consent is implied”.
+
+That is an unsafe evidence collapse for consent-sensitive decisions. **Unknown is not granted, denied, or necessarily absent consent.** The follow-on design should add an explicit `Unspecified`/`Unknown` state, preserve `Absent` and `Implied` as different claims, and attach provenance/confidence to the parser's determination. For actions whose domain requires consent, unknown consent should block automatic authorization or trigger abstention/clarification—not be silently treated as permission. Conversely, not every action requires consent, so unknown consent should not mechanically label all actions immoral.
+
+Acceptance tests should cover no mention of consent, explicit grant, explicit denial, not requested, contextual implication, negation, quoted speech, and adversarial keyword placement. Use property-based paraphrase/scope tests and a fail-closed authorization test for consent-required actions before integrating this into the live engine. This code change is intentionally a separate follow-on; it is not implemented by the benchmark-audit PR.
+
 ## Corrected immediate scope
 
 A new examples/ethics_commonsense_holdout.rs evaluates **only the commonsense task**, on the full standard test CSV and, when present, the full hard-test CSV. It uses the existing live-path scalar scorer with the task's actual binary target and a fixed zero threshold. It reports confusion counts, accuracy, balanced accuracy, precision, recall, specificity, majority-class baseline, row count, split path, and BLAKE3 digest of the exact source file.
