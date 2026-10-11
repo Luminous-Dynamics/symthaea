@@ -53,6 +53,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Check Python reference harness syntax
+        run: |
+          python -m py_compile scripts/qc/check_vwn5_pyscf_reference.py
+
       - name: Install pinned PySCF and numerical dependencies
         run: |
           python -m pip install --disable-pip-version-check \
