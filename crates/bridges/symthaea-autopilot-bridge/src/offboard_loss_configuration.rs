@@ -656,7 +656,11 @@ mod tests {
     }
 
     fn timeout(sequence: u64, at: u64) -> Px4OffboardLossParameterObservationV1 {
-        observation(sequence, Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(1.0_f32.to_bits()), at)
+        observation(
+            sequence,
+            Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(1.0_f32.to_bits()),
+            at,
+        )
     }
 
     fn action(sequence: u64, raw: i32, at: u64) -> Px4OffboardLossParameterObservationV1 {
@@ -689,12 +693,16 @@ mod tests {
             profile(200_000_000),
             ts(assessed_ns),
             observations,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     #[test]
     fn complete_snapshot_preserves_raw_action_without_decoding() {
-        let value = assessment(vec![action(12, 6, 1_100_000_000), timeout(11, 1_000_000_000)], 1_200_000_000);
+        let value = assessment(
+            vec![action(12, 6, 1_100_000_000), timeout(11, 1_000_000_000)],
+            1_200_000_000,
+        );
         assert!(matches!(
             value.outcome().unwrap(),
             Px4OffboardLossConfigurationOutcomeV1::CompleteSnapshotObserved {
@@ -722,7 +730,10 @@ mod tests {
 
     #[test]
     fn stale_required_value_makes_the_whole_window_stale() {
-        let value = assessment(vec![timeout(11, 1_000_000_000), action(12, 6, 1_100_000_000)], 4_000_000_001);
+        let value = assessment(
+            vec![timeout(11, 1_000_000_000), action(12, 6, 1_100_000_000)],
+            4_000_000_001,
+        );
         assert_eq!(
             value.outcome().unwrap(),
             Px4OffboardLossConfigurationOutcomeV1::Stale {
@@ -762,7 +773,10 @@ mod tests {
             ).unwrap_err(),
             Px4OffboardLossConfigurationError::InvalidTimeoutValue
         );
-        assert_eq!(action(12, i32::MAX, 1_100).value, Px4OffboardLossParameterValueV1::RcActionI32(i32::MAX));
+        assert_eq!(
+            action(12, i32::MAX, 1_100).value,
+            Px4OffboardLossParameterValueV1::RcActionI32(i32::MAX)
+        );
     }
 
     #[test]
@@ -788,16 +802,26 @@ mod tests {
 
     #[test]
     fn canonical_order_produces_same_assessment_identity() {
-        let first = assessment(vec![timeout(11, 1_000_000_000), action(12, 6, 1_100_000_000)], 1_200_000_000);
-        let second = assessment(vec![action(12, 6, 1_100_000_000), timeout(11, 1_000_000_000)], 1_200_000_000);
+        let first = assessment(
+            vec![timeout(11, 1_000_000_000), action(12, 6, 1_100_000_000)],
+            1_200_000_000,
+        );
+        let second = assessment(
+            vec![action(12, 6, 1_100_000_000), timeout(11, 1_000_000_000)],
+            1_200_000_000,
+        );
         assert_eq!(first.assessment_id().unwrap(), second.assessment_id().unwrap());
     }
 
     #[test]
     fn serde_mutation_breaks_content_commitments() {
-        let value = assessment(vec![timeout(11, 1_000_000_000), action(12, 6, 1_100_000_000)], 1_200_000_000);
+        let value = assessment(
+            vec![timeout(11, 1_000_000_000), action(12, 6, 1_100_000_000)],
+            1_200_000_000,
+        );
         let encoded = serde_json::to_vec(&value).unwrap();
-        let mut restored: Px4OffboardLossConfigurationAssessmentV1 = serde_json::from_slice(&encoded).unwrap();
+        let mut restored: Px4OffboardLossConfigurationAssessmentV1 =
+            serde_json::from_slice(&encoded).unwrap();
         restored.validate().unwrap();
         restored.observations[0].value = Px4OffboardLossParameterValueV1::RcActionI32(0);
         assert!(restored.validate().is_err());
