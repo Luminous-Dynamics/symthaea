@@ -88,6 +88,12 @@ fn main() {
             let mut config = DftConfig::default();
             config.functional = XcFunctional::Lda;
             config.grid_quality = grid_quality;
+            // Use strict benchmark-only SCF tolerances. Production defaults
+            // remain unchanged; tighter settings reduce SCF error before
+            // comparing energies across independently implemented engines.
+            config.max_iterations = 200;
+            config.energy_convergence = 1e-10;
+            config.density_convergence = 1e-8;
 
             let common = json!({
                 "molecule": molecule_name,
