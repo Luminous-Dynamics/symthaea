@@ -1151,42 +1151,63 @@ fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Result<Option<u8>, String> {
     Ok(Some(midi as u8))
 }
 
-pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
-    let melody = score.voice(VoiceRole::Melody);
-    let motif_len = melody.len().clamp(0, 6);
-    let motif_pitches: Vec<u8> = melody
+fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotifSummary> {
+    let mut notes: Vec<_> = score.notes.iter().filter(|note| note.part == part).collect();
+    notes.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
+    if notes.len() < 2 {
+        return None;
+    }
+
+    // A PartId preserves source-line identity, but one part may contain chords
+    // or overlapping voices. Do not invent a monophonic contour in that case.
+    for pair in notes.windows(2) {
+        let previous_end = pair[0].onset.checked_add(pair[0].duration)?;
+        let ordering = previous_end.checked_cmp(pair[1].onset)?;
+        if ordering == std::cmp::Ordering::Greater {
+            return None;
+        }
+    }
+
+    let motif_len = notes.len().min(6);
+    let midi_pitches: Vec<u8> = notes
         .iter()
         .take(motif_len)
-        .map(|n| n.pitch.midi())
+        .map(|note| note.pitch.midi())
         .collect();
-    let motif_intervals: Vec<i16> = motif_pitches
+    let motif_intervals: Vec<i16> = midi_pitches
         .windows(2)
         .map(|pair| i16::from(pair[1]) - i16::from(pair[0]))
         .collect();
-    let occurrences = if motif_intervals.is_empty() {
-        0
-    } else {
-        melody
-            .windows(motif_len)
-            .filter(|window| {
-                window
-                    .windows(2)
-                    .map(|pair| i16::from(pair[1].pitch.midi()) - i16::from(pair[0].pitch.midi()))
-                    .eq(motif_intervals.iter().copied())
-            })
-            .count()
-    };
-    let motifs = (!motif_pitches.is_empty())
-        .then(|| ImportedMotifSummary {
-            occurrence_count: occurrences,
-            midi_pitches: motif_pitches,
-            identity_note:
-                "Reconstructed opening interval identity; contributor confirmation required".into(),
-            confidence: if occurrences > 1 { 0.72 } else { 0.42 },
+    if motif_intervals.is_empty() {
+        return None;
+    }
+    let occurrence_count = notes
+        .windows(motif_len)
+        .filter(|window| {
+            window
+                .windows(2)
+                .map(|pair| i16::from(pair[1].pitch.midi()) - i16::from(pair[0].pitch.midi()))
+                .eq(motif_intervals.iter().copied())
         })
-        .into_iter()
-        .collect();
+        .count();
 
+    Some(ImportedMotifSummary {
+        source_part_id: Some(part.0),
+        occurrence_count,
+        midi_pitches,
+        identity_note: "Monophonic part-local pitch-interval pattern; musical function remains unspecified; contributor confirmation required".into(),
+        confidence: if occurrence_count > 1 { 0.72 } else { 0.42 },
+    })
+}
+
+pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
+    let parts = score.parts();
+    let voice_count = parts.len();
+    let motifs: Vec<_> = parts
+        .iter()
+        .filter_map(|part| part_local_motif_summary(score, *part))
+        .collect();
+    let skipped_part_count = voice_count.saturating_sub(motifs.len());
     let section_beats = f64::from(score.meter.max(1)) * 8.0;
     let total = score.total_beats.beats();
     let mut sections = Vec::new();
@@ -1214,21 +1235,35 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
         "Confirm section boundaries".into(),
         "Confirm voice and instrument roles".into(),
     ];
-    if melody.is_empty() {
+    if motifs.is_empty() {
         unresolved_interpretations.push(
-            "No source-declared melody role exists; motif reconstruction is withheld rather than guessed from register or part order".into(),
+            "No role-neutral motif summary could be reconstructed from a stable monophonic source part".into(),
         );
     } else {
-        unresolved_interpretations.push("Confirm reconstructed motif identity".into());
+        unresolved_interpretations.push(
+            "Confirm source-part motif identities; no audio or listener-recognition claim is made".into(),
+        );
+    }
+    if skipped_part_count > 0 {
+        unresolved_interpretations.push(format!(
+            "Part-local motif extraction was withheld for {skipped_part_count} source part(s) with fewer than two notes or overlapping/polyphonic events"
+        ));
+    }
+    let unassigned_note_count = score
+        .notes
+        .iter()
+        .filter(|note| !note.part.is_assigned())
+        .count();
+    if unassigned_note_count > 0 {
+        unresolved_interpretations.push(format!(
+            "Part-local motif extraction did not combine {unassigned_note_count} note(s) without persistent PartId identity"
+        ));
     }
     if start < total {
         unresolved_interpretations.push(format!(
             "Section reconstruction stopped at its {MAX_RECONSTRUCTED_SECTIONS}-region safety cap; the remaining duration is not segmented"
         ));
     }
-    // PartId represents source-line identity; VoiceRole represents function.
-    // Count the former instead of counting whichever role labels happen to occur.
-    let voice_count = score.parts().len();
     ImportedWorkAnalysis {
         source_native: true,
         inferred_territory: None,
@@ -1301,6 +1336,24 @@ mod tests {
         assert_eq!(score.notes.len(), 1);
         assert_eq!(score.notes[0].part, PartId(0));
         assert_eq!(score.notes[0].role, VoiceRole::Unspecified);
+    }
+
+    #[test]
+    fn analysis_withholds_motif_for_overlapping_notes_in_one_source_part() {
+        let track = [
+            0, 0x90, 60, 100, // first note starts at tick zero
+            0, 0x90, 64, 100, // second note overlaps it in the same part
+            100, 0x80, 60, 0,
+            0, 0x80, 64, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        let analysis = analyze(&score);
+        assert_eq!(analysis.voice_count, 1);
+        assert!(analysis.motifs.is_empty());
+        assert!(analysis.unresolved_interpretations.iter().any(|item| {
+            item.contains("overlapping/polyphonic events")
+        }));
     }
 
     #[test]
@@ -1954,10 +2007,9 @@ mod tests {
         assert!(analysis.source_native);
         assert!(analysis.inferred_territory.is_none());
         assert_eq!(analysis.voice_count, 1);
-        assert!(analysis.motifs.is_empty());
-        assert!(analysis.unresolved_interpretations.iter().any(|item| {
-            item.contains("motif reconstruction is withheld")
-        }));
+        assert_eq!(analysis.motifs.len(), 1);
+        assert_eq!(analysis.motifs[0].source_part_id, Some(0));
+        assert!(analysis.motifs[0].identity_note.contains("part-local"));
     }
 
     #[test]

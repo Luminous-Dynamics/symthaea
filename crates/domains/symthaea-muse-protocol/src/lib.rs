@@ -174,6 +174,10 @@ fn default_authorization_basis() -> AuthorizationBasis {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedMotifSummary {
+    /// Persistent source-part identity, when extraction was scoped to one known part.
+    /// Missing on legacy records; it is never inferred from register or role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_part_id: Option<u16>,
     pub occurrence_count: usize,
     pub midi_pitches: Vec<u8>,
     pub identity_note: String,
