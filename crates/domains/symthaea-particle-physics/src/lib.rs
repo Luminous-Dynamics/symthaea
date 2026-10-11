@@ -1,20 +1,23 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # symthaea-particle-physics — Standard Model Dynamics
+//! # symthaea-particle-physics — Standard Model and Hadron Dynamics
 //!
-//! Computes particle physics observables from first principles:
+//! Computes particle-physics observables from first principles and maintains
+//! evidence-aware hadron/QCD spectroscopy models:
 //!
 //! - **Cross-sections**: QED (e⁺e⁻ → μ⁺μ⁻, Compton), Z resonance, R-ratio
 //! - **Decay widths**: Muon, tau, W/Z bosons, pion, top quark
 //! - **Running couplings**: α_s(Q²), α_EM(Q²), gauge unification projection
 //! - **Symmetry groups**: SU(2) Pauli matrices, SU(3) Gell-Mann matrices,
 //!   structure constants, Casimir operators
+//! - **Non-perturbative QCD**: confinement, lattice-QCD observables,
+//!   glueball/hadron spectroscopy with observation/interpretation separation
 //!
 //! ## Natural Units
 //!
-//! All calculations use natural units (ℏ = c = 1) with energy in GeV.
-//! Conversion factors are provided for seconds, picobarns, etc.
+//! All calculations use natural units (ℏ = c = 1) with energy in GeV unless
+//! a type or field explicitly names another unit (for example `mass_mev`).
 //!
 //! ## References
 //!
@@ -27,6 +30,7 @@ pub mod cross_sections;
 pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
+pub mod hadron_spectroscopy;
 pub mod lattice_qcd;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -41,6 +45,13 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use hadron_spectroscopy::{
+    BASELINE_GLUEBALL_LEVELS, CompositionInterpretation, EvidenceEffect, EvidenceKind,
+    EvidenceRecord, GlueballLevel, HadronicComposition, InterpretationStatus, Jpc, Measurement,
+    ObservationStatus, ObservedResonance, QcdApproximation, SCALAR_GLUEBALL_MASS_RADIUS_FM,
+    X2370, X2370_EVIDENCE, X2370_GLUEBALL_INTERPRETATION, X2370_MOLECULAR_INTERPRETATION,
+    glueball_channel_matches, glueball_mass_gap_mev, x2370_evidence,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
