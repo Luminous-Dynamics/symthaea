@@ -7,6 +7,9 @@
 //! Run with:
 //!   cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark
 //!
+//! The default sweep reaches 1M dimensions. For the heavier 4M stress tier:
+//!   SYTHAEA_HDC_LTC_BENCH_4M=1 cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark
+//!
 //! Emits CSV for multiple hypervector sizes and time increments. It does not claim a
 //! speedup against another architecture; use the output to track dimension and dt scaling
 //! on a fixed machine/toolchain, and compare against a matched baseline before drawing
