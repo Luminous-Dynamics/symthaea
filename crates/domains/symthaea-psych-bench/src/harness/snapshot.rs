@@ -293,10 +293,6 @@ impl std::fmt::Display for SnapshotComparisonError {
             Self::InvalidSnapshot { side, errors } => {
                 write!(f, "{side} snapshot is invalid: {}", errors.join("; "))
             }
-            Self::SchemaVersionMismatch { baseline, current } => write!(
-                f,
-                "snapshot schema versions differ: baseline={baseline:?}, current={current:?}"
-            ),
             Self::UnsupportedSchemaVersion { side, found, expected } => write!(
                 f,
                 "{side} snapshot schema {found:?} is not supported for strict comparison; expected {expected:?}"
