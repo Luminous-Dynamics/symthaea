@@ -1,7 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! AGW plan Phase 4.1 — held-out Hendrycks ETHICS via the LIVE moral-judgment path.
+//! AGW plan Phase 4.1 — legacy cross-domain diagnostic; NOT a valid ETHICS aggregate.
+//!
+//! IMPORTANT: this pilot applies a generic wrongness score to commonsense,
+//! deontology, justice, and virtue labels. Those tasks ask different questions,
+//! so its cross-domain/per-domain label-agreement percentages are unqualified
+//! and must not be presented as task-level ETHICS accuracy. See
+//! docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md and use
+//! ethics_commonsense_holdout for the target-matched commonsense task.
 //!
 //! Exercises exactly what the facade actually wires
 //! (`EthicsEngine::new(MoralParser::new(), MoralAlgebra::default_dim(), None, None)`,
@@ -125,7 +132,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         ("virtue", "virtue_test.csv", load_scenario_only),
     ];
 
-    println!("AGW Phase 4.1 -- held-out ETHICS via the live Stage-1 moral-judgment path");
+    println!("AGW Phase 4.1 -- LEGACY DIAGNOSTIC ONLY (not valid cross-domain ETHICS accuracy)");
+    println!("WARNING: task targets differ across domains; see docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md");
     println!(
         "N={N_PER_DOMAIN} per domain (first N rows of each frozen *_test.csv, not train, not test_hard)\n"
     );
