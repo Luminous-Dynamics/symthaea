@@ -14,7 +14,9 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
+use symthaea_core::hdc::hdc_ltc_unified::{
+    HdcLtcUnifiedNeuron, UnifiedConfig, DEFAULT_MAX_ITERATIVE_SUBSTEPS,
+};
 
 use crate::encoding::codebook::{NIX_HDC_DIM, NixCodebook};
 
@@ -241,9 +243,24 @@ impl PredictiveMonitor {
         let last_telemetry = last_entry.2.clone();
         let last_input = self.encode_telemetry(&last_telemetry);
 
+        if !hours_ahead.is_finite() || hours_ahead < 0.0 {
+            return None;
+        }
+
+        let dt_seconds_f64 = hours_ahead * 3600.0;
+        if !dt_seconds_f64.is_finite() || dt_seconds_f64 > f32::MAX as f64 {
+            return None;
+        }
+        let dt_seconds = dt_seconds_f64 as f32;
+
         let mut future_neuron = self.neuron.clone();
-        let dt_seconds = (hours_ahead * 3600.0) as f32;
-        future_neuron.evolve_closed_form_iterative(dt_seconds, &last_input);
+        future_neuron
+            .try_evolve_closed_form_iterative(
+                dt_seconds,
+                &last_input,
+                DEFAULT_MAX_ITERATIVE_SUBSTEPS,
+            )
+            .ok()?;
         let predicted_hv = future_neuron.state().clone();
 
         Some(self.decode_telemetry(&predicted_hv))
