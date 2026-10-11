@@ -1,0 +1,81 @@
+name: Research Conjecture Confidence Separation
+
+on:
+  pull_request:
+    paths:
+      - 'patches/science/research-conjecture-confidence-separation-v1.patch'
+      - '.github/workflows/research-conjecture-confidence-separation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Freeze qualification-only branch scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+          base="${{ github.event.pull_request.base.sha }}"
+          changed="$(git diff --name-only "$base"...HEAD)"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(patches/science/research-conjecture-confidence-separation-v1\.patch|\.github/workflows/research-conjecture-confidence-separation\.yml)$' || true)"
+          test -z "$unexpected" || { echo "unexpected branch drift:"; printf '%s\n' "$unexpected"; exit 1; }
+
+      - name: Freeze current scalar-fusion boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=src/web_research/conjecture_feed.rs
+          grep -F 'conjecture.confidence = conjecture.confidence.min(prov.confidence as f64);' "$file"
+          grep -F '`confidence` is capped by the source' "$file"
+          grep -F 'pc.conjecture.confidence <= pc.provenance.confidence as f64' "$file"
+
+      - name: Apply exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch=patches/science/research-conjecture-confidence-separation-v1.patch
+          git apply --check "$patch"
+          git apply "$patch"
+          git diff --check
+
+      - name: Ratchet non-collapsed confidence coordinates
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=src/web_research/conjecture_feed.rs
+          grep -F 'pub struct ProvenancedConfidenceCoordinates' "$file"
+          grep -F 'pub fn confidence_coordinates(&self)' "$file"
+          grep -F 'pub conjecture_score: f64' "$file"
+          grep -F 'pub data_provenance_confidence: f32' "$file"
+          grep -F 'macro promotion) without destructively rewriting the model' "$file"
+          ! grep -Fq 'conjecture.confidence = conjecture.confidence.min(prov.confidence as f64);' "$file"
+          ! grep -Fq '`confidence` is capped by the source' "$file"
+
+      - name: Formatting
+        run: cargo +1.96.0 fmt --all -- --check
+
+      - name: Focused web-research regressions
+        run: |
+          cargo +1.96.0 test -p symthaea --features web_research_module confidence_coordinates -- --nocapture
+          cargo +1.96.0 test -p symthaea --features web_research_module unverified_provenance_forces_quarantine -- --nocapture
+
+      - name: Web-research feature check
+        run: cargo +1.96.0 check -p symthaea --features web_research_module
+
+      - name: Strict library Clippy
+        run: cargo +1.96.0 clippy -p symthaea --features web_research_module --lib -- -D warnings
