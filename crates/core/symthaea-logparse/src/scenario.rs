@@ -308,7 +308,8 @@ mod tests {
             ScenarioEncodingMode::OrderlessBundle
         );
 
-        let ordered_source = aggregate_ordered_scenarios(&[vector.clone()], &labels, &groups).unwrap();
+        let ordered_source =
+            aggregate_ordered_scenarios(&[vector.clone()], &labels, &groups).unwrap();
         let ordered_held_out =
             aggregate_ordered_scenarios(&[vector], &labels, &["otrf-a".into()]).unwrap();
         assert_eq!(
