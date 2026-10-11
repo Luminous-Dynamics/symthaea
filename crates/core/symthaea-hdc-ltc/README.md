@@ -11,7 +11,7 @@ Traditional recurrent neural networks have two scaling problems:
 2. **Temporal integration** requires O(steps) ODE solver evaluations per time jump
 
 HDC-LTC solves both:
-- **Weight hypervectors** replace weight matrices via HDC binding (element-wise multiply): O(D) parameters
+- **Weight hypervectors** replace a dense recurrent matrix with per-dimension HDC binding (element-wise multiply): O(D) parameters per neuron. This is a more compact, structured parameterization—not an equivalent replacement for every possible dense recurrent map.
 - **Closed-form exponential update** avoids repeated ODE solver substeps: O(D) per jump, independent of dt
 
 The closed-form solution:
@@ -46,7 +46,7 @@ neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
 ## Performance
 
 - **Neuron evolution**: O(D) per step, independent of dt; it is not O(1) in the hypervector dimension
-- **Fused hot path**: `evolve_closed_form_fused()` avoids intermediate heap allocations but assumes the caller supplies valid dimensions and finite values
+- **Fused hot path**: `evolve_closed_form_fused()` avoids intermediate heap allocations and fuses the state-norm reduction into the update pass; it assumes the caller supplies valid dimensions and finite values
 - **Checked path**: `try_evolve_closed_form_fused()` validates dt, dimensions, configuration and numerical finiteness before mutation (with an extra O(D) preflight scan)
 - **Small-step stability**: CfC interpolation uses `-expm1(-dt / tau)` to avoid cancellation for tiny positive dt
 - **fast_tanh**: Rational approximation (max 0.4% error) that auto-vectorizes on modern CPUs
