@@ -142,9 +142,9 @@ def unqualified_symbol_mapping_claim(result: dict[str, Any]) -> bool:
                      statement + " " + scope, re.IGNORECASE):
             return True
         attributed = re.search(
-            r"\b(?:according to|source [a-z]|version (?:one|two)|first fictional source|"
+            r"\b(?:according to|source [a-z]\b|version (?:one|two)|first fictional source|"
             r"second fictional source|in (?:this|the) (?:story|passage|text|context|account|tradition|note)|"
-            r"this (?:story|passage|text|account|tradition)|the (?:fictional )?(?:source|note|author|account))\b",
+            r"this (?:story|passage|text|context|account|tradition)|the (?:fictional )?(?:source|note|author|account|text|passage|story))\b",
             statement,
             re.IGNORECASE,
         ) is not None
@@ -385,6 +385,7 @@ def evaluate(bundle_path: Path, corpus_bytes: bytes, corpus: dict[str, Any], cor
             "checks_passed": passed,
             "checks_total": len(rows),
             "case_contract_passed": passed == len(rows),
+            "failed_checks": [row["check"] for row in rows if not row["passed"]],
             "checks": rows,
         })
     pair_rows = []
