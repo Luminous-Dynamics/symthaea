@@ -8,15 +8,23 @@ import json
 import math
 import sys
 
-SCHEMA = "luminous-dynamics.orbital-ring-reference-check/v1"
+SCHEMA = "luminous-dynamics.orbital-ring-reference-check/v2"
 MU = 3.986_004_418e14  # m^3/s^2
 EARTH_RADIUS_KM = 6_378.137
-ALTITUDES_KM = (200.0, 300.0, 400.0, 500.0)
+ALTITUDES_KM = (200.0, 300.0, 400.0, 500.0, 600.0)
 FIXTURES = {
     200.0: {"radius_km": 6578.137, "circumference_km": 41331.65, "speed_km_s": 7.78426, "period_min": 88.494, "specific_kinetic_energy_mj_kg": 30.297},
     300.0: {"radius_km": 6678.137, "circumference_km": 41959.97, "speed_km_s": 7.72576, "period_min": 90.520, "specific_kinetic_energy_mj_kg": 29.844},
     400.0: {"radius_km": 6778.137, "circumference_km": 42588.29, "speed_km_s": 7.66856, "period_min": 92.560, "specific_kinetic_energy_mj_kg": 29.403},
     500.0: {"radius_km": 6878.137, "circumference_km": 43216.61, "speed_km_s": 7.61261, "period_min": 94.616, "specific_kinetic_energy_mj_kg": 28.976},
+    # Historical altitude anchor only; this row is an ideal circular two-body reference.
+    600.0: {"radius_km": 6978.137, "circumference_km": 43844.93, "speed_km_s": 7.55787, "period_min": 96.687, "specific_kinetic_energy_mj_kg": 28.561},
+}
+HISTORICAL_SOURCE_REFERENCE = {
+    "citation": "Paul Birch, Orbital Ring Systems and Jacob's Ladders — I (1982), p. 476",
+    "url": "https://space.nss.org/wp-content/uploads/Orbital-Rings.pdf",
+    "claim": "Birch lists 300 km and 600 km as representative suitable ORS heights in the ladder analysis.",
+    "use_boundary": "Reference altitude only; these ideal circular two-body values do not establish the actual orbital-ring path, equilibrium, or feasibility.",
 }
 DIGITS = {"radius_km": 3, "circumference_km": 2, "speed_km_s": 5, "period_min": 3, "specific_kinetic_energy_mj_kg": 3}
 RUST_ANCHORS_400 = {
@@ -78,6 +86,12 @@ def main():
             check(f"invariant.{int(h)}km.{name}", observed, expected,
                   max(abs(expected)*5e-12, 1e-9), "Numerical consistency only.")
 
+    check("historical_source.600km_anchor_is_explicit",
+          600.0 in ALTITUDES_KM and 600.0 in FIXTURES
+          and "p. 476" in HISTORICAL_SOURCE_REFERENCE["citation"]
+          and "600 km" in HISTORICAL_SOURCE_REFERENCE["claim"],
+          note="Primary-source altitude anchor; not an architecture or feasibility claim.")
+
     row400 = next(r for r in rows if r["altitude_km"] == 400.0)
     for field, (expected, tol) in RUST_ANCHORS_400.items():
         check(f"rust_unit_test_anchor.400km.{field}", row400[field], expected, tol,
@@ -116,7 +130,7 @@ def main():
     failed = [c["id"] for c in checks if c["status"] != "passed"]
     report = {
         "schema": SCHEMA,
-        "model": "t0_orbit_reference_and_circular_stream_limit",
+        "model": "t0_historically_anchored_orbit_reference_and_circular_stream_limit",
         "evidence_state": "passed_at_specified_fidelity" if not failed else "failed",
         "scope": {
             "fidelity": "T0 analytical arithmetic / fixture cross-check",
@@ -126,6 +140,7 @@ def main():
         "assumptions": {"earth_gravitational_parameter_m3_s2": MU, "earth_equatorial_reference_radius_km": EARTH_RADIUS_KM,
                         "gravity_model": "Earth point mass", "orbit": "circular two-body geocentric",
                         "omitted": ["drag", "J2", "third bodies", "Earth rotation", "ring-support physics"]},
+        "historical_source_reference": HISTORICAL_SOURCE_REFERENCE,
         "formulae": {"radius": "r = R_E + h", "circumference": "C = 2*pi*r", "speed": "v = sqrt(mu/r)",
                      "period": "T = 2*pi*sqrt(r^3/mu)", "specific_kinetic_energy": "e_k = 0.5*v^2"},
         "stream_kinematics_limit": {
