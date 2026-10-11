@@ -321,12 +321,13 @@ impl ExactRational {
         encoded
     }
 
-    /// Deterministic HDC projection of this canonical rational value.
+    /// Deterministic categorical HDC projection of this canonical rational value.
     ///
-    /// This finite hypervector is a useful representation for similarity and
-    /// binding, but is not a lossless identifier or proof object. Use the
-    /// canonical_encoding_bytes method when exact identity matters. This
-    /// convenience form is bounded by HARD_MAX_COMPONENT_BITS.
+    /// This hash-derived hypervector can serve as a stable symbol-like code for
+    /// binding and lookup. It intentionally does not preserve numeric order,
+    /// distance, or neighborhood similarity, and is not a lossless identifier
+    /// or proof object. Use canonical_encoding_bytes when exact identity matters.
+    /// This convenience form is bounded by HARD_MAX_COMPONENT_BITS.
     pub fn to_hdc(&self) -> BinaryHV {
         self.project_canonical_bytes(&self.encode_canonical_bytes())
     }
@@ -634,6 +635,20 @@ mod tests {
         };
         assert_eq!(
             ExactRational::from_canonical_encoding_bytes(&leading_zero, limit).unwrap_err(),
+            ExactRationalError::InvalidCanonicalEncoding
+        );
+
+        let non_reduced = {
+            const PREFIX: &[u8] = b"SYMTHAEA\\0EXACT-RATIONAL\\0V1\\0";
+            let mut encoded = PREFIX.to_vec();
+            encoded.extend_from_slice(&1u64.to_be_bytes());
+            encoded.extend_from_slice(b"2");
+            encoded.extend_from_slice(&1u64.to_be_bytes());
+            encoded.extend_from_slice(b"4");
+            encoded
+        };
+        assert_eq!(
+            ExactRational::from_canonical_encoding_bytes(&non_reduced, limit).unwrap_err(),
             ExactRationalError::InvalidCanonicalEncoding
         );
     }
