@@ -39,6 +39,16 @@ The ordinary baseline experiments now use source-file-grouped train/test and 5-f
 
 Accuracy alone can be dominated by common classes; read it alongside macro metrics and the confusion matrix. Class-level false positives here mean confusion among the labeled attack classes—not false alarms on benign enterprise activity. The staged OTRF corpus does not provide the benign control needed to measure operational false-positive rates. The script prints measurements from the currently staged corpora; do not copy historical values into a new result as if it had been reproduced.
 
+## Ingestion integrity
+
+The same PR also hardens the OTRF/EVTX ingestion path used by this benchmark:
+
+- Event IDs are narrowed with checked integer conversion. An out-of-range number or string maps to the existing unknown/default ID instead of wrapping into a valid Windows EventID.
+- OTRF high-cardinality field values are truncated at a valid UTF-8 boundary, so a multibyte character at the byte cap cannot panic the parser.
+- Recursive OTRF JSON files and EVTX inputs are traversed in sorted path order for deterministic sampling.
+
+These checks improve parser robustness but do not make the corpus trustworthy by themselves: skipped malformed records should still be monitored, source manifests should be pinned, and source-label assignments require independent audit.
+
 ## Decision discipline
 
 This first run is exploratory. A candidate result should be treated as promising only if OOD macro recall improves by at least 5 absolute percentage points over the raw-encoder baseline and in-corpus accuracy drops by no more than 5 points. This threshold is a predeclared screening rule, not a production acceptance criterion.
