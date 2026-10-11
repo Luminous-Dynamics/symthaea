@@ -255,10 +255,10 @@ This is an arithmetic cross-check of transcribed source figures, not evidence th
 **A fault-scenario contract now exists; the physics case remains blocked.** The template `docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json` records the Part II source basis and names 23 required inputs. The validator `scripts/engineering/validate_orbital_ring_failure_manifest.py` checks missing/unknown inputs, field-level provenance, rejection of test-fixture/rejected evidence, typed vectors, support-frame from/to frames and epoch, support-frame quaternion, unit ring-plane normal, geometric/load consistency, step/ramp consistency, rider parameters, and explicit energy/momentum term inventories. The template intentionally has 23 unresolved inputs, `declared_state = Blocked`, `analysis_state = NotRun`, and no result artifacts.
 
 - Local syntax check: `python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py` succeeded.
-- Validator self-tests: **73 passed, 0 failed**. Every required value and every provenance record was removed one at a time; invalid numeric types, unknown force laws, geometry/load inconsistency, duplicate supports, frame mismatches, missing energy/momentum term inventories, fixture-only provenance, rejected evidence and empty evidence references all blocked promotion.
+- Last executed validator self-tests: **73 passed, 0 failed** against source blob `2d07b86480dea71f3272fbee2a9fde4152727abb`. The current source adds seven fail-closed regressions for malformed top-level objects, malformed/unknown keys, malformed field-list types, and wraparound duplicate angles; they are not yet runtime-verified. Do not claim the expanded suite passed.
 - Template assessment: contract validation `passed_contract_checks`; expected/declared scenario state remains **Blocked**, with 23 missing fields, zero type errors in the null-only template, and no physics claim.
 - Both emitted JSON reports were byte-identical on repeat and are preserved under `docs/engineering/evidence/`.
-- Validator Git blob SHA: `2d07b86480dea71f3272fbee2a9fde4152727abb`; source SHA-256: `86dece2753b53f44a5f3dffc109a33121ec2b4ff5cef28bca01a41029af74217`.
+- Current validator Git blob SHA: `a07bd079ca13201a157249be20b0e070af19c281`; source SHA-256: `0ff9b84aa734c959c62c852114ff7a089aabb4917bd92b7bad0eb7828568ab0a`.
 - Template Git blob SHA: `a65250ba7284b503e1effb804a3a30668445017e`; SHA-256: `60c747bf226f436c28f08ca047e77faae2368e200bf72f600e3b84f7dd5234b1`; validation report blob: `8d0f200eb2db33c4c4ef6b8dc07ef98d21e184d6` (SHA-256 `0aa07355674fb104d0e9bb38ad3bafad3cd768b3557e4bfe012126b25f8c253c`); self-test report blob: `87612c32dfe45c3c0fb8b8588716b35c0457aa67` (SHA-256 `dc7718642fc57f35ca813fb3be857194c9ec74d9bc9413db9810d8a1432367c5`).
 
 A green manifest-contract result does **not** mean model inputs are physically valid, that a transient ran, or that the ORS is safe. The next gate is independent source-backed specification of those inputs, not automatic transition to ready.
@@ -271,7 +271,7 @@ A green manifest-contract result does **not** mean model inputs are physically v
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
 - Independently recomputed the four documented circular-orbit rows and compared all values at published rounding precision via the Python reference checker.
 - Ran the column-aware power-source audit (20/20 checks) and repeated it with byte-identical JSON output; local copy's Git blob SHA matched the branch source.
-- Ran the failure-manifest validator self-test (73/73 checks); the provenance and consistency gate kept the 23-field scenario template Blocked and NotRun.
+- The last executed failure-manifest self-test (73/73) applies only to the prior validator blob. The current source fingerprint and not-run status are recorded in [validator verification freshness status](evidence/orbital_ring_validator_verification_status.json).
 
 ### Checks not performed
 
