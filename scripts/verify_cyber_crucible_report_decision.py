@@ -41,6 +41,8 @@ def validate_input_receipt_binding(input_receipt: Any, expected_context: Any) ->
     this exact envelope. This function checks artifact linkage; it does not replace
     independent verification of the upstream signature.
     """
+    if not isinstance(expected_context, dict):
+        raise ReportDecisionBindingError("expected context must be an object")
     if not isinstance(input_receipt, dict) or set(input_receipt) != {"payload", "signature"}:
         raise ReportDecisionBindingError("input receipt envelope must contain exactly payload and signature")
     payload = input_receipt.get("payload")
