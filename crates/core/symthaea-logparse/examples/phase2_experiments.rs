@@ -227,15 +227,16 @@ fn print_selective_curve(
     )?;
     println!("  {name} uncalibrated margin-ranked selective evaluation:");
     println!(
-        "  {:>9} {:>9} {:>10} {:>11} {:>17}",
-        "target", "coverage", "accepted", "accuracy", "macro recall"
+        "  {:>9} {:>9} {:>10} {:>12} {:>11} {:>17}",
+        "target", "coverage", "accepted", "min margin", "accuracy", "macro recall"
     );
     for point in points {
         println!(
-            "  {:>8.0}% {:>8.0}% {:>10} {:>11.3} {:>17.3}",
+            "  {:>8.0}% {:>8.0}% {:>10} {:>12.4} {:>11.3} {:>17.3}",
             point.target_coverage * 100.0,
             point.actual_coverage * 100.0,
             point.accepted_samples,
+            point.margin_threshold,
             point.accepted_accuracy,
             point.accepted_macro_recall
         );
