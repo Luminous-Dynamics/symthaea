@@ -35,7 +35,7 @@
 //! Because τ_i is per-dimension, different dimensions of the hypervector can
 //! track events at different timescales simultaneously — fast sensory reactions
 //! (small τ) coexist with long-horizon cognitive memory (large τ) in a single
-//! 16,384-dimensional state vector.
+//! configurable hypervector (16,384 dimensions by default; 65,536 is covered by the scaling benchmark).
 
 use crate::config::{Activation, NeuronConfig, fast_tanh};
 use crate::continuous_hv::ContinuousHV;
@@ -43,8 +43,8 @@ use serde::{Deserialize, Serialize};
 
 /// Unified HDC-LTC Neuron with per-dimension CfC temporal evolution.
 ///
-/// The neuron state is a hypervector (typically 16,384 dimensions) that evolves
-/// continuously in time via a solver-free Closed-form Continuous (CfC) step.
+/// The neuron state is a configurable hypervector (16,384 dimensions by default)
+/// that evolves continuously in time via a solver-free Closed-form Continuous (CfC) step.
 /// Weight operations use HDC binding (element-wise multiply) instead of matrix
 /// multiplication, yielding O(D) per step rather than O(D²).
 ///
