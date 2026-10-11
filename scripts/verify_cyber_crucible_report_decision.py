@@ -12,13 +12,22 @@ try:
 except ModuleNotFoundError:
     from scripts.validate_cyber_crucible_diagnostic_loop import validate_report
 
-from verify_cyber_crucible_decision_receipt import (
-    DecisionVerificationError,
-    ReplayLedger,
-    canonical_json_digest,
-    load_json,
-    verify_decision_receipt,
-)
+try:
+    from verify_cyber_crucible_decision_receipt import (
+        DecisionVerificationError,
+        ReplayLedger,
+        canonical_json_digest,
+        load_json,
+        verify_decision_receipt,
+    )
+except ModuleNotFoundError:
+    from scripts.verify_cyber_crucible_decision_receipt import (
+        DecisionVerificationError,
+        ReplayLedger,
+        canonical_json_digest,
+        load_json,
+        verify_decision_receipt,
+    )
 
 
 class ReportDecisionBindingError(ValueError):
