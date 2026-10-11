@@ -17,7 +17,7 @@ This document formalizes Symthaea's quality management practices for ISO/IEC 420
 | Objective | Target | Measurement | Review Cycle |
 |-----------|--------|-------------|-------------|
 | Safety monitoring coverage | 100% of cycles assessed | SafetyAgent runs every cycle | Continuous |
-| Moral classification accuracy | >= 90% | Psych-bench moral scenario benchmark | Quarterly |
+| Moral classification accuracy | Target >= 90%; no qualified baseline | Task-matched benchmark with pinned data/split | Quarterly after baseline qualification |
 | Phi measurement correlation | r >= 0.95 | Spectral MIP vs exhaustive validation | Quarterly |
 | Test suite pass rate | 100% (0 regressions) | CI pipeline: `cargo test --lib` | Per-commit |
 | Soak test pass rate | 100% (15/15) | Safety soak test suite | Per-commit |
@@ -82,7 +82,7 @@ Before any release:
 
 | Metric | Current | Threshold | Tool |
 |--------|---------|-----------|------|
-| Moral accuracy | 91.1% | >= 90% | Moral scenario benchmark |
+| Moral accuracy | Not qualified | >= 90% target retained, but measurement deferred | Task-semantics audit + future task-matched benchmark |
 | Phi correlation (MIP search) | r=0.99 | >= 0.95 | `test_spectral_mip_validation` |
 | Proptest stability | 29 cases pass | All finite | `proptest_feedback_stability` |
 | Threshold sensitivity | 18 cases pass | All bounded | `proptest_threshold_sensitivity` |
