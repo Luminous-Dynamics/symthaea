@@ -302,7 +302,9 @@
       ],
       "forbidden_behaviors": [
         "infer_trauma_or_pathology",
-        "assert_hidden_motive"
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence",
+        "claim_universal_symbol_meaning"
       ],
       "oracle_note": "It is permissible to describe a change in the character's actions. The text does not establish trauma, repression, or a personal complex."
     },
@@ -352,7 +354,9 @@
       ],
       "forbidden_behaviors": [
         "assign_personality_type",
-        "promote_symbol_similarity_to_truth_or_consciousness_evidence"
+        "promote_symbol_similarity_to_truth_or_consciousness_evidence",
+        "treat_keyword_overlap_as_evidence",
+        "claim_universal_symbol_meaning"
       ],
       "oracle_note": "Describe the visible change in the story. Do not assign a universal individuation stage or consciousness score."
     },
