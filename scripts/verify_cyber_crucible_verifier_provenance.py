@@ -20,7 +20,10 @@ import sys
 import tempfile
 from typing import Any, Callable
 
-from scripts.package_cyber_crucible_verifier import BundleError, verify_bundle
+try:
+    from package_cyber_crucible_verifier import BundleError, verify_bundle
+except ModuleNotFoundError:
+    from scripts.package_cyber_crucible_verifier import BundleError, verify_bundle
 
 POLICY_VERSION = "cyber-crucible-verifier-provenance-policy.v1"
 IN_TOTO_STATEMENT_V1 = "https://in-toto.io/Statement/v1"
