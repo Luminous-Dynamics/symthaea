@@ -68,16 +68,18 @@ def main() -> int:
     if expected_x_id is None or expected_c_id is None:
         raise RuntimeError("PySCF/Libxc does not expose expected LDA_X / LDA_C_VWN codes")
 
-    _, (pure_x_terms, pure_c_terms) = libxc.parse_xc(",vwn")
-    _, (full_x_terms, full_c_terms) = libxc.parse_xc("lda,vwn")
-    if pure_x_terms:
-        raise RuntimeError(f"pure VWN expression unexpectedly has exchange terms: {pure_x_terms}")
-    if len(pure_c_terms) != 1 or pure_c_terms[0][0] != expected_c_id:
-        raise RuntimeError(f",vwn did not resolve to LDA_C_VWN: {pure_c_terms}")
-    if len(full_x_terms) != 1 or full_x_terms[0][0] != expected_x_id:
-        raise RuntimeError(f"lda,vwn did not resolve to LDA_X: {full_x_terms}")
-    if len(full_c_terms) != 1 or full_c_terms[0][0] != expected_c_id:
-        raise RuntimeError(f"lda,vwn did not resolve to LDA_C_VWN: {full_c_terms}")
+    _, pure_terms = libxc.parse_xc(",vwn")
+    _, compound_terms = libxc.parse_xc("lda,vwn")
+    if len(pure_terms) != 1 or pure_terms[0][0] != expected_c_id:
+        raise RuntimeError(f",vwn did not resolve only to LDA_C_VWN: {pure_terms}")
+    if (
+        len(compound_terms) != 2
+        or compound_terms[0][0] != expected_x_id
+        or compound_terms[1][0] != expected_c_id
+    ):
+        raise RuntimeError(
+            f"lda,vwn did not resolve to ordered LDA_X + LDA_C_VWN terms: {compound_terms}"
+        )
 
     densities = np.asarray([entry[0] for entry in REFERENCES], dtype=float)
 
@@ -131,9 +133,8 @@ def main() -> int:
         "functional_ids": {
             "LDA_X": int(expected_x_id),
             "LDA_C_VWN": int(expected_c_id),
-            "pure_c_terms": [[int(code), float(factor)] for code, factor in pure_c_terms],
-            "compound_x_terms": [[int(code), float(factor)] for code, factor in full_x_terms],
-            "compound_c_terms": [[int(code), float(factor)] for code, factor in full_c_terms],
+            "pure_c_terms": [[int(code), float(factor)] for code, factor in pure_terms],
+            "compound_terms": [[int(code), float(factor)] for code, factor in compound_terms],
         },
         "correlation_functional": ",vwn",
         "compound_functional": "lda,vwn",
@@ -142,7 +143,7 @@ def main() -> int:
         "pass": not failed,
         "records": records,
     }
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered, encoding="utf-8")
