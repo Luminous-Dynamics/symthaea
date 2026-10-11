@@ -48,7 +48,7 @@ The trust policy must be provisioned by an operator-controlled mechanism and sup
       }]
     }
 
-Every key has an explicit evaluator identity, a finite validity interval, and a closed role allowlist. Key IDs must be unique within one policy. Unknown identities/roles, expired receipts, future issuance times, invalid timestamps, revoked keys, context mismatches, non-canonical base64url, and invalid signatures fail closed. Revocation is deliberately conservative: once \`revoked_at\` has been reached, the key is rejected even for otherwise valid historical receipts. A separate archival verifier would be needed to preserve historical signature validity under a formally specified revocation policy.
+Every key has an explicit evaluator identity, a finite validity interval, and a closed role allowlist. Key IDs and underlying public-key bytes must be unique within one policy; the same key cannot be aliased under another evaluator identity. An evaluator identity may not hold both functional and security verdict roles, and may not hold an evaluation role and `authorization_decision`. These checks prevent the trust configuration from nominally defining independent evaluators while allowing one principal/key to satisfy both sides. Unknown identities/roles, expired receipts, future issuance times, invalid timestamps, revoked keys, context mismatches, non-canonical base64url, and invalid signatures fail closed. Revocation is deliberately conservative: once \`revoked_at\` has been reached, the key is rejected even for otherwise valid historical receipts. A separate archival verifier would be needed to preserve historical signature validity under a formally specified revocation policy.
 
 ## Replay and operational boundary
 
