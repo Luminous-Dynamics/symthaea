@@ -466,6 +466,17 @@ mod tests {
     }
 
     #[test]
+    fn domain_invariant_encoding_uses_security_channel_when_provider_is_missing() {
+        let mut channel_only = ev("", 4624, "");
+        channel_only.component = "Security".into();
+        let provider_labeled = ev("Microsoft-Windows-Security-Auditing", 4625, "");
+        assert_eq!(
+            encode_domain_invariant(&channel_only),
+            encode_domain_invariant(&provider_labeled)
+        );
+    }
+
+    #[test]
     fn domain_invariant_encoding_rejects_conflicting_provider_and_channel_hints() {
         let conflicting = encode_domain_invariant(&ev(
             "Microsoft-Windows-Security-Auditing",
