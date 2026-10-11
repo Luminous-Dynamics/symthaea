@@ -158,9 +158,9 @@ class DecisionReceiptTests(unittest.TestCase):
             self.verify(receipt, policy=altered)
 
     def test_untrusted_signer_is_rejected(self):
-        receipt = self.make_receipt()
         policy = deepcopy(self.policy)
         policy["keys"][0]["public_key"] = b64url(bytes(reversed(range(32))))
+        receipt = self.make_receipt(policy=policy)
         with self.assertRaises(DecisionVerificationError):
             self.verify(receipt, policy=policy)
 
