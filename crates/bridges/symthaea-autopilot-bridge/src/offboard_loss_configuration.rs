@@ -294,6 +294,11 @@ impl Px4OffboardLossConfigurationProfileV1 {
         if !self.required_parameters.contains(&Px4OffboardLossParameterNameV1::ComOfLossT) {
             return Err(Px4OffboardLossConfigurationError::TimeoutParameterNotRequired);
         }
+        if !self.required_parameters.contains(&Px4OffboardLossParameterNameV1::ComOblAct)
+            && !self.required_parameters.contains(&Px4OffboardLossParameterNameV1::ComOblRcAct)
+        {
+            return Err(Px4OffboardLossConfigurationError::ActionParameterNotRequired);
+        }
         if self.required_parameters.windows(2).any(|pair| pair[0] == pair[1]) {
             return Err(Px4OffboardLossConfigurationError::DuplicateRequiredParameter);
         }
@@ -579,6 +584,9 @@ pub enum Px4OffboardLossConfigurationError {
     /// Required set omits the timeout parameter.
     #[error("configuration profile must require COM_OF_LOSS_T")]
     TimeoutParameterNotRequired,
+    /// Required set omits both known Offboard-loss action parameters.
+    #[error("configuration profile must require COM_OBL_ACT or COM_OBL_RC_ACT")]
+    ActionParameterNotRequired,
     /// Required parameter list contains duplicates.
     #[error("duplicate required Offboard-loss parameter")]
     DuplicateRequiredParameter,
@@ -695,6 +703,25 @@ mod tests {
             observations,
         )
         .unwrap()
+    }
+
+
+    #[test]
+    fn profile_cannot_call_timeout_only_a_complete_loss_configuration() {
+        assert_eq!(
+            Px4OffboardLossConfigurationProfileV1::new(
+                "px4.offboard-loss.timeout-only.v1",
+                "vehicle.slot-a",
+                "px4.firmware-profile.fixture.v1",
+                "px4.param.decoder.fixture.v1",
+                "px4.boot.fixture.session-a",
+                clock(),
+                vec![Px4OffboardLossParameterNameV1::ComOfLossT],
+                200,
+                2_000_000_000,
+            ).unwrap_err(),
+            Px4OffboardLossConfigurationError::ActionParameterNotRequired
+        );
     }
 
     #[test]
