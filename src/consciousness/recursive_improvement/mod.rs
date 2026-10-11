@@ -68,10 +68,10 @@ pub use types::{
 };
 
 pub use capability_ledger::{
-    CapabilityClaim, CapabilityForecast, CapabilityLedger, CapabilityLedgerError,
-    CapabilityLifecycle, CapabilityMetrics, CapabilityOutcomeReceipt, CapabilitySplit,
-    QualificationPolicy, SignedCapabilityOutcomeReceipt, SubjectIdentity,
-    VerifiedCapabilityOutcomeReceipt,
+    CapabilityClaim, CapabilityEvidencePayloadV1, CapabilityForecast, CapabilityLedger,
+    CapabilityLedgerError, CapabilityLifecycle, CapabilityMetrics, CapabilityOutcomeReceipt,
+    CapabilitySplit, QualificationPolicy, SignedCapabilityOutcomeReceipt, SubjectIdentity,
+    VerifiedCapabilityOutcomeReceipt, CAPABILITY_EVIDENCE_SCHEMA_VERSION,
 };
 
 pub use core::{
