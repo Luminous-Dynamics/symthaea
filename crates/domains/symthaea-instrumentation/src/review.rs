@@ -15,8 +15,11 @@ use std::fmt;
 use crate::{ArtifactReference, VerifiedArtifactBytes};
 
 pub const CALIBRATION_REVIEW_SCHEMA: &str = "symthaea.calibration-review.v1";
-pub const REVIEW_TRUST_STORE_SCHEMA: &str = "symthaea.calibration-review-trust.v1";
+pub const REVIEW_TRUST_STORE_SCHEMA: &str = "symthaea.calibration-review-trust.v2";
 pub const MAX_REVIEW_KEY_ID_BYTES: usize = 256;
+pub const MAX_REVIEWER_ID_BYTES: usize = 256;
+pub const MAX_REVIEW_ORGANIZATION_ID_BYTES: usize = 256;
+pub const MAX_REVIEW_EXCLUDED_ORGANIZATIONS: usize = 4096;
 pub const MAX_REVIEW_RECORD_ID_BYTES: usize = 256;
 pub const MAX_REVIEW_TRUST_KEYS: usize = 4096;
 
@@ -25,6 +28,8 @@ pub const MAX_REVIEW_TRUST_KEYS: usize = 4096;
 pub struct ReviewTrustKey {
     key_id: String,
     verifying_key: VerifyingKey,
+    reviewer_id: Option<String>,
+    organization_id: Option<String>,
     not_before_unix_s: u64,
     not_after_unix_s: Option<u64>,
     revoked_at_unix_s: Option<u64>,
@@ -50,14 +55,46 @@ impl ReviewTrustKey {
         Ok(Self {
             key_id,
             verifying_key,
+            reviewer_id: None,
+            organization_id: None,
             not_before_unix_s,
             not_after_unix_s,
             revoked_at_unix_s,
         })
     }
 
+    /// Bind this signing key to a reviewer identity and organization.
+    ///
+    /// These claims are covered by the root-signed trust snapshot. A key without
+    /// both fields can verify a generic signature but cannot approve calibration evidence.
+    pub fn with_reviewer_authorization(
+        mut self,
+        reviewer_id: impl Into<String>,
+        organization_id: impl Into<String>,
+    ) -> Result<Self, ReviewVerificationError> {
+        self.reviewer_id = Some(canonical_token(
+            reviewer_id.into(),
+            "reviewer_id",
+            MAX_REVIEWER_ID_BYTES,
+        )?);
+        self.organization_id = Some(canonical_token(
+            organization_id.into(),
+            "organization_id",
+            MAX_REVIEW_ORGANIZATION_ID_BYTES,
+        )?);
+        Ok(self)
+    }
+
     pub fn key_id(&self) -> &str {
         &self.key_id
+    }
+
+    pub fn reviewer_id(&self) -> Option<&str> {
+        self.reviewer_id.as_deref()
+    }
+
+    pub fn organization_id(&self) -> Option<&str> {
+        self.organization_id.as_deref()
     }
 
     pub fn public_key_bytes(&self) -> [u8; 32] {
@@ -127,7 +164,7 @@ impl ReviewTrustStore {
     /// validity/revocation windows, public keys, and sequence are signed together.
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"SYMRTRS1\0");
+        bytes.extend_from_slice(b"SYMRTRS2\0");
         append_len_prefixed(&mut bytes, REVIEW_TRUST_STORE_SCHEMA.as_bytes());
         bytes.extend_from_slice(&self.sequence.to_le_bytes());
         bytes.extend_from_slice(&self.issued_at_unix_s.to_le_bytes());
@@ -135,6 +172,8 @@ impl ReviewTrustStore {
         bytes.extend_from_slice(&(self.keys.len() as u32).to_le_bytes());
         for key in self.keys.values() {
             append_len_prefixed(&mut bytes, key.key_id.as_bytes());
+            append_optional_token(&mut bytes, key.reviewer_id.as_deref());
+            append_optional_token(&mut bytes, key.organization_id.as_deref());
             bytes.extend_from_slice(&key.public_key_bytes());
             bytes.extend_from_slice(&key.not_before_unix_s.to_le_bytes());
             append_optional_u64(&mut bytes, key.not_after_unix_s);
@@ -145,7 +184,7 @@ impl ReviewTrustStore {
 
     /// Decode and enforce the canonical binary snapshot representation.
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ReviewVerificationError> {
-        const MAGIC: &[u8] = b"SYMRTRS1\0";
+        const MAGIC: &[u8] = b"SYMRTRS2\0";
         if !bytes.starts_with(MAGIC) {
             return Err(ReviewVerificationError::UnsupportedSchemaOrLayout);
         }
@@ -169,17 +208,37 @@ impl ReviewTrustStore {
             let key_id = std::str::from_utf8(read_len_prefixed(bytes, &mut offset)?)
                 .map_err(|_| ReviewVerificationError::InvalidEncoding)?
                 .to_owned();
+            let reviewer_id = read_optional_token(
+                bytes,
+                &mut offset,
+                "reviewer_id",
+                MAX_REVIEWER_ID_BYTES,
+            )?;
+            let organization_id = read_optional_token(
+                bytes,
+                &mut offset,
+                "organization_id",
+                MAX_REVIEW_ORGANIZATION_ID_BYTES,
+            )?;
             let public_key_bytes = read_fixed::<32>(bytes, &mut offset)?;
             let not_before_unix_s = read_u64(bytes, &mut offset)?;
             let not_after_unix_s = read_optional_u64(bytes, &mut offset)?;
             let revoked_at_unix_s = read_optional_u64(bytes, &mut offset)?;
-            keys.push(ReviewTrustKey::new(
+            let mut key = ReviewTrustKey::new(
                 key_id,
                 public_key_bytes,
                 not_before_unix_s,
                 not_after_unix_s,
                 revoked_at_unix_s,
-            )?);
+            )?;
+            match (reviewer_id, organization_id) {
+                (Some(reviewer_id), Some(organization_id)) => {
+                    key = key.with_reviewer_authorization(reviewer_id, organization_id)?;
+                }
+                (None, None) => {}
+                _ => return Err(ReviewVerificationError::InvalidEncoding),
+            }
+            keys.push(key);
         }
         if offset != bytes.len() {
             return Err(ReviewVerificationError::NonCanonicalEncoding);
@@ -194,6 +253,45 @@ impl ReviewTrustStore {
     /// Digest the canonical trust contents (not the authority signature).
     pub fn canonical_digest(&self) -> String {
         crate::sha256_hex(&self.canonical_bytes())
+    }
+
+    fn authorize_reviewer(
+        &self,
+        key_id: &str,
+        policy: &ReviewAuthorizationPolicy,
+    ) -> Result<VerifiedReviewerAuthorization, ReviewVerificationError> {
+        let key = self
+            .keys
+            .get(key_id)
+            .ok_or_else(|| ReviewVerificationError::UnknownSigner(key_id.to_owned()))?;
+        let reviewer_id = key
+            .reviewer_id
+            .as_deref()
+            .ok_or_else(|| ReviewVerificationError::ReviewerNotAuthorized(key_id.to_owned()))?;
+        let reviewer_organization_id = key.organization_id.as_deref().ok_or_else(|| {
+            ReviewVerificationError::ReviewerNotAuthorized(key_id.to_owned())
+        })?;
+
+        if reviewer_organization_id == policy.provider_organization_id {
+            return Err(ReviewVerificationError::ReviewerNotIndependent {
+                reviewer_organization_id: reviewer_organization_id.to_owned(),
+                conflicted_organization_id: policy.provider_organization_id.clone(),
+            });
+        }
+        if policy.excluded_organization_ids.contains(reviewer_organization_id) {
+            return Err(ReviewVerificationError::ReviewerNotIndependent {
+                reviewer_organization_id: reviewer_organization_id.to_owned(),
+                conflicted_organization_id: reviewer_organization_id.to_owned(),
+            });
+        }
+
+        Ok(VerifiedReviewerAuthorization {
+            reviewer_key_id: key_id.to_owned(),
+            reviewer_id: reviewer_id.to_owned(),
+            reviewer_organization_id: reviewer_organization_id.to_owned(),
+            provider_organization_id: policy.provider_organization_id.clone(),
+            policy_sha256: policy.canonical_digest(),
+        })
     }
 
     fn verify(
@@ -414,14 +512,14 @@ impl SignedReviewTrustStoreSnapshot {
 
     /// Canonical domain-separated bytes an authority signs out of process.
     pub fn signing_message(trust_store: &ReviewTrustStore) -> Vec<u8> {
-        let mut message = b"symthaea.calibration-review-trust-signature.v1\0".to_vec();
+        let mut message = b"symthaea.calibration-review-trust-signature.v2\0".to_vec();
         message.extend_from_slice(&trust_store.canonical_bytes());
         message
     }
 
     /// Encode the signed snapshot with a fixed magic, canonical store body and signature.
     pub fn to_canonical_bytes(&self) -> Vec<u8> {
-        let mut bytes = b"SYMRTRSS1\0".to_vec();
+        let mut bytes = b"SYMRTRSS2\0".to_vec();
         bytes.extend_from_slice(&self.trust_store.canonical_bytes());
         bytes.extend_from_slice(&self.signature);
         bytes
@@ -429,7 +527,7 @@ impl SignedReviewTrustStoreSnapshot {
 
     /// Parse a signed snapshot and reject alternate/trailing encodings.
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ReviewVerificationError> {
-        const MAGIC: &[u8] = b"SYMRTRSS1\0";
+        const MAGIC: &[u8] = b"SYMRTRSS2\0";
         if !bytes.starts_with(MAGIC) || bytes.len() < MAGIC.len() + 64 {
             return Err(ReviewVerificationError::UnsupportedSchemaOrLayout);
         }
@@ -491,10 +589,103 @@ impl VerifiedReviewTrustStore {
     /// Bind both the snapshot contents and the authority that authenticated them.
     pub fn canonical_digest(&self) -> String {
         let mut bytes =
-            b"symthaea.calibration-review-verified-trust.v1\0".to_vec();
+            b"symthaea.calibration-review-verified-trust.v2\0".to_vec();
         bytes.extend_from_slice(&self.trust_store.canonical_bytes());
         bytes.extend_from_slice(self.authority_key_sha256.as_bytes());
         crate::sha256_hex(&bytes)
+    }
+}
+
+/// Conflict policy for reviewer authorization for a specific provider.
+///
+/// Provider and exclusion identifiers must come from a separately governed registry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReviewAuthorizationPolicy {
+    provider_organization_id: String,
+    excluded_organization_ids: BTreeSet<String>,
+}
+
+impl ReviewAuthorizationPolicy {
+    pub fn new(
+        provider_organization_id: impl Into<String>,
+        excluded_organization_ids: Vec<String>,
+    ) -> Result<Self, ReviewVerificationError> {
+        if excluded_organization_ids.len() > MAX_REVIEW_EXCLUDED_ORGANIZATIONS {
+            return Err(ReviewVerificationError::TooManyExcludedOrganizations {
+                actual: excluded_organization_ids.len(),
+                maximum: MAX_REVIEW_EXCLUDED_ORGANIZATIONS,
+            });
+        }
+        let provider_organization_id = canonical_token(
+            provider_organization_id.into(),
+            "provider_organization_id",
+            MAX_REVIEW_ORGANIZATION_ID_BYTES,
+        )?;
+        let excluded_organization_ids = excluded_organization_ids
+            .into_iter()
+            .map(|organization_id| {
+                canonical_token(
+                    organization_id,
+                    "excluded_organization_id",
+                    MAX_REVIEW_ORGANIZATION_ID_BYTES,
+                )
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        Ok(Self {
+            provider_organization_id,
+            excluded_organization_ids,
+        })
+    }
+
+    pub fn provider_organization_id(&self) -> &str {
+        &self.provider_organization_id
+    }
+
+    pub fn excluded_organization_ids(&self) -> impl Iterator<Item = &str> {
+        self.excluded_organization_ids.iter().map(String::as_str)
+    }
+
+    fn canonical_digest(&self) -> String {
+        let mut bytes =
+            b"symthaea.calibration-review-authorization-policy.v1\0".to_vec();
+        append_len_prefixed(&mut bytes, self.provider_organization_id.as_bytes());
+        bytes.extend_from_slice(&(self.excluded_organization_ids.len() as u32).to_le_bytes());
+        for organization_id in &self.excluded_organization_ids {
+            append_len_prefixed(&mut bytes, organization_id.as_bytes());
+        }
+        crate::sha256_hex(&bytes)
+    }
+}
+
+/// The root-authenticated reviewer identity plus the applied conflict policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedReviewerAuthorization {
+    reviewer_key_id: String,
+    reviewer_id: String,
+    reviewer_organization_id: String,
+    provider_organization_id: String,
+    policy_sha256: String,
+}
+
+impl VerifiedReviewerAuthorization {
+    pub fn reviewer_key_id(&self) -> &str {
+        &self.reviewer_key_id
+    }
+
+    pub fn reviewer_id(&self) -> &str {
+        &self.reviewer_id
+    }
+
+    pub fn reviewer_organization_id(&self) -> &str {
+        &self.reviewer_organization_id
+    }
+
+    pub fn provider_organization_id(&self) -> &str {
+        &self.provider_organization_id
+    }
+
+    pub fn policy_sha256(&self) -> &str {
+        &self.policy_sha256
     }
 }
 
@@ -550,6 +741,37 @@ fn read_optional_u64(
     match read_fixed::<1>(bytes, offset)?[0] {
         0 => Ok(None),
         1 => Ok(Some(read_u64(bytes, offset)?)),
+        _ => Err(ReviewVerificationError::InvalidEncoding),
+    }
+}
+
+fn append_optional_token(bytes: &mut Vec<u8>, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            bytes.push(1);
+            append_len_prefixed(bytes, value.as_bytes());
+        }
+        None => bytes.push(0),
+    }
+}
+
+fn read_optional_token(
+    bytes: &[u8],
+    offset: &mut usize,
+    field_name: &'static str,
+    maximum_bytes: usize,
+) -> Result<Option<String>, ReviewVerificationError> {
+    match read_fixed::<1>(bytes, offset)?[0] {
+        0 => Ok(None),
+        1 => {
+            let value = std::str::from_utf8(read_len_prefixed(bytes, offset)?)
+                .map_err(|_| ReviewVerificationError::InvalidEncoding)?;
+            Ok(Some(canonical_token(
+                value.to_owned(),
+                field_name,
+                maximum_bytes,
+            )?))
+        }
         _ => Err(ReviewVerificationError::InvalidEncoding),
     }
 }
@@ -650,15 +872,62 @@ pub struct VerifiedCalibrationReviewReceipt {
     artifact: VerifiedArtifactBytes,
     receipt: SignedCalibrationReviewReceipt,
     verified_at_unix_s: u64,
+    reviewer_authorization: Option<VerifiedReviewerAuthorization>,
 }
 
 impl VerifiedCalibrationReviewReceipt {
+    /// Verify canonical receipt bytes and the strict Ed25519 signature only.
+    ///
+    /// This generic method is not sufficient for calibration evidence. For that,
+    /// use verify_for_calibration with a provider-specific conflict policy.
     pub fn verify(
         artifact: VerifiedArtifactBytes,
         trust_store: &VerifiedReviewTrustStore,
         trust_store_guard: &mut ReviewTrustStoreGuard,
         expected_record_id: &str,
         expected_certificate: &ArtifactReference,
+        now_unix_s: u64,
+    ) -> Result<Self, ReviewVerificationError> {
+        Self::verify_internal(
+            artifact,
+            trust_store,
+            trust_store_guard,
+            expected_record_id,
+            expected_certificate,
+            None,
+            now_unix_s,
+        )
+    }
+
+    /// Verify the receipt and require root-authorized reviewer identity/organization
+    /// metadata with organizational separation from the calibration provider.
+    pub fn verify_for_calibration(
+        artifact: VerifiedArtifactBytes,
+        trust_store: &VerifiedReviewTrustStore,
+        trust_store_guard: &mut ReviewTrustStoreGuard,
+        expected_record_id: &str,
+        expected_certificate: &ArtifactReference,
+        authorization_policy: &ReviewAuthorizationPolicy,
+        now_unix_s: u64,
+    ) -> Result<Self, ReviewVerificationError> {
+        Self::verify_internal(
+            artifact,
+            trust_store,
+            trust_store_guard,
+            expected_record_id,
+            expected_certificate,
+            Some(authorization_policy),
+            now_unix_s,
+        )
+    }
+
+    fn verify_internal(
+        artifact: VerifiedArtifactBytes,
+        trust_store: &VerifiedReviewTrustStore,
+        trust_store_guard: &mut ReviewTrustStoreGuard,
+        expected_record_id: &str,
+        expected_certificate: &ArtifactReference,
+        authorization_policy: Option<&ReviewAuthorizationPolicy>,
         now_unix_s: u64,
     ) -> Result<Self, ReviewVerificationError> {
         if artifact.byte_length() == 0 {
@@ -672,11 +941,20 @@ impl VerifiedCalibrationReviewReceipt {
             expected_certificate,
             now_unix_s,
         )?;
+        let reviewer_authorization = authorization_policy
+            .map(|policy| {
+                trust_store
+                    .trust_store()
+                    .authorize_reviewer(receipt.payload().key_id(), policy)
+            })
+            .transpose()?;
+        // Rejected signatures or authorization decisions must not advance rollback state.
         trust_store_guard.record_verified(trust_store);
         Ok(Self {
             artifact,
             receipt,
             verified_at_unix_s: now_unix_s,
+            reviewer_authorization,
         })
     }
 
@@ -690,6 +968,10 @@ impl VerifiedCalibrationReviewReceipt {
 
     pub fn verified_at_unix_s(&self) -> u64 {
         self.verified_at_unix_s
+    }
+
+    pub fn reviewer_authorization(&self) -> Option<&VerifiedReviewerAuthorization> {
+        self.reviewer_authorization.as_ref()
     }
 }
 
@@ -721,6 +1003,15 @@ pub enum ReviewVerificationError {
         sequence: u64,
     },
     InvalidTrustCheckpoint,
+    ReviewerNotAuthorized(String),
+    ReviewerNotIndependent {
+        reviewer_organization_id: String,
+        conflicted_organization_id: String,
+    },
+    TooManyExcludedOrganizations {
+        actual: usize,
+        maximum: usize,
+    },
     TrustSnapshotStale,
     UnknownSigner(String),
     SignerNotYetValid(String),
@@ -829,6 +1120,11 @@ mod tests {
                     Some(NOW + 500),
                     None,
                 )
+                .unwrap()
+                .with_reviewer_authorization(
+                    "reviewer-person-a",
+                    "independent-calibration-lab",
+                )
                 .unwrap(),
             ],
         )
@@ -908,7 +1204,7 @@ mod tests {
 
         let mut tampered = bytes.clone();
         let sequence_offset =
-            b"SYMRTRSS1\0".len() + b"SYMRTRS1\0".len() + 2
+            b"SYMRTRSS2\0".len() + b"SYMRTRS2\0".len() + 2
                 + REVIEW_TRUST_STORE_SCHEMA.len();
         tampered[sequence_offset] ^= 1;
         let parsed_tampered = SignedReviewTrustStoreSnapshot::from_canonical_bytes(&tampered)
@@ -1395,4 +1691,105 @@ mod tests {
             ReviewVerificationError::UnsupportedSchemaOrLayout
         );
     }
+    
+    #[test]
+    fn calibration_review_requires_root_authorized_independent_reviewer_metadata() {
+        let receipt = signed_receipt();
+        let trust = verified_trust_store();
+        let policy = ReviewAuthorizationPolicy::new(
+            "calibration-provider-a",
+            vec!["conflict-of-interest-org".to_owned()],
+        )
+        .unwrap();
+        let mut guard = ReviewTrustStoreGuard::default();
+        let verified = VerifiedCalibrationReviewReceipt::verify_for_calibration(
+            verified_artifact(&receipt),
+            &trust,
+            &mut guard,
+            "calibration-record-1",
+            &certificate(),
+            &policy,
+            NOW,
+        )
+        .unwrap();
+        let authorization = verified
+            .reviewer_authorization()
+            .expect("calibration approval must carry authorization proof");
+        assert_eq!(authorization.reviewer_id(), "reviewer-person-a");
+        assert_eq!(
+            authorization.reviewer_organization_id(),
+            "independent-calibration-lab"
+        );
+        assert_eq!(
+            authorization.provider_organization_id(),
+            "calibration-provider-a"
+        );
+        assert_eq!(authorization.policy_sha256().len(), 64);
+        assert_eq!(guard.last_sequence(), Some(TRUST_SEQUENCE));
+    }
+
+    #[test]
+    fn conflicted_or_unidentified_reviewers_fail_without_advancing_guard() {
+        let receipt = signed_receipt();
+        let trust = verified_trust_store();
+
+        for policy in [
+            ReviewAuthorizationPolicy::new("independent-calibration-lab", Vec::new()).unwrap(),
+            ReviewAuthorizationPolicy::new(
+                "calibration-provider-a",
+                vec!["independent-calibration-lab".to_owned()],
+            )
+            .unwrap(),
+        ] {
+            let mut guard = ReviewTrustStoreGuard::default();
+            assert!(matches!(
+                VerifiedCalibrationReviewReceipt::verify_for_calibration(
+                    verified_artifact(&receipt),
+                    &trust,
+                    &mut guard,
+                    "calibration-record-1",
+                    &certificate(),
+                    &policy,
+                    NOW,
+                ),
+                Err(ReviewVerificationError::ReviewerNotIndependent { .. })
+            ));
+            assert_eq!(guard.last_sequence(), None);
+            assert_eq!(guard.checkpoint(), None);
+        }
+
+        let unauthorised_store = ReviewTrustStore::new(
+            TRUST_SEQUENCE,
+            NOW - 10,
+            NOW + 100,
+            vec![ReviewTrustKey::new(
+                "reviewer-a",
+                signing_key().verifying_key().to_bytes(),
+                NOW - 100,
+                Some(NOW + 500),
+                None,
+            )
+            .unwrap()],
+        )
+        .unwrap();
+        let unauthorised_trust = verified_trust_store_from(unauthorised_store);
+        let mut guard = ReviewTrustStoreGuard::default();
+        let policy =
+            ReviewAuthorizationPolicy::new("calibration-provider-a", Vec::new()).unwrap();
+        assert_eq!(
+            VerifiedCalibrationReviewReceipt::verify_for_calibration(
+                verified_artifact(&receipt),
+                &unauthorised_trust,
+                &mut guard,
+                "calibration-record-1",
+                &certificate(),
+                &policy,
+                NOW,
+            )
+            .unwrap_err(),
+            ReviewVerificationError::ReviewerNotAuthorized("reviewer-a".to_owned())
+        );
+        assert_eq!(guard.last_sequence(), None);
+    }
+
 }

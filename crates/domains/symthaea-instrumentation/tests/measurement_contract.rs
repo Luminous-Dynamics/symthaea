@@ -11,7 +11,8 @@ use symthaea_instrumentation::{
     InstrumentIdentity, MeasurementEnvelope, MeasurementInput, MeasurementPolicy,
     MeasurementStreamGuard, Quantity, QualityFlag, RawDataEvidenceResolver, RawDataReference,
     ResolvedCalibration, ResolvedRawData, ReviewTrustKey, ReviewTrustStore,
-    ReviewTrustStoreGuard, ReviewVerificationError, SignedCalibrationReviewReceipt,
+    ReviewAuthorizationPolicy, ReviewTrustStoreGuard, ReviewVerificationError,
+    SignedCalibrationReviewReceipt,
     StreamOrderFailure, Unit, VerifiedArtifactBytes, VerifiedArtifactDigest,
     VerifiedCalibrationEvidence,
     VerifiedCalibrationReviewReceipt,
@@ -169,6 +170,11 @@ fn review_trust_store() -> VerifiedReviewTrustStore {
                 Some(REVIEW_NOW_UNIX_S + 500),
                 None,
             )
+            .unwrap()
+            .with_reviewer_authorization(
+                "fixture-reviewer-person-01",
+                "independent-calibration-lab-01",
+            )
             .unwrap(),
         ],
     )
@@ -191,12 +197,15 @@ fn verify_review_artifact(
 ) -> Result<VerifiedCalibrationReviewReceipt, String> {
     let verified = VerifiedArtifactBytes::verify(reference, bytes)
         .map_err(|_| "calibration review receipt SHA-256 mismatch".to_owned())?;
-    VerifiedCalibrationReviewReceipt::verify(
+    let authorization_policy =
+        ReviewAuthorizationPolicy::new("calibration-lab-01", Vec::new()).unwrap();
+    VerifiedCalibrationReviewReceipt::verify_for_calibration(
         verified,
         &review_trust_store(),
         trust_guard,
         record_id,
         certificate,
+        &authorization_policy,
         REVIEW_NOW_UNIX_S,
     )
     .map_err(|error| match error {
@@ -460,6 +469,47 @@ fn resolver() -> MockResolver {
         reference_standard_bytes_override: None,
         review_trust_guard: Mutex::new(ReviewTrustStoreGuard::default()),
     }
+}
+
+#[test]
+fn signature_only_review_receipt_cannot_construct_verified_calibration_evidence() {
+    let resolved = resolved_calibration();
+    let certificate = VerifiedArtifactBytes::verify(
+        resolved.evidence().clone(),
+        calibration_fixture_bytes(),
+    )
+    .unwrap();
+    let standard = VerifiedArtifactBytes::verify(
+        calibration_certificate().reference_standard().clone(),
+        reference_standard_fixture_bytes(),
+    )
+    .unwrap();
+    let review = VerifiedArtifactBytes::verify(
+        resolved.review_receipt().clone(),
+        review_fixture_bytes(),
+    )
+    .unwrap();
+    let mut guard = ReviewTrustStoreGuard::default();
+    let signature_verified_only = VerifiedCalibrationReviewReceipt::verify(
+        review,
+        &review_trust_store(),
+        &mut guard,
+        resolved.record_id(),
+        resolved.evidence(),
+        REVIEW_NOW_UNIX_S,
+    )
+    .unwrap();
+
+    assert_eq!(
+        VerifiedCalibrationEvidence::new(
+            resolved,
+            certificate,
+            standard,
+            signature_verified_only,
+        )
+        .unwrap_err(),
+        ContractError::CalibrationReviewAuthorizationMissing
+    );
 }
 
 #[test]

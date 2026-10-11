@@ -32,9 +32,10 @@ pub use evidence::{
 mod review;
 pub use review::{
     CALIBRATION_REVIEW_SCHEMA, REVIEW_TRUST_STORE_SCHEMA, CalibrationReviewPayload,
-    ReviewTrustKey, ReviewTrustStore, ReviewTrustStoreGuard, ReviewVerificationError,
+    ReviewAuthorizationPolicy, ReviewTrustKey, ReviewTrustStore, ReviewTrustStoreGuard,
+    ReviewVerificationError,
     SignedCalibrationReviewReceipt, SignedReviewTrustStoreSnapshot,
-    VerifiedCalibrationReviewReceipt, VerifiedReviewTrustStore,
+    VerifiedCalibrationReviewReceipt, VerifiedReviewerAuthorization, VerifiedReviewTrustStore,
 };
 
 /// Stable instrument and channel identifiers. Patient identity does not belong
@@ -308,6 +309,8 @@ pub enum ContractError {
     EmptyRawDataArtifact,
     InvalidValidityInterval,
     CalibrationReviewMustBeDistinct,
+    CalibrationReviewAuthorizationMissing,
+    CalibrationReviewAuthorizationMismatch,
     VerifiedArtifactReferenceMismatch(&'static str),
     VerifiedReviewReceiptBindingMismatch,
     InvalidCalibrationCertificate(String),
@@ -338,6 +341,14 @@ impl fmt::Display for ContractError {
             Self::CalibrationReviewMustBeDistinct => {
                 write!(f, "calibration evidence and review receipt must be distinct artifacts")
             }
+            Self::CalibrationReviewAuthorizationMissing => write!(
+                f,
+                "calibration evidence requires root-authorized reviewer identity and independence proof"
+            ),
+            Self::CalibrationReviewAuthorizationMismatch => write!(
+                f,
+                "review authorization must target this certificate provider and remain organizationally distinct"
+            ),
             Self::VerifiedArtifactReferenceMismatch(artifact) => {
                 write!(f, "verified bytes must match the resolved {artifact} reference")
             }
@@ -785,6 +796,16 @@ impl VerifiedCalibrationEvidence {
             calibration.standard_uncertainty(),
         ) {
             return Err(ContractError::CalibrationCertificateClaimMismatch(field));
+        }
+        let reviewer_authorization = review_receipt
+            .reviewer_authorization()
+            .ok_or(ContractError::CalibrationReviewAuthorizationMissing)?;
+        if reviewer_authorization.provider_organization_id()
+            != parsed_certificate.calibration_provider_id()
+            || reviewer_authorization.reviewer_organization_id()
+                == parsed_certificate.calibration_provider_id()
+        {
+            return Err(ContractError::CalibrationReviewAuthorizationMismatch);
         }
         if reference_standard.byte_length() == 0 {
             return Err(ContractError::EmptyEvidenceArtifact("reference_standard"));
