@@ -177,7 +177,10 @@ class VerifierProvenanceTests(unittest.TestCase):
         self.assertIn("--cert-oidc-issuer", command)
         self.assertIn(GITHUB_OIDC_ISSUER, command)
         self.assertIn("--deny-self-hosted-runners", command)
-        self.assertIn(str(self.artifact), command)
+        snapshot_path = Path(command[3])
+        self.assertNotEqual(str(self.artifact), str(snapshot_path))
+        self.assertTrue(snapshot_path.is_file())
+        self.assertEqual(sha256_file(snapshot_path), self.policy["artifact_sha256"])
 
     def test_verification_environment_pins_host_and_drops_untrusted_gh_config(self):
         with patch.dict(os.environ, {
