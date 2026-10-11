@@ -98,9 +98,13 @@ def verify_bundle(bundle_dir: str) -> dict:
     for label, record in (("source response", response), ("OpenAPI", openapi_record)):
         if record.get("http_status") != 200:
             raise CaptureError(f"{label} status is not HTTP 200")
-        if record.get("content_type", "").split(";", 1)[0].strip().lower() != "application/json":
+        content_type = record.get("content_type")
+        if not isinstance(content_type, str) or content_type.split(";", 1)[0].strip().lower() != "application/json":
             raise CaptureError(f"{label} content type is not application/json")
-        final_url = urlsplit(record.get("final_url", ""))
+        final_url_value = record.get("final_url")
+        if not isinstance(final_url_value, str):
+            raise CaptureError(f"{label} final URL is missing or not text")
+        final_url = urlsplit(final_url_value)
         if final_url.scheme != "https" or final_url.hostname != API_HOST or final_url.username or final_url.password:
             raise CaptureError(f"{label} final URL is outside official PVGIS HTTPS host")
 
