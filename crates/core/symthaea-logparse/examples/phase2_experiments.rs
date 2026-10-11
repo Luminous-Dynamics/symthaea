@@ -28,7 +28,10 @@ use symthaea_logparse::encoder::{
 use symthaea_logparse::probe::{
     classification_report, ClassificationReport, LogisticProbe, TrainConfig,
 };
-use symthaea_logparse::scenario::{aggregate_scenarios, ScenarioEmbedding};
+use symthaea_logparse::scenario::{
+    ORDERED_SCENARIO_ENCODER_VERSION, ScenarioEmbedding, aggregate_ordered_scenarios,
+    aggregate_scenarios,
+};
 use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -191,15 +194,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if run_scenario_level_evaluation {
         println!("\n=== Capture/scenario-level evaluation ===");
-        println!("  One bundled vector per labeled source file or scenario directory.");
-        println!("  This orderless bag-of-events representation is not temporal correlation.");
+        println!("  One vector per labeled source file or scenario directory.");
+        println!("  Compare an orderless bundle with relative record-position encoding.");
+        println!(
+            "  Ordered scenario encoder version: {ORDERED_SCENARIO_ENCODER_VERSION}"
+        );
+        println!("  Relative record order is not proof of timestamp order or causality.");
 
         let sbou_raw_scenarios = aggregate_scenarios(&sbou_hvs, &sbou_labels, &sbou_groups)?;
         let otrf_raw_scenarios = aggregate_scenarios(&otrf_hvs, &otrf_labels, &otrf_groups)?;
         run_scenario_classifier(
-            "raw encoder",
+            "raw encoder / orderless bundle",
             &sbou_raw_scenarios,
             &otrf_raw_scenarios,
+            cfg,
+        )?;
+
+        let sbou_raw_ordered =
+            aggregate_ordered_scenarios(&sbou_hvs, &sbou_labels, &sbou_groups)?;
+        let otrf_raw_ordered =
+            aggregate_ordered_scenarios(&otrf_hvs, &otrf_labels, &otrf_groups)?;
+        run_scenario_classifier(
+            "raw encoder / relative record position",
+            &sbou_raw_ordered,
+            &otrf_raw_ordered,
             cfg,
         )?;
 
@@ -213,9 +231,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let otrf_di_scenarios =
                 aggregate_scenarios(&otrf_di_hvs, &otrf_labels, &otrf_groups)?;
             run_scenario_classifier(
-                "domain-invariant encoder",
+                "domain-invariant encoder / orderless bundle",
                 &sbou_di_scenarios,
                 &otrf_di_scenarios,
+                cfg,
+            )?;
+
+            let sbou_di_ordered =
+                aggregate_ordered_scenarios(&sbou_di_hvs, &sbou_labels, &sbou_groups)?;
+            let otrf_di_ordered =
+                aggregate_ordered_scenarios(&otrf_di_hvs, &otrf_labels, &otrf_groups)?;
+            run_scenario_classifier(
+                "domain-invariant encoder / relative record position",
+                &sbou_di_ordered,
+                &otrf_di_ordered,
                 cfg,
             )?;
         }
