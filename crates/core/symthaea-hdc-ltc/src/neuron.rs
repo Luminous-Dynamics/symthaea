@@ -884,7 +884,10 @@ mod tests {
         let slow_tau = slow.mean_tau(&input);
         assert!(
             slow_tau > fast_tau * 1.1,
-            "backbone_tau must increase effective tau as state norm grows: fast={fast_tau}, slow={slow_tau}"
+            concat!(
+                "backbone_tau must increase effective tau as state norm grows: ",
+                "fast={fast_tau}, slow={slow_tau}"
+            )
         );
     }
 
