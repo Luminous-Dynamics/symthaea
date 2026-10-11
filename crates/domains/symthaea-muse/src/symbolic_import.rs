@@ -176,6 +176,12 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                             .into(),
                     );
                 }
+                TrackEventKind::Meta(MetaMessage::Lyric(_)) => {
+                    return Err(
+                        "MIDI lyric events are not represented by Score; refusing to discard sung text during symbolic import"
+                            .into(),
+                    );
+                }
                 TrackEventKind::Meta(MetaMessage::SmpteOffset(_)) => {
                     return Err(
                         "MIDI SMPTE start offsets are not supported by the beat-relative Score importer"
@@ -1387,6 +1393,18 @@ mod tests {
             error.contains("MIDI port-routing metadata is not supported"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn midi_lyrics_are_rejected_until_score_preserves_sung_text() {
+        let track = [
+            0, 0xFF, 0x05, 4, b'H', b'e', b'l', b'o', // lyric meta-event
+            0, 0x90, 60, 100,
+            1, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("lyric events are not represented by Score"), "{error}");
     }
 
     #[test]
