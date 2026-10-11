@@ -10,6 +10,7 @@ import shutil
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from scripts.package_cyber_crucible_verifier import (
     BUNDLE_ROOT,
@@ -58,6 +59,15 @@ class VerifierBundleTests(unittest.TestCase):
                 list(PACKAGE_FILES),
             )
             self.assertEqual(len(manifest["files"]), len(PACKAGE_FILES))
+
+    def test_valid_bundle_verification_does_not_materialize_all_tar_headers(self):
+        repository_root = Path(__file__).resolve().parents[1]
+        bundle_path = self.temp_root / "streamed.tar.gz"
+        build_bundle(repository_root, bundle_path, TEST_COMMIT)
+        with patch("tarfile.TarFile.getmembers", side_effect=AssertionError("getmembers must not be used")):
+            result = verify_bundle(bundle_path, expected_source_commit=TEST_COMMIT)
+        self.assertTrue(result["bundle_verified"])
+        self.assertEqual(result["file_count"], len(PACKAGE_FILES))
 
     def test_wrong_expected_commit_is_rejected(self):
         repository_root = Path(__file__).resolve().parents[1]
