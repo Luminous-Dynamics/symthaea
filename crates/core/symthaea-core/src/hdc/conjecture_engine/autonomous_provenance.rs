@@ -611,7 +611,9 @@ pub struct AutonomousDiscoveryReceiptV1 {
     pub schema_version: u32,
     pub source_revision: String,
     pub system_id: String,
-    /// BLAKE3 of a canonical system definition, including RHS equations/constants.
+    /// Exact versioned UTF-8 system declaration whose digest is recorded below.
+    pub system_definition_canonical: String,
+    /// BLAKE3 of the canonical system definition, including RHS equations/constants.
     pub system_definition_blake3: String,
     pub discovery_mode: AutonomousDiscoveryMode,
     pub discovery_seed: u64,
@@ -730,6 +732,7 @@ pub fn build_autonomous_discovery_receipt_v1(
         schema_version: 1,
         source_revision,
         system_id: normalized_system_id,
+        system_definition_canonical: system_definition_canonical.to_string(),
         system_definition_blake3,
         discovery_mode: candidate.discovery_mode,
         discovery_seed: config.seed,
@@ -765,6 +768,13 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
     } else {
         receipt.holdout_failure != Some(AutonomousHoldoutFailure::IdenticalSeeds)
     };
+    let system_identity_consistent =
+        match validate_system_identity(&receipt.system_id, &receipt.system_definition_canonical) {
+            Ok((system_id, definition_blake3)) => {
+                system_id == receipt.system_id && definition_blake3 == receipt.system_definition_blake3
+            }
+            Err(_) => false,
+        };
     let holdout = AutonomousHoldoutValidation {
         discovery_seed: receipt.discovery_seed,
         holdout_seed: receipt.holdout_seed,
@@ -780,6 +790,7 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         assessment_context_blake3: receipt.assessment_context_blake3.clone(),
     };
     receipt.schema_version == 1
+        && system_identity_consistent
         && matches!(receipt.source_revision.len(), 40 | 64)
         && receipt.source_revision == receipt.source_revision.to_ascii_lowercase()
         && receipt.source_revision.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -907,6 +918,7 @@ fn compute_receipt_digest(receipt: &AutonomousDiscoveryReceiptV1) -> String {
     hash_u64(&mut hasher, receipt.schema_version as u64);
     hash_string(&mut hasher, &receipt.source_revision);
     hash_string(&mut hasher, &receipt.system_id);
+    hash_string(&mut hasher, &receipt.system_definition_canonical);
     hash_string(&mut hasher, &receipt.system_definition_blake3);
     hash_string(&mut hasher, receipt.discovery_mode.as_str());
     hash_u64(&mut hasher, receipt.discovery_seed);
@@ -967,7 +979,11 @@ mod tests {
             .expect("valid harmonic test system")
     }
     fn invalid_rhs_system() -> AutonomousHoldoutSystemV1 {
-        AutonomousHoldoutSystemV1::new("invalid-rhs-shape-v1", "system-definition-v1\ninvalid-rhs-shape-v1\nrhs(state,t)->[]", wrong_dimension_at_start)
+        AutonomousHoldoutSystemV1::new(
+            "invalid-rhs-shape-v1",
+            "system-definition-v1\ninvalid-rhs-shape-v1\nrhs(state, t) -> []",
+            wrong_dimension_at_start,
+        )
             .expect("valid invalid-shape identity")
     }
     fn wrong_dimension_after_start_system() -> AutonomousHoldoutSystemV1 {
@@ -1285,6 +1301,55 @@ mod tests {
             &config, &[], &candidate(formula, AutonomousDiscoveryMode::Cold),
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0], 4.0, 0.01, &holdout);
         assert!(matches!(result, Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord)));
+    }
+
+    #[test]
+    fn verifier_rejects_resealed_receipt_with_mismatched_system_id() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            &harmonic_system(),
+            &formula,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"],
+            &config,
+            4.0,
+            0.01,
+            3,
+            701,
+            1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            &config,
+            &[],
+            &candidate,
+            &["x", "y", "vx", "vy"],
+            &[1.0, 0.0, 0.0, 1.0],
+            4.0,
+            0.01,
+            &holdout,
+        ).expect("well-formed receipt should be constructed");
+
+        receipt.system_id = "unrelated-system-v1".to_string();
+        receipt.assessment_context_blake3 = assessment_context_digest(
+            &receipt.candidate_formula,
+            &receipt.variable_names,
+            &receipt.initial_state,
+            receipt.discovery_seed,
+            receipt.holdout_seed,
+            receipt.t_max,
+            receipt.dt,
+            receipt.requested_trajectories,
+            receipt.threshold,
+            &receipt.system_id,
+            &receipt.system_definition_blake3,
+        );
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
     }
 
     #[test]
