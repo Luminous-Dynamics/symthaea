@@ -56,7 +56,7 @@ class PVGISCaptureContractTests(unittest.TestCase):
         with self.assertRaisesRegex(CaptureError, "non-standard JSON"):
             parse_json_bytes(b'{"value":NaN}', "fixture")
         with self.assertRaisesRegex(CaptureError, "UTF-8 JSON"):
-            parse_json_bytes(b"\\xff", "fixture")
+            parse_json_bytes(b"\xff", "fixture")
 
     def test_payload_size_is_bounded(self):
         validate_payload_size(b"123", 3)
@@ -65,8 +65,8 @@ class PVGISCaptureContractTests(unittest.TestCase):
 
     @patch("capture_pvgis6._fetch_json")
     def test_capture_preserves_raw_bodies_and_binds_their_digests(self, fetch):
-        openapi_bytes = b'{ "openapi": "3.1.0", "paths": {} }\\n'
-        source_bytes = b'{\\n  "results": {"global_inclined_irradiance": [1, 2]}\\n}\\n'
+        openapi_bytes = b'{ "openapi": "3.1.0", "paths": {} }\n'
+        source_bytes = b'{\n  "results": {"global_inclined_irradiance": [1, 2]}\n}\n'
         openapi = {
             "payload": openapi_bytes, "status": 200, "headers": [["Content-Type", "application/json"]],
             "content_type": "application/json", "final_url": OPENAPI_URL,
@@ -81,7 +81,7 @@ class PVGISCaptureContractTests(unittest.TestCase):
         fetch.side_effect = [openapi, source]
         with tempfile.TemporaryDirectory() as temp:
             params_path = Path(temp) / "params.json"
-            params_bytes = b'{ "latitude": -26.2, "longitude": 28 }\\n'
+            params_bytes = b'{ "latitude": -26.2, "longitude": 28 }\n'
             params_path.write_bytes(params_bytes)
             output = Path(temp) / "capture"
             capture("performance/broadband", params_bytes, str(output))
