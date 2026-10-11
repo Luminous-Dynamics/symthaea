@@ -137,8 +137,8 @@ Record unqualified stages as unknown/not run, not pass. A CI source check is not
 
 The current hardware profiles remain device-class-specific guardrails, subject to runtime limits:
 
-- RTX 2070 Laptop GPU profile: 1.5 GiB default HDC/CfC working-set cap; 2 GiB conditional profiling ceiling.
-- Pixel 8 Pro profile: 256 MiB default cap; 512 MiB conditional profiling ceiling.
+- RTX 2070 Laptop GPU profile (being tracked in [PR #7364](https://github.com/Luminous-Dynamics/symthaea/pull/7364)): [hardware profile](https://github.com/Luminous-Dynamics/symthaea/blob/feat/hdc-cfc-neuron-scaling/crates/core/symthaea-hdc-ltc/docs/RTX_2070_LAPTOP_GPU_PROFILE.md) — 1.5 GiB default HDC/CfC working-set cap; 2 GiB conditional profiling ceiling.
+- Pixel 8 Pro profile (also in [PR #7364](https://github.com/Luminous-Dynamics/symthaea/pull/7364)): [mobile profile](https://github.com/Luminous-Dynamics/symthaea/blob/feat/hdc-cfc-neuron-scaling/crates/core/symthaea-hdc-ltc/docs/PIXEL_8_PRO_MOBILE_GPU_PROFILE.md) — 256 MiB default cap; 512 MiB conditional profiling ceiling.
 - Other devices: start conservatively from measured/queried limits; do not copy either profile's numbers blindly.
 
 The individual profile documents define dimensions, batching and evidence collection. Their caps are policy choices, not statements of physically free memory. Chunk buffer/batch work to actual backend limits and re-check mutable budget signals before large allocations.
