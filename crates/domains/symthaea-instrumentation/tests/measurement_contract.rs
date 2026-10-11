@@ -946,6 +946,10 @@ fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_prov
         assessment.calibration_provider_id()
     );
     assert_eq!(review_authorization.policy_sha256().len(), 64);
+    assert_eq!(review_authorization.trust_store_sequence(), 4);
+    assert_eq!(review_authorization.trust_store_sha256().len(), 64);
+    assert_eq!(review_authorization.trust_authority_key_sha256().len(), 64);
+    assert_eq!(review_authorization.verified_at_unix_s(), REVIEW_NOW_UNIX_S);
     assert_eq!(assessment.raw_data().artifact().artifact_id(), "raw-acquisition-1");
     assert_eq!(assessment.raw_data().byte_length(), 4_096);
     assert_eq!(assessment.raw_data().media_type(), "application/octet-stream");

@@ -292,6 +292,10 @@ impl ReviewTrustStore {
             provider_organization_id: policy.provider_organization_id.clone(),
             excluded_organization_ids: policy.excluded_organization_ids.iter().cloned().collect(),
             policy_sha256: policy.canonical_digest(),
+            trust_store_sequence: 0,
+            trust_store_sha256: String::new(),
+            trust_authority_key_sha256: String::new(),
+            verified_at_unix_s: 0,
         })
     }
 
@@ -667,6 +671,10 @@ pub struct VerifiedReviewerAuthorization {
     provider_organization_id: String,
     excluded_organization_ids: Vec<String>,
     policy_sha256: String,
+    trust_store_sequence: u64,
+    trust_store_sha256: String,
+    trust_authority_key_sha256: String,
+    verified_at_unix_s: u64,
 }
 
 impl VerifiedReviewerAuthorization {
@@ -693,6 +701,22 @@ impl VerifiedReviewerAuthorization {
 
     pub fn policy_sha256(&self) -> &str {
         &self.policy_sha256
+    }
+
+    pub fn trust_store_sequence(&self) -> u64 {
+        self.trust_store_sequence
+    }
+
+    pub fn trust_store_sha256(&self) -> &str {
+        &self.trust_store_sha256
+    }
+
+    pub fn trust_authority_key_sha256(&self) -> &str {
+        &self.trust_authority_key_sha256
+    }
+
+    pub fn verified_at_unix_s(&self) -> u64 {
+        self.verified_at_unix_s
     }
 }
 
@@ -953,6 +977,14 @@ impl VerifiedCalibrationReviewReceipt {
                 trust_store
                     .trust_store()
                     .authorize_reviewer(receipt.payload().key_id(), policy)
+                    .map(|mut authorization| {
+                        authorization.trust_store_sequence = trust_store.sequence();
+                        authorization.trust_store_sha256 = trust_store.canonical_digest();
+                        authorization.trust_authority_key_sha256 =
+                            trust_store.authority_key_sha256().to_owned();
+                        authorization.verified_at_unix_s = now_unix_s;
+                        authorization
+                    })
             })
             .transpose()?;
         // Rejected signatures or authorization decisions must not advance rollback state.
@@ -1732,6 +1764,10 @@ mod tests {
             "calibration-provider-a"
         );
         assert_eq!(authorization.policy_sha256().len(), 64);
+        assert_eq!(authorization.trust_store_sequence(), TRUST_SEQUENCE);
+        assert_eq!(authorization.trust_store_sha256().len(), 64);
+        assert_eq!(authorization.trust_authority_key_sha256().len(), 64);
+        assert_eq!(authorization.verified_at_unix_s(), NOW);
         assert_eq!(
             authorization.excluded_organization_ids().collect::<Vec<_>>(),
             vec!["conflict-of-interest-org"]
