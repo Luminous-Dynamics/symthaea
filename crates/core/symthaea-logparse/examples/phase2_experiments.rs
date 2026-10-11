@@ -30,7 +30,7 @@ use symthaea_logparse::probe::{
 };
 use symthaea_logparse::scenario::{
     ORDERED_SCENARIO_ENCODER_VERSION, ScenarioEmbedding, ScenarioEncodingMode,
-    aggregate_ordered_scenarios, aggregate_scenarios,
+    aggregate_ordered_scenarios, aggregate_scenarios, validate_matching_scenario_modes,
 };
 use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
@@ -260,18 +260,8 @@ fn run_scenario_classifier(
     held_out_scenarios: &[ScenarioEmbedding],
     cfg: TrainConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(first_scenario) = source_scenarios.first() else {
-        return Err("source scenario set is empty".into());
-    };
-    let expected_mode = first_scenario.encoding_mode;
-    if source_scenarios
-        .iter()
-        .chain(held_out_scenarios.iter())
-        .any(|scenario| scenario.encoding_mode != expected_mode)
-    {
-        return Err("scenario encoder modes differ between training and held-out data".into());
-    }
-
+    let expected_mode =
+        validate_matching_scenario_modes(source_scenarios, held_out_scenarios)?;
     let mode_name = match expected_mode {
         ScenarioEncodingMode::OrderlessBundle => "orderless-bundle",
         ScenarioEncodingMode::RelativeRecordPosition => "relative-record-position",
