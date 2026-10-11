@@ -6,6 +6,8 @@ on:
       - QUAL MEL-EPI-001F exact subject dispatcher
     types:
       - completed
+    branches:
+      - main
 
 permissions:
   actions: read
@@ -21,7 +23,12 @@ jobs:
         env:
           EXPECTED_SUBJECT: 9308736b927d85c19d882ba0db7ada1aaf5dc1d2
           EXPECTED_PARENT: a4f5351882b08f044319d5e61a01c792341f3726
+          EXPECTED_WORKFLOW_NAME: QUAL MEL-EPI-001F exact subject dispatcher
+          EXPECTED_WORKFLOW_BLOB_SHA: db2f1a9fcd612a1a462763bf763614c3f8612bdf
           WORKFLOW_PATH: .github/workflows/qual-mel-epi-001f-dispatch.yml
+          EXPECTED_OBSERVER_WORKFLOW_PATH: .github/workflows/qual-mel-epi-001f-independent-receipt.yml
+          OBSERVER_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          OBSERVER_WORKFLOW_REF: ${{ github.workflow_ref }}
         with:
           script: |
             const fs = require('fs');
@@ -32,12 +39,78 @@ jobs:
             const repo = context.repo.repo;
             const subject = process.env.EXPECTED_SUBJECT;
             const expectedParent = process.env.EXPECTED_PARENT;
+            const expectedWorkflowName = process.env.EXPECTED_WORKFLOW_NAME;
+            const expectedWorkflowBlobSha = process.env.EXPECTED_WORKFLOW_BLOB_SHA;
+            const expectedSourceBlobShas = {
+              'crates/domains/symthaea-epistemic-types/src/claim_derivation.rs':
+                '79ced4b67ac1b248e19f685036101b66fcc6162a',
+              'crates/domains/symthaea-epistemic-types/src/lib.rs':
+                'b077b51b190ba14e09718ae2147c11f85016445b',
+              'docs/research/MEL_EPI_001F_CLAIM_DERIVATION_V1.md':
+                '476c980d3d4d2e3254255f7259910fffebea7150',
+            };
             const workflowPath = process.env.WORKFLOW_PATH;
+            const expectedObserverWorkflowPath = process.env.EXPECTED_OBSERVER_WORKFLOW_PATH;
+            const observerWorkflowSha = process.env.OBSERVER_WORKFLOW_SHA;
+            const observerWorkflowRef = process.env.OBSERVER_WORKFLOW_REF;
+            const triggerAction = context.payload.action;
+
+            const observerWorkflowIdentityVerified =
+              /^[0-9a-f]{40}$/.test(observerWorkflowSha) &&
+              observerWorkflowRef ===
+                owner + '/' + repo + '/' + expectedObserverWorkflowPath + '@refs/heads/main';
+
+            const observerWorkflowFile = await github.rest.repos.getContent({
+              owner,
+              repo,
+              path: expectedObserverWorkflowPath,
+              ref: observerWorkflowSha,
+            });
+
+            if (Array.isArray(observerWorkflowFile.data)) {
+              throw new Error('observer workflow path resolved to a directory');
+            }
+
+            const observerWorkflowBytes = Buffer.from(
+              observerWorkflowFile.data.content,
+              observerWorkflowFile.data.encoding
+            );
+            const observerWorkflowSha256 = crypto
+              .createHash('sha256')
+              .update(observerWorkflowBytes)
+              .digest('hex');
+
+            const actor = run.actor
+              ? { id: run.actor.id ?? null, login: run.actor.login ?? null }
+              : null;
+            const triggeringActor = run.triggering_actor
+              ? {
+                  id: run.triggering_actor.id ?? null,
+                  login: run.triggering_actor.login ?? null,
+                }
+              : null;
 
             const jobs = await github.paginate(
-              github.rest.actions.listJobsForWorkflowRun,
-              { owner, repo, run_id: run.id, per_page: 100 }
+              github.rest.actions.listJobsForWorkflowRunAttempt,
+              {
+                owner,
+                repo,
+                run_id: run.id,
+                attempt_number: run.run_attempt,
+                per_page: 100,
+              }
             );
+
+            const jobsAttemptVerified =
+              Number.isInteger(run.run_attempt) &&
+              run.run_attempt >= 1 &&
+              jobs.every(
+                (job) =>
+                  job.run_id === run.id &&
+                  job.head_sha === run.head_sha &&
+                  job.head_branch === run.head_branch &&
+                  job.workflow_name === run.name
+              );
 
             const workflowFile = await github.rest.repos.getContent({
               owner,
@@ -50,10 +123,34 @@ jobs:
               throw new Error('dispatcher workflow path resolved to a directory');
             }
 
-            const workflowText = Buffer.from(
+            const workflowBytes = Buffer.from(
               workflowFile.data.content,
               workflowFile.data.encoding
-            ).toString('utf8');
+            );
+            const workflowText = workflowBytes.toString('utf8');
+            const workflowSha256 = crypto.createHash('sha256').update(workflowBytes).digest('hex');
+
+            const dispatcherWorkflow = await github.rest.actions.getWorkflow({
+              owner,
+              repo,
+              workflow_id: workflowPath,
+            });
+
+            const runAttemptVerified = run.run_attempt === 1;
+
+            const workflowIdentityVerified =
+              triggerAction === 'completed' &&
+              String(run.workflow_id) === String(dispatcherWorkflow.data.id) &&
+              run.name === expectedWorkflowName &&
+              dispatcherWorkflow.data.name === expectedWorkflowName &&
+              dispatcherWorkflow.data.path === workflowPath &&
+              run.path === workflowPath + '@main' &&
+              run.event === 'workflow_dispatch' &&
+              run.head_branch === 'main' &&
+              run.repository?.full_name === owner + '/' + repo &&
+              run.head_repository?.full_name === owner + '/' + repo;
+
+            const workflowBlobVerified = workflowFile.data.sha === expectedWorkflowBlobSha;
 
             const requiredWorkflowFragments = [
               subject,
@@ -67,6 +164,8 @@ jobs:
               'cargo test --locked -p symthaea-epistemic-types',
               'cargo check --locked -p symthaea-epistemic-types --all-targets',
               'cargo clippy --locked -p symthaea-epistemic-types --all-targets --no-deps -- -D warnings',
+              'on:\n  workflow_dispatch',
+              'permissions:\n  contents: read',
             ];
 
             const missingWorkflowFragments = requiredWorkflowFragments.filter(
@@ -151,6 +250,12 @@ jobs:
               };
             }
 
+            const sourceBlobHashesVerified =
+              expectedFiles.every(
+                (path) =>
+                  sourceHashes[path]?.blob_sha === expectedSourceBlobShas[path]
+              );
+
             const expectedSteps = [
               'Verify workflow host is main',
               'Checkout exact 001F product subject',
@@ -177,12 +282,20 @@ jobs:
                 stepOutcomes[name][0] === 'success'
             );
 
+            const workflowContractVerified =
+              workflowIdentityVerified &&
+              workflowBlobVerified &&
+              missingWorkflowFragments.length === 0;
+
             const qualificationResult =
               run.conclusion === 'success' &&
-              run.head_branch === 'main' &&
-              missingWorkflowFragments.length === 0 &&
+              runAttemptVerified &&
+              jobsAttemptVerified &&
+              observerWorkflowIdentityVerified &&
+              workflowContractVerified &&
               ancestryVerified &&
               sourceSurfaceVerified &&
+              sourceBlobHashesVerified &&
               requiredStepsSucceeded
                 ? 'PASS'
                 : 'NOT_PASS';
@@ -193,18 +306,50 @@ jobs:
               product_subject: subject,
               workflow_run: {
                 id: run.id,
+                trigger_action: triggerAction,
                 attempt: run.run_attempt,
+                attempt_verified: runAttemptVerified,
+                jobs_attempt: run.run_attempt,
+                jobs_attempt_verified: jobsAttemptVerified,
                 conclusion: run.conclusion,
                 event: run.event,
+                name: run.name,
+                path: run.path,
+                workflow_id: run.workflow_id,
                 head_branch: run.head_branch,
                 head_sha: run.head_sha,
+                repository_full_name: run.repository?.full_name ?? null,
+                head_repository_full_name: run.head_repository?.full_name ?? null,
                 workflow_file_path: workflowPath,
                 workflow_file_blob_sha: workflowFile.data.sha,
+                workflow_file_sha256: workflowSha256,
                 html_url: run.html_url,
+                created_at: run.created_at ?? null,
+                run_started_at: run.run_started_at ?? null,
+                updated_at: run.updated_at ?? null,
+                actor,
+                triggering_actor: triggeringActor,
               },
               workflow_contract: {
+                expected_workflow_name: expectedWorkflowName,
+                expected_workflow_path: workflowPath,
+                expected_workflow_blob_sha: expectedWorkflowBlobSha,
+                observed_workflow_id: run.workflow_id,
+                resolved_workflow_id: dispatcherWorkflow.data.id,
                 missing_fragments: missingWorkflowFragments,
-                verified: missingWorkflowFragments.length === 0,
+                identity_verified: workflowIdentityVerified,
+                blob_verified: workflowBlobVerified,
+                verified: workflowContractVerified,
+              },
+              observer_context: {
+                run_id: Number(process.env.GITHUB_RUN_ID),
+                run_attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+                workflow_sha: observerWorkflowSha,
+                workflow_ref: observerWorkflowRef,
+                workflow_file_path: expectedObserverWorkflowPath,
+                workflow_blob_sha: observerWorkflowFile.data.sha,
+                workflow_sha256: observerWorkflowSha256,
+                identity_verified: observerWorkflowIdentityVerified,
               },
               ancestry: {
                 expected: expectedAncestry,
@@ -215,6 +360,8 @@ jobs:
                 expected_files: expectedFiles,
                 observed_files: changedFiles,
                 verified: sourceSurfaceVerified,
+                blob_hashes_verified: sourceBlobHashesVerified,
+                expected_blob_shas: expectedSourceBlobShas,
                 files: sourceHashes,
               },
               gate_outcomes: stepOutcomes,
@@ -229,9 +376,156 @@ jobs:
             core.info('Qualification result: ' + qualificationResult);
 
       - name: Upload independent qualification receipt
+        id: upload_receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: mel-epi-001f-independent-run-receipt-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          name: mel-epi-001f-independent-run-receipt-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-observer-${{ github.run_id }}-${{ github.run_attempt }}
           path: MEL_EPI_001F_INDEPENDENT_RUN_RECEIPT_V1.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Verify receipt artifact server identity
+        id: verify_receipt_artifact
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          EXPECTED_ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
+          EXPECTED_ARTIFACT_NAME: mel-epi-001f-independent-run-receipt-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-observer-${{ github.run_id }}-${{ github.run_attempt }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ steps.upload_receipt.outputs.artifact-digest }}
+        with:
+          script: |
+            const artifactId = Number(process.env.EXPECTED_ARTIFACT_ID);
+            const expectedName = process.env.EXPECTED_ARTIFACT_NAME;
+            const expectedDigest = 'sha256:' + process.env.EXPECTED_ARTIFACT_DIGEST;
+
+            if (!Number.isSafeInteger(artifactId) || artifactId <= 0) {
+              throw new Error('receipt artifact ID is not a positive safe integer');
+            }
+
+            const artifactResponse = await github.rest.actions.getArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: artifactId,
+            });
+            const artifact = artifactResponse.data;
+
+            if (artifact.id !== artifactId) {
+              throw new Error('artifact API returned a different artifact ID');
+            }
+            if (artifact.name !== expectedName) {
+              throw new Error('artifact API name does not match the uploaded receipt artifact name');
+            }
+            if (artifact.digest !== expectedDigest) {
+              throw new Error('artifact API digest does not match the upload-artifact digest');
+            }
+            if (artifact.expired) {
+              throw new Error('receipt artifact is already expired');
+            }
+            if (artifact.workflow_run?.id !== Number(process.env.GITHUB_RUN_ID)) {
+              throw new Error('artifact API workflow run ID is not the current observer run');
+            }
+            if (artifact.workflow_run?.head_branch !== 'main') {
+              throw new Error('artifact API workflow run is not on main');
+            }
+            if (artifact.workflow_run?.head_sha !== process.env.GITHUB_SHA) {
+              throw new Error('artifact API workflow run head SHA is not the observer workflow host SHA');
+            }
+
+            core.setOutput('api_url', artifact.url);
+            core.setOutput('name', artifact.name);
+            core.setOutput('digest', artifact.digest);
+            core.setOutput('workflow_run_id', String(artifact.workflow_run.id));
+            core.setOutput('workflow_head_sha', artifact.workflow_run.head_sha);
+
+      - name: Bind receipt artifact digest
+        env:
+          RECEIPT_ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
+          RECEIPT_ARTIFACT_URL: ${{ steps.upload_receipt.outputs.artifact-url }}
+          RECEIPT_ARTIFACT_DIGEST: ${{ steps.upload_receipt.outputs.artifact-digest }}
+          RECEIPT_ARTIFACT_NAME: mel-epi-001f-independent-run-receipt-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-observer-${{ github.run_id }}-${{ github.run_attempt }}
+          RECEIPT_ARTIFACT_SERVER_API_URL: ${{ steps.verify_receipt_artifact.outputs.api_url }}
+          RECEIPT_ARTIFACT_SERVER_NAME: ${{ steps.verify_receipt_artifact.outputs.name }}
+          RECEIPT_ARTIFACT_SERVER_DIGEST: ${{ steps.verify_receipt_artifact.outputs.digest }}
+          RECEIPT_ARTIFACT_SERVER_WORKFLOW_RUN_ID: ${{ steps.verify_receipt_artifact.outputs.workflow_run_id }}
+          RECEIPT_ARTIFACT_SERVER_WORKFLOW_HEAD_SHA: ${{ steps.verify_receipt_artifact.outputs.workflow_head_sha }}
+          OBSERVER_RUN_ID: ${{ github.run_id }}
+          OBSERVER_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          test -n "$RECEIPT_ARTIFACT_ID"
+          test -n "$RECEIPT_ARTIFACT_URL"
+          test -n "$RECEIPT_ARTIFACT_DIGEST"
+          node <<'NODE'
+          const fs = require('fs');
+          const crypto = require('crypto');
+
+          const receiptPath = 'MEL_EPI_001F_INDEPENDENT_RUN_RECEIPT_V1.json';
+          const receiptBytes = fs.readFileSync(receiptPath);
+          const receipt = JSON.parse(receiptBytes.toString('utf8'));
+          const artifactDigest = process.env.RECEIPT_ARTIFACT_DIGEST;
+          const artifactId = process.env.RECEIPT_ARTIFACT_ID;
+          const artifactUrl = process.env.RECEIPT_ARTIFACT_URL;
+          const artifactIdNumber = Number(artifactId);
+
+          if (!/^[0-9a-f]{64}$/.test(artifactDigest)) {
+            throw new Error('receipt artifact digest is not a lowercase SHA-256 hex digest');
+          }
+          if (!/^[0-9]+$/.test(artifactId)) {
+            throw new Error('receipt artifact ID is not a decimal integer');
+          }
+          if (!Number.isSafeInteger(artifactIdNumber) || artifactIdNumber <= 0) {
+            throw new Error('receipt artifact ID is not a positive safe integer');
+          }
+
+          const expectedArtifactUrl =
+            process.env.GITHUB_SERVER_URL +
+            '/' +
+            process.env.GITHUB_REPOSITORY +
+            '/actions/runs/' +
+            process.env.GITHUB_RUN_ID +
+            '/artifacts/' +
+            artifactId;
+          if (artifactUrl !== expectedArtifactUrl) {
+            throw new Error('receipt artifact URL is not bound to this observer run and artifact ID');
+          }
+
+          const manifest = {
+            schema_version: 'mel-epi-001f-independent-run-receipt-artifact-manifest-v1',
+            receipt: {
+              filename: receiptPath,
+              sha256: crypto.createHash('sha256').update(receiptBytes).digest('hex'),
+              qualification_result: receipt.qualification_result,
+              product_subject: receipt.product_subject,
+              workflow_run_id: receipt.workflow_run.id,
+              workflow_run_attempt: receipt.workflow_run.attempt,
+              observer_run_id: Number(process.env.OBSERVER_RUN_ID),
+              observer_run_attempt: Number(process.env.OBSERVER_RUN_ATTEMPT),
+            },
+            artifact: {
+              name: process.env.RECEIPT_ARTIFACT_NAME,
+              id: artifactIdNumber,
+              url: artifactUrl,
+              digest: 'sha256:' + artifactDigest,
+            },
+            server_observation: {
+              verified: true,
+              api_url: process.env.RECEIPT_ARTIFACT_SERVER_API_URL,
+              name: process.env.RECEIPT_ARTIFACT_SERVER_NAME,
+              digest: process.env.RECEIPT_ARTIFACT_SERVER_DIGEST,
+              workflow_run_id: Number(process.env.RECEIPT_ARTIFACT_SERVER_WORKFLOW_RUN_ID),
+              workflow_head_sha: process.env.RECEIPT_ARTIFACT_SERVER_WORKFLOW_HEAD_SHA,
+            },
+          };
+
+          fs.writeFileSync(
+            'MEL_EPI_001F_INDEPENDENT_RUN_RECEIPT_ARTIFACT_MANIFEST_V1.json',
+            JSON.stringify(manifest, null, 2) + '\n'
+          );
+          NODE
+
+      - name: Upload receipt artifact manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mel-epi-001f-independent-run-receipt-manifest-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-observer-${{ github.run_id }}-${{ github.run_attempt }}
+          path: MEL_EPI_001F_INDEPENDENT_RUN_RECEIPT_ARTIFACT_MANIFEST_V1.json
           if-no-files-found: error
           retention-days: 90
