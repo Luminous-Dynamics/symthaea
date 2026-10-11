@@ -106,7 +106,7 @@ jobs:
             accept-flake-config = true
 
       - name: Setup Cachix
-        uses: cachix/cachix-action@v14
+        uses: cachix/cachix-action@v17
         with:
           name: symthaea
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
