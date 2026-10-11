@@ -33,7 +33,8 @@
         "hash a minimal source dataset subset and all reference inputs",
         "reproduce one labelled reference case in a fresh environment",
         "separate pre-reweighting, same-observable post-reweighting, and genuinely held-out-observable results",
-        "check target overlap with model training and exposure"
+        "check target overlap with model training and exposure",
+        "verify publisher-provided checksum for the data archive, or explicitly record its absence; preserve the downloaded archive and compute a local SHA-256 before extraction"
       ],
       "revision": "f161b5220a52ebd1a715c91a68beef125101608e",
       "revision_url": "https://github.com/PeptoneLtd/peptonebench/commit/f161b5220a52ebd1a715c91a68beef125101608e",
@@ -261,6 +262,21 @@
     {
       "description": "mdCATH dataset paper",
       "url": "https://doi.org/10.1038/s41597-024-04140-z"
+    },
+    {
+      "description": "Pinned PeptoneBench source audit",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/blob/research/protein-dynamics-benchmark-constitution/docs/research/PEPTONEBENCH_PINNED_SOURCE_AUDIT_2026-10-11.md"
+    },
+    {
+      "description": "Protein dynamics run-record schema",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/blob/research/protein-dynamics-benchmark-constitution/docs/research/PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json"
     }
-  ]
+  ],
+  "execution_record_contract": {
+    "schema_version": "1.0.0",
+    "path": "docs/research/PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json",
+    "purpose": "Fail-closed provenance, target-outcome, metric-role, and resource-accounting contract.",
+    "runtime_validator_implemented": false,
+    "execution_record_created": false
+  }
 }
