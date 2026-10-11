@@ -756,11 +756,9 @@ mod tests {
     #[test]
     fn large_balanced_rational_has_finite_f64_approximation() {
         let limit = RationalBudget::default();
-        let base = format!("1{}", "0".repeat(900));
-        let numerator = format!("{}1", "1".to_string() + &"0".repeat(899));
+        let numerator = format!("1{}1", "0".repeat(899));
         let denominator = "9".repeat(900);
         let value = ExactRational::parse(&numerator, &denominator, limit).unwrap();
-        assert_eq!(base.len(), 901);
         let approx = value.to_f64_approx().expect("ratio near one should remain finite");
         assert!(approx.is_finite());
         assert!((approx - 1.0).abs() < f64::EPSILON);
