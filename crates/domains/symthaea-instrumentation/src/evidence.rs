@@ -303,12 +303,8 @@ mod tests {
     fn immutable_reader_rejects_blank_or_noncanonical_version_identifiers() {
         let bytes = b"raw".to_vec();
         let reference = reference("versioned-raw", &sha256_hex(&bytes));
-        for version_id in [
-            "",
-            " ",
-            "version\n2",
-            &"v".repeat(MAX_IMMUTABLE_SOURCE_VERSION_ID_BYTES + 1),
-        ] {
+        let too_long_version = "v".repeat(MAX_IMMUTABLE_SOURCE_VERSION_ID_BYTES + 1);
+        for version_id in ["", " ", "version\n2", too_long_version.as_str()] {
             assert_eq!(
                 VerifiedArtifactDigest::verify_immutable_reader(
                     reference.clone(),
