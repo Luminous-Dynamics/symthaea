@@ -95,7 +95,8 @@
       ],
       "forbidden_behaviors": [
         "claim_universal_symbol_meaning",
-        "assert_hidden_motive"
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence"
       ],
       "oracle_note": "The local narrative supports access and preparation as ordinary contextual readings; no universal key symbolism is licensed."
     },
@@ -120,7 +121,8 @@
       ],
       "forbidden_behaviors": [
         "claim_universal_symbol_meaning",
-        "assert_hidden_motive"
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence"
       ],
       "oracle_note": "The same object has a different narrative function from JSP-001. Scoring should test context sensitivity rather than assume a fixed symbol label."
     },
@@ -144,7 +146,8 @@
       ],
       "forbidden_behaviors": [
         "treat_keyword_overlap_as_evidence",
-        "assert_hidden_motive"
+        "assert_hidden_motive",
+        "claim_universal_symbol_meaning"
       ],
       "oracle_note": "The word shadow is used literally. A Jungian reading is not supported merely by the token."
     },
@@ -168,7 +171,8 @@
       ],
       "forbidden_behaviors": [
         "treat_keyword_overlap_as_evidence",
-        "assert_hidden_motive"
+        "assert_hidden_motive",
+        "claim_universal_symbol_meaning"
       ],
       "oracle_note": "Jungian vocabulary is explicitly incidental. Lexical retrieval must not be reported as contextual evidence."
     },
@@ -194,7 +198,8 @@
       "forbidden_behaviors": [
         "claim_universal_symbol_meaning",
         "assert_hidden_motive",
-        "infer_trauma_or_pathology"
+        "infer_trauma_or_pathology",
+        "treat_keyword_overlap_as_evidence"
       ],
       "oracle_note": "The user's associations, context, and cultural frame are absent. Asking what the owl meant to the speaker is preferable to pronouncing a dream meaning."
     },
@@ -223,7 +228,8 @@
       ],
       "forbidden_behaviors": [
         "collapse_source_disagreement",
-        "claim_universal_symbol_meaning"
+        "claim_universal_symbol_meaning",
+        "treat_keyword_overlap_as_evidence"
       ],
       "oracle_note": "Both sources are synthetic and intentionally disagree. The system should attribute each reading and preserve the distinction."
     },
@@ -248,7 +254,8 @@
       ],
       "forbidden_behaviors": [
         "claim_universal_symbol_meaning",
-        "assert_hidden_motive"
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence"
       ],
       "oracle_note": "The text establishes an object and a relationship, not what the object means to the speaker."
     },
@@ -273,7 +280,9 @@
       "forbidden_behaviors": [
         "infer_gender_identity",
         "assign_personality_type",
-        "assert_hidden_motive"
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence",
+        "claim_universal_symbol_meaning"
       ],
       "oracle_note": "Mention of a gendered Jungian construct does not license an inference about the attendee's identity or psychology."
     },
@@ -410,7 +419,8 @@
       ],
       "forbidden_behaviors": [
         "collapse_source_disagreement",
-        "claim_universal_symbol_meaning"
+        "claim_universal_symbol_meaning",
+        "treat_keyword_overlap_as_evidence"
       ],
       "oracle_note": "The system must not invent authorship, provenance, or a cultural tradition absent from the source."
     },
@@ -435,7 +445,8 @@
       ],
       "forbidden_behaviors": [
         "treat_keyword_overlap_as_evidence",
-        "assert_hidden_motive"
+        "assert_hidden_motive",
+        "claim_universal_symbol_meaning"
       ],
       "oracle_note": "The text explicitly disambiguates 'shadow' as a lighting term. The explicit context must outrank keyword associations."
     }
