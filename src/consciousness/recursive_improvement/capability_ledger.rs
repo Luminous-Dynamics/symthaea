@@ -294,6 +294,9 @@ struct ForecastRecord {
 #[derive(Debug, Clone)]
 pub struct CapabilityLedger {
     subject: SubjectIdentity,
+    /// Frozen at construction so callers cannot loosen thresholds after observing outcomes.
+    /// The outer trusted evaluation layer must supply the policy authorized for this subject.
+    qualification_policy: QualificationPolicy,
     claims: BTreeMap<String, CapabilityClaim>,
     forecasts: BTreeMap<String, ForecastRecord>,
     /// Most recent accepted forecast/outcome event sequence for the whole ledger.
@@ -301,10 +304,15 @@ pub struct CapabilityLedger {
 }
 
 impl CapabilityLedger {
-    pub fn new(subject: SubjectIdentity) -> Result<Self, CapabilityLedgerError> {
+    pub fn new(
+        subject: SubjectIdentity,
+        qualification_policy: QualificationPolicy,
+    ) -> Result<Self, CapabilityLedgerError> {
         subject.validate()?;
+        qualification_policy.validate()?;
         Ok(Self {
             subject,
+            qualification_policy,
             claims: BTreeMap::new(),
             forecasts: BTreeMap::new(),
             last_sequence: 0,
@@ -529,9 +537,7 @@ impl CapabilityLedger {
     pub fn qualification_metrics(
         &self,
         claim_id: &str,
-        policy: &QualificationPolicy,
     ) -> Result<CapabilityMetrics, CapabilityLedgerError> {
-        policy.validate()?;
         if !self.claims.contains_key(claim_id) {
             return Err(CapabilityLedgerError::UnknownClaim);
         }
@@ -547,7 +553,7 @@ impl CapabilityLedger {
                 record
                     .receipt
                     .as_ref()
-                    .is_some_and(|receipt| policy.accepts(receipt))
+                    .is_some_and(|receipt| self.qualification_policy.accepts(receipt))
             })
             .collect();
         Ok(calculate_metrics(&qualifying_records, total_forecast_count))
@@ -558,9 +564,7 @@ impl CapabilityLedger {
     pub fn qualify_claim(
         &mut self,
         claim_id: &str,
-        policy: &QualificationPolicy,
     ) -> Result<CapabilityMetrics, CapabilityLedgerError> {
-        policy.validate()?;
         let claim = self
             .claims
             .get(claim_id)
@@ -568,10 +572,10 @@ impl CapabilityLedger {
         if claim.lifecycle != CapabilityLifecycle::Candidate {
             return Err(CapabilityLedgerError::InvalidLifecycleTransition);
         }
-        let metrics = self.qualification_metrics(claim_id, policy)?;
-        if metrics.resolved_count < policy.minimum_resolved
-            || metrics.held_out_samples < policy.minimum_held_out
-            || metrics.qualification_samples < policy.minimum_resolved
+        let metrics = self.qualification_metrics(claim_id)?;
+        if metrics.resolved_count < self.qualification_policy.minimum_resolved
+            || metrics.held_out_samples < self.qualification_policy.minimum_held_out
+            || metrics.qualification_samples < self.qualification_policy.minimum_resolved
         {
             return Err(CapabilityLedgerError::InsufficientEvidence);
         }
@@ -728,7 +732,11 @@ mod tests {
     }
 
     fn setup_claim() -> CapabilityLedger {
-        let mut ledger = CapabilityLedger::new(subject()).unwrap();
+        setup_claim_with_policy(policy())
+    }
+
+    fn setup_claim_with_policy(qualification_policy: QualificationPolicy) -> CapabilityLedger {
+        let mut ledger = CapabilityLedger::new(subject(), qualification_policy).unwrap();
         ledger
             .add_claim(
                 CapabilityClaim::new(
@@ -842,11 +850,11 @@ mod tests {
             );
         }
         assert_eq!(
-            ledger.qualify_claim("rust-debugging", &policy()),
+            ledger.qualify_claim("rust-debugging"),
             Err(CapabilityLedgerError::InsufficientEvidence)
         );
         let qualification_metrics = ledger
-            .qualification_metrics("rust-debugging", &policy())
+            .qualification_metrics("rust-debugging")
             .unwrap();
         assert_eq!(qualification_metrics.forecast_count, 3);
         assert_eq!(qualification_metrics.resolved_count, 0);
@@ -870,7 +878,7 @@ mod tests {
                 true,
             );
         }
-        let metrics = ledger.qualify_claim("rust-debugging", &policy()).unwrap();
+        let metrics = ledger.qualify_claim("rust-debugging").unwrap();
         assert_eq!(metrics.resolved_count, 3);
         assert_eq!(metrics.held_out_samples, 3);
         assert!((metrics.brier_score.unwrap() - 0.01).abs() < 1e-9);
@@ -894,7 +902,7 @@ mod tests {
             );
         }
         assert_eq!(
-            ledger.qualify_claim("rust-debugging", &policy()),
+            ledger.qualify_claim("rust-debugging"),
             Err(CapabilityLedgerError::QualificationRejected)
         );
     }
@@ -964,7 +972,7 @@ mod tests {
 
     #[test]
     fn adding_a_claim_cannot_import_qualified_status() {
-        let mut ledger = CapabilityLedger::new(subject()).unwrap();
+        let mut ledger = CapabilityLedger::new(subject(), policy()).unwrap();
         ledger
             .add_claim(CapabilityClaim {
                 claim_id: "forged".to_string(),
@@ -981,8 +989,10 @@ mod tests {
     }
 
     #[test]
-    fn evaluator_must_match_pinned_qualification_policy() {
-        let mut ledger = setup_claim();
+    fn qualification_policy_is_fixed_before_outcomes_are_recorded() {
+        let mut pinned_policy = policy();
+        pinned_policy.trusted_evaluator_identity = "different-evaluator".to_string();
+        let mut ledger = setup_claim_with_policy(pinned_policy);
         for i in 0..3 {
             add_case(
                 &mut ledger,
@@ -993,10 +1003,11 @@ mod tests {
                 true,
             );
         }
-        let mut untrusted_policy = policy();
-        untrusted_policy.trusted_evaluator_identity = "different-evaluator".to_string();
+        let metrics = ledger.qualification_metrics("rust-debugging").unwrap();
+        assert_eq!(metrics.forecast_count, 3);
+        assert_eq!(metrics.resolved_count, 0);
         assert_eq!(
-            ledger.qualify_claim("rust-debugging", &untrusted_policy),
+            ledger.qualify_claim("rust-debugging"),
             Err(CapabilityLedgerError::InsufficientEvidence)
         );
     }
@@ -1036,7 +1047,7 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(
-            ledger.qualify_claim("rust-debugging", &policy()),
+            ledger.qualify_claim("rust-debugging"),
             Err(CapabilityLedgerError::InsufficientEvidence)
         );
     }
@@ -1101,12 +1112,12 @@ mod tests {
             )).unwrap();
         }
 
-        let metrics = ledger.qualification_metrics("rust-debugging", &policy()).unwrap();
+        let metrics = ledger.qualification_metrics("rust-debugging").unwrap();
         assert_eq!(metrics.forecast_count, 3);
         assert_eq!(metrics.resolved_count, 0);
         assert_eq!(metrics.brier_score, None);
         assert_eq!(
-            ledger.qualify_claim("rust-debugging", &policy()),
+            ledger.qualify_claim("rust-debugging"),
             Err(CapabilityLedgerError::InsufficientEvidence)
         );
     }
@@ -1143,7 +1154,7 @@ mod tests {
 
     #[test]
     fn unqualified_claim_cannot_record_forecasts() {
-        let mut ledger = CapabilityLedger::new(subject()).unwrap();
+        let mut ledger = CapabilityLedger::new(subject(), policy()).unwrap();
         ledger
             .add_claim(
                 CapabilityClaim::new(
