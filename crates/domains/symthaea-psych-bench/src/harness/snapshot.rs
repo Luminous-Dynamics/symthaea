@@ -170,22 +170,55 @@ impl RegressionSnapshot {
             errors.push("Snapshot name is empty".to_string());
         }
 
-        if self.metrics.is_empty() {
+        let metric_count: usize = self.metrics.values().map(BTreeMap::len).sum();
+        if metric_count == 0 {
             errors.push("Snapshot contains no benchmark metrics".to_string());
         }
 
         for (bench, bench_metrics) in &self.metrics {
+            if bench_metrics.is_empty() {
+                errors.push(format!(
+                    "{bench}: benchmark contains no metrics"
+                ));
+            }
             for (metric_name, val) in bench_metrics {
+                if val.n == 0 {
+                    errors.push(format!(
+                        "{}/{}: sample count n must be greater than zero",
+                        bench, metric_name
+                    ));
+                }
                 if !val.mean.is_finite() {
                     errors.push(format!(
                         "{}/{}: mean is not finite ({:?})",
                         bench, metric_name, val.mean
                     ));
                 }
-                if !val.std_dev.is_finite() {
+                if !val.std_dev.is_finite() || val.std_dev < 0.0 {
                     errors.push(format!(
-                        "{}/{}: std_dev is not finite ({:?})",
+                        "{}/{}: std_dev must be finite and non-negative ({:?})",
                         bench, metric_name, val.std_dev
+                    ));
+                }
+                if !val.ci_lower.is_finite() {
+                    errors.push(format!(
+                        "{}/{}: ci_lower is not finite ({:?})",
+                        bench, metric_name, val.ci_lower
+                    ));
+                }
+                if !val.ci_upper.is_finite() {
+                    errors.push(format!(
+                        "{}/{}: ci_upper is not finite ({:?})",
+                        bench, metric_name, val.ci_upper
+                    ));
+                }
+                if val.ci_lower.is_finite()
+                    && val.ci_upper.is_finite()
+                    && val.ci_lower > val.ci_upper
+                {
+                    errors.push(format!(
+                        "{}/{}: ci_lower exceeds ci_upper ({:?} > {:?})",
+                        bench, metric_name, val.ci_lower, val.ci_upper
                     ));
                 }
             }
@@ -872,6 +905,44 @@ mod strict_population_tests {
         let summary = report.format_summary();
         assert!(summary.contains("No comparable metrics"));
         assert!(!summary.contains("All metrics within baseline CI"));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_zero_sample_count() {
+        let mut invalid = snapshot("zero-n", &[("NBack", &[("accuracy", 0.8)])]);
+        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().n = 0;
+        let errors = invalid.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("sample count n")));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_negative_dispersion() {
+        let mut invalid = snapshot("negative-sd", &[("NBack", &[("accuracy", 0.8)])]);
+        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().std_dev = -0.1;
+        let errors = invalid.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("finite and non-negative")));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_nonfinite_or_reversed_confidence_bounds() {
+        let mut nonfinite = snapshot("nonfinite-ci", &[("NBack", &[("accuracy", 0.8)])]);
+        nonfinite.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().ci_lower = f64::INFINITY;
+        assert!(nonfinite.validate().unwrap_err().iter().any(|error| error.contains("ci_lower is not finite")));
+
+        let mut reversed = snapshot("reversed-ci", &[("NBack", &[("accuracy", 0.8)])]);
+        let metric = reversed.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap();
+        metric.ci_lower = 0.9;
+        metric.ci_upper = 0.7;
+        assert!(reversed.validate().unwrap_err().iter().any(|error| error.contains("ci_lower exceeds ci_upper")));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_nonempty_benchmark_map_with_no_metrics() {
+        let mut invalid = snapshot("empty-inner", &[]);
+        invalid.metrics.insert("NBack".to_string(), BTreeMap::new());
+        let errors = invalid.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("no benchmark metrics")));
+        assert!(errors.iter().any(|error| error.contains("benchmark contains no metrics")));
     }
 
     #[test]
