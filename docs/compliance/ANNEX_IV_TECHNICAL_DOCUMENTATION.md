@@ -162,7 +162,7 @@ See Section 7 — Third-Party AI Component Assessment.
 | Measure | Metric | Target | Current |
 |---------|--------|--------|---------|
 | Phi validation | Pearson r vs exhaustive | ≥0.95 | 0.99 |
-| Moral classification | Accuracy on prototypes | ≥90% | 91.1% |
+| Moral classification | Task-matched held-out accuracy | Qualification pending | Not qualified; historical 91.1% claim withdrawn from current metrics |
 | Safety monitoring | False negative rate | 0% | 0% (33 tests) |
 | Consciousness clamping | NaN/Inf prevention | 100% | 100% (safety agent) |
 
@@ -285,7 +285,7 @@ bash scripts/compliance-dashboard.sh          # 14 suites, 15 doc checks
 | Metric | Value | Method |
 |--------|-------|--------|
 | Phi correlation | r = 0.99 | SpectralMIP vs exhaustive MIP (62 data points) |
-| Moral accuracy | 91.1% | Prototype classification on moral_algebra test set |
+| Moral accuracy | Not qualified | Historical prototype-classification figure; task-matched external metric pending |
 | Safety false negatives | 0% | 33 unit tests + 15 soak tests |
 | Threshold stability | Stable | ±wide perturbation across 6 scenarios |
 | Consciousness bounds | [0.0, 1.0] | Property-based verification |
@@ -295,7 +295,7 @@ bash scripts/compliance-dashboard.sh          # 14 suites, 15 doc checks
 **Reference**: `TECHNICAL_STATUS.md`, `TRANSPARENCY_OBLIGATIONS.md` §2
 
 - Phi is a proxy for consciousness, not direct measurement
-- Moral classification has ~9% error rate
+- No qualified moral error rate is currently available; do not infer one from an unqualified historical accuracy claim
 - Substrate feasibility for non-biological substrates is theoretical (honest_confidence: 0.10 for silicon)
 - ~25% of modules remain structural/disconnected (iroh P2P, some consciousness subsystems)
 - Single-developer limitation affects review rigor
