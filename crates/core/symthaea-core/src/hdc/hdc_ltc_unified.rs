@@ -3185,6 +3185,57 @@ mod checked_iterative_evolution_tests {
     }
 
     #[test]
+    fn checked_iterative_rejects_zero_budget_and_invalid_configuration() {
+        let mut neuron = neuron();
+        let input = input();
+        assert_eq!(
+            neuron.try_evolve_closed_form_iterative(0.1, &input, 0),
+            Err(IterativeEvolutionError::InvalidSubstepBudget)
+        );
+
+        let mut invalid_tau = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 256,
+                tau_base: f32::NAN,
+                ..UnifiedConfig::default()
+            },
+            4242,
+        );
+        assert_eq!(
+            invalid_tau.try_evolve_closed_form_iterative(0.1, &input, 100),
+            Err(IterativeEvolutionError::InvalidConfiguration { field: "tau_base" })
+        );
+        assert_eq!(invalid_tau.evolution_clock(), (0.0, 0));
+        assert_eq!(invalid_tau.state().norm(), 0.0);
+    }
+
+    #[test]
+    fn checked_iterative_rejects_corrupt_state_and_parameters() {
+        let input = input();
+        let mut bad_state = neuron();
+        bad_state.set_state(ContinuousHV::zero(255));
+        assert_eq!(
+            bad_state.try_evolve_closed_form_iterative(0.1, &input, 100),
+            Err(IterativeEvolutionError::StateDimensionMismatch {
+                expected: 256,
+                actual: 255
+            })
+        );
+
+        let mut bad_parameter = neuron();
+        bad_parameter.weight_hv.values[3] = f32::NAN;
+        assert_eq!(
+            bad_parameter.try_evolve_closed_form_iterative(0.1, &input, 100),
+            Err(IterativeEvolutionError::NonFiniteParameter {
+                field: "weight_hv",
+                index: 3
+            })
+        );
+        assert_eq!(bad_parameter.evolution_clock(), (0.0, 0));
+        assert_eq!(bad_parameter.state().norm(), 0.0);
+    }
+
+    #[test]
     fn checked_iterative_valid_step_respects_budget_and_advances_clock_once() {
         let mut neuron = neuron();
         let input = input();
