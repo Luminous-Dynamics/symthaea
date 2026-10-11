@@ -364,40 +364,57 @@ fn load_otrf_corpus(
     Ok((events, groups))
 }
 
-/// Stratified 5-fold cross-validation. Splits each class's samples into k
-/// contiguous chunks after a deterministic shuffle, then trains k models.
-fn run_kfold(hvs: &[Hdv], labels: &[String], k: usize, cfg: TrainConfig) -> Vec<f32> {
-    use symthaea_logparse::probe::LogisticProbe;
-
-    // Group indices by label
-    let mut by_label: BTreeMap<String, Vec<usize>> = BTreeMap::new();
-    for (i, l) in labels.iter().enumerate() {
-        by_label.entry(l.clone()).or_default().push(i);
+/// Stratified k-fold cross-validation with source groups kept intact.
+fn run_grouped_kfold(
+    hvs: &[Hdv],
+    labels: &[String],
+    groups: &[String],
+    k: usize,
+    cfg: TrainConfig,
+) -> Result<Vec<f32>, String> {
+    if hvs.len() != labels.len() || labels.len() != groups.len() {
+        return Err("grouped CV input length mismatch".to_string());
+    }
+    if k < 2 {
+        return Err("grouped CV needs at least two folds".to_string());
     }
 
-    // Deterministic shuffle per label
-    let mut state: u64 = 0xDEADBEEF;
-    fn xorshift(s: &mut u64) -> u64 {
-        let mut x = *s;
-        x ^= x << 13;
-        x ^= x >> 7;
-        x ^= x << 17;
-        *s = x;
-        x.wrapping_mul(0x2545F4914F6CDD1D)
-    }
-    for (_, idxs) in by_label.iter_mut() {
-        for i in (1..idxs.len()).rev() {
-            let j = (xorshift(&mut state) as usize) % (i + 1);
-            idxs.swap(i, j);
+    let mut by_label: BTreeMap<String, BTreeMap<String, Vec<usize>>> = BTreeMap::new();
+    let mut group_labels: BTreeMap<&str, &str> = BTreeMap::new();
+    for (i, (label, group)) in labels.iter().zip(groups.iter()).enumerate() {
+        if let Some(existing) = group_labels.get(group.as_str()) {
+            if *existing != label.as_str() {
+                return Err(format!("group {group:?} contains multiple labels"));
+            }
+        } else {
+            group_labels.insert(group.as_str(), label.as_str());
         }
+        by_label
+            .entry(label.clone())
+            .or_default()
+            .entry(group.clone())
+            .or_default()
+            .push(i);
     }
 
-    // Assign each index to a fold via round-robin within each label
-    let n = hvs.len();
-    let mut fold_of = vec![0usize; n];
-    for (_, idxs) in by_label.iter() {
-        for (position, &idx) in idxs.iter().enumerate() {
-            fold_of[idx] = position % k;
+    let mut state = 0xDEADBEEFu64;
+    let mut fold_of = vec![usize::MAX; hvs.len()];
+    for (label, group_map) in by_label.iter_mut() {
+        if group_map.len() < k {
+            return Err(format!(
+                "label {label:?} has {} groups; need at least {k} for grouped {k}-fold CV",
+                group_map.len()
+            ));
+        }
+        let mut ids: Vec<String> = group_map.keys().cloned().collect();
+        for i in (1..ids.len()).rev() {
+            let j = (xorshift(&mut state) as usize) % (i + 1);
+            ids.swap(i, j);
+        }
+        for (position, id) in ids.iter().enumerate() {
+            for &index in &group_map[id] {
+                fold_of[index] = position % k;
+            }
         }
     }
 
@@ -407,7 +424,7 @@ fn run_kfold(hvs: &[Hdv], labels: &[String], k: usize, cfg: TrainConfig) -> Vec<
         let mut train_y = Vec::new();
         let mut test_hvs = Vec::new();
         let mut test_y = Vec::new();
-        for i in 0..n {
+        for i in 0..hvs.len() {
             if fold_of[i] == fold {
                 test_hvs.push(hvs[i].clone());
                 test_y.push(labels[i].clone());
@@ -417,15 +434,16 @@ fn run_kfold(hvs: &[Hdv], labels: &[String], k: usize, cfg: TrainConfig) -> Vec<
             }
         }
         println!(
-            "  fold {}: train={}, test={}",
+            "  grouped fold {}: train={}, test={}",
             fold + 1,
             train_hvs.len(),
             test_hvs.len()
         );
         let probe = LogisticProbe::train(&train_hvs, &train_y, cfg);
-        let acc = probe.accuracy(&test_hvs, &test_y);
-        println!("  fold {}: test accuracy = {:.3}", fold + 1, acc);
-        accs.push(acc);
+        let accuracy = probe.accuracy(&test_hvs, &test_y);
+        println!("  grouped fold {}: test accuracy = {:.3}", fold + 1, accuracy);
+        accs.push(accuracy);
     }
-    accs
+    Ok(accs)
 }
+
