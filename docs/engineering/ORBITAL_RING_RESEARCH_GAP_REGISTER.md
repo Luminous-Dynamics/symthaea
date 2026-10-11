@@ -64,7 +64,7 @@ Part II also reports a PORS example with ~0.21 GW dissipation and ~9.8 × 10¹²
 
 ## Execution order
 
-1. **Keep the existing T0 checker.** Its current 47 checks cover circular-orbit arithmetic and one fixed-circle kinematic limit only.
+1. **Keep the T0 checker and widen the source-backed envelope.** The prior v1 source passed 47/47 checks; v2 adds a 600 km circular two-body reference corresponding to Birch Part I p. 476 plus a source-bound regression. The v2 script has 56 expected checks but is not yet runtime-verified. It still covers analytical arithmetic and one fixed-circle kinematic limit only; it is not a stationary-ring or coupled-support model. See [the historical geometry reference note](ORBITAL_RING_HISTORICAL_GEOMETRY_REFERENCE.md).
 2. **RG-02 source audit advanced; source-scope resolution remains open.** The 100 MW / 10 GW paragraph and Table 8's 500 MW / 50 GW continuous-skyhook row should remain separate until the superconducting-surface alternative and the fixed-ring/sheath configuration are normalized to an identical boundary. Continue this work in parallel with RG-01 geometry and frame specification.
 3. **Then RG-01 / RG-03.** Freeze one continuous-skyhook support-load-step geometry and rider/coupler contract. Model load removal separately from coil outage, quench, rider loss, and ladder collapse; complete the momentum/energy boundary and fault destinations before treating a coupled simulation as meaningful.
 4. **Then RG-06 and RG-05.** Use adjacent ring-stability methods cautiously and model debris as a structural/operations constraint, not as a final checklist item.
