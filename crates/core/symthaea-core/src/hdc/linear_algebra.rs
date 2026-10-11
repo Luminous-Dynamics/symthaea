@@ -2306,9 +2306,16 @@ mod tests {
         a.data[0] = f64::NAN;
 
         assert!(a.try_svd().is_err());
+        assert!(a.try_rank().is_err());
+        assert!(a.try_condition_number().is_err());
+        assert!(a.try_null_space().is_err());
+
         let (singular_values, _, _, result) = a.svd();
         assert!(!result.verified);
         assert!(singular_values.iter().all(|value| value.is_nan()));
+        assert_eq!(a.rank(), 0, "legacy rank wrapper uses its documented failure sentinel");
+        assert!(a.condition_number().is_nan());
+        assert!(a.null_space().is_none());
     }
 
     /// SVD reconstruction: A ≈ U Σ V^T
