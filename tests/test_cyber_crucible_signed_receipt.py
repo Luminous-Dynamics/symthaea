@@ -58,6 +58,8 @@ def signed_receipt(
         "evaluator_id": "independent-security-evaluator",
         "role": role,
         "campaign_id": "campaign-2026-10-A",
+        "subject_id": "symthaea-candidate-A",
+        "attempt_id": "attempt-2026-10-11-0001",
         "run_nonce": nonce,
         "issued_at": issued_at,
         "expires_at": expires_at,
@@ -96,6 +98,8 @@ def context(receipt: dict) -> dict:
     p = receipt["payload"]
     return {
         "campaign_id": p["campaign_id"],
+        "subject_id": p["subject_id"],
+        "attempt_id": p["attempt_id"],
         "run_nonce": p["run_nonce"],
         "scenario_id": p["scenario_id"],
         "scenario_revision": p["scenario_revision"],
@@ -203,6 +207,17 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         receipt["signature"] = b64url(bytes(sig))
         with self.assertRaises(verifier.VerificationError):
             self.verify(receipt)
+
+    def test_expected_subject_and_attempt_are_bound(self):
+        receipt = signed_receipt()
+        expected = context(receipt)
+        expected["subject_id"] = "different-candidate"
+        with self.assertRaisesRegex(verifier.VerificationError, "expected context field: subject_id"):
+            self.verify(receipt, expected=expected)
+        expected = context(receipt)
+        expected["attempt_id"] = "different-attempt"
+        with self.assertRaisesRegex(verifier.VerificationError, "expected context field: attempt_id"):
+            self.verify(receipt, expected=expected)
 
     def test_expected_scenario_identity_mismatch_is_rejected(self):
         receipt = signed_receipt()
