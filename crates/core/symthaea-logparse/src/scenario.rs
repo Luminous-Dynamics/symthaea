@@ -135,6 +135,27 @@ mod tests {
     }
 
     #[test]
+    fn aggregation_does_not_encode_ground_truth_label_or_group_id() {
+        let vector = random_hv(0xCAFE);
+        let a = aggregate_scenarios(
+            std::slice::from_ref(&vector),
+            &["execution".into()],
+            &["source-a".into()],
+        )
+        .unwrap();
+        let b = aggregate_scenarios(
+            std::slice::from_ref(&vector),
+            &["persistence".into()],
+            &["source-b".into()],
+        )
+        .unwrap();
+
+        assert_ne!(a[0].label, b[0].label);
+        assert_ne!(a[0].scenario_id, b[0].scenario_id);
+        assert_eq!(a[0].vector, b[0].vector);
+    }
+
+    #[test]
     fn aggregation_rejects_conflicting_labels_within_a_scenario() {
         let hvs = vec![random_hv(1), random_hv(2)];
         let labels = vec!["execution".into(), "persistence".into()];
