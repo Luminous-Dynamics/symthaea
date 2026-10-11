@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "scripts/verify_cyber_crucible_decision_receipt.py"
+      - "scripts/verify_cyber_crucible_report_decision.py"
       - "tests/test_cyber_crucible_decision_receipt.py"
       - "validation/cyber_crucible_verifier_decision_v1.schema.json"
       - "validation/cyber_crucible_decision_trust_policy_v1.schema.json"
@@ -13,6 +14,7 @@ on:
     branches: [main]
     paths:
       - "scripts/verify_cyber_crucible_decision_receipt.py"
+      - "scripts/verify_cyber_crucible_report_decision.py"
       - "tests/test_cyber_crucible_decision_receipt.py"
       - "validation/cyber_crucible_verifier_decision_v1.schema.json"
       - "validation/cyber_crucible_decision_trust_policy_v1.schema.json"
