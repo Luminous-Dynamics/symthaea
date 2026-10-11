@@ -76,6 +76,10 @@ pub const MAX_IMMUTABLE_SOURCE_VERSION_ID_BYTES: usize = 512;
 /// immutable object version. A path, mutable database row, or latest-version alias
 /// does not satisfy this contract.
 pub trait ImmutableArtifactReader: Read {
+    /// Logical artifact ID that this pinned source version belongs to.
+    fn artifact_id(&self) -> &str;
+
+    /// Stable version/generation ID for the same bytes returned by Read.
     fn immutable_version_id(&self) -> &str;
 }
 
@@ -108,6 +112,13 @@ impl VerifiedArtifactDigest {
         reader: R,
     ) -> Result<Self, ArtifactVerificationError> {
         let artifact_id = reference.artifact_id().to_owned();
+        let actual_artifact_id = reader.artifact_id().to_owned();
+        if actual_artifact_id != artifact_id {
+            return Err(ArtifactVerificationError::ImmutableSourceIdentityMismatch {
+                expected_artifact_id: artifact_id,
+                actual_artifact_id,
+            });
+        }
         let source_version_id = reader.immutable_version_id().to_owned();
         if source_version_id.is_empty()
             || source_version_id.trim() != source_version_id
@@ -212,6 +223,10 @@ pub enum ArtifactVerificationError {
     InvalidImmutableSourceVersion {
         artifact_id: String,
     },
+    ImmutableSourceIdentityMismatch {
+        expected_artifact_id: String,
+        actual_artifact_id: String,
+    },
 }
 
 impl fmt::Display for ArtifactVerificationError {
@@ -235,6 +250,13 @@ impl fmt::Display for ArtifactVerificationError {
             Self::InvalidImmutableSourceVersion { artifact_id } => {
                 write!(f, "invalid immutable source version for artifact {artifact_id}")
             }
+            Self::ImmutableSourceIdentityMismatch {
+                expected_artifact_id,
+                actual_artifact_id,
+            } => write!(
+                f,
+                "identity mismatch: {expected_artifact_id} != {actual_artifact_id}"
+            ),
         }
     }
 }
@@ -248,13 +270,15 @@ mod tests {
     #[derive(Debug)]
     struct VersionedCursor {
         inner: std::io::Cursor<Vec<u8>>,
+        artifact_id: String,
         version_id: String,
     }
 
     impl VersionedCursor {
-        fn new(version_id: &str, bytes: Vec<u8>) -> Self {
+        fn new(artifact_id: &str, version_id: &str, bytes: Vec<u8>) -> Self {
             Self {
                 inner: std::io::Cursor::new(bytes),
+                artifact_id: artifact_id.to_owned(),
                 version_id: version_id.to_owned(),
             }
         }
@@ -267,6 +291,10 @@ mod tests {
     }
 
     impl ImmutableArtifactReader for VersionedCursor {
+        fn artifact_id(&self) -> &str {
+            &self.artifact_id
+        }
+
         fn immutable_version_id(&self) -> &str {
             &self.version_id
         }
@@ -290,7 +318,7 @@ mod tests {
         let reference = reference("versioned-raw", &sha256_hex(&bytes));
         let verified = VerifiedArtifactDigest::verify_immutable_reader(
             reference.clone(),
-            VersionedCursor::new("object-version-17", bytes.clone()),
+            VersionedCursor::new("versioned-raw", "object-version-17", bytes.clone()),
         )
         .unwrap();
 
@@ -308,7 +336,7 @@ mod tests {
             assert_eq!(
                 VerifiedArtifactDigest::verify_immutable_reader(
                     reference.clone(),
-                    VersionedCursor::new(version_id, bytes.clone()),
+                    VersionedCursor::new("versioned-raw", version_id, bytes.clone()),
                 )
                 .unwrap_err(),
                 ArtifactVerificationError::InvalidImmutableSourceVersion {
@@ -316,6 +344,23 @@ mod tests {
                 }
             );
         }
+    }
+
+    #[test]
+    fn immutable_reader_rejects_artifact_identity_substitution() {
+        let bytes = b"raw".to_vec();
+        let reference = reference("expected-raw", &sha256_hex(&bytes));
+        assert_eq!(
+            VerifiedArtifactDigest::verify_immutable_reader(
+                reference,
+                VersionedCursor::new("different-raw", "object-version-17", bytes),
+            )
+            .unwrap_err(),
+            ArtifactVerificationError::ImmutableSourceIdentityMismatch {
+                expected_artifact_id: "expected-raw".to_owned(),
+                actual_artifact_id: "different-raw".to_owned(),
+            }
+        );
     }
 
     #[test]

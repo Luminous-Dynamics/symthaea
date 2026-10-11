@@ -378,13 +378,19 @@ fn policy() -> MeasurementPolicy {
 
 struct ImmutableFixtureReader {
     inner: Cursor<Vec<u8>>,
+    artifact_id: String,
     version_id: String,
 }
 
 impl ImmutableFixtureReader {
-    fn new(bytes: Vec<u8>, version_id: impl Into<String>) -> Self {
+    fn new(
+        bytes: Vec<u8>,
+        artifact_id: impl Into<String>,
+        version_id: impl Into<String>,
+    ) -> Self {
         Self {
             inner: Cursor::new(bytes),
+            artifact_id: artifact_id.into(),
             version_id: version_id.into(),
         }
     }
@@ -397,6 +403,10 @@ impl Read for ImmutableFixtureReader {
 }
 
 impl ImmutableArtifactReader for ImmutableFixtureReader {
+    fn artifact_id(&self) -> &str {
+        &self.artifact_id
+    }
+
     fn immutable_version_id(&self) -> &str {
         &self.version_id
     }
@@ -476,13 +486,11 @@ impl RawDataEvidenceResolver for MockResolver {
             .raw_reference_override
             .clone()
             .unwrap_or_else(|| reference.artifact().clone());
-        let version_id = format!(
-            "fixture-object-version:{}:v1",
-            reference_to_verify.artifact_id()
-        );
+        let source_artifact_id = reference_to_verify.artifact_id().to_owned();
+        let version_id = format!("fixture-object-version:{source_artifact_id}:v1");
         let verified = VerifiedArtifactDigest::verify_immutable_reader(
             reference_to_verify,
-            ImmutableFixtureReader::new(bytes, version_id),
+            ImmutableFixtureReader::new(bytes, source_artifact_id, version_id),
         )
         .map_err(|_| "raw acquisition digest or source version is invalid".to_owned())?;
         ResolvedRawData::from_verified_digest(verified, "application/octet-stream")
@@ -982,6 +990,7 @@ fn rejects_empty_or_malformed_resolved_raw_data_metadata() {
         versioned_reference,
         ImmutableFixtureReader::new(
             raw_fixture_bytes(),
+            "raw-acquisition-1",
             "fixture-object-version:raw-acquisition-1:v1",
         ),
     )
