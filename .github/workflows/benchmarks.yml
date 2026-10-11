@@ -86,6 +86,9 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Test regression checker
+        run: python3 -m unittest discover -s scripts -p "test_check_regressions.py"
+
       - name: Reset Criterion results
         run: rm -rf target/criterion
 
@@ -114,9 +117,6 @@ jobs:
           else
             cargo bench --bench quick -- --noplot
           fi
-
-      - name: Test regression checker
-        run: python3 -m unittest discover -s scripts -p "test_check_regressions.py"
 
       - name: Check for regressions
         if: github.event_name == 'pull_request'
