@@ -761,13 +761,28 @@ mod tests {
     fn test_verified_receipt(
         receipt: CapabilityOutcomeReceipt,
     ) -> VerifiedCapabilityOutcomeReceipt {
-        // Synthetic unit-test admission only. Production code has no public token constructor;
-        // real issuance must be added inside the reviewed independent-verifier path.
-        VerifiedCapabilityOutcomeReceipt::from_verified_pipeline(
+        test_verified_receipt_from(
             receipt,
             "symthaea-evidence-verifier",
             "v1",
-            "9".repeat(64),
+        )
+    }
+
+    fn test_verified_receipt_from(
+        receipt: CapabilityOutcomeReceipt,
+        verifier_identity: &str,
+        verifier_revision: &str,
+    ) -> VerifiedCapabilityOutcomeReceipt {
+        // Synthetic unit-test admission only. Production code has no public token constructor;
+        // real issuance must be added inside the reviewed independent-verifier path.
+        // The sequence makes fixture roots unique within a ledger unless a test intentionally
+        // reuses a receipt root to exercise replay rejection.
+        let verification_root = format!("{:064x}", receipt.sequence);
+        VerifiedCapabilityOutcomeReceipt::from_verified_pipeline(
+            receipt,
+            verifier_identity,
+            verifier_revision,
+            verification_root,
         )
         .expect("fixed synthetic verifier provenance is structurally valid")
     }
@@ -1016,6 +1031,52 @@ mod tests {
                 }))
                 .unwrap();
         }
+        assert_eq!(
+            ledger.qualify_claim("rust-debugging", &policy()),
+            Err(CapabilityLedgerError::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn qualification_requires_the_policy_pinned_verifier_revision() {
+        let mut ledger = setup_claim();
+        for i in 0..3u64 {
+            let forecast_sequence = i * 2 + 1;
+            let id = format!("untrusted-verifier-{i}");
+            ledger.record_forecast(CapabilityForecast {
+                forecast_id: id.clone(),
+                claim_id: "rust-debugging".to_string(),
+                claim_sha256: "f".repeat(64),
+                subject: subject(),
+                sequence: forecast_sequence,
+                context_id: format!("held-out-{i}"),
+                split: CapabilitySplit::HeldOut,
+                predicted_success_probability: 0.9,
+                expected_compute_units: 10.0,
+                predicted_failure_mode: None,
+            }).unwrap();
+
+            ledger.resolve_verified_forecast(test_verified_receipt_from(
+                CapabilityOutcomeReceipt {
+                    forecast_id: id,
+                    subject: subject(),
+                    sequence: forecast_sequence + 1,
+                    observed_success: true,
+                    split: CapabilitySplit::HeldOut,
+                    evaluator_identity: "independent-qualification-runner".to_string(),
+                    evaluator_revision: "v1".to_string(),
+                    receipt_sha256: format!("{:064x}", forecast_sequence + 1),
+                    actual_compute_units: Some(10.0),
+                },
+                "untrusted-verifier",
+                "v1",
+            )).unwrap();
+        }
+
+        let metrics = ledger.qualification_metrics("rust-debugging", &policy()).unwrap();
+        assert_eq!(metrics.forecast_count, 3);
+        assert_eq!(metrics.resolved_count, 0);
+        assert_eq!(metrics.brier_score, None);
         assert_eq!(
             ledger.qualify_claim("rust-debugging", &policy()),
             Err(CapabilityLedgerError::InsufficientEvidence)
