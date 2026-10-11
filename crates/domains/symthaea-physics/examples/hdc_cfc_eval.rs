@@ -170,7 +170,7 @@ impl HdcEncoder {
         let mut snapshots: Vec<ContinuousHV> = Vec::with_capacity(4);
         let mut bundle_accum = ContinuousHV::zero(DIM);
 
-        // Accumulate prediction errors (surprise)
+        // Accumulate state/input dissimilarity scores (untrained "surprise")
         let mut total_surprise = 0.0f32;
         let mut surprise_accum = ContinuousHV::zero(DIM);
 
@@ -333,6 +333,9 @@ fn compute_auc(roc: &[RocPoint]) -> f64 {
     auc.clamp(0.0, 1.0)
 }
 
+/// Oracle F1 for exploratory inspection: threshold selection uses the supplied labels.
+/// Do not report this as held-out performance; use a separate validation split to select
+/// a deployment threshold and then evaluate that frozen threshold on test data.
 fn find_best_f1(scored: &[(f64, bool)]) -> f64 {
     let total_pos = scored.iter().filter(|(_, l)| *l).count() as f64;
     if total_pos < 1.0 {
@@ -855,7 +858,7 @@ fn main() {
         eprintln!("[Battery] Done.");
 
         println!("---- Battery Degradation -----------------------------------------------");
-        println!("  Method                AUC       Best-F1");
+        println!("  Method                AUC       Best-F1*");
         println!(
             "  HDC-Only              {:.3}     {:.3}",
             r.auc_hdc, r.f1_hdc
@@ -897,7 +900,7 @@ fn main() {
         eprintln!("[Spacecraft] Done.");
 
         println!("---- Spacecraft (SMAP) -------------------------------------------------");
-        println!("  Method                AUC       Best-F1");
+        println!("  Method                AUC       Best-F1*");
         println!(
             "  HDC-Only              {:.3}     {:.3}",
             r.auc_hdc, r.f1_hdc
