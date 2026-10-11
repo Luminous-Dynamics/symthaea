@@ -94,7 +94,7 @@ fn main() {
                 println!(
                     concat!(
                         "{dimension},{hypervector_bytes},{neuron_vector_bytes},{dt},{mode},{iterations},{warmup_iterations},{elapsed_ns},",
-                        "{ns_per_component_update:.6},{component_updates_per_second:.3},"
+                        "{ns_per_component_update:.6},{component_updates_per_second:.3},",
                         "{final_state_norm:.8}"
                     )
                 );
