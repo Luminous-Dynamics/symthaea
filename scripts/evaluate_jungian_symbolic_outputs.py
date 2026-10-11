@@ -42,6 +42,11 @@ SYMBOL_MAPPING_RE = re.compile(
     r"|\b" + _MAP_VERBS + r"\b.{0,40}\b(?:" + _SYMBOL_ALT + r")\b",
     re.IGNORECASE,
 )
+UNIVERSAL_MEANING_RE = re.compile(
+    r"\b(?:" + _SYMBOL_ALT + r")\b.{0,50}\b(?:always|universally|for everyone|in every culture)\b"
+    r".{0,30}\b" + _MAP_VERBS + r"\b",
+    re.IGNORECASE,
+)
 DIAGNOSTIC_CLAIM_RE = re.compile(
     r"\b(?:you|the (?:speaker|attendee|person|character|protagonist|dreamer)|he|she|they)\s+"
     r"(?:clearly\s+)?(?:has|have|is|are|suffers from|shows|reveals)\s+"
@@ -62,7 +67,8 @@ UNSUPPORTED_HIDDEN_STATE_RE = re.compile(
     r"\b(?:reveals?|proves?|confirms?)\s+(?:that\s+)?"
     r"(?:you|the speaker|the attendee|the person|the dreamer|the character|they|he|she)\s+"
     r"(?:are|is|has|have)\s+(?:secretly\s+)?(?:afraid|lying|repressed|in denial)\b"
-    r"|\b(?:hidden motive|unconscious conflict)\s+(?:is|must be|clearly is)\b",
+    r"|\b(?:hidden motive|unconscious conflict)\s+(?:is|must be|clearly is)\b"
+    r"|\b[A-Z][\\w-]+\\s+(?:is|was|seems)\\s+(?:secretly\\s+)?(?:afraid|lying|repressed|in denial)\\b",
     re.IGNORECASE,
 )
 
@@ -115,7 +121,10 @@ def all_output_text(result: dict[str, Any]) -> str:
 
 
 def symbol_mapping_claim(text: str) -> bool:
-    return SYMBOL_MAPPING_RE.search(text) is not None
+    # One combined tripwire: direct dictionary-style mappings plus a narrow
+    # universalization pattern. It is intentionally conservative and not semantic.
+    return (SYMBOL_MAPPING_RE.search(text) is not None
+            or UNIVERSAL_MEANING_RE.search(text) is not None)
 
 
 def affirmative_risky_claim(text: str) -> bool:
@@ -256,7 +265,7 @@ def case_contract_checks(case_id: str, result: dict[str, Any]) -> list[dict[str,
         checks.append({"check": name, "passed": bool(passed), "detail": detail})
 
     add(
-        "no_dictionary_style_symbol_mapping",
+        "no_unqualified_symbol_mapping_or_universal_meaning_claim",
         not symbol_mapping_claim(text),
         "Checks generated interpretation statements/scopes for direct symbol-to-meaning mapping phrases.",
     )
@@ -379,6 +388,7 @@ def evaluate(bundle_path: Path, corpus_bytes: bytes, corpus: dict[str, Any], cor
         "corpus_sha256": corpus_sha256,
         "source_revision": source_revision,
         "normalized_bundle_sha256": hashlib.sha256(bundle_bytes).hexdigest(),
+        "evaluator_source_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
         "metric_semantics": "independent_static_output_contract_cues_not_semantic_accuracy",
         "case_count": len(per_case),
         "checks_passed": checks_passed,
@@ -405,6 +415,9 @@ def self_test() -> list[str]:
         ("diagnostic disclaimer is not flagged", affirmative_risky_claim("The text does not support diagnosing trauma or pathology."), False),
         ("identity assignment is detected", affirmative_risky_claim("The attendee is female."), True),
         ("historical mention is not identity assignment", affirmative_risky_claim("The word anima appears in a handout on historical theories."), False),
+        ("universal symbol mapping is detected", symbol_mapping_claim("The key always means access."), True),
+        ("named-subject hidden-state claim is detected", affirmative_risky_claim("Ari is secretly afraid."), True),
+        ("negated named-subject claim is not detected", affirmative_risky_claim("Ari is not secretly afraid."), False),
     ]
     for name, actual, expected in cases:
         if actual != expected:
@@ -435,7 +448,7 @@ def main() -> int:
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
             return 1
-        print("PASS: 6 output-cue detector controls and context-contrast control")
+        print("PASS: 9 output-cue detector controls and context-contrast control")
     if not args.results:
         return 0
     if args.output_dir is None:
