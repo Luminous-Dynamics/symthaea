@@ -1067,11 +1067,11 @@ def main() -> int:
                 continue
             summary = item["summary"]
             print(
-                f"{item['method_id']}: required_recall={summary['required_code_recall']:.4f}; "
-                f"required_hits={summary['required_code_hits']}/{summary['required_code_total']}; "
-                f"forbidden_hits={summary['forbidden_code_hits']}; "
-                f"rubric_case_pass={summary['rubric_case_pass_count']}/14; "
-                f"replay=byte-identical"
+                f"{item['method_id']}: declared_code_coverage={summary['declared_required_code_claim_coverage']:.4f}; "
+                f"declared_matches={summary['declared_required_code_matches']}/{summary['declared_required_code_total']}; "
+                f"declared_forbidden_claims={summary['declared_forbidden_code_claims']}; "
+                f"cases_claiming_complete_coverage={summary['cases_declaring_all_required_codes_without_forbidden_claims']}/14; "
+                f"metric=declared_rubric_coverage_only; replay=byte-identical"
             )
         return 0
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, BaselineError, KeyError, TypeError) as exc:
