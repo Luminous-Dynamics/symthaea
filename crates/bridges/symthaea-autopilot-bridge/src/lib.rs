@@ -18,6 +18,8 @@ pub mod heartbeat;
 pub mod offboard_submission;
 /// PX4-reported navigation-mode and failsafe-state observations.
 pub mod offboard_observation;
+/// PX4 FailsafeFlags Offboard control-signal-loss input evidence.
+pub mod offboard_loss_flag;
 /// Evidence-backed PX4 operational-readiness profiles and assessments.
 pub mod readiness;
 /// Readiness-specific content-addressed PX4 status projections.
