@@ -1,0 +1,124 @@
+name: SPINE-000 Static Census
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/spine-000-census.yml'
+      - 'scripts/spine_census.py'
+      - 'scripts/spine_overlap_census.py'
+      - 'docs/research/SPINE_000_CAUSAL_CENSUS.md'
+      - 'docs/research/SPINE_000B_PROPOSAL_INFLUENCE_CONTRACT.md'
+      - 'src/cognitive_loop/subsystem_trait.rs'
+      - 'src/cognitive_loop/managers/**'
+      - 'src/cognitive_loop/cycle_phase_dynamics/**'
+      - 'src/cognitive_loop/cycle_phase_output/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  static-census:
+    name: Execute read-only SPINE-000A/C census
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify exact checkout and compile census tools
+        run: |
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          python3 -m py_compile scripts/spine_census.py scripts/spine_overlap_census.py
+
+      - name: Execute read-only static census
+        run: |
+          mkdir -p artifacts/spine-000-static
+          python3 scripts/spine_census.py \
+            --output artifacts/spine-000-static/static-registry.json
+          python3 scripts/spine_overlap_census.py \
+            --output artifacts/spine-000-static/explicit-overlap.json
+
+      - name: Validate scientific boundary and schemas
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path('artifacts/spine-000-static')
+          registry = json.loads((root / 'static-registry.json').read_text())
+          overlap = json.loads((root / 'explicit-overlap.json').read_text())
+
+          assert registry['schema'] == 'symthaea.spine.census.static-registry.v1'
+          assert overlap['schema'] == 'symthaea.spine.census.explicit-overlap.v1'
+
+          for report in (registry, overlap):
+              assert report['authority'] == 'measurement-only'
+              assert report['causal_load_claimed'] is False
+              assert report['git_head'] == os.environ['GITHUB_SHA']
+              assert report['manager_count'] > 0
+
+          assert registry['duplicate_subsystem_names'] == []
+          assert overlap['manager_count'] == registry['manager_count']
+          assert overlap['absence_of_witness_means_no_overlap'] is False
+          assert overlap['explicit_overlap_count'] > 0
+
+          registry_names = {
+              item['subsystem_name']
+              for item in registry['managers']
+              if item['subsystem_name'] is not None
+          }
+          overlap_names = {
+              item['subsystem_name']
+              for item in overlap['records']
+              if item['subsystem_name'] is not None
+          }
+          assert registry_names == overlap_names
+
+          summary = Path(os.environ['GITHUB_STEP_SUMMARY'])
+          with summary.open('a') as handle:
+              handle.write('## SPINE-000 static census\n\n')
+              handle.write('Authority: **measurement-only**. No causal-load claim is produced.\n\n')
+              handle.write(f"- managers discovered: `{registry['manager_count']}`\n")
+              handle.write(
+                  f"- explicit source-level overlap witnesses: "
+                  f"`{overlap['explicit_overlap_count']}`\n"
+              )
+              handle.write('- duplicate subsystem names: `0`\n')
+              handle.write(f"- exact subject: `{registry['git_head']}`\n")
+          PY
+
+      - name: Bind and hash evidence outputs
+        run: |
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "git_index_tree=$(git write-tree)"
+            echo "tracked_status_begin"
+            git status --porcelain --untracked-files=no
+            echo "tracked_status_end"
+          } | tee artifacts/spine-000-static/SUBJECT.txt
+
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+          sha256sum \
+            scripts/spine_census.py \
+            scripts/spine_overlap_census.py \
+            docs/research/SPINE_000_CAUSAL_CENSUS.md \
+            docs/research/SPINE_000B_PROPOSAL_INFLUENCE_CONTRACT.md \
+            artifacts/spine-000-static/static-registry.json \
+            artifacts/spine-000-static/explicit-overlap.json \
+            artifacts/spine-000-static/SUBJECT.txt \
+            | tee artifacts/spine-000-static/SHA256SUMS
+
+      - name: Upload exact-subject census evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000-static-${{ github.sha }}
+          path: artifacts/spine-000-static/
+          retention-days: 90
