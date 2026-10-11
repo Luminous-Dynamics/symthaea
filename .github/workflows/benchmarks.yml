@@ -130,6 +130,8 @@ jobs:
       - name: Check for regressions
         if: github.event_name == 'pull_request'
         run: |
+          # Preserve the checker's non-zero exit code through the report tee.
+          set -o pipefail
           python3 scripts/check_regressions.py \
             --threshold 5 \
             --critical-threshold 10 \
