@@ -28,8 +28,10 @@ Luminous Dynamics\\
 \maketitle
 
 \begin{abstract}
-Hyperdimensional Computing (HDC) represents information using high-dimensional binary vectors and manipulates them via bitwise operations---predominantly XOR binding, majority bundling, and cyclic permutation. We observe that these operations share the same algebraic substrate as binary tower field arithmetic in \emph{Binius}, a recently proposed STARK proof system over $\mathrm{GF}(2^k)$. This alignment means that HDC's core XOR binding operation translates to \emph{native field addition} in Binius, requiring \textbf{zero non-linear constraints}---compared to $O(N)$ constraints in prime-field STARKs, where $N$ is the vector dimensionality. We implement and benchmark real proofs on \emph{both} backends: a Binius proof of 16,384-bit XOR binding (256 AND constraints, 430~ms, 75~KB) and a Winterfell STARK proof of 256-bit XOR binding (1,020 constraints, 369~ms, 19~KB). Extrapolating to equal scale yields a \textbf{255$\times$ constraint reduction} --- measured, not estimated. We further benchmark majority-vote bundling (768 AND for 3 vectors) and demonstrate a complete health attestation pipeline (Winterfell STARK + Dilithium5 PQ signatures) with \textbf{34.1~ms end-to-end latency}. We further show that Closed-form Continuous-time (CfC) neural networks, which underpin temporal HDC processing, require only \textbf{1~AND constraint per neuron per timestep} in Binius, with all additive state updates being free. These results establish binary-field STARKs as the natural proof system for privacy-preserving HDC applications, including federated learning, anonymous governance, and decentralized identity.
-\end{abstract}
+Hyperdimensional Computing (HDC) uses high-dimensional binary vectors and operations such as XOR binding, majority bundling, and permutation. In a binary-field proof system, XOR is addition and therefore does not require nonlinear AND/MUL gates. This paper reports a Binius64 circuit for a 16,384-bit XOR relation and a public harness that generates and verifies the resulting proof. The circuit's reported constraint total also includes equality-wiring overhead.
+
+The public artifact does not implement a Winterfell XOR prover in its benchmark harness: its Winterfell comparison is an analytic estimate. Accordingly, the same-scale cross-backend speedup and constraint-reduction ratios previously reported are retracted pending a reproducible, measured baseline. The Hamming circuit and multi-input majority circuits are being corrected to match their stated functions; historical measurements for those circuits are superseded. The temporal demo proves a packed-bit recurrence with witness-supplied gates, not numerical fixed-point CfC dynamics. Health-attestation and federated-learning end-to-end claims are outside what this public artifact currently reproduces.
+\end{abstract}\end{abstract}
 
 \noindent\textbf{Keywords:} zero-knowledge proofs, hyperdimensional computing, binary fields, STARKs, Binius, privacy-preserving machine learning, CfC networks
 \vspace{1em}
@@ -49,9 +51,9 @@ A growing need exists for \emph{privacy-preserving HDC}: proving that an HDC com
 \textbf{Contributions.}
 \begin{enumerate}
     \item We identify the algebraic alignment between HDC operations and binary tower fields (Section~\ref{sec:alignment}).
-    \item We implement and benchmark a Binius proof of 16,384-bit HDC XOR binding, showing 192$\times$ fewer constraints than prime-field STARKs (Section~\ref{sec:evaluation}).
-    \item We demonstrate that CfC neural networks require only 1~AND constraint per neuron per timestep in Binius, enabling efficient temporal proofs (Section~\ref{sec:cfc}).
-    \item We describe the integration into Mycelix, a production Holochain-based decentralized system with 11 privacy-sensitive clusters (Section~\ref{sec:system}).
+    \item We implement and measure a Binius proof for a 16,384-bit HDC XOR relation. A same-scale comparison with a prime-field STARK is left open because the public harness's Winterfell values are analytic estimates, not measurements (Section~\ref{sec:evaluation}).
+    \item We analyze a packed-bit recurrence circuit with witness-supplied gating words. This is not a numerical CfC proof; a fixed-point encoding and constrained numeric gating function remain future work (Section~\ref{sec:cfc}).
+    \item We describe a proposed integration architecture for Mycelix. The public artifacts reviewed here do not independently establish a production deployment across 11 clusters (Section~\ref{sec:system}).
 \end{enumerate}
 
 % ============================================================================
@@ -128,8 +130,8 @@ Table~\ref{tab:alignment} summarizes the constraint costs.
 \textbf{Operation} & \textbf{Binius} & \textbf{Prime STARK} & \textbf{Ratio} & \textbf{Measured} \\
 \midrule
 XOR binding ($D$ bits) & 0 AND & $4D$ & $\infty$ & 256 vs 1,020 (256-bit) \\
-Majority bundle ($n{=}3$) & $2D/64$ AND & $O(D \cdot n)$ & $O(n)$ & 768 AND (16Kbit) \\
-Majority bundle ($n{=}8$) & $(n{-}1)D/64$ & $O(D \cdot n)$ & $O(1)$ & 2,048 AND (16Kbit) \\
+Majority bundle ($n{=}3$) & corrected bit-sliced circuit & -- & -- & historical count superseded \\
+Majority bundle ($n{=}8$) & corrected bit-sliced circuit & -- & -- & historical count superseded \\
 Cyclic permutation & 0 & $O(D)$ & $\infty$ & (reindexing) \\
 \bottomrule
 \end{tabular}
@@ -196,7 +198,7 @@ To prevent overreading the ``zero-cost XOR'' claim, we explicitly enumerate the 
     \item \textbf{Cheap} (1 AND per operation): Bitwise AND, comparison gates, threshold checks.
     \item \textbf{Structural overhead}: \texttt{assert\_eq} bookkeeping (256 ANDs for 16,384-bit binding in our benchmark---from constraint wiring, not the XOR operation itself).
     \item \textbf{Witness assumptions}: Sigmoid/gating values in CfC proofs are witness-supplied and range-checked, not computed inside the circuit. The quoted CfC cost is for the \emph{update relation given a supplied gating value}, not for proving the full neural computation end-to-end.
-    \item \textbf{Not addressed}: Majority-vote bundling requires $O(D \log n)$ ANDs for threshold comparison; this remains unmeasured.
+    \item \textbf{Bundling evidence}: the former generic $n>3$ circuit implemented AND reduction, not majority. It is corrected in the public source; previous n>3 numbers are superseded until rerun.
 \end{itemize}
 
 \subsection{Claim Hierarchy}
@@ -206,7 +208,7 @@ We distinguish four levels of evidence strength:
 \begin{enumerate}
     \item \textbf{Provable algebraic result}: XOR binding is linear in binary-field STARK AIR and incurs zero non-linear constraints. This follows from the definition of $\mathrm{GF}(2^k)$ addition.
     \item \textbf{Measured implementation result}: Binius benchmark on 16,384-bit binding produces 256 AND constraints (structural only) with real cryptographic proof generation and verification.
-    \item \textbf{Same-scale measured comparison}: Winterfell proves 16,384-bit XOR in 23.8~s with 65,532 constraints (real proof). Binius proves the same operation in 430~ms with 256 constraints. Both measured on identical hardware at identical scale.
+    \item \textbf{Cross-backend comparison}: not established by the public harness. Its Winterfell figures are analytic estimates; no same-scale Winterfell XOR proof is executed by the public benchmark.
     \item \textbf{Forward-looking implication}: Binary-field STARKs are the natural proof system for XOR-dominant HDC workloads. The triple-stack (HDC+FHE+ZKP) remains speculative.
 \end{enumerate}
 
@@ -219,105 +221,43 @@ All benchmarks run on a single machine (AMD Ryzen, 32GB RAM, NixOS) with \texttt
 
 \textbf{Binius proofs are real}: generated by Binius64~\cite{binius64} with Blake3 Merkle commitments and FRI verification. Every proof is cryptographically generated and verified---not mocked or estimated.
 
-\textbf{Winterfell baseline is measured}: We implement a real Winterfell STARK circuit (HealthRangeAir) that performs 32-bit decomposition with binary checks and range verification. Proving takes 27.19~ms averaged over 10 iterations. The extrapolation to 16,384-bit XOR uses the measured per-constraint cost.
+\textbf{Winterfell comparison status}: the public benchmark's Winterfell values are analytic estimates. It defines no Winterfell AIR for the 16,384-bit XOR operation and does not invoke a Winterfell prover or verifier. Historical same-scale ratios are therefore not reproduced by this artifact and are withdrawn pending publication and execution of a matching baseline.
 
 \subsection{HDC XOR Binding (16,384 bits)}
 
-Table~\ref{tab:xor_results} shows the benchmark results for proving XOR binding of two 16,384-bit binary hypervectors.
+The public harness contains a real Binius64 proof for the XOR relation. The Binius timing and proof-size values previously recorded in this manuscript are historical and should be refreshed from the corrected reproduction command before publication.
 
 \begin{table}[t]
 \centering
-\caption{HDC XOR Binding Proof: Binius vs.\ Prime-Field STARK}
+\caption{Public-artifact evidence status for HDC XOR binding}
 \label{tab:xor_results}
-\begin{tabular}{@{}lrrr@{}}
+\begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Metric} & \textbf{Binius (16Kbit)} & \textbf{Winterfell (16Kbit)} & \textbf{Ratio} \\
+\textbf{Metric} & \textbf{Binius} & \textbf{Winterfell} \\
 \midrule
-Non-linear constr. & \textbf{256} & 65,532 & \textbf{256$\times$} \\
-Prover time & \textbf{430 ms} & 23,762 ms & \textbf{55$\times$} \\
-Verifier time & \textbf{10.4 ms} & 23.7 ms & \textbf{2.3$\times$} \\
-Proof size & 75 KB & \textbf{47.6 KB} & 0.63$\times$ \\
+Circuit execution & Real proof generated and verified & No public XOR prover run \\
+Constraint count & 256 reported structural AND constraints & Not measured \\
+Prover / verifier time & Historical internal values; refresh required & Not measured \\
+Proof size & Historical internal value; refresh required & Not measured \\
 \bottomrule
-\multicolumn{4}{l}{\footnotesize Both: real cryptographic proofs at identical scale (16,384-bit XOR binding).} \\
-\multicolumn{4}{l}{\footnotesize Same hardware (AMD Ryzen, NixOS). No extrapolation.}
+\multicolumn{3}{l}{\footnotesize XOR itself is linear; reported Binius AND count includes equality wiring.} \\
+\multicolumn{3}{l}{\footnotesize No measured cross-backend ratio is claimed in this revision.}
 \end{tabular}
 \end{table}
 
-The 256 AND constraints in Binius are from structural \texttt{assert\_eq} bookkeeping---the XOR operations themselves produced \textbf{zero} AND/MUL constraints. This is a \textbf{192$\times$ reduction} in non-linear constraints.
+The 256 reported Binius AND constraints come from structural \texttt{assert\_eq} bookkeeping; XOR itself is linear and contributes zero nonlinear AND/MUL gates. The cross-backend reduction ratio is not reported here because the public artifact does not contain a measured same-scale Winterfell XOR proof.
 
-\subsection{CfC Temporal Evolution}
+\subsection{Temporal Recurrence Demonstration}
 
-Table~\ref{tab:cfc_results} shows CfC temporal proof benchmarks at two scales.
+The former timing table is superseded. The implementation operates on packed 64-bit words using bitwise XOR/AND and supplies the gating word as a witness. It does not use a fixed-point numeric representation, constrain a numerical sigmoid, or establish equivalence to the numerical CfC equation. No numerical CfC-versus-LTC/RK4 performance claim is made until equivalent arithmetic circuits and reference tests exist.
 
-\begin{table}[t]
-\centering
-\caption{CfC Temporal Proof in Binius (Real Proofs)}
-\label{tab:cfc_results}
-\begin{tabular}{@{}lrrrr@{}}
-\toprule
-\textbf{Config} & \textbf{AND} & \textbf{Prove} & \textbf{Verify} & \textbf{Size} \\
-\midrule
-8N $\times$ 10T & 96 & 160 ms & 12 ms & 478 KB \\
-64N $\times$ 100T & 7,360 & 410 ms & 27 ms & 156 KB \\
-\bottomrule
-\end{tabular}
-\end{table}
+\subsection{HDC Majority Bundling}
 
-At 64 neurons $\times$ 100 timesteps, the CfC proof requires 7,360 AND constraints with 12,800 free XOR operations. An equivalent LTC+RK4 proof would require $\sim$117,760 AND constraints ($16\times$ more).
+The former benchmark treated the three-input case as majority correctly, but its generic $n>3$ path used pairwise AND reduction, which is logical AND rather than majority. The public correction branch replaces that reduction with a bit-sliced counter and strict-majority comparison (ties resolve to zero). The earlier 8-input results and related timing/constraint values are superseded and must be regenerated from the corrected circuit before publication.
 
-\subsection{HDC Bundling}
+\subsection{End-to-End Application Claims}
 
-Table~\ref{tab:bundling} shows measured bundling results.
-
-\begin{table}[t]
-\centering
-\caption{HDC Majority-Vote Bundling in Binius (Real Proofs)}
-\label{tab:bundling}
-\begin{tabular}{@{}lrrrr@{}}
-\toprule
-\textbf{Config} & \textbf{AND} & \textbf{XOR (free)} & \textbf{Prove} & \textbf{Size} \\
-\midrule
-3 vecs $\times$ 16Kbit & 768 & 512 & 925 ms & 78 KB \\
-8 vecs $\times$ 16Kbit & 2,048 & $\sim$1,792 & 635 ms & 147 KB \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-For 3-vector bundling, $\mathrm{majority}(a,b,c) = (a \wedge b) \oplus ((a \oplus b) \wedge c)$, requiring exactly 2 AND per 64-bit word. The 2 XOR operations are free. This confirms the $O(D \cdot n)$ AND cost with free additive counting.
-
-\subsection{End-to-End System Pipeline}
-
-To validate the complete system, we implemented a health attestation pipeline using the DASTARK architecture: Winterfell STARK range proof + Dilithium5 post-quantum signature + off-chain verification. Table~\ref{tab:e2e} shows measured end-to-end latency.
-
-\begin{table}[t]
-\centering
-\caption{Complete DASTARK Pipeline: Health Attestation (Real, All Measured)}
-\label{tab:e2e}
-\begin{tabular}{@{}lr@{}}
-\toprule
-\textbf{Operation} & \textbf{Time} \\
-\midrule
-Winterfell STARK prove (32-row AIR) & 22.7 ms \\
-Dilithium5 PQ sign (NIST Level 5) & 7.0 ms \\
-Winterfell STARK verify & 1.4 ms \\
-Dilithium5 PQ verify & 2.9 ms \\
-\textbf{Total pipeline} & \textbf{34.1 ms} \\
-\midrule
-STARK proof size & 7.5 KB \\
-Dilithium5 signature & 4,659 bytes \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The 34.1~ms total latency is compatible with clinical workflow requirements ($<$1~second response time). The 7.5~KB proof + 4.7~KB signature = 12.2~KB total payload is practical for Holochain DHT storage. All 6 end-to-end integration tests pass, including tampered-proof rejection and wrong-key rejection.
-
-\subsection{Winterfell Range Proofs (Health)}
-
-We implemented Winterfell STARK range proofs for health attestations (proving value $\in [min, max]$ via bit decomposition) with 6 end-to-end tests. A consciousness tier range proof (proving $\Phi \geq$ threshold without revealing $\Phi$) takes 46~ms. Hamming similarity (511 AND for 16,384 bits, 498~ms) completes all four HDC operations.
-
-\subsection{Triple-Stack: Encrypted Federated Learning}
-
-OTP encryption (XOR with mask) is free in Binius. We prove encrypted gradient aggregation from $N$ participants with \textbf{zero encryption overhead}: 3 participants (192 AND, 58~ms), 8 (512 AND, 88~ms), 16 (1,024 AND, 91~ms). The Binius verifier compiles to WASM (694~KB), enabling in-zome verification.
+The earlier health-attestation latency table and federated-learning aggregate figures are not reproduced by the current public benchmark paths. They are excluded from the quantitative claims of this revision. The public Hamming and majority circuits establish only their stated packed-word relations; they do not establish a deployed health pipeline, one-time-pad encryption correctness, or numeric encrypted-gradient aggregation.
 
 \subsection{Applications}
 
@@ -363,10 +303,8 @@ OTP encryption (XOR with mask) is free in Binius. We prove encrypted gradient ag
 
 % ============================================================================
 \section{Reproducibility}
-% ============================================================================
 
-All benchmarks are reproducible via a single script:
-\texttt{cd papers/binius-hdc \&\& bash reproduce.sh}. The script runs all Binius and Winterfell benchmarks, outputs paper-ready tables, and validates all unit tests. Source code, benchmark binaries, and the Binius64 dependency are included in the repository. Expected runtime: 3--5 minutes on a modern x86\_64 system with 32~GB RAM.
+The public reproduction command is \texttt{bash papers/theory-foundations/binius-hdc/reproduce.sh}. It runs the standalone Binius benchmark tests and proof demonstrations in this repository. It does not reproduce a Winterfell XOR proof or the previous health-attestation pipeline, because those executables are not part of the public standalone tree. Cross-backend ratios and application-level claims remain out of scope until their source and measurements are reproducible.
 
 % ============================================================================
 \section{Future Work}
@@ -376,9 +314,8 @@ All benchmarks are reproducible via a single script:
 
 % ============================================================================
 \section{Conclusion}
-% ============================================================================
 
-We have shown that binary-field STARKs (Binius) are the natural algebraic substrate for zero-knowledge proofs in Hyperdimensional Computing. At identical scale (16,384-bit vectors), Binius requires \textbf{256$\times$ fewer non-linear constraints} and proves \textbf{55$\times$ faster} than a Winterfell prime-field STARK---both measured with real cryptographic proofs, no extrapolation. Majority-vote bundling, Hamming similarity, and CfC temporal evolution (with in-circuit sigmoid) are all benchmarked with real proofs. A complete health attestation pipeline (STARK + Dilithium5) achieves 34.1~ms end-to-end latency. These results establish binary-field STARKs as the natural proof system for privacy-preserving HDC at scale.
+Binary-field addition maps naturally to XOR, and the public Binius64 harness demonstrates generation and verification of a proof for a packed-word XOR relation. That algebraic result is the supported contribution of this artifact. The previously reported same-scale Winterfell speedup and constraint-reduction ratios are withdrawn because the public harness estimates, rather than measures, the Winterfell comparator. Hamming-distance and multi-input majority circuits have been corrected, and prior counts for those circuits are superseded pending reruns. The packed-bit recurrence demo is not a numerical CfC proof; health-attestation and federated-learning end-to-end results are not established by the public reproduction path. The next milestone is a semantically matched evaluation with independent reference outputs and measured baselines.
 
 % ============================================================================
 \section*{Acknowledgments}
