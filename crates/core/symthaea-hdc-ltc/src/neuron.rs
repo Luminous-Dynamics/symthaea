@@ -331,8 +331,8 @@ impl HdcLtcUnifiedNeuron {
     /// Implements the Hasani LTC closed-form update in a single O(D) pass
     /// with zero intermediate heap allocations.
     ///
-    /// This allocation-free hot path assumes finite, non-negative dt, finite inputs/configuration,
-    /// and matching dimensions. It preserves positive dt values without an artificial floor;
+    /// This allocation-free hot path assumes finite, non-negative dt, matching dimensions, and
+    /// well-scaled finite inputs/configuration. It preserves positive dt values without a floor;
     /// use `try_evolve_closed_form_fused` at data-quality boundaries for validation and a
     /// true zero-dt no-op.
     ///
@@ -358,7 +358,8 @@ impl HdcLtcUnifiedNeuron {
         let dt_clamped = dt;
 
         // Stable scaled sum-of-squares avoids overflow for large finite components.
-        // Accumulation is fused into the update pass; the state is revisited only if clipping is needed.
+        // Accumulation is fused into the update pass; the state is revisited only
+        // when clipping is needed.
         let mut state_norm_scale = 0.0_f32;
         let mut state_norm_ssq = 0.0_f32;
 
@@ -405,7 +406,10 @@ impl HdcLtcUnifiedNeuron {
                     let x_inf_i = fast_tanh(
                         self.weight_hv.values[i] * h_i + self.input_mask.values[i] * inp_i,
                     ) * gate_i;
-                    debug_assert_intermediate!(x_inf_i.is_finite(), "Equilibrium x_inf_i must be finite");
+                    debug_assert_intermediate!(
+                        x_inf_i.is_finite(),
+                        "Equilibrium x_inf_i must be finite"
+                    );
 
                     // Per-dim interpolation factor: σ_i = 1 - exp(-dt / τ_i)
                     let sigma_i = cfc_interpolation_alpha(dt_clamped, tau_i);
@@ -417,9 +421,16 @@ impl HdcLtcUnifiedNeuron {
 
                     // CfC update: h_i(t+dt) = (1-σ_i)·h_i + σ_i·x_inf_i
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
-                    debug_assert_intermediate!(new_h_i.is_finite(), "Evolved state value must be finite");
+                    debug_assert_intermediate!(
+                        new_h_i.is_finite(),
+                        "Evolved state value must be finite"
+                    );
                     self.state.values[i] = new_h_i;
-                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
+                    update_scaled_sum_squares(
+                        new_h_i,
+                        &mut state_norm_scale,
+                        &mut state_norm_ssq,
+                    );
                 }
             }
             Activation::Sigmoid => {
@@ -444,7 +455,11 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert_intermediate!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
-                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
+                    update_scaled_sum_squares(
+                        new_h_i,
+                        &mut state_norm_scale,
+                        &mut state_norm_ssq,
+                    );
                 }
             }
             Activation::SiLU => {
@@ -469,7 +484,11 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert_intermediate!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
-                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
+                    update_scaled_sum_squares(
+                        new_h_i,
+                        &mut state_norm_scale,
+                        &mut state_norm_ssq,
+                    );
                 }
             }
             Activation::Identity => {
@@ -494,7 +513,11 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert_intermediate!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
-                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
+                    update_scaled_sum_squares(
+                        new_h_i,
+                        &mut state_norm_scale,
+                        &mut state_norm_ssq,
+                    );
                 }
             }
             Activation::BoundedTanh { bound } => {
@@ -520,7 +543,11 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert_intermediate!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
-                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
+                    update_scaled_sum_squares(
+                        new_h_i,
+                        &mut state_norm_scale,
+                        &mut state_norm_ssq,
+                    );
                 }
             }
         }
