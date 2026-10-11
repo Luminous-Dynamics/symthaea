@@ -1,0 +1,30 @@
+{
+  "schema": "luminous-dynamics.orbital-ring-validator-verification-status/v1",
+  "verification_state": "not_run_after_source_change",
+  "current_validator": {
+    "path": "scripts/engineering/validate_orbital_ring_failure_manifest.py",
+    "git_blob_sha": "a07bd079ca13201a157249be20b0e070af19c281",
+    "sha256": "0ff9b84aa734c959c62c852114ff7a089aabb4917bd92b7bad0eb7828568ab0a",
+    "expected_self_test_check_count": 80
+  },
+  "last_executed_self_test": {
+    "verification_state": "passed_for_exact_prior_source_only",
+    "checks_passed": 73,
+    "checks_failed": 0,
+    "validator_git_blob_sha": "2d07b86480dea71f3272fbee2a9fde4152727abb",
+    "validator_sha256": "86dece2753b53f44a5f3dffc109a33121ec2b4ff5cef28bca01a41029af74217",
+    "report_git_blob_sha": "87612c32dfe45c3c0fb8b8588716b35c0457aa67",
+    "report_sha256": "dc7718642fc57f35ca813fb3be857194c9ec74d9bc9413db9810d8a1432367c5"
+  },
+  "unexecuted_regressions": [
+    "non_object_manifest_fails_closed_without_exception",
+    "non_object_required_inputs_fails_structural_gate",
+    "unexpected_input_key_fails_structural_gate",
+    "unexpected_provenance_key_fails_structural_gate",
+    "non_list_required_fields_fails_closed_without_exception",
+    "object_required_fields_fails_closed_without_exception",
+    "support_angles_duplicate_across_zero_wrap_block"
+  ],
+  "execution_note": "The current environment could not resolve github.com when attempting to clone the branch, and the repository script therefore was not rerun locally after the source change. Do not represent the current 80-check suite as passed until executed.",
+  "physics_claim": "none; these checks cover manifest contract handling only, not orbital-ring equilibrium, stability, or survivability"
+}
