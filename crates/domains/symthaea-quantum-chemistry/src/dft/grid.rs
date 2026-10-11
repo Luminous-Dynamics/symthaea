@@ -535,6 +535,43 @@ mod tests {
     }
 
     #[test]
+    fn test_radial_grid_resolves_diffuse_and_tight_gaussians_by_quality() {
+        // For every alpha > 0, ∫ exp(-alpha*r²) d³r = π^(3/2)/alpha^(3/2).
+        // Sweep multiple length scales to exercise both the radial mapping and
+        // the quality presets instead of validating only one specially chosen
+        // Gaussian. Tolerances are relative and deliberately tighter for
+        // the denser presets; they do not tune SCF or chemical-energy criteria.
+        let atom = Atom::new(1, 0.0, 0.0, 0.0);
+        let cases = [
+            (GridQuality::Coarse, 5e-4),
+            (GridQuality::Medium, 5e-6),
+            (GridQuality::Fine, 1e-7),
+        ];
+        let alphas = [0.25_f64, 0.5, 1.0, 2.0, 4.0];
+
+        for (quality, relative_tolerance) in cases {
+            let grid = DftGrid::build(&[atom], quality);
+            for alpha in alphas {
+                let numerical: f64 = grid
+                    .points
+                    .iter()
+                    .map(|point| {
+                        let r2 =
+                            point.x * point.x + point.y * point.y + point.z * point.z;
+                        point.weight * (-alpha * r2).exp()
+                    })
+                    .sum();
+                let exact = PI.powf(1.5) / alpha.powf(1.5);
+                let relative_error = (numerical - exact).abs() / exact;
+                assert!(
+                    relative_error <= relative_tolerance,
+                    "{quality:?}, alpha={alpha}: integral={numerical}, exact={exact}, relative error={relative_error}, tolerance={relative_tolerance}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_single_atom_grid_integrates_three_dimensional_gaussian() {
         // ∫ exp(-r²) d³r = π^(3/2). This also detects a missing 4π
         // factor when the angular Lebedev weights are normalized to sum to 1.
