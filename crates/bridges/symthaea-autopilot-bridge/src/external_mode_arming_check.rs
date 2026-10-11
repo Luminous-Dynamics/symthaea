@@ -1476,7 +1476,23 @@ mod tests {
     #[derive(serde::Deserialize)]
     struct Px4ArmingCheckReplayCorpusV1 {
         schema_version: u16,
+        provenance: Px4ArmingCheckReplayProvenanceV1,
         cases: Vec<Px4ArmingCheckReplayCaseV1>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Px4ArmingCheckReplayProvenanceV1 {
+        fixture_kind: String,
+        raw_wire_capture: bool,
+        note: String,
+        source_contracts: Vec<Px4MessageContractReferenceV1>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Px4MessageContractReferenceV1 {
+        message: String,
+        source_url: String,
+        source_blob_sha: String,
     }
 
     #[derive(serde::Deserialize)]
@@ -2337,6 +2353,59 @@ mod tests {
         let corpus: Px4ArmingCheckReplayCorpusV1 =
             serde_json::from_str(CORPUS_JSON).expect("replay corpus JSON must parse");
         assert_eq!(corpus.schema_version, 1);
+        assert_eq!(
+            corpus.provenance.fixture_kind,
+            "synthetic_scenario_parameters"
+        );
+        assert!(!corpus.provenance.raw_wire_capture);
+        assert!(
+            corpus.provenance.note.contains("no captured PX4 frame bytes"),
+            "synthetic fixture must not be confused with recorded transport data"
+        );
+
+        let pinned_contracts = [
+            (
+                "ArmingCheckRequest v1",
+                "79a30af500ecf3661169f62a50edfe0f02fbcd8f",
+            ),
+            (
+                "ArmingCheckReply v1",
+                "604539e49066546e518c7ebaec8b6f1a7cc97285",
+            ),
+            (
+                "RegisterExtComponentReply v1",
+                "17ff6765c9a1980f1cec163a0ff38aea07491a12",
+            ),
+            (
+                "SetpointConfigReply v1",
+                "d5c8cb562461a2826f782d3ec8ee5a5c65674471",
+            ),
+        ];
+        assert_eq!(corpus.provenance.source_contracts.len(), pinned_contracts.len());
+        for (message, blob_sha) in pinned_contracts {
+            let matching = corpus
+                .provenance
+                .source_contracts
+                .iter()
+                .filter(|contract| contract.message == message)
+                .collect::<Vec<_>>();
+            assert_eq!(matching.len(), 1, "expected one source reference for {message}");
+            let contract = matching[0];
+            assert_eq!(
+                contract.source_blob_sha, blob_sha,
+                "source blob changed for {message}"
+            );
+            assert!(
+                contract.source_url.starts_with(
+                    "https://github.com/PX4/PX4-Autopilot/blob/"
+                ),
+                "unexpected source URL for {message}"
+            );
+            assert!(
+                contract.source_url.contains("/msg/versioned/"),
+                "non-versioned message source for {message}"
+            );
+        }
 
         let mut case_ids = BTreeSet::new();
         for case in corpus.cases {
