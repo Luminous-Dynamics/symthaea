@@ -416,12 +416,17 @@ impl ExactRational {
         self.value.denom().to_str_radix(10)
     }
 
-    /// Convert to a finite f64 approximation if representable.
+    /// Convert to a finite f64 approximation when it does not overflow or
+    /// collapse a nonzero value all the way to zero.
     ///
-    /// This convenience form is bounded by HARD_MAX_COMPONENT_BITS. Floating
-    /// conversion is always explicitly approximate.
+    /// Subnormal nonzero approximations are retained. A nonzero exact rational
+    /// that underflows to +/-0.0 returns None so callers can distinguish total
+    /// underflow from a usable finite approximation. This convenience form is
+    /// bounded by HARD_MAX_COMPONENT_BITS.
     pub fn to_f64_approx(&self) -> Option<f64> {
-        self.value.to_f64().filter(|value| value.is_finite())
+        self.value.to_f64().filter(|value| {
+            value.is_finite() && (*value != 0.0 || self.value.numer().is_zero())
+        })
     }
 
     /// Approximate conversion, only after validating the caller's resource budget.
@@ -746,6 +751,33 @@ mod tests {
             too_wide_denominator.try_to_number().unwrap_err(),
             ExactRationalError::ExactResultOutOfRange
         );
+    }
+
+    #[test]
+    fn large_balanced_rational_has_finite_f64_approximation() {
+        let limit = RationalBudget::default();
+        let base = format!("1{}", "0".repeat(900));
+        let numerator = format!("{}1", "1".to_string() + &"0".repeat(899));
+        let denominator = "9".repeat(900);
+        let value = ExactRational::parse(&numerator, &denominator, limit).unwrap();
+        assert_eq!(base.len(), 901);
+        let approx = value.to_f64_approx().expect("ratio near one should remain finite");
+        assert!(approx.is_finite());
+        assert!((approx - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn float_conversion_reports_overflow_and_total_underflow() {
+        let limit = RationalBudget::default();
+        let huge = format!("1{}", "0".repeat(1_100));
+        let too_large = ExactRational::from_integer(&huge, limit).unwrap();
+        assert_eq!(too_large.to_f64_approx(), None);
+
+        let tiny = ExactRational::parse("1", &huge, limit).unwrap();
+        assert_eq!(tiny.to_f64_approx(), None);
+
+        let zero = ExactRational::from_integer("0", limit).unwrap();
+        assert_eq!(zero.to_f64_approx(), Some(0.0));
     }
 
     #[test]
