@@ -642,6 +642,14 @@ mod tests {
         vec![state[2], state[3], -state[0], -state[1]]
     }
 
+    fn wrong_dimension_after_start(state: &[f64], time: f64) -> Vec<f64> {
+        if time == 0.0 {
+            vec![state[2], state[3], -state[0], -state[1]]
+        } else {
+            Vec::new()
+        }
+    }
+
     fn system_definition_digest() -> String {
         blake3::hash(
             b"harmonic-oscillator-v1;xdot=vx;ydot=vy;vxdot=-x;vydot=-y",
@@ -887,5 +895,29 @@ mod tests {
         assert!(!verify_autonomous_discovery_receipt_v1(&altered));
     }
 
+
+    #[test]
+    fn wrong_rhs_dimension_on_intermediate_step_fails_closed_without_panicking() {
+        let config = RegressorConfig { seed: 23, ..RegressorConfig::default() };
+        let result = validate_invariant_holdout(
+            wrong_dimension_after_start, &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 709, 1e-2,
+        );
+        assert!(!result.passed);
+        assert_eq!(result.trajectories_checked, 0);
+        assert_eq!(result.failure, Some(AutonomousHoldoutFailure::IncompleteCoverage));
+    }
+
+    #[test]
+    fn oversized_holdout_budget_is_rejected_before_integration() {
+        let config = RegressorConfig { seed: 23, ..RegressorConfig::default() };
+        let result = validate_invariant_holdout(
+            harmonic_rhs, &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 600.0, 0.01, 100, 709, 1e-2,
+        );
+        assert!(!result.passed);
+        assert_eq!(result.trajectories_checked, 0);
+        assert_eq!(result.failure, Some(AutonomousHoldoutFailure::TrajectoryLimitExceeded));
+    }
 
 }
