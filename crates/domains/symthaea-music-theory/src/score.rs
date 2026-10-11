@@ -53,10 +53,6 @@ impl PartId {
 /// Which contrapuntal voice a note belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VoiceRole {
-    /// The source does not explicitly identify this line's musical function.
-    /// Role-dependent analysis must not reinterpret this as a melody, bass, or
-    /// harmony merely from pitch register or source-part ordering.
-    Unspecified,
     /// The tune — the developed motivic line.
     Melody,
     /// Inner harmony / accompaniment chord tones.
@@ -67,6 +63,11 @@ pub enum VoiceRole {
     /// chord tones, collision-avoided) — appears in the RETURN section,
     /// where classical practice earns the reprise new interest.
     CounterMelody,
+    /// The source does not explicitly identify this line's musical function.
+    /// Appended to preserve the serialized variant order of existing roles.
+    /// Role-dependent analysis must not reinterpret this as melody, bass, or
+    /// harmony merely from pitch register or source-part ordering.
+    Unspecified,
 }
 
 /// Structural role of the moment a note occurs in — lets muse apply expressive

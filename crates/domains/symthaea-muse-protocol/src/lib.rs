@@ -174,14 +174,14 @@ fn default_authorization_basis() -> AuthorizationBasis {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedMotifSummary {
-    /// Persistent source-part identity, when extraction was scoped to one known part.
-    /// Missing on legacy records; it is never inferred from register or role.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_part_id: Option<u16>,
     pub occurrence_count: usize,
     pub midi_pitches: Vec<u8>,
     pub identity_note: String,
     pub confidence: f32,
+    /// Persistent source-part identity, when extraction was scoped to one known part.
+    /// Missing on legacy records; it is never inferred from register or role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_part_id: Option<u16>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -2715,4 +2715,15 @@ mod tests {
         let back: PerformedNoteEvent = serde_json::from_str(&json).unwrap();
         assert!(back.source_note_id.is_none());
     }
+    #[test]
+    fn imported_motif_summary_defaults_missing_source_part_id_for_legacy_records() {
+        let legacy = r#"{"occurrence_count":2,"midi_pitches":[60,62,64],"identity_note":"legacy record","confidence":0.42}"#;
+        let decoded: ImportedMotifSummary = serde_json::from_str(legacy).unwrap();
+        assert_eq!(decoded.source_part_id, None);
+
+        let round_trip = serde_json::to_string(&decoded).unwrap();
+        assert!(!round_trip.contains("source_part_id"));
+    }
+
+
 }
