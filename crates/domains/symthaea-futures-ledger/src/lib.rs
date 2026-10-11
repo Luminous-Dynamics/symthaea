@@ -3,17 +3,30 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-futures-ledger
 //!
-//! Replayable evidence records for the Symthaea Futures Laboratory
-//! (`SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md`). Every scored forecast writes one
-//! [`EvidenceRecord`] — the mechanism that makes a later "was this calibrated?" question
-//! answerable without rerunning the experiment, and that lets a later loosening of an
-//! observation policy be detected against old scores instead of silently invalidating them.
+//! Replayable evidence records for the Symthaea Futures Laboratory.
 //!
-//! Field set mirrors the plan's "Evidence ledger schema" section exactly — keep them in sync.
+//! [`EvidenceRecord`] is the original v1 schema used by existing seeded
+//! simulation backtests. It remains wire/API compatible.
+//!
+//! [`v2`] adds a time/provenance-neutral two-phase lifecycle:
+//! [`v2::ForecastCommitment`] contains only information available before an
+//! outcome, while [`v2::ForecastResolution`] records the later realization and
+//! score. v2 supports both seeded simulations and hashed external observation
+//! snapshots without sentinel seeds or fake tick semantics.
+//!
+//! The v2 *schema* does not by itself prove wall-clock precedence. A durable
+//! prospective registry must additionally enforce unique immutable commitment IDs
+//! (and, in a later hardening, content-addressed/append-only commitment evidence).
+//! Never treat possession of a `ForecastCommitmentId` alone as cryptographic proof
+//! that a forecast existed before its outcome.
 
 use serde::{Deserialize, Serialize};
 use symthaea_futures_core::{ForecastDistribution, OutcomeRegion};
 
+pub mod v2;
+
+/// Original seeded-simulation evidence schema. Retained unchanged for existing
+/// artifacts and backtests; new prospective/external integrations should use v2.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvidenceRecord {
     pub scenario_family: String,
