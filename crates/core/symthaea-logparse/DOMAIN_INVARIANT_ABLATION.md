@@ -40,7 +40,7 @@ Accuracy alone can be dominated by common classes; read it alongside macro recal
 
 This first run is exploratory. A candidate result should be treated as promising only if OOD macro recall improves by at least 5 absolute percentage points over the raw-encoder baseline and in-corpus accuracy drops by no more than 5 points. This threshold is a predeclared screening rule, not a production acceptance criterion.
 
-Even if it passes that screen, it still needs multiple deterministic seeds, a held-out third corpus, benign telemetry and false-positive measurement, per-class confusion analysis, calibration/abstention evaluation, and a grouped split by source file or attack scenario. The existing event-level split can place events from the same capture in train and test; it is not sufficient evidence of deployment generalization.
+Even if it passes that screen, it still needs multiple deterministic seeds, a held-out third corpus, benign telemetry and false-positive measurement, per-class confusion analysis, calibration/abstention evaluation, and stronger scenario-aware holdouts where one capture is not equivalent to one attack scenario. Grouping by source file is a minimum leakage control, not sufficient evidence of deployment generalization.
 
 Do not report a security detection pass from classification accuracy alone. A robust evaluation needs detection quality, false alarms, alert precision, diagnostic quality, uncertainty behavior, and an independent holdout. These dimensions are consistent with the direction of the [MITRE ATT&CK Evaluations Enterprise 2026 methodology](https://attackevals.mitre.org/enterprise/er8), which moves beyond a binary detected/not-detected verdict.
 
