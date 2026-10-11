@@ -6,6 +6,7 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "src/coding_agent/**"
       - "src/language/**"
       - "examples/benchmark_coding_backends.rs"
       - "examples/forecastbench_eval.rs"

@@ -19,6 +19,7 @@ on:
       - "scripts/merge_repair_lessons.py"
       - "tests/fixtures/coding_backends_baseline.json"
       - "tests/fixtures/coding_backends_*_baseline.json"
+      - "src/coding_agent/**"
       - "src/language/**"
       - ".github/workflows/coding-backend-regression.yml"
   workflow_dispatch:
