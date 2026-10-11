@@ -201,6 +201,17 @@ class VerifierProvenanceTests(unittest.TestCase):
             self.verify()
         self.runner.assert_not_called()
 
+    def test_attested_bytes_must_also_be_a_valid_deterministic_bundle(self):
+        self.artifact.write_bytes(b"not a tar archive")
+        self.policy["artifact_sha256"] = sha256_file(self.artifact)
+        self.runner.return_value = SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps([self.verified_entry()]),
+            stderr="",
+        )
+        with self.assertRaises(ProvenanceVerificationError):
+            self.verify()
+
     def test_changed_cli_digest_fails_before_cli(self):
         self.gh.write_bytes(b"replaced gh executable")
         with self.assertRaises(ProvenanceVerificationError):
