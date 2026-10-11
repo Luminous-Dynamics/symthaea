@@ -6,6 +6,8 @@ It is **not** a production authorization service, incident-response runner, or p
 
 ## Run the checks
 
+The path-scoped GitHub workflows pin `actions/checkout` to upstream-verified commit `3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1) and `actions/setup-python` to `5fda3b95a4ea91299a34e894583c3862153e4b97` (v7.0.0). Both upstream commit objects report verified signatures. The interpreter patch is pinned to Python 3.12.15, and direct test dependencies are version-pinned.
+
 Install the pinned dependencies used by the path-scoped workflow:
 
     python3 -m pip install "cryptography==50.0.2" "rfc8785==0.1.4"
