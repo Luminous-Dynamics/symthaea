@@ -2151,6 +2151,86 @@ mod tests {
         assert!((sv[1] - 3.0).abs() < 1e-6);
     }
 
+    #[test]
+    fn test_svd_returns_descending_singular_values() {
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 0.0, 0.0],
+            &[0.0, 3.0, 0.0],
+            &[0.0, 0.0, 2.0],
+        ]);
+        let (singular_values, _, _, result) = a.try_svd().expect("direct SVD should converge");
+
+        assert!(result.verified);
+        assert!((singular_values[0] - 3.0).abs() < 1e-10);
+        assert!((singular_values[1] - 2.0).abs() < 1e-10);
+        assert!((singular_values[2] - 1.0).abs() < 1e-10);
+        assert!(singular_values.windows(2).all(|pair| pair[0] >= pair[1]));
+    }
+
+    #[test]
+    fn test_svd_rank_deficient_matrix_has_finite_factors() {
+        // AᵀA has a leading zero diagonal eigenvalue in the original column order.
+        // The direct SVD should still return paired, ordered singular values/factors.
+        let a = HdcMatrix::from_rows(&[&[0.0, 0.0], &[0.0, 3.0], &[0.0, 0.0]]);
+        let (singular_values, u, v, result) =
+            a.try_svd().expect("rank-deficient direct SVD should converge");
+
+        assert!(result.verified);
+        assert_eq!((u.rows, u.cols), (3, 3));
+        assert_eq!((v.rows, v.cols), (2, 2));
+        assert!((singular_values[0] - 3.0).abs() < 1e-10);
+        assert!(singular_values[1].abs() < 1e-10);
+        assert!(u.data.iter().all(|value| value.is_finite()));
+        assert!(v.data.iter().all(|value| value.is_finite()));
+
+        for i in 0..3 {
+            for j in 0..3 {
+                let dot: f64 = (0..3).map(|row| u.get(row, i) * u.get(row, j)).sum();
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert!((dot - expected).abs() < 1e-8);
+            }
+        }
+        for i in 0..2 {
+            for j in 0..2 {
+                let dot: f64 = (0..2).map(|row| v.get(row, i) * v.get(row, j)).sum();
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert!((dot - expected).abs() < 1e-8);
+            }
+        }
+
+        for i in 0..3 {
+            for j in 0..2 {
+                let reconstructed: f64 = (0..2)
+                    .map(|k| u.get(i, k) * singular_values[k] * v.get(j, k))
+                    .sum();
+                assert!((reconstructed - a.get(i, j)).abs() < 1e-8);
+            }
+        }
+    }
+
+    #[test]
+    fn test_svd_normalizes_large_finite_input_before_factorization() {
+        let a = HdcMatrix::from_rows(&[&[1.0e200, 0.0], &[0.0, 3.0e200]]);
+        let (singular_values, _, _, result) =
+            a.try_svd().expect("finite large-scale matrix should remain solvable");
+
+        assert!(result.verified);
+        assert!(singular_values.iter().all(|value| value.is_finite()));
+        assert!(((singular_values[0] / 3.0e200) - 1.0).abs() < 1e-10);
+        assert!(((singular_values[1] / 1.0e200) - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_svd_checked_api_rejects_non_finite_input_and_wrapper_fails_closed() {
+        let mut a = HdcMatrix::identity(2);
+        a.data[0] = f64::NAN;
+
+        assert!(a.try_svd().is_err());
+        let (singular_values, _, _, result) = a.svd();
+        assert!(!result.verified);
+        assert!(singular_values.iter().all(|value| value.is_nan()));
+    }
+
     /// SVD reconstruction: A ≈ U Σ V^T
     #[test]
     fn test_svd_reconstruction() {
