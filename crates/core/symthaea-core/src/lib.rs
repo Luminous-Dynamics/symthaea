@@ -61,6 +61,9 @@
 // at crate level which cannot be suppressed locally.
 #![cfg_attr(test, allow(deprecated))]
 
+/// Security-assurance primitives whose validity does not derive from cognition.
+#[allow(missing_docs)]
+pub mod assurance;
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
