@@ -523,7 +523,7 @@ def self_test() -> list[str]:
                 "scope": "Source A only",
                 "supporting_evidence_ids": ["JSP-006-E1"],
                 "epistemic_status": "InterpretationHypothesis",
-            }]}), True),
+            }], "abstention": {"abstain": False, "reason": "Self-test source-scoped hypothesis."}}), True),
         ("context-blind dictionary mapping remains flagged",
             unqualified_symbol_mapping_claim({"interpretations": [{
                 "statement": "Context-blind dictionary candidate: 'owl' maps to 'wisdom'.",
@@ -537,7 +537,7 @@ def self_test() -> list[str]:
                 "scope": "Open inquiry only",
                 "supporting_evidence_ids": [],
                 "epistemic_status": "OpenQuestion",
-            }]}), True),
+            }], "abstention": {"abstain": True, "reason": "Self-test question fixture."}}), True),
     ]
     for name, actual, expected in cases:
         if actual != expected:
