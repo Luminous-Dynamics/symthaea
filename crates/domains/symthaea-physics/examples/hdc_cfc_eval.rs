@@ -1021,39 +1021,46 @@ fn main() {
     let smap_test = base.join("data/spacecraft/smap_test.csv");
     if smap_train.exists() && smap_test.exists() {
         eprintln!("[Spacecraft] Starting evaluation...");
-        let r = evaluate_spacecraft(&smap_train, &smap_test);
-        eprintln!("[Spacecraft] Done.");
-
-        println!("---- Spacecraft (SMAP) -------------------------------------------------");
-        println!("  Method                AUC       Best-F1*");
-        println!(
-            "  HDC-Only              {:.3}     {:.3}",
-            r.auc_hdc, r.f1_hdc
-        );
-        println!(
-            "  CfC Multiscale        {:.3}     {:.3}",
-            r.auc_cfc, r.f1_cfc
-        );
-        println!(
-            "  CfC Surprise+HDC HV   {:.3}     {:.3}",
-            r.auc_hybrid, r.f1_hybrid
-        );
-        println!(
-            "  HDC+CfC Score Fused   {:.3}     {:.3}",
-            r.auc_fused, r.f1_fused
-        );
-        let best_cfc = r.auc_cfc.max(r.auc_hybrid).max(r.auc_fused);
-        let delta = best_cfc - r.auc_hdc;
-        println!(
-            "  Best vs HDC           {:+.3}     {:+.3}",
-            delta,
-            [r.f1_cfc, r.f1_hybrid, r.f1_fused]
-                .iter()
-                .cloned()
-                .fold(f64::NEG_INFINITY, f64::max)
-                - r.f1_hdc
-        );
-        println!();
+        match evaluate_spacecraft(&smap_train, &smap_test) {
+            Some(r) => {
+                eprintln!("[Spacecraft] Done.");
+                println!("---- Spacecraft (SMAP) -------------------------------------------------");
+                println!("  Method                AUC       Best-F1*");
+                println!(
+                    "  HDC-Only              {:.3}     {:.3}",
+                    r.auc_hdc, r.f1_hdc
+                );
+                println!(
+                    "  CfC Multiscale        {:.3}     {:.3}",
+                    r.auc_cfc, r.f1_cfc
+                );
+                println!(
+                    "  CfC Surprise+HDC HV   {:.3}     {:.3}",
+                    r.auc_hybrid, r.f1_hybrid
+                );
+                println!(
+                    "  HDC+CfC Score Fused   {:.3}     {:.3}",
+                    r.auc_fused, r.f1_fused
+                );
+                let best_cfc = r.auc_cfc.max(r.auc_hybrid).max(r.auc_fused);
+                let delta = best_cfc - r.auc_hdc;
+                println!(
+                    "  Best vs HDC           {:+.3}     {:+.3}",
+                    delta,
+                    [r.f1_cfc, r.f1_hybrid, r.f1_fused]
+                        .iter()
+                        .cloned()
+                        .fold(f64::NEG_INFINITY, f64::max)
+                        - r.f1_hdc
+                );
+                println!();
+            }
+            None => {
+                eprintln!(
+                    "[Spacecraft] Evaluation skipped because valid train/test calibration data is insufficient."
+                );
+            }
+        }
     } else {
         eprintln!("Spacecraft data not found, skipping.");
     }
