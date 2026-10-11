@@ -228,6 +228,11 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(verifier.VerificationError, "has expired"):
             self.verify(receipt)
 
+    def test_expiry_boundary_is_exclusive(self):
+        receipt = signed_receipt(expires_at="2026-10-11T00:30:00Z")
+        with self.assertRaisesRegex(verifier.VerificationError, "has expired"):
+            self.verify(receipt)
+
     def test_future_issued_receipt_is_rejected(self):
         receipt = signed_receipt(issued_at="2026-10-11T00:31:00Z")
         with self.assertRaisesRegex(verifier.VerificationError, "issue time is in the future"):
