@@ -22,7 +22,9 @@
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use symthaea_logparse::encoder::{Hdv, encode, encode_domain_invariant};
-use symthaea_logparse::probe::{classification_report, ClassificationReport, LogisticProbe, TrainConfig};
+use symthaea_logparse::probe::{
+    classification_report, ClassificationReport, LogisticProbe, TrainConfig,
+};
 use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -168,7 +170,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  ablation OOD macro F1:                  {:.3}", di_ood_report.macro_f1);
         print_classification_report("domain-invariant OOD", &di_ood_report);
         println!(
-            "  Class-level FPs measure confusion among these labels, not benign operational false positives."
+            "{}",
+            concat!(
+                "  Class-level FPs measure confusion among these labels, ",
+                "not benign operational false positives."
+            )
         );
     }
 
