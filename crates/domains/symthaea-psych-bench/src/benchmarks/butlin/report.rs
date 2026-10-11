@@ -390,11 +390,50 @@ impl ProbeQuality {
     }
 }
 
+/// Errors produced when validating or constructing durable effect estimates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffectEstimateValidationError {
+    NonFiniteBaselineMean,
+    NonFiniteInterventionMean,
+    NonFiniteAbsoluteChange,
+    NonFiniteRelativeChange,
+    InconsistentAbsoluteChange,
+    InconsistentRelativeChange,
+    InvalidStandardDeviation,
+}
+
+impl std::fmt::Display for EffectEstimateValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::NonFiniteBaselineMean => "baseline mean is not finite",
+            Self::NonFiniteInterventionMean => "intervention mean is not finite",
+            Self::NonFiniteAbsoluteChange => "derived absolute change is not finite",
+            Self::NonFiniteRelativeChange => "derived relative change is not finite",
+            Self::InconsistentAbsoluteChange => {
+                "persisted absolute change disagrees with the raw means"
+            }
+            Self::InconsistentRelativeChange => {
+                "persisted relative change disagrees with the canonical zero-baseline policy or raw means"
+            }
+            Self::InvalidStandardDeviation => {
+                "standard deviation must be finite and non-negative"
+            }
+        };
+        f.write_str(message)
+    }
+}
+
+impl std::error::Error for EffectEstimateValidationError {}
+
 /// Magnitude of an observed effect between a baseline and an intervention
-/// (ablation) condition, across some number of seeds. Carries the actual
-/// numbers rather than only a boolean gate, so future multi-seed thresholds
-/// don't require another schema redesign.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+/// (ablation) condition, across some number of seeds.
+///
+/// The raw means are the source values. `absolute_change` and
+/// `relative_change` are canonical derived values and are checked whenever
+/// this record is deserialized for durable use. Seed count is preserved
+/// literally: an unknown/empty seed lineage remains zero rather than being
+/// promoted to one.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct EffectEstimate {
     pub baseline_mean: f64,
     pub intervention_mean: f64,
@@ -405,8 +444,12 @@ pub struct EffectEstimate {
 }
 
 impl EffectEstimate {
-    /// Construct from a single baseline/intervention pair (`seed_count: 1`);
-    /// use `with_std_dev` to attach cross-seed spread once available.
+    /// Construct using the historical infallible path.
+    ///
+    /// This retains compatibility for diagnostic observations which may need
+    /// to preserve a non-finite raw result. Such values are not valid durable
+    /// authority records: call `validate()` or use `try_new()` before
+    /// persisting or promoting them.
     pub fn new(baseline_mean: f64, intervention_mean: f64, seed_count: usize) -> Self {
         let absolute_change = intervention_mean - baseline_mean;
         let relative_change = if baseline_mean.abs() > f64::EPSILON {
@@ -424,9 +467,143 @@ impl EffectEstimate {
         }
     }
 
+    /// Construct an effect estimate with numerically validated fields.
+    ///
+    /// This does not prove that any seeds were actually executed or that
+    /// `seed_count` matches the run's seed lineage. Before authority use, the
+    /// caller must bind this estimate to the exact intervention/run receipt and
+    /// derive or verify the count from its exact seed identities. A zero count
+    /// is preserved for diagnostics and is not positive evidence.
+    pub fn try_new(
+        baseline_mean: f64,
+        intervention_mean: f64,
+        seed_count: usize,
+    ) -> Result<Self, EffectEstimateValidationError> {
+        if !baseline_mean.is_finite() {
+            return Err(EffectEstimateValidationError::NonFiniteBaselineMean);
+        }
+        if !intervention_mean.is_finite() {
+            return Err(EffectEstimateValidationError::NonFiniteInterventionMean);
+        }
+
+        let absolute_change = intervention_mean - baseline_mean;
+        if !absolute_change.is_finite() {
+            return Err(EffectEstimateValidationError::NonFiniteAbsoluteChange);
+        }
+        let relative_change = if baseline_mean.abs() > f64::EPSILON {
+            let relative = absolute_change / baseline_mean;
+            if !relative.is_finite() {
+                return Err(EffectEstimateValidationError::NonFiniteRelativeChange);
+            }
+            Some(relative)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            baseline_mean,
+            intervention_mean,
+            absolute_change,
+            relative_change,
+            seed_count,
+            standard_deviation: None,
+        })
+    }
+
+    /// Validate raw values, derived fields, and dispersion.
+    ///
+    /// This catches inconsistent public-field mutations as well as malformed
+    /// values reconstructed from a serialized record.
+    pub fn validate(&self) -> Result<(), EffectEstimateValidationError> {
+        let canonical = Self::try_new(
+            self.baseline_mean,
+            self.intervention_mean,
+            self.seed_count,
+        )?;
+        if self.absolute_change != canonical.absolute_change {
+            return Err(EffectEstimateValidationError::InconsistentAbsoluteChange);
+        }
+        if self.relative_change != canonical.relative_change {
+            return Err(EffectEstimateValidationError::InconsistentRelativeChange);
+        }
+        if let Some(sd) = self.standard_deviation {
+            if !sd.is_finite() || sd < 0.0 {
+                return Err(EffectEstimateValidationError::InvalidStandardDeviation);
+            }
+        }
+        Ok(())
+    }
+
+    /// Legacy unchecked builder retained for compatibility.
+    ///
+    /// This method preserves the historical infallible behavior and therefore
+    /// does not certify that the supplied dispersion is valid. Call
+    /// `validate()` before authority use, or prefer `try_with_std_dev()` in
+    /// new code so invalid input is returned as an error rather than panicking.
     pub fn with_std_dev(mut self, std_dev: f64) -> Self {
         self.standard_deviation = Some(std_dev);
         self
+    }
+
+    /// Attach dispersion only when both the existing estimate and the new
+    /// standard deviation pass validation.
+    pub fn try_with_std_dev(
+        mut self,
+        std_dev: f64,
+    ) -> Result<Self, EffectEstimateValidationError> {
+        self.validate()?;
+        if !std_dev.is_finite() || std_dev < 0.0 {
+            return Err(EffectEstimateValidationError::InvalidStandardDeviation);
+        }
+        self.standard_deviation = Some(std_dev);
+        Ok(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for EffectEstimate {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error as _;
+
+        #[derive(Deserialize)]
+        struct PersistedEffectEstimate {
+            baseline_mean: f64,
+            intervention_mean: f64,
+            absolute_change: f64,
+            relative_change: Option<f64>,
+            seed_count: usize,
+            standard_deviation: Option<f64>,
+        }
+
+        let persisted = PersistedEffectEstimate::deserialize(deserializer)?;
+        let mut estimate = Self::try_new(
+            persisted.baseline_mean,
+            persisted.intervention_mean,
+            persisted.seed_count,
+        )
+        .map_err(D::Error::custom)?;
+
+        // Reject inconsistent cached fields rather than trusting or silently
+        // rewriting persisted evidence. Recompute under the current canonical
+        // relative-change policy, including a None result for a near-zero
+        // baseline.
+        if persisted.absolute_change != estimate.absolute_change {
+            return Err(D::Error::custom(
+                EffectEstimateValidationError::InconsistentAbsoluteChange,
+            ));
+        }
+        if persisted.relative_change != estimate.relative_change {
+            return Err(D::Error::custom(
+                EffectEstimateValidationError::InconsistentRelativeChange,
+            ));
+        }
+
+        if let Some(sd) = persisted.standard_deviation {
+            estimate = estimate.try_with_std_dev(sd).map_err(D::Error::custom)?;
+        }
+        Ok(estimate)
     }
 }
 
@@ -1918,6 +2095,141 @@ mod tests {
                 expected: REPORT_SCHEMA_VERSION,
                 found: 2,
             }
+        );
+    }
+}
+
+#[cfg(test)]
+mod effect_estimate_persistence_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn valid_effect_estimate_round_trips_with_canonical_derived_fields() {
+        let original = EffectEstimate::try_new(0.8, 0.4, 4)
+            .unwrap()
+            .try_with_std_dev(0.05)
+            .unwrap();
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: EffectEstimate = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored, original);
+        assert_eq!(restored.absolute_change, -0.4);
+        assert_eq!(restored.relative_change, Some(-0.5));
+    }
+
+    #[test]
+    fn persisted_inconsistent_absolute_change_is_rejected() {
+        let estimate = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        let mut value = serde_json::to_value(estimate).unwrap();
+        value["absolute_change"] = json!(123.0);
+
+        let err = serde_json::from_value::<EffectEstimate>(value).unwrap_err();
+        assert!(err.to_string().contains("absolute change"));
+    }
+
+    #[test]
+    fn persisted_inconsistent_relative_change_is_rejected() {
+        let estimate = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        let mut value = serde_json::to_value(estimate).unwrap();
+        value["relative_change"] = json!(999.0);
+
+        let err = serde_json::from_value::<EffectEstimate>(value).unwrap_err();
+        assert!(err.to_string().contains("relative change"));
+    }
+
+    #[test]
+    fn near_zero_baseline_requires_canonical_absent_relative_change() {
+        let estimate = EffectEstimate::try_new(0.0, 0.5, 3).unwrap();
+        assert_eq!(estimate.relative_change, None);
+        let mut value = serde_json::to_value(estimate).unwrap();
+        value["relative_change"] = json!(0.5);
+
+        let err = serde_json::from_value::<EffectEstimate>(value).unwrap_err();
+        assert!(err.to_string().contains("zero-baseline policy"));
+    }
+
+    #[test]
+    fn negative_or_nonfinite_dispersion_is_rejected() {
+        let estimate = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        let mut value = serde_json::to_value(estimate).unwrap();
+        value["standard_deviation"] = json!(-0.01);
+
+        let err = serde_json::from_value::<EffectEstimate>(value).unwrap_err();
+        assert!(err.to_string().contains("standard deviation"));
+
+        assert_eq!(
+            EffectEstimate::try_new(0.8, 0.4, 4)
+                .unwrap()
+                .try_with_std_dev(f64::NAN)
+                .unwrap_err(),
+            EffectEstimateValidationError::InvalidStandardDeviation
+        );
+        assert_eq!(
+            EffectEstimate::try_new(0.8, 0.4, 4)
+                .unwrap()
+                .try_with_std_dev(-0.1)
+                .unwrap_err(),
+            EffectEstimateValidationError::InvalidStandardDeviation
+        );
+    }
+
+    #[test]
+    fn nonfinite_means_and_overflowed_derived_values_cannot_enter_validated_path() {
+        assert_eq!(
+            EffectEstimate::try_new(f64::NAN, 0.2, 1).unwrap_err(),
+            EffectEstimateValidationError::NonFiniteBaselineMean
+        );
+        assert_eq!(
+            EffectEstimate::try_new(0.2, f64::INFINITY, 1).unwrap_err(),
+            EffectEstimateValidationError::NonFiniteInterventionMean
+        );
+        assert_eq!(
+            EffectEstimate::try_new(-f64::MAX, f64::MAX, 1).unwrap_err(),
+            EffectEstimateValidationError::NonFiniteAbsoluteChange
+        );
+    }
+
+    #[test]
+    fn relative_change_overflow_is_rejected_even_when_raw_means_are_finite() {
+        assert_eq!(
+            EffectEstimate::try_new(1e-10, 1e308, 1).unwrap_err(),
+            EffectEstimateValidationError::NonFiniteRelativeChange
+        );
+    }
+
+    #[test]
+    fn validate_rejects_nonfinite_or_negative_mutated_dispersion() {
+        let mut nonfinite = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        nonfinite.standard_deviation = Some(f64::INFINITY);
+        assert_eq!(
+            nonfinite.validate().unwrap_err(),
+            EffectEstimateValidationError::InvalidStandardDeviation
+        );
+
+        let mut negative = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        negative.standard_deviation = Some(-0.01);
+        assert_eq!(
+            negative.validate().unwrap_err(),
+            EffectEstimateValidationError::InvalidStandardDeviation
+        );
+    }
+
+    #[test]
+    fn zero_seed_count_is_preserved_without_inference() {
+        let estimate = EffectEstimate::try_new(0.8, 0.4, 0).unwrap();
+        let restored: EffectEstimate =
+            serde_json::from_str(&serde_json::to_string(&estimate).unwrap()).unwrap();
+        assert_eq!(restored.seed_count, 0);
+    }
+
+    #[test]
+    fn mutated_public_derived_field_fails_validation_before_authority_use() {
+        let mut estimate = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        estimate.absolute_change = 99.0;
+        assert_eq!(
+            estimate.validate().unwrap_err(),
+            EffectEstimateValidationError::InconsistentAbsoluteChange
         );
     }
 }
