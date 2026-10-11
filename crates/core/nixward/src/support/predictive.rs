@@ -3,12 +3,15 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! LTC Temporal Failure Prediction
 //!
-//! Extrapolates system telemetry forward in time using the O(1) LTC closed-form
-//! solver. Predicts disk exhaustion, memory pressure, store bloat, and error
+//! Combines linear trend extrapolation with bounded HDC-LTC evolution as a secondary
+//! directional signal. Predicts disk exhaustion, memory pressure, store bloat, and error
 //! rate acceleration across multiple time horizons (1h, 6h, 24h, 7d).
 //!
-//! Key insight: encode telemetry as HDC vector → feed to LTC neuron →
-//! `evolve_closed_form(dt, input_hv)` → decode predicted values → check thresholds.
+//! Key insight: encode telemetry as an HDC vector, attempt checked iterative evolution
+//! within an explicit work budget, then use LTC/trend directional agreement only when
+//! the iterative result is available. Trend forecasts remain available when LTC rejects
+//! an invalid or over-budget horizon. One solver jump costs O(D); iterative evolution is
+//! O(D × N) for D dimensions and N accepted substeps.
 
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -131,7 +134,10 @@ impl PredictiveMonitor {
     pub fn new(thresholds: AlertThresholds) -> Self {
         let config = UnifiedConfig {
             dimension: NIX_HDC_DIM,
-            tau_base: 3600.0, // 1-hour time constant (telemetry evolves slowly)
+            // Core clamps effective tau to [0.01, 10] seconds. 12.5 saturates
+            // the 10-second ceiling even at the worst-case 0.8 input adjustment;
+            // larger values (e.g. 3600s) do not create a one-hour time constant.
+            tau_base: 12.5,
             ..UnifiedConfig::default()
         };
 
@@ -229,10 +235,12 @@ impl PredictiveMonitor {
         }
     }
 
-    /// Use the LTC neuron's closed-form solver to predict future telemetry.
+    /// Use checked iterative LTC evolution to predict future telemetry.
     ///
-    /// Clones the neuron, evolves it forward by `hours_ahead` hours, then
-    /// decodes the resulting state vector back to telemetry values.
+    /// Returns `None` when there is no history, the horizon is invalid/unrepresentable,
+    /// or the requested work exceeds the solver budget. The core model caps effective tau
+    /// at 10 seconds, so this monitor can refine horizons up to roughly 4096 seconds with
+    /// its default budget; longer horizons remain trend-only in `predict`.
     pub fn predict_ltc(&mut self, hours_ahead: f64) -> Option<SystemTelemetry> {
         // Validate before reading/encoding telemetry so rejected horizons have no side effects.
         let dt_seconds = checked_horizon_seconds(hours_ahead)?;
@@ -262,7 +270,8 @@ impl PredictiveMonitor {
     ///
     /// Uses linear trend extrapolation for predicted values. When enough history
     /// is available (>=10 samples), the LTC neuron is consulted for directional
-    /// agreement — if LTC and trend agree, confidence is boosted.
+    /// agreement — if LTC and trend agree, confidence is boosted. The boost is omitted
+    /// when the iterative horizon is rejected by the explicit substep budget.
     pub fn predict(&mut self, hours_ahead: f64) -> Vec<Prediction> {
         // Keep the trend path and the iterative LTC path on the same horizon contract.
         // Invalid or unrepresentable horizons must not produce NaN/Inf predictions.
@@ -723,6 +732,21 @@ mod tests {
         let mut monitor = PredictiveMonitor::with_defaults();
         monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
         assert_eq!(monitor.sample_count(), 1);
+    }
+
+    #[test]
+    fn ltc_budget_rejection_keeps_trend_horizon_predictions_available() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        for _ in 0..10 {
+            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        }
+
+        // With tau capped at 10s, six hours requires 21,600 one-second substeps.
+        // LTC fails closed before evolution; the trend path still yields predictions.
+        assert!(monitor.predict_ltc(6.0).is_none());
+        let predictions = monitor.predict(6.0);
+        assert_eq!(predictions.len(), 6);
+        assert!(predictions.iter().all(|prediction| prediction.hours_ahead == 6.0));
     }
 
     #[test]
