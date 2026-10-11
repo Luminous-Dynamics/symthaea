@@ -14,7 +14,7 @@ use super::authorization::NixLocalExecutionAuthorityV1;
 /// cannot recreate this provenance from serialized records.
 #[must_use]
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct NixLiveExecutionWitnessV1 {
+pub struct NixLiveExecutionWitnessV1 {
     action_intent_digest: String,
     approval_request_id: String,
     projection_digest: String,
