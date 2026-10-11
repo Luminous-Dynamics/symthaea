@@ -139,8 +139,9 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
     total_energy = float(mean_field.kernel())
 
     density_matrix = mean_field.make_rdm1()
+    ao_grid = mean_field._numint.eval_ao(molecule, mean_field.grids.coords)
     rho_grid = mean_field._numint.eval_rho(
-        molecule, mean_field.grids.coords, density_matrix, xctype="LDA"
+        molecule, ao_grid, density_matrix, xctype="LDA"
     )
     integrated_electron_count = float(np.dot(rho_grid, mean_field.grids.weights))
     expected_total_energy = require_finite(f"{molecule_name} PySCF total energy", total_energy)
