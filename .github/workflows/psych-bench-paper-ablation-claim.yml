@@ -1,0 +1,125 @@
+name: Psych-Bench Paper Ablation Claim Ceiling
+
+on:
+  push:
+    branches:
+      - psych-bench/paper-ablation-claim-ceiling
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/psych-bench-paper-ablation-claim.yml'
+      - 'papers/evaluation/psych-bench/ABLATION_INTERPRETATION_NOTICE.md'
+      - 'crates/domains/symthaea-psych-bench/src/harness/config.rs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  claim-ceiling:
+    name: Exact-subject paper ablation claim ceiling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual"
+
+      - name: Prove legacy presets are combined mechanism+nuisance conditions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('crates/domains/symthaea-psych-bench/src/harness/config.rs').read_text()
+          required = [
+              'AblationPreset::CfcOnly => {\n                base.enable_fep = false;\n                base.enable_social = false;\n                base.encoding_noise = 0.35;',
+              'AblationPreset::NoFep => {\n                base.enable_fep = false;\n                base.encoding_noise = 0.25;',
+              'AblationPreset::NoSocial => {\n                base.enable_social = false;\n                base.encoding_noise = 0.15;',
+              'AblationPreset::ReducedWm => {\n                base.working_memory_capacity = 3;\n                base.encoding_noise = 0.30;',
+              'AblationPreset::HdcOnly => {\n                base.enable_fep = false;\n                base.enable_social = false;\n                base.working_memory_capacity = 3;\n                base.encoding_noise = 0.50;',
+          ]
+          missing = [fragment.split('=>', 1)[0].strip() for fragment in required if fragment not in source]
+          if missing:
+              raise SystemExit(f'legacy preset semantics changed; requalify interpretation notice: {missing}')
+          PY
+
+      - name: Validate publication claim ceiling notice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          notice = Path('papers/evaluation/psych-bench/ABLATION_INTERPRETATION_NOTICE.md').read_text()
+          required = [
+              'legacy combined-model preset comparisons',
+              'They are not clean mechanism-only interventions.',
+              'They do **not** mean that fresh mechanism-only paper data have already been generated.',
+              'Publication migration gate',
+              '#3223', '#3240', '#3258', '#3273', '#3380',
+          ]
+          missing = [item for item in required if item not in notice]
+          if missing:
+              raise SystemExit(f'claim-ceiling notice is missing required boundary text: {missing}')
+
+          forbidden = [
+              'Fresh mechanism-only paper data have already been generated.',
+              'The historical table proves the causal effect',
+              'Figure 8 proves the causal effect',
+          ]
+          found = [phrase for phrase in forbidden if phrase in notice]
+          if found:
+              raise SystemExit(f'notice appears to overclaim: {found}')
+          PY
+
+      - name: Prove this tranche does not modify historical paper evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            mapfile -t changed < <(git diff --name-only HEAD^ HEAD)
+            allowed=(
+              '.github/workflows/psych-bench-paper-ablation-claim.yml'
+              'papers/evaluation/psych-bench/ABLATION_INTERPRETATION_NOTICE.md'
+            )
+            for path in "${changed[@]}"; do
+              ok=false
+              for candidate in "${allowed[@]}"; do
+                if [ "$path" = "$candidate" ]; then
+                  ok=true
+                  break
+                fi
+              done
+              if [ "$ok" != true ]; then
+                printf 'unexpected evidence/manuscript change in claim-ceiling tranche: %s\n' "$path" >&2
+                exit 1
+              fi
+            done
+          fi
+
+      - name: Postflight exact-subject immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
