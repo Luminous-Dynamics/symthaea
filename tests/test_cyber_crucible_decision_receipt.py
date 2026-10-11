@@ -10,7 +10,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-import rfc8785
+from jsonschema import Draft202012Validator, ValidationError
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -101,6 +101,20 @@ class DecisionReceiptTests(unittest.TestCase):
             now=now,
             replay_ledger=ReplayLedger(self.db_path if path is None else path),
         )
+
+    def test_generated_receipt_satisfies_published_json_schema(self):
+        schema_path = Path(__file__).resolve().parents[1] / "validation" / "cyber_crucible_verifier_decision_v1.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(self.make_receipt())
+
+    def test_json_schema_requires_report_digest_binding(self):
+        schema_path = Path(__file__).resolve().parents[1] / "validation" / "cyber_crucible_verifier_decision_v1.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        receipt = self.make_receipt()
+        del receipt["payload"]["report_digest"]
+        with self.assertRaises(ValidationError):
+            Draft202012Validator(schema).validate(receipt)
 
     def test_accept_decision_is_authenticated_but_non_authorizing(self):
         result = self.verify(self.make_receipt())
