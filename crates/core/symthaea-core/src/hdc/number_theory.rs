@@ -804,8 +804,8 @@ mod tests {
         let inverse = ring.inverse(3).expect("gcd(3, modulus) = 1");
         assert_eq!(ring.multiply(3, inverse), 1);
 
-        let prime_large = (1u64 << 63) + 29;
-        let prime_ring = ModularRing::new(prime_large);
+        let large_modulus = (1u64 << 63) + 29;
+        let prime_ring = ModularRing::new(large_modulus);
         let inv = prime_ring.inverse(prime_ring.modulus - 1).unwrap();
         assert_eq!(inv, prime_ring.modulus - 1);
         assert_eq!(prime_ring.multiply(prime_ring.modulus - 1, inv), 1);
