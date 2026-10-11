@@ -2873,7 +2873,9 @@ mod tests {
         );
 
         // Also test the iterative path
-        neuron.evolve_closed_form_iterative(100.0, &input);
+        neuron
+            .try_evolve_closed_form_iterative(100.0, &input, 100_000)
+            .expect("comparison horizon stays within the explicit validation budget");
         let state = neuron.state();
         assert!(
             state.norm().is_finite(),
