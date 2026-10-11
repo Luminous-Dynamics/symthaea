@@ -5,9 +5,9 @@
 [![CI](https://github.com/Luminous-Dynamics/symthaea/actions/workflows/ci.yml/badge.svg)](https://github.com/Luminous-Dynamics/symthaea/actions)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dynamics (CfC), consciousness-relevant measurement (IIT-inspired Φ, Butlin-indicator probes), and zero-knowledge proofs. **It does not claim to prove consciousness, and nothing below is a regulatory compliance certification.** What it does have: working ZK circuits over HDC's binary-field structure, measured against a prime-field baseline, and an internal research program that documents its own retractions — see the Evidence table below before trusting any specific number.
+Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dynamics (CfC), consciousness-relevant measurement (IIT-inspired Φ, Butlin-indicator probes), and zero-knowledge proofs. **It does not claim to prove consciousness, and nothing below is a regulatory compliance certification.** What it does have: working Binius circuits for several packed-word relations, plus an internal research program that records retractions. The public benchmark's Winterfell comparison is an analytic estimate, not a measured same-scale proof; see the Evidence table before trusting any performance ratio.
 
-[**Live Demo**](https://symthaea.luminousdynamics.io) | [**Paper**](papers/binius-hdc/) | [**Benchmarks**](papers/binius-hdc/reproduce.sh) | [**Honest Status**](docs/HONEST_STATUS.md)
+[**Live Demo**](https://symthaea.luminousdynamics.io) | [**Paper**](papers/theory-foundations/binius-hdc/) | [**Benchmarks**](papers/theory-foundations/binius-hdc/reproduce.sh) | [**Honest Status**](docs/HONEST_STATUS.md)
 
 ---
 
@@ -15,9 +15,9 @@ Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dy
 
 | Claim | Status | Evidence | Limitations |
 |-------|--------|----------|--------------|
-| HDC XOR binding: 256x fewer ZKP constraints than a prime-field baseline (Binius vs. Winterfell, 16Kbit) | Reproduced internally | `papers/binius-hdc/reproduce.sh` — real proofs, not estimates | Same-scale comparison only; not audited by a third party |
+| HDC XOR binding (16Kbit) | Binius proof is generated and verified by the public harness | `crates/hdc-zkp-bench/src/main.rs` measures Binius and explicitly labels Winterfell values as analytic estimates | The public artifact does not establish a measured cross-backend ratio; XOR itself is linear, while reported equality constraints include structural overhead |
 | Health-value range proof in ~34ms (ZK range proof, value ∈ [min, max]) | Working cryptographic primitive | `crates/mycelix-zkp-core/`, benchmark output below | **Not a HIPAA compliance certification.** A range proof is one building block; no accredited assessment of any system built on it has been performed |
-| Selective-disclosure age≥18 proof | Working cryptographic primitive | `papers/binius-hdc/` eIDAS-shaped demo | **Not an eIDAS 2.0-certified wallet or credential.** Demonstrates the primitive an eIDAS-compliant system would need, nothing more |
+| Selective-disclosure age≥18 proof | Working cryptographic primitive | `papers/theory-foundations/binius-hdc/` eIDAS-shaped demo | **Not an eIDAS 2.0-certified wallet or credential.** Demonstrates the primitive an eIDAS-compliant system would need, nothing more |
 | Butlin consciousness-indicator probes | Structural implementation, partially audited | Internal construct-validity re-check found only 4/12 probe rows survive; of those, one (`AE-2`) has real empirical support to date, and that result is explicitly scoped as "causally-supported internal wiring evidence," not functional capacity and not evidence of consciousness | **Not evidence the system is conscious.** Most of the original 12-row matrix did not hold up to its own re-audit |
 | Moral-reasoning benchmark (Hendrycks Ethics) | Internal benchmark, re-run and corrected | Canonical 2026-07-15 re-run on held-out test CSVs: 56.2% overall; only the `virtue` category (76.5%) is meaningfully above chance | An earlier 91.1%/94.5%/84.7% figure was **retracted as leakage-inflated** — if you see those numbers anywhere else in this repo's history, they are superseded |
 | Cognitive loop runs at ~31 Hz measured | Reproduced internally | Loop telemetry | Measured on one reference machine; not a real-time guarantee |
@@ -28,9 +28,9 @@ None of this is a claim of general intelligence, sentience, or legal/medical/fin
 
 - **Healthcare attestation primitive** — Prove "patient vitals are in normal range" in ~34ms without revealing the actual values, via a ZK range proof. ([health-zkp](crates/mycelix-zkp-core/))
 - **Anonymous eligibility proof** — Prove "I'm eligible to vote" without revealing identity, with post-quantum Dilithium5 signatures. ([governance](crates/mycelix-zkp-core/src/consciousness.rs))
-- **Selective credential disclosure** — Prove "age >= 18" via ZKP without revealing date of birth or nationality. ([eidas-shaped demo](papers/binius-hdc/))
-- **Verified federated learning** — 16 participants submit encrypted gradients; aggregation proven correct in ~91ms. ([triple-stack](crates/hdc-zkp-bench/src/fl_triple_stack.rs))
-- **Verifiable search** — Prove search results were ranked per a stated formula, not manipulated. ([prism-zkp](papers/binius-hdc/))
+- **Selective credential disclosure** — Prove "age >= 18" via ZKP without revealing date of birth or nationality. ([eidas-shaped demo](papers/theory-foundations/binius-hdc/))
+- **Bitwise-majority proof demo** — proves strict per-bit majority over private opaque 64-bit words. It does **not** prove one-time-pad encryption, numeric-gradient aggregation, or an end-to-end federated-learning protocol. The source file path is retained for compatibility. ([legacy benchmark file](crates/hdc-zkp-bench/src/fl_triple_stack.rs))
+- **Verifiable search** — Prove search results were ranked per a stated formula, not manipulated. ([prism-zkp](papers/theory-foundations/binius-hdc/))
 - **Cognitive-loop state-transition proof** — Prove a specific internal state transition occurred as specified, without revealing the internal state itself. This is a proof about *a computation*, not a proof about *consciousness*. ([cycle_integrity](crates/symthaea-zkproof/src/cycle_integrity.rs))
 
 ## Quick Start
@@ -48,11 +48,11 @@ cargo build --release
 # Run tests (21K+ workspace-wide)
 cargo nextest run --workspace --lib
 
-# Run ZKP benchmarks
-cd crates/mycelix-zkp-core && cargo test --features full --lib
+# Run the public Binius proof-circuit tests
+cargo test --manifest-path crates/hdc-zkp-bench/Cargo.toml
 
-# Run Binius HDC benchmark (needs .deps/binius64)
-cd crates/hdc-zkp-bench && cargo run --release
+# Run the public Binius benchmark suite
+cargo run --release --manifest-path crates/hdc-zkp-bench/Cargo.toml
 
 # Try the Spore kernel in browser
 open https://symthaea.luminousdynamics.io
@@ -60,28 +60,15 @@ open https://symthaea.luminousdynamics.io
 
 ## Key Numbers
 
-### ZKP: Binary-Field STARKs vs Prime-Field (Same Scale, Both Measured)
+### Publicly reproducible Binius evidence
 
-| Metric | Binius (16Kbit) | Winterfell (16Kbit) | Advantage |
-|--------|---------------|-------------------|-----------|
-| **Constraints** | 256 | 65,532 | **256x fewer** |
-| **Prover time** | 430 ms | 23,762 ms | **55x faster** |
-| **Verifier time** | 10.4 ms | 23.7 ms | **2.3x faster** |
+The public harness generates and verifies a real Binius proof for packed-word XOR. XOR itself is linear in this representation and contributes no nonlinear AND/MUL gate, but the circuit's equality wiring still contributes measured structural constraints.
 
-XOR binding — the core HDC operation — requires **zero non-linear constraints** in Binius. Both numbers are real cryptographic proofs, not estimates.
+An earlier internal run recorded 256 reported AND constraints, approximately 430 ms proving time, 10.4 ms verification time, and a 75 KB proof for the 16,384-bit XOR demo. These are historical reference values, not fresh measurements from this correction branch.
 
-### ZKP Circuit Library
+The public code computes the Winterfell comparator with an analytic model and does not construct or run a Winterfell prover. **No measured same-scale speedup or constraint-reduction ratio is claimed by this public artifact.**
 
-| Circuit | AND Gates | Prove Time | What It Proves |
-|---------|-----------|------------|----------------|
-| XOR binding (16Kbit) | 256 | 430 ms | HDC binding correctness |
-| Bundling (3 vectors) | 768 | 925 ms | Majority vote aggregation |
-| Hamming similarity | 511 | 498 ms | Search relevance |
-| CfC temporal (64N×100T) | 7,360 | 954 ms | Neural network evolution |
-| CfC + sigmoid | 13,760 | 680 ms | Full neural computation |
-| FL encrypted (16 participants) | 1,024 | 91 ms | Encrypted gradient aggregate |
-| Health range proof | ~32 | 27 ms | Value in [min, max] |
-| Consciousness tier | ~32 | 46 ms | Phi >= threshold |
+The previous Hamming result is superseded: its circuit summed/truncated XOR-word values rather than population counts. The previous 8- and 16-input aggregation results are superseded: those paths reduced inputs with AND rather than majority. The previous federated-learning claim is withdrawn because the circuit did not constrain OTP encryption or numeric gradient aggregation. The temporal proof demo is a bitwise recurrence with witness-supplied gates, not a proof of numerical fixed-point CfC dynamics.
 
 ### Cognitive Architecture
 
@@ -118,7 +105,7 @@ XOR binding — the core HDC operation — requires **zero non-linear constraint
 
 | Paper | Venue | Status |
 |-------|-------|--------|
-| [**Binary-Field STARKs for HDC**](papers/binius-hdc/) | IEEE S&P 2027 | Submission-ready (v5) |
+| [**Binary-Field STARKs for HDC**](papers/theory-foundations/binius-hdc/) | Intended venue: IEEE S&P 2027 | Audit revision required; cross-backend and application claims are being re-scoped |
 | [CfC Temporal Proofs](papers/cfc-zkp/) | NeurIPS workshop | 3-page draft |
 | [Triple-Stack FL](papers/triple-stack-fl/) | PoPETs | 3-page draft |
 | HAI: Hyperdimensional Active Inference | PLoS Comp Bio | Manuscript complete |
