@@ -384,12 +384,6 @@ impl RegressionReport {
         warning_pct: f64,
         critical_pct: f64,
     ) -> Result<Self, SnapshotComparisonError> {
-        if baseline.schema_version != current.schema_version {
-            return Err(SnapshotComparisonError::SchemaVersionMismatch {
-                baseline: baseline.schema_version.clone(),
-                current: current.schema_version.clone(),
-            });
-        }
         for (side, snapshot) in [("baseline", baseline), ("current", current)] {
             if snapshot.schema_version != SNAPSHOT_SCHEMA_VERSION {
                 return Err(SnapshotComparisonError::UnsupportedSchemaVersion {
@@ -401,6 +395,12 @@ impl RegressionReport {
             if let Err(errors) = snapshot.validate() {
                 return Err(SnapshotComparisonError::InvalidSnapshot { side, errors });
             }
+        }
+        if baseline.schema_version != current.schema_version {
+            return Err(SnapshotComparisonError::SchemaVersionMismatch {
+                baseline: baseline.schema_version.clone(),
+                current: current.schema_version.clone(),
+            });
         }
 
         for benchmark in baseline.metrics.keys() {
