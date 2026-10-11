@@ -96,6 +96,38 @@
       "assessment_at_ns": 1400000000,
       "config_assessed_at_ns": 1200000000,
       "duplicate_second_received_at_ns": 1360000000
+    },
+    {
+      "case_id": "reply_at_exact_response_deadline",
+      "kind": "assessment",
+      "expected": "requirements_match",
+      "request_id": 31,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1200000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.deadline-equality",
+      "reply_window_id": "arming-check.fixture.deadline-equality",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1500000000,
+      "assessment_at_ns": 1550000000,
+      "config_assessed_at_ns": 1300000000,
+      "duplicate_second_received_at_ns": null
+    },
+    {
+      "case_id": "equal_source_timestamp_is_not_regression",
+      "kind": "assessment",
+      "expected": "requirements_match",
+      "request_id": 32,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1250000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.source-time-equality",
+      "reply_window_id": "arming-check.fixture.source-time-equality",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1350000000,
+      "assessment_at_ns": 1400000000,
+      "config_assessed_at_ns": 1200000000,
+      "duplicate_second_received_at_ns": null
     }
   ],
   "provenance": {
