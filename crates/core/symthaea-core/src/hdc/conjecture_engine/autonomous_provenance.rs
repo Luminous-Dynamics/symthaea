@@ -535,7 +535,9 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         && receipt.system_definition_blake3 == receipt.system_definition_blake3.to_ascii_lowercase()
         && receipt.system_definition_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
         && receipt.search_config_blake3.len() == 64
+        && receipt.search_config_blake3 == receipt.search_config_blake3.to_ascii_lowercase()
         && receipt.search_config_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && !receipt.candidate_formula.trim().is_empty()
         && !receipt.variable_names.is_empty()
         && receipt.variable_names.iter().all(|name| !name.trim().is_empty())
         && receipt.variable_names.iter().collect::<std::collections::HashSet<_>>().len()
