@@ -1,0 +1,378 @@
+name: Spore Boot Ecology
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/core/symthaea-boot-ecology/**"
+      - "crates/core/symthaea-boot-state/**"
+      - "crates/domains/symthaea-quicken-fb/**"
+      - "nix/packages/spore-boot-tools.nix"
+      - "scripts/spore_preview_gallery.py"
+      - "scripts/spore_inoculation_gallery.py"
+      - "scripts/spore_visual_lint.py"
+      - "scripts/spore_visual_evidence.py"
+      - "docs/design/SPORE_BOOT_ECOLOGY_V03.md"
+      - "docs/design/SPORE_VISUAL_LANGUAGE_V031.md"
+      - "docs/design/SPORE_VISUAL_FIDELITY_V032.md"
+      - ".github/workflows/spore-boot-ecology.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spore-boot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boot-ecology:
+    name: Rust state + renderer gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # This focused lane qualifies the exact source head. Repository-wide CI
+      # separately owns synthetic PR-merge integration.
+      SPORE_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      SPORE_EVALUATED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SPORE_SOURCE_COMMIT }}
+
+      - name: Verify exact-head identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SPORE_SOURCE_COMMIT"
+          test "$SPORE_EVALUATED_COMMIT" = "$SPORE_SOURCE_COMMIT"
+          echo "head=$(git rev-parse HEAD)"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')"
+
+      - name: Install repository-pinned Rust toolchain
+        id: toolchain
+        run: |
+          set -euo pipefail
+          RUST_CHANNEL="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$RUST_CHANNEL"
+          echo "channel=$RUST_CHANNEL" >> "$GITHUB_OUTPUT"
+          rustup toolchain install "$RUST_CHANNEL" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$RUST_CHANNEL"
+          test "$(rustc --version | awk '{print $2}')" = "$RUST_CHANNEL"
+          rustc --version
+          cargo --version
+
+      - name: Resolve existing workspace lock minimally
+        id: lock
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          if git diff --quiet -- Cargo.lock; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            git diff --stat -- Cargo.lock
+          fi
+
+      - name: Upload resolver-produced Cargo.lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-ecology-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Capture pinned rustfmt candidate
+        id: rustfmt
+        run: |
+          set -euo pipefail
+          cargo fmt \
+            -p symthaea-boot-ecology \
+            -p symthaea-boot-state \
+            -p symthaea-quicken-fb
+
+          if git diff --quiet -- . ':(exclude)Cargo.lock'; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+          git diff --binary -- . ':(exclude)Cargo.lock' > spore-boot-ecology-rustfmt.patch
+          {
+            echo 'schema=spore-boot-ecology-rustfmt-candidate-v1'
+            echo "source_commit=$SPORE_SOURCE_COMMIT"
+            echo "evaluated_commit=$(git rev-parse HEAD)"
+            echo "evaluated_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            sha256sum spore-boot-ecology-rustfmt.patch
+          } > spore-boot-ecology-rustfmt-evidence.txt
+          git diff --stat -- . ':(exclude)Cargo.lock'
+
+          # Restore formatter-mutated tracked source. A resolver-produced lock
+          # candidate remains separate so neither candidate can silently repair
+          # the exact committed state being qualified.
+          git diff --name-only -z -- . ':(exclude)Cargo.lock' \
+            | xargs -0 -r git checkout --
+
+      - name: Upload exact rustfmt candidate
+        if: steps.rustfmt.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-ecology-rustfmt-candidate
+          path: |
+            spore-boot-ecology-rustfmt.patch
+            spore-boot-ecology-rustfmt-evidence.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Require committed qualification inputs
+        if: steps.lock.outputs.changed == 'true' || steps.rustfmt.outputs.changed == 'true'
+        env:
+          RUST_CHANNEL: ${{ steps.toolchain.outputs.channel }}
+        run: |
+          if [[ "${{ steps.lock.outputs.changed }}" == 'true' ]]; then
+            echo "Cargo.lock differs from Cargo $RUST_CHANNEL resolver output." >&2
+            echo 'Commit the uploaded spore-boot-ecology-cargo-lock candidate unchanged.' >&2
+          fi
+          if [[ "${{ steps.rustfmt.outputs.changed }}" == 'true' ]]; then
+            echo "Rust $RUST_CHANNEL formatting differs from the exact source head." >&2
+            echo 'Apply the uploaded spore-boot-ecology-rustfmt-candidate patch unchanged.' >&2
+          fi
+          exit 1
+
+      - name: Format boot crates
+        run: >-
+          cargo fmt --check
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+
+      - name: Check boot crates
+        run: >-
+          cargo check --locked
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+          --all-targets
+
+      - name: Clippy boot crates
+        run: >-
+          cargo clippy --locked
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+          --all-targets
+          -- -D warnings
+
+      - name: Test boot crates
+        run: >-
+          cargo test --locked
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+
+      - name: Probe complete renderer CPU cost
+        run: >-
+          cargo run --locked --release
+          -p symthaea-quicken-fb
+          --bin spore_render_probe
+          --
+          --width 640
+          --height 360
+          --frames 24
+          --out spore-render-probe.json
+
+      - name: Verify renderer cost evidence
+        run: |
+          test -s spore-render-probe.json
+          python3 - <<'PY'
+          import json, math
+          from pathlib import Path
+          report = json.loads(Path("spore-render-probe.json").read_text())
+          assert report["schema"] == "spore-render-probe-v1"
+          assert report["width"] == 640 and report["height"] == 360
+          assert report["frames"] == 24
+          for key in ("mean_frame_ms", "p50_frame_ms", "p95_frame_ms", "max_frame_ms"):
+              value = float(report[key])
+              assert math.isfinite(value) and value >= 0.0, (key, value)
+          assert len(report["final_frame_blake3"]) == 64
+          assert report["policy"] == "evidence-only-no-performance-threshold"
+          PY
+
+      - name: Render exact lifecycle preview matrix
+        run: >-
+          cargo run --locked --release
+          -p symthaea-quicken-fb
+          --bin spore_boot_preview_matrix
+          --
+          --out spore-boot-preview-matrix
+          --width 320
+          --height 180
+          --fps 1
+
+      - name: Publish exact boot preview gallery
+        run: python3 scripts/spore_preview_gallery.py spore-boot-preview-matrix
+
+      - name: Verify boot preview manifest, gallery, and case count
+        run: |
+          test -s spore-boot-preview-matrix/matrix-manifest.json
+          test -s spore-boot-preview-matrix/gallery-manifest.json
+          test -s spore-boot-preview-matrix/index.html
+          test "$(find spore-boot-preview-matrix -name preview-manifest.json | wc -l)" -eq 16
+          test "$(find spore-boot-preview-matrix -name 'frame-*.ppm' | wc -l)" -ge 16
+          test "$(find spore-boot-preview-matrix -name 'frame-*.png' | wc -l)" -ge 16
+
+      - name: Render exact inoculation phase matrix
+        run: >-
+          cargo run --locked --release
+          -p symthaea-quicken-fb
+          --bin spore_inoculation_preview
+          --
+          --out spore-inoculation-preview
+          --width 320
+          --height 180
+
+      - name: Publish exact inoculation phase gallery
+        run: python3 scripts/spore_inoculation_gallery.py spore-inoculation-preview
+
+      - name: Verify inoculation phase preview and count
+        run: |
+          test -s spore-inoculation-preview/inoculation-manifest.json
+          test -s spore-inoculation-preview/gallery-manifest.json
+          test -s spore-inoculation-preview/index.html
+          test "$(find spore-inoculation-preview -name 'frame-*.ppm' | wc -l)" -eq 32
+          test "$(find spore-inoculation-preview -name 'frame-*.png' | wc -l)" -eq 32
+
+      - name: Render exact install-path ceremony matrix
+        run: >-
+          cargo run --locked --release
+          -p symthaea-quicken-fb
+          --bin spore_inoculation_paths_preview
+          --
+          --out spore-inoculation-paths-preview
+          --width 320
+          --height 180
+
+      - name: Publish exact install-path ceremony gallery
+        run: python3 scripts/spore_inoculation_gallery.py spore-inoculation-paths-preview
+
+      - name: Verify six path signatures
+        run: |
+          test -s spore-inoculation-paths-preview/inoculation-manifest.json
+          test -s spore-inoculation-paths-preview/gallery-manifest.json
+          test -s spore-inoculation-paths-preview/index.html
+          test "$(find spore-inoculation-paths-preview -name 'frame-*.ppm' | wc -l)" -eq 18
+          test "$(find spore-inoculation-paths-preview -name 'frame-*.png' | wc -l)" -eq 18
+
+      - name: Lint exact pixels for blank-output and semantic-collapse regressions
+        run: >-
+          python3 scripts/spore_visual_lint.py
+          spore-boot-preview-matrix
+          spore-inoculation-preview
+          spore-inoculation-paths-preview
+
+      - name: Verify visual lint reports
+        run: |
+          for root in spore-boot-preview-matrix spore-inoculation-preview spore-inoculation-paths-preview; do
+            test -s "$root/visual-lint.json"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for root in (
+              "spore-boot-preview-matrix",
+              "spore-inoculation-preview",
+              "spore-inoculation-paths-preview",
+          ):
+              report = json.loads(Path(root, "visual-lint.json").read_text())
+              assert report["schema"] == "spore-visual-lint-v1"
+              assert report["scenario_count"] > 0
+              assert report["policy"]["purpose"] == "sanity-and-semantic-diversity-not-aesthetic-scoring"
+          PY
+
+      - name: Seal exact visual evidence
+        run: >-
+          python3 scripts/spore_visual_evidence.py
+          spore-boot-preview-matrix
+          spore-inoculation-preview
+          spore-inoculation-paths-preview
+
+      - name: Verify exact visual evidence seals
+        run: |
+          for root in spore-boot-preview-matrix spore-inoculation-preview spore-inoculation-paths-preview; do
+            test -s "$root/evidence-manifest.json"
+            test -s "$root/EVIDENCE.sha256"
+            test -s "$root/visual-lint.json"
+            (cd "$root" && sha256sum -c EVIDENCE.sha256)
+          done
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          roots = (
+              "spore-boot-preview-matrix",
+              "spore-inoculation-preview",
+              "spore-inoculation-paths-preview",
+          )
+          expected_source = os.environ["SPORE_SOURCE_COMMIT"]
+          expected_evaluated = os.environ["SPORE_EVALUATED_COMMIT"]
+          assert expected_source == expected_evaluated
+          for root in roots:
+              manifest = json.loads(Path(root, "evidence-manifest.json").read_text())
+              assert manifest["schema"] == "spore-visual-evidence-v1"
+              assert manifest["source_commit"] == expected_source
+              assert manifest["evaluated_commit"] == expected_evaluated
+              assert manifest["file_count"] > 0
+              assert manifest["total_bytes"] > 0
+              assert any(item["path"] == "visual-lint.json" for item in manifest["files"])
+          PY
+
+      - name: Verify tracked exact-head state after evidence generation
+        run: |
+          set -euo pipefail
+          git diff --quiet
+          git diff --cached --quiet
+          test "$(git rev-parse HEAD)" = "$SPORE_SOURCE_COMMIT"
+
+      - name: Upload renderer cost evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-render-probe
+          path: spore-render-probe.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload exact boot renderer previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-preview-matrix
+          path: spore-boot-preview-matrix
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload exact inoculation phase previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-inoculation-preview
+          path: spore-inoculation-preview
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload exact install-path ceremony previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-inoculation-paths-preview
+          path: spore-inoculation-paths-preview
+          if-no-files-found: warn
+          retention-days: 14

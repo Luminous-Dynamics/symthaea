@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-boot-ecology"
+version = "0.1.0"
+edition = "2024"
+description = "Lightweight state-aware procedural boot ecology protocol and composer"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { workspace = true }
+blake3 = { workspace = true }
