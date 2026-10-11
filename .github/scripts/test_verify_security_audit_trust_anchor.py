@@ -477,10 +477,10 @@ class TrustAnchorPolicyTests(unittest.TestCase):
     def test_workflow_status_write_is_scoped_to_verifier_job(self):
         workflow = (Path(__file__).resolve().parent.parent / "workflows" /
                     "security-audit-independent-verifier.yml").read_text(encoding="utf-8")
-        top_level, jobs = workflow.split("\\njobs:\\n", 1)
-        top_permissions = top_level.split("\\npermissions:\\n", 1)[1].split("\\n\\n", 1)[0]
+        top_level, jobs = workflow.split("\njobs:\n", 1)
+        top_permissions = top_level.split("\npermissions:\n", 1)[1].split("\n\n", 1)[0]
         self.assertNotIn("statuses: write", top_permissions)
-        job_permissions = jobs.split("\\n    permissions:\\n", 1)[1].split("\\n    steps:\\n", 1)[0]
+        job_permissions = jobs.split("\n    permissions:\n", 1)[1].split("\n    steps:\n", 1)[0]
         self.assertIn("statuses: write", job_permissions)
 
     def test_api_rejects_bad_json(self):
