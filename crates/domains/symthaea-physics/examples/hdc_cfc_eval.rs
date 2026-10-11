@@ -1053,7 +1053,7 @@ fn main() {
     println!("  Normalization is fit on training partitions only.");
     println!("  Best-F1 thresholds use evaluation labels and are oracle diagnostics,");
     println!("  not deployable metrics. Select thresholds on a separate validation split.");
-    println!("  Treat AUC/F1 differences as exploratory pending a fixed split, seed, and tuning protocol");
+    println!("  Treat AUC/F1 differences as exploratory until the protocol is fixed and repeated");
     println!("  are preregistered and repeated on independent data.");
     println!("================================================================");
 }
