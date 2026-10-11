@@ -64,6 +64,7 @@ For Stage 2, add at least one external symbolic-regression baseline if its probl
 - Evaluate the final frozen candidate list using an evaluator independent of the search's ranking loop.
 - Re-evaluate accepted candidates with a second integration step size (for example, halved step size) and check numerical stability of conclusions.
 - Exclude constants, functionally constant expressions, malformed formulas, non-finite values, and candidates with insufficient gradient informativeness from successful recovery counts. Record each rejection reason.
+- Freeze the gradient-informativeness policy in each receipt: the squared-gradient floor is `0.01` (equivalent to a gradient magnitude at least 10% of that orbit's peak), and the minimum informative-sample fraction is `0.5` on every scored holdout orbit. Both values must be serialized and bound into the context and receipt digests; the independent verifier rejects substituted policy values. Tune or sensitivity-test alternatives only on exploratory/development runs, not the sealed confirmatory holdout.
 - Score a system as recovered only when an accepted candidate meets the predeclared symbolic-equivalence or domain-appropriate oracle criterion **and** passes the frozen holdout rule. Numerical near-conservation by itself is not exact symbolic recovery.
 
 The independent holdout seed must differ from the discovery seed. The evaluation harness must also demonstrate that changing a candidate, input condition, or system identity invalidates the associated assessment context and receipt.
