@@ -82,6 +82,10 @@ The normal minimization path is initialized deterministically by the current cal
 **Gate C — Symthaea controller adapter**
 Only after Gate B is reproduced: expose candidate selection/resource allocation to Symthaea while keeping experimental observables and evaluation-only metadata inaccessible to the controller. The specialist generator/forward model stays identical across arms. Compare uniform/fixed, conventional heuristic, Symthaea without HDC, and full Symthaea under a matched call/compute budget. Evaluate primary held-out evidence once, after targets, splits, code versions, resource caps, metrics, exclusions, and stopping rules are frozen.
 
+## Run-record contract
+
+A fail-closed JSON Schema has been added at [PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json](PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json). It freezes preregistration/source identities, accounts for every expected target, separates raw/refined/held-out metric roles, captures resource use and artifacts, and requires failed/missing results to remain explicit. The schema is not yet wired into a runtime validator and is not evidence that a run has occurred.
+
 ## Current decision
 
 **Reuse is promising but not yet qualified.** The implementation provides useful score/refinement machinery, but reference reproducibility, target-level failure accounting, source-observable circularity, and environment/data identity must be resolved before it is used as an evaluator for claims about Symthaea. No protein benchmark was run during this audit, and no scientific-performance claim is authorized by it.
