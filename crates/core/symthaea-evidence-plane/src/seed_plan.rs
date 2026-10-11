@@ -27,6 +27,14 @@
 //! report carrying it can be checked against the plan it claims to have run
 //! under, so a silently-edited seed set is detectable after the fact rather than
 //! taken on trust.
+//!
+//! The fingerprint is a versioned BLAKE3 digest over an explicit canonical byte
+//! encoding — never a Rust `Debug`/`Hash`/`DefaultHasher` representation. That
+//! makes seed-plan identity portable across compiler/toolchain versions and host
+//! platforms. The serialized identifier is explicitly algorithm-typed as
+//! `blake3:<64 lowercase hex>` so stored evidence never depends on an implicit
+//! digest convention. Any future encoding change must bump
+//! [`SEED_PLAN_FINGERPRINT_VERSION`] rather than silently changing identity.
 
 use std::collections::HashSet;
 
@@ -34,6 +42,11 @@ use serde::{Deserialize, Serialize};
 
 /// Minimum confirmatory seeds, per the pre-registration.
 pub const MIN_CONFIRMATORY_SEEDS: usize = 8;
+
+/// Version of the canonical byte encoding used by [`SeedPlan::fingerprint`].
+pub const SEED_PLAN_FINGERPRINT_VERSION: u8 = 1;
+
+const SEED_PLAN_FINGERPRINT_DOMAIN: &[u8] = b"symthaea-seed-plan";
 
 /// Ways a seed plan can be invalid or misused.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,8 +56,12 @@ pub enum SeedViolation {
     DevelopmentSeedReused { seed: u64 },
     /// Fewer confirmatory seeds than the pre-registration requires.
     TooFewConfirmatory { got: usize, required: usize },
-    /// The same seed appears twice, inflating apparent sample size.
+    /// The same confirmatory seed appears twice, inflating apparent sample size.
     DuplicateSeed { seed: u64 },
+    /// The same development seed appears twice. Development seeds are a semantic
+    /// set in the frozen plan; duplicate presentation must not mint a distinct
+    /// durable fingerprint for the same development history.
+    DuplicateDevelopmentSeed { seed: u64 },
     /// A run used a seed that was never registered as confirmatory.
     UnregisteredSeed { seed: u64 },
 }
@@ -79,6 +96,13 @@ impl SeedPlan {
         for &s in &confirmatory {
             if !seen.insert(s) {
                 violations.push(SeedViolation::DuplicateSeed { seed: s });
+            }
+        }
+
+        let mut seen_development = HashSet::new();
+        for &s in &development {
+            if !seen_development.insert(s) {
+                violations.push(SeedViolation::DuplicateDevelopmentSeed { seed: s });
             }
         }
 
@@ -129,15 +153,40 @@ impl SeedPlan {
         }
     }
 
-    /// Stable identifier for this exact plan, for embedding in a results report.
+    /// Stable, portable, algorithm-typed identifier for this exact plan.
+    ///
+    /// Encoding contract (v1):
+    ///
+    /// ```text
+    /// "symthaea-seed-plan" || version_u8 ||
+    /// confirmatory_len_u64_le || sorted(confirmatory_seed_u64_le...) ||
+    /// development_len_u64_le || sorted(development_seed_u64_le...)
+    /// ```
+    ///
+    /// Length prefixes make the two seed domains unambiguous; sorting makes
+    /// identity independent of presentation order; explicit little-endian u64
+    /// encoding makes it independent of host endianness. Registration rejects
+    /// duplicate identities in either domain, so the canonical sequence denotes
+    /// an exact set rather than a multiset. The full 32-byte BLAKE3 digest is
+    /// returned as canonical `blake3:<64 lowercase hex>` text.
     pub fn fingerprint(&self) -> String {
-        // Order-independent so a reordered-but-identical set fingerprints the
-        // same; a reordering is not a different plan.
-        let mut c = self.confirmatory.clone();
-        let mut d = self.development.clone();
-        c.sort_unstable();
-        d.sort_unstable();
-        crate::config_hash(&(c, d))
+        let mut confirmatory = self.confirmatory.clone();
+        let mut development = self.development.clone();
+        confirmatory.sort_unstable();
+        development.sort_unstable();
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(SEED_PLAN_FINGERPRINT_DOMAIN);
+        hasher.update(&[SEED_PLAN_FINGERPRINT_VERSION]);
+        hasher.update(&(confirmatory.len() as u64).to_le_bytes());
+        for seed in confirmatory {
+            hasher.update(&seed.to_le_bytes());
+        }
+        hasher.update(&(development.len() as u64).to_le_bytes());
+        for seed in development {
+            hasher.update(&seed.to_le_bytes());
+        }
+        format!("blake3:{}", hasher.finalize().to_hex())
     }
 }
 
@@ -168,18 +217,30 @@ mod tests {
 
     /// Duplicates would inflate apparent sample size while adding no information.
     #[test]
-    fn duplicate_seeds_are_rejected() {
+    fn duplicate_confirmatory_seeds_are_rejected() {
         let mut seeds: Vec<u64> = (100..107).collect();
         seeds.push(100);
         let v = SeedPlan::register(seeds, vec![]).expect_err("must reject");
         assert!(v.contains(&SeedViolation::DuplicateSeed { seed: 100 }));
     }
 
+    /// Development history is a set too: duplicate presentation is malformed,
+    /// not a distinct durable identity.
+    #[test]
+    fn duplicate_development_seeds_are_rejected() {
+        let v = SeedPlan::register((100..108).collect(), vec![1, 2, 1])
+            .expect_err("duplicate development seed must reject");
+        assert!(v.contains(&SeedViolation::DuplicateDevelopmentSeed { seed: 1 }));
+    }
+
     /// All violations are reported at once, so a plan can be fixed in one pass.
     #[test]
     fn every_violation_is_reported_not_just_the_first() {
-        let v = SeedPlan::register(vec![1, 1, 2], vec![2]).expect_err("must reject");
-        assert!(v.len() >= 3, "expected several violations, got {v:?}");
+        let v = SeedPlan::register(vec![1, 1, 2], vec![2, 2]).expect_err("must reject");
+        assert!(v.len() >= 4, "expected several violations, got {v:?}");
+        assert!(v.contains(&SeedViolation::DuplicateSeed { seed: 1 }));
+        assert!(v.contains(&SeedViolation::DuplicateDevelopmentSeed { seed: 2 }));
+        assert!(v.contains(&SeedViolation::DevelopmentSeedReused { seed: 2 }));
     }
 
     /// The guard has to work where the seed is consumed, not only where the plan
@@ -200,22 +261,44 @@ mod tests {
         ok_plan().enforce(999);
     }
 
-    /// A silently-edited seed set must be detectable after the fact.
+    /// A silently-edited confirmatory seed set must be detectable after the fact.
     #[test]
-    fn fingerprint_changes_when_the_plan_changes() {
+    fn fingerprint_changes_when_confirmatory_plan_changes() {
         let a = ok_plan();
         let b = SeedPlan::register((200..208).collect(), vec![1, 2, 3]).expect("valid");
         assert_ne!(a.fingerprint(), b.fingerprint());
     }
 
-    /// Reordering is not a different plan.
+    /// Development history is part of the registered plan identity too.
+    #[test]
+    fn fingerprint_changes_when_development_plan_changes() {
+        let a = ok_plan();
+        let b = SeedPlan::register((100..108).collect(), vec![10, 11, 12]).expect("valid");
+        assert_ne!(a.fingerprint(), b.fingerprint());
+    }
+
+    /// Reordering is not a different plan in either seed domain.
     #[test]
     fn fingerprint_is_order_independent() {
         let a = SeedPlan::register((100..108).collect(), vec![1, 2]).expect("valid");
-        let mut rev: Vec<u64> = (100..108).collect();
-        rev.reverse();
-        let b = SeedPlan::register(rev, vec![2, 1]).expect("valid");
+        let mut confirmatory: Vec<u64> = (100..108).collect();
+        confirmatory.reverse();
+        let b = SeedPlan::register(confirmatory, vec![2, 1]).expect("valid");
         assert_eq!(a.fingerprint(), b.fingerprint());
+    }
+
+    #[test]
+    fn fingerprint_is_typed_full_lowercase_blake3_hex() {
+        let fingerprint = ok_plan().fingerprint();
+        let hex = fingerprint
+            .strip_prefix("blake3:")
+            .expect("durable seed-plan identity must declare its digest algorithm");
+        assert_eq!(hex.len(), 64, "full BLAKE3 digest must be retained");
+        assert!(
+            hex.bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+            "fingerprint digest must be canonical lowercase hexadecimal"
+        );
     }
 
     /// There must be no way to grow the set after registration. This test exists
