@@ -15,6 +15,7 @@ pub mod aging;
 pub mod compound_stability;
 pub mod database;
 pub mod encoder;
+pub mod evidence;
 pub mod haptic_prober;
 pub mod mining;
 pub mod properties;
@@ -23,6 +24,10 @@ pub mod strategic;
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
 pub use database::{MaterialDatabase, MaterialSearchResult};
 pub use encoder::MaterialHdcEncoder;
+pub use evidence::{
+    MaterialsClaimAuthority, MaterialsEvidenceChain, MaterialsEvidenceError, MaterialsEvidenceKind,
+    MaterialsEvidenceRecord, MaterialsEvidenceStage,
+};
 pub use mining::{
     MINING_HORIZON_LABELS, MINING_HORIZONS, MiningFepAction, MiningFepAgent, MiningHdcEncoder,
     MiningPredictor, MiningReading,
