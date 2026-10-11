@@ -56,7 +56,15 @@ def normal_force_per_length(line_density_kg_m, inertial_speed_m_s, path_radius_m
         raise ValueError("inputs must be finite")
     if line_density_kg_m < 0 or inertial_speed_m_s < 0 or path_radius_m <= 0:
         raise ValueError("density/speed must be non-negative and radius positive")
-    return line_density_kg_m * inertial_speed_m_s**2 / path_radius_m
+    if line_density_kg_m == 0.0 or inertial_speed_m_s == 0.0:
+        return 0.0
+    try:
+        result = line_density_kg_m * inertial_speed_m_s**2 / path_radius_m
+    except OverflowError as exc:
+        raise ValueError("normal-force result exceeds floating-point range") from exc
+    if not math.isfinite(result):
+        raise ValueError("normal-force result must be finite")
+    return result
 
 
 def main():
@@ -118,6 +126,20 @@ def main():
           normal_force_per_length(1.0, 3.0, 20.0), 0.5 * base, 1e-12)
     check("circular_stream.density_doubling_doubles_resultant",
           normal_force_per_length(2.0, 3.0, 10.0), 2.0 * base, 1e-12)
+    check(
+        "circular_stream.zero_density_large_finite_speed_is_zero",
+        normal_force_per_length(0.0, 1e308, 10.0),
+        0.0,
+        0.0,
+        "Avoids an intermediate overflow when the physical result is exactly zero.",
+    )
+    try:
+        normal_force_per_length(1.0, 1e308, 10.0)
+        overflow_rejected = False
+    except ValueError:
+        overflow_rejected = True
+    check("circular_stream.nonfinite_result_rejected", overflow_rejected)
+
     for name, args in (
         ("negative_density_rejected", (-1.0, 3.0, 10.0)),
         ("nonfinite_speed_rejected", (1.0, math.inf, 10.0)),
