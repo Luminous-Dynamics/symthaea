@@ -171,10 +171,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  ablation OOD accuracy:                  {di_ood:.3}");
         println!("  baseline raw OOD macro recall:          {raw_macro_ood:.3}");
         println!("  ablation OOD macro recall:              {di_macro_ood:.3}");
+        print_per_class_recall("domain-invariant OOD", &di_probe, &otrf_di_hvs, &otrf_labels);
         println!("  Compare both accuracy and macro recall; neither alone proves detection quality.");
     }
 
     Ok(())
+}
+
+fn print_per_class_recall(
+    name: &str,
+    probe: &LogisticProbe,
+    hvs: &[Hdv],
+    labels: &[String],
+) {
+    let predictions = probe.predict_batch(hvs);
+    let mut per_class: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
+    for (label, prediction) in labels.iter().zip(predictions.iter()) {
+        let entry = per_class.entry(label.as_str()).or_insert((0, 0));
+        entry.1 += 1;
+        if probe.class_names.get(*prediction).map(String::as_str) == Some(label.as_str()) {
+            entry.0 += 1;
+        }
+    }
+    println!("  {name} per-class recall:");
+    for (label, (correct, total)) in per_class {
+        let recall = if total == 0 { f32::NAN } else { correct as f32 / total as f32 };
+        println!("    {label:<22} {correct:>4}/{total:<4} ({recall:.3})");
+    }
 }
 
 fn macro_accuracy(probe: &LogisticProbe, hvs: &[Hdv], labels: &[String]) -> f32 {
