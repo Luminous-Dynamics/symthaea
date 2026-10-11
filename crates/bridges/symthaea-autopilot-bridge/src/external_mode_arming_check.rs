@@ -1507,6 +1507,37 @@ mod tests {
     }
 
     #[test]
+    fn independently_bound_registration_from_another_session_is_rejected() {
+        let other_session = Px4ExternalModeRegistrationBindingV1::new(
+            "px4.registration.decoder.fixture.v1",
+            "vehicle.slot-a",
+            "px4.v1.18.external-mode.fixture.v1",
+            "px4.boot.fixture.session-b",
+            991,
+            "org.luminous.fixture.mode",
+            1,
+            true,
+            3,
+            42,
+            -1,
+            ts(900_000_000),
+        )
+        .unwrap();
+        assert_eq!(
+            Px4ExternalModeArmingCheckAssessmentV1::new(
+                profile(),
+                other_session,
+                config_assessment(42, true, 0, 1_200_000_000),
+                arming_request(1 << 3),
+                Some(arming_reply(8, 3, false, 1_350_000_000)),
+                ts(1_400_000_000),
+            )
+            .unwrap_err(),
+            Px4ExternalModeArmingCheckError::BootSessionMismatch
+        );
+    }
+
+    #[test]
     fn mismatch_reports_only_differing_requirement_fields() {
         let value = assessment(
             registration(true, 3, 42),
@@ -1666,7 +1697,23 @@ mod tests {
             Px4ExternalModeArmingCheckOutcomeV1::RegistrationNotSuccessful
         ));
 
-        let stale = assessment(
+        let stale_profile = Px4ExternalModeArmingCheckProfileV1::new(
+            "px4.external-mode.arming-check.stale-registration.fixture.v1",
+            "vehicle.slot-a",
+            "px4.v1.18.external-mode.fixture.v1",
+            "px4.registration.decoder.fixture.v1",
+            "px4.arming-check.decoder.fixture.v1",
+            "px4.boot.fixture.session-a",
+            "arming-check.fixture.cycle-1",
+            clock(),
+            2_000_000_000,
+            5_000_000_000,
+            200_000_000,
+            500_000_000,
+        )
+        .unwrap();
+        let stale = Px4ExternalModeArmingCheckAssessmentV1::new(
+            stale_profile,
             Px4ExternalModeRegistrationBindingV1::new(
                 "px4.registration.decoder.fixture.v1",
                 "vehicle.slot-a",
@@ -1685,8 +1732,9 @@ mod tests {
             config_assessment(42, true, 0, 1_200_000_000),
             arming_request(1 << 3),
             Some(arming_reply(8, 3, false, 1_350_000_000)),
-            4_000_000_000,
-        );
+            ts(4_000_000_000),
+        )
+        .unwrap();
         assert!(matches!(
             stale.outcome().unwrap(),
             Px4ExternalModeArmingCheckOutcomeV1::RegistrationEvidenceStale { .. }
@@ -1725,7 +1773,7 @@ mod tests {
     }
 
     #[test]
-    fn assessment_rejects_mixed_sessions_producers_or_capture_windows() {
+    fn mutating_capture_window_breaks_request_commitment() {
         let mut req = arming_request(1 << 3);
         req.capture_window_id = "arming-check.other-cycle".into();
         // The test exercises digest validation too: field mutation is detected before join.
