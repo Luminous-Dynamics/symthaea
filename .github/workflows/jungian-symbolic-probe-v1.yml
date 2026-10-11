@@ -44,6 +44,9 @@ jobs:
           echo "head=$(git rev-parse HEAD)"
           echo "python_path=$(command -v python3)"
           python3 --version
+          rustc --version --verbose
+          cargo --version
+          rustup show active-toolchain
           python3 - <<'PY'
           import hashlib, pathlib, platform, sys
           p = pathlib.Path("docs/research/data/jungian_symbolic_probe_v1.json")
@@ -68,6 +71,8 @@ jobs:
           OUT="$RUNNER_TEMP/jungian-baseline-capture"
           mkdir -p "$OUT"
           SOURCE_REVISION="$(git rev-parse HEAD)"
+          export SYMTHAEA_RUSTC_VERSION="$(rustc --version --verbose | tr '\\n' ';')"
+          export SYMTHAEA_CARGO_VERSION="$(cargo --version)"
           cargo run --quiet --no-default-features --bin jungian_glyph_projection_probe --features glyph_codex -- \
             --corpus docs/research/data/jungian_symbolic_probe_v1.json \
             --output "$OUT/glyph_projection.json" \
