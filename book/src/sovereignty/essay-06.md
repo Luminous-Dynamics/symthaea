@@ -119,21 +119,21 @@ This is not forgiveness without accountability. It is accountability without per
 
 ---
 
-### VI. What 92.9% Means
+### VI. How to Read an Unqualified Benchmark
 
 We must be honest about performance.
 
-Symthaea's moral algebra achieves 92.9% accuracy on the Hendrycks ETHICS benchmark — a standardized test of ethical reasoning across multiple categories including justice, deontology, virtue ethics, utilitarianism, and commonsense morality.[^10] This is a strong result. It is not a perfect result.
+Earlier drafts of this essay cited 92.9% accuracy on Hendrycks ETHICS.[^10] That figure is not currently qualified for external use. The 94.5% headline family was retracted as leakage-inflated, and the later 56.2% cross-domain pilot is also unqualified: its current runner applies a generic wrongness score to tasks with different target semantics, and its sample-count/provenance description is inconsistent. See `docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md`. Until task-specific scoring, grouping, data manifests, and independent reproduction are in place, none of these aggregate numbers should be presented as verified moral-reasoning accuracy.
 
-The 7.1% error rate means that approximately one in fourteen moral evaluations produces an incorrect judgment — an action classified as permissible when it should be flagged, or an action flagged when it should be permitted. In a system that produces 42 million evaluations per day, this translates to approximately 3 million errors.
+Because the cited accuracy is unqualified, its implied 7.1% error rate is not established, and it cannot responsibly be extrapolated into a daily error count. We need a valid task-matched measurement before estimating operational error rates.
 
-Three million daily moral errors sounds alarming. But consider the baseline.
+The comparison must therefore remain architectural and historical, not a quantitative benchmark comparison.
 
-The 1602 architecture has a 100% moral error rate on any axis other than shareholder value, because it has no mechanism for evaluating any axis other than shareholder value. The VOC's moral accuracy on the dimension of human welfare was zero — not because its directors were immoral, but because the architecture did not include a term for human welfare in its optimization function.
+The VOC/1602 discussion is a conceptual illustration of how institutions can omit human welfare from decision criteria; it is not a measured 100% moral-error baseline and must not be used as a numerical comparison against Symthaea.
 
-RLHF-trained language models achieve varying moral accuracy depending on the benchmark, but they suffer from a structural limitation that the moral algebra does not: their moral evaluations are opaque. When a language model declines to produce harmful content, the user cannot inspect the moral reasoning that produced the refusal. The evaluation is a black box. When Symthaea flags an action as potentially violating the nonviolence obligation, the participant can inspect the evaluation: which obligation was triggered, what the alignment score was, what the confidence interval is, and whether the flag represents a clear violation or an ambiguous case requiring human deliberation.
+Traceable internal signals can help a reviewer understand which rule or representation contributed to a verdict, but inspectability is not correctness. Symthaea still needs validated explanations, calibrated uncertainty, and task-matched evaluation; likewise, opacity should not be generalized as a property of every RLHF-trained system.
 
-92.9% accuracy with full auditability and explicit uncertainty is, we argue, categorically better than either 0% accuracy (the 1602 architecture) or opaque accuracy (RLHF). The remaining 7.1% error rate is not a reason to abandon computational ethics. It is a reason to continue improving it — with the same intellectual honesty that requires us to report the error rate rather than hide it.
+A structured, inspectable ethics architecture is a worthwhile engineering hypothesis, not proof of better moral performance. The reason to continue is to measure it honestly, test adversarially, preserve uncertainty and disagreement, and demonstrate improvements on valid held-out tasks.
 
 ---
 
@@ -183,4 +183,4 @@ We have described the instrument. Now we describe what it builds.
 
 [^9]: For Navajo Peacemaking, see Robert Yazzie, "Life Comes From It: Navajo Justice Concepts," *New Mexico Law Review* 24 (1994). For Ubuntu's approach to restorative justice, see Desmond Tutu, *No Future Without Forgiveness* (Doubleday, 1999). For the Maori concept of *utu*, see Hirini Moko Mead, *Tikanga Māori: Living by Māori Values* (Huia Publishers, 2003).
 
-[^10]: Dan Hendrycks et al., "Aligning AI With Shared Human Values," *Proceedings of the International Conference on Learning Representations* (2021). The ETHICS benchmark comprises five categories: justice (12,000 examples), deontology (18,000), virtue ethics (12,000), utilitarianism (12,000), and commonsense morality (6,000). Symthaea's 92.9% accuracy is across four categories (justice, deontology, virtue, commonsense); the figure including non-Hendrycks datasets (Social Chemistry 101) is 91.1%.
+[^10]: Dan Hendrycks et al., "Aligning AI With Shared Human Values," *Proceedings of the International Conference on Learning Representations* (2021). ETHICS contains distinct task families; they are not interchangeable binary wrongness labels. The historical 92.9% and associated 91.1%/94.5% headline claims are not qualified as current performance, and the later 56.2% cross-domain pilot remains unqualified pending task/label/split reconciliation. See `docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md`.

@@ -1,7 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Unified Moral Reasoning Benchmark
+//! Legacy Unified Moral Reasoning Benchmark — results are unqualified.
+//!
+//! IMPORTANT: this composite crosses multiple datasets, label contracts, model
+//! components and evaluation paths. Do not cite its aggregate as task-level ETHICS
+//! accuracy until the dataset/split manifest and each task adapter are audited.
+//! See docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md. Use
+//! ethics_commonsense_holdout for a narrowly task-matched live-path diagnostic.
 //!
 //! Tests the moral algebra and parser against 5 priority datasets:
 //! 1. ETHICS (Hendrycks) - Commonsense, Deontology, Justice, Virtue
@@ -199,8 +205,9 @@ fn main() {
     let ablation_mode = std::env::var("ABLATION").unwrap_or_default();
 
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║       Unified Moral Reasoning Benchmark                      ║");
-    println!("║   Testing HDC Moral Algebra on 5 Priority Datasets           ║");
+    println!("║  LEGACY COMPOSITE BENCHMARK (NOT QUALIFIED)                   ║");
+    println!("║  Multiple datasets / split contracts require audit           ║");
+    println!("WARNING: do not cite aggregate as ETHICS accuracy; see docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md");
     println!("╚══════════════════════════════════════════════════════════════╝");
     if !ablation_mode.is_empty() && ablation_mode != "full" {
         println!("  ABLATION MODE: {}", ablation_mode);

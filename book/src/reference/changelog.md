@@ -15,7 +15,7 @@
 ## February 2026
 
 - **Substrate Independence** — Phases 3 (multi-substrate simulation) and 4 (hybrid per-region) completed
-- **External validation** — Hendrycks ETHICS 94.5%, ARC-AGI, Sleep-EDF, DMC Humanoid
+- **Historical validation claims** — Hendrycks ETHICS 94.5% headline later retracted as leakage-inflated (2026-07-15); current ETHICS aggregate is unqualified pending task-semantics reconciliation. Other named evaluations have their own status/claim boundaries.
 - **Soma** — Screen vision with dual-stream foveation, gesture recognition, metabolism state machine
 
 ## January 2026

@@ -21,7 +21,7 @@ cd luminous-dynamics/symthaea
 All benchmarks are standalone Rust examples in `examples/benchmark_*.rs`.
 
 ```bash
-# Ethics HDC (92.9% ETHICS-only, ~5 min)
+# Historical ETHICS HDC pilot (unqualified; rerun for investigation only)
 cargo run --release --example benchmark_ethics_hdc
 
 # ISOLET speaker classification (91.7%, ~2 min)
@@ -74,7 +74,7 @@ cargo run --release --example benchmark_meditation_resting
 
 | Benchmark | Metric | Result |
 |-----------|--------|--------|
-| Ethics HDC | ETHICS-only accuracy (4 categories) | 92.9% |
+| Ethics HDC | Historical pilot metric | Unqualified; task and split semantics require reconciliation |
 | ISOLET | Classification accuracy (26 letters) | 91.7% |
 | LibriSpeech | Speaker identification (10 speakers) | 94.5% |
 | C. elegans | Circuit Phi range (5 circuits) | 0.53-0.58 |
