@@ -235,6 +235,20 @@ mod tests {
         assert_ne!(a[0].label, b[0].label);
         assert_ne!(a[0].scenario_id, b[0].scenario_id);
         assert_eq!(a[0].vector, b[0].vector);
+
+        let ordered_a = aggregate_ordered_scenarios(
+            std::slice::from_ref(&vector),
+            &["execution".into()],
+            &["source-a".into()],
+        )
+        .unwrap();
+        let ordered_b = aggregate_ordered_scenarios(
+            std::slice::from_ref(&vector),
+            &["persistence".into()],
+            &["source-b".into()],
+        )
+        .unwrap();
+        assert_eq!(ordered_a[0].vector, ordered_b[0].vector);
     }
 
     #[test]
