@@ -89,7 +89,8 @@ def validate_record(
     if expected_ids != sorted(expected_ids):
         errors.append("expected-target IDs must be sorted lexicographically before freezing the manifest")
 
-    expected_digest = record.get("preregistration", {}).get("target_manifest_sha256")
+    prereg_for_hash = record.get("preregistration")
+    expected_digest = prereg_for_hash.get("target_manifest_sha256") if isinstance(prereg_for_hash, dict) else None
     observed_digest = sha256_bytes(targets_raw or b"")
     if expected_digest != observed_digest:
         errors.append(
@@ -101,7 +102,7 @@ def validate_record(
     rows = record.get("targets", [])
     if not isinstance(rows, list):
         rows = []
-    ids = [row.get("target_id") for row in rows if isinstance(row, dict)]
+    ids = [row.get("target_id") for row in rows if isinstance(row, dict) and isinstance(row.get("target_id"), str)]
     if len(ids) != len(set(ids)):
         errors.append("run record contains duplicate target_id rows")
     expected_set = set(expected_ids)
@@ -130,7 +131,9 @@ def validate_record(
         metrics = row.get("metrics", [])
         diag = row.get("diagnostics", {})
         codes = diag.get("error_codes", []) if isinstance(diag, dict) else []
-        if outcome in {"FAIL_EXECUTION", "FAIL_INVALID_OR_MISSING_METRICS"} and not codes:
+        if isinstance(outcome, str) and outcome in {"FAIL_EXECUTION", "FAIL_INVALID_OR_MISSING_METRICS"} and (
+            not isinstance(codes, list) or not codes or not all(isinstance(code, str) and code for code in codes)
+        ):
             errors.append(f"{label}: failure outcome must retain at least one diagnostics.error_codes entry")
         if status == "complete" and outcome == "NOT_RUN":
             errors.append(f"{label}: a complete run cannot contain a NOT_RUN target")
@@ -145,9 +148,12 @@ def validate_record(
             if isinstance(value, (int, float)) and not isinstance(value, bool) and not math.isfinite(float(value)):
                 errors.append(f"{mlabel}: metric value must be finite (NaN/Infinity are never valid scores)")
             key = (metric.get("metric_name"), metric.get("observable_id"), metric.get("condition_id"), metric.get("evaluation_role"))
-            if key in metric_keys:
+            if not all(value is None or isinstance(value, str) for value in key):
+                errors.append(f"{mlabel}: metric identity fields must be strings (condition_id may be null)")
+            elif key in metric_keys:
                 errors.append(f"{mlabel}: duplicate metric identity within target")
-            metric_keys.add(key)
+            else:
+                metric_keys.add(key)
             role, evidence, overlap = metric.get("evaluation_role"), row.get("evidence_class"), metric.get("observable_overlap")
             if role == "independent_held_out_observable" and overlap != "held_out_unseen":
                 errors.append(f"{mlabel}: independent held-out metric must have observable_overlap=held_out_unseen")
@@ -160,9 +166,10 @@ def validate_record(
 
     # Any artifact claimed in the record must resolve locally under the chosen root and match its hash.
     root = artifact_root.resolve()
-    artifacts = record.get("output_artifacts", [])
+    artifacts_value = record.get("output_artifacts", [])
+    artifacts = artifacts_value if isinstance(artifacts_value, list) else []
     verified_count = 0
-    for index, artifact in enumerate(artifacts if isinstance(artifacts, list) else []):
+    for index, artifact in enumerate(artifacts):
         if not isinstance(artifact, dict):
             continue
         location = artifact.get("uri_or_relative_path")
@@ -176,13 +183,17 @@ def validate_record(
         if parsed.scheme or candidate.is_absolute():
             errors.append(f"{label}: verifier accepts local relative paths only; remote/absolute paths cannot be independently hashed")
             continue
-        resolved = (root / candidate).resolve()
+        try:
+            resolved = (root / candidate).resolve()
+        except (OSError, RuntimeError, ValueError) as exc:
+            errors.append(f"{label}: cannot resolve artifact path: {exc}")
+            continue
         if not resolved.is_relative_to(root):
             errors.append(f"{label}: artifact path escapes artifact root")
             continue
         try:
             raw = resolved.read_bytes()
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             errors.append(f"{label}: cannot read artifact: {exc}")
             continue
         observed = sha256_bytes(raw)
@@ -240,7 +251,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     artifact_root = args.artifact_root or args.record.resolve().parent
-    errors, warnings, status = validate_record(args.record, args.schema, args.expected_targets, artifact_root)
+    try:
+        errors, warnings, status = validate_record(args.record, args.schema, args.expected_targets, artifact_root)
+    except Exception as exc:
+        print(f"ERROR: validator encountered malformed input or an unexpected validation failure: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print("INVALID_RUN_RECORD: validation failed closed", file=sys.stderr)
+        return 2
     for warning in warnings:
         print(f"WARNING: {warning}", file=sys.stderr)
     for error in errors:
