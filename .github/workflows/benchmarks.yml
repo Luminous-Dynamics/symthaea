@@ -27,6 +27,8 @@ on:
       - 'Cargo.lock'
       - 'crates/core/symthaea-core/src/hdc/conjecture_engine.rs'
       - 'crates/core/symthaea-core/src/hdc/conjecture_engine/**'
+      - 'scripts/check_regressions.py'
+      - 'scripts/test_check_regressions.py'
       - '.github/workflows/benchmarks.yml'
   workflow_dispatch:
     inputs:
