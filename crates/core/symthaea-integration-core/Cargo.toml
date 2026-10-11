@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-integration-core"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Domain-neutral integration contracts and runtime observation envelopes for Symthaea's autonomic infrastructure fabric"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-evidence-plane = { path = "../symthaea-evidence-plane" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
