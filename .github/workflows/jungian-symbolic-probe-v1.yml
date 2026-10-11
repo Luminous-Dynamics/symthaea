@@ -114,9 +114,26 @@ jobs:
                   f"{s['required_code_hits']}/{s['required_code_total']} | {s['forbidden_code_hits']} | "
                   f"{s['rubric_case_pass_count']}/14 | executed |"
               )
+          if data.get("context_pair_diagnostics"):
+              lines.extend([
+                  "",
+                  "## HDC context-pair geometry (exploratory; no pass thresholds)",
+                  "",
+                  "| Pair | Whole-text HDC cosine | 11D projection cosine | 11D L2 distance | Top-1 glyph equal | Top-5 glyph Jaccard |",
+                  "|---|---:|---:|---:|---|---:|",
+              ])
+              for row in data["context_pair_diagnostics"]:
+                  projected = row["modality_projection_cosine"]
+                  projected_text = "n/a" if projected is None else f"{projected:.4f}"
+                  lines.append(
+                      f"| {row['left_case_id']} / {row['right_case_id']} | "
+                      f"{row['whole_text_hdc_cosine']:.4f} | {projected_text} | "
+                      f"{row['modality_projection_l2_distance']:.4f} | "
+                      f"{row['top1_glyph_equal']} | {row['top5_glyph_jaccard']:.3f} |"
+                  )
           lines.extend([
               "",
-              "> These are hand-authored rubric-agreement diagnostics on exposed synthetic development cases. They are not psychological truth, independent human evaluation, holdout performance, or evidence that the Glyph/HDC model works.",
+              "> These are hand-authored rubric-agreement diagnostics on exposed synthetic development cases. HDC pair metrics are representation geometry only. Neither metric family measures psychological truth, independent human evaluation, holdout performance, or clinical usefulness.",
               "",
           ])
           with open(sys.argv[2], "a", encoding="utf-8") as f:
