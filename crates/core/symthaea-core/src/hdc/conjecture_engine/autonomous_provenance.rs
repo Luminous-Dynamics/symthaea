@@ -442,7 +442,9 @@ pub fn build_autonomous_discovery_receipt_v1(
     {
         return Err(AutonomousDiscoveryReceiptError::InvalidVariables);
     }
-    if initial_state.len() != var_names.len() || initial_state.iter().any(|value| !value.is_finite()) {
+    if initial_state.len() != var_names.len()
+        || initial_state.iter().any(|value| !value.is_finite())
+    {
         return Err(AutonomousDiscoveryReceiptError::InvalidInitialState);
     }
     if !t_max.is_finite() || t_max <= 0.0 || !dt.is_finite() || dt <= 0.0 {
@@ -454,7 +456,9 @@ pub fn build_autonomous_discovery_receipt_v1(
     if candidate.discovery_mode == AutonomousDiscoveryMode::Composed {
         return Err(AutonomousDiscoveryReceiptError::ComposedCandidateNeedsParentReceipts);
     }
-    if candidate.discovery_mode == AutonomousDiscoveryMode::Cold && !extra_seed_templates.is_empty() {
+    if candidate.discovery_mode == AutonomousDiscoveryMode::Cold
+        && !extra_seed_templates.is_empty()
+    {
         return Err(AutonomousDiscoveryReceiptError::ColdRunContainsPriors);
     }
     let effective = sanitized_config(config, candidate.discovery_mode);
@@ -771,7 +775,10 @@ mod tests {
         );
         let result = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[Expr::Var("x".into())],
+            "harmonic-oscillator-v1",
+            &system_definition_digest(),
+            &config,
+            &[Expr::Var("x".into())],
             &candidate, &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         );
@@ -793,7 +800,10 @@ mod tests {
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         );
-        assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::ComposedCandidateNeedsParentReceipts);
+        assert_eq!(
+            result.unwrap_err(),
+            AutonomousDiscoveryReceiptError::ComposedCandidateNeedsParentReceipts
+        );
     }
     
     #[test]
