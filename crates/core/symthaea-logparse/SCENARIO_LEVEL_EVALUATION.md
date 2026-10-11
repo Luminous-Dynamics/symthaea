@@ -4,7 +4,7 @@
 
 A grouped event split prevents events from the same EVTX file leaking into both train and test, but its accuracy is still event-weighted: a capture with many retained events can contribute many predictions. This experiment adds a second unit of analysis where one EVTX source file or one OTRF scenario directory produces one example.
 
-The library helper \`scenario::aggregate_scenarios\` validates that every group has one non-empty ground-truth label, bundles that group’s already-encoded event vectors, records the event count, and returns scenarios sorted by stable group ID. Labels and group IDs are evaluation metadata; neither is encoded in the vector.
+The library helper `scenario::aggregate_scenarios` validates that every group has one non-empty ground-truth label, bundles that group’s already-encoded event vectors, records the event count, and returns scenarios sorted by stable group ID. Labels and group IDs are evaluation metadata; neither is encoded in the vector.
 
 ## How aggregation works—and what it does not do
 
@@ -16,11 +16,11 @@ The aggregate may be dominated by a large number of unrelated or repeated events
 
 Stage the same EVTX-ATTACK-SAMPLES and OTRF directories described by the Phase 2 example. Then run:
 
-\`\`\`bash
+```bash
 cargo run -p symthaea-logparse --example phase2_experiments --release -- \\
   /tmp/evtx-staged /tmp/otrf-staged \\
   --scenario-level-evaluation --domain-invariant-ablation
-\`\`\`
+```
 
 The example still runs the grouped event-level baseline and optional domain-invariant ablation. The scenario flag additionally reports, for the raw and domain-invariant variants:
 
@@ -33,7 +33,7 @@ Each model is trained on one bundled vector per EVTX file and evaluated on one b
 
 ## Interpretation discipline
 
-Compare results from the same exact commit and the same staged data, and record the printed \`DOMAIN_INVARIANT_ENCODER_VERSION\` for the experimental representation. Do not treat the raw and domain-invariant results as reproduced or improved until the staged run actually completes.
+Compare results from the same exact commit and the same staged data, and record the printed `DOMAIN_INVARIANT_ENCODER_VERSION` for the experimental representation. Do not treat the raw and domain-invariant results as reproduced or improved until the staged run actually completes.
 
 Scenario-level accuracy and macro metrics still do not measure benign operational false-positive rates because the current OTRF test set is an attack-labelled corpus. They also do not establish transfer to a third collection or a production environment. Retain the independent OTRF test, add benign business activity, repeat with multiple seeds, and report uncertainty and per-class errors.
 
