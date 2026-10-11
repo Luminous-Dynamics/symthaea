@@ -108,12 +108,12 @@ def verify_bundle(bundle_dir: str) -> dict:
         if final_url.scheme != "https" or final_url.hostname != API_HOST or final_url.username or final_url.password:
             raise CaptureError(f"{label} final URL is outside official PVGIS HTTPS host")
 
-    if response.get("requested_url") != expected_url or response.get("final_url") != expected_url:
-        raise CaptureError("captured endpoint URL does not match request manifest exactly")
+    if response.get("requested_url") != expected_url:
+        raise CaptureError("captured endpoint requested URL does not match request manifest")
     if openapi_record.get("url") != f"{API_BASE}/openapi.json":
         raise CaptureError("OpenAPI URL does not match pinned API base")
-    if openapi_record.get("final_url") != openapi_record.get("url"):
-        raise CaptureError("OpenAPI final URL differs from its requested URL")
+    # The capture client permits redirects only to the same official HTTPS host.
+    # The final URLs are checked above; they may therefore differ from requested URLs.
 
     return {
         "valid": True,
