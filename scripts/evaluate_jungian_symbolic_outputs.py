@@ -238,12 +238,15 @@ def validate_bundle(
             require(actual["evidence_id"] not in seen_obs, f"{case_id}: duplicate observation")
             seen_obs.add(actual["evidence_id"])
         require(isinstance(result["interpretations"], list), f"{case_id}: interpretations must be an array")
+        seen_hypothesis_ids: set[str] = set()
         for item in result["interpretations"]:
             require(isinstance(item, dict) and set(item) == INTERPRETATION_KEYS,
                     f"{case_id}: interpretation schema mismatch")
             for key in ("hypothesis_id", "statement", "scope", "epistemic_status"):
                 require(isinstance(item[key], str) and item[key], f"{case_id}: malformed {key}")
-            require(item["epistemic_status"] in {"InterpretationHypothesis", "OpenQuestion"},
+            require(item["hypothesis_id"] not in seen_hypothesis_ids, f"{case_id}: duplicate hypothesis ID")
+            seen_hypothesis_ids.add(item["hypothesis_id"])
+            require(item["epistemic_status"] in {"InterpretationHypothesis", "ScholarlyInterpretation", "OpenQuestion"},
                     f"{case_id}: unrecognized epistemic status")
             for key in ("supporting_evidence_ids", "contradicting_evidence_ids"):
                 refs = item[key]
@@ -255,6 +258,9 @@ def validate_bundle(
                 not (set(item["supporting_evidence_ids"]) & set(item["contradicting_evidence_ids"])),
                 f"{case_id}: support/contradiction overlap",
             )
+            if item["epistemic_status"] != "OpenQuestion":
+                require(bool(item["supporting_evidence_ids"]),
+                        f"{case_id}: non-question interpretation has no supporting evidence")
         require(isinstance(result["open_questions"], list)
                 and all(isinstance(q, str) and q for q in result["open_questions"]),
                 f"{case_id}: malformed open questions")
