@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 const CAPABILITY_RECEIPT_VERIFIER_IDENTITY: &str = "symthaea-capability-receipt-verifier";
-const CAPABILITY_RECEIPT_VERIFIER_REVISION: &str = "capability-receipt-v1";
+const CAPABILITY_RECEIPT_VERIFIER_REVISION: &str = "capability-evidence-envelope-v2";
 
 /// Exact software/evaluation subject to which all forecasts and outcomes are bound.
 ///
@@ -1633,8 +1633,8 @@ mod tests {
                     receipt_sha256: format!("{:064x}", forecast_sequence + 1),
                     actual_compute_units: Some(10.0),
                 },
-                "untrusted-verifier",
-                "v1",
+                CAPABILITY_RECEIPT_VERIFIER_IDENTITY,
+                "capability-receipt-v1",
             )).unwrap();
         }
 
