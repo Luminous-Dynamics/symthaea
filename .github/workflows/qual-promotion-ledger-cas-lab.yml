@@ -26,6 +26,9 @@ jobs:
           RACE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-race"
           race_ref_path="${RACE_REF#refs/}"
 
+          FORCE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-force"
+          force_ref_path="${FORCE_REF#refs/}"
+
           delete_ref() {
             local target_ref_path="$1"
             local status
@@ -46,6 +49,7 @@ jobs:
           cleanup_best_effort() {
             delete_ref "${ref_path}" || true
             delete_ref "${race_ref_path}" || true
+            delete_ref "${force_ref_path}" || true
           }
           trap cleanup_best_effort EXIT
 
@@ -64,10 +68,16 @@ jobs:
             -f ref="${RACE_REF}" \
             -f sha="${BASE_SHA}" >/dev/null
 
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="${FORCE_REF}" \
+            -f sha="${BASE_SHA}" >/dev/null
+
           LAB_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref_path}" --jq '.object.sha')"
           RACE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${race_ref_path}" --jq '.object.sha')"
+          FORCE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
           test "${LAB_HEAD}" = "${BASE_SHA}"
           test "${RACE_HEAD}" = "${BASE_SHA}"
+          test "${FORCE_HEAD}" = "${BASE_SHA}"
 
           create_commit() {
             local message="$1"
@@ -205,6 +215,47 @@ jobs:
           STALE_OBJECT_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${STALE_SHA}" --jq '.sha')"
           test "${STALE_OBJECT_SHA}" = "${STALE_SHA}"
 
+          # Negative control: demonstrate the provider capability that the
+          # monotonic CAS theorem must exclude from authoritative writer topology.
+          FORCE_B_SHA="$(create_commit 'qual-cas-lab: privileged force-writer intermediate' "${BASE_SHA}")"
+          FORCE_S_SHA="$(create_commit 'qual-cas-lab: ABA stale successor' "${BASE_SHA}")"
+
+          force_forward_response="$(mktemp)"
+          force_forward_status="$(update_ref_status "${FORCE_B_SHA}" "${force_forward_response}")"
+          test "${force_forward_status}" = "200"
+          FORCE_AFTER_FORWARD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
+          test "${FORCE_AFTER_FORWARD}" = "${FORCE_B_SHA}"
+
+          force_rollback_response="$(mktemp)"
+          force_rollback_status="$(curl -sS -o "${force_rollback_response}" -w '%{http_code}' \
+            -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "${api_root}/git/refs/${force_ref_path}" \
+            -d "$(jq -n --arg sha "${BASE_SHA}" '{sha:$sha, force:true}')")"
+          test "${force_rollback_status}" = "200"
+
+          FORCE_AFTER_ROLLBACK="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
+          test "${FORCE_AFTER_ROLLBACK}" = "${BASE_SHA}"
+
+          aba_response="$(mktemp)"
+          aba_status="$(update_ref_status "${FORCE_S_SHA}" "${aba_response}")"
+          test "${aba_status}" = "200"
+          FORCE_AFTER_ABA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
+          test "${FORCE_AFTER_ABA}" = "${FORCE_S_SHA}"
+
+          {
+            echo "### Privileged force-writer negative control"
+            echo
+            echo "- force_forward_http: ${force_forward_status}"
+            echo "- force_rollback_http: ${force_rollback_status}"
+            echo "- force_rollback_observed: true"
+            echo "- stale_successor_after_force_rollback_http: ${aba_status}"
+            echo "- stale_successor_became_active_after_ABA: true"
+            echo "- implication: non-force CAS alone does not exclude privileged force-writer rollback"
+          } >> "$GITHUB_STEP_SUMMARY"
+
           {
             echo "## Promotion ledger Git-ref CAS lab"
             echo
@@ -223,17 +274,22 @@ jobs:
             echo "- stale_candidate_sha: \`${STALE_SHA}\`"
             echo "- invalidation_sha: \`${INVALIDATION_SHA}\`"
             echo "- final_current_ref_sha: \`${CURRENT_AFTER_ROLLBACK}\`"
+            echo "- force_forward_http: ${force_forward_status}"
+            echo "- force_rollback_http: ${force_rollback_status}"
+            echo "- force_rollback_observed: true"
+            echo "- stale_successor_after_force_rollback_http: ${aba_status}"
+            echo "- stale_successor_became_active_after_ABA: true"
             echo "- stale_candidate_remained_reachable_as_object: true"
             echo "- stale_candidate_became_active: false"
           } >> "$GITHUB_STEP_SUMMARY"
 
           # A successful lab requires proven cleanup, not merely an attempted DELETE.
-          if ! delete_ref "${ref_path}" || ! delete_ref "${race_ref_path}"; then
+          if ! delete_ref "${ref_path}" || ! delete_ref "${race_ref_path}" || ! delete_ref "${force_ref_path}"; then
             echo "temporary promotion-ledger lab ref cleanup failed" >&2
             exit 1
           fi
 
-          for candidate_ref in "${ref_path}" "${race_ref_path}"; do
+          for candidate_ref in "${ref_path}" "${race_ref_path}" "${force_ref_path}"; do
             delete_status="$(curl -sS -o /dev/null -w '%{http_code}' \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GH_TOKEN}" \
@@ -244,6 +300,8 @@ jobs:
 
           {
             echo "- claim: same-parent successors serialize at the Git-ref publication point when non-fast-forward updates are rejected"
+            echo "- conditional_assumption: no privileged writer can force-reset/delete-recreate the authoritative ledger ref"
+            echo "- force_writer_negative_control: provider permits an ABA rollback when the credential can use force=true"
             echo "- cleanup_verified: true"
           } >> "$GITHUB_STEP_SUMMARY"
 
