@@ -1,11 +1,11 @@
 {
   "current_validator": {
-    "expected_self_test_check_count": 82,
-    "git_blob_sha": "f6f0e54b3d7224c8b1d9bd870121fdc0c7c24bc5",
+    "expected_self_test_check_count": 84,
+    "git_blob_sha": "e6f79e02689da61686af383ebfff470b26549b0c",
     "path": "scripts/engineering/validate_orbital_ring_failure_manifest.py",
-    "sha256": "81ab14d1d5b01850ac170df01ba50251e18026400bd2e2bffda9f25b70430cbc"
+    "sha256": "ec7e01912c730df7bd0d9afb3eedced99be30de264cabc5d690278e2c72fbd81"
   },
-  "execution_note": "Current source is not yet executed after the latest nine fail-closed regression additions. The prior 73/73 report is bound to the prior source only. The draft-safe targeted workflow has an 82-check gate and will preserve deterministic outputs and fingerprints when a run executes.",
+  "execution_note": "Current source adds eleven fail-closed regression cases beyond the last executed 73-check source. They remain unexecuted locally; do not mark the 84-check suite passed until the draft-safe workflow runs on this exact source fingerprint. The expected gate now reports Blocked for structural contract failures as well as field-level blockers.",
   "last_executed_self_test": {
     "checks_failed": 0,
     "checks_passed": 73,
@@ -26,7 +26,9 @@
     "object_required_fields_fails_closed_without_exception",
     "support_angles_duplicate_across_zero_wrap_block",
     "duplicate_json_object_keys_rejected",
-    "nonstandard_nan_token_rejected"
+    "nonstandard_nan_token_rejected",
+    "required_fields_subset_fails_closed_and_blocks_promotion",
+    "unexpected_provenance_key_keeps_expected_gate_blocked"
   ],
   "verification_state": "not_run_after_source_change"
 }
