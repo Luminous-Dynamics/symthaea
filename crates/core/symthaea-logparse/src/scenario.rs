@@ -1,14 +1,20 @@
 //! Capture/scenario-level aggregation for leakage-resistant cybersecurity evaluation.
 //!
-//! This module deliberately treats one source capture or labeled scenario as one
-//! statistical example. Event labels and group IDs are evaluator metadata; only
-//! event vectors contribute to the aggregate representation. The v1 operation is
-//! an orderless HDC bundle, not a temporal sequence model. Keeping that limitation
-//! explicit prevents scenario aggregation from being overclaimed as attack-chain
-//! correlation.
+//! The orderless operation treats one source capture or labeled scenario as one
+//! statistical example. The separate ordered operation binds event vectors to
+//! coarse relative record-position roles. Neither operation establishes that a
+//! source label describes every event in a capture; neither is a production
+//! incident detector or a causal attack-chain model.
 
-use crate::encoder::{HDC_DIM, Hdv, bundle};
+use crate::encoder::{HDC_DIM, Hdv, bind, bundle, random_hv};
 use std::collections::BTreeMap;
+use std::sync::OnceLock;
+
+const POSITION_BUCKETS: usize = 8;
+const POSITION_ROLE_SEED: u64 = 0x5343_454E_4152_0000;
+
+/// Version of the experimental relative-record-position encoder.
+pub const ORDERED_SCENARIO_ENCODER_VERSION: &str = "relative-record-position-v1";
 
 /// One independently labeled capture/scenario represented by a bundle of its events.
 #[derive(Debug, Clone, PartialEq)]
@@ -19,25 +25,22 @@ pub struct ScenarioEmbedding {
     pub label: String,
     /// Number of event vectors bundled into the scenario representation.
     pub event_count: usize,
-    /// Orderless HDC bundle of the scenario's event vectors.
+    /// Scenario representation. The exact semantics depend on the aggregation mode.
     pub vector: Hdv,
 }
 
-/// Bundle event vectors so that each source capture/scenario contributes exactly
-/// one sample to training or evaluation.
-///
-/// Group membership is deterministic and output is sorted by scenario ID. A group
-/// must have one non-empty label; conflicting labels fail closed rather than
-/// arbitrarily picking one. The underlying bundle is permutation-invariant, so
-/// the order returned by filesystem traversal does not affect the scenario vector.
-///
-/// This function does not establish that the label accurately describes every
-/// event in a capture. Mixed-technique captures need finer scenario annotations.
-pub fn aggregate_scenarios(
+fn position_roles() -> &'static [Hdv; POSITION_BUCKETS] {
+    static ROLES: OnceLock<[Hdv; POSITION_BUCKETS]> = OnceLock::new();
+    ROLES.get_or_init(|| {
+        std::array::from_fn(|index| random_hv(POSITION_ROLE_SEED.wrapping_add(index as u64)))
+    })
+}
+
+fn validated_groups(
     hvs: &[Hdv],
     labels: &[String],
     groups: &[String],
-) -> Result<Vec<ScenarioEmbedding>, String> {
+) -> Result<BTreeMap<String, Vec<usize>>, String> {
     if hvs.len() != labels.len() || labels.len() != groups.len() {
         return Err(format!(
             "length mismatch: vectors={}, labels={}, groups={}",
@@ -60,7 +63,6 @@ pub fn aggregate_scenarios(
 
     let mut by_group: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     let mut group_labels: BTreeMap<&str, &str> = BTreeMap::new();
-
     for (index, (label, group)) in labels.iter().zip(groups.iter()).enumerate() {
         if let Some(existing) = group_labels.get(group.as_str()) {
             if *existing != label.as_str() {
@@ -73,18 +75,79 @@ pub fn aggregate_scenarios(
         }
         by_group.entry(group.clone()).or_default().push(index);
     }
+    Ok(by_group)
+}
 
+fn aggregate_with_mode(
+    hvs: &[Hdv],
+    labels: &[String],
+    groups: &[String],
+    ordered: bool,
+) -> Result<Vec<ScenarioEmbedding>, String> {
+    let by_group = validated_groups(hvs, labels, groups)?;
     let mut scenarios = Vec::with_capacity(by_group.len());
+
     for (scenario_id, indices) in by_group {
-        let event_vectors: Vec<Hdv> = indices.iter().map(|&index| hvs[index].clone()).collect();
+        let vector = if ordered {
+            let roles = position_roles();
+            let count = indices.len();
+            let position_bound: Vec<Hdv> = indices
+                .iter()
+                .enumerate()
+                .map(|(rank, &index)| {
+                    let bucket = ((rank * POSITION_BUCKETS) / count).min(POSITION_BUCKETS - 1);
+                    bind(&hvs[index], &roles[bucket])
+                })
+                .collect();
+            bundle(&position_bound)
+        } else {
+            let event_vectors: Vec<Hdv> =
+                indices.iter().map(|&index| hvs[index].clone()).collect();
+            bundle(&event_vectors)
+        };
+
         scenarios.push(ScenarioEmbedding {
             scenario_id,
             label: labels[indices[0]].clone(),
             event_count: indices.len(),
-            vector: bundle(&event_vectors),
+            vector,
         });
     }
     Ok(scenarios)
+}
+
+/// Bundle event vectors so that each source capture/scenario contributes exactly
+/// one orderless sample to training or evaluation.
+///
+/// Group membership is deterministic and output is sorted by scenario ID. A group
+/// must have one non-empty label; conflicting labels fail closed rather than
+/// arbitrarily picking one. The bundle is invariant to event row order, and neither
+/// the label nor the group ID contributes to the vector.
+///
+/// This function does not establish that the label accurately describes every
+/// event in a capture. Mixed-technique captures need finer scenario annotations.
+pub fn aggregate_scenarios(
+    hvs: &[Hdv],
+    labels: &[String],
+    groups: &[String],
+) -> Result<Vec<ScenarioEmbedding>, String> {
+    aggregate_with_mode(hvs, labels, groups, false)
+}
+
+/// Bundle events after binding each vector to one of eight coarse relative record
+/// positions. The caller must provide events in deterministic record order within
+/// each group; rows within a group are consumed in input order.
+///
+/// This experimental representation retains coarse order while discarding absolute
+/// timestamps and time gaps. It is not a temporal graph, does not identify causal
+/// links, and does not repair missing or out-of-order source records. Compare it to
+/// aggregate_scenarios on exactly the same grouped splits before drawing conclusions.
+pub fn aggregate_ordered_scenarios(
+    hvs: &[Hdv],
+    labels: &[String],
+    groups: &[String],
+) -> Result<Vec<ScenarioEmbedding>, String> {
+    aggregate_with_mode(hvs, labels, groups, true)
 }
 
 #[cfg(test)]
@@ -132,6 +195,25 @@ mod tests {
         let reverse_groups: Vec<String> = groups.iter().rev().cloned().collect();
         let reversed = aggregate_scenarios(&reverse_hvs, &reverse_labels, &reverse_groups).unwrap();
         assert_eq!(forward, reversed);
+    }
+
+    #[test]
+    fn ordered_aggregation_is_deterministic_and_position_sensitive() {
+        let hvs = vec![random_hv(11), random_hv(22), random_hv(33)];
+        let labels = vec!["execution".into(), "execution".into(), "execution".into()];
+        let groups = vec!["same-capture".into(), "same-capture".into(), "same-capture".into()];
+
+        let first = aggregate_ordered_scenarios(&hvs, &labels, &groups).unwrap();
+        let repeated = aggregate_ordered_scenarios(&hvs, &labels, &groups).unwrap();
+        assert_eq!(first, repeated);
+
+        let reversed_hvs: Vec<Hdv> = hvs.iter().rev().cloned().collect();
+        let reversed_labels: Vec<String> = labels.iter().rev().cloned().collect();
+        let reversed_groups: Vec<String> = groups.iter().rev().cloned().collect();
+        let reversed =
+            aggregate_ordered_scenarios(&reversed_hvs, &reversed_labels, &reversed_groups)
+                .unwrap();
+        assert_ne!(first[0].vector, reversed[0].vector);
     }
 
     #[test]
