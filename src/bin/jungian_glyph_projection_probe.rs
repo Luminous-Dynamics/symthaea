@@ -54,6 +54,13 @@ fn parse_args() -> Result<Args, String> {
     let mut args = std::env::args().skip(1);
 
     while let Some(arg) = args.next() {
+        if arg == "--help" || arg == "-h" {
+            return Err(
+                "usage: jungian_glyph_projection_probe --corpus PATH --output PATH \
+                 --source-revision GIT_ID --glyph-source-blob GIT_BLOB \
+                 --registry-source-blob GIT_BLOB --encoder-source-blob GIT_BLOB".to_string(),
+            );
+        }
         let value = args
             .next()
             .ok_or_else(|| format!("missing value for {arg}"))?;
@@ -64,13 +71,6 @@ fn parse_args() -> Result<Args, String> {
             "--glyph-source-blob" => glyph_source_blob = Some(value),
             "--registry-source-blob" => registry_source_blob = Some(value),
             "--encoder-source-blob" => encoder_source_blob = Some(value),
-            "--help" | "-h" => {
-                return Err(
-                    "usage: jungian_glyph_projection_probe --corpus PATH --output PATH \
-                     --source-revision GIT_ID --glyph-source-blob GIT_BLOB \
-                     --registry-source-blob GIT_BLOB --encoder-source-blob GIT_BLOB".to_string(),
-                );
-            }
             unknown => return Err(format!("unknown argument: {unknown}")),
         }
     }
@@ -207,6 +207,20 @@ fn run() -> Result<(), String> {
                 .total_cmp(left_score)
                 .then_with(|| left_entry.id.cmp(&right_entry.id))
         });
+        let glyph_scores: Vec<Value> = glyph_rankings
+            .iter()
+            .enumerate()
+            .map(|(rank, (entry, score))| {
+                json!({
+                    "rank": rank + 1,
+                    "glyph_id": entry.id,
+                    "name": entry.name,
+                    "class": format!("{:?}", entry.class),
+                    "field_modality": entry.field_modality.name(),
+                    "cosine_similarity": score,
+                })
+            })
+            .collect();
         let top_glyphs: Vec<Value> = glyph_rankings
             .iter()
             .take(5)
@@ -231,6 +245,7 @@ fn run() -> Result<(), String> {
             "input_sha256": format!("{:x}", Sha256::digest(text.as_bytes())),
             "modality_scores": modality_scores,
             "top_modalities": top_modalities,
+            "glyph_scores": glyph_scores,
             "top_glyphs": top_glyphs,
         }));
         encoded_inputs.push((case_id.to_string(), hv));
@@ -277,8 +292,9 @@ fn run() -> Result<(), String> {
             "sentiment_weight": 0.2,
             "seed_profile": "the exact committed TextHdcEncoder implementation",
         },
-        "basis_profile": "GlyphBasis::new over the 11 committed MODALITY_KEYWORDS",
-        "registry_profile": "GlyphRegistry::new over the committed 70-entry GLYPH_DATA",
+        "model_scope": "Existing general-purpose Glyph Codex substrate; not a dedicated Jungian model or validated archetype detector.",
+        "basis_profile": "GlyphBasis::new over the 11 committed MODALITY_KEYWORDS; vectors use TextHdcEncoder with 0.5 trigram and 0.2 sentiment weights.",
+        "registry_profile": "GlyphRegistry::new encodes only name + core_function + echo_phrase; relational_archetype, somatic_practice, sonic_signature, and field_modality are not part of the embedding input text.",
         "retrieval": "cosine similarity only; nearest-neighbor association is not an interpretation or truth score",
         "claim_ceiling": "Representation-level projection/retrieval only. No validated archetype, unconscious-content, clinical, subjective-experience, or consciousness claim.",
         "pairwise_input_similarity_profile": "Cosine between whole-text TextHdcEncoder outputs; reflects this committed lexical/morphological/positional encoding only, not semantic truth.",
