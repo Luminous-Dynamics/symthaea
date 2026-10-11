@@ -17,6 +17,7 @@ pub mod fep_agent;
 pub mod plugin;
 pub mod reflex;
 pub mod simulator;
+pub mod soil_process;
 pub mod training;
 pub mod types;
 
