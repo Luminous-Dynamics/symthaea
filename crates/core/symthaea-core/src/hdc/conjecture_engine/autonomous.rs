@@ -440,6 +440,28 @@ pub(crate) fn compute_trajectory_variance(
     var * (1.0 + 4.0 * nan_fraction)
 }
 
+/// Records candidate-generation provenance separately from validation or proof.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AutonomousDiscoveryMode {
+    /// Built-in or caller-provided templates may guide search.
+    Primed,
+    /// Built-in templates and prior-dependent configuration are disabled.
+    Cold,
+    /// Candidate created by composing other candidates.
+    Composed,
+}
+
+impl AutonomousDiscoveryMode {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Primed => "primed",
+            Self::Cold => "cold",
+            Self::Composed => "composed",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AutonomousInvariant {
     pub formula: Expr,
@@ -448,6 +470,7 @@ pub struct AutonomousInvariant {
     pub mean_value: f64,
     pub complexity: usize,
     pub symbolically_proven: bool,
+    pub discovery_mode: AutonomousDiscoveryMode,
 }
 
 pub fn compose_top_k_invariants(
@@ -545,6 +568,7 @@ pub fn compose_top_k_invariants(
         mean_value,
         complexity,
         symbolically_proven: false,
+        discovery_mode: AutonomousDiscoveryMode::Composed,
     })
 }
 
@@ -579,8 +603,66 @@ pub fn discover_invariants_autonomous_with_seed_templates(
     dt: f64,
     extra_seed_templates: &[Expr],
 ) -> Vec<AutonomousInvariant> {
+    discover_invariants_autonomous_with_mode(
+        rhs, initial_state, var_names, dynamics, config, t_max, dt,
+        extra_seed_templates, AutonomousDiscoveryMode::Primed,
+    )
+}
+
+/// Cold autonomous discovery: built-in invariant templates and caller-supplied
+/// priors are excluded. The results remain candidate proposals, not evidence of truth.
+pub fn discover_invariants_autonomous_cold(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>,
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+) -> Vec<AutonomousInvariant> {
+    discover_invariants_autonomous_with_mode(
+        rhs, initial_state, var_names, dynamics, config, t_max, dt,
+        &[], AutonomousDiscoveryMode::Cold,
+    )
+}
+
+fn effective_discovery_config(
+    config: &RegressorConfig,
+    mode: AutonomousDiscoveryMode,
+) -> RegressorConfig {
+    let mut effective = config.clone();
+    if mode == AutonomousDiscoveryMode::Cold {
+        effective.disable_macro_seeds = true;
+        effective.prior_composition_rate = 0.0;
+        effective.prior_fragment_bonus = 1.0;
+        effective.orthogonality_penalty = 1.0;
+        effective.known_invariants.clear();
+    }
+    effective
+}
+
+fn discover_invariants_autonomous_with_mode(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>,
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+    extra_seed_templates: &[Expr],
+    mode: AutonomousDiscoveryMode,
+) -> Vec<AutonomousInvariant> {
+    if mode == AutonomousDiscoveryMode::Cold && !extra_seed_templates.is_empty() {
+        return Vec::new();
+    }
+    let effective_config = effective_discovery_config(config, mode);
+    let config = &effective_config;
     let ndim = initial_state.len();
-    assert_eq!(var_names.len(), ndim);
+    if var_names.len() != ndim || var_names.is_empty()
+        || initial_state.iter().any(|value| !value.is_finite())
+    {
+        return Vec::new();
+    }
 
     let sample_one = |ic: &[f64]| -> Vec<Vec<f64>> {
         let (_t, states) = rk45_trajectory(rhs, ic, t_max, dt);
@@ -632,7 +714,10 @@ pub fn discover_invariants_autonomous_with_seed_templates(
         })
         .collect();
 
-    let mut seed_templates = build_invariant_templates(var_names);
+    let mut seed_templates = match mode {
+        AutonomousDiscoveryMode::Primed => build_invariant_templates(var_names),
+        AutonomousDiscoveryMode::Cold | AutonomousDiscoveryMode::Composed => Vec::new(),
+    };
     let mut seen_seed_templates: std::collections::HashSet<String> =
         seed_templates.iter().map(macro_usage_key).collect();
     for template in extra_seed_templates {
@@ -996,6 +1081,7 @@ pub fn discover_invariants_autonomous_with_seed_templates(
             mean_value: mean,
             complexity: expr.complexity(),
             symbolically_proven: proven,
+            discovery_mode: mode,
         });
 
         if results.len() >= 10 {
