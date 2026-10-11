@@ -29,8 +29,8 @@ use symthaea_logparse::probe::{
     classification_report, ClassificationReport, LogisticProbe, TrainConfig,
 };
 use symthaea_logparse::scenario::{
-    ORDERED_SCENARIO_ENCODER_VERSION, ScenarioEmbedding, ScenarioEncodingMode,
     aggregate_ordered_scenarios, aggregate_scenarios, validate_matching_scenario_modes,
+    ORDERED_SCENARIO_ENCODER_VERSION, ScenarioEmbedding, ScenarioEncodingMode,
 };
 use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
