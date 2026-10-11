@@ -9,6 +9,11 @@ on:
       - "tests/test_cyber_crucible_diagnostic_loop.py"
       - "validation/CYBER_CRUCIBLE_DIAGNOSTIC_LOOP_V1.md"
       - ".github/workflows/cyber-crucible-diagnostic-loop.yml"
+      - "scripts/verify_cyber_crucible_signed_receipt.py"
+      - "tests/test_cyber_crucible_signed_receipt.py"
+      - "validation/cyber_crucible_signed_receipt_v1.schema.json"
+      - "validation/CYBER_CRUCIBLE_SIGNED_RECEIPT_V1.md"
+      - ".github/workflows/cyber-crucible-authenticated-receipts.yml"
   push:
     branches: [main]
     paths:
@@ -18,6 +23,11 @@ on:
       - "tests/test_cyber_crucible_diagnostic_loop.py"
       - "validation/CYBER_CRUCIBLE_DIAGNOSTIC_LOOP_V1.md"
       - ".github/workflows/cyber-crucible-diagnostic-loop.yml"
+      - "scripts/verify_cyber_crucible_signed_receipt.py"
+      - "tests/test_cyber_crucible_signed_receipt.py"
+      - "validation/cyber_crucible_signed_receipt_v1.schema.json"
+      - "validation/CYBER_CRUCIBLE_SIGNED_RECEIPT_V1.md"
+      - ".github/workflows/cyber-crucible-authenticated-receipts.yml"
   workflow_dispatch:
 
 permissions:
@@ -32,8 +42,12 @@ jobs:
       - name: Checkout exact revision
         uses: actions/checkout@v4
 
-      - name: Install pinned JSON Schema validator
-        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.26.0"
+      - name: Install pinned verification dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check \
+            "jsonschema==4.26.0" \
+            "cryptography==50.0.2" \
+            "rfc8785==0.1.4"
 
       - name: Validate schema and public example
         run: |
@@ -58,3 +72,17 @@ jobs:
 
       - name: Exercise fail-closed regressions
         run: python3 -m unittest discover -s tests -p "test_cyber_crucible_diagnostic_loop.py" -v
+
+      - name: Meta-validate signed receipt schema
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          schema = json.loads(Path("validation/cyber_crucible_signed_receipt_v1.schema.json").read_text(encoding="utf-8"))
+          Draft202012Validator.check_schema(schema)
+          print("JSON Schema PASS: signed receipt envelope")
+          PY
+
+      - name: Exercise signed-receipt trust-boundary regressions
+        run: python3 -m unittest discover -s tests -p "test_cyber_crucible_signed_receipt.py" -v
