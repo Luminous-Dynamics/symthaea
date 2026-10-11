@@ -64,6 +64,10 @@ cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark # CSV from 2
 SYTHAEA_HDC_LTC_BENCH_4M=1 cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark # optional 4M stress tier
 ```
 
+## GPU backend profile
+
+For an 8 GiB RTX 2070 Laptop GPU target, see [the hardware-specific GPU profile](docs/RTX_2070_LAPTOP_GPU_PROFILE.md). It defines a 1.5 GiB default working-set soft cap, a conditional 2 GiB ceiling, adapter-limit enforcement, and CPU/GPU qualification requirements. These are design limits, not evidence of a completed GPU backend.
+
 ## References
 
 - Hasani, R. et al. (2021). "Closed-form Continuous-time Neural Networks." Nature Machine Intelligence.
