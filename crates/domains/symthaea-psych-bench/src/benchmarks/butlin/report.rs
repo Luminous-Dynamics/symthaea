@@ -528,16 +528,13 @@ impl EffectEstimate {
         Ok(())
     }
 
-    /// Compatibility wrapper for attaching dispersion.
+    /// Legacy unchecked builder retained for compatibility.
     ///
-    /// Invalid dispersion is rejected rather than stored. Call
-    /// `try_with_std_dev()` when the value can be invalid or comes from
-    /// untrusted input, so validation can be handled without a panic.
+    /// This method preserves the historical infallible behavior and therefore
+    /// does not certify that the supplied dispersion is valid. Call
+    /// `validate()` before authority use, or prefer `try_with_std_dev()` in
+    /// new code so invalid input is returned as an error rather than panicking.
     pub fn with_std_dev(mut self, std_dev: f64) -> Self {
-        assert!(
-            std_dev.is_finite() && std_dev >= 0.0,
-            "standard deviation must be finite and non-negative"
-        );
         self.standard_deviation = Some(std_dev);
         self
     }
