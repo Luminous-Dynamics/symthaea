@@ -9,7 +9,7 @@
 #[cfg(feature = "glyph_codex")]
 use serde_json::{Value, json};
 #[cfg(feature = "glyph_codex")]
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 #[cfg(feature = "glyph_codex")]
 use symthaea::hdc::glyph_basis::{
     FieldModality, GlyphBasis, GlyphRegistry, N_FIELD_MODALITIES,
@@ -146,6 +146,7 @@ fn run() -> Result<(), String> {
     let encoder = TextHdcEncoder::with_sentiment(DIMENSION, 3, 0.5, 0.2);
 
     let mut rows = Vec::with_capacity(cases.len());
+    let mut encoded_inputs: Vec<(String, symthaea::hdc::ContinuousHV)> = Vec::with_capacity(cases.len());
     for case in cases {
         let case_id = required_str(case, "id")?;
         let text = required_str(case, "input_text")?;
@@ -223,6 +224,27 @@ fn run() -> Result<(), String> {
             "top_modalities": top_modalities,
             "top_glyphs": top_glyphs,
         }));
+        encoded_inputs.push((case_id.to_string(), hv));
+    }
+
+    let mut pairwise_input_similarity = Vec::with_capacity(encoded_inputs.len() * (encoded_inputs.len() - 1) / 2);
+    for left_index in 0..encoded_inputs.len() {
+        for right_index in (left_index + 1)..encoded_inputs.len() {
+            let (left_id, left_hv) = &encoded_inputs[left_index];
+            let (right_id, right_hv) = &encoded_inputs[right_index];
+            let similarity = left_hv.similarity(right_hv) as f64;
+            if !similarity.is_finite() || !(-1.0..=1.0).contains(&similarity) {
+                return Err(format!("invalid whole-text input similarity for {left_id} vs {right_id}"));
+            }
+            pairwise_input_similarity.push(json!({
+                "left_case_id": left_id,
+                "right_case_id": right_id,
+                "cosine_similarity": similarity,
+            }));
+        }
+    }
+    if pairwise_input_similarity.len() != EXPECTED_CASES * (EXPECTED_CASES - 1) / 2 {
+        return Err("pairwise input similarity matrix is incomplete".into());
     }
 
     let output = json!({
@@ -248,6 +270,8 @@ fn run() -> Result<(), String> {
         "registry_profile": "GlyphRegistry::new over the committed 70-entry GLYPH_DATA",
         "retrieval": "cosine similarity only; nearest-neighbor association is not an interpretation or truth score",
         "claim_ceiling": "Representation-level projection/retrieval only. No validated archetype, unconscious-content, clinical, subjective-experience, or consciousness claim.",
+        "pairwise_input_similarity_profile": "Cosine between whole-text TextHdcEncoder outputs; reflects this committed lexical/morphological/positional encoding only, not semantic truth.",
+        "pairwise_input_similarity": pairwise_input_similarity,
         "cases": rows,
     });
 
