@@ -340,8 +340,8 @@ fn main() {
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
 
-    println!("\nKey insight: Bundling costs O(N × D) AND constraints in Binius.");
-    println!("XOR vote counting is FREE. Only the comparison/reduction uses AND gates.");
+    println!("\nKey insight: Strict majority uses a bit-sliced counter plus threshold comparison; its gate count must be measured from the corrected circuit.");
+    println!("Re-run this benchmark before using any post-correction timing or constraint count.");
 
     // Hamming similarity
     println!("\n\n{}", "=".repeat(60));
