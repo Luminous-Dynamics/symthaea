@@ -301,8 +301,14 @@ pub enum ArithmeticPrecision {
 pub enum NumericArithmeticError {
     /// A public Rational variant had a zero denominator.
     InvalidRationalOperand,
+    /// A public Rational variant is not reduced or has a negative denominator.
+    NonCanonicalRationalOperand,
     /// Division by an exactly zero denominator was requested.
     DivisionByZero,
+    /// Zero raised to zero has no unique defined value.
+    IndeterminatePower,
+    /// Zero raised to a negative exponent requires division by zero.
+    ZeroToNegativePower,
     /// An input Real was NaN or infinite.
     NonFiniteOperand,
     /// A finite input operation produced a non-finite floating-point result.
@@ -315,7 +321,10 @@ impl std::fmt::Display for NumericArithmeticError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidRationalOperand => write!(f, "rational operand has a zero denominator"),
+            Self::NonCanonicalRationalOperand => write!(f, "rational operand is not reduced with a positive denominator"),
             Self::DivisionByZero => write!(f, "division by zero"),
+            Self::IndeterminatePower => write!(f, "zero raised to zero is indeterminate"),
+            Self::ZeroToNegativePower => write!(f, "zero cannot be raised to a negative exponent"),
             Self::NonFiniteOperand => write!(f, "operand is NaN or infinite"),
             Self::NonFiniteResult => write!(f, "operation produced a non-finite result"),
             Self::ExactResultOutOfRange => {
@@ -767,6 +776,19 @@ impl NumericTower {
             Number::Rational { denominator: 0, .. } => {
                 Err(NumericArithmeticError::InvalidRationalOperand)
             }
+            Number::Rational { numerator, denominator } => {
+                let normalized = normalize_fraction_i128(
+                    i128::from(*numerator),
+                    i128::from(*denominator),
+                );
+                if *denominator < 0
+                    || normalized != Some((i128::from(*numerator), i128::from(*denominator)))
+                {
+                    Err(NumericArithmeticError::NonCanonicalRationalOperand)
+                } else {
+                    Ok(())
+                }
+            }
             Number::Real(value) if !value.is_finite() => {
                 Err(NumericArithmeticError::NonFiniteOperand)
             }
@@ -859,6 +881,61 @@ impl NumericTower {
         self.checked_binary_arithmetic(a, b, "divide", "/")
     }
 
+    /// Exponentiate while enforcing numeric-domain invariants and reporting exactness.
+    ///
+    /// Unlike the compatibility power API, this method rejects 0^0 and zero raised
+    /// to a negative exponent, rejects malformed/noncanonical rational variants and
+    /// non-finite operands, and does not return non-finite results. A finite result
+    /// outside the fixed-width exact representation may be returned as Real and
+    /// explicitly marked as approximate.
+    pub fn checked_power(
+        &self,
+        base: &Number,
+        exponent: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        Self::validate_checked_operand(base)?;
+        Self::validate_checked_operand(exponent)?;
+
+        if base.is_zero_exact() && exponent.is_zero_exact() {
+            return Err(NumericArithmeticError::IndeterminatePower);
+        }
+        if base.is_zero_exact() && Self::number_is_negative(exponent) {
+            return Err(NumericArithmeticError::ZeroToNegativePower);
+        }
+
+        let result = self.power(base, exponent);
+        Self::validate_checked_result(&result.number)?;
+        let precision = if matches!(result.number, Number::Real(_)) {
+            ArithmeticPrecision::Approximate
+        } else {
+            ArithmeticPrecision::Exact
+        };
+        Ok(NumericArithmeticResult { result, precision })
+    }
+
+    fn number_is_negative(number: &Number) -> bool {
+        match number {
+            Number::Natural(_) => false,
+            Number::Integer(value) => *value < 0,
+            Number::Rational { numerator, denominator } => {
+                (*numerator < 0) != (*denominator < 0)
+            }
+            Number::Real(value) => *value < 0.0,
+        }
+    }
+
+    fn validate_checked_result(number: &Number) -> Result<(), NumericArithmeticError> {
+        match number {
+            Number::Rational { denominator: 0, .. } => {
+                Err(NumericArithmeticError::InvalidRationalOperand)
+            }
+            Number::Real(value) if !value.is_finite() => {
+                Err(NumericArithmeticError::NonFiniteResult)
+            }
+            _ => Ok(()),
+        }
+    }
+
     /// Add two numbers using checked exact arithmetic with an explicit Real fallback.
     pub fn add(&self, a: &Number, b: &Number) -> NumberResult {
         self.binary_arithmetic(a, b, "add", "+")
@@ -903,7 +980,11 @@ impl NumericTower {
             Number::Integer(exp) => {
                 self.integer_power(base, i128::from(*exp), &mut proof_trace)
             }
-            // Rational or real exponent → always ℝ
+            // A rational with denominator one is an exact integer exponent too.
+            Number::Rational { numerator, denominator: 1 } => {
+                self.integer_power(base, i128::from(*numerator), &mut proof_trace)
+            }
+            // Other rational or real exponents require approximate real exponentiation.
             _ => {
                 let b = base.to_f64();
                 let e = exponent.to_f64();
@@ -2258,6 +2339,83 @@ mod tests {
             tower.checked_divide(&Number::Natural(1), &Number::Real(-0.0)).unwrap_err(),
             NumericArithmeticError::DivisionByZero
         );
+    }
+
+    #[test]
+    fn test_checked_power_rejects_undefined_zero_domains() {
+        let tower = NumericTower::new();
+        assert_eq!(
+            tower.checked_power(&Number::Natural(0), &Number::Natural(0)).unwrap_err(),
+            NumericArithmeticError::IndeterminatePower
+        );
+        assert_eq!(
+            tower.checked_power(&Number::Natural(0), &Number::Integer(-1)).unwrap_err(),
+            NumericArithmeticError::ZeroToNegativePower
+        );
+        let positive = tower.checked_power(&Number::Natural(0), &Number::Natural(2)).unwrap();
+        assert_eq!(positive.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(positive.result.number, Number::Natural(0)));
+    }
+
+    #[test]
+    fn test_checked_power_preserves_exact_integer_exponents() {
+        let tower = NumericTower::new();
+        let result = tower.checked_power(
+            &Number::Natural(3),
+            &Number::Rational { numerator: 4, denominator: 1 },
+        ).unwrap();
+        assert_eq!(result.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(result.result.number, Number::Natural(81)));
+    }
+
+    #[test]
+    fn test_checked_power_classifies_finite_overflow_as_approximate() {
+        let tower = NumericTower::new();
+        let result = tower.checked_power(
+            &Number::Natural(2),
+            &Number::Natural(64),
+        ).unwrap();
+        assert_eq!(result.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(result.result.number, Number::Real(value) if value.is_finite() && value > u64::MAX as f64));
+    }
+
+    #[test]
+    fn test_checked_power_rejects_non_finite_result_and_malformed_inputs() {
+        let tower = NumericTower::new();
+        assert_eq!(
+            tower.checked_power(&Number::Natural(2), &Number::Natural(1024)).unwrap_err(),
+            NumericArithmeticError::NonFiniteResult
+        );
+        assert_eq!(
+            tower.checked_power(
+                &Number::Rational { numerator: 2, denominator: 4 },
+                &Number::Natural(2),
+            ).unwrap_err(),
+            NumericArithmeticError::NonCanonicalRationalOperand
+        );
+        assert_eq!(
+            tower.checked_power(&Number::Real(f64::NAN), &Number::Natural(2)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+        assert_eq!(
+            tower.checked_power(&Number::Integer(-4), &Number::Rational { numerator: 1, denominator: 2 }).unwrap_err(),
+            NumericArithmeticError::NonFiniteResult
+        );
+    }
+
+    #[test]
+    fn test_checked_arithmetic_rejects_noncanonical_rational_operands() {
+        let tower = NumericTower::new();
+        for malformed in [
+            Number::Rational { numerator: 2, denominator: 4 },
+            Number::Rational { numerator: 0, denominator: 5 },
+            Number::Rational { numerator: 1, denominator: -2 },
+        ] {
+            assert_eq!(
+                tower.checked_add(&malformed, &Number::Natural(1)).unwrap_err(),
+                NumericArithmeticError::NonCanonicalRationalOperand
+            );
+        }
     }
 
     #[test]
