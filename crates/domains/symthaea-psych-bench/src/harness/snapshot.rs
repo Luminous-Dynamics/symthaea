@@ -217,6 +217,71 @@ impl RegressionSnapshot {
     }
 }
 
+
+/// Errors that disqualify a strict regression comparison before any metric
+/// deltas are interpreted. These describe comparison integrity, not scientific
+/// findings such as an indicator being NotDemonstrated or Contradicted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SnapshotComparisonError {
+    InvalidSnapshot {
+        side: &'static str,
+        errors: Vec<String>,
+    },
+    SchemaVersionMismatch {
+        baseline: String,
+        current: String,
+    },
+    UnsupportedSchemaVersion {
+        side: &'static str,
+        found: String,
+        expected: String,
+    },
+    MissingBenchmark(String),
+    UnexpectedBenchmark(String),
+    MissingMetric {
+        benchmark: String,
+        metric: String,
+    },
+    UnexpectedMetric {
+        benchmark: String,
+        metric: String,
+    },
+}
+
+impl std::fmt::Display for SnapshotComparisonError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidSnapshot { side, errors } => {
+                write!(f, "{side} snapshot is invalid: {}", errors.join("; "))
+            }
+            Self::SchemaVersionMismatch { baseline, current } => write!(
+                f,
+                "snapshot schema versions differ: baseline={baseline:?}, current={current:?}"
+            ),
+            Self::UnsupportedSchemaVersion { side, found, expected } => write!(
+                f,
+                "{side} snapshot schema {found:?} is not supported for strict comparison; expected {expected:?}"
+            ),
+            Self::MissingBenchmark(name) => {
+                write!(f, "current snapshot is missing baseline benchmark {name:?}")
+            }
+            Self::UnexpectedBenchmark(name) => {
+                write!(f, "current snapshot contains unexpected benchmark {name:?}")
+            }
+            Self::MissingMetric { benchmark, metric } => write!(
+                f,
+                "current snapshot is missing baseline metric {benchmark:?}/{metric:?}"
+            ),
+            Self::UnexpectedMetric { benchmark, metric } => write!(
+                f,
+                "current snapshot contains unexpected metric {benchmark:?}/{metric:?}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SnapshotComparisonError {}
+
 impl RegressionReport {
     /// Compare current results against a baseline snapshot.
     ///
@@ -303,6 +368,76 @@ impl RegressionReport {
                 critical,
             },
         }
+    }
+
+    /// Compare snapshots only when they contain exactly the same benchmark
+    /// and metric population.
+    ///
+    /// This prevents missing/filtered metrics from silently disappearing from
+    /// the intersection-based exploratory comparison below. The result is
+    /// still only a metric-population comparison: callers must separately
+    /// qualify execution identity and metric direction before treating it as
+    /// evidence-integrity authority.
+    pub fn compare_strict_metric_population(
+        baseline: &RegressionSnapshot,
+        current: &RegressionSnapshot,
+        warning_pct: f64,
+        critical_pct: f64,
+    ) -> Result<Self, SnapshotComparisonError> {
+        if baseline.schema_version != current.schema_version {
+            return Err(SnapshotComparisonError::SchemaVersionMismatch {
+                baseline: baseline.schema_version.clone(),
+                current: current.schema_version.clone(),
+            });
+        }
+        for (side, snapshot) in [("baseline", baseline), ("current", current)] {
+            if snapshot.schema_version != SNAPSHOT_SCHEMA_VERSION {
+                return Err(SnapshotComparisonError::UnsupportedSchemaVersion {
+                    side,
+                    found: snapshot.schema_version.clone(),
+                    expected: SNAPSHOT_SCHEMA_VERSION.to_string(),
+                });
+            }
+            if let Err(errors) = snapshot.validate() {
+                return Err(SnapshotComparisonError::InvalidSnapshot { side, errors });
+            }
+        }
+
+        for benchmark in baseline.metrics.keys() {
+            if !current.metrics.contains_key(benchmark) {
+                return Err(SnapshotComparisonError::MissingBenchmark(benchmark.clone()));
+            }
+        }
+        for benchmark in current.metrics.keys() {
+            if !baseline.metrics.contains_key(benchmark) {
+                return Err(SnapshotComparisonError::UnexpectedBenchmark(benchmark.clone()));
+            }
+        }
+
+        for (benchmark, baseline_metrics) in &baseline.metrics {
+            let current_metrics = current
+                .metrics
+                .get(benchmark)
+                .expect("benchmark key sets were reconciled above");
+            for metric in baseline_metrics.keys() {
+                if !current_metrics.contains_key(metric) {
+                    return Err(SnapshotComparisonError::MissingMetric {
+                        benchmark: benchmark.clone(),
+                        metric: metric.clone(),
+                    });
+                }
+            }
+            for metric in current_metrics.keys() {
+                if !baseline_metrics.contains_key(metric) {
+                    return Err(SnapshotComparisonError::UnexpectedMetric {
+                        benchmark: benchmark.clone(),
+                        metric: metric.clone(),
+                    });
+                }
+            }
+        }
+
+        Ok(Self::compare(baseline, current, warning_pct, critical_pct))
     }
 
     /// Returns `true` if any metric has a Critical regression.
@@ -654,5 +789,131 @@ mod tests {
         let loaded = RegressionSnapshot::from_json(&json).unwrap();
         assert_eq!(loaded.schema_version, SNAPSHOT_SCHEMA_VERSION);
         assert_eq!(loaded.name, "roundtrip");
+    }
+}
+
+#[cfg(test)]
+mod strict_population_tests {
+    use super::*;
+    use crate::harness::report::MetricValue;
+
+    fn snapshot(
+        name: &str,
+        values: &[(&str, &[(&str, f64)])],
+    ) -> RegressionSnapshot {
+        let mut metrics = BTreeMap::new();
+        for (benchmark, benchmark_metrics) in values {
+            let mut per_benchmark = BTreeMap::new();
+            for (metric, mean) in *benchmark_metrics {
+                per_benchmark.insert(
+                    (*metric).to_string(),
+                    MetricValue {
+                        mean: *mean,
+                        std_dev: 0.01,
+                        n: 20,
+                        ci_lower: *mean - 0.02,
+                        ci_upper: *mean + 0.02,
+                    },
+                );
+            }
+            metrics.insert((*benchmark).to_string(), per_benchmark);
+        }
+        RegressionSnapshot {
+            name: name.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            git_hash: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
+            config_summary: "strict comparison unit fixture".to_string(),
+            schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
+            metrics,
+        }
+    }
+
+    #[test]
+    fn strict_comparison_rejects_missing_benchmark() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("Stroop", &[("accuracy", 0.7)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::MissingBenchmark("NBack".to_string())
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_missing_metric() {
+        let baseline = snapshot(
+            "baseline",
+            &[("NBack", &[("accuracy", 0.8), ("latency", 4.0)])],
+        );
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::MissingMetric {
+                benchmark: "NBack".to_string(),
+                metric: "latency".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_empty_current_population() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[]);
+        assert!(matches!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10),
+            Err(SnapshotComparisonError::InvalidSnapshot { side: "current", .. })
+        ));
+    }
+
+    #[test]
+    fn strict_comparison_rejects_unexpected_metrics() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot(
+            "current",
+            &[("NBack", &[("accuracy", 0.81), ("new_metric", 1.0)])],
+        );
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::UnexpectedMetric {
+                benchmark: "NBack".to_string(),
+                metric: "new_metric".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn strict_comparison_accepts_exact_matching_population() {
+        let baseline = snapshot(
+            "baseline",
+            &[("NBack", &[("accuracy", 0.8), ("latency", 4.0)])],
+        );
+        let current = snapshot(
+            "current",
+            &[("NBack", &[("accuracy", 0.81), ("latency", 4.1)])],
+        );
+        let report = RegressionReport::compare_strict_metric_population(
+            &baseline, &current, 0.05, 0.10,
+        )
+        .unwrap();
+        assert_eq!(report.summary.total_metrics, 2);
+        assert_eq!(report.results.len(), 2);
+    }
+
+    #[test]
+    fn strict_comparison_rejects_unsupported_schema_version() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let mut current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
+        current.schema_version = "999.0".to_string();
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::UnsupportedSchemaVersion {
+                side: "current",
+                found: "999.0".to_string(),
+                expected: SNAPSHOT_SCHEMA_VERSION.to_string(),
+            }
+        );
     }
 }
