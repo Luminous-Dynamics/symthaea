@@ -46,6 +46,124 @@ impl Px4OffboardLossParameterNameV1 {
     }
 }
 
+/// Wire encoding advertised by MAVLink AUTOPILOT_VERSION for PARAM_VALUE.param_value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Px4MavlinkParameterEncodingV1 {
+    /// Integer payload bytes occupy the IEEE-754 Float32 storage bits.
+    Bytewise,
+    /// Numeric integer values are converted to/from Float32 using C-style casts.
+    CStyleCast,
+}
+
+impl Px4MavlinkParameterEncodingV1 {
+    const fn digest_tag(self) -> u8 {
+        match self {
+            Self::Bytewise => 1,
+            Self::CStyleCast => 2,
+        }
+    }
+}
+
+/// Preserved PARAM_VALUE wire-level fields needed to interpret a parameter response.
+///
+/// `param_value_bits` are the exact bits of the Float32 field as decoded from the
+/// MAVLink payload. Under bytewise encoding, an INT32 payload uses those bits as
+/// integer storage; under C-style encoding, they represent a numeric Float32 value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Px4MavlinkParameterValueV1 {
+    /// Canonically decoded PARAM_VALUE.param_id (expected to match an allowlisted name).
+    pub param_id: String,
+    /// Exact IEEE-754 storage bits received in PARAM_VALUE.param_value.
+    pub param_value_bits: u32,
+    /// Raw MAV_PARAM_TYPE numeric value (6 = INT32, 9 = REAL32).
+    pub param_type_raw: u8,
+    /// PARAM_VALUE.param_count from the source component.
+    pub param_count: u16,
+    /// PARAM_VALUE.param_index from the source component.
+    pub param_index: u16,
+    /// MAVLink packet-header system ID of the response sender.
+    pub source_system_id: u8,
+    /// MAVLink packet-header component ID of the response sender.
+    pub source_component_id: u8,
+    /// Encoding mode selected from AUTOPILOT_VERSION capabilities or an explicitly
+    /// justified compatibility profile.
+    pub encoding: Px4MavlinkParameterEncodingV1,
+}
+
+impl Px4MavlinkParameterValueV1 {
+    fn validate_for(
+        &self,
+        value: Px4OffboardLossParameterValueV1,
+    ) -> Result<(), Px4OffboardLossConfigurationError> {
+        if self.param_id != value.parameter_name().as_str() {
+            return Err(Px4OffboardLossConfigurationError::ParameterIdMismatch);
+        }
+        if self.param_count == 0 || self.param_index >= self.param_count {
+            return Err(Px4OffboardLossConfigurationError::InvalidParameterIndex);
+        }
+        let expected_type = match value {
+            Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(_) => 9,
+            Px4OffboardLossParameterValueV1::LegacyActionI32(_)
+            | Px4OffboardLossParameterValueV1::RcActionI32(_) => 6,
+        };
+        if self.param_type_raw != expected_type {
+            return Err(Px4OffboardLossConfigurationError::ParameterTypeMismatch {
+                expected: expected_type,
+                found: self.param_type_raw,
+            });
+        }
+        match value {
+            Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(bits) => {
+                if self.param_value_bits != bits {
+                    return Err(Px4OffboardLossConfigurationError::WireValueMismatch);
+                }
+            }
+            Px4OffboardLossParameterValueV1::LegacyActionI32(expected)
+            | Px4OffboardLossParameterValueV1::RcActionI32(expected) => {
+                let observed = match self.encoding {
+                    Px4MavlinkParameterEncodingV1::Bytewise => {
+                        i32::from_le_bytes(self.param_value_bits.to_le_bytes())
+                    }
+                    Px4MavlinkParameterEncodingV1::CStyleCast => {
+                        let numeric = f32::from_bits(self.param_value_bits);
+                        if !numeric.is_finite()
+                            || numeric.fract() != 0.0
+                            || f64::from(numeric) < f64::from(i32::MIN)
+                            || f64::from(numeric) > f64::from(i32::MAX)
+                        {
+                            return Err(
+                                Px4OffboardLossConfigurationError::InvalidCStyleActionValue,
+                            );
+                        }
+                        numeric as i32
+                    }
+                };
+                if observed != expected {
+                    return Err(Px4OffboardLossConfigurationError::WireValueMismatch);
+                }
+            }
+        }
+        if self.param_id.len() > 16
+            || !self.param_id.is_ascii()
+            || self.param_id.chars().any(char::is_control)
+        {
+            return Err(Px4OffboardLossConfigurationError::InvalidWireParameterId);
+        }
+        Ok(())
+    }
+
+    fn feed_digest(&self, hasher: &mut blake3::Hasher) {
+        feed_str(hasher, &self.param_id);
+        hasher.update(&self.param_value_bits.to_le_bytes());
+        hasher.update(&[self.param_type_raw]);
+        hasher.update(&self.param_count.to_le_bytes());
+        hasher.update(&self.param_index.to_le_bytes());
+        hasher.update(&[self.source_system_id, self.source_component_id]);
+        hasher.update(&[self.encoding.digest_tag()]);
+    }
+}
+
 /// Typed parameter value preserving the raw timeout bits and action integers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "raw", rename_all = "snake_case")]
@@ -124,7 +242,9 @@ pub struct Px4OffboardLossParameterObservationV1 {
     pub capture_window_id: String,
     /// Adapter-allocated unique response sequence.
     pub capture_sequence: u64,
-    /// Exact raw parameter value.
+    /// Wire-level PARAM_VALUE metadata and raw Float32 storage bits.
+    pub wire: Px4MavlinkParameterValueV1,
+    /// Decoded value verified against the committed wire representation.
     pub value: Px4OffboardLossParameterValueV1,
     /// Local response-receive time in the declared companion clock.
     pub received_at: TimestampV1,
@@ -142,6 +262,7 @@ impl Px4OffboardLossParameterObservationV1 {
         source_boot_session_id: impl Into<String>,
         capture_window_id: impl Into<String>,
         capture_sequence: u64,
+        wire: Px4MavlinkParameterValueV1,
         value: Px4OffboardLossParameterValueV1,
         received_at: TimestampV1,
     ) -> Result<Self, Px4OffboardLossConfigurationError> {
@@ -153,6 +274,7 @@ impl Px4OffboardLossParameterObservationV1 {
             source_boot_session_id: source_boot_session_id.into(),
             capture_window_id: capture_window_id.into(),
             capture_sequence,
+            wire,
             value,
             received_at,
             observation_digest_hex: String::new(),
@@ -194,6 +316,7 @@ impl Px4OffboardLossParameterObservationV1 {
         validate_identifier(&self.source_boot_session_id, "source_boot_session_id")?;
         validate_identifier(&self.capture_window_id, "capture_window_id")?;
         self.value.validate()?;
+        self.wire.validate_for(self.value)?;
         self.received_at
             .validate()
             .map_err(Px4OffboardLossConfigurationError::Timestamp)?;
@@ -210,6 +333,7 @@ impl Px4OffboardLossParameterObservationV1 {
         feed_str(&mut hasher, &self.source_boot_session_id);
         feed_str(&mut hasher, &self.capture_window_id);
         hasher.update(&self.capture_sequence.to_le_bytes());
+        self.wire.feed_digest(&mut hasher);
         self.value.feed_digest(&mut hasher);
         feed_str(&mut hasher, self.received_at.clock_domain.as_str());
         hasher.update(&self.received_at.nanoseconds.to_le_bytes());
@@ -232,6 +356,12 @@ pub struct Px4OffboardLossConfigurationProfileV1 {
     pub producer_profile_id: String,
     /// Expected PX4 boot/session identity.
     pub source_boot_session_id: String,
+    /// Expected MAVLink packet-header system ID for PARAM_VALUE responses.
+    pub expected_source_system_id: u8,
+    /// Expected MAVLink packet-header component ID for PARAM_VALUE responses.
+    pub expected_source_component_id: u8,
+    /// Declared wire encoding mode from AUTOPILOT_VERSION capabilities or prior profile.
+    pub parameter_encoding: Px4MavlinkParameterEncodingV1,
     /// Clock used to compare parameter receive timestamps.
     pub receiver_clock_domain: ClockDomainId,
     /// Parameters required for this particular firmware profile.
@@ -253,6 +383,9 @@ impl Px4OffboardLossConfigurationProfileV1 {
         firmware_profile_id: impl Into<String>,
         producer_profile_id: impl Into<String>,
         source_boot_session_id: impl Into<String>,
+        expected_source_system_id: u8,
+        expected_source_component_id: u8,
+        parameter_encoding: Px4MavlinkParameterEncodingV1,
         receiver_clock_domain: ClockDomainId,
         mut required_parameters: Vec<Px4OffboardLossParameterNameV1>,
         max_capture_skew_ns: u64,
@@ -266,6 +399,9 @@ impl Px4OffboardLossConfigurationProfileV1 {
             firmware_profile_id: firmware_profile_id.into(),
             producer_profile_id: producer_profile_id.into(),
             source_boot_session_id: source_boot_session_id.into(),
+            expected_source_system_id,
+            expected_source_component_id,
+            parameter_encoding,
             receiver_clock_domain,
             required_parameters,
             max_capture_skew_ns,
@@ -326,6 +462,11 @@ impl Px4OffboardLossConfigurationProfileV1 {
         feed_str(&mut hasher, &self.firmware_profile_id);
         feed_str(&mut hasher, &self.producer_profile_id);
         feed_str(&mut hasher, &self.source_boot_session_id);
+        hasher.update(&[
+            self.expected_source_system_id,
+            self.expected_source_component_id,
+            self.parameter_encoding.digest_tag(),
+        ]);
         feed_str(&mut hasher, self.receiver_clock_domain.as_str());
         hasher.update(&(self.required_parameters.len() as u64).to_le_bytes());
         for name in &self.required_parameters {
@@ -519,6 +660,15 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
             if item.source_boot_session_id != self.profile.source_boot_session_id {
                 return Err(Px4OffboardLossConfigurationError::BootSessionMismatch);
             }
+            if item.wire.source_system_id != self.profile.expected_source_system_id {
+                return Err(Px4OffboardLossConfigurationError::SourceSystemMismatch);
+            }
+            if item.wire.source_component_id != self.profile.expected_source_component_id {
+                return Err(Px4OffboardLossConfigurationError::SourceComponentMismatch);
+            }
+            if item.wire.encoding != self.profile.parameter_encoding {
+                return Err(Px4OffboardLossConfigurationError::ParameterEncodingMismatch);
+            }
             if item.received_at.clock_domain != self.profile.receiver_clock_domain {
                 return Err(Px4OffboardLossConfigurationError::ReceiverClockMismatch);
             }
@@ -620,6 +770,33 @@ pub enum Px4OffboardLossConfigurationError {
     /// An observation carried another adapter-local capture-window ID.
     #[error("parameter response capture-window mismatch")]
     CaptureWindowMismatch,
+    /// PARAM_VALUE.param_id did not match the typed allowlisted parameter.
+    #[error("wire parameter ID did not match the typed parameter")]
+    ParameterIdMismatch,
+    /// Wire parameter ID was not a short, printable ASCII parameter name.
+    #[error("invalid wire parameter ID")]
+    InvalidWireParameterId,
+    /// PARAM_VALUE.param_type disagreed with the parameter definition.
+    #[error("wire parameter type mismatch: expected {expected}, found {found}")]
+    ParameterTypeMismatch { expected: u8, found: u8 },
+    /// PARAM_VALUE count/index were inconsistent.
+    #[error("invalid PARAM_VALUE param_count/param_index")]
+    InvalidParameterIndex,
+    /// C-style Float32 action encoding was not a finite integral i32.
+    #[error("invalid C-style encoded action parameter")]
+    InvalidCStyleActionValue,
+    /// The interpreted value did not agree with PARAM_VALUE.param_value bits.
+    #[error("typed parameter value disagreed with wire value")]
+    WireValueMismatch,
+    /// Response packet system ID did not match profile.
+    #[error("parameter response system ID mismatch")]
+    SourceSystemMismatch,
+    /// Response packet component ID did not match profile.
+    #[error("parameter response component ID mismatch")]
+    SourceComponentMismatch,
+    /// Encoding mode did not match the profile's declared mode.
+    #[error("parameter wire encoding mismatch")]
+    ParameterEncodingMismatch,
     /// Source producer did not match profile.
     #[error("parameter producer mismatch")]
     ProducerMismatch,
@@ -680,6 +857,34 @@ mod tests {
         )
     }
 
+    fn wire_for(
+        value: Px4OffboardLossParameterValueV1,
+    ) -> Px4MavlinkParameterValueV1 {
+        let param_value_bits = match value {
+            Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(bits) => bits,
+            Px4OffboardLossParameterValueV1::LegacyActionI32(raw)
+            | Px4OffboardLossParameterValueV1::RcActionI32(raw) => raw as u32,
+        };
+        let (param_count, param_index) = match value.parameter_name() {
+            Px4OffboardLossParameterNameV1::ComOfLossT => (100, 10),
+            Px4OffboardLossParameterNameV1::ComOblAct => (100, 11),
+            Px4OffboardLossParameterNameV1::ComOblRcAct => (100, 12),
+        };
+        Px4MavlinkParameterValueV1 {
+            param_id: value.parameter_name().as_str().to_owned(),
+            param_value_bits,
+            param_type_raw: match value {
+                Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(_) => 9,
+                _ => 6,
+            },
+            param_count,
+            param_index,
+            source_system_id: 1,
+            source_component_id: 1,
+            encoding: Px4MavlinkParameterEncodingV1::Bytewise,
+        }
+    }
+
     fn observation_in_window(
         capture_window_id: &str,
         sequence: u64,
@@ -693,6 +898,7 @@ mod tests {
             "px4.boot.fixture.session-a",
             capture_window_id,
             sequence,
+            wire_for(value),
             value,
             ts(received_ns),
         )
@@ -718,6 +924,9 @@ mod tests {
             "px4.firmware-profile.fixture.v1",
             "px4.param.decoder.fixture.v1",
             "px4.boot.fixture.session-a",
+            1,
+            1,
+            Px4MavlinkParameterEncodingV1::Bytewise,
             clock(),
             vec![
                 Px4OffboardLossParameterNameV1::ComOfLossT,
@@ -834,6 +1043,9 @@ mod tests {
                 "px4.boot.fixture.session-a",
                 "parameter-capture.fixture.attempt-1",
                 1,
+                wire_for(Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(
+                    f32::NAN.to_bits(),
+                )),
                 Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(f32::NAN.to_bits()),
                 ts(1_000),
             ).unwrap_err(),
@@ -854,6 +1066,7 @@ mod tests {
             "px4.boot.fixture.session-b",
             "parameter-capture.fixture.attempt-1",
             12,
+            wire_for(Px4OffboardLossParameterValueV1::RcActionI32(6)),
             Px4OffboardLossParameterValueV1::RcActionI32(6),
             ts(1_100_000_000),
         ).unwrap();
