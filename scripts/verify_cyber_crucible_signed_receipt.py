@@ -147,6 +147,8 @@ def _validate_policy(policy: Any) -> dict[str, dict[str, Any]]:
         raise VerificationError("trust policy keys must be a non-empty list")
     by_id: dict[str, dict[str, Any]] = {}
     seen_evaluator_pairs: set[tuple[str, str]] = set()
+    seen_public_keys: set[bytes] = set()
+    roles_by_evaluator: dict[str, set[str]] = {}
     allowed_key_fields = {
         "key_id", "evaluator_id", "public_key", "roles", "not_before", "not_after", "revoked_at"
     }
@@ -168,7 +170,11 @@ def _validate_policy(policy: Any) -> dict[str, dict[str, Any]]:
         if pair in seen_evaluator_pairs:
             raise VerificationError(f"duplicate evaluator/key binding: {pair}")
         seen_evaluator_pairs.add(pair)
-        _b64url_decode(key["public_key"], f"{label}.public_key", 32)
+        public_key_bytes = _b64url_decode(key["public_key"], f"{label}.public_key", 32)
+        if public_key_bytes in seen_public_keys:
+            raise VerificationError("duplicate public key material in trust policy")
+        seen_public_keys.add(public_key_bytes)
+        roles_by_evaluator.setdefault(evaluator_id, set()).update(key["roles"])
         not_before = _utc(key["not_before"], f"{label}.not_before")
         not_after = _utc(key["not_after"], f"{label}.not_after")
         if not_before >= not_after:
@@ -176,6 +182,17 @@ def _validate_policy(policy: Any) -> dict[str, dict[str, Any]]:
         if key["revoked_at"] is not None:
             _utc(key["revoked_at"], f"{label}.revoked_at")
         by_id[key_id] = key
+
+    verdict_roles = {"functional_verdict", "security_verdict"}
+    for evaluator_id, roles in roles_by_evaluator.items():
+        if verdict_roles <= roles:
+            raise VerificationError(
+                f"evaluator identity {evaluator_id!r} is assigned both independent verdict roles"
+            )
+        if "authorization_decision" in roles and roles & verdict_roles:
+            raise VerificationError(
+                f"evaluator identity {evaluator_id!r} cannot both evaluate and authorize"
+            )
     return by_id
 
 
