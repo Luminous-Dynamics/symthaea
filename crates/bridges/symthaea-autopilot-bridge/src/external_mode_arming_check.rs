@@ -618,10 +618,19 @@ impl Px4ExternalModeArmingCheckProfileV1 {
         validate_identifier(&self.profile_id, "profile_id")?;
         validate_identifier(&self.target_instance_id, "target_instance_id")?;
         validate_identifier(&self.firmware_profile_id, "firmware_profile_id")?;
-        validate_identifier(&self.registration_producer_profile_id, "registration_producer_profile_id")?;
-        validate_identifier(&self.arming_check_producer_profile_id, "arming_check_producer_profile_id")?;
+        validate_identifier(
+            &self.registration_producer_profile_id,
+            "registration_producer_profile_id",
+        )?;
+        validate_identifier(
+            &self.arming_check_producer_profile_id,
+            "arming_check_producer_profile_id",
+        )?;
         validate_identifier(&self.source_boot_session_id, "source_boot_session_id")?;
-        validate_identifier(&self.arming_check_capture_window_id, "arming_check_capture_window_id")?;
+        validate_identifier(
+            &self.arming_check_capture_window_id,
+            "arming_check_capture_window_id",
+        )?;
         self.receiver_clock_domain
             .validate()
             .map_err(Px4ExternalModeArmingCheckError::Timestamp)?;
@@ -854,7 +863,7 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
         }
         let config_outcome = self.setpoint_configuration.outcome()?;
         let is_applied_config = matches!(
-            config_outcome,
+            &config_outcome,
             Px4ExternalModeSetpointConfigOutcomeV1::ApplyRequestAccepted { .. }
         );
         if !is_applied_config {
@@ -881,7 +890,7 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
                     Px4SetpointConfigBlockReasonV1::CheckOnlyRequest
                 }
                 Px4ExternalModeSetpointConfigOutcomeV1::ApplyRequestAccepted { .. } => {
-                    unreachable!("matched as applied configuration above")
+                    return Err(Px4ExternalModeArmingCheckError::OutcomeClassificationContradiction);
                 }
             };
             return Ok(
@@ -894,7 +903,8 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
         {
             return Ok(Px4ExternalModeArmingCheckOutcomeV1::RegistrationNotSuccessful);
         }
-        if (self.request.valid_registrations_mask & (1_u32 << self.registration.arming_check_id_raw))
+        if (self.request.valid_registrations_mask
+            & (1_u32 << (self.registration.arming_check_id_raw as u32)))
             == 0
         {
             return Ok(Px4ExternalModeArmingCheckOutcomeV1::RegistrationNotMarkedValid {
@@ -1036,40 +1046,61 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
         let config = &self.setpoint_configuration;
         if config.profile.target_instance_id != self.profile.target_instance_id
             || config.request.target_instance_id != self.profile.target_instance_id
-            || config.reply.as_ref().is_some_and(|r| r.target_instance_id != self.profile.target_instance_id)
+            || config
+                .reply
+                .as_ref()
+                .is_some_and(|r| r.target_instance_id != self.profile.target_instance_id)
         {
             return Err(Px4ExternalModeArmingCheckError::TargetMismatch);
         }
-        if config.request.firmware_profile_id != self.profile.firmware_profile_id
-            || config.reply.as_ref().is_some_and(|r| r.firmware_profile_id != self.profile.firmware_profile_id)
+        if config.profile.firmware_profile_id != self.profile.firmware_profile_id
+            || config.request.firmware_profile_id != self.profile.firmware_profile_id
+            || config
+                .reply
+                .as_ref()
+                .is_some_and(|r| r.firmware_profile_id != self.profile.firmware_profile_id)
         {
             return Err(Px4ExternalModeArmingCheckError::FirmwareProfileMismatch);
         }
-        if config.request.source_boot_session_id != self.profile.source_boot_session_id
-            || config.reply.as_ref().is_some_and(|r| r.source_boot_session_id != self.profile.source_boot_session_id)
+        if config.profile.source_boot_session_id != self.profile.source_boot_session_id
+            || config.request.source_boot_session_id != self.profile.source_boot_session_id
+            || config
+                .reply
+                .as_ref()
+                .is_some_and(|r| r.source_boot_session_id != self.profile.source_boot_session_id)
         {
             return Err(Px4ExternalModeArmingCheckError::BootSessionMismatch);
         }
         if config.profile.receiver_clock_domain != self.profile.receiver_clock_domain
             || config.request.submitted_at.clock_domain != self.profile.receiver_clock_domain
-            || config.reply.as_ref().is_some_and(|r| r.received_at.clock_domain != self.profile.receiver_clock_domain)
+            || config
+                .reply
+                .as_ref()
+                .is_some_and(|r| r.received_at.clock_domain != self.profile.receiver_clock_domain)
         {
             return Err(Px4ExternalModeArmingCheckError::ReceiverClockMismatch);
+        }
+        if config.profile.producer_profile_id != config.request.producer_profile_id
+            || config.profile.capture_window_id != config.request.capture_window_id
+        {
+            return Err(Px4ExternalModeArmingCheckError::SetpointConfigProfileMismatch);
         }
         let expected_profile = &self.profile.arming_check_producer_profile_id;
         if self.request.producer_profile_id != *expected_profile {
             return Err(Px4ExternalModeArmingCheckError::ArmingCheckProducerMismatch);
         }
-        if self.registration.mode_id_raw < 0 {
-            return Err(Px4ExternalModeArmingCheckError::SuccessfulRegistrationHasInvalidIds);
-        }
-        let mode_id = self.registration.mode_id_raw as u8;
-        if config.request.source_id != mode_id {
-            return Err(Px4ExternalModeArmingCheckError::ModeRegistrationMismatch);
-        }
-        if let Some(reply) = &config.reply {
-            if reply.source_id != mode_id {
+        if self.registration.success {
+            if self.registration.mode_id_raw < 0 {
+                return Err(Px4ExternalModeArmingCheckError::SuccessfulRegistrationHasInvalidIds);
+            }
+            let mode_id = self.registration.mode_id_raw as u8;
+            if config.request.source_id != mode_id {
                 return Err(Px4ExternalModeArmingCheckError::ModeRegistrationMismatch);
+            }
+            if let Some(reply) = &config.reply {
+                if reply.source_id != mode_id {
+                    return Err(Px4ExternalModeArmingCheckError::ModeRegistrationMismatch);
+                }
             }
         }
         Ok(())
@@ -1193,6 +1224,12 @@ pub enum Px4ExternalModeArmingCheckError {
     /// SetpointConfig's mode ID did not match the mode ID in registration evidence.
     #[error("SetpointConfig mode ID does not match registered mode ID")]
     ModeRegistrationMismatch,
+    /// Nested SetpointConfig profile did not match its source observations.
+    #[error("SetpointConfig evidence profile does not match its source observations")]
+    SetpointConfigProfileMismatch,
+    /// The outcome classifier contradicted the computed SetpointConfig outcome.
+    #[error("SetpointConfig outcome classification contradicted its source value")]
+    OutcomeClassificationContradiction,
     /// Reply request_id did not match the captured ArmingCheckRequest.
     #[error("ArmingCheckReply request ID mismatch")]
     ReplyRequestIdMismatch,
@@ -1492,9 +1529,6 @@ mod tests {
 
     #[test]
     fn can_arm_and_run_false_is_not_misreported_as_requirement_mismatch() {
-        let mut reply = arming_reply(8, 3, false, 1_350_000_000);
-        reply.can_arm_and_run = false;
-        // Reconstruct so the content digest commits to the changed can-arm value.
         let reply = Px4ExternalModeArmingCheckReplyV1::new(
             "px4.arming-check.decoder.fixture.v1",
             "vehicle.slot-a",
@@ -1550,23 +1584,31 @@ mod tests {
 
     #[test]
     fn request_id_registration_id_and_valid_mask_are_independently_checked() {
-        let wrong_request = assessment(
+        let wrong_request = Px4ExternalModeArmingCheckAssessmentV1::new(
+            profile(),
             registration(true, 3, 42),
             config_assessment(42, true, 0, 1_200_000_000),
             arming_request(1 << 3),
             Some(arming_reply(9, 3, false, 1_350_000_000)),
-            1_400_000_000,
+            ts(1_400_000_000),
         );
-        assert_eq!(wrong_request.validate().unwrap_err(), Px4ExternalModeArmingCheckError::ReplyRequestIdMismatch);
+        assert_eq!(
+            wrong_request.unwrap_err(),
+            Px4ExternalModeArmingCheckError::ReplyRequestIdMismatch
+        );
 
-        let wrong_registration = assessment(
+        let wrong_registration = Px4ExternalModeArmingCheckAssessmentV1::new(
+            profile(),
             registration(true, 3, 42),
             config_assessment(42, true, 0, 1_200_000_000),
             arming_request(1 << 3),
             Some(arming_reply(8, 4, false, 1_350_000_000)),
-            1_400_000_000,
+            ts(1_400_000_000),
         );
-        assert_eq!(wrong_registration.validate().unwrap_err(), Px4ExternalModeArmingCheckError::ReplyRegistrationIdMismatch);
+        assert_eq!(
+            wrong_registration.unwrap_err(),
+            Px4ExternalModeArmingCheckError::ReplyRegistrationIdMismatch
+        );
 
         let not_valid = assessment(
             registration(true, 3, 42),
@@ -1719,7 +1761,7 @@ mod tests {
     }
 
     #[test]
-    fn timestamps_and_zero_timing_bounds_fail_closed() {
+    fn zero_timing_bounds_fail_closed() {
         assert_eq!(
             Px4ExternalModeArmingCheckProfileV1::new(
                 "px4.arming-check.invalid-profile.v1",
@@ -1738,21 +1780,5 @@ mod tests {
             .unwrap_err(),
             Px4ExternalModeArmingCheckError::ZeroTimingBound
         );
-        let mut reg = registration(true, 3, 42);
-        reg.received_at = ts(2_000_000_000);
-        assert!(Px4ExternalModeRegistrationBindingV1::new(
-            "px4.registration.decoder.fixture.v1",
-            "vehicle.slot-a",
-            "px4.v1.18.external-mode.fixture.v1",
-            "px4.boot.fixture.session-a",
-            991,
-            "org.luminous.fixture.mode",
-            1,
-            true,
-            3,
-            42,
-            -1,
-            ts(900_000_000),
-        ).unwrap().validate().is_ok());
     }
 }
