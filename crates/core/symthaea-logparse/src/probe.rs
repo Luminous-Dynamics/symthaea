@@ -276,6 +276,85 @@ pub fn stratified_split(
     (train_hvs, train_labels, test_hvs, test_labels)
 }
 
+/// Assign whole source groups to deterministic stratified folds.
+///
+/// Every group receives exactly one fold, and every label must have at least
+/// `k` distinct groups so each fold has examples of every class.
+/// This function does not examine feature vectors, making fold assignment
+/// independently testable and reusable by benchmark runners.
+pub fn grouped_fold_assignment(
+    labels: &[String],
+    groups: &[String],
+    k: usize,
+    seed: u64,
+) -> Result<Vec<usize>, String> {
+    if labels.len() != groups.len() {
+        return Err(format!(
+            "length mismatch: labels={}, groups={}",
+            labels.len(),
+            groups.len()
+        ));
+    }
+    if labels.is_empty() {
+        return Err("cannot assign folds for an empty corpus".to_string());
+    }
+    if k < 2 {
+        return Err("fold count must be at least two".to_string());
+    }
+    if labels.iter().any(|label| label.is_empty()) || groups.iter().any(|group| group.is_empty()) {
+        return Err("labels and group IDs must be non-empty".to_string());
+    }
+
+    let mut by_label: std::collections::BTreeMap<
+        String,
+        std::collections::BTreeMap<String, Vec<usize>>,
+    > = Default::default();
+    let mut group_labels: std::collections::BTreeMap<&str, &str> = Default::default();
+    for (index, (label, group)) in labels.iter().zip(groups.iter()).enumerate() {
+        if let Some(existing) = group_labels.get(group.as_str()) {
+            if *existing != label.as_str() {
+                return Err(format!(
+                    "group {group:?} contains multiple labels: {existing:?} and {label:?}"
+                ));
+            }
+        } else {
+            group_labels.insert(group.as_str(), label.as_str());
+        }
+        by_label
+            .entry(label.clone())
+            .or_default()
+            .entry(group.clone())
+            .or_default()
+            .push(index);
+    }
+
+    let mut state = seed.max(1);
+    let mut fold_of = vec![usize::MAX; labels.len()];
+    for (label, group_map) in by_label {
+        let mut group_ids: Vec<String> = group_map.keys().cloned().collect();
+        if group_ids.len() < k {
+            return Err(format!(
+                "label {label:?} has {} groups; need at least {k} for grouped {k}-fold CV",
+                group_ids.len()
+            ));
+        }
+        for i in (1..group_ids.len()).rev() {
+            let j = (xorshift(&mut state) as usize) % (i + 1);
+            group_ids.swap(i, j);
+        }
+        for (position, group_id) in group_ids.iter().enumerate() {
+            for &index in &group_map[group_id] {
+                fold_of[index] = position % k;
+            }
+        }
+    }
+
+    if fold_of.iter().any(|fold| *fold == usize::MAX) {
+        return Err("fold assignment left one or more events unassigned".to_string());
+    }
+    Ok(fold_of)
+}
+
 /// Grouped stratified train/test split for leakage-resistant evaluation.
 ///
 /// A group is indivisible: all events from one source file, capture, or scenario
@@ -460,6 +539,76 @@ mod tests {
         assert!(grouped_stratified_split(&hvs, &labels, &groups[..1], 0.5, 1).is_err());
         assert!(grouped_stratified_split(&hvs, &labels, &groups, 1.0, 1).is_err());
         assert!(grouped_stratified_split(&hvs, &labels, &groups, f32::NAN, 1).is_err());
+    }
+
+    #[test]
+    fn grouped_fold_assignment_keeps_groups_intact_and_stratifies_every_fold() {
+        let labels = vec![
+            "a".into(), "a".into(), "a".into(), "a".into(),
+            "b".into(), "b".into(), "b".into(), "b".into(),
+        ];
+        let groups = vec![
+            "a1".into(), "a1".into(), "a2".into(), "a2".into(),
+            "b1".into(), "b1".into(), "b2".into(), "b2".into(),
+        ];
+        let labels = vec![
+            "a".into(), "a".into(), "a".into(), "a".into(),
+            "a".into(), "a".into(), "b".into(), "b".into(),
+            "b".into(), "b".into(), "b".into(), "b".into(),
+        ];
+        let groups = vec![
+            "a1".into(), "a1".into(), "a2".into(), "a2".into(), "a3".into(), "a3".into(),
+            "b1".into(), "b1".into(), "b2".into(), "b2".into(), "b3".into(), "b3".into(),
+        ];
+        let folds = grouped_fold_assignment(&labels, &groups, 3, 0xC0FFEE).unwrap();
+        for i in 0..groups.len() {
+            for j in 0..groups.len() {
+                if groups[i] == groups[j] {
+                    assert_eq!(folds[i], folds[j], "group {} was split", groups[i]);
+                }
+            }
+        }
+        for label in ["a", "b"] {
+            for fold in 0..3 {
+                assert!(
+                    labels.iter().zip(folds.iter()).any(|(actual, assigned)| {
+                        actual == label && *assigned == fold
+                    }),
+                    "label {label} missing from fold {fold}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn grouped_fold_assignment_is_deterministic() {
+        let labels = vec!["a".into(), "a".into(), "a".into(), "b".into(), "b".into(), "b".into()];
+        let groups = vec!["a1".into(), "a2".into(), "a3".into(), "b1".into(), "b2".into(), "b3".into()];
+        assert_eq!(
+            grouped_fold_assignment(&labels, &groups, 3, 99).unwrap(),
+            grouped_fold_assignment(&labels, &groups, 3, 99).unwrap()
+        );
+    }
+
+    #[test]
+    fn grouped_fold_assignment_rejects_ambiguous_or_undersized_groups() {
+        let labels = vec!["a".into(), "b".into(), "a".into(), "b".into()];
+        let mixed_groups = vec!["same".into(), "same".into(), "a2".into(), "b2".into()];
+        assert!(
+            grouped_fold_assignment(&labels, &mixed_groups, 2, 1)
+                .unwrap_err()
+                .contains("multiple labels")
+        );
+
+        let small_labels = vec!["a".into(), "a".into(), "b".into(), "b".into()];
+        let small_groups = vec!["a1".into(), "a2".into(), "b1".into(), "b1".into()];
+        assert!(
+            grouped_fold_assignment(&small_labels, &small_groups, 2, 1)
+                .unwrap_err()
+                .contains("need at least")
+        );
+        assert!(grouped_fold_assignment(&labels, &mixed_groups, 1, 1).is_err());
+        assert!(grouped_fold_assignment(&labels, &mixed_groups[..3], 2, 1).is_err());
     }
 
     #[test]
