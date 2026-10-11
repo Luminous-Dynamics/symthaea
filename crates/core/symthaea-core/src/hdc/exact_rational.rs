@@ -1233,7 +1233,10 @@ mod tests {
         let a = ExactRational::from_integer("255", wide).unwrap();
         let b = ExactRational::from_integer("254", wide).unwrap();
         assert_eq!(a.checked_lcm(&b, narrow).unwrap_err(), ExactRationalError::ResourceLimitExceeded);
-        assert_eq!(a.checked_gcd(&b, narrow).unwrap_err(), ExactRationalError::ResourceLimitExceeded);
+        assert_eq!(a.checked_gcd(&b, narrow).unwrap().to_string(), "1/1");
+
+        let oversized = ExactRational::from_integer("256", wide).unwrap();
+        assert_eq!(oversized.checked_gcd(&one, narrow).unwrap_err(), ExactRationalError::ResourceLimitExceeded);
     }
 
     #[test]
