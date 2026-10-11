@@ -290,6 +290,7 @@ impl ReviewTrustStore {
             reviewer_id: reviewer_id.to_owned(),
             reviewer_organization_id: reviewer_organization_id.to_owned(),
             provider_organization_id: policy.provider_organization_id.clone(),
+            excluded_organization_ids: policy.excluded_organization_ids.iter().cloned().collect(),
             policy_sha256: policy.canonical_digest(),
         })
     }
@@ -664,6 +665,7 @@ pub struct VerifiedReviewerAuthorization {
     reviewer_id: String,
     reviewer_organization_id: String,
     provider_organization_id: String,
+    excluded_organization_ids: Vec<String>,
     policy_sha256: String,
 }
 
@@ -682,6 +684,11 @@ impl VerifiedReviewerAuthorization {
 
     pub fn provider_organization_id(&self) -> &str {
         &self.provider_organization_id
+    }
+
+    /// Organizations excluded by the exact policy applied during verification.
+    pub fn excluded_organization_ids(&self) -> impl Iterator<Item = &str> {
+        self.excluded_organization_ids.iter().map(String::as_str)
     }
 
     pub fn policy_sha256(&self) -> &str {
@@ -1725,6 +1732,10 @@ mod tests {
             "calibration-provider-a"
         );
         assert_eq!(authorization.policy_sha256().len(), 64);
+        assert_eq!(
+            authorization.excluded_organization_ids().collect::<Vec<_>>(),
+            vec!["conflict-of-interest-org"]
+        );
         assert_eq!(guard.last_sequence(), Some(TRUST_SEQUENCE));
     }
 
