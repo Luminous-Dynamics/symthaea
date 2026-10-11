@@ -1512,7 +1512,10 @@ mod tests {
             false,
             false,
             0,
-            [Px4ExternalModeArmingCheckEventV1::default(); PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
+            [
+                Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+            ],
         )
     }
 
@@ -1689,7 +1692,10 @@ mod tests {
             false,
             false,
             0,
-            [Px4ExternalModeArmingCheckEventV1::default(); PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
+            [
+                Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+            ],
             true,
             true,
             false,
@@ -1959,10 +1965,17 @@ mod tests {
         assert_eq!(reply.events[0].log_levels, 0xA5);
         reply.validate().unwrap();
 
-        let mut mutated = reply;
-        mutated.events[0].arguments[24] ^= 1;
+        let mut mutated_health = reply.clone();
+        mutated_health.health_component_warning = false;
         assert_eq!(
-            mutated.validate().unwrap_err(),
+            mutated_health.validate().unwrap_err(),
+            Px4ExternalModeArmingCheckError::DigestMismatch("arming-check reply")
+        );
+
+        let mut mutated_event = reply;
+        mutated_event.events[0].arguments[24] ^= 1;
+        assert_eq!(
+            mutated_event.validate().unwrap_err(),
             Px4ExternalModeArmingCheckError::DigestMismatch("arming-check reply")
         );
     }
@@ -1979,7 +1992,10 @@ mod tests {
             false,
             false,
             (PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1 + 1) as u8,
-            [Px4ExternalModeArmingCheckEventV1::default(); PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
+            [
+                Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+            ],
         )
         .unwrap_err();
         assert_eq!(error, Px4ExternalModeArmingCheckError::InvalidEventCount { found: 6 });
