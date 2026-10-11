@@ -52,7 +52,7 @@ jobs:
           reference_sha256 = Path(sys.argv[5]).read_text(encoding="utf-8").split()[0]
           assert reference["git_blob_sha"] == reference_blob, (reference["git_blob_sha"], reference_blob)
           assert reference["sha256"] == reference_sha256, (reference["sha256"], reference_sha256)
-          assert reference["expected_check_count"] == 56, reference
+          assert reference["expected_check_count"] == 66, reference
           print("verification status matches validator (84 checks) and reference checker (56 checks)")
           PY
 
@@ -100,8 +100,8 @@ jobs:
           import sys
 
           report = json.load(open(sys.argv[1], encoding="utf-8"))
-          expected = 56
-          assert report["schema"] == "luminous-dynamics.orbital-ring-reference-check/v2", report
+          expected = 66
+          assert report["schema"] == "luminous-dynamics.orbital-ring-reference-check/v3", report
           assert report["check_count"] == expected, report
           assert report["evidence_state"] == "passed_at_specified_fidelity", report
           assert report["failed_check_ids"] == [], report
@@ -114,6 +114,7 @@ jobs:
           row = next(item for item in report["rows"] if item["altitude_km"] == 600.0)
           assert abs(row["radius_km"] - 6978.137) < 1e-9, row
           assert abs(row["speed_km_s"] - 7.5578652065) < 1e-9, row
+          assert abs(row["specific_orbital_energy_mj_kg"] + 28.5606632401) < 1e-9, row
           print(f"orbit reference checker: {expected}/{expected} deterministic T0 checks passed")
           PY
 
