@@ -154,7 +154,7 @@
       },
       {
         "message": "SetpointConfigReply v1",
-        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/main/msg/versioned/SetpointConfigReply.msg",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/9dd448d7af27ee90f4aa2a1e2b4e9e49f87a446f/msg/versioned/SetpointConfigReply.msg",
         "source_blob_sha": "d5c8cb562461a2826f782d3ec8ee5a5c65674471"
       }
     ]
