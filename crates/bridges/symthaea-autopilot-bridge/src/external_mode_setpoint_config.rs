@@ -209,8 +209,8 @@ pub struct Px4ExternalModeSetpointConfigRequestV1 {
     pub should_apply: bool,
     /// Requested timeout in milliseconds; zero means the timeout is disabled by this request.
     pub timeout_ms: u16,
-    /// Companion-side receive time, not a PX4 source timestamp.
-    pub received_at: TimestampV1,
+    /// Companion-monotonic time the adapter submitted this request to PX4.
+    pub submitted_at: TimestampV1,
     /// Domain-separated commitment to the exact captured request.
     pub request_digest_hex: String,
 }
@@ -229,7 +229,7 @@ impl Px4ExternalModeSetpointConfigRequestV1 {
         source_id: u8,
         should_apply: bool,
         timeout_ms: u16,
-        received_at: TimestampV1,
+        submitted_at: TimestampV1,
     ) -> Result<Self, Px4ExternalModeSetpointConfigError> {
         let mut item = Self {
             schema_version: PX4_EXTERNAL_MODE_SETPOINT_CONFIG_SCHEMA_V1,
@@ -244,7 +244,7 @@ impl Px4ExternalModeSetpointConfigRequestV1 {
             source_id,
             should_apply,
             timeout_ms,
-            received_at,
+            submitted_at,
             request_digest_hex: String::new(),
         };
         item.validate_without_digest()?;
@@ -288,7 +288,7 @@ impl Px4ExternalModeSetpointConfigRequestV1 {
         validate_identifier(&self.firmware_profile_id, "firmware_profile_id")?;
         validate_identifier(&self.source_boot_session_id, "source_boot_session_id")?;
         validate_identifier(&self.capture_window_id, "capture_window_id")?;
-        self.received_at
+        self.submitted_at
             .validate()
             .map_err(Px4ExternalModeSetpointConfigError::Timestamp)?;
         Ok(())
@@ -308,8 +308,8 @@ impl Px4ExternalModeSetpointConfigRequestV1 {
         hasher.update(&self.type_raw.to_le_bytes());
         hasher.update(&[self.source_id, u8::from(self.should_apply)]);
         hasher.update(&self.timeout_ms.to_le_bytes());
-        feed_str(&mut hasher, self.received_at.clock_domain.as_str());
-        hasher.update(&self.received_at.nanoseconds.to_le_bytes());
+        feed_str(&mut hasher, self.submitted_at.clock_domain.as_str());
+        hasher.update(&self.submitted_at.nanoseconds.to_le_bytes());
         digest_hex(hasher.finalize().as_bytes())
     }
 }
@@ -724,7 +724,7 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
         let Some(reply) = &self.reply else {
             let request_age_ns = self
                 .assessed_at
-                .elapsed_since(&self.request.received_at)
+                .elapsed_since(&self.request.submitted_at)
                 .map_err(Px4ExternalModeSetpointConfigError::Timestamp)?;
             return if request_age_ns > self.profile.max_reply_wait_ns {
                 Ok(Px4ExternalModeSetpointConfigOutcomeV1::ReplyMissing {
@@ -811,7 +811,7 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
         }
         self.check_request_profile()?;
         self.assessed_at
-            .elapsed_since(&self.request.received_at)
+            .elapsed_since(&self.request.submitted_at)
             .map_err(|error| match error {
                 EvidenceValidationError::NonMonotonicTimestamp => {
                     Px4ExternalModeSetpointConfigError::AssessmentBeforeRequest
@@ -830,7 +830,7 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
             if reply.source_timestamp_us < self.request.source_timestamp_us {
                 return Err(Px4ExternalModeSetpointConfigError::SourceTimeRegression);
             }
-            if reply.received_at.nanoseconds < self.request.received_at.nanoseconds {
+            if reply.received_at.nanoseconds < self.request.submitted_at.nanoseconds {
                 return Err(Px4ExternalModeSetpointConfigError::ReceiveOrderRegression);
             }
             self.assessed_at
@@ -861,7 +861,7 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
         if self.request.capture_window_id != self.profile.capture_window_id {
             return Err(Px4ExternalModeSetpointConfigError::CaptureWindowMismatch);
         }
-        if self.request.received_at.clock_domain != self.profile.receiver_clock_domain {
+        if self.request.submitted_at.clock_domain != self.profile.receiver_clock_domain {
             return Err(Px4ExternalModeSetpointConfigError::ReceiverClockMismatch);
         }
         Ok(())
