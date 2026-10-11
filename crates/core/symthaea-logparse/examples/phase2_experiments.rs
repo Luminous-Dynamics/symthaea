@@ -115,18 +115,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Experiment 2: 5-fold stratified cross-validation on sbousseaden
     // ----------------------------------------------------------------
     println!("\n=== Experiment 2: grouped 5-fold CV on sbousseaden ===");
-    let fold_accs =
-        run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, 0xDEADBEEF, cfg)?;
-    let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
-    let var = fold_accs.iter().map(|a| (a - mean).powi(2)).sum::<f32>() / fold_accs.len() as f32;
-    let std = var.sqrt();
-    println!("  per-fold test accuracy: {:?}", fold_accs);
-    println!("  mean ± std: {mean:.3} ± {std:.3}");
-    println!(
-        "  min/max:    {:.3} / {:.3}",
-        fold_accs.iter().cloned().fold(f32::INFINITY, f32::min),
-        fold_accs.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
-    );
+    match run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, 0xDEADBEEF, cfg) {
+        Ok(fold_accs) if !fold_accs.is_empty() => {
+            let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
+            let var = fold_accs
+                .iter()
+                .map(|a| (a - mean).powi(2))
+                .sum::<f32>()
+                / fold_accs.len() as f32;
+            let std = var.sqrt();
+            println!("  per-fold test accuracy: {:?}", fold_accs);
+            println!("  mean ± std: {mean:.3} ± {std:.3}");
+            println!(
+                "  min/max:    {:.3} / {:.3}",
+                fold_accs.iter().cloned().fold(f32::INFINITY, f32::min),
+                fold_accs.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
+            );
+        }
+        Ok(_) => println!("  grouped CV unavailable: no fold metrics produced"),
+        Err(error) => println!(
+            "  grouped CV unavailable under the strict capture-group contract: {error}"
+        ),
+    }
 
     // ----------------------------------------------------------------
     // Experiment 3: Cross-corpus OOD — train on sbousseaden, test on OTRF
@@ -308,25 +318,32 @@ fn run_scenario_classifier(
     // Same three split seeds are reused for every scenario encoder so results
     // are paired across representation variants.
     let scenario_repeat_seeds = [0xDEADBEEF, 0x51CE_0002, 0x51CE_0003];
-    let repeat_means = run_repeated_grouped_kfold(
+    match run_repeated_grouped_kfold(
         &source_hvs,
         &source_labels,
         &source_groups,
         5,
         &scenario_repeat_seeds,
         cfg,
-    )?;
-    let mean = repeat_means.iter().sum::<f32>() / repeat_means.len() as f32;
-    let variance = repeat_means
-        .iter()
-        .map(|accuracy| (accuracy - mean).powi(2))
-        .sum::<f32>()
-        / repeat_means.len() as f32;
-    println!(
-        "  repeated grouped scenario 5-fold accuracy: {mean:.3} ± {:.3} (repeat means)",
-        variance.sqrt()
-    );
-    println!("  per-repeat means: {repeat_means:?}");
+    ) {
+        Ok(repeat_means) if !repeat_means.is_empty() => {
+            let mean = repeat_means.iter().sum::<f32>() / repeat_means.len() as f32;
+            let variance = repeat_means
+                .iter()
+                .map(|accuracy| (accuracy - mean).powi(2))
+                .sum::<f32>()
+                / repeat_means.len() as f32;
+            println!(
+                "  repeated grouped scenario 5-fold accuracy: {mean:.3} ± {:.3} (repeat means)",
+                variance.sqrt()
+            );
+            println!("  per-repeat means: {repeat_means:?}");
+        }
+        Ok(_) => println!("  grouped scenario CV unavailable: no repeat metrics produced"),
+        Err(error) => println!(
+            "  grouped scenario CV unavailable under the strict capture-group contract: {error}"
+        ),
+    }
 
     let (train_hvs, train_labels, test_hvs, test_labels) =
         symthaea_logparse::probe::grouped_stratified_split(
