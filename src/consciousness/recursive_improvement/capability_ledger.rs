@@ -8,10 +8,11 @@
 //! evaluator identities/revisions on held-out or transfer cases can qualify a claim. Training
 //! success remains useful telemetry but cannot grant qualification.
 //!
-//! This module validates provenance metadata and policy binding; it does not verify evaluator
-//! signatures, fetch runner artifacts, or prove that a supplied receipt is authentic. Those checks
-//! belong to the independent evidence/verifier layer. A constructed receipt or this in-memory
-//! ledger, by itself, is not proof that a real run occurred.
+//! Under the optional `identity` feature, the signed-receipt ingress verifies an Ed25519
+//! signature using the evaluator key frozen in the ledger policy and checks the SHA-256 of the
+//! exact evidence bytes. It does not retrieve runner artifacts or independently prove that a real
+//! run occurred; evaluator-key custody and the evaluator's truthfulness remain in the trust model.
+//! Raw receipt data cannot be admitted to qualification directly, and a digest string is not proof.
 //!
 //! This first version measures prospective success-probability calibration. Expected compute cost
 //! and realized compute are retained for analysis, but do not yet participate in qualification.
@@ -176,9 +177,9 @@ impl CapabilityOutcomeReceipt {
 
 /// Opaque qualification-admission token. It intentionally has private fields and no serde
 /// implementation, so callers cannot create one by supplying a digest or deserializing a claim.
-/// Only this module and its descendants (the future independent verifier and unit tests) can
-/// issue the token. The verifier must authenticate artifacts/signatures before issuance; this
-/// wrapper is an API boundary, not a cryptographic primitive.
+/// Only this module and its descendants can issue the token. The feature-gated receipt
+/// verifier checks the evaluator signature, signed receipt fields, and evidence-payload digest
+/// before issuance. This wrapper is an API boundary; it does not itself prove runner truth.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerifiedCapabilityOutcomeReceipt {
     receipt: CapabilityOutcomeReceipt,
@@ -491,10 +492,10 @@ impl CapabilityLedger {
 
     /// Resolve a forecast only through the opaque token issued by the independent verifier.
     ///
-    /// Raw CapabilityOutcomeReceipt values cannot qualify a claim: matching evaluator labels and
-    /// a caller-supplied digest do not authenticate an execution artifact. Until the reviewed
-    /// verifier path can issue VerifiedCapabilityOutcomeReceipt, production qualification fails
-    /// closed.
+    /// Raw CapabilityOutcomeReceipt values cannot qualify a claim: matching evaluator labels
+    /// and a caller-supplied digest do not authenticate an execution artifact. The identity-feature
+    /// ingress verifies a signature and exact evidence bytes before issuing the opaque token;
+    /// builds without that feature have no production receipt-admission path.
     pub fn resolve_verified_forecast(
         &mut self,
         verified: VerifiedCapabilityOutcomeReceipt,
@@ -700,7 +701,7 @@ mod receipt_verifier {
             .map_err(|_| CapabilityLedgerError::InvalidReceiptSignature)?;
 
         let evidence_root = Sha256::digest(evidence_payload);
-        if signed.receipt.receipt_sha256 != hex::encode(evidence_root) {
+        if signed.receipt.receipt_sha256 != hex::encode(&evidence_root) {
             return Err(CapabilityLedgerError::EvidenceRootMismatch);
         }
 
