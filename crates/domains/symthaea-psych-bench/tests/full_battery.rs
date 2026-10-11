@@ -96,7 +96,7 @@ use symthaea_psych_bench::benchmarks::{
 };
 use symthaea_psych_bench::harness::{
     BenchmarkConfig, BenchmarkReport, PsychBenchmark,
-    snapshot::{RegressionReport, RegressionSnapshot},
+    snapshot::{RegressionReport, RegressionSnapshot, SNAPSHOT_SCHEMA_VERSION},
 };
 
 fn battery_config() -> BenchmarkConfig {
@@ -363,17 +363,26 @@ fn regression_against_baseline() {
         "/baselines/v0.9.0.json"
     ));
 
-    // Skip gracefully if no baseline snapshot exists yet
-    if !baseline_path.exists() {
-        eprintln!(
-            "WARNING: No baseline snapshot at {}. Skipping regression test.",
-            baseline_path.display()
-        );
-        return;
-    }
+    // This path is part of the committed regression guard. A missing file
+    // must never turn the guard into a successful no-op.
+    assert!(
+        baseline_path.is_file(),
+        "Required regression baseline is missing; refusing to skip: {}",
+        baseline_path.display()
+    );
 
     let baseline =
         RegressionSnapshot::load(baseline_path).expect("failed to load baseline snapshot");
+    assert_eq!(
+        baseline.schema_version, SNAPSHOT_SCHEMA_VERSION,
+        "Committed regression baseline uses an unsupported schema version"
+    );
+    baseline.validate().unwrap_or_else(|errors| {
+        panic!(
+            "Committed regression baseline is structurally invalid: {}",
+            errors.join("; ")
+        )
+    });
 
     // Check staleness (warn if > 30 days old, but don't fail)
     if let Some(warning) = baseline.staleness_warning(30) {
