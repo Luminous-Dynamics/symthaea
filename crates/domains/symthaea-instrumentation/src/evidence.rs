@@ -108,7 +108,7 @@ impl VerifiedArtifactDigest {
         reader: R,
     ) -> Result<Self, ArtifactVerificationError> {
         let artifact_id = reference.artifact_id().to_owned();
-        let source_version_id = reader.immutable_version_id();
+        let source_version_id = reader.immutable_version_id().to_owned();
         if source_version_id.is_empty()
             || source_version_id.trim() != source_version_id
             || source_version_id.len() > MAX_IMMUTABLE_SOURCE_VERSION_ID_BYTES
@@ -118,11 +118,7 @@ impl VerifiedArtifactDigest {
                 artifact_id,
             });
         }
-        Self::verify_reader_inner(
-            reference,
-            reader,
-            Some(source_version_id.to_owned()),
-        )
+        Self::verify_reader_inner(reference, reader, Some(source_version_id))
     }
 
     fn verify_reader_inner<R: Read>(
@@ -264,7 +260,7 @@ mod tests {
         }
     }
 
-    impl Read for VersionedCursor {
+    impl std::io::Read for VersionedCursor {
         fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
             std::io::Read::read(&mut self.inner, buffer)
         }
