@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-infrastructure"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Domain-neutral typed vocabulary for interoperable physical infrastructure coordination"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["infrastructure", "interoperability", "digital-twin", "safety"]
+categories = ["science", "simulation"]
+
+[dependencies]
+serde = { workspace = true }
