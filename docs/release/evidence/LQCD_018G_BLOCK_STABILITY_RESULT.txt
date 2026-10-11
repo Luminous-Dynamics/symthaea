@@ -1,0 +1,17 @@
+subject_sha256=6ce995feca98b5180de95c45e883a353470278c3fc872dc1dde4cfdfbd71900d
+subject=independent-standard-library
+central_t0=0.33750000000000002
+block_1_se=0.0042128883956444058
+block_2_se=0.0061045555275102302
+block_3_se=0.0080544204816276263
+block_4_se=0.0090863018951899219
+block_6_se=0.012732198384543647
+plateau_blocks=3,4,6
+plateau_change_3_4=0.12040115823331843
+plateau_change_4_6=0.33420230012236629
+plateau_max_change=0.33420230012236629
+policy_0.30=FAIL
+policy_0.35=PASS
+two_chain_block_4=REJECT_PARTIAL_CHAIN_BLOCK
+two_chain_block_3=CHAIN_LOCAL
+authority=synthetic-resampling-semantics-only
