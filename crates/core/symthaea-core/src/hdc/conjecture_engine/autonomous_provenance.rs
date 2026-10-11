@@ -314,6 +314,7 @@ pub enum AutonomousDiscoveryReceiptError {
     InvalidSourceRevision,
     EmptySystemId,
     InvalidSystemDefinition,
+    InvalidSearchConfig,
     EmptyCandidate,
     InvalidVariables,
     InvalidInitialState,
@@ -358,7 +359,64 @@ fn sanitized_config(config: &RegressorConfig, mode: AutonomousDiscoveryMode) -> 
     effective
 }
 
-fn search_config_digest(config: &RegressorConfig, extra_seed_templates: &[Expr]) -> String {
+/// Serializable effective search settings carried inside a receipt so an
+/// independent verifier can inspect prior isolation instead of trusting only a hash.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AutonomousSearchConfigV1 {
+    pub population_size: usize,
+    pub generations: usize,
+    pub max_depth: usize,
+    pub max_complexity: usize,
+    pub lambda: f64,
+    pub tournament_size: usize,
+    pub mutation_rate: f64,
+    pub seed: u64,
+    pub disable_macro_seeds: bool,
+    pub exclude_trig: bool,
+    pub diverse_trajectory_count: usize,
+    pub prior_composition_rate: f64,
+    pub prior_fragment_bonus: f64,
+    pub orthogonality_penalty: f64,
+    pub orthogonality_threshold: f64,
+    pub known_invariant_formulas: Vec<String>,
+    pub use_lie_fitness: bool,
+    pub extra_seed_template_formulas: Vec<String>,
+}
+
+fn snapshot_search_config(
+    config: &RegressorConfig,
+    extra_seed_templates: &[Expr],
+) -> AutonomousSearchConfigV1 {
+    AutonomousSearchConfigV1 {
+        population_size: config.population_size,
+        generations: config.generations,
+        max_depth: config.max_depth,
+        max_complexity: config.max_complexity,
+        lambda: config.lambda,
+        tournament_size: config.tournament_size,
+        mutation_rate: config.mutation_rate,
+        seed: config.seed,
+        disable_macro_seeds: config.disable_macro_seeds,
+        exclude_trig: config.exclude_trig,
+        diverse_trajectory_count: config.diverse_trajectory_count,
+        prior_composition_rate: config.prior_composition_rate,
+        prior_fragment_bonus: config.prior_fragment_bonus,
+        orthogonality_penalty: config.orthogonality_penalty,
+        orthogonality_threshold: config.orthogonality_threshold,
+        known_invariant_formulas: config
+            .known_invariants
+            .iter()
+            .map(|invariant| format!("{}", invariant))
+            .collect(),
+        use_lie_fitness: config.use_lie_fitness,
+        extra_seed_template_formulas: extra_seed_templates
+            .iter()
+            .map(|template| format!("{}", template))
+            .collect(),
+    }
+}
+
+fn search_config_digest(config: &AutonomousSearchConfigV1) -> String {
     let mut hasher = blake3::Hasher::new();
     hash_string(&mut hasher, "symthaea-autonomous-search-config-v1");
     hash_usize(&mut hasher, config.population_size);
@@ -377,15 +435,61 @@ fn search_config_digest(config: &RegressorConfig, extra_seed_templates: &[Expr])
     hash_f64(&mut hasher, config.orthogonality_penalty);
     hash_f64(&mut hasher, config.orthogonality_threshold);
     hasher.update(&[u8::from(config.use_lie_fitness)]);
-    hash_usize(&mut hasher, config.known_invariants.len());
-    for invariant in &config.known_invariants {
-        hash_string(&mut hasher, &format!("{}", invariant));
+    hash_usize(&mut hasher, config.known_invariant_formulas.len());
+    for formula in &config.known_invariant_formulas {
+        hash_string(&mut hasher, formula);
     }
-    hash_usize(&mut hasher, extra_seed_templates.len());
-    for template in extra_seed_templates {
-        hash_string(&mut hasher, &format!("{}", template));
+    hash_usize(&mut hasher, config.extra_seed_template_formulas.len());
+    for formula in &config.extra_seed_template_formulas {
+        hash_string(&mut hasher, formula);
     }
     hasher.finalize().to_hex().to_string()
+}
+
+fn search_config_is_consistent(
+    config: &AutonomousSearchConfigV1,
+    mode: AutonomousDiscoveryMode,
+    discovery_seed: u64,
+) -> bool {
+    let scalars_finite = config.lambda.is_finite()
+        && config.mutation_rate.is_finite()
+        && config.prior_composition_rate.is_finite()
+        && config.prior_fragment_bonus.is_finite()
+        && config.orthogonality_penalty.is_finite()
+        && config.orthogonality_threshold.is_finite();
+    if !scalars_finite
+        || config.population_size == 0
+        || config.generations == 0
+        || config.max_depth == 0
+        || config.max_complexity == 0
+        || config.tournament_size == 0
+        || config.diverse_trajectory_count == 0
+        || config.seed != discovery_seed
+        || config.mutation_rate < 0.0
+        || config.mutation_rate > 1.0
+        || config.prior_composition_rate < 0.0
+        || config.prior_composition_rate > 1.0
+        || config.prior_fragment_bonus < 0.0
+        || config.prior_fragment_bonus > 1.0
+        || config.orthogonality_threshold < 0.0
+        || config.orthogonality_threshold > 1.0
+        || config.known_invariant_formulas.iter().any(|formula| formula.trim().is_empty())
+        || config.extra_seed_template_formulas.iter().any(|formula| formula.trim().is_empty())
+    {
+        return false;
+    }
+    match mode {
+        AutonomousDiscoveryMode::Cold => {
+            config.disable_macro_seeds
+                && config.prior_composition_rate == 0.0
+                && config.prior_fragment_bonus == 1.0
+                && config.orthogonality_penalty == 1.0
+                && config.known_invariant_formulas.is_empty()
+                && config.extra_seed_template_formulas.is_empty()
+        }
+        AutonomousDiscoveryMode::Primed => true,
+        AutonomousDiscoveryMode::Composed => false,
+    }
 }
 
 /// Identity receipt for one candidate and one independent holdout record.
@@ -401,6 +505,7 @@ pub struct AutonomousDiscoveryReceiptV1 {
     pub discovery_mode: AutonomousDiscoveryMode,
     pub discovery_seed: u64,
     pub holdout_seed: u64,
+    pub search_config: AutonomousSearchConfigV1,
     pub search_config_blake3: String,
     pub candidate_formula: String,
     pub candidate_blake3: String,
@@ -485,6 +590,19 @@ pub fn build_autonomous_discovery_receipt_v1(
         return Err(AutonomousDiscoveryReceiptError::ColdRunContainsPriors);
     }
     let effective = sanitized_config(config, candidate.discovery_mode);
+    let effective_templates = if candidate.discovery_mode == AutonomousDiscoveryMode::Cold {
+        &[]
+    } else {
+        extra_seed_templates
+    };
+    let search_config = snapshot_search_config(&effective, effective_templates);
+    if !search_config_is_consistent(
+        &search_config,
+        candidate.discovery_mode,
+        config.seed,
+    ) {
+        return Err(AutonomousDiscoveryReceiptError::InvalidSearchConfig);
+    }
     let holdout_valid = holdout_record_is_consistent(holdout, t_max, dt, initial_state.len());
     if !holdout_valid {
         return Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord);
@@ -500,14 +618,8 @@ pub fn build_autonomous_discovery_receipt_v1(
         discovery_mode: candidate.discovery_mode,
         discovery_seed: config.seed,
         holdout_seed: holdout.holdout_seed,
-        search_config_blake3: search_config_digest(
-            &effective,
-            if candidate.discovery_mode == AutonomousDiscoveryMode::Cold {
-                &[]
-            } else {
-                extra_seed_templates
-            },
-        ),
+        search_config_blake3: search_config_digest(&search_config),
+        search_config,
         candidate_formula: formula,
         candidate_blake3,
         variable_names: var_names.iter().map(|name| (*name).to_string()).collect(),
@@ -559,6 +671,13 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         && receipt.search_config_blake3.len() == 64
         && receipt.search_config_blake3 == receipt.search_config_blake3.to_ascii_lowercase()
         && receipt.search_config_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && search_config_is_consistent(
+            &receipt.search_config,
+            receipt.discovery_mode,
+            receipt.discovery_seed,
+        )
+        && search_config_digest(&receipt.search_config) == receipt.search_config_blake3
+        && receipt.discovery_mode != AutonomousDiscoveryMode::Composed
         && !receipt.candidate_formula.trim().is_empty()
         && !receipt.variable_names.is_empty()
         && receipt.variable_names.iter().all(|name| !name.trim().is_empty())
@@ -1058,6 +1177,79 @@ mod tests {
             4.0, 0.01, &holdout,
         ).expect("well-formed receipt should be constructed");
         receipt.search_config_blake3 = "not-a-digest".to_string();
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
+    fn verifier_rejects_cold_receipt_with_prior_snapshot_even_after_redigest() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs,
+            &formula,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"],
+            &config,
+            4.0,
+            0.01,
+            2,
+            701,
+            1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            &config,
+            &[],
+            &candidate,
+            &["x", "y", "vx", "vy"],
+            &[1.0, 0.0, 0.0, 1.0],
+            4.0,
+            0.01,
+            &holdout,
+        )
+        .expect("well-formed receipt should be constructed");
+        receipt.search_config.known_invariant_formulas.push("x".to_string());
+        receipt.search_config_blake3 = search_config_digest(&receipt.search_config);
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
+    fn verifier_rejects_composed_receipt_even_after_redigest() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Primed);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs,
+            &formula,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"],
+            &config,
+            4.0,
+            0.01,
+            2,
+            701,
+            1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            &config,
+            &[],
+            &candidate,
+            &["x", "y", "vx", "vy"],
+            &[1.0, 0.0, 0.0, 1.0],
+            4.0,
+            0.01,
+            &holdout,
+        )
+        .expect("well-formed receipt should be constructed");
+        receipt.discovery_mode = AutonomousDiscoveryMode::Composed;
         receipt.receipt_blake3 = compute_receipt_digest(&receipt);
         assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
     }
