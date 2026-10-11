@@ -55,6 +55,7 @@ pub mod adapter;
 pub mod benchmarks;
 pub mod harness;
 pub mod substrate_transfer;
+pub mod suite_identity;
 pub mod wm;
 
 #[cfg(feature = "neuroevolution")]
