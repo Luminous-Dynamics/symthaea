@@ -116,8 +116,9 @@ pub fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[&str]) -> Vec<f64> {
     grad
 }
 
-/// Fraction of `trajectory` samples where `expr`'s gradient magnitude clears
-/// a threshold relative to the trajectory's own peak gradient magnitude.
+/// Fraction of `trajectory` samples where the squared gradient magnitude of
+/// `expr` reaches a fraction of the trajectory's peak squared gradient magnitude.
+/// The current 0.01 floor therefore means 10% of peak gradient amplitude.
 ///
 /// [`lie_derivative_variance`] normalizes by the *mean* squared gradient,
 /// which a degenerate high-power monomial of a single variable can game: if
@@ -153,8 +154,8 @@ pub fn gradient_informativeness_fraction(
     if max_grad_sq <= 0.0 || !max_grad_sq.is_finite() {
         return 0.0;
     }
-    // 1% of the trajectory's own peak -- relative, not absolute, so it
-    // applies regardless of the candidate's overall scale.
+    // 1% of peak squared gradient magnitude (equivalent to 10% amplitude).
+    // This relative threshold applies regardless of the candidate's scale.
     const INFORMATIVE_RELATIVE_FLOOR: f64 = 0.01;
     let informative = grad_sq_vals
         .iter()
