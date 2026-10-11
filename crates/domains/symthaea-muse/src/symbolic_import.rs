@@ -177,7 +177,12 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                         MidiMessage::NoteOn { key, .. } | MidiMessage::NoteOff { key, .. } => {
                             Some((key.as_int(), None))
                         }
-                        _ => None,
+                        unsupported => {
+                            return Err(format!(
+                                "MIDI channel {} uses unsupported playback event {unsupported:?}; Score cannot preserve controller, instrument, aftertouch, or pitch-bend semantics",
+                                channel + 1
+                            ));
+                        }
                     };
                     if let Some((pitch, velocity)) = note_event {
                         if channel == 9 {
@@ -195,6 +200,18 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                             velocity,
                         });
                     }
+                }
+                TrackEventKind::SysEx(_) => {
+                    return Err(
+                        "MIDI System Exclusive events are not supported; Score cannot preserve device-specific instrument or playback state"
+                            .into(),
+                    );
+                }
+                TrackEventKind::Escape(_) => {
+                    return Err(
+                        "MIDI escape events are not supported; Score cannot preserve arbitrary synthesizer commands"
+                            .into(),
+                    );
                 }
                 _ => {}
             }
@@ -1213,6 +1230,42 @@ mod tests {
             error.contains("channel 10 note events are outside the pitched-note importer"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn midi_program_change_is_rejected_instead_of_silently_dropped() {
+        let track = [
+            0, 0xC0, 5, // program 5 changes the channel instrument
+            0, 0x90, 60, 100,
+            1, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("unsupported playback event"), "{error}");
+    }
+
+    #[test]
+    fn midi_sustain_controller_is_rejected_instead_of_shortening_notes() {
+        let track = [
+            0, 0xB0, 64, 127, // sustain pedal down
+            0, 0x90, 60, 100,
+            1, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("unsupported playback event"), "{error}");
+    }
+
+    #[test]
+    fn midi_pitch_bend_is_rejected_instead_of_flattening_sounding_pitch() {
+        let track = [
+            0, 0xE0, 0, 127, // non-neutral pitch bend
+            0, 0x90, 60, 100,
+            1, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("unsupported playback event"), "{error}");
     }
 
     #[test]
