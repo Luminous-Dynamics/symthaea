@@ -53,6 +53,71 @@ fn failed_holdout(
     }
 }
 
+fn checked_rk4_trajectory(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial: &[f64],
+    t_end: f64,
+    dt: f64,
+) -> Option<Vec<Vec<f64>>> {
+    let dimension = initial.len();
+    if dimension == 0 || !t_end.is_finite() || t_end <= 0.0 || !dt.is_finite() || dt <= 0.0 {
+        return None;
+    }
+    let estimated_steps = (t_end / dt).ceil();
+    if !estimated_steps.is_finite()
+        || estimated_steps > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
+    {
+        return None;
+    }
+    let max_steps = estimated_steps as usize;
+    let mut t = 0.0_f64;
+    let mut state = initial.to_vec();
+    let mut states = Vec::with_capacity(max_steps.saturating_add(1));
+    states.push(state.clone());
+
+    let derivative = |values: &[f64], time: f64| -> Option<Vec<f64>> {
+        if values.len() != dimension || values.iter().any(|value| !value.is_finite()) {
+            return None;
+        }
+        let output = rhs(values, time);
+        if output.len() != dimension || output.iter().any(|value| !value.is_finite()) {
+            return None;
+        }
+        Some(output)
+    };
+
+    for _ in 0..max_steps {
+        if t >= t_end {
+            break;
+        }
+        let h = dt.min(t_end - t);
+        if !h.is_finite() || h <= 0.0 || t + h <= t {
+            return None;
+        }
+        let k1 = derivative(&state, t)?;
+        let y2: Vec<f64> = (0..dimension).map(|i| state[i] + h * 0.5 * k1[i]).collect();
+        let k2 = derivative(&y2, t + 0.5 * h)?;
+        let y3: Vec<f64> = (0..dimension).map(|i| state[i] + h * 0.5 * k2[i]).collect();
+        let k3 = derivative(&y3, t + 0.5 * h)?;
+        let y4: Vec<f64> = (0..dimension).map(|i| state[i] + h * k3[i]).collect();
+        let k4 = derivative(&y4, t + h)?;
+
+        for i in 0..dimension {
+            state[i] += h / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
+        }
+        if state.iter().any(|value| !value.is_finite()) {
+            return None;
+        }
+        t += h;
+        states.push(state.clone());
+    }
+
+    if t < t_end {
+        return None;
+    }
+    Some(states)
+}
+
 /// Assess a candidate on independently seeded, perturbed initial conditions.
 ///
 /// The discovery seed is read from the exact search config rather than accepting
@@ -141,7 +206,7 @@ pub fn validate_invariant_holdout(
     }
 
     let sample_orbit = |initial: &[f64]| -> Option<Vec<Vec<f64>>> {
-        let (_times, states) = rk45_trajectory(rhs, initial, t_max, dt);
+        let states = checked_rk4_trajectory(rhs, initial, t_max, dt)?;
         let n_samples = 200.min(states.len());
         if n_samples < 20 {
             return None;
@@ -444,10 +509,36 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
     } else {
         receipt.holdout_failure != Some(AutonomousHoldoutFailure::IdenticalSeeds)
     };
+    let holdout = AutonomousHoldoutValidation {
+        discovery_seed: receipt.discovery_seed,
+        holdout_seed: receipt.holdout_seed,
+        requested_trajectories: receipt.requested_trajectories,
+        trajectories_checked: receipt.trajectories_checked,
+        max_lie_derivative_variance: receipt.max_lie_derivative_variance,
+        median_lie_derivative_variance: receipt.median_lie_derivative_variance,
+        threshold: receipt.threshold,
+        passed: receipt.holdout_passed,
+        failure: receipt.holdout_failure,
+    };
     receipt.schema_version == 1
-        && seed_pair_consistent
+        && !receipt.source_revision.is_empty()
+        && matches!(receipt.source_revision.len(), 40 | 64)
+        && receipt.source_revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && !receipt.system_id.trim().is_empty()
         && receipt.system_definition_blake3.len() == 64
         && receipt.system_definition_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && !receipt.variable_names.is_empty()
+        && receipt.variable_names.iter().all(|name| !name.trim().is_empty())
+        && receipt.variable_names.iter().collect::<std::collections::HashSet<_>>().len()
+            == receipt.variable_names.len()
+        && receipt.initial_state.len() == receipt.variable_names.len()
+        && receipt.initial_state.iter().all(|value| value.is_finite())
+        && receipt.t_max.is_finite()
+        && receipt.t_max > 0.0
+        && receipt.dt.is_finite()
+        && receipt.dt > 0.0
+        && seed_pair_consistent
+        && holdout_record_is_consistent(&holdout, receipt.t_max, receipt.dt)
         && blake3::hash(receipt.candidate_formula.as_bytes()).to_hex().to_string()
             == receipt.candidate_blake3
         && compute_receipt_digest(receipt) == receipt.receipt_blake3
@@ -754,5 +845,47 @@ mod tests {
         assert_eq!(receipt.holdout_failure, Some(AutonomousHoldoutFailure::IdenticalSeeds));
         assert!(verify_autonomous_discovery_receipt_v1(&receipt));
     }
+
+    #[test]
+    fn verifier_rejects_semantically_invalid_receipt_even_after_redigest() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        ).expect("well-formed receipt should be constructed");
+        receipt.holdout_passed = false;
+        receipt.holdout_failure = None;
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
+    fn changing_system_definition_changes_receipt_identity() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
+        );
+        let receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        ).expect("well-formed receipt should be constructed");
+        let mut altered = receipt.clone();
+        altered.system_definition_blake3 = blake3::hash(b"a different rhs").to_hex().to_string();
+        assert!(!verify_autonomous_discovery_receipt_v1(&altered));
+    }
+
 
 }
