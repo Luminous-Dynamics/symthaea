@@ -193,7 +193,9 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
         "multiplicity": multiplicity,
         "expected_electron_count": expected_electrons,
         "total_energy_hartree": expected_total_energy,
-        "nuclear_repulsion_hartree": float(mean_field.energy_nuc()),
+        "nuclear_repulsion_hartree": require_finite(
+            f"{molecule_name} PySCF nuclear repulsion energy", mean_field.energy_nuc()
+        ),
         "scf_converged": bool(mean_field.converged),
         "scf_iterations": (
             int(mean_field.cycles) if getattr(mean_field, "cycles", None) is not None else None
