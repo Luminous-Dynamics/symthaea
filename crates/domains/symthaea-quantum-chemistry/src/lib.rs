@@ -100,7 +100,7 @@ pub mod vibrational;
 // Re-export key types for convenience
 pub use basis::{BasisSet, BasisSetProvider, ContractedGaussian, PrimitiveGaussian, ShellType};
 pub use consciousness::{OrbitalPhiMeasurement, build_atom_basis_ranges, compute_orbital_phi};
-pub use dft::{DftConfig, DftResult, XcFunctional, kohn_sham_dft};
+pub use dft::{DftConfig, DftResult, XcFunctional, kohn_sham_dft, try_kohn_sham_dft};
 pub use geometry_opt::{GeomOptConfig, GeomOptResult, optimize_geometry};
 pub use molecule::{Atom, Molecule};
 pub use post_hf::mp2::{
