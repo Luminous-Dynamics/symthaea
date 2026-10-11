@@ -156,12 +156,23 @@ impl NumberTheoryEngine {
         a
     }
 
-    /// Least common multiple
-    pub fn lcm(&self, a: u64, b: u64) -> u64 {
+    /// Checked least common multiple.
+    ///
+    /// Returns `None` when the exact result is greater than `u64::MAX`.
+    /// Dividing before multiplying minimizes the intermediate and avoids wraparound.
+    pub fn checked_lcm(&self, a: u64, b: u64) -> Option<u64> {
         if a == 0 || b == 0 {
-            return 0;
+            return Some(0);
         }
-        (a / self.gcd(a, b)) * b
+        (a / self.gcd(a, b)).checked_mul(b)
+    }
+
+    /// Least common multiple, panicking rather than silently wrapping on overflow.
+    ///
+    /// Use `checked_lcm` when the inputs may be outside a known-safe range.
+    pub fn lcm(&self, a: u64, b: u64) -> u64 {
+        self.checked_lcm(a, b)
+            .expect("least common multiple exceeds u64::MAX; use checked_lcm to handle overflow")
     }
 
     /// Sieve of Eratosthenes
@@ -694,6 +705,17 @@ mod tests {
     fn test_lcm() {
         let engine = NumberTheoryEngine::new();
         assert_eq!(engine.lcm(12, 18), 36);
+        assert_eq!(engine.checked_lcm(12, 18), Some(36));
+        assert_eq!(engine.checked_lcm(0, u64::MAX), Some(0));
+        assert_eq!(engine.checked_lcm(u64::MAX, 1), Some(u64::MAX));
+        assert_eq!(engine.checked_lcm(u64::MAX, 2), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "least common multiple exceeds u64::MAX")]
+    fn test_lcm_fails_explicitly_instead_of_wrapping_on_overflow() {
+        let engine = NumberTheoryEngine::new();
+        let _ = engine.lcm(u64::MAX, 2);
     }
 
     // ── Miller-Rabin tests ──────────────────────────────────────────────
