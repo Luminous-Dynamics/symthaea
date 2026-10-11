@@ -2,7 +2,7 @@
 
 **O(D) work per temporal update, independent of elapsed time at fixed D.**
 
-A standalone Rust crate implementing the Hyperdimensional Liquid Time-Constant (HDC-LTC) unified neuron architecture. The neuron's *state* is a configurable hypervector (16,384 dimensions by default); the scaling benchmark covers dimensions from 256 through 65,536 (64K). It evolves with a solver-free Closed-form Continuous (CfC) update. At fixed dimension, the update cost does not grow with the elapsed time horizon: a 1 ms jump and a 100 s jump perform the same fixed number of O(D) passes. The shared state-complexity factor `backbone_tau` modulates the base time constant, while per-coordinate state/input terms preserve heterogeneous time scales. CfC is an efficient closed-form approximation for liquid time-constant dynamics, not an exact integrator for every arbitrary nonlinear LTC ODE.
+A standalone Rust crate implementing the Hyperdimensional Liquid Time-Constant (HDC-LTC) unified neuron architecture. The neuron's *state* is a configurable hypervector (16,384 dimensions by default); the scaling benchmark covers dimensions from 256 through 1,048,576 (1M), with an optional 4,194,304-dimension (4M) stress tier. These are measurement targets rather than claims of runtime qualification. It evolves with a solver-free Closed-form Continuous (CfC) update. At fixed dimension, the update cost does not grow with the elapsed time horizon: a 1 ms jump and a 100 s jump perform the same fixed number of O(D) passes. The shared state-complexity factor `backbone_tau` modulates the base time constant, while per-coordinate state/input terms preserve heterogeneous time scales. CfC is an efficient closed-form approximation for liquid time-constant dynamics, not an exact integrator for every arbitrary nonlinear LTC ODE.
 
 ## The Key Insight
 
@@ -47,7 +47,7 @@ neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
 ## Performance
 
 - **Neuron evolution**: O(D) per step, independent of dt; it is not O(1) in the hypervector dimension
-- **Dimension/memory scaling**: vector dimensions are configurable. One f32 hypervector occupies 64 KiB at 16,384 dimensions and 256 KiB at 65,536 dimensions. The neuron currently stores eight dimension-sized vectors (state, five parameter vectors, and two momentum vectors): about 512 KiB at 16K or 2 MiB at 64K, excluding allocator and struct overhead.
+- **Dimension/memory scaling**: vector dimensions are configurable. One f32 hypervector occupies 64 KiB at 16K, 1 MiB at 256K, 4 MiB at 1M, and 16 MiB at 4M. The neuron stores eight dimension-sized vectors (state, five parameter vectors, and two momentum vectors), so those vectors occupy approximately 512 KiB, 8 MiB, 32 MiB, and 128 MiB respectively, excluding input vectors, temporary allocations, allocator and struct overhead. Many concurrent neurons can therefore become bandwidth- and memory-capacity-bound well before one large neuron exhausts RAM.
 - **Fused hot path**: `evolve_closed_form_fused()` avoids intermediate heap allocations and fuses a scaled sum-of-squares *post-update bound check* into the update pass. The shared state norm used by `backbone_tau` is computed before that pass. The hot path assumes matching dimensions and well-scaled finite values
 - **Checked path**: `try_evolve_closed_form_fused()` validates dt, dimensions, configuration and finite inputs/parameters, then verifies the evolved state; if arithmetic overflow produces a non-finite result, it restores the prior state and counters. Validation and rollback safety add O(D) scans and a state clone
 - **Small-step stability**: CfC interpolation uses `-expm1(-dt / tau)` to avoid cancellation for tiny positive dt
@@ -60,7 +60,8 @@ neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
 cargo run --example time_series   # Sine wave prediction
 cargo run --example controller    # PD controller with LTC
 cargo run --example language      # Mini thought-to-text demo
-cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark # CSV measurements from 256 through 65,536 dimensions
+cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark # CSV from 256 through 1M dimensions
+SYTHAEA_HDC_LTC_BENCH_4M=1 cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark # optional 4M stress tier
 ```
 
 ## References
