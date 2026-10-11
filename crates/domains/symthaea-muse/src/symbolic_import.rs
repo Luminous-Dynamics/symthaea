@@ -1257,7 +1257,9 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         source_part_id: Some(part.0),
         occurrence_count,
         midi_pitches,
-        identity_note: "Monophonic part-local pitch-interval pattern; musical function remains unspecified; contributor confirmation required".into(),
+        identity_note:
+            "Monophonic part-local pitch-interval pattern; musical function remains unspecified; contributor confirmation required"
+                .into(),
         confidence: if occurrence_count > 1 { 0.72 } else { 0.42 },
         pitch_interval_pattern,
         onset_deltas,
@@ -1451,6 +1453,28 @@ mod tests {
         assert_eq!(first[0].onset_denominator, 1);
         assert_eq!(first[0].duration_numerator, 5);
         assert_eq!(first[0].duration_denominator, 24);
+    }
+
+    #[test]
+    fn motif_occurrence_evidence_is_bounded_and_reports_truncation() {
+        let motif = [60_u8, 62, 64, 65, 67, 69];
+        let mut track = Vec::new();
+        for _ in 0..130 {
+            for pitch in motif {
+                track.extend_from_slice(&[0, 0x90, pitch, 100, 100, 0x80, pitch, 0]);
+            }
+        }
+        track.extend_from_slice(&[0, 0xFF, 0x2F, 0]);
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        let analysis = analyze(&score);
+        assert_eq!(analysis.motifs.len(), 1);
+        let summary = &analysis.motifs[0];
+        assert_eq!(summary.occurrence_count, 130);
+        assert_eq!(
+            summary.matched_occurrences.len(),
+            MAX_MOTIF_OCCURRENCE_EVIDENCE
+        );
+        assert_eq!(summary.occurrence_evidence_complete, Some(false));
     }
 
     #[test]
