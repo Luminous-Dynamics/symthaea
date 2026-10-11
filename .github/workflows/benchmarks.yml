@@ -138,6 +138,15 @@ jobs:
             --results target/criterion \
             --format markdown | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Archive quick benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quick-benchmark-evidence-${{ github.sha }}
+          path: target/criterion/
+          if-no-files-found: warn
+          retention-days: 30
+
   # Full benchmark suite (manual dispatch only — requires self-hosted runner)
   full-benchmark:
     name: Full Benchmark Suite
