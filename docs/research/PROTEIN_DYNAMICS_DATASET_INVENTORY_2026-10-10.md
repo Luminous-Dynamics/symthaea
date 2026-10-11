@@ -19,7 +19,9 @@ This is a benchmark-reuse candidate, not an endorsement or a qualification pass.
 
 ## Execution record
 
-The machine-readable [run-record schema](PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json) defines the provenance, target-outcome, metric-role, resource, and artifact fields required for later runs. It is a contract only at this stage; no runtime validator or benchmark execution is claimed.
+The machine-readable [run-record schema](PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json) is now checked by [the executable validator](../../scripts/research/validate_protein_dynamics_run.py). It compares the target census with the exact frozen target-manifest hash, rejects duplicate/unregistered target IDs and non-finite metrics, checks observable-role labels, requires failure codes, reconciles target conformer counts with resource totals, and verifies local output-file hashes. Its [16 adversarial tests](../../scripts/research/test_validate_protein_dynamics_run.py) cover malformed metadata and integrity failures; see the [usage guide](PROTEIN_DYNAMICS_RUN_RECORD_VALIDATOR.md).
+
+The test suite uses the production schema when run inside the repository. The available local sandbox lacked a repository checkout; the 16 test cases were exercised against a minimal-schema fixture for semantic validation, not against the production schema. No dataset asset, target set, actual run record, or benchmark result has been created.
 
 ## Source facts and limits
 
