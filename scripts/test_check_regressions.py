@@ -75,6 +75,10 @@ class CriterionBaselineTests(unittest.TestCase):
             self.assertEqual(len(regressions), 1)
             self.assertAlmostEqual(regressions[0].change_percent, 15.0)
             self.assertTrue(regressions[0].is_critical)
+            self.assertEqual(regressions[0].change_ci_lower_percent, 12.0)
+            self.assertEqual(regressions[0].change_ci_upper_percent, 18.0)
+            self.assertEqual(regressions[0].confidence_level, 0.95)
+            self.assertFalse(regressions[0].is_inconclusive)
 
     def test_required_baseline_fails_closed_when_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
