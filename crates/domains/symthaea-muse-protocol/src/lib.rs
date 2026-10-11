@@ -193,7 +193,8 @@ pub struct ImportedNoteReference {
     pub duration_denominator: i64,
 }
 
-/// One non-overlapping pitch-interval-contour match, with source note snapshots.
+/// One exact pitch-interval-contour match, with source note snapshots.
+////// Overlapping matches may both be represented in the evidence list.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImportedMotifOccurrence {
     pub notes: Vec<ImportedNoteReference>,
@@ -208,8 +209,13 @@ pub struct ImportedBeatRational {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedMotifSummary {
-    /// Total non-overlapping pitch-interval-contour matches, including those beyond the evidence cap.
+    /// Total exact pitch-interval-contour windows, including overlapping windows
+    /// and matches beyond the stored evidence cap.
     pub occurrence_count: usize,
+    /// Greedily selected non-overlapping occurrences. None means a legacy record
+    /// predates this distinction; this is not a musical-importance judgment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub independent_occurrence_count: Option<usize>,
     pub midi_pitches: Vec<u8>,
     pub identity_note: String,
     pub confidence: f32,
@@ -223,8 +229,8 @@ pub struct ImportedMotifSummary {
     /// Exact onset spacings for the representative occurrence, in beats.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub onset_deltas: Vec<ImportedBeatRational>,
-    /// Earliest onset-ordered sample of occurrences matching pitch intervals;
-    /// rhythm is evidence alongside each occurrence, not currently a match gate.
+    /// Earliest onset-ordered sample of exact pitch-contour windows; windows may
+    /// overlap. Rhythm is evidence alongside each match, not a match gate.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub matched_occurrences: Vec<ImportedMotifOccurrence>,
     /// None means an older record did not state whether its evidence was complete.
