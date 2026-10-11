@@ -22,6 +22,7 @@ from urllib.request import Request, urlopen
 
 USER_AGENT = "LuminousDynamics-ProteinResearch/1.0"
 DEFAULT_TIMEOUT_SECONDS = 30
+MAX_METADATA_BYTES = 25 * 1024 * 1024
 CHUNK_BYTES = 1024 * 1024
 
 
@@ -37,7 +38,10 @@ def request_bytes(url: str, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> bytes:
     request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     try:
         with urlopen(request, timeout=timeout) as response:
-            return response.read()
+            raw = response.read(MAX_METADATA_BYTES + 1)
+            if len(raw) > MAX_METADATA_BYTES:
+                raise FetchError(f"metadata response exceeded {MAX_METADATA_BYTES} bytes")
+            return raw
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         raise FetchError(f"request failed for {url}: {exc}") from exc
 
@@ -81,7 +85,7 @@ def parse_file_metadata(record: dict[str, Any], filename: str) -> dict[str, Any]
     if not isinstance(download_url, str):
         raise FetchError("Zenodo file metadata has no content/download URL")
     parsed = urlparse(download_url)
-    if parsed.scheme != "https" or parsed.hostname not in {"zenodo.org", "www.zenodo.org", "api.zenodo.org"}:
+    if parsed.scheme != "https" or parsed.username is not None or parsed.password is not None or parsed.hostname not in {"zenodo.org", "www.zenodo.org", "api.zenodo.org"}:
         raise FetchError("refusing a download URL not hosted on HTTPS Zenodo")
     return {
         "key": filename,
@@ -125,6 +129,8 @@ def download_verified(
     sidecar_path = output_dir / (file_info["key"] + ".zenodo.json")
     if final_path.exists() and not force:
         raise FetchError(f"destination already exists; refusing to overwrite: {final_path} (use --force only after review)")
+    if sidecar_path.exists() and not force:
+        raise FetchError(f"verification sidecar already exists without an authorized overwrite: {sidecar_path}")
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{file_info['key']}.", suffix=".part", dir=output_dir)
     os.close(descriptor)
     temporary_path = Path(temporary_name)
@@ -238,6 +244,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except (FetchError, OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:
+        print(f"ERROR: unexpected acquisition failure; no unverified archive was accepted: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
 
