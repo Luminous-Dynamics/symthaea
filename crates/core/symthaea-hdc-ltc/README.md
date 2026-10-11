@@ -2,7 +2,7 @@
 
 **O(D) work per temporal update, independent of elapsed time at fixed D.**
 
-A standalone Rust crate implementing the Hyperdimensional Liquid Time-Constant (HDC-LTC) unified neuron architecture. The neuron's *state* is a hypervector (16,384 dimensions by default) evolved with a solver-free Closed-form Continuous (CfC) update. At fixed dimension, the update cost does not grow with the elapsed time horizon: a 1 ms jump and a 100 s jump perform the same fixed number of O(D) passes. The shared state-complexity factor `backbone_tau` modulates the base time constant, while per-coordinate state/input terms preserve heterogeneous time scales. CfC is an efficient closed-form approximation for liquid time-constant dynamics, not an exact integrator for every arbitrary nonlinear LTC ODE.
+A standalone Rust crate implementing the Hyperdimensional Liquid Time-Constant (HDC-LTC) unified neuron architecture. The neuron's *state* is a configurable hypervector (16,384 dimensions by default); the scaling benchmark covers dimensions from 256 through 65,536 (64K). It evolves with a solver-free Closed-form Continuous (CfC) update. At fixed dimension, the update cost does not grow with the elapsed time horizon: a 1 ms jump and a 100 s jump perform the same fixed number of O(D) passes. The shared state-complexity factor `backbone_tau` modulates the base time constant, while per-coordinate state/input terms preserve heterogeneous time scales. CfC is an efficient closed-form approximation for liquid time-constant dynamics, not an exact integrator for every arbitrary nonlinear LTC ODE.
 
 ## The Key Insight
 
@@ -47,6 +47,7 @@ neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
 ## Performance
 
 - **Neuron evolution**: O(D) per step, independent of dt; it is not O(1) in the hypervector dimension
+- **Dimension/memory scaling**: vector dimensions are configurable. One f32 hypervector occupies 64 KiB at 16,384 dimensions and 256 KiB at 65,536 dimensions. The neuron currently stores eight dimension-sized vectors (state, five parameter vectors, and two momentum vectors): about 512 KiB at 16K or 2 MiB at 64K, excluding allocator and struct overhead.
 - **Fused hot path**: `evolve_closed_form_fused()` avoids intermediate heap allocations and fuses a scaled sum-of-squares *post-update bound check* into the update pass. The shared state norm used by `backbone_tau` is computed before that pass. The hot path assumes matching dimensions and well-scaled finite values
 - **Checked path**: `try_evolve_closed_form_fused()` validates dt, dimensions, configuration and finite inputs/parameters, then verifies the evolved state; if arithmetic overflow produces a non-finite result, it restores the prior state and counters. Validation and rollback safety add O(D) scans and a state clone
 - **Small-step stability**: CfC interpolation uses `-expm1(-dt / tau)` to avoid cancellation for tiny positive dt
@@ -59,7 +60,7 @@ neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
 cargo run --example time_series   # Sine wave prediction
 cargo run --example controller    # PD controller with LTC
 cargo run --example language      # Mini thought-to-text demo
-cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark # CSV scaling measurements
+cargo run --release -p symthaea-hdc-ltc --example scaling_benchmark # CSV measurements from 256 through 65,536 dimensions
 ```
 
 ## References
