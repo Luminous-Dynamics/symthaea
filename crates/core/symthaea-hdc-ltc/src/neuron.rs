@@ -26,7 +26,7 @@
 //!
 //! ```text
 //! gate_i  = σ(gate_weight_i · h_i  +  input_mask_i · I_i  +  gate_bias_i)
-//! tau_i   = τ_base · clamp(σ(τ_mod_i · |h_i| + τ_coupling · |I_i|), τ_min, τ_max)
+//! tau_i   = clamp(τ_base · (1 + backbone_tau · ||h||) · (1 + σ(τ_mod_i · |h_i| + τ_coupling · |I_i|)), τ_min, τ_max)
 //! x_inf_i = f(weight_hv_i · h_i + input_mask_i · I_i) · gate_i
 //! σ_i     = 1 - exp(-dt / tau_i)
 //! h_i(t+dt) = (1 - σ_i) · h_i(t)  +  σ_i · x_inf_i
@@ -399,7 +399,7 @@ impl HdcLtcUnifiedNeuron {
                         gate_i
                     );
 
-                    // Per-dim tau: τ_i = τ_base · clamp(σ(τ_mod_i · |h_i| + τ_coupling · |I_i|), min, max)
+                    // Per-dim tau includes shared state-complexity scaling and local state/input modulation.
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
                     let tau_i =
