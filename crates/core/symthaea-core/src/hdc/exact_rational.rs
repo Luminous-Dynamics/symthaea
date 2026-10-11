@@ -106,6 +106,8 @@ pub enum ExactRationalError {
     ZeroDenominator,
     /// A division operation used a zero rational divisor.
     DivisionByZero,
+    /// An operation requiring an integer received a non-integral rational.
+    NonIntegerInput,
     /// Parsing, an operand, or a result exceeded the configured resource budget.
     ResourceLimitExceeded,
     /// A legacy numeric-tower rational violates its documented canonical form.
@@ -126,6 +128,7 @@ impl fmt::Display for ExactRationalError {
             Self::InvalidNumericTowerRational => write!(f, "numeric-tower rational is not in canonical form"),
             Self::ZeroDenominator => write!(f, "rational denominator cannot be zero"),
             Self::DivisionByZero => write!(f, "division by zero"),
+            Self::NonIntegerInput => write!(f, "operation requires integer inputs"),
             Self::ResourceLimitExceeded => write!(f, "rational resource budget exceeded"),
             Self::ExactResultOutOfRange => {
                 write!(f, "exact rational is outside the numeric-tower range")
@@ -574,6 +577,60 @@ impl ExactRational {
     ) -> Result<Self, ExactRationalError> {
         let floor = self.checked_floor(budget)?;
         self.checked_subtract(&floor, budget)
+    }
+
+    /// Greatest common divisor of two exact integers; result is non-negative.
+    /// Non-integer rationals are rejected, and inputs/results obey the caller budget.
+    pub fn checked_gcd(
+        &self,
+        other: &Self,
+        budget: RationalBudget,
+    ) -> Result<Self, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        budget.validate_value(&other.value)?;
+        if !self.is_integer() || !other.is_integer() {
+            return Err(ExactRationalError::NonIntegerInput);
+        }
+
+        let mut a = self.value.numer().abs();
+        let mut b = other.value.numer().abs();
+        while !b.is_zero() {
+            let remainder = &a % &b;
+            a = b;
+            b = remainder;
+        }
+        let value = BigRational::from_integer(a);
+        budget.validate_value(&value)?;
+        Ok(Self { value })
+    }
+
+    /// Least common multiple of two exact integers; result is non-negative.
+    /// Zero has lcm zero with every integer. Non-integer rationals are rejected.
+    pub fn checked_lcm(
+        &self,
+        other: &Self,
+        budget: RationalBudget,
+    ) -> Result<Self, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        budget.validate_value(&other.value)?;
+        if !self.is_integer() || !other.is_integer() {
+            return Err(ExactRationalError::NonIntegerInput);
+        }
+
+        let a = self.value.numer().abs();
+        let b = other.value.numer().abs();
+        if a.is_zero() || b.is_zero() {
+            return Ok(Self { value: BigRational::from_integer(BigInt::from(0u8)) });
+        }
+
+        let gcd = self.checked_gcd(other, budget)?.value;
+        let gcd_integer = gcd.numer();
+        // Divide before multiplying to keep the intermediate no larger than
+        // necessary; final normalized value must still fit the configured budget.
+        let lcm = (a / gcd_integer) * b;
+        let value = BigRational::from_integer(lcm);
+        budget.validate_value(&value)?;
+        Ok(Self { value })
     }
 
     /// Add exactly, failing closed if operands or normalized result exceed budget.
@@ -1144,6 +1201,59 @@ mod tests {
                 assert_eq!(floor_plus_one.checked_compare(&value, limit).unwrap(), std::cmp::Ordering::Greater);
                 let ceil_minus_one = ceil.checked_subtract(&one, limit).unwrap();
                 assert_eq!(ceil_minus_one.checked_compare(&value, limit).unwrap(), std::cmp::Ordering::Less);
+            }
+        }
+    }
+
+    #[test]
+    fn exact_gcd_and_lcm_handle_signs_zero_and_large_integers() {
+        let limit = budget(256);
+        let from = |n: &str| ExactRational::from_integer(n, limit).unwrap();
+
+        assert_eq!(from("-54").checked_gcd(&from("24"), limit).unwrap().to_string(), "6/1");
+        assert_eq!(from("0").checked_gcd(&from("0"), limit).unwrap().to_string(), "0/1");
+        assert_eq!(from("-21").checked_lcm(&from("6"), limit).unwrap().to_string(), "42/1");
+        assert_eq!(from("-21").checked_lcm(&from("0"), limit).unwrap().to_string(), "0/1");
+
+        let large = from("1606938044258990275541962092341162602522202993782792835301376"); // 2^200
+        let multiple = from("4820814127976970826625886277023487807566608981348378505904128"); // 3 * 2^200
+        assert_eq!(large.checked_gcd(&multiple, limit).unwrap(), large);
+        assert_eq!(large.checked_lcm(&multiple, limit).unwrap(), multiple);
+    }
+
+    #[test]
+    fn exact_gcd_and_lcm_reject_nonintegers_and_enforce_result_budget() {
+        let wide = budget(32);
+        let narrow = budget(8);
+        let half = ExactRational::parse("1", "2", wide).unwrap();
+        let one = ExactRational::from_integer("1", wide).unwrap();
+        assert_eq!(half.checked_gcd(&one, wide).unwrap_err(), ExactRationalError::NonIntegerInput);
+        assert_eq!(half.checked_lcm(&one, wide).unwrap_err(), ExactRationalError::NonIntegerInput);
+
+        let a = ExactRational::from_integer("255", wide).unwrap();
+        let b = ExactRational::from_integer("254", wide).unwrap();
+        assert_eq!(a.checked_lcm(&b, narrow).unwrap_err(), ExactRationalError::ResourceLimitExceeded);
+        assert_eq!(a.checked_gcd(&b, narrow).unwrap_err(), ExactRationalError::ResourceLimitExceeded);
+    }
+
+    #[test]
+    fn gcd_lcm_identity_holds_for_a_small_signed_integer_grid() {
+        let limit = budget(128);
+        for a in -12..=12 {
+            for b in -12..=12 {
+                let lhs = ExactRational::from_integer(&a.to_string(), limit).unwrap();
+                let rhs = ExactRational::from_integer(&b.to_string(), limit).unwrap();
+                let gcd = lhs.checked_gcd(&rhs, limit).unwrap();
+                let lcm = lhs.checked_lcm(&rhs, limit).unwrap();
+                assert!(!gcd.is_negative());
+                assert!(!lcm.is_negative());
+                if a != 0 && b != 0 {
+                    let product = lhs.checked_abs(limit).unwrap()
+                        .checked_multiply(&rhs.checked_abs(limit).unwrap(), limit).unwrap();
+                    assert_eq!(gcd.checked_multiply(&lcm, limit).unwrap(), product);
+                } else {
+                    assert!(lcm.is_zero());
+                }
             }
         }
     }
