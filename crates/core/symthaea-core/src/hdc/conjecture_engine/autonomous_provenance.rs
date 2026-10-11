@@ -28,6 +28,8 @@ pub struct AutonomousHoldoutValidation {
 }
 
 const MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES: usize = 4096;
+const MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY: f64 = 100_000.0;
+const MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS: usize = 5_000_000;
 
 fn failed_holdout(
     discovery_seed: u64,
@@ -96,6 +98,8 @@ pub fn validate_invariant_holdout(
         || t_max <= 0.0
         || !dt.is_finite()
         || dt <= 0.0
+        || !(t_max / dt).is_finite()
+        || t_max / dt > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
         || !threshold.is_finite()
         || threshold < 0.0
     {
@@ -120,7 +124,11 @@ pub fn validate_invariant_holdout(
             AutonomousHoldoutFailure::ZeroTrajectories,
         );
     }
-    if holdout_trajectories > MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES {
+    let estimated_steps = (t_max / dt).ceil() as usize;
+    if holdout_trajectories > MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES
+        || estimated_steps.saturating_mul(holdout_trajectories)
+            > MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS
+    {
         return failed_holdout(
             discovery_seed,
             holdout_seed,
