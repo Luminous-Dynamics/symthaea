@@ -1,0 +1,112 @@
+{
+  "schema_version": "hdc-ltc-resolution-trajectory.v1",
+  "status": "research_only",
+  "dimensions": [
+    1024,
+    2048,
+    4096,
+    8192,
+    16384,
+    32768,
+    65536
+  ],
+  "fixture_seed": "0x4844432d4c544301",
+  "input_seed": "0x5452414a2d494e50",
+  "fixed_dt_seconds": 0.02,
+  "irregular_dt_seconds": [
+    0.01,
+    0.017,
+    0.031,
+    0.007,
+    0.023,
+    0.041,
+    0.013,
+    0.029
+  ],
+  "arms": [
+    "identity",
+    "reference",
+    "convert_then_evolve",
+    "evolve_then_convert",
+    "round_trip",
+    "legacy_dilate"
+  ],
+  "metrics": [
+    "normalized_l2_error",
+    "cosine_similarity",
+    "similarity_order_preservation",
+    "binding_equivariance_error",
+    "permutation_equivariance_error",
+    "bundle_distortion",
+    "state_error",
+    "equilibrium_error",
+    "effective_tau_error",
+    "gating_error",
+    "one_step_error",
+    "cumulative_trajectory_divergence",
+    "long_horizon_boundedness",
+    "round_trip_hysteresis",
+    "resident_bytes",
+    "conversion_bytes_moved",
+    "allocation_count",
+    "conversion_latency",
+    "evolution_latency",
+    "peak_temporary_memory"
+  ],
+  "horizon_steps": [
+    1,
+    10,
+    100,
+    1000
+  ],
+  "policy": {
+    "unknown_is_not_zero": true,
+    "unsupported_is_not_applicable": true,
+    "no_production_transition_without_trajectory_evidence": true
+  },
+  "operator_matrix": {
+    "transition_count": 42,
+    "directionality": "all_strict_source_target_pairs",
+    "baseline": "legacy_dilate",
+    "metrics": [
+      "binding_equivariance_error",
+      "bundle_equivariance_error",
+      "permutation_equivariance_error",
+      "round_trip_hysteresis",
+      "hadamard_binding_equivariance_error",
+      "hadamard_bundle_equivariance_error",
+      "hadamard_permutation_equivariance_error"
+    ],
+    "threshold_policy": "characterization_only_no_quality_gate",
+    "deterministic": true
+  },
+  "ablation_arms": [
+    "state_only",
+    "state_and_parameters",
+    "full_coupled_state_parameters"
+  ],
+  "reference_separation": [
+    "evolve_high_then_project",
+    "project_then_evolve",
+    "native_low_direct"
+  ],
+  "projection_candidates": [
+    {
+      "family": "legacy_dilate",
+      "version": "existing",
+      "directions": [
+        "expand",
+        "contract"
+      ],
+      "status": "characterization_negative_control"
+    },
+    {
+      "family": "hadamard_truncate",
+      "version": "v1",
+      "directions": [
+        "contract"
+      ],
+      "status": "research_candidate"
+    }
+  ]
+}

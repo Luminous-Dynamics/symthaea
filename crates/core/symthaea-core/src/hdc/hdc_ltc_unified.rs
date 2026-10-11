@@ -2845,3 +2845,132 @@ mod tests {
         assert_eq!(neuron.config().fourier_frequencies, vec![5.0, 10.0, 15.0]);
     }
 }
+
+
+#[cfg(test)]
+mod adaptive_resolution_tests {
+    use super::{HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
+    use crate::hdc::unified_hv::ContinuousHV;
+
+    const HI: usize = 16_384;
+    const LO: usize = 4_096;
+    const SEED: u64 = 0x4844432d5452414e;
+
+    fn config(dim: usize) -> UnifiedConfig {
+        UnifiedConfig {
+            dimension: dim,
+            activation: UnifiedActivation::Tanh,
+            tau_base: 0.1,
+            backbone_tau: 0.5,
+            learning_rate: 0.01,
+            momentum: 0.9,
+            weight_decay: 0.0001,
+            gating_steepness: 1.0,
+            interp_bias: 0.0,
+            fourier_frequencies: Vec::new(),
+            fourier_amplitude: 0.1,
+        }
+    }
+
+    fn input(dim: usize, step: usize) -> ContinuousHV {
+        ContinuousHV::random(dim, SEED.wrapping_add(step as u64 * 7919))
+    }
+
+    fn projected_neuron(src: &HdcLtcUnifiedNeuron, target_dim: usize) -> HdcLtcUnifiedNeuron {
+        let mut cfg = src.config.clone();
+        cfg.dimension = target_dim;
+
+        HdcLtcUnifiedNeuron {
+            state: src.state.dilate(target_dim),
+            weight_hv: src.weight_hv.dilate(target_dim),
+            input_mask: src.input_mask.dilate(target_dim),
+            tau_modulator: src.tau_modulator.dilate(target_dim),
+            gate_weight: src.gate_weight.dilate(target_dim),
+            gate_bias: src.gate_bias.dilate(target_dim),
+            weight_momentum: src.weight_momentum.dilate(target_dim),
+            input_momentum: src.input_momentum.dilate(target_dim),
+            running_mean: src.running_mean,
+            running_var: src.running_var,
+            total_time: src.total_time,
+            update_count: src.update_count,
+            config: cfg,
+        }
+    }
+
+    fn relative_error(a: &ContinuousHV, b: &ContinuousHV) -> f32 {
+        let denom = a.norm().max(1e-12);
+        a.subtract(b).norm() / denom
+    }
+
+    #[test]
+    fn coupled_state_and_parameter_projection_is_deterministic() {
+        let high = HdcLtcUnifiedNeuron::new(config(HI), SEED);
+        let a = projected_neuron(&high, LO);
+        let b = projected_neuron(&high, LO);
+
+        assert_eq!(a.state.values, b.state.values);
+        assert_eq!(a.weight_hv.values, b.weight_hv.values);
+        assert_eq!(a.input_mask.values, b.input_mask.values);
+        assert_eq!(a.tau_modulator.values, b.tau_modulator.values);
+        assert_eq!(a.gate_weight.values, b.gate_weight.values);
+        assert_eq!(a.gate_bias.values, b.gate_bias.values);
+        assert_eq!(a.weight_momentum.values, b.weight_momentum.values);
+        assert_eq!(a.input_momentum.values, b.input_momentum.values);
+    }
+
+    #[test]
+    fn coupled_projection_exposes_dynamic_not_just_static_error() {
+        let mut high = HdcLtcUnifiedNeuron::new(config(HI), SEED);
+        let mut low = projected_neuron(&high, LO);
+
+        for step in 0..8 {
+            let dt = [0.01, 0.017, 0.031, 0.007, 0.023, 0.041, 0.013, 0.029][step];
+            let high_input = input(HI, step);
+            let low_input = high_input.dilate(LO);
+
+            high.evolve_closed_form(dt, &high_input);
+            low.evolve_closed_form(dt, &low_input);
+
+            let projected_reference = high.state.dilate(LO);
+            let state_error = relative_error(low.state(), &projected_reference);
+            let tau_error = (low.effective_tau(&low_input) - high.effective_tau(&high_input)).abs();
+
+            assert!(state_error.is_finite());
+            assert!(tau_error.is_finite());
+        }
+    }
+
+    #[test]
+    fn projection_round_trip_hysteresis_is_measurable_for_the_full_liquid_state() {
+        let high = HdcLtcUnifiedNeuron::new(config(HI), SEED);
+        let low = projected_neuron(&high, LO);
+
+        let high_round_trip = projected_neuron(&low, HI);
+
+        let state_error = relative_error(&high.state, &high_round_trip.state);
+        let weight_error = relative_error(&high.weight_hv, &high_round_trip.weight_hv);
+        let tau_error = relative_error(&high.tau_modulator, &high_round_trip.tau_modulator);
+
+        assert!(state_error.is_finite());
+        assert!(weight_error.is_finite());
+        assert!(tau_error.is_finite());
+    }
+
+    #[test]
+    fn legacy_dilate_is_not_assumed_to_commute_with_binding() {
+        let w = ContinuousHV::random(HI, SEED.wrapping_add(1));
+        let x = ContinuousHV::random(HI, SEED.wrapping_add(2));
+
+        let projected_bind = w.bind(&x).dilate(LO);
+        let bound_projected = w.dilate(LO).bind(&x.dilate(LO));
+
+        let error = relative_error(&projected_bind, &bound_projected);
+
+        assert!(error.is_finite());
+        // Element-wise multiplication is nonlinear with respect to the
+        // averaging/folding performed by dilate(). A production transition
+        // therefore cannot assume algebra preservation from static similarity.
+        assert!(error > 1e-7);
+    }
+
+}
