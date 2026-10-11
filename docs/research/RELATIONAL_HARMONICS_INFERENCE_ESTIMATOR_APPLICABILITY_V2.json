@@ -1,0 +1,41 @@
+{
+  "schema": "relational-prediction-inference-estimator-applicability/v2",
+  "status": "not-approved-for-execution",
+  "current_evaluator": {
+    "estimator_id": "fixed-ridge-standardized-v1",
+    "training_preprocessing": "feature means and scales fit on the training window only",
+    "fit": "ridge-regularized linear model with deterministic Gaussian elimination",
+    "rolling_estimation": "fresh fit at every origin",
+    "primary_comparison": ["RelationalAugmented", "NonRelationalContext"]
+  },
+  "new_scientific_gates": {
+    "origin_local_conditioning": "required at every estimator origin; aggregate lane fails closed if any required origin is inadmissible",
+    "hypothesis_preservation": "any adaptive projection must preserve the declared coefficient-space hypothesis at every required origin; otherwise it is a distinct projected estimand",
+    "finite_sample_null_support": "a formal directional null path is executable only when the finite-sample equal-risk null point exists under the declared nuisance policy",
+    "estimated_nuisance_null": "bootstrap calibration must be separately validated when the equal-risk null point and covariance nuisance are estimated rather than oracle-known",
+    "uniform_null_surface": "single-point calibration is insufficient for a direction-free composite equal-accuracy claim; a least-favorable or otherwise uniform null-surface policy remains unresolved"
+  },
+  "evidence": {
+    "origin_local_conditioning": "docs/research/RELATIONAL_HARMONICS_ORIGIN_LOCAL_CONDITIONING_ADVERSARY_EXECUTED_V1.json",
+    "hypothesis_preservation": "docs/research/RELATIONAL_HARMONICS_PROJECTION_HYPOTHESIS_PRESERVATION_CERTIFICATE_EXECUTED_V2.json",
+    "estimated_nuisance_null": "docs/research/RELATIONAL_HARMONICS_ESTIMATED_NUISANCE_NULL_SURFACE_BOOTSTRAP_EXECUTED_V1.json"
+  },
+  "execution_gate": {
+    "current_selection": "stop-assumption-failure",
+    "required_before_formal_inference": [
+      "derive and document the exact estimator/procedure bridge for the fixed-ridge rolling evaluator",
+      "validate null calibration over the admissible finite-sample equal-risk surface rather than one convenient point",
+      "establish the nuisance estimation policy and its bootstrap behavior",
+      "show how serial dependence, heteroskedasticity, overlapping training windows, and the fixed gap are represented in the inferential procedure",
+      "validate the actual Rust implementation independently from the estimator-mechanics mirror",
+      "preserve the declared scientific estimand under any regularization or projection"
+    ]
+  },
+  "scientific_boundary": {
+    "no_formal_inference_in_this_pr": true,
+    "no_p_value_claim": true,
+    "no_confidence_interval_claim": true,
+    "literature_is_not_treated_as_proof_of_estimator_compatibility": true,
+    "synthetic_calibration_is_not_empirical_validation": true
+  }
+}

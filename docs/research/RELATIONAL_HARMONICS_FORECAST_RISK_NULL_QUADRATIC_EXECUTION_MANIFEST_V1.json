@@ -1,0 +1,10 @@
+{
+  "schema": "rh006-forecast-risk-null-quadratic-execution-manifest/v1",
+  "script_path": "scripts/research/rh006_forecast_risk_null_quadratic.py",
+  "script_sha256": "05ee65adc68ab779d0433c75dc579c638e20f9846fcb52e6ab93553622b512aa",
+  "command": "python scripts/research/rh006_forecast_risk_null_quadratic.py --paths 50 --seed 20261008",
+  "observed_output_sha256": "f6ef4cec52bb3eb70db02306014044ab3a545a463518503d2b73112441057191",
+  "formal_inference_enabled": false,
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure"
+}

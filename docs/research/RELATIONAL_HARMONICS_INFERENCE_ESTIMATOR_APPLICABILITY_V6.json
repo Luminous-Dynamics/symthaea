@@ -1,0 +1,89 @@
+{
+  "schema":"relational-prediction-inference-estimator-applicability/v6",
+  "status":"not-approved-for-execution",
+  "current_evaluator":{
+    "estimator_id":"fixed-ridge-standardized-v1",
+    "training_preprocessing":"feature means and scales fit on the training window only",
+    "fit":"ridge-regularized linear model with deterministic Gaussian elimination",
+    "rolling_estimation":"fresh fit at every origin",
+    "primary_comparison":["RelationalAugmented","NonRelationalContext"]
+  },
+  "gates":{
+    "origin_local_conditioning":"required at every estimator origin; aggregate lane fails closed if any required origin is inadmissible",
+    "hypothesis_preservation":"adaptive projection may be used only for a separately declared projected estimand unless every required origin preserves the declared coefficient-space hypothesis",
+    "finite_sample_null_support":"formal directional calibration requires a supported finite-sample equal-risk null point under the declared nuisance policy",
+    "estimated_nuisance_null":"nuisance-estimated restricted-null calibration requires its own validation; oracle calibration is not sufficient",
+    "uniform_null_surface":"a single directional or null point is insufficient for direction-free composite equal-accuracy inference",
+    "least_favorable":"finite direction-grid maxima remain diagnostic; no least-favorable critical value is authorized",
+    "weak_identification":"near-zero curvature / weakly identified regions require explicit robust calibration rather than ordinary bootstrap inheritance",
+    "null_surface_eigenstructure":"Q curvature and R=bb'-4cQ discriminant geometry must be characterized before direction-free uniform calibration",
+    "surface_criticality":"near-zero ||2Qgamma+b|| regions require separate weak/critical treatment",
+    "branch_conditioning":"for a quadratic ray root, |partial_t Delta|=sqrt(D); small discriminant therefore creates intrinsically sensitive root branches and requires explicit conditioning diagnostics",
+    "null_locality":"supported but remote roots require an explicit predeclared parameter/effect/risk radius or a separately declared global estimand; no silent coefficient-norm truncation is permitted",
+    "effect_locality":"when a local estimand is intended, locality should be expressed in induced held-out outcome/effect units via a positive-semidefinite feature metric, not coefficient norm alone",
+    "bootstrap_operator_equivalence":"cached forecast operators are valid refits only under the fixed-feature linear-ridge conditions; this equivalence must not be generalized to joint feature/outcome resampling",
+    "joint_feature_outcome_law":"the finite-sample risk/null surface must include relevant feature/outcome cross-moments whenever the scientific DGP permits endogeneity or shared latent innovations"
+  },
+  "evidence":{
+    "origin_local_conditioning":"docs/research/RELATIONAL_HARMONICS_ORIGIN_LOCAL_CONDITIONING_ADVERSARY_EXECUTED_V1.json",
+    "hypothesis_preservation":"docs/research/RELATIONAL_HARMONICS_PROJECTION_HYPOTHESIS_PRESERVATION_CERTIFICATE_EXECUTED_V2.json",
+    "estimated_nuisance_null":"docs/research/RELATIONAL_HARMONICS_ESTIMATED_NUISANCE_NULL_SURFACE_BOOTSTRAP_EXECUTED_V1.json",
+    "least_favorable_envelope":"docs/research/RELATIONAL_HARMONICS_LEAST_FAVORABLE_NULL_SURFACE_ENVELOPE_EXECUTED_V1.json",
+    "null_surface_eigenstructure":"docs/research/RELATIONAL_HARMONICS_NULL_SURFACE_EIGENSTRUCTURE_EXECUTED_V1.json",
+    "locality_branch_conditioning":"docs/research/RELATIONAL_HARMONICS_NULL_SURFACE_LOCALITY_BRANCH_CONDITIONING_DERIVED_V1.json",
+    "bootstrap_operator_equivalence":"docs/research/RELATIONAL_HARMONICS_BOOTSTRAP_OPERATOR_EQUIVALENCE_AUDIT_V1.json",
+    "joint_feature_outcome_endogeneity":"docs/research/RELATIONAL_HARMONICS_JOINT_FEATURE_OUTCOME_ENDOGENEITY_EXECUTED_V1.json"
+  },
+  "scientific_state":{
+    "severe_geometry":{
+      "configuration":"epsilon=1e-4, ridge=1e-4",
+      "weak_direction_root_support":0.421,
+      "supported_weak_root_median":8895.1428,
+      "Q_second_to_max_abs_eigenvalue_median":8.379828287184255e-11,
+      "R_vs_minus4cQ":"approximately 1"
+    },
+    "locality":{
+      "weak_projection_limit":-0.22360679774997896,
+      "derived_effect_scales":{
+        "epsilon_1e-2":3.1840330086747866,
+        "epsilon_1e-3":24.7485096861306,
+        "epsilon_1e-4":1989.0143970367815
+      }
+    },
+    "joint_endogeneity":{
+      "design":"40 paths x 50 outcomes per path, omega 0..0.9",
+      "control":"marginal AR(0.5)+heteroskedastic outcome law preserved",
+      "finding":"The independence-based nominal equal-risk root becomes increasingly non-null under controlled feature/outcome innovation correlation.",
+      "strong_omega_0_9_mean_diff":0.012599162179711654,
+      "weak_omega_0_9_mean_diff":0.005134531935906821
+    },
+    "operator_audit":{
+      "fixed_feature_refit_equivalence_max_abs_difference":5.551115123125783e-16
+    }
+  },
+  "execution_gate":{
+    "current_selection":"stop-assumption-failure",
+    "required_before_formal_inference":[
+      "derive and document an exact fixed-ridge rolling estimator/procedure bridge",
+      "define whether the scientific null is global over the whole equal-risk surface or local in coefficient/effect/risk radius",
+      "predeclare a scientifically motivated locality/radius coordinate if a local null is intended",
+      "measure continuous-surface support within the declared locality rather than relying on arbitrary directional grids",
+      "stratify nuisance calibration by curvature, discriminant/root-existence, branch conditioning, and effect radius",
+      "derive the joint feature/outcome finite-sample risk surface including cross-moment terms where endogeneity is scientifically plausible",
+      "establish uniform or least-favorable size control, including weak-identification and endogeneity regimes",
+      "validate the actual Rust implementation independently from the mechanics mirror",
+      "preserve the declared scientific estimand under any regularization or projection"
+    ]
+  },
+  "scientific_boundary":{
+    "no_formal_inference_in_this_pr":true,
+    "no_p_value_claim":true,
+    "no_confidence_interval_claim":true,
+    "synthetic_calibration_is_not_empirical_validation":true,
+    "grid_envelope_is_not_a_critical_value":true,
+    "remote_null_is_not_automatically_local_null":true,
+    "eigenstructure_chart_is_not_uniform_calibration":true,
+    "branch_conditioning_is_not_nuisance_calibration":true,
+    "conditional_feature_bootstrap_is_not_joint_DGP_validation":true
+  }
+}

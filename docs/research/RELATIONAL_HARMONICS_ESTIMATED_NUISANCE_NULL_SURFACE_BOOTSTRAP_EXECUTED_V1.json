@@ -1,0 +1,104 @@
+{
+  "schema": "rh006-estimated-nuisance-null-surface-bootstrap-receipt/v1",
+  "status": "research-diagnostic-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "formal_inference": false,
+  "source_commit": {
+    "branch": "research/relational-harmonics-v1",
+    "script_path": "scripts/research/rh006_estimated_nuisance_null_surface_bootstrap_v4.py",
+    "git_blob_sha1": "20ca25b16a5a446afdaeecf435171ad01e78e6fd",
+    "repository_script_sha256": "a7edf0122415d8e8307346ad9e1dbd5a66b28259bfa0df55af5786e974e67904",
+    "local_execution_script_sha256": "efccfb5a47d2bb89622e80a694d807234deda00c44b3aa66b6f5a1702be4ff0b",
+    "byte_identity_claim": false,
+    "identity_note": "The local execution and fetched repository text were not treated as byte-identical because their SHA-256 hashes differ. Results are retained as independent estimator-mechanics diagnostic evidence, not exact-blob execution evidence."
+  },
+  "geometry": {
+    "train": 48,
+    "gap": 4,
+    "test": 16,
+    "origins": 24,
+    "step": 16,
+    "horizon": 1,
+    "oracle_rho": 0.5,
+    "oracle_heteroskedastic": true,
+    "ridges": [1e-8, 1e-4],
+    "epsilons": [0.01, 0.001, 0.0001],
+    "directions": ["strong", "weak"],
+    "bartlett_lag": 3,
+    "bootstrap_replicates": 49,
+    "focus_bootstrap_replicates": 99
+  },
+  "executions": {
+    "matrix": {
+      "command": "python scripts/research/rh006_estimated_nuisance_null_surface_bootstrap_v4.py --mc 50 --bootstrap 49 --seed 20261031",
+      "mc": 50,
+      "seed": 20261031,
+      "local_payload_sha256": "0b6e471472eb0544e7d2a674239a4a5f53ff41af0c2ad277d185e43c70486830",
+      "selected_cells": [
+        {"epsilon": 0.001, "ridge": 0.0001, "direction": "weak", "oracle_root_available": 1.0, "estimated_root_available": 1.0, "estimated_vs_oracle_root_ratio_median": 0.9687942090088473, "oracle_bootstrap_reject_rate": 0.04, "estimated_bootstrap_reject_rate": 0.02},
+        {"epsilon": 0.0001, "ridge": 1e-8, "direction": "weak", "oracle_root_available": 1.0, "estimated_root_available": 1.0, "estimated_vs_oracle_root_ratio_median": 0.9640101528494738, "oracle_bootstrap_reject_rate": 0.06, "estimated_bootstrap_reject_rate": 0.04},
+        {"epsilon": 0.0001, "ridge": 0.0001, "direction": "weak", "oracle_root_available": 0.4, "estimated_root_available": 0.4, "estimated_vs_oracle_root_ratio_median": 0.9749210958797827, "oracle_bootstrap_reject_rate": 0.0, "estimated_bootstrap_reject_rate": 0.0}
+      ]
+    },
+    "focus_eps_1e-3_ridge_1e-4_weak": {
+      "command": "python scripts/research/rh006_estimated_nuisance_null_surface_bootstrap_v4.py --mc 500 --bootstrap 99 --seed 20261032 --epsilon 0.001 --ridge 0.0001 --direction weak",
+      "oracle_root_available": 1.0,
+      "estimated_root_available": 1.0,
+      "oracle_bootstrap_reject_rate": 0.056,
+      "estimated_bootstrap_reject_rate": 0.06,
+      "estimated_vs_oracle_root_ratio_median": 0.9686622019132174
+    },
+    "focus_eps_1e-4_ridge_1e-4_weak": {
+      "command": "python scripts/research/rh006_estimated_nuisance_null_surface_bootstrap_v4.py --mc 500 --bootstrap 99 --seed 20261033 --epsilon 0.0001 --ridge 0.0001 --direction weak",
+      "datasets_with_oracle_root": 219,
+      "datasets_with_estimated_root": 219,
+      "oracle_root_available": 0.438,
+      "estimated_root_available": 0.438,
+      "oracle_bootstrap_reject_rate": 0.0410958904109589,
+      "estimated_bootstrap_reject_rate": 0.0319634703196347,
+      "estimated_vs_oracle_root_ratio_median": 0.9651725784999837
+    },
+    "root_failure_modes_eps_1e-4_ridge_1e-4_weak": {
+      "command": "root-failure-mode diagnostic using the v4 estimator mechanics",
+      "mc": 1000,
+      "seed": 20261028,
+      "oracle_no_root": 581,
+      "oracle_positive_root": 419,
+      "estimated_positive_root": 417,
+      "estimated_discriminant_negative": 1,
+      "estimated_no_positive_nonnegative_discriminant": 1,
+      "estimated_given_oracle_root_rate": 0.9952267303102625,
+      "median_estimated_to_oracle_root_ratio": 0.9669618239631942
+    }
+  },
+  "null_definition": {
+    "oracle": "For each feature path and predeclared direction, solve the exact finite-sample equal-risk quadratic under the known AR(0.5)+heteroskedastic covariance.",
+    "estimated": "Fit nuisance mean/covariance components from the observed dataset, reconstruct the same finite-sample equal-risk quadratic, and use its positive root as the plug-in restricted null point.",
+    "bootstrap": "Generate dependent/heteroskedastic bootstrap outcomes from the estimated restricted null and evaluate every bootstrap world with the same rolling estimator and Bartlett studentizer."
+  },
+  "interpretation": {
+    "primary": "The severe weak-direction failure is primarily null-surface topology, not nuisance estimation. At epsilon=1e-4 and ridge=1e-4, only about 42% of paths have a positive equal-risk root even with oracle nuisance; among oracle-supported paths, estimated nuisance retains a positive root on about 99.5% and shifts the root by about 3.3% in the median.",
+    "calibration": "On a root-supported near-singular control (epsilon=1e-3, ridge=1e-4, weak), 500x99 gives oracle rejection 5.6% and estimated-nuisance rejection 6.0%. This is encouraging mechanical calibration but far from a proof.",
+    "severe_cell": "At epsilon=1e-4, ridge=1e-4, weak, the 500x99 pilot has only 219 usable composite-null points. The oracle and estimated rejection rates are 4.11% and 3.20%, respectively, but the dominant limitation is that most feature paths do not admit the positive weak-direction null point in the first place.",
+    "formal_boundary": "No formal p-value, confidence interval, estimator compatibility claim, uniform size guarantee, or real-data result is established."
+  },
+  "next_gate": {
+    "name": "least-favorable null-surface envelope",
+    "requirements": [
+      "predeclare a finite direction grid or an analytically defined admissible surface parameterization before calibration;",
+      "measure null-root existence as a first-class support condition;",
+      "estimate nuisance at each null point and quantify root movement;",
+      "evaluate bootstrap rejection over the entire admissible null surface rather than one convenient point;",
+      "retain origin-local conditioning and projection-preservation gates;",
+      "treat any projected lane as a separate estimand."
+    ],
+    "reason": "A composite equal-risk null is not characterized by one directional root. Uniform calibration requires controlling the worst admissible null configuration rather than selecting a favorable point after seeing the result."
+  },
+  "literature": [
+    "Clark & McCracken (2015), Journal of Econometrics 186(1), 160-177, DOI 10.1016/j.jeconom.2014.06.016",
+    "Clark & McCracken (2012), Tests of Equal Forecast Accuracy for Overlapping Models, FRBSL WP 2011-024B",
+    "Doko Tchatoka & Haque (2023), Journal of Forecasting 42(7), 1844-1864, DOI 10.1002/for.2987",
+    "Chernozhukov, Hansen & Spindler (2015), Valid Post-Selection and Post-Regularization Inference"
+  ]
+}

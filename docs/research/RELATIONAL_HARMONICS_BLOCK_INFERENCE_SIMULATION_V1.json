@@ -1,0 +1,12 @@
+{
+  "schema": "relational-prediction-block-inference-simulation/v1",
+  "status": "superseded-unverified",
+  "reason": "The prior numerical size tables were not independently executed in the present verification loop and must not be treated as observed evidence.",
+  "replacement": "docs/research/RELATIONAL_HARMONICS_ORACLE_RESTRICTED_DGP_REFIT_BOOTSTRAP_EXECUTED_V2.json",
+  "scientific_boundary": {
+    "not_a_validity_proof": true,
+    "formal_inference": false,
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure"
+  }
+}

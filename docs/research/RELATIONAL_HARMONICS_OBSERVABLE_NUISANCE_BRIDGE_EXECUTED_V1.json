@@ -1,0 +1,31 @@
+{
+  "schema": "rh006-observable-nuisance-bridge/v1",
+  "status": "research-boundary-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "audited_head": "4806ee90eee02a6b1a431edf2d5ae03bcf702877",
+  "source_path": "src/partnership/relational_prediction.rs",
+  "observable_fields": [
+    "feature_time",
+    "outcome_time",
+    "agent_a",
+    "agent_b",
+    "alignment",
+    "a_to_b",
+    "b_to_a",
+    "turn_taking",
+    "common_driver",
+    "future_outcome"
+  ],
+  "latent_inputs_present": false,
+  "latent_driver_q_present": false,
+  "outcome_error_e_present": false,
+  "conclusion": "The current RH-006 observable schema does not directly identify the latent q/e objects used by the generalized-K stress family. A measurement/innovation bridge or an observable-moment nuisance formulation is required before real-data K nuisance estimation.",
+  "nonclaims": [
+    "No formal inference.",
+    "No confidence interval.",
+    "No empirical validation.",
+    "No K estimator qualification.",
+    "No Rust implementation qualification."
+  ]
+}

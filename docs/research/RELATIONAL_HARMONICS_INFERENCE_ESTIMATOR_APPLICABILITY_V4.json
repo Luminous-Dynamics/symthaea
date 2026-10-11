@@ -1,0 +1,92 @@
+{
+  "schema": "relational-prediction-inference-estimator-applicability/v4",
+  "status": "not-approved-for-execution",
+  "current_evaluator": {
+    "estimator_id": "fixed-ridge-standardized-v1",
+    "training_preprocessing": "feature means and scales fit on the training window only",
+    "fit": "ridge-regularized linear model with deterministic Gaussian elimination",
+    "rolling_estimation": "fresh fit at every origin",
+    "primary_comparison": ["RelationalAugmented", "NonRelationalContext"]
+  },
+  "gates": {
+    "origin_local_conditioning": "required at every estimator origin; aggregate lane fails closed if any required origin is inadmissible",
+    "hypothesis_preservation": "adaptive projection may be used only for a separately declared projected estimand unless every required origin preserves the declared coefficient-space hypothesis",
+    "finite_sample_null_support": "formal directional calibration requires a supported finite-sample equal-risk null point under the declared nuisance policy",
+    "estimated_nuisance_null": "nuisance-estimated restricted-null calibration requires its own validation; oracle calibration is not sufficient",
+    "uniform_null_surface": "a single directional or null point is insufficient for direction-free composite equal-accuracy inference",
+    "least_favorable": "finite direction-grid maxima remain diagnostic; no least-favorable critical value is authorized",
+    "weak_identification": "near-zero curvature / weakly identified regions require explicit robust calibration rather than ordinary bootstrap inheritance",
+    "null_surface_eigenstructure": "Q curvature and R=bb'-4cQ discriminant geometry must be characterized before direction-free uniform calibration",
+    "surface_criticality": "near-zero ||2Qgamma+b|| regions require separate weak/critical treatment",
+    "null_locality": "supported but remote roots require an explicit predeclared parameter/effect/risk radius or a separately declared global estimand; no silent norm truncation is permitted"
+  },
+  "evidence": {
+    "origin_local_conditioning": "docs/research/RELATIONAL_HARMONICS_ORIGIN_LOCAL_CONDITIONING_ADVERSARY_EXECUTED_V1.json",
+    "hypothesis_preservation": "docs/research/RELATIONAL_HARMONICS_PROJECTION_HYPOTHESIS_PRESERVATION_CERTIFICATE_EXECUTED_V2.json",
+    "estimated_nuisance_null": "docs/research/RELATIONAL_HARMONICS_ESTIMATED_NUISANCE_NULL_SURFACE_BOOTSTRAP_EXECUTED_V1.json",
+    "least_favorable_envelope": "docs/research/RELATIONAL_HARMONICS_LEAST_FAVORABLE_NULL_SURFACE_ENVELOPE_EXECUTED_V1.json",
+    "null_surface_eigenstructure": "docs/research/RELATIONAL_HARMONICS_NULL_SURFACE_EIGENSTRUCTURE_EXECUTED_V1.json"
+  },
+  "scientific_state": {
+    "severe_geometry": {
+      "configuration": "epsilon=1e-4, ridge=1e-4, 1000 feature paths",
+      "weak_direction_root_support": 0.421,
+      "weak_direction_negative_discriminant_failures": 578,
+      "supported_weak_root_median": 8895.1428,
+      "Q_second_to_max_abs_eigenvalue_median": 8.379828287184255e-11,
+      "R_vs_minus4cQ_alignment": "approximately 1",
+      "bb_over_minus4cQ_max_frobenius_ratio": 4.137542485629595e-12,
+      "finding": "Root-existence is essentially inherited from the weak/indefinite Q geometry in this severe cell."
+    },
+    "epsilon_ladder": {
+      "ridge": 1e-4,
+      "weak_root_medians": {
+        "epsilon_1e-2": 14.2394285,
+        "epsilon_1e-3": 110.6787,
+        "epsilon_1e-4": 8895.1428
+      },
+      "finding": "The finite-sample equal-risk root moves rapidly outward as effective curvature weakens."
+    },
+    "stratified_nuisance": {
+      "severe_60x49": {
+        "high_local_regular": {
+          "points": 240,
+          "estimated_root_support": 1.0,
+          "median_root_ratio": 0.9671801714,
+          "oracle_reject_rate": 0.0333333333,
+          "estimated_nuisance_reject_rate": 0.0333333333
+        },
+        "near_flat_remote_critical": {
+          "points": 206,
+          "estimated_root_support": 1.0,
+          "median_root_ratio": 0.9659088672,
+          "oracle_reject_rate": 0.0194174757,
+          "estimated_nuisance_reject_rate": 0.0291262136
+        }
+      },
+      "finding": "The deep severe-cell pilot shows no conditional estimated-root collapse; nuisance calibration must nevertheless be treated separately from surface support and locality."
+    }
+  },
+  "execution_gate": {
+    "current_selection": "stop-assumption-failure",
+    "required_before_formal_inference": [
+      "derive and document an exact fixed-ridge rolling estimator/procedure bridge",
+      "define whether the scientific null is global over the whole equal-risk surface or local in coefficient/effect/risk radius",
+      "predeclare a scientifically motivated locality/radius coordinate if a local null is intended",
+      "complete surface stratification across Q curvature, R discriminant/root-existence, surface criticality, and root/effect radius",
+      "validate estimated-nuisance calibration across those strata with materially larger Monte Carlo depth",
+      "establish uniform or least-favorable size control, including weak-identification regimes",
+      "validate the actual Rust implementation independently from the mechanics mirror",
+      "preserve the declared scientific estimand under any regularization or projection"
+    ]
+  },
+  "scientific_boundary": {
+    "no_formal_inference_in_this_pr": true,
+    "no_p_value_claim": true,
+    "no_confidence_interval_claim": true,
+    "synthetic_calibration_is_not_empirical_validation": true,
+    "grid_envelope_is_not_a_critical_value": true,
+    "remote_null_is_not_automatically_local_null": true,
+    "eigenstructure_chart_is_not_uniform_calibration": true
+  }
+}

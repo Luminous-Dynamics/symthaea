@@ -1,0 +1,34 @@
+{
+  "schema":"rh006-weak-effect-projection-executed/v1",
+  "status":"research-diagnostic-only",
+  "formal_inference":false,
+  "applicability":"not-approved-for-execution",
+  "selection":"stop-assumption-failure",
+  "execution":{
+    "paths":100,
+    "seed":20261028,
+    "geometry":{"train":48,"gap":4,"test":16,"origins":24,"step":16}
+  },
+  "weak_direction":[0.0,0.4472135954999579,-0.8944271909999159],
+  "feature_projection":"u'Z=(a2b-2*b2a)/sqrt(5), with a2b=al and b2a=0.25+0.5*al in the epsilon->0 construction",
+  "analytic_limit":"u'Z -> -0.5/sqrt(5)=-0.22360679774997896 as epsilon->0",
+  "results":{
+    "epsilon_1e-2":{"mean_of_path_means":-0.22359648,"mean_path_sd":0.00186030739,"mean_rms":0.22360422,"mean_abs":0.22359648},
+    "epsilon_1e-3":{"mean_of_path_means":-0.223605766,"mean_path_sd":0.000186030739,"mean_rms":0.223605843,"mean_abs":0.223605766},
+    "epsilon_1e-4":{"mean_of_path_means":-0.223606695,"mean_path_sd":0.0000186030739,"mean_rms":0.223606695,"mean_abs":0.223606695},
+    "epsilon_0":{"mean_of_path_means":-0.223606798,"mean_path_sd":7.51711294e-17,"mean_rms":0.223606798,"mean_abs":0.223606798}
+  },
+  "derived_root_effect_scales":{
+    "epsilon_1e-2":{"root_median":14.2394285,"implied_effect_magnitude":3.1840330086747866},
+    "epsilon_1e-3":{"root_median":110.6787,"implied_effect_magnitude":24.7485096861306},
+    "epsilon_1e-4":{"root_median":8895.1428,"implied_effect_magnitude":1989.0143970367815}
+  },
+  "provenance":{
+    "feature_dgp":"scripts/research/rh006_null_surface_eigenstructure_splitmix64.py",
+    "root_values_source":"docs/research/RELATIONAL_HARMONICS_NULL_SURFACE_EIGENSTRUCTURE_EXECUTED_V1.json",
+    "calculation":"100 deterministic feature paths per epsilon; effect-scale conversion uses the exact weak-direction projection and recorded root medians"
+  },
+  "interpretation":"The weak-direction induced outcome perturbation becomes nearly deterministic as epsilon shrinks: its RMS tends to 0.2236068 while dispersion is O(epsilon). Therefore the severe remote roots imply enormous outcome-space mean shifts and are not merely coefficient-coordinate artifacts.",
+  "nonclaims":["No formal inference.","No uniform size guarantee.","No empirical validation.","No exact-Rust implementation validation."],
+  "payload_sha256":"36c6777d5a4f7c0f2ec015fa98a3b192dabeb870b6aa8f16b391e9bfe538984e"
+}

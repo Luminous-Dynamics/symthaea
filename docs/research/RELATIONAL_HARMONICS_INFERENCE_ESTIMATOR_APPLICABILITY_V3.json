@@ -1,0 +1,49 @@
+{
+  "schema": "relational-prediction-inference-estimator-applicability/v3",
+  "status": "not-approved-for-execution",
+  "current_evaluator": {
+    "estimator_id": "fixed-ridge-standardized-v1",
+    "training_preprocessing": "feature means and scales fit on the training window only",
+    "fit": "ridge-regularized linear model with deterministic Gaussian elimination",
+    "rolling_estimation": "fresh fit at every origin",
+    "primary_comparison": ["RelationalAugmented", "NonRelationalContext"]
+  },
+  "gates": {
+    "origin_local_conditioning": "required at every estimator origin; aggregate lane fails closed if any required origin is inadmissible",
+    "hypothesis_preservation": "adaptive projection may be used only for a separately declared projected estimand unless every required origin preserves the declared coefficient-space hypothesis",
+    "finite_sample_null_support": "formal directional calibration requires a supported finite-sample equal-risk null point under the declared nuisance policy",
+    "estimated_nuisance_null": "nuisance-estimated restricted-null calibration requires its own validation; oracle calibration is not sufficient",
+    "uniform_null_surface": "a single directional or null point is insufficient for direction-free composite equal-accuracy inference",
+    "least_favorable": "finite direction-grid maxima remain diagnostic; no least-favorable critical value is authorized",
+    "weak_identification": "near-zero curvature / weakly identified regions require explicit robust calibration rather than ordinary bootstrap inheritance"
+  },
+  "evidence": {
+    "origin_local_conditioning": "docs/research/RELATIONAL_HARMONICS_ORIGIN_LOCAL_CONDITIONING_ADVERSARY_EXECUTED_V1.json",
+    "hypothesis_preservation": "docs/research/RELATIONAL_HARMONICS_PROJECTION_HYPOTHESIS_PRESERVATION_CERTIFICATE_EXECUTED_V2.json",
+    "estimated_nuisance_null": "docs/research/RELATIONAL_HARMONICS_ESTIMATED_NUISANCE_NULL_SURFACE_BOOTSTRAP_EXECUTED_V1.json",
+    "least_favorable_envelope": "docs/research/RELATIONAL_HARMONICS_LEAST_FAVORABLE_NULL_SURFACE_ENVELOPE_EXECUTED_V1.json"
+  },
+  "scientific_state": {
+    "estimated_nuisance_result": "In the severe weak-direction cell epsilon=1e-4, ridge=1e-4, the oracle equal-risk root exists on 41.9% of feature paths and the estimated-nuisance root on 41.7%; conditional root retention is about 99.5%, so null-surface topology dominates nuisance estimation.",
+    "envelope_result": "A 50-path x 2-outcome x 99-bootstrap AR(0.5)+heteroskedastic focus over 16 predeclared directions had 100% root support and a maximum directional rejection rate of 2%. This is diagnostic evidence only.",
+    "pilot_noise": "The smaller 12-path envelope pilot produced 25%/16.7% directional maxima; these are not treated as size failures because each direction had only 12 null paths and one outcome per point."
+  },
+  "execution_gate": {
+    "current_selection": "stop-assumption-failure",
+    "required_before_formal_inference": [
+      "derive and document an exact fixed-ridge rolling estimator/procedure bridge",
+      "replace arbitrary directional coverage with an admissible null-surface parameterization tied to risk curvature/eigenstructure",
+      "validate estimated-nuisance calibration over the admissible surface",
+      "establish uniform or least-favorable size control, including weak-identification regimes",
+      "validate the actual Rust implementation independently from the mechanics mirror",
+      "preserve the declared scientific estimand under any regularization or projection"
+    ]
+  },
+  "scientific_boundary": {
+    "no_formal_inference_in_this_pr": true,
+    "no_p_value_claim": true,
+    "no_confidence_interval_claim": true,
+    "synthetic_calibration_is_not_empirical_validation": true,
+    "grid_envelope_is_not_a_critical_value": true
+  }
+}

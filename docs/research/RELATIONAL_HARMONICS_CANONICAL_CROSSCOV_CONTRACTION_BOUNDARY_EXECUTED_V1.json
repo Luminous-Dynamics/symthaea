@@ -1,0 +1,54 @@
+{
+  "schema": "rh006-canonical-crosscov-contraction-boundary/v1",
+  "status": "research-diagnostic-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "execution": {
+    "trials": 60,
+    "seed": 20261012,
+    "latent_dim": 7,
+    "outcome_dim": 5,
+    "strengths": [
+      0,
+      0.35,
+      0.85,
+      0.99,
+      1,
+      1.01
+    ]
+  },
+  "source_identity": {
+    "local_source_sha256": "098091ebc4d308b1774c105dc1994ee33d6c829f04cc09f8a89f0b9b228afcc4",
+    "local_result_sha256": "366abb7791dd09ad412d17e3b491217b813222ea1b6264296e46fa181e49a79f",
+    "payload_sha256": "0b3b3bca142c1dbd75f565f81b99e795605a4786ea3c1bd05f647d85aeb92b1f"
+  },
+  "results": {
+    "0.0": {
+      "admissible_fraction": 1
+    },
+    "0.35": {
+      "admissible_fraction": 1
+    },
+    "0.85": {
+      "admissible_fraction": 1
+    },
+    "0.99": {
+      "admissible_fraction": 1
+    },
+    "1.0": {
+      "admissible_fraction": 1,
+      "min_cov_eigen_range": [
+        -1.6050663643022744e-14,
+        1.6057573652703306e-14
+      ]
+    },
+    "1.01": {
+      "admissible_fraction": 0,
+      "min_cov_eigen_range": [
+        -0.17405889804199656,
+        -0.010958184199275156
+      ]
+    }
+  },
+  "conclusion": "The canonical cross-covariance class is a spectral-norm contraction. Strength 1 is the covariance-completion boundary; strength above 1 is infeasible."
+}

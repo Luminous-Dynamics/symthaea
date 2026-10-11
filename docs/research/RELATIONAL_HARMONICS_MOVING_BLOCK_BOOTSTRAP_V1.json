@@ -1,0 +1,25 @@
+{
+  "schema": "relational-prediction-resampling-specification/v1",
+  "resampling_method_id": "moving-block-bootstrap-v1",
+  "status": "contract-only",
+  "scope": {
+    "dependence_target": "serially dependent forecast-loss differential process",
+    "sampling_unit": "contiguous blocks",
+    "overlap": "moving",
+    "replacement": true
+  },
+  "requirements": [
+    "Prespecify block length before inference; block length must not be optimized against the realized inference statistic.",
+    "Preserve local serial dependence in the resampled loss process rather than assuming independent target losses.",
+    "For the nested finite-sample procedure, integrate the moving-block resampling with the residual-based component required by the selected nested-bootstrap specification.",
+    "Record the realized block-length rule and bootstrap configuration in the future inference receipt."
+  ],
+  "scientific_boundary": {
+    "execution_in_this_pr": false,
+    "block_length_selection_policy_is_declared_but_not_executed": true,
+    "references": [
+      "Tchatoka (2023), Journal of Forecasting, DOI 10.1002/for.2987",
+      "Grant, Mrazik, Satchell (2026), Journal of Forecasting, DOI 10.1002/for.70150"
+    ]
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "schema":"rh006-joint-feature-outcome-endogeneity-executed/v1",
+  "status":"research-diagnostic-only",
+  "formal_inference":false,
+  "applicability":"not-approved-for-execution",
+  "selection":"stop-assumption-failure",
+  "source_identity":{
+    "script":"scripts/research/rh006_joint_feature_outcome_endogeneity_splitmix64.py",
+    "repository_git_blob_sha1":"5e956ffa3dcf632d81566bd63f92893939f2fd5d",
+    "local_execution_sha256":"ec255396810ad8caeb10ceb286ffd5e41f7cab384cd5a2f9777955497f15c178",
+    "byte_identity_claim":true
+  },
+  "execution":{
+    "paths":40,
+    "outcomes_per_path":50,
+    "seed":20261080,
+    "omegas":[0.0,0.25,0.5,0.75,0.9],
+    "ridge":0.0001,
+    "geometry":{"train":48,"gap":4,"test":16,"origins":24,"step":16}
+  },
+  "design":{
+    "marginal_outcome_law":"AR(0.5) with the declared heteroskedastic scale is preserved",
+    "endogeneity":"the innovation shock driving relational feature channel raw[5] is shared with the outcome innovation with correlation omega",
+    "null_surface":"computed using the existing independence covariance formula; this intentionally tests the uncovered joint feature/outcome assumption",
+    "directional_cases":["weak","strong"]
+  },
+  "results":{
+    "weak":{
+      "omega_0":{"root_support_rate":1.0,"mean_diff_at_gamma0":-0.0009062797491137854,"mean_diff_at_nominal_root":-4.821996400438419e-07},
+      "omega_0.25":{"root_support_rate":1.0,"mean_diff_at_gamma0":-0.00023723005042820589,"mean_diff_at_nominal_root":-0.0003116641020673366},
+      "omega_0.5":{"root_support_rate":1.0,"mean_diff_at_gamma0":0.0017532322049849396,"mean_diff_at_nominal_root":0.0007294666224875406},
+      "omega_0.75":{"root_support_rate":1.0,"mean_diff_at_gamma0":0.005057881531579879,"mean_diff_at_nominal_root":0.0030921507600758353},
+      "omega_0.9":{"root_support_rate":1.0,"mean_diff_at_gamma0":0.00770001767581526,"mean_diff_at_nominal_root":0.005134531935906821}
+    },
+    "strong":{
+      "omega_0":{"root_support_rate":1.0,"mean_diff_at_gamma0":-0.000901232492252178,"mean_diff_at_nominal_root":1.0648238075179103e-06},
+      "omega_0.25":{"root_support_rate":1.0,"mean_diff_at_gamma0":-0.0002449124020284401,"mean_diff_at_nominal_root":0.001777659137711013},
+      "omega_0.5":{"root_support_rate":1.0,"mean_diff_at_gamma0":0.0017064945771521553,"mean_diff_at_nominal_root":0.004885860962857284},
+      "omega_0.75":{"root_support_rate":1.0,"mean_diff_at_gamma0":0.0048630008665286155,"mean_diff_at_nominal_root":0.009075135953634664},
+      "omega_0.9":{"root_support_rate":1.0,"mean_diff_at_gamma0":0.007619556359956187,"mean_diff_at_nominal_root":0.012599162179711654}
+    }
+  },
+  "interpretation":{
+    "primary":"When feature/outcome innovation correlation is zero, the independence null root is approximately equal-risk. As correlation with the relational feature channel increases, the same nominal root produces a positive relational-vs-context loss differential, and the shift grows with omega.",
+    "meaning":"The current RH-006 finite-sample null construction is not portable to a joint endogenous feature/outcome DGP without extending the risk identity to include the cross-moments induced by endogeneity.",
+    "strongest_signal":"At omega=0.9, the mean loss differential at the independence-based nominal root is about 0.0126 for the strong direction and 0.00513 for the weak direction.",
+    "control":"The marginal AR(0.5)+heteroskedastic outcome process is held fixed, so the effect is not explained by a changed marginal serial covariance law."
+  },
+  "next_gate":"derive the finite-sample risk surface under explicit feature/outcome cross-covariance, then repeat null-support and nuisance-calibration tests under the joint DGP.",
+  "nonclaims":[
+    "No formal p-value.",
+    "No confidence interval.",
+    "No uniform size guarantee.",
+    "No empirical validation.",
+    "No claim that every endogenous feature/outcome process creates the same displacement.",
+    "No exact-Rust implementation qualification."
+  ]
+}

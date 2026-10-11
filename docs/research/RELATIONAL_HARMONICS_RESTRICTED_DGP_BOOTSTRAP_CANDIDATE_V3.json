@@ -1,0 +1,137 @@
+{
+  "schema": "rh006-dependent-heteroskedastic-risk-null-oracle-executed/v1",
+  "status": "research-diagnostic-only",
+  "faithfulness_scope": "independent estimator-mechanics reimplementation; not the Symthaea Rust implementation",
+  "execution": {
+    "command": "python scripts/research/rh006_oracle_risk_null_covariance_splitmix64.py --paths 50 --directions 128 --calibration-outcomes-per-path 4 --mc-verify 500 --bootstrap 199 --seed 20261009",
+    "script_sha256": "3d581855570262c1cbac5cdda6afd368f282fb59a2ba0b51c9b4ae7ba3d1defe",
+    "source_output_payload_sha256": "8eb8f221c69dfb98b46fb747a8ca0c27894e4b020084da378344aa60bb0fde5c",
+    "environment": "independent Python/numpy harness"
+  },
+  "geometry": {
+    "train": 48,
+    "test": 16,
+    "gap": 4,
+    "origins": 24,
+    "step": 16,
+    "ridge": 1e-8,
+    "bartlett_lag": 3,
+    "alpha": 0.05,
+    "paths": 50,
+    "directions": 128,
+    "calibration_outcomes_per_path": 4,
+    "mc_verify": 500,
+    "bootstrap_reps": 199
+  },
+  "risk_equation": {
+    "full_identity": "R_m = H^-1[||W_m mu_tr-mu_te||^2 + tr(W_m Sigma_tt W_m') + tr(Sigma_yy) - 2 tr(W_m Sigma_ty)]",
+    "vector_null": "Delta(gamma) = gamma' Q gamma + b' gamma + c",
+    "directional_null": "Delta(kappa; v) = (v'Qv)kappa^2 + (b'v)kappa + c",
+    "covariance_terms": [
+      "train/train",
+      "test/test",
+      "train/test"
+    ],
+    "test_test_cancellation": true
+  },
+  "null_construction": {
+    "structural_null": "beta_relational = 0",
+    "forecast_accuracy_null": "E[D_o] = 0",
+    "direction": "equal-amplitude [a_to_b, b_to_a, turn_taking]",
+    "root_policy": "smallest positive root on the predeclared direction; oracle-known covariance"
+  },
+  "scenarios": [
+    {
+      "rho": 0.0,
+      "heteroskedastic": false,
+      "positive_root_count": "50/50",
+      "positive_root_mean": 0.107196,
+      "positive_root_range": [
+        0.101685,
+        0.113663
+      ],
+      "directional_root_envelope": [
+        0.095899,
+        0.331758
+      ],
+      "risk_null_mc_delta_mean": -2.93e-06,
+      "risk_null_mc_delta_se_mean": 1.90e-06,
+      "bootstrap_outcomes": 200,
+      "bootstrap_reject_rate": 0.055,
+      "bootstrap_mean_p": 0.524
+    },
+    {
+      "rho": 0.5,
+      "heteroskedastic": false,
+      "positive_root_count": "50/50",
+      "positive_root_mean": 0.131894,
+      "positive_root_range": [
+        0.122682,
+        0.139677
+      ],
+      "directional_root_envelope": [
+        0.113537,
+        0.402432
+      ],
+      "risk_null_mc_delta_mean": 5.55e-06,
+      "risk_null_mc_delta_se_mean": 4.08e-06,
+      "bootstrap_outcomes": 200,
+      "bootstrap_reject_rate": 0.06,
+      "bootstrap_mean_p": 0.504
+    },
+    {
+      "rho": 0.8,
+      "heteroskedastic": false,
+      "positive_root_count": "50/50",
+      "positive_root_mean": 0.187311,
+      "positive_root_range": [
+        0.15918,
+        0.20386
+      ],
+      "directional_root_envelope": [
+        0.155616,
+        0.600129
+      ],
+      "risk_null_mc_delta_mean": -3.47e-06,
+      "risk_null_mc_delta_se_mean": 8.42e-06,
+      "bootstrap_outcomes": 200,
+      "bootstrap_reject_rate": 0.05,
+      "bootstrap_mean_p": 0.514
+    },
+    {
+      "rho": 0.5,
+      "heteroskedastic": true,
+      "positive_root_count": "50/50",
+      "positive_root_mean": 0.133992,
+      "positive_root_range": [
+        0.127385,
+        0.147477
+      ],
+      "directional_root_envelope": [
+        0.116122,
+        0.401273
+      ],
+      "risk_null_mc_delta_mean": -2.46e-06,
+      "risk_null_mc_delta_se_mean": 3.32e-06,
+      "bootstrap_outcomes": 200,
+      "bootstrap_reject_rate": 0.07,
+      "bootstrap_mean_p": 0.475
+    }
+  ],
+  "interpretation": {
+    "primary": "Serial correlation materially changes the finite-sample equal-risk boundary; test/test covariance cancels from the paired differential but remains part of the full risk identity.",
+    "secondary": "The equal-risk null is a quadratic surface in the full relational coefficient vector, so an equal-amplitude root is only a direction-specific slice.",
+    "calibration": "The oracle risk-null refit bootstrap showed pilot rejection rates near nominal 0.05 under these synthetic DGPs, but 200 outcomes per scenario and oracle nuisance inputs are insufficient for a validity claim.",
+    "endogeneity": "Conditioning on features remains an explicit gate; endogenous features require a joint feature/outcome DGP.",
+    "formal_inference": false,
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure"
+  },
+  "limitations": [
+    "Pilot calibration only; no formal validity proof.",
+    "Nuisance quantities are oracle-known; estimated-nuisance behavior remains untested.",
+    "Null-surface nuisance-point policy is unresolved.",
+    "Feature/outcome exogeneity is unresolved for real RH-006 data."
+  ],
+  "payload_sha256": "db1291256a06ad8022ac048f1306de564ce6b0d1c1784d5e134cf799d4c07c66"
+}

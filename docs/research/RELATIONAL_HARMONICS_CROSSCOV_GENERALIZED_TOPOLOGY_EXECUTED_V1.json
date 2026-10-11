@@ -1,0 +1,50 @@
+{
+  "schema": "rh006-crosscov-generalized-topology-evidence/v1",
+  "status": "research-diagnostic-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "execution": {
+    "local_source_sha256": "ca1418e05874fa6ba7af4b5e7ac7cdb5a83f3514dd91857dbd2bc92b4a6d60f7",
+    "local_result_sha256": "8ea4421f1b02fbc90dc8dda24242fa385128ae6adb6ebfade1bb630716e2e3c6",
+    "paths_per_family": 40,
+    "seed": 20261080,
+    "omegas": [0.0, 0.25, 0.5, 0.75, 0.9],
+    "cross_covariance_families": ["single_rel","multi_rel","mixed_common_rel","anti_rel","lag_rel"],
+    "geometry": {"train": 48, "gap": 4, "test": 16, "origins": 24, "step": 16},
+    "ridge": 0.0001,
+    "identity_checks": 90,
+    "mc_outcomes_per_cell": 250
+  },
+  "repository_source_identity": {
+    "path": "scripts/research/rh006_crosscov_generalized_topology_splitmix64.py",
+    "repository_git_blob_sha1": "408c0fb44b183d3afc9de0fa6a148c6db4b45f2d",
+    "byte_identity_to_local_execution_source": false,
+    "reason": "Repository source was committed after the independent local execution; byte-level equivalence was not established."
+  },
+  "exact_topology_theorem": {
+    "assumption": "Q positive definite",
+    "c_lt_0": "all directions have positive discriminant and exactly one positive root",
+    "c_eq_0": "nonzero positive-root branch is the b'u<0 hemisphere",
+    "c_gt_0": "global discriminant support iff b'Q^{-1}b > 4c; supported region is a discriminant cone intersected with b'u<0"
+  },
+  "results": {
+    "topology_cells": 1000,
+    "theorem_vs_actual_spectrum_match_rate": 1.0,
+    "omega_0_topology": "all+ for all five families",
+    "contemporaneous_omega_0_5": "cone for all 40 paths in each contemporaneous family",
+    "lagged_omega_0_9": "10/40 all-direction, 30/40 cone",
+    "lagged_omega_0_9_weak_ray_support": 0.875,
+    "lagged_omega_0_9_strong_ray_support": 0.25,
+    "mc_identity_max_abs_error": 0.0001477877788188817,
+    "mc_identity_mean_abs_error": 0.00002944042724922693
+  },
+  "scientific_conclusion": "Cross-covariance geometry, not a scalar endogeneity magnitude alone, determines null-surface displacement and topology. The exact Q-positive-definite theorem can replace arbitrary discriminant-direction grids in its valid regime, while lag/channel structure remains an explicit nuisance dimension.",
+  "nonclaims": [
+    "No formal p-value.",
+    "No confidence interval.",
+    "No uniform or least-favorable size guarantee.",
+    "No empirical validation.",
+    "No claim this finite-rank family spans every endogenous DGP.",
+    "No exact-Rust implementation qualification."
+  ]
+}

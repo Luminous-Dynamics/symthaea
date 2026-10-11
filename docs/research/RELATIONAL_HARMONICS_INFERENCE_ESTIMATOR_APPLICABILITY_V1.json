@@ -1,0 +1,41 @@
+{
+  "schema": "relational-prediction-inference-estimator-applicability/v1",
+  "status": "not-approved-for-execution",
+  "current_evaluator": {
+    "estimator_id": "fixed-ridge-standardized-v1",
+    "training_preprocessing": "feature means and scales fit on the training window only",
+    "fit": "ridge-regularized linear model with deterministic Gaussian elimination",
+    "rolling_estimation": "fresh fit at every origin",
+    "primary_comparison": [
+      "RelationalAugmented",
+      "NonRelationalContext"
+    ]
+  },
+  "literature_mapping": [
+    {
+      "procedure_id": "nested-forecast-bootstrap-v1",
+      "reference": "Doko Tchatoka & Haque (2023), Journal of Forecasting, DOI 10.1002/for.2987",
+      "supported_framework": "nested regression forecast comparison with a hybrid moving-block/residual bootstrap",
+      "mapping_status": "not-established-for-current-fixed-ridge-estimator"
+    },
+    {
+      "procedure_id": "nested-forecast-bootstrap-v1",
+      "reference": "Clark & McCracken (2015), Journal of Econometrics, DOI 10.1016/j.jeconom.2014.06.016",
+      "supported_framework": "nested forecast model comparisons with bootstrap inference for regression forecasts",
+      "mapping_status": "not-established-for-current-fixed-ridge-estimator"
+    }
+  ],
+  "execution_gate": {
+    "current_selection": "stop-assumption-failure",
+    "required_before_formal_inference": [
+      "derive and document a valid bootstrap statistic for the fixed-ridge estimator, including the effect of training-window standardization and regularization;",
+      "show that the bootstrap construction preserves the relevant null distribution for the actual rolling-origin estimator;",
+      "pin the exact estimator/procedure compatibility artifact and its implementation specification before inspecting the confirmatory result"
+    ]
+  },
+  "scientific_boundary": {
+    "no_formal_inference_in_this_pr": true,
+    "no_p_value_claim": true,
+    "literature_is_not_treated_as_proof_of_estimator_compatibility": true
+  }
+}
