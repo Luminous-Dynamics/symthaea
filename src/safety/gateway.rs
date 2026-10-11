@@ -28,7 +28,11 @@ pub enum SafetyCheck<'a> {
     Query(&'a str),
     /// Concrete shell / Nix command string
     Command(&'a str),
-    /// Planned side-effect encoded as ActionIR
+    /// Planned side-effect encoded as ActionIR.
+    ///
+    /// This is a conservative pre-admission screen, not final effect authority.
+    /// Capability, sandbox, lease, and execution-policy checks remain the
+    /// responsibility of the owning action/effect layer.
     Action(&'a ActionIR),
 }
 
@@ -189,20 +193,40 @@ impl SafetyGateway {
         SafetyDecision::allowed()
     }
 
-    /// Safety check for planned side-effects (ActionIR)
+    /// Conservative pre-admission check for planned side-effects (`ActionIR`).
+    ///
+    /// This match is deliberately exhaustive. Adding a new `ActionIR` variant
+    /// must fail compilation here until its screening semantics are reviewed.
+    /// Passing this screen never grants capability or execution authority.
     fn check_action(&mut self, action: &ActionIR) -> SafetyDecision {
         match action {
-            ActionIR::DeleteFile { path } if is_forbidden_path(path) => {
-                return SafetyDecision::blocked(
-                    format!("Blocked: Cannot delete system path '{}'", path.display()),
-                    Some(ForbiddenCategory::DangerousCommand),
-                );
+            ActionIR::ReadFile { .. }
+            | ActionIR::ListDirectory { .. }
+            | ActionIR::ReadSensor { .. }
+            | ActionIR::NoOp => {}
+            ActionIR::WriteFile { path, .. } => {
+                if is_forbidden_path(path) {
+                    return SafetyDecision::blocked(
+                        format!("Blocked: Cannot write to system path '{}'", path.display()),
+                        Some(ForbiddenCategory::SecurityRisk),
+                    );
+                }
             }
-            ActionIR::WriteFile { path, .. } if is_forbidden_path(path) => {
-                return SafetyDecision::blocked(
-                    format!("Blocked: Cannot write to system path '{}'", path.display()),
-                    Some(ForbiddenCategory::SecurityRisk),
-                );
+            ActionIR::DeleteFile { path } => {
+                if is_forbidden_path(path) {
+                    return SafetyDecision::blocked(
+                        format!("Blocked: Cannot delete system path '{}'", path.display()),
+                        Some(ForbiddenCategory::DangerousCommand),
+                    );
+                }
+            }
+            ActionIR::CreateDirectory { path, .. } => {
+                if is_forbidden_path(path) {
+                    return SafetyDecision::blocked(
+                        format!("Blocked: Cannot create system path '{}'", path.display()),
+                        Some(ForbiddenCategory::SecurityRisk),
+                    );
+                }
             }
             ActionIR::RunCommand { program, args, .. } => {
                 // Check the program name
@@ -221,8 +245,33 @@ impl SafetyGateway {
                     return SafetyDecision::blocked(msg, Some(ForbiddenCategory::DangerousCommand));
                 }
             }
+            ActionIR::WriteServo { servo_id, .. } => {
+                return SafetyDecision::blocked(
+                    format!(
+                        "Blocked: Servo {servo_id} actuation requires explicit actuator authority"
+                    ),
+                    Some(ForbiddenCategory::SecurityRisk),
+                );
+            }
+            ActionIR::SwarmGossip { topic, .. } => {
+                return SafetyDecision::blocked(
+                    format!(
+                        "Blocked: Swarm gossip on topic '{topic}' requires explicit network authority"
+                    ),
+                    Some(ForbiddenCategory::SecurityRisk),
+                );
+            }
+            ActionIR::WasmSandbox { module_path, .. } => {
+                return SafetyDecision::blocked(
+                    format!(
+                        "Blocked: WASM module '{}' requires explicit Forge/sandbox authority",
+                        module_path.display()
+                    ),
+                    Some(ForbiddenCategory::SecurityRisk),
+                );
+            }
             ActionIR::Sequence(actions) => {
-                // Check each sub-action
+                // Check each sub-action and propagate the first denial.
                 for sub_action in actions {
                     let decision = self.check_action(sub_action);
                     if !decision.allowed {
@@ -230,8 +279,6 @@ impl SafetyGateway {
                     }
                 }
             }
-            // ReadFile, CreateDirectory, ListDirectory, NoOp are safe
-            _ => {}
         }
 
         SafetyDecision::allowed()
@@ -337,6 +384,18 @@ mod tests {
     }
 
     #[test]
+    fn test_gateway_blocks_dangerous_directory_creation() {
+        let mut gw = SafetyGateway::new();
+        let action = ActionIR::CreateDirectory {
+            path: "/boot/symthaea".into(),
+            recursive: true,
+        };
+        let decision = gw.check(SafetyCheck::Action(&action));
+        assert!(!decision.allowed);
+        assert_eq!(decision.category, Some(ForbiddenCategory::SecurityRisk));
+    }
+
+    #[test]
     fn test_gateway_blocks_dangerous_action_run() {
         let mut gw = SafetyGateway::new();
         let action = ActionIR::RunCommand {
@@ -358,6 +417,54 @@ mod tests {
         };
         let decision = gw.check(SafetyCheck::Action(&action));
         assert!(decision.allowed);
+    }
+
+    #[test]
+    fn test_gateway_allows_read_sensor_screening() {
+        let mut gw = SafetyGateway::new();
+        let action = ActionIR::ReadSensor {
+            sensor_id: "imu-0".into(),
+            channels: vec!["accel_x".into()],
+        };
+        let decision = gw.check(SafetyCheck::Action(&action));
+        assert!(decision.allowed);
+    }
+
+    #[test]
+    fn test_gateway_blocks_servo_without_actuator_authority() {
+        let mut gw = SafetyGateway::new();
+        let action = ActionIR::WriteServo {
+            servo_id: 3,
+            value: 0.5,
+        };
+        let decision = gw.check(SafetyCheck::Action(&action));
+        assert!(!decision.allowed);
+        assert_eq!(decision.category, Some(ForbiddenCategory::SecurityRisk));
+    }
+
+    #[test]
+    fn test_gateway_blocks_swarm_gossip_without_network_authority() {
+        let mut gw = SafetyGateway::new();
+        let action = ActionIR::SwarmGossip {
+            topic: "research".into(),
+            payload: vec![1, 2, 3],
+        };
+        let decision = gw.check(SafetyCheck::Action(&action));
+        assert!(!decision.allowed);
+        assert_eq!(decision.category, Some(ForbiddenCategory::SecurityRisk));
+    }
+
+    #[test]
+    fn test_gateway_blocks_wasm_without_forge_authority() {
+        let mut gw = SafetyGateway::new();
+        let action = ActionIR::WasmSandbox {
+            module_path: "/tmp/test.wasm".into(),
+            function_name: "verify".into(),
+            input_data: vec![],
+        };
+        let decision = gw.check(SafetyCheck::Action(&action));
+        assert!(!decision.allowed);
+        assert_eq!(decision.category, Some(ForbiddenCategory::SecurityRisk));
     }
 
     #[test]
