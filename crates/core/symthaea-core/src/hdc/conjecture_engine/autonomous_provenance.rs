@@ -23,14 +23,32 @@ pub struct AutonomousHoldoutSystemV1 {
     rhs: fn(&[f64], f64) -> Vec<f64>,
 }
 impl AutonomousHoldoutSystemV1 {
-    pub fn new(system_id: &str, canonical_definition: &str, rhs: fn(&[f64], f64) -> Vec<f64>)
-        -> Result<Self, AutonomousDiscoveryReceiptError> {
-        let (system_id, definition_blake3) = validate_system_identity(system_id, canonical_definition)?;
-        Ok(Self { system_id, canonical_definition: canonical_definition.to_string(), definition_blake3, rhs })
+    pub fn new(
+        system_id: &str,
+        canonical_definition: &str,
+        rhs: fn(&[f64], f64) -> Vec<f64>,
+    ) -> Result<Self, AutonomousDiscoveryReceiptError> {
+        let (system_id, definition_blake3) =
+            validate_system_identity(system_id, canonical_definition)?;
+        Ok(Self {
+            system_id,
+            canonical_definition: canonical_definition.to_string(),
+            definition_blake3,
+            rhs,
+        })
     }
-    pub fn system_id(&self) -> &str { &self.system_id }
-    pub fn canonical_definition(&self) -> &str { &self.canonical_definition }
-    pub fn definition_blake3(&self) -> &str { &self.definition_blake3 }
+
+    pub fn system_id(&self) -> &str {
+        &self.system_id
+    }
+
+    pub fn canonical_definition(&self) -> &str {
+        &self.canonical_definition
+    }
+
+    pub fn definition_blake3(&self) -> &str {
+        &self.definition_blake3
+    }
 }
 /// Generalization evidence from fresh initial conditions. Passing this validator
 /// is not symbolic equivalence, formal proof, or validation against reality.
@@ -387,22 +405,33 @@ pub enum AutonomousDiscoveryReceiptError {
     ColdRunContainsPriors,
     ComposedCandidateNeedsParentReceipts,
 }
-fn validate_system_identity(system_id: &str, canonical_definition: &str)
-    -> Result<(String, String), AutonomousDiscoveryReceiptError> {
+fn validate_system_identity(
+    system_id: &str,
+    canonical_definition: &str,
+) -> Result<(String, String), AutonomousDiscoveryReceiptError> {
     let normalized_id = system_id.trim();
-    if normalized_id.is_empty() { return Err(AutonomousDiscoveryReceiptError::EmptySystemId); }
+    if normalized_id.is_empty() {
+        return Err(AutonomousDiscoveryReceiptError::EmptySystemId);
+    }
     if !canonical_definition.starts_with("system-definition-v1\n")
-        || canonical_definition.contains('\r') {
+        || canonical_definition.contains('\r')
+    {
         return Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinition);
     }
+
     let mut lines = canonical_definition.split('\n');
     let header = lines.next();
     let declared_id = lines.next();
     let has_body = lines.any(|line| !line.trim().is_empty());
-    if header != Some("system-definition-v1") || declared_id != Some(normalized_id) || !has_body {
+    if header != Some("system-definition-v1")
+        || declared_id != Some(normalized_id)
+        || !has_body
+    {
         return Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinition);
     }
-    Ok((normalized_id.to_string(), blake3::hash(canonical_definition.as_bytes()).to_hex().to_string()))
+
+    let digest = blake3::hash(canonical_definition.as_bytes()).to_hex().to_string();
+    Ok((normalized_id.to_string(), digest))
 }
 fn hash_field(hasher: &mut blake3::Hasher, bytes: &[u8]) {
     hasher.update(&(bytes.len() as u64).to_le_bytes());
@@ -444,9 +473,13 @@ fn assessment_context_digest(
     hash_string(&mut hasher, system_id);
     hash_string(&mut hasher, system_definition_blake3);
     hash_usize(&mut hasher, variable_names.len());
-    for name in variable_names { hash_string(&mut hasher, name); }
+    for name in variable_names {
+        hash_string(&mut hasher, name);
+    }
     hash_usize(&mut hasher, initial_state.len());
-    for value in initial_state { hash_f64(&mut hasher, *value); }
+    for value in initial_state {
+        hash_f64(&mut hasher, *value);
+    }
     hash_u64(&mut hasher, discovery_seed);
     hash_u64(&mut hasher, holdout_seed);
     hash_f64(&mut hasher, t_max);
@@ -771,7 +804,8 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
     let system_identity_consistent =
         match validate_system_identity(&receipt.system_id, &receipt.system_definition_canonical) {
             Ok((system_id, definition_blake3)) => {
-                system_id == receipt.system_id && definition_blake3 == receipt.system_definition_blake3
+                system_id == receipt.system_id
+                    && definition_blake3 == receipt.system_definition_blake3
             }
             Err(_) => false,
         };
@@ -975,8 +1009,12 @@ mod tests {
     }
 
     fn harmonic_system() -> AutonomousHoldoutSystemV1 {
-        AutonomousHoldoutSystemV1::new("harmonic-oscillator-v1", system_definition_canonical(), harmonic_rhs)
-            .expect("valid harmonic test system")
+        AutonomousHoldoutSystemV1::new(
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            harmonic_rhs,
+        )
+        .expect("valid harmonic test system")
     }
     fn invalid_rhs_system() -> AutonomousHoldoutSystemV1 {
         AutonomousHoldoutSystemV1::new(
@@ -987,12 +1025,20 @@ mod tests {
             .expect("valid invalid-shape identity")
     }
     fn wrong_dimension_after_start_system() -> AutonomousHoldoutSystemV1 {
-        AutonomousHoldoutSystemV1::new("wrong-dimension-after-start-v1", "system-definition-v1\nwrong-dimension-after-start-v1\nrhs changes shape after t=0", wrong_dimension_after_start)
-            .expect("valid test identity")
+        AutonomousHoldoutSystemV1::new(
+            "wrong-dimension-after-start-v1",
+            "system-definition-v1\nwrong-dimension-after-start-v1\nrhs changes shape after t=0",
+            wrong_dimension_after_start,
+        )
+        .expect("valid test identity")
     }
     fn constant_system() -> AutonomousHoldoutSystemV1 {
-        AutonomousHoldoutSystemV1::new("constant-flow-v1", "system-definition-v1\nconstant-flow-v1\nxdot=0", constant_rhs)
-            .expect("valid constant identity")
+        AutonomousHoldoutSystemV1::new(
+            "constant-flow-v1",
+            "system-definition-v1\nconstant-flow-v1\nxdot=0",
+            constant_rhs,
+        )
+        .expect("valid constant identity")
     }
 
     fn harmonic_energy() -> Expr {
@@ -1286,8 +1332,15 @@ mod tests {
 
     #[test]
     fn system_identity_requires_matching_versioned_definition() {
-        let result = AutonomousHoldoutSystemV1::new("another-system-v1", system_definition_canonical(), harmonic_rhs);
-        assert!(matches!(result, Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinition)));
+        let result = AutonomousHoldoutSystemV1::new(
+            "another-system-v1",
+            system_definition_canonical(),
+            harmonic_rhs,
+        );
+        assert!(matches!(
+            result,
+            Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinition)
+        ));
     }
 
     #[test]
