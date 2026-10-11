@@ -130,28 +130,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Experiment 2: 5-fold stratified cross-validation on sbousseaden
     // ----------------------------------------------------------------
     println!("\n=== Experiment 2: grouped 5-fold CV on sbousseaden ===");
-    match run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, 0xDEADBEEF, cfg) {
-        Ok(fold_accs) if !fold_accs.is_empty() => {
-            let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
-            let var = fold_accs
-                .iter()
-                .map(|a| (a - mean).powi(2))
-                .sum::<f32>()
-                / fold_accs.len() as f32;
-            let std = var.sqrt();
-            println!("  per-fold test accuracy: {:?}", fold_accs);
-            println!("  mean ± std: {mean:.3} ± {std:.3}");
-            println!(
-                "  min/max:    {:.3} / {:.3}",
-                fold_accs.iter().cloned().fold(f32::INFINITY, f32::min),
-                fold_accs.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
-            );
-        }
-        Ok(_) => println!("  grouped CV unavailable: no fold metrics produced"),
-        Err(error) => println!(
-            "  grouped CV unavailable under the strict capture-group contract: {error}"
-        ),
-    }
+    let grouped_cv_summary =
+        match run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, 0xDEADBEEF, cfg) {
+            Ok(fold_accs) if !fold_accs.is_empty() => {
+                let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
+                let var = fold_accs
+                    .iter()
+                    .map(|a| (a - mean).powi(2))
+                    .sum::<f32>()
+                    / fold_accs.len() as f32;
+                let std = var.sqrt();
+                println!("  per-fold test accuracy: {:?}", fold_accs);
+                println!("  mean ± std: {mean:.3} ± {std:.3}");
+                println!(
+                    "  min/max:    {:.3} / {:.3}",
+                    fold_accs.iter().cloned().fold(f32::INFINITY, f32::min),
+                    fold_accs.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
+                );
+                Some((mean, std))
+            }
+            Ok(_) => {
+                println!("  grouped CV unavailable: no fold metrics produced");
+                None
+            }
+            Err(error) => {
+                println!(
+                    "  grouped CV unavailable under strict capture-group contract: {error}"
+                );
+                None
+            }
+        };
 
     // ----------------------------------------------------------------
     // Experiment 3: Cross-corpus OOD — train on sbousseaden, test on OTRF
@@ -185,7 +193,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("  sbousseaden grouped holdout: unavailable (insufficient groups)");
     }
-    println!("  sbousseaden 5-fold CV:       {mean:.3} ± {std:.3}");
+    if let Some((mean, std)) = grouped_cv_summary {
+        println!("  sbousseaden grouped 5-fold CV: {mean:.3} ± {std:.3}");
+    } else {
+        println!("  sbousseaden grouped 5-fold CV: unavailable");
+    }
     println!("  OOD (train sbou, test otrf): {ood_test_acc:.3}");
     println!("  chance (7 classes):          {:.3}", 1.0 / 7.0);
     println!("  Phase 1 cutoff:              0.500");
