@@ -125,7 +125,7 @@ impl std::fmt::Display for NeuronStepError {
             Self::NonFiniteOutput { index } => {
                 write!(
                     f,
-                    "evolution produced a non-finite state component at index {index}; state was rolled back"
+                    "non-finite output at index {index}; state rolled back"
                 )
             }
             Self::ParameterDimensionMismatch { field, expected, actual } => {
@@ -441,17 +441,23 @@ impl HdcLtcUnifiedNeuron {
                         + self.input_mask.values[i] * inp_i
                         + self.gate_bias.values[i];
                     let gate_i = sigmoid(gate_pre * gating_steepness);
-                    debug_assert_intermediate!(gate_i >= 0.0 && gate_i <= 1.0 && gate_i.is_finite());
+                    debug_assert_intermediate!(
+                        gate_i >= 0.0 && gate_i <= 1.0 && gate_i.is_finite()
+                    );
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
                     let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
-                    debug_assert_intermediate!(tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite());
+                    debug_assert_intermediate!(
+                        tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite()
+                    );
                     let x_inf_i =
                         sigmoid(self.weight_hv.values[i] * h_i + self.input_mask.values[i] * inp_i)
                             * gate_i;
                     debug_assert_intermediate!(x_inf_i.is_finite());
                     let sigma_i = cfc_interpolation_alpha(dt_clamped, tau_i);
-                    debug_assert_intermediate!(sigma_i >= 0.0 && sigma_i <= 1.0 && sigma_i.is_finite());
+                    debug_assert_intermediate!(
+                        sigma_i >= 0.0 && sigma_i <= 1.0 && sigma_i.is_finite()
+                    );
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert_intermediate!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
@@ -470,17 +476,23 @@ impl HdcLtcUnifiedNeuron {
                         + self.input_mask.values[i] * inp_i
                         + self.gate_bias.values[i];
                     let gate_i = sigmoid(gate_pre * gating_steepness);
-                    debug_assert_intermediate!(gate_i >= 0.0 && gate_i <= 1.0 && gate_i.is_finite());
+                    debug_assert_intermediate!(
+                        gate_i >= 0.0 && gate_i <= 1.0 && gate_i.is_finite()
+                    );
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
                     let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
-                    debug_assert_intermediate!(tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite());
+                    debug_assert_intermediate!(
+                        tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite()
+                    );
                     let combined =
                         self.weight_hv.values[i] * h_i + self.input_mask.values[i] * inp_i;
                     let x_inf_i = silu(combined) * gate_i;
                     debug_assert_intermediate!(x_inf_i.is_finite());
                     let sigma_i = cfc_interpolation_alpha(dt_clamped, tau_i);
-                    debug_assert_intermediate!(sigma_i >= 0.0 && sigma_i <= 1.0 && sigma_i.is_finite());
+                    debug_assert_intermediate!(
+                        sigma_i >= 0.0 && sigma_i <= 1.0 && sigma_i.is_finite()
+                    );
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert_intermediate!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
@@ -499,17 +511,23 @@ impl HdcLtcUnifiedNeuron {
                         + self.input_mask.values[i] * inp_i
                         + self.gate_bias.values[i];
                     let gate_i = sigmoid(gate_pre * gating_steepness);
-                    debug_assert_intermediate!(gate_i >= 0.0 && gate_i <= 1.0 && gate_i.is_finite());
+                    debug_assert_intermediate!(
+                        gate_i >= 0.0 && gate_i <= 1.0 && gate_i.is_finite()
+                    );
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
                     let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
-                    debug_assert_intermediate!(tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite());
+                    debug_assert_intermediate!(
+                        tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite()
+                    );
                     let x_inf_i = (self.weight_hv.values[i] * h_i
                         + self.input_mask.values[i] * inp_i)
                         * gate_i;
                     debug_assert_intermediate!(x_inf_i.is_finite());
                     let sigma_i = cfc_interpolation_alpha(dt_clamped, tau_i);
-                    debug_assert_intermediate!(sigma_i >= 0.0 && sigma_i <= 1.0 && sigma_i.is_finite());
+                    debug_assert_intermediate!(
+                        sigma_i >= 0.0 && sigma_i <= 1.0 && sigma_i.is_finite()
+                    );
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert_intermediate!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
@@ -528,18 +546,24 @@ impl HdcLtcUnifiedNeuron {
                         + self.input_mask.values[i] * inp_i
                         + self.gate_bias.values[i];
                     let gate_i = sigmoid(gate_pre * gating_steepness);
-                    debug_assert_intermediate!(gate_i >= 0.0 && gate_i <= 1.0 && gate_i.is_finite());
+                    debug_assert_intermediate!(
+                        gate_i >= 0.0 && gate_i <= 1.0 && gate_i.is_finite()
+                    );
                     let tau_pre =
                         self.tau_modulator.values[i] * h_i.abs() + tau_coupling * inp_i.abs();
                     let tau_i = (tau_base * (1.0 + sigmoid(tau_pre))).clamp(tau_min, tau_max);
-                    debug_assert_intermediate!(tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite());
+                    debug_assert_intermediate!(
+                        tau_i >= tau_min && tau_i <= tau_max && tau_i.is_finite()
+                    );
                     let x_inf_i = fast_tanh(
                         (self.weight_hv.values[i] * h_i + self.input_mask.values[i] * inp_i)
                             * bound,
                     ) * gate_i;
                     debug_assert_intermediate!(x_inf_i.is_finite());
                     let sigma_i = cfc_interpolation_alpha(dt_clamped, tau_i);
-                    debug_assert_intermediate!(sigma_i >= 0.0 && sigma_i <= 1.0 && sigma_i.is_finite());
+                    debug_assert_intermediate!(
+                        sigma_i >= 0.0 && sigma_i <= 1.0 && sigma_i.is_finite()
+                    );
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert_intermediate!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
