@@ -112,6 +112,7 @@ pub use gp_support::{
     fd_gradient, gradient_informativeness_fraction, is_informatively_conserved,
     lie_derivative_variance, GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR,
 };
+pub(crate) use gp_support::lie_derivative_variance_with_work;
 /// IIT falsifiable-prediction test: does coupling hypothesis memory into
 /// experiment selection track measurable integration (Φ)? See
 /// `iit_coupling.rs` module docs.
