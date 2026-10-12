@@ -119,3 +119,10 @@ Most tests live in prover crates rather than verifier crates. This is a natural 
 - [binius.xyz](https://www.binius.xyz) - Documentation website
 - [docs.binius.xyz](https://docs.binius.xyz) - Rust API documentation
 - Individual crate documentation via `cargo doc`
+
+
+## Snapshot scope and upstream version boundary
+
+This architecture table describes the APIs in this vendored source snapshot, not every released or current upstream Binius64 API. In this checkout, `binius-prover::Prover` and `binius-verifier::Verifier` are the non-zero-knowledge path, while the separately vendored Iron Spartan frontend/prover/verifier implements a ZK-capable path over `GF(2^128)`.
+
+The current upstream [Binius64 prover source](https://github.com/binius-zk/binius64/blob/main/crates/prover/src/zk_config.rs) and [verifier source](https://github.com/binius-zk/binius64/blob/main/crates/verifier/src/zk_config.rs) contain additional `ZKProver` and `ZKVerifier` wrappers around the word-oriented Binius64 constraint system. Those files are absent from this vendored snapshot. However, [upstream PR #2505](https://github.com/binius-zk/binius64/pull/2505) reports that this composed wrapper discloses private-word information via unmasked oracle-relation claims. As observed on 2026-10-12, that PR remained open; its proposed rejection of private words is explicitly a stopgap, not a protocol fix. Consequently, the wrapper is a research target, not an acceptable private-witness migration target until a reviewed protocol repair lands and independent regression tests establish the privacy property. This report concerns the composed Binius64 wrapper, not proof that the separately used standalone Iron Spartan system is affected. The report also means that retaining the 64-bit frontend is a possible future path, but not yet a security-qualified one.

@@ -1,17 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Binius benchmark: CfC sigmoid approximation.
+//! Legacy module path for a packed-bit recurrence with a low-byte gate mask.
 //!
-//! Implements a piecewise sigmoid for the CfC temporal proof.
-//! This removes the "witness-supplied sigma" caveat from the paper.
-//!
-//! Approach: 4-segment piecewise linear approximation using Binius gates.
-//! sigma(x) ≈ clamp(0.5 + x/8, 0, 1) for 8-bit fixed-point inputs.
-//!
-//! In Binius:
-//! - The shift (x >> 3) is a reindexing operation (FREE)
-//! - The add (0.5 + shifted) uses XOR if treating as fixed-point (FREE)
-//! - The clamp requires comparison gates (AND constraints)
+//! Despite the historical `sigmoid` name, this code implements no sigmoid,
+//! fixed-point activation, clamp, comparison, or range check. It masks an
+//! unconstrained private u64 witness with 0xFF and uses that result as a
+//! bitwise gate word in `h_next = h XOR (gate AND (target XOR h))`.
+//! Only the lowest eight bit lanes can switch; the other lanes retain their
+//! prior state. This is not numerical CfC dynamics.
 
 use std::time::Instant;
 
@@ -28,7 +24,7 @@ use binius_verifier::{
     hash::{StdCompression, StdDigest},
 };
 
-pub struct SigmoidBenchResult {
+pub struct MaskedGateBenchResult {
     pub neurons: usize,
     pub and_constraints: usize,
     pub prove_time_ms: f64,
@@ -36,20 +32,14 @@ pub struct SigmoidBenchResult {
     pub proof_size_bytes: usize,
 }
 
-/// Benchmark CfC temporal proof WITH sigmoid computation inside the circuit.
+/// Demonstrate a low-byte-masked gate in a packed-bit recurrence.
 ///
-/// For each neuron at each timestep:
-/// 1. Compute f = -dt/tau (witness input, validated via range check)
-/// 2. Compute sigma = piecewise_sigmoid(f)
-///    - sigma = f AND mask (select bits for the linear region)
-///    - Clamp via AND with saturation mask
-/// 3. h_new = h + sigma * (x_inf - h) (same as before)
-///
-/// This adds ~2 AND per neuron per step for the sigmoid approximation,
-/// compared to 1 AND per step without sigmoid.
-pub fn bench_cfc_with_sigmoid(neurons: usize, timesteps: usize) -> SigmoidBenchResult {
+/// The mask source remains an unconstrained witness word; no numerical
+/// activation is computed or proven. The historical name is retained in the
+/// file path for compatibility with the benchmark harness.
+pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> MaskedGateBenchResult {
     println!(
-        "\n=== BINIUS: CfC with Sigmoid ({} neurons × {} steps) ===\n",
+        "\n=== BINIUS: Packed-bit Recurrence with Low-Byte Mask ({} words × {} timesteps) ===\n",
         neurons, timesteps
     );
 
@@ -65,32 +55,27 @@ pub fn bench_cfc_with_sigmoid(neurons: usize, timesteps: usize) -> SigmoidBenchR
         final_h_wires.push(builder.add_inout());
     }
 
-    // For each timestep, for each neuron:
-    // f_input = witness (the -dt/tau value, 64-bit)
-    // sigma = piecewise_sigmoid(f_input):
-    //   mask = f_input AND 0xFF (extract low 8 bits as sigmoid index)
-    //   sigma ≈ mask (in the linear region, mask IS the sigmoid output)
-    //   This is a crude approximation but demonstrates the circuit structure.
-    //
-    // Then: h_new = h + sigma * (x_inf - h) as before.
+    // Each timestep uses an unconstrained witness word as a gate source.
+    // Masking with 0xFF leaves only the lowest eight bit lanes enabled.
+    // The recurrence is Boolean and does not model numerical activation dynamics.
     let mut current_h: Vec<_> = h_wires.clone();
-    let mut f_wires = Vec::new();
+    let mut gate_input_wires = Vec::new();
 
-    // Constant for sigmoid mask (select low bits as sigmoid value)
-    let sigmoid_mask = builder.add_constant_64(0xFF); // 8-bit sigmoid precision
+    // Low-byte mask; it is not an activation function.
+    let gate_mask = builder.add_constant_64(0xFF); // Enables only the lowest eight bit lanes
 
     for _t in 0..timesteps {
         let mut new_h = Vec::with_capacity(neurons);
         for n in 0..neurons {
-            let f_input = builder.add_witness(); // -dt/tau value
-            f_wires.push(f_input);
+            let gate_input = builder.add_witness(); // unconstrained witness word
+            gate_input_wires.push(gate_input);
 
-            // Sigmoid approximation: sigma = f_input AND mask (1 AND)
-            let sigma = builder.band(f_input, sigmoid_mask);
+            // Gate mask: retain the lowest eight bits of the witness word (1 AND).
+            let gate = builder.band(gate_input, gate_mask);
 
-            // CfC update: h_new = h XOR (sigma AND (x_inf XOR h))
+            // Bitwise gated update: h_new = h XOR (gate AND (x_inf XOR h)).
             let delta = builder.bxor(x_inf_wires[n], current_h[n]); // FREE
-            let product = builder.band(sigma, delta); // 1 AND
+            let product = builder.band(gate, delta); // 1 AND
             let h_new = builder.bxor(current_h[n], product); // FREE
 
             new_h.push(h_new);
@@ -106,40 +91,47 @@ pub fn bench_cfc_with_sigmoid(neurons: usize, timesteps: usize) -> SigmoidBenchR
 
     let stat = binius_frontend::CircuitStat::collect(&circuit);
     println!(
-        "  AND constraints: {} (sigmoid + CfC update)",
+        "  AND constraints: {} (gate masking + recurrence update)",
         stat.n_and_constraints
     );
     println!("  MUL constraints: {}", stat.n_mul_constraints);
     println!(
-        "  Expected: ~{} AND (2 per neuron per step: sigmoid + update)",
+        "  Expected: ~{} AND (2 per word per step: mask + update)",
         2 * neurons * timesteps
     );
     println!("  XOR operations: {} (all FREE)", neurons * timesteps * 2);
 
-    // Fill witness
+    // Fill witness with deterministic synthetic fixtures.
     let mut witness = circuit.new_witness_filler();
-    let h0_vals: Vec<u64> = (0..neurons).map(|_| rand::random()).collect();
-    let x_inf_vals: Vec<u64> = (0..neurons).map(|_| rand::random()).collect();
+    let h0_vals = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_MASK_INITIAL_STATE,
+        neurons,
+    );
+    let x_inf_vals =
+        crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_MASK_INPUT, neurons);
 
     for n in 0..neurons {
         witness[h_wires[n]] = Word(h0_vals[n]);
         witness[x_inf_wires[n]] = Word(x_inf_vals[n]);
     }
 
-    // Pre-generate f values
-    let f_vals: Vec<u64> = (0..timesteps * neurons).map(|_| rand::random()).collect();
-    for (i, &f) in f_vals.iter().enumerate() {
-        witness[f_wires[i]] = Word(f);
+    // Pre-generate synthetic private gate inputs in circuit order.
+    let gate_input_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_MASK_GATE,
+        timesteps * neurons,
+    );
+    for (i, &value) in gate_input_values.iter().enumerate() {
+        witness[gate_input_wires[i]] = Word(value);
     }
 
-    // Simulate CfC with sigmoid to compute final h
+    // Simulate the same low-byte-masked gate recurrence as the circuit.
     let mut h_state = h0_vals.clone();
     for t in 0..timesteps {
         for n in 0..neurons {
-            let f = f_vals[t * neurons + n];
-            let sigma = f & 0xFF; // Sigmoid approximation
+            let gate_input = gate_input_values[t * neurons + n];
+            let gate = gate_input & 0xFF; // Low-byte mask, not a sigmoid
             let delta = x_inf_vals[n] ^ h_state[n];
-            let product = sigma & delta;
+            let product = gate & delta;
             h_state[n] ^= product;
         }
     }
@@ -193,13 +185,12 @@ pub fn bench_cfc_with_sigmoid(neurons: usize, timesteps: usize) -> SigmoidBenchR
         "  Verifier time: {:.3} ms",
         verify_time.as_secs_f64() * 1000.0
     );
-    println!("  Verification: PASSED (real cryptographic proof)");
+    println!("  Verification: PASSED (integrity proof; no Binius64 ZK privacy guarantee)");
 
-    println!("\n  vs CfC WITHOUT sigmoid: 1 AND per neuron per step");
-    println!("  vs CfC WITH sigmoid:    2 AND per neuron per step (+1 for sigmoid mask)");
-    println!("  Overhead: 2x AND, but sigmoid is computed IN-CIRCUIT (not witness-supplied)");
+    println!("\n  Masked recurrence: two AND gates per word per timestep (mask + update).");
+    println!("  The mask source remains private; no sigmoid or numeric CfC is encoded.");
 
-    SigmoidBenchResult {
+    MaskedGateBenchResult {
         neurons,
         and_constraints: stat.n_and_constraints,
         prove_time_ms: prove_time.as_secs_f64() * 1000.0,
