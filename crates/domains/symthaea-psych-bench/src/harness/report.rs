@@ -139,6 +139,7 @@ impl UncertaintyProvenanceV1 {
             parameters: BTreeMap::from([
                 ("alpha".to_string(), "0.05".to_string()),
                 ("resamples".to_string(), "2000".to_string()),
+                ("rng".to_string(), "xorshift64_seed_xor_9e3779b97f4a7c15_v1".to_string()),
                 ("seed".to_string(), seed.to_string()),
             ]),
             observation_digest: String::new(),
@@ -210,13 +211,18 @@ impl UncertaintyProvenanceV1 {
                 if resamples != Some(2000) || seed.is_none() || alpha.is_none() {
                     errors.push("BCa bootstrap provenance requires resamples=2000, a parseable alpha, and the actual u64 seed".to_string());
                 }
+                if self.parameters.get("rng").map(String::as_str)
+                    != Some("xorshift64_seed_xor_9e3779b97f4a7c15_v1")
+                {
+                    errors.push("BCa bootstrap provenance uses an unsupported or missing resampling PRNG".to_string());
+                }
                 if let Some(alpha) = alpha {
                     if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0
                         || (1.0 - alpha - self.confidence_level).abs() > 1e-12 {
                         errors.push("BCa bootstrap alpha does not match the declared confidence level".to_string());
                     }
                 }
-                if self.parameters.len() != 3 {
+                if self.parameters.len() != 4 {
                     errors.push("BCa bootstrap provenance contains unsupported or missing method parameters".to_string());
                 }
             }
