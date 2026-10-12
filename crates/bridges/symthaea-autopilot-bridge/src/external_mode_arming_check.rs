@@ -2522,6 +2522,28 @@ mod tests {
         )
         .unwrap();
         equal_time.validate().unwrap();
+
+        // A future timestamp in an unused fixed-array slot is preserved as raw
+        // payload, but it is not a declared Event and must not reject the reply.
+        let mut unused_tail_events = [Px4ExternalModeArmingCheckEventV1::default();
+            PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1];
+        unused_tail_events[PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1 - 1].timestamp_us_raw =
+            1_250_001;
+        let unused_tail = arming_reply_with_diagnostics(
+            8,
+            3,
+            false,
+            1_350_000_000,
+            1_250_000,
+            0,
+            false,
+            false,
+            false,
+            0,
+            unused_tail_events,
+        )
+        .unwrap();
+        unused_tail.validate().unwrap();
     }
 
     #[test]
