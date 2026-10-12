@@ -132,6 +132,16 @@ test of the actual CLI entry point additionally check rejection behavior and inv
 These fixed vectors avoid relying only on an encoder/decoder round trip within
 either implementation.
 
+The Python verifier suite also differentially checks candidate claims for every
+integer from 2 through 2,000 against a separate trial-division primality oracle.
+For every prime in that interval it verifies and canonical-round-trips the
+recursive Pocklington proof; for every composite it requires rejection. The
+Carmichael number 561 receives a dedicated regression: base 2 satisfies
+`2^560 mod 561 = 1`, so a Fermat-only test would accept it, but both the
+Python and Rust certificate verifiers must reject the proof-shaped claim at the
+Pocklington GCD condition. These are finite regression checks, not a formal
+proof of either implementation's source code.
+
 The focused GitHub Actions workflow
 `.github/workflows/math-certificate-verifier.yml` runs Python bytecode
 compilation, the standard-library unit tests, and the CLI help check on
