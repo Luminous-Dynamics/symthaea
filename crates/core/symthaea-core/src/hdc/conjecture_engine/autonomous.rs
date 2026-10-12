@@ -656,6 +656,7 @@ const MAX_AUTONOMOUS_SEARCH_FITNESS_EVALUATIONS: usize = 1_000_000;
 const MAX_AUTONOMOUS_SEARCH_TRAJECTORIES: usize = 4_096;
 const MAX_AUTONOMOUS_SEARCH_TOTAL_STEPS: f64 = 5_000_000.0;
 const MAX_AUTONOMOUS_SEARCH_TOTAL_STATE_UPDATES: f64 = 50_000_000.0;
+const MAX_AUTONOMOUS_SEARCH_TOTAL_SCORE_OPERATIONS: f64 = 100_000_000.0;
 const MAX_AUTONOMOUS_SEARCH_COMPLEXITY: usize = 2_048;
 const MAX_AUTONOMOUS_SEARCH_DEPTH: usize = 1_024;
 
@@ -705,12 +706,21 @@ fn autonomous_discovery_request_is_bounded(
         .population_size
         .checked_mul(config.generations)
         .unwrap_or(usize::MAX);
+    let total_candidate_scores = fitness_evaluations
+        .checked_add(config.population_size)
+        .unwrap_or(usize::MAX);
+    let samples_per_trajectory = (steps_per_trajectory + 1.0).min(200.0);
+    let estimated_score_operations = total_candidate_scores as f64
+        * trajectory_count as f64
+        * samples_per_trajectory
+        * dimension as f64;
 
     steps_per_trajectory <= 100_000.0
         && steps_per_trajectory * dimension as f64 <= 10_000_000.0
         && total_steps <= MAX_AUTONOMOUS_SEARCH_TOTAL_STEPS
         && total_state_updates <= MAX_AUTONOMOUS_SEARCH_TOTAL_STATE_UPDATES
         && fitness_evaluations <= MAX_AUTONOMOUS_SEARCH_FITNESS_EVALUATIONS
+        && estimated_score_operations <= MAX_AUTONOMOUS_SEARCH_TOTAL_SCORE_OPERATIONS
         && config.known_invariants.len() <= MAX_AUTONOMOUS_SEARCH_POPULATION
 }
 
@@ -1660,6 +1670,23 @@ mod cold_discovery_provenance_tests {
         };
         let result = discover_invariants_autonomous_cold(
             harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.0,
+        );
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn cold_entry_point_fails_closed_on_excessive_scoring_work() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+        let config = RegressorConfig {
+            population_size: 1_000,
+            generations: 100,
+            diverse_trajectory_count: 5,
+            ..RegressorConfig::default()
+        };
+        let result = discover_invariants_autonomous_cold(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 2.0, 0.01,
         );
         assert!(result.is_empty());
     }
