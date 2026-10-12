@@ -54,6 +54,7 @@ The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses
 - conflicting ID reuse and persistent terminal tombstones;
 - expiry persistence and rejection of ACK after expiry;
 - queue byte budget and total-row fail-closed limits;
+- concurrent duplicate enqueues, concurrent byte-capacity enforcement and concurrent idempotent ACKs;
 - invalid inputs and SQLite integrity_check.
 
 These tests have been added to the dedicated GitHub Actions workflow. At the time this document was authored, the exact-head CI run was queued/pending; these tests are not declared passed until that specific run concludes successfully.
