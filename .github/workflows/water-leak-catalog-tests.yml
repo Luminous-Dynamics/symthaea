@@ -1,6 +1,13 @@
 name: Water Leak Satellite Catalog Tests
 
 on:
+  push:
+    branches:
+      - "research/water-leak-001-johannesburg-transfer"
+    paths:
+      - "tools/water_leak_satellite/**"
+      - "tests/test_water_leak_satellite_catalog_inventory.py"
+      - ".github/workflows/water-leak-catalog-tests.yml"
   pull_request:
     paths:
       - "tools/water_leak_satellite/**"
@@ -40,7 +47,7 @@ jobs:
 
   live-catalog-inventory:
     name: Live Copernicus scene inventory (reconnaissance only)
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'research/water-leak-001-johannesburg-transfer')
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'research/water-leak-001-johannesburg-transfer')
     needs: offline-tests
     runs-on: ubuntu-24.04
     timeout-minutes: 20
