@@ -267,8 +267,6 @@ class CertifiedFactorizationTests(unittest.TestCase):
             {"verified": True, "format": "SYMPPRF1", "value": 17, "certificate_nodes": 2},
         )
 
-
-
 def _reference_is_prime(value: int) -> bool:
     """Simple trial-division oracle, independent of the Pocklington checker."""
     if value < 2:
@@ -347,7 +345,7 @@ def _small_domain_claim(
 
 
 class ExhaustiveSmallDomainTests(unittest.TestCase):
-    def test_acceptance_matches_trial_division_for_values_two_through_five_hundred(self) -> None:
+    def test_acceptance_matches_trial_division_for_values_two_through_two_thousand(self) -> None:
         # The expected primality classification comes from a separate, deliberately
         # simple trial-division oracle—not from either certificate implementation.
         cache = {2: proof_two()}
