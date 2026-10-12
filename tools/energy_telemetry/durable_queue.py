@@ -129,7 +129,46 @@ class DurableTelemetryQueue:
                 ON telemetry_events(status, priority DESC, observed_at_utc, event_id)
                 """
             )
-            db.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS telemetry_queue_config (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                    max_queue_bytes INTEGER NOT NULL CHECK(max_queue_bytes > 0),
+                    max_records INTEGER NOT NULL CHECK(max_records > 0),
+                    max_future_skew_seconds INTEGER NOT NULL CHECK(max_future_skew_seconds >= 0)
+                )
+                """
+            )
+            # Policy limits must be common to every process opening this DB.
+            # Otherwise one worker could instantiate a larger limit and bypass
+            # another worker's capacity/clock-skew policy.
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                config = db.execute(
+                    "SELECT max_queue_bytes, max_records, max_future_skew_seconds "
+                    "FROM telemetry_queue_config WHERE singleton = 1"
+                ).fetchone()
+                expected = (
+                    self.max_queue_bytes, self.max_records,
+                    int(self.max_future_skew.total_seconds()),
+                )
+                if config is None:
+                    db.execute(
+                        "INSERT INTO telemetry_queue_config "
+                        "(singleton, max_queue_bytes, max_records, max_future_skew_seconds) "
+                        "VALUES (1, ?, ?, ?)",
+                        expected,
+                    )
+                elif tuple(config) != expected:
+                    raise TelemetryQueueError(
+                        "queue policy configuration mismatch with existing database"
+                    )
+                db.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+                db.execute("COMMIT")
+            except Exception:
+                if db.in_transaction:
+                    db.execute("ROLLBACK")
+                raise
 
     @staticmethod
     def _timestamp(value: datetime) -> str:
