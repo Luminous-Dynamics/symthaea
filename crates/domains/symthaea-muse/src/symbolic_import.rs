@@ -1299,7 +1299,6 @@ fn rhythm_near_match_summary(
     summary
 }
 
-
 fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotifSummary> {
     // Keep original Score indices and explicit within-part ordering together.
     // The index is relative to this exact score snapshot, not a persistent ID.
@@ -1631,7 +1630,6 @@ mod tests {
         track
     }
 
-
     fn midi_file_with_tracks(tracks: &[&[u8]]) -> Vec<u8> {
         let format = if tracks.len() > 1 { 1_u16 } else { 0_u16 };
         midi_file_with_format(format, tracks)
@@ -1724,7 +1722,6 @@ mod tests {
         assert_eq!(first[0].duration_denominator, 24);
     }
 
-
     #[test]
     fn rhythm_aware_near_matches_expose_pitch_tolerance_and_reject_direction_changes() {
         let pitches = [
@@ -1739,7 +1736,10 @@ mod tests {
         let motif = &analysis.motifs[0];
         assert_eq!(motif.pitch_interval_pattern, vec![2, 2, 1]);
 
-        let near = motif.rhythm_near_matches.as_ref().expect("valid timing yields a near-match scan");
+        let near = motif
+            .rhythm_near_matches
+            .as_ref()
+            .expect("valid timing yields a near-match scan");
         assert_eq!(near.max_allowed_pitch_interval_deviation_semitones, 1);
         assert!((near.max_allowed_normalized_onset_gap_error - 0.15).abs() < 1e-12);
         assert_eq!(near.occurrence_count, 1);

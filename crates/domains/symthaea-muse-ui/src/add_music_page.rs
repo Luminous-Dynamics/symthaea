@@ -206,17 +206,23 @@ pub fn AddMusicPage() -> impl IntoView {
                                     } else {
                                         "truncated"
                                     };
-                                    let first_example = summary.occurrences.first().map(|occurrence| {
-                                        let indices = occurrence.notes.iter()
-                                            .map(|note| note.score_note_index.to_string())
-                                            .collect::<Vec<_>>()
-                                            .join(", ");
+                                    let first_example = summary
+                                        .occurrences
+                                        .first()
+                                        .map(|occurrence| {
+                                            let indices = occurrence
+                                                .notes
+                                                .iter()
+                                                .map(|note| note.score_note_index.to_string())
+                                                .collect::<Vec<_>>()
+                                                .join(", ");
                                         format!(
                                             "; first candidate score-note indices [{indices}], observed max interval deviation {} semitone(s), max normalized gap error {:.3}",
                                             occurrence.observed_max_pitch_interval_deviation_semitones,
                                             occurrence.observed_max_normalized_onset_gap_error,
                                         )
-                                    }).unwrap_or_default();
+                                        })
+                                        .unwrap_or_default();
                                     format!(
                                         "Rhythm-aware near matches: {} windows, {} non-overlapping; tolerance ≤{} semitone(s) per interval magnitude and ≤{:.2} normalized onset-gap-share error; stored {} of {} evidence ({evidence_status}){first_example}",
                                         summary.occurrence_count,
