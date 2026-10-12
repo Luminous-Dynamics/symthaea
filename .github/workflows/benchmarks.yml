@@ -66,6 +66,9 @@ jobs:
   quick-check:
     name: Quick Benchmark Check
     runs-on: ubuntu-latest
+    # Share compiled Cargo artifacts while keeping base and PR source trees separate.
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
     if: >-
       (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip bench]')) ||
       (github.event_name == 'pull_request' && !contains(github.event.pull_request.title, '[skip bench]'))
@@ -94,15 +97,45 @@ jobs:
       - name: Reset Criterion results
         run: rm -rf target/criterion
 
-      - name: Checkout PR base revision
+      - name: Checkout PR base revision in an isolated worktree
         if: github.event_name == 'pull_request'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
           clean: false
+
+      # The base tree contains this unmanifested source directory. Apply the
+      # exact workspace exclusion now present in the PR's Cargo.toml, so the
+      # baseline build can parse the workspace. No bench or dependency code changes.
+      - name: Make base workspace discoverable
+        if: github.event_name == 'pull_request'
+        working-directory: baseline
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          manifest = Path("Cargo.toml")
+          text = manifest.read_text(encoding="utf-8")
+          exclusion = '    "crates/core/symthaea-observation-attestation",'
+          if exclusion not in text:
+              anchor = "exclude = [\\n"
+              if anchor not in text:
+                  raise SystemExit("Cargo.toml has no workspace exclude list; refusing an unreviewed baseline edit")
+              text = text.replace(anchor, anchor + exclusion + "\\n", 1)
+              manifest.write_text(text, encoding="utf-8")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(
+                  "Baseline compatibility adjustment: excluded only the manifestless "
+                  "crates/core/symthaea-observation-attestation source directory from Cargo "
+                  "workspace discovery. Benchmark source and dependency declarations were not changed.\\n\\n"
+              )
+          PY
 
       - name: Record main baseline
         if: github.event_name == 'pull_request'
+        working-directory: baseline
         run: cargo bench --bench quick -- --noplot --save-baseline main
 
       # The base run also writes estimates under each benchmark's "new/" path.
@@ -111,13 +144,6 @@ jobs:
       - name: Clear base-revision current estimates
         if: github.event_name == 'pull_request'
         run: find target/criterion -type d -name new -prune -exec rm -rf {} +
-
-      - name: Checkout tested revision
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          clean: false
 
       - name: Run quick benchmarks
         run: |
