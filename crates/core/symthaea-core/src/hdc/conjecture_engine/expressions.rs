@@ -877,4 +877,100 @@ mod domain_safe_simplification_tests {
         ));
         assert!(simplified.eval(&[("a", 1.0), ("b", 1.0), ("c", 0.0)]).is_nan());
     }
+    #[test]
+    fn checked_sum_uses_lexical_binding_and_rejects_invalid_bounds() {
+        let sum_k = Expr::Sum(Box::new(Expr::Var("k".into())), "k".into());
+        assert_eq!(sum_k.eval_checked(&[("n", 5.0)]).unwrap(), 15.0);
+        // The summation binder must shadow, not append behind, an outer k binding.
+        assert_eq!(sum_k.eval_checked(&[("n", 5.0), ("k", 99.0)]).unwrap(), 15.0);
+
+        assert_eq!(
+            sum_k.eval_checked(&[("n", -1.0)]),
+            Err(ExprEvalError::InvalidSummationBound)
+        );
+        assert_eq!(
+            sum_k.eval_checked(&[("n", 1.5)]),
+            Err(ExprEvalError::InvalidSummationBound)
+        );
+        assert_eq!(
+            sum_k.eval_checked(&[("n", 101.0)]),
+            Err(ExprEvalError::SummationLimitExceeded {
+                bound: 101,
+                max: MAX_SUMMATION_UPPER_BOUND,
+            })
+        );
+        assert!(matches!(
+            sum_k.eval_checked(&[]),
+            Err(ExprEvalError::MissingVariable(name)) if name == "n"
+        ));
+    }
+
+    #[test]
+    fn nested_finite_sums_respect_inner_binder_scope() {
+        let nested = Expr::Sum(
+            Box::new(Expr::Sum(
+                Box::new(Expr::Var("k".into())),
+                "k".into(),
+            )),
+            "k".into(),
+        );
+        // For every outer k in 0..=2, the inner sum independently evaluates to 0+1+2.
+        assert_eq!(nested.eval_checked(&[("n", 2.0)]).unwrap(), 9.0);
+    }
+
+    #[test]
+    fn finite_sum_uses_compensated_accumulation_for_cancellation() {
+        // At k = 0, 1, 2 this polynomial evaluates to 1e16, 1, -1e16.
+        // Naive accumulation loses the unit term and returns 0; Neumaier
+        // compensation preserves the mathematically expected floating result 1.
+        let coefficient = -10_000_000_000_000_000.0_f64 + 2.0;
+        let term = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::Const(10_000_000_000_000_000.0)),
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Const(coefficient)),
+                    Box::new(Expr::Var("k".into())),
+                )),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("k".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let sum = Expr::Sum(Box::new(term), "k".into());
+        assert!((sum.eval_checked(&[("n", 2.0)]).unwrap() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn checked_evaluator_reports_domains_and_nonfinite_values() {
+        let division = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Const(0.0)),
+        );
+        assert_eq!(division.eval_checked(&[]), Err(ExprEvalError::DivisionByZero));
+
+        let log_zero = Expr::Func(UnaryFn::Log, Box::new(Expr::Const(0.0)));
+        assert!(matches!(
+            log_zero.eval_checked(&[]),
+            Err(ExprEvalError::DomainError(_))
+        ));
+
+        let overflow = Expr::Func(UnaryFn::Exp, Box::new(Expr::Const(10_000.0)));
+        assert_eq!(overflow.eval_checked(&[]), Err(ExprEvalError::NonFiniteResult));
+
+        assert!(matches!(
+            Expr::Var("x".into()).eval_checked(&[("x", f64::NAN)]),
+            Err(ExprEvalError::NonFiniteVariableBinding(name)) if name == "x"
+        ));
+        assert!(matches!(
+            Expr::Var("x".into()).eval_checked(&[("x", 1.0), ("x", 2.0)]),
+            Err(ExprEvalError::DuplicateVariableBinding(name)) if name == "x"
+        ));
+    }
+
 }
