@@ -368,28 +368,55 @@ impl PrimalityProof {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProofByteReaderError {
+    TruncatedInput,
+    LengthOverflow,
+}
+
+impl From<ProofByteReaderError> for PrimalityProofWireError {
+    fn from(error: ProofByteReaderError) -> Self {
+        match error {
+            ProofByteReaderError::TruncatedInput => Self::TruncatedInput,
+            ProofByteReaderError::LengthOverflow => Self::LengthOverflow,
+        }
+    }
+}
+
+impl From<ProofByteReaderError> for CertifiedFactorizationWireError {
+    fn from(error: ProofByteReaderError) -> Self {
+        match error {
+            ProofByteReaderError::TruncatedInput => Self::TruncatedInput,
+            ProofByteReaderError::LengthOverflow => Self::LengthOverflow,
+        }
+    }
+}
+
 struct PrimalityProofByteReader<'a> {
     bytes: &'a [u8],
     offset: usize,
 }
 
 impl<'a> PrimalityProofByteReader<'a> {
-    fn read(&mut self, length: usize) -> Result<&'a [u8], PrimalityProofWireError> {
-        let end = self.offset.checked_add(length).ok_or(PrimalityProofWireError::LengthOverflow)?;
+    fn read(&mut self, length: usize) -> Result<&'a [u8], ProofByteReaderError> {
+        let end = self
+            .offset
+            .checked_add(length)
+            .ok_or(ProofByteReaderError::LengthOverflow)?;
         if end > self.bytes.len() {
-            return Err(PrimalityProofWireError::TruncatedInput);
+            return Err(ProofByteReaderError::TruncatedInput);
         }
         let slice = &self.bytes[self.offset..end];
         self.offset = end;
         Ok(slice)
     }
 
-    fn read_u32(&mut self) -> Result<u32, PrimalityProofWireError> {
+    fn read_u32(&mut self) -> Result<u32, ProofByteReaderError> {
         let bytes = self.read(4)?;
         Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
-    fn read_u64(&mut self) -> Result<u64, PrimalityProofWireError> {
+    fn read_u64(&mut self) -> Result<u64, ProofByteReaderError> {
         let bytes = self.read(8)?;
         Ok(u64::from_be_bytes([
             bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
