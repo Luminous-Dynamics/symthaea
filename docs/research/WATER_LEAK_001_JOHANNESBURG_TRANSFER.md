@@ -316,6 +316,10 @@ The offline suite now contains **42 tests**: 13 catalogue-inventory tests, 14 gr
 
 As of 2026-10-12, I retrieved the official STAC collection metadata pages for `sentinel-1-grd` and `sentinel-2-l2a`. That confirms the collection identifiers, product descriptions and endpoints exist; it does not establish any scene intersection, acquisition continuity or data suitability for the reconnaissance area. Direct item-search URLs were inaccessible through the research browser, and the working container could not resolve external DNS. Do not claim a live AOI inventory or model/test PASS beyond the locally reproduced offline suite until a completed hosted run and its artifact are independently inspected.
 
+### Data acquisition playbook
+
+The complementary source ladder, repair-response packet, prospective local cohort and public benchmark rights gates are specified in [WATER_LEAK_001_DATA_ACQUISITION_PLAYBOOK.md](WATER_LEAK_001_DATA_ACQUISITION_PLAYBOOK.md). The key priority is repair-centred event linking: pre-repair observations + independent inspection + verified repair + post-repair observations + matched controls. This does not replace the strict ground-truth contract below.
+
 ### Ground-truth label and data-rights contract
 
 A new strict record schema and standard-library-only validator define a safe handoff for any future labelled dataset:
