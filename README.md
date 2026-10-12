@@ -1,11 +1,11 @@
 # Symthaea
 
-**Experimental cognitive architecture for testing verifiable state transitions, representation mechanisms, and consciousness-relevant computational indicators — paired with a zero-knowledge proof stack for privacy-preserving attestation.**
+**Experimental cognitive architecture for testing verifiable state transitions, representation mechanisms, and consciousness-relevant computational indicators, with multiple proof-system integrations. The bundled Binius64 HDC harness demonstrates computational integrity only; it does not provide zero-knowledge input privacy.**
 
 [![CI](https://github.com/Luminous-Dynamics/symthaea/actions/workflows/ci.yml/badge.svg)](https://github.com/Luminous-Dynamics/symthaea/actions)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dynamics (CfC), consciousness-relevant measurement (IIT-inspired Φ, Butlin-indicator probes), and zero-knowledge proofs. **It does not claim to prove consciousness, and nothing below is a regulatory compliance certification.** What it does have: working Binius circuits for several packed-word relations, plus an internal research program that records retractions. The public benchmark's Winterfell comparison is an analytic estimate, not a measured same-scale proof; see the Evidence table before trusting any performance ratio.
+Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dynamics (CfC), consciousness-relevant measurement (IIT-inspired Φ, Butlin-indicator probes), and several proof-system integrations. **It does not claim to prove consciousness, and nothing below is a regulatory compliance certification.** The vendored `vendor/binius64/ARCHITECTURE.md` explicitly lists the standard Binius64 prover/verifier as non-zero-knowledge; only the separate Iron Spartan backend is marked zero-knowledge there. The public HDC harness uses the standard Binius64 backend and makes no confidentiality claim for witness inputs. The public benchmark's Winterfell comparison is an analytic estimate, not a measured same-scale proof.
 
 [**Live Demo**](https://symthaea.luminousdynamics.io) | [**Paper**](papers/theory-foundations/binius-hdc/) | [**Benchmarks**](papers/theory-foundations/binius-hdc/reproduce.sh) | [**Honest Status**](docs/HONEST_STATUS.md)
 
@@ -15,7 +15,7 @@ Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dy
 
 | Claim | Status | Evidence | Limitations |
 |-------|--------|----------|--------------|
-| HDC XOR binding (16Kbit) | Binius proof is generated and verified by the public harness | `crates/hdc-zkp-bench/src/main.rs` measures Binius and explicitly labels Winterfell values as analytic estimates | The public artifact does not establish a measured cross-backend ratio; XOR itself is linear, while reported equality constraints include structural overhead |
+| HDC XOR binding (16Kbit) | Binius64 computational-integrity proof is generated and verified by the public harness | `crates/hdc-zkp-bench/src/main.rs`; vendored `vendor/binius64/ARCHITECTURE.md` labels this backend non-zero-knowledge | Witness-input confidentiality is not guaranteed; the public artifact also does not establish a measured cross-backend ratio |
 | Health-value range proof (~34ms historical claim) | Not reproduced by the current public standalone benchmark | Historical paper/readme claim only; `crates/mycelix-zkp-core/` is not a path in this standalone repository | No fresh proof execution or independent review in this branch; not a HIPAA compliance certification |
 | Selective-disclosure age≥18 proof | Described as an eIDAS-shaped research demo; not independently reproduced in this audit | Research paper/demo description only | Not an eIDAS-certified wallet, credential, issuer, or trust service |
 | Butlin consciousness-indicator probes | Structural implementation, partially audited | Internal construct-validity re-check found only 4/12 probe rows survive; of those, one (`AE-2`) has real empirical support to date, and that result is explicitly scoped as "causally-supported internal wiring evidence," not functional capacity and not evidence of consciousness | **Not evidence the system is conscious.** Most of the original 12-row matrix did not hold up to its own re-audit |
@@ -26,12 +26,12 @@ None of this is a claim of general intelligence, sentience, or legal/medical/fin
 
 ## What the public proof harness demonstrates
 
-- **Packed-word XOR relation:** a Binius circuit generates and verifies a proof that public packed output words equal the bitwise XOR of private input words. This is a relation proof, not a complete encryption protocol.
+- **Packed-word XOR integrity:** a Binius64 circuit generates and verifies a proof that the public output equals the XOR of witness input words. The backend is not zero-knowledge; this does not establish input confidentiality or a complete encryption protocol.
 - **Hamming distance:** the correction branch now constrains a proper population count of XOR words and sums them into a public distance. Rust tests are authored but pending branch build/CI.
 - **Strict bitwise majority:** the correction branch uses bit-sliced counters and a per-lane threshold comparison; ties resolve to zero. Tests are authored but not yet executed on this branch.
 - **Temporal recurrence:** current demos prove a packed-bit recurrence with witness-supplied gating words, not numerical fixed-point CfC dynamics.
 
-The public standalone benchmark does **not** currently reproduce the cited ~34ms health-attestation pipeline, an end-to-end age credential, a correct encrypted numeric-gradient aggregate, or a measured same-scale Winterfell XOR proof. Those application-level claims must remain unverified until their source paths, semantics, and measurements are independently reproducible.
+The public standalone benchmark does **not** currently provide a zero-knowledge Binius64 proof, nor reproduce the cited ~34ms health-attestation pipeline, an end-to-end age credential, a correct encrypted numeric-gradient aggregate, or a measured same-scale Winterfell XOR proof. Those application-level claims must remain unverified until their source paths, semantics, and measurements are independently reproducible.
 
 ## Quick Start
 
