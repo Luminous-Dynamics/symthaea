@@ -1157,7 +1157,6 @@ const MAX_MOTIF_OCCURRENCE_EVIDENCE: usize = 128;
 const MAX_MOTIF_NEAR_MATCH_OCCURRENCE_EVIDENCE: usize = 128;
 const MOTIF_NEAR_MATCH_MAX_INTERVAL_DEVIATION_SEMITONES: i16 = 1;
 const MOTIF_NEAR_MATCH_MAX_NORMALIZED_ONSET_GAP_ERROR: f64 = 0.15;
-const MOTIF_NEAR_MATCH_EXACT_GAP_EPSILON: f64 = 1e-9;
 
 /// Normalize exact inter-onset gaps to shares of the motif's total onset span.
 /// This makes the shape invariant to uniform tempo scaling while keeping the
@@ -1243,6 +1242,11 @@ fn rhythm_near_match_summary(
         if !interval_pattern_is_compatible {
             continue;
         }
+        // Exact pitch-interval contours belong to the exact layer, regardless
+        // of rhythmic variation; do not double-count them as near matches.
+        if interval_pattern_is_exact {
+            continue;
+        }
 
         let Some(candidate_gap_shape) = normalized_onset_gap_shape(candidate) else {
             continue;
@@ -1258,12 +1262,6 @@ fn rhythm_near_match_summary(
         if max_gap_error > MOTIF_NEAR_MATCH_MAX_NORMALIZED_ONSET_GAP_ERROR {
             continue;
         }
-        // The candidate already belongs to the exact contour layer if its
-        // signed intervals and normalized rhythm shape are both unchanged.
-        if interval_pattern_is_exact && max_gap_error <= MOTIF_NEAR_MATCH_EXACT_GAP_EPSILON {
-            continue;
-        }
-
         summary.occurrence_count += 1;
         if window_start >= next_non_overlapping_start {
             summary.independent_occurrence_count += 1;
@@ -1758,6 +1756,31 @@ mod tests {
             1
         );
         assert!(near.occurrences[0].observed_max_normalized_onset_gap_error < 1e-12);
+    }
+
+
+    #[test]
+    fn rhythm_near_matches_do_not_duplicate_exact_contours_with_changed_rhythm() {
+        let pitches = [
+            60_u8, 62, 64, 65, 60, 62, 64, 65, 70, 72, 74, 75,
+        ];
+        let mut extra_rest_before_note = vec![0_u8; pitches.len()];
+        extra_rest_before_note[9] = 100;
+        let track = monophonic_midi_track(&pitches, &extra_rest_before_note);
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        let analysis = analyze(&score);
+        assert_eq!(analysis.motifs.len(), 1);
+        let motif = &analysis.motifs[0];
+
+        // Exact contour matching intentionally ignores rhythmic shape.
+        assert_eq!(motif.pitch_interval_pattern, vec![2, 2, 1]);
+        assert_eq!(motif.occurrence_count, 3);
+        let near = motif
+            .rhythm_near_matches
+            .as_ref()
+            .expect("valid timing yields a near-match scan");
+        assert_eq!(near.occurrence_count, 0);
+        assert!(near.occurrences.is_empty());
     }
 
     #[test]

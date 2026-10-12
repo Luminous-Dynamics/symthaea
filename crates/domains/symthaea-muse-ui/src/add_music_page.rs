@@ -216,8 +216,8 @@ pub fn AddMusicPage() -> impl IntoView {
                                                 .map(|note| note.score_note_index.to_string())
                                                 .collect::<Vec<_>>()
                                                 .join(", ");
-                                        format!(
-                                            "; first candidate score-note indices [{indices}], observed max interval deviation {} semitone(s), max normalized gap error {:.3}",
+                                            format!(
+                                                "; first candidate score-note indices [{indices}], observed max interval deviation {} semitone(s), max normalized gap error {:.3}",
                                             occurrence.observed_max_pitch_interval_deviation_semitones,
                                             occurrence.observed_max_normalized_onset_gap_error,
                                         )
