@@ -27,6 +27,161 @@ fn phi_from_distinct_prime_factors(value: u64, factors: &[(u64, u32)]) -> u64 {
     phi
 }
 
+/// A compact, canonical integer-factorization certificate.
+///
+/// The prime factors must be strictly increasing and each exponent must be non-zero.
+/// The certificate deliberately excludes HDC encodings and floating-point totients:
+/// both are derived representations, not evidence that the integer factorization is valid.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FactorizationCertificate {
+    pub value: u64,
+    pub factors: Vec<(u64, u32)>,
+}
+
+/// Why a factorization certificate could not be verified.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FactorizationVerificationError {
+    /// Zero has no prime factorization under this certificate format.
+    ZeroInput,
+    /// Canonical factors must be strictly increasing; duplicates belong in the exponent.
+    FactorsNotStrictlyIncreasing { previous: u64, current: u64 },
+    /// A factor with exponent zero is not a canonical factorization entry.
+    ZeroExponent { factor: u64 },
+    /// The claimed factor is not prime under the deterministic u64 primality verifier.
+    CompositeFactor { factor: u64 },
+    /// The claimed prime powers cannot be multiplied without exceeding u64.
+    ProductOverflow { factor: u64 },
+    /// The exact product of the claimed prime powers differs from the certified input.
+    ProductMismatch { expected: u64, actual: u64 },
+}
+
+impl PrimeFactorization {
+    /// Discard derived HDC/float fields and retain the arithmetic certificate only.
+    pub fn certificate(&self) -> FactorizationCertificate {
+        FactorizationCertificate {
+            value: self.value,
+            factors: self.factors.clone(),
+        }
+    }
+}
+
+impl FactorizationCertificate {
+    /// Verify canonical form, every prime factor, and exact reconstruction.
+    ///
+    /// Prime checks use a separate deterministic Miller–Rabin implementation with
+    /// the seven-base u64 witness set, not Pollard–Brent or the search engine's
+    /// selected witness schedule. This is a reproducible machine-integer verifier;
+    /// it is not a recursively checkable formal proof object.
+    pub fn verify(&self) -> Result<(), FactorizationVerificationError> {
+        if self.value == 0 {
+            return Err(FactorizationVerificationError::ZeroInput);
+        }
+
+        let mut previous = 1u64;
+        let mut reconstructed = 1u64;
+        for &(prime, exponent) in &self.factors {
+            if prime <= previous {
+                return Err(FactorizationVerificationError::FactorsNotStrictlyIncreasing {
+                    previous,
+                    current: prime,
+                });
+            }
+            if exponent == 0 {
+                return Err(FactorizationVerificationError::ZeroExponent { factor: prime });
+            }
+            if !certificate_is_prime_u64(prime) {
+                return Err(FactorizationVerificationError::CompositeFactor { factor: prime });
+            }
+
+            previous = prime;
+            for _ in 0..exponent {
+                reconstructed = reconstructed.checked_mul(prime).ok_or(
+                    FactorizationVerificationError::ProductOverflow { factor: prime },
+                )?;
+            }
+        }
+
+        if reconstructed != self.value {
+            return Err(FactorizationVerificationError::ProductMismatch {
+                expected: self.value,
+                actual: reconstructed,
+            });
+        }
+        Ok(())
+    }
+}
+
+// These modular-arithmetic helpers are intentionally separate from ModularRing and
+// NumberTheoryEngine::miller_rabin, so certificate checking does not reuse the search
+// engine's arithmetic path. A u64-by-u64 product fits exactly in u128.
+fn certificate_mul_mod(a: u64, b: u64, modulus: u64) -> u64 {
+    ((u128::from(a) * u128::from(b)) % u128::from(modulus)) as u64
+}
+
+fn certificate_pow_mod(mut base: u64, mut exponent: u64, modulus: u64) -> u64 {
+    let mut result = 1u64;
+    base %= modulus;
+    while exponent != 0 {
+        if exponent & 1 != 0 {
+            result = certificate_mul_mod(result, base, modulus);
+        }
+        base = certificate_mul_mod(base, base, modulus);
+        exponent >>= 1;
+    }
+    result
+}
+
+/// Deterministic primality check over the complete u64 domain using a witness set
+/// different from the factorization search engine's first-prime schedule.
+fn certificate_is_prime_u64(n: u64) -> bool {
+    if n < 2 {
+        return false;
+    }
+
+    // These include every prime divisor of the seven witness constants. Testing
+    // equality first handles those primes explicitly; other multiples are composite.
+    const SMALL_PRIMES: [u64; 16] = [
+        2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 73, 193, 407_521, 299_210_837,
+    ];
+    for prime in SMALL_PRIMES {
+        if n == prime {
+            return true;
+        }
+        if n % prime == 0 {
+            return false;
+        }
+    }
+
+    let mut odd_part = n - 1;
+    let mut powers_of_two = 0u32;
+    while odd_part & 1 == 0 {
+        odd_part >>= 1;
+        powers_of_two += 1;
+    }
+
+    const WITNESSES: [u64; 7] = [2, 325, 9_375, 28_178, 450_775, 9_780_504, 1_795_265_022];
+    'witness: for witness in WITNESSES {
+        let base = witness % n;
+        if base == 0 {
+            continue;
+        }
+
+        let mut x = certificate_pow_mod(base, odd_part, n);
+        if x == 1 || x == n - 1 {
+            continue;
+        }
+        for _ in 1..powers_of_two {
+            x = certificate_mul_mod(x, x, n);
+            if x == n - 1 {
+                continue 'witness;
+            }
+        }
+        return false;
+    }
+
+    true
+}
+
 /// Number theory engine for HDC-based arithmetic
 pub struct NumberTheoryEngine {
     multiplication: BinaryHV,
@@ -864,6 +1019,79 @@ mod tests {
                 product * u128::from(prime).pow(exponent)
             });
         assert_eq!(reconstructed, u128::from(semiprime));
+    }
+
+    #[test]
+    fn test_factorization_certificates_verify_search_results() {
+        let engine = NumberTheoryEngine::new();
+        for value in [
+            1u64,
+            2,
+            30,
+            3_215_031_751,
+            1_000_000_007u64 * 1_000_000_009,
+            4_294_967_291u64 * 4_294_967_279,
+            18_446_744_073_709_551_557,
+        ] {
+            let factorization = engine.factorize(value);
+            let certificate = factorization.certificate();
+            assert_eq!(certificate.value, value);
+            assert_eq!(certificate.verify(), Ok(()), "value={value}");
+        }
+    }
+
+    #[test]
+    fn test_factorization_certificate_rejects_tampering_and_noncanonical_forms() {
+        let cases = [
+            (
+                FactorizationCertificate { value: 15, factors: vec![(15, 1)] },
+                FactorizationVerificationError::CompositeFactor { factor: 15 },
+            ),
+            (
+                FactorizationCertificate { value: 6, factors: vec![(3, 1), (2, 1)] },
+                FactorizationVerificationError::FactorsNotStrictlyIncreasing { previous: 3, current: 2 },
+            ),
+            (
+                FactorizationCertificate { value: 2, factors: vec![(2, 0)] },
+                FactorizationVerificationError::ZeroExponent { factor: 2 },
+            ),
+            (
+                FactorizationCertificate { value: 11, factors: vec![(2, 1)] },
+                FactorizationVerificationError::ProductMismatch { expected: 11, actual: 2 },
+            ),
+            (
+                FactorizationCertificate { value: u64::MAX, factors: vec![(2, 64)] },
+                FactorizationVerificationError::ProductOverflow { factor: 2 },
+            ),
+            (
+                FactorizationCertificate { value: 0, factors: vec![] },
+                FactorizationVerificationError::ZeroInput,
+            ),
+        ];
+
+        for (certificate, expected_error) in cases {
+            assert_eq!(certificate.verify(), Err(expected_error), "certificate={certificate:?}");
+        }
+    }
+
+    #[test]
+    fn test_certificate_primality_verifier_matches_search_engine_through_10000() {
+        let engine = NumberTheoryEngine::new();
+        for n in 0u64..=10_000 {
+            assert_eq!(
+                certificate_is_prime_u64(n),
+                engine.is_prime(n),
+                "n={n}"
+            );
+        }
+        for n in [
+            18_446_744_073_709_551_557u64,
+            3_215_031_751,
+            u64::MAX,
+            341_550_071_728_321,
+        ] {
+            assert_eq!(certificate_is_prime_u64(n), engine.is_prime(n), "n={n}");
+        }
     }
 
     #[test]
