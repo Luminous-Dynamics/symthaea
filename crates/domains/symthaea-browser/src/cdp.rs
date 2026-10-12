@@ -566,26 +566,31 @@ async fn validate_click_target_enabled(page: &Page, backend_node_id: &BackendNod
         .execute(GetFullAxTreeParams::builder().build())
         .await
         .context("Read accessibility tree before click")?;
-    let node = tree.result.nodes.iter().find(|node| {
+    let disabled = tree.result.nodes.iter().find(|node| {
         node.backend_dom_node_id
             .as_ref()
             .is_some_and(|id| *id.inner() == *backend_node_id.inner())
-    });
-
-    if let Some(node) = node {
-        let disabled = node.properties.as_ref().is_some_and(|properties| {
+    }).map(|node| {
+        node.properties.as_ref().is_some_and(|properties| {
             properties.iter().any(|property| {
                 let property_name = serde_json::to_value(&property.name).ok();
                 property_name.as_ref().and_then(serde_json::Value::as_str) == Some("disabled")
                     && property.value.value.as_ref()
                         .and_then(serde_json::Value::as_bool) == Some(true)
             })
-        });
-        if disabled {
-            bail!("click target is disabled in the accessibility tree");
-        }
+        })
+    });
+    validate_click_target_state(disabled)
+}
+
+/// A CSS-resolved node that cannot be confirmed in the accessibility tree is
+/// not eligible for an action. Missing evidence must not imply "enabled".
+fn validate_click_target_state(disabled: Option<bool>) -> Result<()> {
+    match disabled {
+        None => bail!("click target is not present in the accessibility tree"),
+        Some(true) => bail!("click target is disabled in the accessibility tree"),
+        Some(false) => Ok(()),
     }
-    Ok(())
 }
 
 async fn validate_text_entry_target(page: &Page, backend_node_id: &BackendNodeId) -> Result<()> {
@@ -747,6 +752,22 @@ mod native_cdp_tests {
         assert!(require_unique_css_match_count("button.primary", 1).is_ok());
         assert!(require_unique_css_match_count("button.primary", 0).is_err());
         assert!(require_unique_css_match_count("button.primary", 2).is_err());
+    }
+
+    #[test]
+    fn click_target_validation_fails_closed_without_ax_evidence() {
+        assert!(
+            validate_click_target_state(None).is_err(),
+            "a DOM target missing from the AX tree must not be treated as enabled"
+        );
+        assert!(
+            validate_click_target_state(Some(true)).is_err(),
+            "an explicitly disabled target must be rejected"
+        );
+        assert!(
+            validate_click_target_state(Some(false)).is_ok(),
+            "an observed enabled target may proceed"
+        );
     }
 
     #[test]
