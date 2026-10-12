@@ -1684,6 +1684,45 @@ mod tests {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn arming_reply_with_requirements(
+        request_id: u8,
+        registration_id: u8,
+        requirements: Px4ComparableModeRequirementsV1,
+        received_ns: u64,
+    ) -> Px4ExternalModeArmingCheckReplyV1 {
+        Px4ExternalModeArmingCheckReplyV1::new(
+            "px4.arming-check.decoder.fixture.v1",
+            "vehicle.slot-a",
+            "px4.v1.18.external-mode.fixture.v1",
+            "px4.boot.fixture.session-a",
+            "arming-check.fixture.cycle-1",
+            1_250_000,
+            request_id,
+            registration_id,
+            0,
+            false,
+            false,
+            false,
+            true,
+            0,
+            [Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
+            requirements.angular_velocity,
+            requirements.attitude,
+            requirements.local_altitude,
+            requirements.local_position,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            ts(received_ns),
+        )
+        .unwrap()
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn arming_reply_with_diagnostics(
         req_id: u8,
@@ -1859,24 +1898,62 @@ mod tests {
     }
 
     #[test]
-    fn mismatch_reports_only_differing_requirement_fields() {
-        let value = assessment(
-            registration(true, 3, 42),
-            config_assessment(42, true, 0, 1_200_000_000),
-            arming_request(1 << 3),
-            Some(arming_reply(8, 3, true, 1_350_000_000)),
-            1_400_000_000,
+    fn all_four_common_requirement_fields_are_compared_independently() {
+        let configuration = config_assessment(42, true, 0, 1_200_000_000);
+        let expected = Px4ComparableModeRequirementsV1::from_setpoint_reply(
+            configuration.reply.as_ref().unwrap(),
         );
-        assert_eq!(
-            value.outcome().unwrap(),
-            Px4ExternalModeArmingCheckOutcomeV1::RequirementsMismatch {
-                differing_fields: vec![Px4ModeRequirementFieldV1::LocalAltitude],
-                registration_id: 3,
-                mode_id: 42,
-                request_id: 8,
-                can_arm_and_run: true,
-            }
-        );
+        let cases = [
+            (
+                Px4ModeRequirementFieldV1::AngularVelocity,
+                Px4ComparableModeRequirementsV1 {
+                    angular_velocity: !expected.angular_velocity,
+                    ..expected
+                },
+            ),
+            (
+                Px4ModeRequirementFieldV1::Attitude,
+                Px4ComparableModeRequirementsV1 {
+                    attitude: !expected.attitude,
+                    ..expected
+                },
+            ),
+            (
+                Px4ModeRequirementFieldV1::LocalAltitude,
+                Px4ComparableModeRequirementsV1 {
+                    local_altitude: !expected.local_altitude,
+                    ..expected
+                },
+            ),
+            (
+                Px4ModeRequirementFieldV1::LocalPosition,
+                Px4ComparableModeRequirementsV1 {
+                    local_position: !expected.local_position,
+                    ..expected
+                },
+            ),
+        ];
+
+        for (field, observed) in cases {
+            let value = assessment(
+                registration(true, 3, 42),
+                configuration.clone(),
+                arming_request(1 << 3),
+                Some(arming_reply_with_requirements(8, 3, observed, 1_350_000_000)),
+                1_400_000_000,
+            );
+            assert_eq!(
+                value.outcome().unwrap(),
+                Px4ExternalModeArmingCheckOutcomeV1::RequirementsMismatch {
+                    differing_fields: vec![field],
+                    registration_id: 3,
+                    mode_id: 42,
+                    request_id: 8,
+                    can_arm_and_run: true,
+                },
+                "requirement field {field:?} should be the only reported difference"
+            );
+        }
     }
 
     #[test]
