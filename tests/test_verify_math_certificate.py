@@ -58,6 +58,20 @@ def certificate_thirty() -> verifier.CertifiedFactorization:
 
 
 class PrimalityProofTests(unittest.TestCase):
+    def test_primality_proof_golden_vector_is_stable(self) -> None:
+        # Hand-authored SYMPPRF1 encoding of p=3 with the base node p=2.
+        golden = bytes.fromhex(
+            "53594d5050524631"
+            "0000000000000003"
+            "00000002"
+            "0000000000000002" "00000000" "00000000"
+            "0000000000000003" "00000001"
+            "0000000000000002" "00000001"
+            "00000001" "0000000000000002" "0000000000000002"
+        )
+        self.assertEqual(verifier.encode_primality_proof(proof_three()), golden)
+        self.assertEqual(verifier.decode_primality_proof(golden), proof_three())
+
     def test_valid_pocklington_proof_and_canonical_round_trip(self) -> None:
         proof = proof_seventeen()
         encoded = verifier.encode_primality_proof(proof)
