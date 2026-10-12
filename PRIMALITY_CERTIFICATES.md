@@ -120,9 +120,11 @@ On success, the command emits a JSON object with `"verified": true`, the input
 value, and the verified format. Invalid certificates return a non-zero exit code
 and a JSON error on standard error. The independent verifier checks the same
 version-1 resource ceilings and demands byte-for-byte equality with its own
-canonical re-encoding. A hand-authored golden vector, malformed-input tests, and a subprocess test of the
-actual command-line entry point help lock down field layout and invocation independently
-of round-trip tests.
+canonical re-encoding. The same hand-authored 80-byte proof-for-3 golden vector is asserted in both
+`number_theory.rs` and the Python test suite; malformed-input tests and a subprocess
+test of the actual CLI entry point additionally check rejection behavior and invocation.
+This cross-language vector avoids relying only on an encoder/decoder round trip within
+either implementation.
 
 The focused GitHub Actions workflow
 `.github/workflows/math-certificate-verifier.yml` runs Python bytecode
