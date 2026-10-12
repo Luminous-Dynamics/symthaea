@@ -419,9 +419,7 @@ impl Px4OffboardSubmissionCadenceV1 {
     ///
     /// A positive outcome proves only that the retained local submission events
     /// fit these thresholds. It does not prove PX4 received them or entered Offboard.
-    pub fn outcome(
-        &self,
-    ) -> Result<Px4OffboardSubmissionOutcomeV1, Px4OffboardSubmissionError> {
+    pub fn outcome(&self) -> Result<Px4OffboardSubmissionOutcomeV1, Px4OffboardSubmissionError> {
         self.validate()?;
         // Preserve an observed local rejection even when the history is too short
         // to assess cadence; absence of enough samples must not erase known failure.
@@ -439,8 +437,14 @@ impl Px4OffboardSubmissionCadenceV1 {
             });
         }
 
-        let first = self.samples.first().ok_or(Px4OffboardSubmissionError::EmptySampleWindow)?;
-        let latest = self.samples.last().ok_or(Px4OffboardSubmissionError::EmptySampleWindow)?;
+        let first = self
+            .samples
+            .first()
+            .ok_or(Px4OffboardSubmissionError::EmptySampleWindow)?;
+        let latest = self
+            .samples
+            .last()
+            .ok_or(Px4OffboardSubmissionError::EmptySampleWindow)?;
         let mut failures = Vec::new();
         let latest_age_ns = self
             .assessed_at
@@ -499,7 +503,10 @@ impl Px4OffboardSubmissionCadenceV1 {
                 (
                     Px4OffboardTransportV1::MavlinkSetpoint,
                     Px4OffboardMessageKindV1::MavlinkSetpoint { message_id },
-                ) if self.profile.allowed_mavlink_setpoint_message_ids.contains(&message_id) => {}
+                ) if self
+                    .profile
+                    .allowed_mavlink_setpoint_message_ids
+                    .contains(&message_id) => {}
                 (
                     Px4OffboardTransportV1::Ros2OffboardControlMode,
                     Px4OffboardMessageKindV1::Ros2OffboardControlMode,
@@ -508,7 +515,9 @@ impl Px4OffboardSubmissionCadenceV1 {
                     Px4OffboardTransportV1::MavlinkSetpoint,
                     Px4OffboardMessageKindV1::MavlinkSetpoint { message_id },
                 ) => {
-                    return Err(Px4OffboardSubmissionError::UnapprovedMavlinkMessageId(message_id));
+                    return Err(Px4OffboardSubmissionError::UnapprovedMavlinkMessageId(
+                        message_id,
+                    ));
                 }
                 _ => return Err(Px4OffboardSubmissionError::MessageKindTransportMismatch),
             }
@@ -760,15 +769,29 @@ mod tests {
         let value = assessment(
             vec![
                 event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(11, 500_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(12, 1_000_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(
+                    11,
+                    500_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
+                event(
+                    12,
+                    1_000_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
             ],
             1_100_000_000,
         );
-        assert_eq!(value.outcome().unwrap(), Px4OffboardSubmissionOutcomeV1::WithinProfile);
-        assert!(value.assessment_id().unwrap().starts_with(
-            "symthaea.autopilot.px4.offboard-submission-assessment.v1:"
-        ));
+        assert_eq!(
+            value.outcome().unwrap(),
+            Px4OffboardSubmissionOutcomeV1::WithinProfile
+        );
+        assert!(
+            value
+                .assessment_id()
+                .unwrap()
+                .starts_with("symthaea.autopilot.px4.offboard-submission-assessment.v1:")
+        );
     }
 
     #[test]
@@ -776,18 +799,37 @@ mod tests {
         let boundary = assessment(
             vec![
                 event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(11, 500_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(12, 1_000_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(
+                    11,
+                    500_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
+                event(
+                    12,
+                    1_000_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
             ],
             1_250_000_000,
         );
-        assert_eq!(boundary.outcome().unwrap(), Px4OffboardSubmissionOutcomeV1::WithinProfile);
+        assert_eq!(
+            boundary.outcome().unwrap(),
+            Px4OffboardSubmissionOutcomeV1::WithinProfile
+        );
 
         let stale = assessment(
             vec![
                 event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(11, 500_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(12, 1_000_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(
+                    11,
+                    500_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
+                event(
+                    12,
+                    1_000_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
             ],
             1_250_000_001,
         );
@@ -803,8 +845,16 @@ mod tests {
         let gapped = assessment(
             vec![
                 event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(11, 500_000_001, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(12, 1_000_000_002, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(
+                    11,
+                    500_000_001,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
+                event(
+                    12,
+                    1_000_000_002,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
             ],
             1_100_000_000,
         );
@@ -817,8 +867,16 @@ mod tests {
         let rejected = assessment(
             vec![
                 event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(11, 500_000_000, Px4LocalSubmissionResultV1::RejectedByLocalTransport),
-                event(12, 1_000_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(
+                    11,
+                    500_000_000,
+                    Px4LocalSubmissionResultV1::RejectedByLocalTransport,
+                ),
+                event(
+                    12,
+                    1_000_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
             ],
             1_100_000_000,
         );
@@ -834,7 +892,11 @@ mod tests {
         let value = assessment(
             vec![
                 event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(11, 500_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(
+                    11,
+                    500_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
             ],
             600_000_000,
         );
@@ -847,7 +909,11 @@ mod tests {
         );
 
         let known_rejection = assessment(
-            vec![event(10, 0, Px4LocalSubmissionResultV1::RejectedByLocalTransport)],
+            vec![event(
+                10,
+                0,
+                Px4LocalSubmissionResultV1::RejectedByLocalTransport,
+            )],
             100,
         );
         assert_eq!(
@@ -863,8 +929,16 @@ mod tests {
         let value = assessment(
             vec![
                 event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(11, 100_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(12, 200_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(
+                    11,
+                    100_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
+                event(
+                    12,
+                    200_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
             ],
             300_000_000,
         );
@@ -879,12 +953,19 @@ mod tests {
     fn sequence_gaps_are_not_hidden_by_canonical_timestamp_sorting() {
         let samples = vec![
             event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-            event(12, 500_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-            event(13, 1_000_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+            event(
+                12,
+                500_000_000,
+                Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+            ),
+            event(
+                13,
+                1_000_000_000,
+                Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+            ),
         ];
         assert_eq!(
-            Px4OffboardSubmissionCadenceV1::new(profile(), ts(1_100_000_000), samples)
-                .unwrap_err(),
+            Px4OffboardSubmissionCadenceV1::new(profile(), ts(1_100_000_000), samples).unwrap_err(),
             Px4OffboardSubmissionError::SubmissionSequenceGap {
                 previous: 10,
                 found: 12,
@@ -905,12 +986,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Px4OffboardSubmissionCadenceV1::new(
-                profile(),
-                ts(1),
-                vec![wrong_target],
-            )
-            .unwrap_err(),
+            Px4OffboardSubmissionCadenceV1::new(profile(), ts(1), vec![wrong_target],).unwrap_err(),
             Px4OffboardSubmissionError::TargetMismatch
         );
 
@@ -997,13 +1073,12 @@ mod tests {
             ts(1),
         )
         .unwrap();
-        let value = Px4OffboardSubmissionCadenceV1::new(
-            ros_profile,
-            ts(2),
-            vec![first, second],
-        )
-        .unwrap();
-        assert_eq!(value.outcome().unwrap(), Px4OffboardSubmissionOutcomeV1::WithinProfile);
+        let value =
+            Px4OffboardSubmissionCadenceV1::new(ros_profile, ts(2), vec![first, second]).unwrap();
+        assert_eq!(
+            value.outcome().unwrap(),
+            Px4OffboardSubmissionOutcomeV1::WithinProfile
+        );
     }
 
     #[test]
@@ -1022,7 +1097,10 @@ mod tests {
             vec![86, 82, 84],
         )
         .unwrap();
-        assert_eq!(unsorted.allowed_mavlink_setpoint_message_ids, vec![82, 84, 86]);
+        assert_eq!(
+            unsorted.allowed_mavlink_setpoint_message_ids,
+            vec![82, 84, 86]
+        );
         let other_policy = Px4OffboardSubmissionProfileV1::new(
             "px4.offboard.publisher.fixture.v1",
             "vehicle.slot-a",
@@ -1068,15 +1146,26 @@ mod tests {
         let value = assessment(
             vec![
                 event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(11, 500_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
-                event(12, 1_000_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(
+                    11,
+                    500_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
+                event(
+                    12,
+                    1_000_000_000,
+                    Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+                ),
             ],
             1_100_000_000,
         );
         let bytes = serde_json::to_vec(&value).unwrap();
         let mut restored: Px4OffboardSubmissionCadenceV1 = serde_json::from_slice(&bytes).unwrap();
         restored.validate().unwrap();
-        assert_eq!(restored.assessment_id().unwrap(), value.assessment_id().unwrap());
+        assert_eq!(
+            restored.assessment_id().unwrap(),
+            value.assessment_id().unwrap()
+        );
         restored.samples[0].sequence_number += 1;
         assert!(restored.validate().is_err());
     }
