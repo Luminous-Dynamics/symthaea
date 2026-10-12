@@ -64,3 +64,6 @@
 - Rewrote the XOR theorem to distinguish the absence of nonlinear AND/MUL gates from the wordwise equality assertions that bind the public output. A nonlinear-gate count is not a count of all circuit structure or a performance result.
 - Withdrawn the unqualified claim that a general HDC cyclic permutation requires zero constraints. Whole-word reordering can be an index permutation; general bit-level shifts across packed-word boundaries require separate rotation/shift logic and a measured circuit.
 - Removed the stale source-header claim that an executable Winterfell XOR circuit is available at a monorepo path absent from this standalone artifact. The benchmark now describes the Winterfell side only as an analytic estimate.
+
+
+- Follow-up source scan removed a second stale comment that referenced a non-existent standalone path for a separately measured Winterfell circuit. Both module-level and function-level descriptions now consistently state that this crate contains no Winterfell XOR prover.

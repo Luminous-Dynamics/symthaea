@@ -180,9 +180,9 @@ fn bench_binius_hdc_xor() -> BenchResult {
 // ANALYTIC ESTIMATE ONLY — no real prover. This function implements no
 // AIR and never invokes Winterfell. All numbers it reports are derived
 // from a constraint-count model, not from running a prover. Do NOT cite
-// them as measured proving results. A real, measured Winterfell
-// 16,384-bit XOR circuit exists separately in
-// crates/mycelix-zkp-core/src/circuits/winterfell_xor.rs (monorepo root).
+// them as measured proving results. This standalone artifact contains
+// no executable Winterfell XOR circuit, so its output cannot establish
+// a cross-backend comparison.
 // ═══════════════════════════════════════════════════════════════════
 
 fn bench_winterfell_hdc_xor() -> BenchResult {
