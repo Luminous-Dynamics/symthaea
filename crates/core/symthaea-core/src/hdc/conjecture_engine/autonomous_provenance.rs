@@ -456,7 +456,7 @@ pub enum AutonomousDiscoveryReceiptError {
     IdenticalSeeds,
     HoldoutSeedMismatch,
     InvalidHoldoutRecord,
-    ColdRunContainsPriors,
+    UncontrolledRunContainsPriors,
     ComposedCandidateNeedsParentReceipts,
 }
 fn validate_system_identity(
@@ -549,7 +549,7 @@ fn assessment_context_digest(
 
 fn sanitized_config(config: &RegressorConfig, mode: AutonomousDiscoveryMode) -> RegressorConfig {
     let mut effective = config.clone();
-    if mode == AutonomousDiscoveryMode::Cold {
+    if matches!(mode, AutonomousDiscoveryMode::Cold | AutonomousDiscoveryMode::RandomBaseline) {
         effective.disable_macro_seeds = true;
         effective.prior_composition_rate = 0.0;
         effective.prior_fragment_bonus = 1.0;
@@ -681,7 +681,7 @@ fn search_config_is_consistent(
         return false;
     }
     match mode {
-        AutonomousDiscoveryMode::Cold => {
+        AutonomousDiscoveryMode::Cold | AutonomousDiscoveryMode::RandomBaseline => {
             config.disable_macro_seeds
                 && config.prior_composition_rate == 0.0
                 && config.prior_fragment_bonus == 1.0
@@ -785,13 +785,18 @@ pub fn build_autonomous_discovery_receipt_v1(
     if candidate.discovery_mode == AutonomousDiscoveryMode::Composed {
         return Err(AutonomousDiscoveryReceiptError::ComposedCandidateNeedsParentReceipts);
     }
-    if candidate.discovery_mode == AutonomousDiscoveryMode::Cold
-        && !extra_seed_templates.is_empty()
+    if matches!(
+        candidate.discovery_mode,
+        AutonomousDiscoveryMode::Cold | AutonomousDiscoveryMode::RandomBaseline
+    ) && !extra_seed_templates.is_empty()
     {
-        return Err(AutonomousDiscoveryReceiptError::ColdRunContainsPriors);
+        return Err(AutonomousDiscoveryReceiptError::UncontrolledRunContainsPriors);
     }
     let effective = sanitized_config(config, candidate.discovery_mode);
-    let effective_templates = if candidate.discovery_mode == AutonomousDiscoveryMode::Cold {
+    let effective_templates = if matches!(
+        candidate.discovery_mode,
+        AutonomousDiscoveryMode::Cold | AutonomousDiscoveryMode::RandomBaseline
+    ) {
         &[]
     } else {
         extra_seed_templates
@@ -1424,7 +1429,7 @@ mod tests {
             &candidate, &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         );
-        assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::ColdRunContainsPriors);
+        assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::UncontrolledRunContainsPriors);
     }
 
     #[test]
