@@ -124,7 +124,7 @@ class DurableQueueTests(unittest.TestCase):
         self.assertEqual(self.queue.pending_count, 1)
 
     def test_byte_limit_fails_without_silent_eviction(self):
-        limited = DurableTelemetryQueue(self.database, max_queue_bytes=100)
+        limited = DurableTelemetryQueue(str(Path(self.temp.name) / "limited.sqlite3"), max_queue_bytes=100)
         limited.enqueue(event(size=80), now_utc=self.now)
         with self.assertRaises(QueueCapacityError):
             limited.enqueue(event("c", size=30), now_utc=self.now)
@@ -132,7 +132,7 @@ class DurableQueueTests(unittest.TestCase):
         self.assertEqual(limited.pending_bytes, 80)
 
     def test_terminal_record_limit_fails_closed_instead_of_pruning_tombstones(self):
-        tiny = DurableTelemetryQueue(self.database, max_queue_bytes=1000, max_records=1)
+        tiny = DurableTelemetryQueue(str(Path(self.temp.name) / "tiny.sqlite3"), max_queue_bytes=1000, max_records=1)
         tiny.enqueue(event(expires="2026-10-12T10:04:00Z"), now_utc=self.now)
         with self.assertRaisesRegex(QueueCapacityError, "record limit"):
             tiny.enqueue(event("c"), now_utc=self.now)
@@ -188,13 +188,13 @@ class DurableQueueTests(unittest.TestCase):
         results = []
         errors = []
         lock = threading.Lock()
-        limited = DurableTelemetryQueue(self.database, max_queue_bytes=250, max_records=100)
+        limited = DurableTelemetryQueue(str(Path(self.temp.name) / "concurrent-limited.sqlite3"), max_queue_bytes=250, max_records=100)
 
         def submit(i):
             try:
-                local_queue = self.reopen(max_queue_bytes=250, max_records=100)
+                local_queue = limited
                 barrier.wait(timeout=5)
-                result = local_queue.enqueue(event(chr(97 + i), size=100), now_utc=self.now)
+                result = local_queue.enqueue(event("01234567"[i], size=100), now_utc=self.now)
                 with lock:
                     results.append(result)
             except QueueCapacityError:
@@ -254,6 +254,14 @@ class DurableQueueTests(unittest.TestCase):
     def test_ephemeral_database_path_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "persistent filesystem path"):
             DurableTelemetryQueue(":memory:")
+
+    def test_policy_configuration_mismatch_fails_closed(self):
+        with self.assertRaisesRegex(TelemetryQueueError, "configuration mismatch"):
+            DurableTelemetryQueue(self.database, max_queue_bytes=999)
+        with self.assertRaisesRegex(TelemetryQueueError, "configuration mismatch"):
+            DurableTelemetryQueue(self.database, max_records=99_999)
+        with self.assertRaisesRegex(TelemetryQueueError, "configuration mismatch"):
+            DurableTelemetryQueue(self.database, max_future_skew_seconds=299)
 
     def test_nonfinite_busy_timeout_is_rejected(self):
         for timeout in (float("nan"), float("inf"), float("-inf"), 0, -1):
