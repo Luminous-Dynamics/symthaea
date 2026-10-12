@@ -41,13 +41,13 @@ This is a reasoned local persistence configuration, not proof against all hardwa
 1. **Authenticity:** the queue validates shapes and state only. The network adapter must authenticate the sender and bind a canonical envelope (including the metadata, digest, expiry and policy/version context) to a vetted signature or MAC.
 2. **ACK authenticity:** a digest match is not a proof that the authorized receiver acknowledged delivery. ACKs need authenticated identity, replay protection and receiver-side idempotency.
 3. **Payload protection:** this module stores no payload bytes and performs no encryption. The caller must encrypt transit; production should not place actual values in the digest field or mistake a digest for anonymization.
-4. **Schema migration:** schema version 1 is checked with PRAGMA user_version. Future changes need versioned, transactional migrations and downgrade/upgrade tests.
+4. **Schema migration:** schema migration advances version 1 to version 2 with PRAGMA user_version; unsupported future versions fail closed. Future changes need versioned, transactional migrations and downgrade/upgrade tests.
 5. **Privacy budgeting:** delivery retries must not double-charge a retransmission of an identical private release. The separate DP accountant must transactionally reserve unique release identity, participant contribution bounds, mechanism, adjacency definition, and cumulative privacy spend. It is still a separate, not-yet-production component.
 6. **Power/control:** a queue ACK is never actuator authorization. Any later actuator command path needs separate credentials, local interlocks, bounded capabilities and a safety case.
 
 ## Test plan added
 
-The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files and synthetic event metadata. Thirteen deterministic tests are added; they cover:
+The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files and synthetic event metadata. Nineteen deterministic tests are added; they cover:
 - enqueue and pending-byte recovery after creating a fresh process-like queue instance;
 - re-transmission after restart and persisted attempt counts;
 - ACK and duplicate ACK behavior across queue instances;
