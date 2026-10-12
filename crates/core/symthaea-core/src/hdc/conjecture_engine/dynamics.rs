@@ -5,13 +5,12 @@ const MAX_RK4_STEPS_PER_TRAJECTORY: f64 = 100_000.0;
 const MAX_RK4_STATE_DIMENSION: usize = 4_096;
 const MAX_RK4_STATE_UPDATES_PER_TRAJECTORY: f64 = 10_000_000.0;
 
-/// Fixed-step RK4 trajectory generator. The historical name is retained for API
-/// compatibility; this is not an adaptive Dormand–Prince RK45 integrator.
+/// Fixed-step fourth-order Runge–Kutta trajectory generator (RK4).
 ///
 /// Invalid inputs, excessive work, malformed/non-finite RHS values, or numerical
 /// overflow return an empty trajectory (never a partial trajectory that callers
 /// could mistake for complete coverage).
-pub(crate) fn rk45_trajectory(
+pub(crate) fn rk4_trajectory(
     f: impl Fn(&[f64], f64) -> Vec<f64>,
     y0: &[f64],
     t_end: f64,
@@ -253,7 +252,7 @@ pub fn check_virial_theorem(
 
 #[cfg(test)]
 mod bounded_rk4_trajectory_tests {
-    use super::rk45_trajectory;
+    use super::rk4_trajectory;
 
     fn constant_rhs(state: &[f64], _time: f64) -> Vec<f64> {
         vec![1.0; state.len()]
@@ -262,7 +261,7 @@ mod bounded_rk4_trajectory_tests {
     #[test]
     fn indexed_rk4_reaches_exact_non_binary_endpoints() {
         for (t_end, dt) in [(4.0, 0.01), (1.0, 0.1)] {
-            let (times, states) = rk45_trajectory(constant_rhs, &[0.0], t_end, dt);
+            let (times, states) = rk4_trajectory(constant_rhs, &[0.0], t_end, dt);
             assert!(!times.is_empty());
             assert_eq!(times.last().copied(), Some(t_end));
             assert_eq!(states.len(), times.len());
@@ -272,22 +271,22 @@ mod bounded_rk4_trajectory_tests {
 
     #[test]
     fn invalid_timing_or_rhs_fails_closed_without_partial_trajectory() {
-        let (times, states) = rk45_trajectory(constant_rhs, &[0.0], 1.0, 0.0);
+        let (times, states) = rk4_trajectory(constant_rhs, &[0.0], 1.0, 0.0);
         assert!(times.is_empty());
         assert!(states.is_empty());
 
-        let (times, states) = rk45_trajectory(|_state, _time| vec![f64::NAN], &[0.0], 1.0, 0.1);
+        let (times, states) = rk4_trajectory(|_state, _time| vec![f64::NAN], &[0.0], 1.0, 0.1);
         assert!(times.is_empty());
         assert!(states.is_empty());
 
-        let (times, states) = rk45_trajectory(|_state, _time| vec![], &[0.0], 1.0, 0.1);
+        let (times, states) = rk4_trajectory(|_state, _time| vec![], &[0.0], 1.0, 0.1);
         assert!(times.is_empty());
         assert!(states.is_empty());
     }
 
     #[test]
     fn excessive_step_budget_is_rejected_before_allocation() {
-        let (times, states) = rk45_trajectory(constant_rhs, &[0.0], 1.0e9, 1.0e-6);
+        let (times, states) = rk4_trajectory(constant_rhs, &[0.0], 1.0e9, 1.0e-6);
         assert!(times.is_empty());
         assert!(states.is_empty());
     }
