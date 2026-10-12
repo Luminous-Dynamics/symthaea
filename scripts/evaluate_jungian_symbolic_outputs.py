@@ -648,9 +648,10 @@ def validate_annotation_seed_bytes(
     expected = build_annotation_seed(
         bundle_bytes, results, method_id, source_revision, corpus, corpus_bytes
     )
+    expected_bytes = canonical_json(expected)
     require(
-        seed == expected,
-        "annotation seed differs from deterministic reconstruction of bound sources",
+        seed_bytes == expected_bytes,
+        "annotation seed bytes differ from canonical deterministic reconstruction of bound sources",
     )
     return seed
 
@@ -777,6 +778,8 @@ def annotation_seed_self_test() -> list[str]:
         mutation["annotation_guide_sha256"] = "e" * 64
         mutations.append(("reject guide digest mutation", mutation))
 
+        mutations.append(("reject noncanonical serialization", b" " + canonical_json(seed)))
+
         mutation = copy.deepcopy(seed)
         mutation["annotation_state"] = "ANNOTATED"
         mutations.append(("reject forged annotation state", mutation))
@@ -809,8 +812,9 @@ def annotation_seed_self_test() -> list[str]:
 
         for name, mutated in mutations:
             try:
+                mutated_bytes = mutated if isinstance(mutated, bytes) else canonical_json(mutated)
                 validate_annotation_seed_bytes(
-                    canonical_json(mutated),
+                    mutated_bytes,
                     bundle_bytes=bundle_bytes,
                     results=results,
                     method_id=method_id,
@@ -1124,7 +1128,7 @@ def main() -> int:
                 print(f"- annotation seed: {failure}", file=sys.stderr)
             return 1
         print("PASS: 36 evaluator controls (31 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
-        print("PASS: 8 annotation-seed invariant controls plus 8 hostile packet mutations")
+        print("PASS: 8 annotation-seed invariant controls plus 9 hostile packet mutations")
     if not args.results:
         return 0
     if args.output_dir is None:
