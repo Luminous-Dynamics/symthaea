@@ -50,44 +50,57 @@ pub(crate) fn macro_usage_key(expr: &Expr) -> String {
 /// (not `pub(crate)`) so external crates can reuse the exact same scoring
 /// function the real search uses, e.g. for noise-robustness benchmarking
 /// against the true fitness landscape rather than an approximation of it.
-pub fn lie_derivative_variance(
+pub fn lie_derivative_variance_with_work(
     expr: &Expr,
     rhs: fn(&[f64], f64) -> Vec<f64>,
     trajectory: &[Vec<f64>],
     var_names: &[&str],
-) -> f64 {
+) -> (f64, u64) {
+    let mut rhs_calls = 0u64;
     let mut lie_vals = Vec::with_capacity(trajectory.len());
     let mut grad_sq_vals = Vec::with_capacity(trajectory.len());
 
     for state in trajectory {
         let grad = fd_gradient(expr, state, var_names);
         if grad.iter().any(|g| !g.is_finite()) {
-            return f64::MAX;
+            return (f64::MAX, rhs_calls);
         }
+        rhs_calls = rhs_calls.saturating_add(1);
         let flow = rhs(state, 0.0);
         if flow.len() != grad.len() {
-            return f64::MAX;
+            return (f64::MAX, rhs_calls);
         }
         let lie: f64 = grad.iter().zip(flow.iter()).map(|(g, f)| g * f).sum();
         let grad_sq: f64 = grad.iter().map(|g| g * g).sum();
         if !lie.is_finite() || !grad_sq.is_finite() {
-            return f64::MAX;
+            return (f64::MAX, rhs_calls);
         }
         lie_vals.push(lie);
         grad_sq_vals.push(grad_sq);
     }
 
     if lie_vals.is_empty() {
-        return f64::MAX;
+        return (f64::MAX, rhs_calls);
     }
 
     let mean_lie_sq = lie_vals.iter().map(|v| v * v).sum::<f64>() / lie_vals.len() as f64;
     let mean_grad_sq = grad_sq_vals.iter().sum::<f64>() / grad_sq_vals.len() as f64;
     const MIN_GRADIENT_MAG_SQ: f64 = 1e-12;
     if mean_grad_sq < MIN_GRADIENT_MAG_SQ {
-        return f64::MAX;
+        return (f64::MAX, rhs_calls);
     }
-    mean_lie_sq / mean_grad_sq
+    (mean_lie_sq / mean_grad_sq, rhs_calls)
+}
+
+/// Score Lie-derivative variance while preserving how many RHS evaluations
+/// were spent, including calls before a rejected/non-finite score.
+pub fn lie_derivative_variance(
+    expr: &Expr,
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    trajectory: &[Vec<f64>],
+    var_names: &[&str],
+) -> f64 {
+    lie_derivative_variance_with_work(expr, rhs, trajectory, var_names).0
 }
 
 /// Central-difference gradient of `expr` at `state` w.r.t. `var_names`.
