@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: qc-vwn5-standalone-libxc-${{ github.event.pull_request.number || github.run_id || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   vwn5:
