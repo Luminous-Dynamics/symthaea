@@ -527,7 +527,7 @@ where
         NavigateToHistoryEntryParams::builder()
             .entry_id(entry_id)
             .build()
-            .context("Build history navigation request")?,
+            .map_err(|error| anyhow::anyhow!("Build history navigation request: {error}"))?,
     )
     .await
     .context("Navigate to history entry")?;
