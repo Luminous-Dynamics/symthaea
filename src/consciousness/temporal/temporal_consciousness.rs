@@ -220,11 +220,13 @@ impl PhiTrajectory {
         }
     }
 
-    /// Record a Φ observation using the trajectory's local monotonic clock.
+    /// Record Φ using the trajectory's local monotonic clock.
     ///
-    /// Use `observe_at` in deterministic experiments or when observations arrive
-    /// from an externally measured clock. The compatibility method intentionally
-    /// keeps the original simple call surface.
+    /// Each accepted value represents the interval ending at its elapsed offset,
+    /// consistent with `observe_at`'s integration convention. Use `try_observe`
+    /// when the caller needs an admission result; this compatibility method keeps
+    /// the original call surface and discards that result. Use `observe_at` for
+    /// deterministic experiments or an externally measured elapsed clock.
     pub fn observe(&mut self, phi: f64) {
         let _ = self.try_observe(phi);
     }
@@ -857,7 +859,8 @@ impl TemporalConsciousnessAnalyzer {
         Self::new(TemporalConsciousnessConfig::default())
     }
 
-    /// Full observation: update all temporal analyses
+    /// Compatibility entry point: update temporal analyses for an accepted Φ sample.
+    /// Rejected samples do not update metrics and are counted in rejection statistics.
     pub(crate) fn observe(
         &mut self,
         state: &BinaryHV,
