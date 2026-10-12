@@ -193,8 +193,11 @@ class StoreForwardQueue:
             self._in_flight.add(event.event_id)
         return tuple(result)
 
-    def acknowledge(self, *, event_id: str, payload_sha256: str) -> str:
-        """Remove only an event selected for delivery and only for its exact digest."""
+    def acknowledge(self, *, event_id: str, payload_sha256: str, now_utc: datetime) -> str:
+        """Remove only a selected, unexpired event for its exact digest."""
+        _utc(now_utc, "now_utc")
+        if not isinstance(event_id, str) or not EVENT_ID_RE.fullmatch(event_id):
+            raise TelemetryQueueError("ack event_id must be a 32-character lowercase hexadecimal ID")
         if not isinstance(payload_sha256, str) or not SHA256_RE.fullmatch(payload_sha256):
             raise TelemetryQueueError("ack payload digest must be a lowercase SHA-256 digest")
         event = self._pending.get(event_id)
@@ -203,6 +206,8 @@ class StoreForwardQueue:
             if terminal is not None and terminal[0].payload_sha256 == payload_sha256 and terminal[1] == "delivered":
                 return "idempotent_ack"
             raise TelemetryQueueError("ack references no pending event")
+        if now_utc >= event.expires_at_utc:
+            raise TelemetryQueueError("event expired before ACK; call expire to record it")
         if event_id not in self._in_flight:
             raise TelemetryQueueError("cannot acknowledge an event not selected for delivery")
         if event.payload_sha256 != payload_sha256:
