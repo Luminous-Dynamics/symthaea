@@ -12,9 +12,7 @@
 use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::embodiment_evidence::{
-    ClockDomainId, EvidenceValidationError, TimestampV1,
-};
+use symthaea_core::embodiment_evidence::{ClockDomainId, EvidenceValidationError, TimestampV1};
 use thiserror::Error;
 
 /// Schema version for SetpointConfig exchange evidence.
@@ -260,7 +258,9 @@ impl Px4ExternalModeSetpointConfigRequestV1 {
     pub fn validate(&self) -> Result<(), Px4ExternalModeSetpointConfigError> {
         self.validate_without_digest()?;
         if self.request_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ExternalModeSetpointConfigError::DigestMismatch("request"));
+            return Err(Px4ExternalModeSetpointConfigError::DigestMismatch(
+                "request",
+            ));
         }
         Ok(())
     }
@@ -282,9 +282,11 @@ impl Px4ExternalModeSetpointConfigRequestV1 {
     fn validate_without_digest(&self) -> Result<(), Px4ExternalModeSetpointConfigError> {
         validate_schema(self.schema_version)?;
         if self.message_version != PX4_SETPOINT_CONFIG_MESSAGE_VERSION_V0 {
-            return Err(Px4ExternalModeSetpointConfigError::UnsupportedMessageVersion {
-                found: self.message_version,
-            });
+            return Err(
+                Px4ExternalModeSetpointConfigError::UnsupportedMessageVersion {
+                    found: self.message_version,
+                },
+            );
         }
         validate_identifier(&self.producer_profile_id, "producer_profile_id")?;
         validate_identifier(&self.target_instance_id, "target_instance_id")?;
@@ -426,9 +428,11 @@ impl Px4ExternalModeSetpointConfigReplyV1 {
     fn validate_without_digest(&self) -> Result<(), Px4ExternalModeSetpointConfigError> {
         validate_schema(self.schema_version)?;
         if self.message_version != PX4_SETPOINT_CONFIG_MESSAGE_VERSION_V0 {
-            return Err(Px4ExternalModeSetpointConfigError::UnsupportedMessageVersion {
-                found: self.message_version,
-            });
+            return Err(
+                Px4ExternalModeSetpointConfigError::UnsupportedMessageVersion {
+                    found: self.message_version,
+                },
+            );
         }
         validate_identifier(&self.producer_profile_id, "producer_profile_id")?;
         validate_identifier(&self.target_instance_id, "target_instance_id")?;
@@ -530,7 +534,9 @@ impl Px4ExternalModeSetpointConfigProfileV1 {
     pub fn validate(&self) -> Result<(), Px4ExternalModeSetpointConfigError> {
         self.validate_without_digest()?;
         if self.profile_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ExternalModeSetpointConfigError::DigestMismatch("profile"));
+            return Err(Px4ExternalModeSetpointConfigError::DigestMismatch(
+                "profile",
+            ));
         }
         Ok(())
     }
@@ -546,8 +552,7 @@ impl Px4ExternalModeSetpointConfigProfileV1 {
         self.receiver_clock_domain
             .validate()
             .map_err(Px4ExternalModeSetpointConfigError::Timestamp)?;
-        if self.max_reply_wait_ns == 0 || self.max_reply_age_ns == 0
-        {
+        if self.max_reply_wait_ns == 0 || self.max_reply_age_ns == 0 {
             return Err(Px4ExternalModeSetpointConfigError::ZeroTimingBound);
         }
         Ok(())
@@ -701,7 +706,9 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
     pub fn validate(&self) -> Result<(), Px4ExternalModeSetpointConfigError> {
         self.validate_without_digest()?;
         if self.assessment_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ExternalModeSetpointConfigError::DigestMismatch("assessment"));
+            return Err(Px4ExternalModeSetpointConfigError::DigestMismatch(
+                "assessment",
+            ));
         }
         Ok(())
     }
@@ -726,10 +733,12 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
                 .elapsed_since(&self.request.submitted_at)
                 .map_err(Px4ExternalModeSetpointConfigError::Timestamp)?;
             return if request_age_ns > self.profile.max_reply_wait_ns {
-                Ok(Px4ExternalModeSetpointConfigOutcomeV1::ReplyNotObservedBeforeDeadline {
-                    request_age_ns,
-                    max_reply_wait_ns: self.profile.max_reply_wait_ns,
-                })
+                Ok(
+                    Px4ExternalModeSetpointConfigOutcomeV1::ReplyNotObservedBeforeDeadline {
+                        request_age_ns,
+                        max_reply_wait_ns: self.profile.max_reply_wait_ns,
+                    },
+                )
             } else {
                 Ok(Px4ExternalModeSetpointConfigOutcomeV1::AwaitingReply {
                     request_age_ns,
@@ -753,10 +762,12 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
             .elapsed_since(&self.request.submitted_at)
             .map_err(Px4ExternalModeSetpointConfigError::Timestamp)?;
         if response_latency_ns > self.profile.max_reply_wait_ns {
-            return Ok(Px4ExternalModeSetpointConfigOutcomeV1::ReplyObservedTooLate {
-                response_latency_ns,
-                max_reply_wait_ns: self.profile.max_reply_wait_ns,
-            });
+            return Ok(
+                Px4ExternalModeSetpointConfigOutcomeV1::ReplyObservedTooLate {
+                    response_latency_ns,
+                    max_reply_wait_ns: self.profile.max_reply_wait_ns,
+                },
+            );
         }
         if reply.result() != Px4SetpointConfigResultV1::Success {
             return Ok(Px4ExternalModeSetpointConfigOutcomeV1::ReplyRejected {
@@ -764,9 +775,11 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
             });
         }
         if !self.request.setpoint_type().is_known_concrete() {
-            return Ok(Px4ExternalModeSetpointConfigOutcomeV1::UnknownSetpointType {
-                type_raw: self.request.type_raw,
-            });
+            return Ok(
+                Px4ExternalModeSetpointConfigOutcomeV1::UnknownSetpointType {
+                    type_raw: self.request.type_raw,
+                },
+            );
         }
 
         let common = (
@@ -778,27 +791,31 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
             reply.reply_id()?,
         );
         if !self.request.should_apply {
-            return Ok(Px4ExternalModeSetpointConfigOutcomeV1::ValidationRequestAccepted {
+            return Ok(
+                Px4ExternalModeSetpointConfigOutcomeV1::ValidationRequestAccepted {
+                    type_raw: common.0,
+                    source_id: common.1,
+                    requested_timeout_ms: common.2,
+                    timeout_requested_enabled: common.3,
+                    request_id: common.4,
+                    reply_id: common.5,
+                },
+            );
+        }
+        Ok(
+            Px4ExternalModeSetpointConfigOutcomeV1::ApplyRequestAccepted {
                 type_raw: common.0,
                 source_id: common.1,
                 requested_timeout_ms: common.2,
                 timeout_requested_enabled: common.3,
+                mode_req_angular_velocity: reply.mode_req_angular_velocity,
+                mode_req_attitude: reply.mode_req_attitude,
+                mode_req_local_alt: reply.mode_req_local_alt,
+                mode_req_local_position: reply.mode_req_local_position,
                 request_id: common.4,
                 reply_id: common.5,
-            });
-        }
-        Ok(Px4ExternalModeSetpointConfigOutcomeV1::ApplyRequestAccepted {
-            type_raw: common.0,
-            source_id: common.1,
-            requested_timeout_ms: common.2,
-            timeout_requested_enabled: common.3,
-            mode_req_angular_velocity: reply.mode_req_angular_velocity,
-            mode_req_attitude: reply.mode_req_attitude,
-            mode_req_local_alt: reply.mode_req_local_alt,
-            mode_req_local_position: reply.mode_req_local_position,
-            request_id: common.4,
-            reply_id: common.5,
-        })
+            },
+        )
     }
 
     fn validate_without_digest(&self) -> Result<(), Px4ExternalModeSetpointConfigError> {
@@ -914,9 +931,11 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
 
 fn validate_schema(schema_version: u16) -> Result<(), Px4ExternalModeSetpointConfigError> {
     if schema_version != PX4_EXTERNAL_MODE_SETPOINT_CONFIG_SCHEMA_V1 {
-        return Err(Px4ExternalModeSetpointConfigError::UnsupportedSchemaVersion {
-            found: schema_version,
-        });
+        return Err(
+            Px4ExternalModeSetpointConfigError::UnsupportedSchemaVersion {
+                found: schema_version,
+            },
+        );
     }
     Ok(())
 }
@@ -1132,10 +1151,7 @@ mod tests {
             Px4ExternalModeSetpointTypeV1::from_raw(700),
             Px4ExternalModeSetpointTypeV1::Other(700)
         );
-        assert_eq!(
-            Px4ExternalModeSetpointTypeV1::Other(700).as_raw(),
-            700
-        );
+        assert_eq!(Px4ExternalModeSetpointTypeV1::Other(700).as_raw(), 700);
     }
 
     #[test]
@@ -1155,9 +1171,12 @@ mod tests {
                 ..
             }
         ));
-        assert!(value.assessment_id().unwrap().starts_with(
-            "symthaea.autopilot.px4.external-mode-setpoint-config.assessment.v1:"
-        ));
+        assert!(
+            value
+                .assessment_id()
+                .unwrap()
+                .starts_with("symthaea.autopilot.px4.external-mode-setpoint-config.assessment.v1:")
+        );
     }
 
     #[test]
@@ -1172,7 +1191,9 @@ mod tests {
             1_000_000_000,
         );
         assert!(matches!(
-            assessment(req, Some(reply()), 1_200_000_000).outcome().unwrap(),
+            assessment(req, Some(reply()), 1_200_000_000)
+                .outcome()
+                .unwrap(),
             Px4ExternalModeSetpointConfigOutcomeV1::ValidationRequestAccepted {
                 requested_timeout_ms: 250,
                 ..
@@ -1192,7 +1213,9 @@ mod tests {
             1_000_000_000,
         );
         assert!(matches!(
-            assessment(req, Some(reply()), 1_200_000_000).outcome().unwrap(),
+            assessment(req, Some(reply()), 1_200_000_000)
+                .outcome()
+                .unwrap(),
             Px4ExternalModeSetpointConfigOutcomeV1::ApplyRequestAccepted {
                 requested_timeout_ms: 0,
                 timeout_requested_enabled: false,
@@ -1204,14 +1227,18 @@ mod tests {
     #[test]
     fn missing_reply_is_awaiting_then_not_observed_after_the_declared_deadline() {
         assert!(matches!(
-            assessment(request(), None, 1_100_000_000).outcome().unwrap(),
+            assessment(request(), None, 1_100_000_000)
+                .outcome()
+                .unwrap(),
             Px4ExternalModeSetpointConfigOutcomeV1::AwaitingReply {
                 request_age_ns: 100_000_000,
                 ..
             }
         ));
         assert!(matches!(
-            assessment(request(), None, 1_300_000_001).outcome().unwrap(),
+            assessment(request(), None, 1_300_000_001)
+                .outcome()
+                .unwrap(),
             Px4ExternalModeSetpointConfigOutcomeV1::ReplyNotObservedBeforeDeadline {
                 request_age_ns: 300_000_001,
                 ..
@@ -1470,9 +1497,7 @@ mod tests {
         value.message_version = 1;
         assert_eq!(
             value.validate(),
-            Err(Px4ExternalModeSetpointConfigError::UnsupportedMessageVersion {
-                found: 1,
-            })
+            Err(Px4ExternalModeSetpointConfigError::UnsupportedMessageVersion { found: 1 })
         );
         assert_eq!(
             Px4ExternalModeSetpointConfigProfileV1::new(
