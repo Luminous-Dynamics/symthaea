@@ -157,7 +157,11 @@ impl GpuContext {
     /// hardware. Callers needing hardware-only execution must check the report
     /// and then verify a real operation/readback.
     pub async fn new_with_report() -> Result<(Self, GpuAdapterReport), GpuContextInitError> {
-        let instance = wgpu::Instance::default();
+        // Honor WGPU_BACKEND and related documented WGPU_* runtime settings.
+        // This is essential for qualification jobs that must force Vulkan rather
+        // than accidentally exercising another enabled backend.
+        let instance_descriptor = wgpu::InstanceDescriptor::default().with_env();
+        let instance = wgpu::Instance::new(&instance_descriptor);
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
