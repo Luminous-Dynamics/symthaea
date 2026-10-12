@@ -315,12 +315,13 @@ def _parse_grammar_dispatch(
 
     if not fallback_seen:
         raise CoverageError("Grammar dispatcher has no compatibility fallback arm")
-    missing = sorted(used_families - set(dispatch))
-    if missing:
-        raise CoverageError(
-            "Grammar families have no explicit dispatch or compatibility fallback: "
-            + ", ".join(missing)
-        )
+    # The final binding arm (for example, `family =>`) is the real
+    # compatibility fallback for families without a dedicated match arm.
+    for family in sorted(used_families - set(dispatch)):
+        dispatch[family] = {
+            "mode": "compatibility_fallback",
+            "entrypoint": fallback_marker,
+        }
     return dispatch
 
 
