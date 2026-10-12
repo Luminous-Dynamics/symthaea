@@ -828,7 +828,7 @@ mod tests {
         let semiprime = p * q;
         let factorization = engine.factorize(semiprime);
         assert_eq!(factorization.value, semiprime);
-        assert_eq!(factorization.factors, vec![(p, 1), (q, 1)]);
+        assert_eq!(factorization.factors, vec![(p, 1u32), (q, 1u32)]);
 
         let reconstructed = factorization
             .factors
@@ -850,11 +850,14 @@ mod tests {
         let semiprime = p * q;
         assert!(semiprime > u64::MAX - 100_000_000_000);
         let factorization = engine.factorize(semiprime);
-        assert_eq!(factorization.factors, vec![(q, 1), (p, 1)]);
+        assert_eq!(factorization.factors, vec![(q, 1u32), (p, 1u32)]);
 
-        let reconstructed = factorization.factors.iter().fold(1u128, |product, &(prime, exponent)| {
-            product * u128::from(prime).pow(exponent)
-        });
+        let reconstructed = factorization
+            .factors
+            .iter()
+            .fold(1u128, |product, &(prime, exponent)| {
+                product * u128::from(prime).pow(exponent)
+            });
         assert_eq!(reconstructed, u128::from(semiprime));
     }
 
