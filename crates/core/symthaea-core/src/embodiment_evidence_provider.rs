@@ -14,7 +14,7 @@
 
 use crate::embodiment::EmbodimentBridge;
 use crate::embodiment_evidence::{
-    EmbodimentEvidenceKind, EvidenceAvailability, EvidenceMetadataV1, EvidenceSourceClass,
+    EmbodimentEvidenceKind, EvidenceMetadataV1, EvidenceSourceClass,
     EvidenceValidationError, NormalizedScalarEvidenceV1, NormalizedVectorEvidenceV1,
 };
 
@@ -164,6 +164,7 @@ impl EmbodimentEvidenceProviderV1 for LegacyCompatibilityEvidenceAdapter<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::embodiment_evidence::EvidenceAvailability;
     use crate::embodiment::{
         AgentIdentity, EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel,
         GROUNDING_SENSORIMOTOR,
