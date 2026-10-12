@@ -1046,9 +1046,15 @@ fn holdout_record_is_consistent(
         return false;
     }
     let estimated_steps = (t_max / dt).ceil();
-    let actual_steps = match actual_rk4_step_count(t_max, dt) {
-        Some(steps) => steps,
-        None => return false,
+    // A preflight-rejected over-budget record has executed zero steps. Do not
+    // run the bounded step-count loop for a request that should never integrate.
+    let actual_steps = if estimated_steps > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY {
+        0
+    } else {
+        match actual_rk4_step_count(t_max, dt) {
+            Some(steps) => steps,
+            None => return false,
+        }
     };
     let state_updates_per_trajectory = estimated_steps * state_dimension as f64;
     let total_steps = estimated_steps * holdout.requested_trajectories as f64;
