@@ -159,9 +159,50 @@ Every result is reported against an exact commit, toolchain, schema and fixture 
 
 **Phase 4 — temporal planning.** Combine Symthaea's learned predictions with Mycelix's causal/evidence history, Sol Atlas' physical and civilizational horizons, and Symtropy's persistent worldline memory through explicit mappings. Keep the models' uncertainties and timescales separate; integrate evidence, not just scalar scores.
 
-## 7. Grounding references
+## 7. Greek temporal semantics: lenses, not competing clocks
+
+Ancient Greek vocabulary offers a useful set of conceptual lenses for asking different questions about time. This is **not a canonical ancient taxonomy of mutually exclusive kinds of time**: word meanings overlap, vary by period and author, and later philosophical/religious uses can differ from earlier everyday usage. Use the lenses as explicitly named semantic interpretations over typed temporal data, not as substitutes for clock domains, units, or reference systems.
+
+| Lens | Greek | Historically grounded sense | Engineering question | Candidate use in this ecosystem |
+|---|---|---|---|---|
+| **Chronos** | χρόνος | Time or duration; in Aristotle's *Physics* IV, time is counted/numbered motion with respect to before and after | How much time elapsed? How long until a deadline? What is the ordered duration? | Monotonic durations, simulation horizon, physical-time rates and forecast calibration |
+| **Kairos** | καιρός | The fitting, due, critical or opportune time; in rhetoric, a moment fitted to situation, audience and action | Is this the right moment to act, intervene, speak, or defer? | Symthaea's action window; Mycelix proposal/deadline/expiry decisions; urgency and intervention timing |
+| **Aion** | αἰών | In early Greek usage, life, vital force, whole lifetime or generation; in some cosmological and later uses, an age or eternity | What spans a life, generation, era or open-ended continuity? | Civilizational and ecological horizons, intergenerational obligations, continuity and renewal beyond a single project or life |
+| **Hora** | ὥρα | A season or naturally/otherwise fixed period, and later or contextually an hour/time of day | What changes with the season, time of day or recurring environmental phase? | Sol Atlas's day/seasonal contexts, light and energy availability, biological/care rhythms |
+| **Eniautos** | ἐνιαυτός | A year, yearly cycle, and in some usages a larger recurring period or cycle | What recurs annually, and what does one complete cycle change? | Model-year accounting, annual resource budgets, season-to-season comparison and frozen-year baselines |
+| **Rhythmos** | ῥυθμός | Rhythm, cadence or an organized pattern of movement; not simply another word for a clock | What pattern repeats, at what cadence, and how does it adapt? | Symthaea observation cadence and bodily rhythms; Symtropy's event/game/energy cycles; seasonal and civic rhythms |
+| **Nun / to nyn** | νῦν / τὸ νῦν | “Now”; in philosophical analysis, the now can be treated as a boundary relating past and future rather than a duration in itself | What is observed or decided now, and what evidence was available at that point? | Decision snapshots, event-time cutoffs, causal audits and leakage-free forecasting |
+
+### How to apply these without collapsing their meanings
+
+- **One event may have several lenses at once.** A heatwave may have a Chronos duration (five days), a Hora context (a seasonal anomaly), a Kairos intervention window (water dispatch must happen before storage runs out), a Rhythmos effect (recurrent demand peaks), and Aion consequences (long-lived infrastructure or ecosystem damage).
+- **Kairos is not just “timestamp + priority.”** A meaningful opportunity estimate needs context: the action available, the deadline or window, current conditions, expected consequence, uncertainty and the cost of acting too early or too late. It is a decision assessment, not an objective clock.
+- **Aion does not certify literal eternity.** It can motivate life-, generation- or era-scale analysis, and open-ended renewal as a research objective. A finite model can compare finite horizons and resilience under stated assumptions; it cannot prove infinite survival.
+- **Hora and Eniautos are not identical.** A Hora-style cycle can be a season, hour or other period; an Eniautos-style lens emphasizes a yearly cycle. Neither supplies a correct calendar by itself: the implementation must name the calendar, timezone, body/location and baseline when those details affect the question.
+- **Rhythmos is a pattern over time, not a time reference system.** A 20 ms cognitive sampling cadence, a daily care rhythm and a thousand-year ecological renewal pattern are not interchangeable simply because each has a rhythm.
+- **Nun is not the same as the entire present interval.** Store the observation/decision instant and the interval of evidence separately when evaluating what a system could know at decision time.
+
+### A practical type design
+
+Keep two independent pieces of metadata:
+
+1. **Clock domain** — how the coordinate is represented and compared: monotonic elapsed time, UTC wall time, causal/logical position, simulation/worldline tick, astronomical scale, or local calendar.
+2. **Temporal lens** — what role the time plays in a claim or decision: Chronos, Kairos, Aion, Hora, Eniautos, Rhythmos, Now, or a typed domain-specific extension.
+
+That allows a Mycelix claim to have a UTC recording timestamp and source-chain causal position, while also being evaluated with a Kairos deadline and Aion-scale consequences. It also lets Sol Atlas use a model-year coordinate with an Eniautos lens without confusing that with elapsed UI playback time.
+
+A future schema might encode the lens as `temporal_aspect`, but it must not make the lens determine units, causality, or physical truth. If the lens is absent or disputed, keep the underlying timestamp and event semantics usable and mark only the interpretation as unknown.
+
+## 8. Grounding references
 
 - Lamport, L. (1978), *Time, Clocks, and the Ordering of Events in a Distributed System*. Defines the “happened-before” partial order and logical clocks. [Microsoft Research](https://www.microsoft.com/en-us/research/publication/time-clocks-ordering-events-distributed-system/)
+- Aristotle, *Physics* IV.11, on time as number/count of motion with respect to before and after. [MIT Classics Archive translation](https://classics.mit.edu/Aristotle/physics.4.iv.html)
+- Plato, *Timaeus* 37d, on generated time as a “moving image of Eternity.” This is Plato's cosmological account, not a universal definition shared by all Greek authors. [Perseus Digital Library](https://www.perseus.tufts.edu/hopper/text?doc=Perseus%3Atext%3A1999.01.0180%3Atext%3DTim.%3Asection%3D37d)
+- Oxford Classical Dictionary, “Aion”: early senses include life, vital force, lifetime and generation, with eternity emerging in cosmological usage. [Oxford Academic](https://academic.oup.com/edited-volume/61673/chapter-abstract/548066302)
+- Oxford Classical Dictionary, “Kairos”: the personification of Opportunity and a concept distinguished from Chronos. [Oxford Academic](https://academic.oup.com/edited-volume/61673/chapter-abstract/549669909)
+- Liddell–Scott–Jones lexicon via the Greek Language Portal, “ἐνιαυτός”: year and recurring period/cycle. [Greek Language Portal](https://www.greek-language.gr/digitalResources/ancient_greek/tools/liddell-scott/search.html?lq=%E1%BC%90%CE%BD%CE%B9%CE%B1%CF%85%CF%84%CF%8C%CF%82)
+- Liddell–Scott–Jones lexicon, “ὥρα”: season, hour and fixed period. [Lexicon entry](https://bible.by/strong/greek/5610/dict/liddell-scott-jones/)
+- Oxford Classical Dictionary, “Rhythmics”: rhythmos as organized movement/rhythm, including bodily and musical cadence. [Oxford Academic](https://academic.oup.com/edited-volume/61673/chapter-abstract/552822120)
 - W3C, *Time Ontology in OWL*. Models temporal entities as instants/intervals, with duration, temporal reference systems and Allen interval relations. [W3C](https://www.w3.org/TR/owl-time/)
 - Rust standard library, `std::time::Instant`. Describes a monotonic nondecreasing clock for measuring elapsed duration, with platform-specific caveats. [Rust documentation](https://doc.rust-lang.org/stable/std/time/struct.Instant.html)
 - NASA/JPL NAIF, *SPICE Time Subsystem*. Defines astronomical scales including TT/TDB and the J2000 epoch for ephemeris use. [SPICE documentation](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/time.html)
