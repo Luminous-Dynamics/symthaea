@@ -162,31 +162,8 @@ fn rk45_trajectory(
     t_end: f64,
     dt: f64,
 ) -> (Vec<f64>, Vec<Vec<f64>>) {
-    let mut t = 0.0;
-    let mut y = y0.to_vec();
-    let mut times = vec![t];
-    let mut states = vec![y.clone()];
-    let dim = y0.len();
-
-    while t < t_end {
-        let h = dt.min(t_end - t);
-        let k1 = f(&y, t);
-        let y2: Vec<f64> = (0..dim).map(|i| y[i] + h * 0.5 * k1[i]).collect();
-        let k2 = f(&y2, t + 0.5 * h);
-        let y3: Vec<f64> = (0..dim).map(|i| y[i] + h * 0.5 * k2[i]).collect();
-        let k3 = f(&y3, t + 0.5 * h);
-        let y4: Vec<f64> = (0..dim).map(|i| y[i] + h * k3[i]).collect();
-        let k4 = f(&y4, t + h);
-        for i in 0..dim {
-            y[i] += h / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
-        }
-        t += h;
-        times.push(t);
-        states.push(y.clone());
-    }
-    (times, states)
+    super::dynamics::rk45_trajectory(f, y0, t_end, dt)
 }
-
 fn lorenz_rhs(s: &[f64], _t: f64) -> Vec<f64> {
     let (x, y, z) = (s[0], s[1], s[2]);
     let (sigma, rho, beta) = (10.0, 28.0, 8.0 / 3.0);
