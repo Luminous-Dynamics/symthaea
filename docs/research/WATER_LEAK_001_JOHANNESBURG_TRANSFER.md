@@ -299,7 +299,7 @@ The feature branch now includes a standard-library-only catalogue metadata colle
 Run from the repository root to perform only catalogue reconnaissance:
 
 ```sh
-python3 -m unittest tests.test_water_leak_satellite_catalog_inventory -v
+python3 -m unittest discover -s tests -p 'test_water_leak_satellite_catalog_inventory.py' -v
 python3 tools/water_leak_satellite/catalog_inventory.py \
   --bbox 27.7,-26.5,28.4,-25.8 \
   --start 2023-01-01 --end 2026-10-12 \
