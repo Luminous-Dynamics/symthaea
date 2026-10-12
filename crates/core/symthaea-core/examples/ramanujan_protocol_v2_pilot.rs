@@ -113,8 +113,8 @@ fn multiply_polynomials(left: &Polynomial, right: &Polynomial) -> Option<Polynom
     let mut result = Polynomial::new();
     for ((left_x, left_v), left_coefficient) in left {
         for ((right_x, right_v), right_coefficient) in right {
-            let x_power = left_x + right_x;
-            let v_power = left_v + right_v;
+            let x_power = *left_x + *right_x;
+            let v_power = *left_v + *right_v;
             if x_power + v_power > 2 {
                 return None;
             }
@@ -218,7 +218,6 @@ fn is_oracle_equivalent_harmonic_energy(candidate: &AutonomousInvariant) -> bool
 
 fn condition_run(
     mode: AutonomousDiscoveryMode,
-    seed: u64,
     config: &RegressorConfig,
 ) -> symthaea_core::hdc::conjecture_engine::AutonomousDiscoveryRunV1 {
     match mode {
@@ -236,18 +235,6 @@ fn condition_run(
             ),
         AutonomousDiscoveryMode::Composed => unreachable!("pilot does not run composed mode"),
     }
-    .pipe_with_seed(seed)
-}
-
-// Keep seed assignment explicit and checked for every run. This helper avoids
-// allowing a stale config seed to masquerade as a paired-seed comparison.
-trait SeedCheckedRun {
-    fn pipe_with_seed(self, expected_seed: u64) -> Self;
-}
-impl SeedCheckedRun for symthaea_core::hdc::conjecture_engine::AutonomousDiscoveryRunV1 {
-    fn pipe_with_seed(self, _expected_seed: u64) -> Self {
-        self
-    }
 }
 
 fn build_run_record(
@@ -261,7 +248,7 @@ fn build_run_record(
     if config.seed != seed || seed == holdout_seed {
         return Err("paired-seed invariant failed before run".into());
     }
-    let discovery = condition_run(mode, seed, config);
+    let discovery = condition_run(mode, config);
     let system = AutonomousHoldoutSystemV1::new(SYSTEM_ID, SYSTEM_DEFINITION, harmonic_rhs)
         .map_err(|error| format!("system identity initialization failed: {error:?}"))?;
 
@@ -460,10 +447,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         AutonomousDiscoveryMode::Primed,
         AutonomousDiscoveryMode::RandomBaseline,
     ];
-    let system = AutonomousHoldoutSystemV1::new(SYSTEM_ID, SYSTEM_DEFINITION, harmonic_rhs)
-        .map_err(|error| format!("system identity initialization failed: {error:?}"))?;
-    drop(system);
-
     for replicate in 0..replicates {
         let seed = first_seed.wrapping_add(replicate as u64);
         let holdout_seed = seed.wrapping_add(HOLDOUT_SEED_OFFSET);
