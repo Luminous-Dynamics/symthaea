@@ -119,9 +119,11 @@ Electricity usage linked to a person, dwelling, account or stable location can b
 Files:
 - `docs/research/energy_telemetry_envelope.schema.json`
 - `tools/energy_telemetry/privacy_contract.py`
+- `tools/energy_telemetry/release_guard.py`
 - `tests/test_energy_telemetry_privacy_contract.py`
+- `tests/test_energy_telemetry_release_guard.py`
 
-The initial unit suite contains 33 deterministic, network-free cases covering schema/validator alignment, privacy-policy gates, extreme numeric inputs, edge cases and ambiguous JSON input. They are implemented cases; no hosted CI pass is implied.
+The deterministic, network-free suite contains 43 cases: 33 envelope/parser cases and 10 release-policy cases. The release guard rejects overlapping time windows for shared participants, deduplicates exact same-batch retransmissions, and composes epsilon/delta budgets per local participant token. This release guard is in-memory only; production requires a durable, access-controlled and tamper-evident ledger whose restart/recovery path cannot reset privacy budgets. They are implemented cases; no hosted CI pass is implied.
 
 The validator checks the aggregate envelope's exact keys, UTC/time-window consistency, cohort floor, bounded integer energy value, finite coverage fraction, privacy-mechanism/recipient compatibility and per-release DP parameter limits. A dedicated [pinned GitHub Actions workflow](https://github.com/Luminous-Dynamics/symthaea/blob/research/privacy-preserving-satellite-energy-telemetry/.github/workflows/energy-telemetry-privacy-tests.yml) compiles and runs the offline tests on relevant branch/PR changes. It also rejects duplicate JSON keys, non-standard `NaN`/`Infinity` constants and malformed container types without crashing. It does not establish cryptographic authenticity, hardware provenance, meter calibration, the reality of claimed cohort membership or a mathematical privacy proof.
 
