@@ -32,7 +32,6 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   WGPU_BACKEND: vulkan
-  SYTHAEA_GPU_SMOKE_REQUIRED: '1'
   XDG_RUNTIME_DIR: /tmp/symthaea-xdg-runtime
 
 jobs:
@@ -40,6 +39,8 @@ jobs:
     name: WGPU compute dispatch on Mesa lavapipe (software Vulkan)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      SYTHAEA_GPU_EXPECT_SOFTWARE: '1'
     steps:
       - name: Checkout exact tested revision
         uses: actions/checkout@v4
@@ -122,3 +123,58 @@ jobs:
             gpu-capability-smoke.log
           if-no-files-found: warn
           retention-days: 30
+
+  # Physical-GPU qualification is intentionally manual and main-only. Never
+  # execute pull-request-controlled source on this public repository's
+  # self-hosted runner. The existing runner labels are used by benchmarks.yml.
+  hardware-nvidia:
+    name: WGPU compute dispatch on NVIDIA physical GPU
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.software-vulkan.result == 'success'
+    needs: [software-vulkan]
+    runs-on: [self-hosted, gpu, nixos]
+    timeout-minutes: 45
+    env:
+      SYTHAEA_GPU_EXPECT_NVIDIA: '1'
+    steps:
+      - name: Checkout trusted main revision only
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Verify exact trusted revision and inventory physical GPU
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          command -v nvidia-smi
+          nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv | tee gpu-hardware-inventory.txt
+          if command -v vulkaninfo >/dev/null 2>&1; then
+            vulkaninfo --summary 2>&1 | tee -a gpu-hardware-inventory.txt
+          else
+            echo "vulkaninfo is not installed; runtime WGPU adapter report remains the source of backend identity."
+          fi
+
+      - name: Run real NVIDIA Vulkan dispatch/readback under the pinned Nix development environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix develop --command bash -lc '
+            set -euo pipefail
+            rustc --version
+            cargo test -p symthaea-core --features gpu --lib \
+              hdc::gpu_compute::capability_report_tests -- --nocapture 2>&1 \
+              | tee gpu-capability-hardware.log
+          '
+
+      - name: Upload physical-GPU evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-hardware-smoke-${{ github.sha }}
+          path: |
+            gpu-hardware-inventory.txt
+            gpu-capability-hardware.log
+          if-no-files-found: warn
+          retention-days: 90
