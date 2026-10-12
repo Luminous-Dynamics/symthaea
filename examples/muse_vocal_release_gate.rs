@@ -576,7 +576,7 @@ fn run_saved_ratings_review(
     );
     for (clip_id, internal) in &clip_by_id {
         let public = public_by_id
-            .get(clip_id)
+            .get(*clip_id)
             .context("private clip is missing from the public listening manifest")?;
         anyhow::ensure!(
             public.lyrics == internal.lyrics && public.audio == internal.audio,
@@ -594,7 +594,7 @@ fn run_saved_ratings_review(
     }
     anyhow::ensure!(
         key_by_id.len() == clip_by_id.len()
-            && clip_by_id.keys().all(|clip_id| key_by_id.contains_key(clip_id)),
+            && clip_by_id.keys().all(|clip_id| key_by_id.contains_key(*clip_id)),
         "private answer key and manifest identities differ"
     );
 
