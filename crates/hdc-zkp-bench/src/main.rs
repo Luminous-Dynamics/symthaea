@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! HDC XOR Binding Proof Benchmark
+//! HDC XOR Binding Integrity-Proof Benchmark
 //!
 //! Proves a 16,384-bit Hyperdimensional XOR binding operation across:
 //! 1. **Binius64** — Binary tower field STARK (XOR = native field addition, FREE).
@@ -14,7 +14,7 @@
 //!    `crates/mycelix-zkp-core/src/circuits/winterfell_xor.rs` (monorepo root).
 //!
 //! This benchmark generates the core data for the paper:
-//! "Binary-Field STARKs for Hyperdimensional Computing"
+//! "Binary-Field Proofs for Hyperdimensional Computing"
 //!
 //! ## Key Insight
 //!
@@ -64,7 +64,7 @@ fn bench_binius_hdc_xor() -> BenchResult {
     let builder = CircuitBuilder::new();
     let hv_dim_words = 256; // 16,384 bits / 64 bits per word
 
-    // Input wires: two HDC vectors (private witness)
+    // Input wires: witness vectors (Binius64 does not guarantee witness privacy)
     let vec_a: Vec<_> = (0..hv_dim_words).map(|_| builder.add_witness()).collect();
     let vec_b: Vec<_> = (0..hv_dim_words).map(|_| builder.add_witness()).collect();
 
@@ -160,7 +160,7 @@ fn bench_binius_hdc_xor() -> BenchResult {
         "  Verifier time: {:.3} ms",
         verify_time.as_secs_f64() * 1000.0
     );
-    println!("  Verification: PASSED (real cryptographic proof)");
+    println!("  Verification: PASSED (integrity proof; no Binius64 ZK privacy guarantee)");
 
     BenchResult {
         backend: "Binius64 (GF(2^64))".to_string(),
@@ -267,11 +267,13 @@ struct BenchResult {
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║  HDC XOR Binding — ZKP Backend Comparison Benchmark         ║");
+    println!("║  HDC XOR Binding — Proof Backend Comparison Benchmark     ║");
     println!("║  Paper: \"Binary-Field STARKs for Hyperdimensional Computing\"║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
     println!("Operation: XOR binding of two 16,384-bit BinaryHV vectors");
+    println!("Security scope: computational integrity only; this Binius64 backend is not zero-knowledge.");
+    println!("Do not treat witness inputs as confidential under this harness.");
     println!("This is the fundamental operation in Hyperdimensional Computing.");
     println!();
     println!("Backends: Binius = REAL prover+verifier (measured).");
@@ -402,12 +404,12 @@ fn main() {
     );
     println!("    No sigmoid, range check, or numeric CfC arithmetic is encoded.");
 
-    // Triple Stack: HDC + FHE + ZKP
+    // Legacy triple-stack module path: opaque-word XOR relation only
     println!("\n\n{}", "=".repeat(60));
-    println!("OPAQUE-WORD XOR RELATION PROOF");
+    println!("OPAQUE-WORD XOR INTEGRITY PROOF");
     println!("{}", "=".repeat(60));
 
-    let triple = triple_stack::bench_triple_stack(256); // 16,384 bits
+    let triple = triple_stack::bench_opaque_xor_relation(256); // 16,384-bit opaque-word XOR relation
 
     println!(
         "\n  XOR relation: {} AND constraints for {}-bit packed-word output",
@@ -416,7 +418,7 @@ fn main() {
     );
     println!("  Proves c = a XOR b for opaque words; it does not prove OTP encryption or mask generation.");
 
-    // Strict bitwise majority over private packed-word inputs. This is a Boolean
+    // Strict bitwise majority over witness packed-word inputs. This is a Boolean
     // circuit demo, not encrypted-gradient aggregation or a federated-learning protocol.
     println!("\n\n{}", "=".repeat(60));
     println!("BITWISE MAJORITY PROOF BENCHMARK (OPAQUE WORDS)");
@@ -464,7 +466,9 @@ fn main() {
                 "prove_time_ms": binius_result.prove_time_ms,
                 "verify_time_ms": binius_result.verify_time_ms,
                 "proof_size_bytes": binius_result.proof_size_bytes,
-                "real_proof": true
+                "real_proof": true,
+                "zero_knowledge": false,
+                "privacy_note": "the standard vendored Binius64 backend does not guarantee witness confidentiality"
             },
             "winterfell": {
                 "constraints": winterfell_result.constraint_count,
