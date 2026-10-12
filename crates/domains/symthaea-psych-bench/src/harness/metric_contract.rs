@@ -170,10 +170,12 @@ impl MetricDefinitionV1 {
                     "bca_bootstrap_v1" => {
                         let alpha = parameters.get("alpha").and_then(|v| v.parse::<f64>().ok());
                         if parameters.get("resamples").map(String::as_str) != Some("2000")
+                            || parameters.get("rng").map(String::as_str)
+                                != Some("xorshift64_seed_xor_9e3779b97f4a7c15_v1")
                             || alpha.is_none()
-                            || parameters.len() != 2
+                            || parameters.len() != 3
                         {
-                            errors.push("BCa bootstrap policy requires exactly alpha and resamples=2000".to_string());
+                            errors.push("BCa bootstrap policy requires exactly alpha, rng, and resamples=2000".to_string());
                         }
                         if let Some(alpha) = alpha {
                             if !alpha.is_finite()
@@ -644,6 +646,7 @@ mod tests {
                 parameters: BTreeMap::from([
                     ("alpha".to_string(), "0.05".to_string()),
                     ("resamples".to_string(), "2000".to_string()),
+                    ("rng".to_string(), "xorshift64_seed_xor_9e3779b97f4a7c15_v1".to_string()),
                 ]),
             },
             ComparisonRuleV1::RelativeDelta {
@@ -701,7 +704,7 @@ mod tests {
             parameters.insert("unrecognized".to_string(), "value".to_string());
         }
         let errors = definition.validate().unwrap_err();
-        assert!(errors.iter().any(|message| message.contains("exactly alpha and resamples=2000")));
+        assert!(errors.iter().any(|message| message.contains("exactly alpha, rng, and resamples=2000")));
     }
 
     #[test]
@@ -817,6 +820,10 @@ mod tests {
         assert_eq!(provenance.method(), "bca_bootstrap_v1");
         assert_eq!(provenance.sample_unit(), Some("independent_seed_run"));
         assert_eq!(provenance.parameters().get("seed").map(String::as_str), Some("17"));
+        assert_eq!(
+            provenance.parameters().get("rng").map(String::as_str),
+            Some("xorshift64_seed_xor_9e3779b97f4a7c15_v1")
+        );
         assert!(provenance.validate_for_value(&loaded).is_ok());
     }
 
