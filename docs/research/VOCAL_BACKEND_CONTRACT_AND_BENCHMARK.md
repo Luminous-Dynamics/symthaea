@@ -115,6 +115,8 @@ A source audit found two pronunciation-integrity defects and one language-contra
 - The DiffSinger worker had the same unknown-IPA-to-`ax` fallback. The mapping now lives in a small dependency-light module and rejects unsupported symbols rather than producing plausible but incorrect audio.
 - The DiffSinger adapter always constructed `en/<phone>` tokens and used language ID 0 for an unknown language. The worker now requires an explicit English (`en`) mapping and rejects non-English requests until language-specific G2P, phone inventory, and model tokens are implemented together. This is an honest capability limit, not a claim of multilingual support.
 
+The source-alignment audit also found that the existing letter fallback emits the composite IPA token `ks` for `x`. The functional renderer now expands that token into ordered `K` then `S` spans, rather than either rejecting a valid G2P output or losing one articulation. A Rust regression walks the current G2P dictionary and alphabet fallback; a dependency-light Python fixture checks the DiffSinger map. These tests protect mapping coverage, not acoustic pronunciation correctness.
+
 These checks prevent a subset of hidden pronunciation corruption; they do not prove improved naturalness or speech intelligibility. A future non-English path should use language-specific grapheme-to-phoneme rules, a declared phone inventory, and exact token coverage rather than reusing English phone labels.
 
 ### Evaluation dimensions for spoken communication
