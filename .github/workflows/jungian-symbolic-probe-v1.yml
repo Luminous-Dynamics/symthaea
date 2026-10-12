@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+# A newer head supersedes an older capture on this PR; keep only current work active.
+concurrency:
+  group: jungian-probe-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   capture:
     runs-on: ubuntu-24.04
@@ -58,11 +63,12 @@ jobs:
           print("runner_sha256=" + hashlib.sha256(r.read_bytes()).hexdigest())
           PY
 
-      - name: Validate the frozen corpus and validator mutations
+      - name: Validate frozen corpus, output evaluator, and hostile mutations
         shell: bash
         run: |
           set -euo pipefail
           python3 scripts/validate_jungian_symbolic_probe.py --self-test
+          python3 scripts/evaluate_jungian_symbolic_outputs.py --self-test
 
       - name: Run deterministic lexical and context-rule baselines
         id: baselines
@@ -96,7 +102,6 @@ jobs:
             --glyph-projection "$OUT/glyph_projection.json"
           python3 scripts/validate_jungian_symbolic_probe.py --results "$OUT/keyword_dictionary_foil_v0.normalized.json"
           python3 scripts/validate_jungian_symbolic_probe.py --results "$OUT/context_guardrails_rules_v0.normalized.json"
-          python3 scripts/evaluate_jungian_symbolic_outputs.py --self-test
           python3 scripts/evaluate_jungian_symbolic_outputs.py \
             --corpus docs/research/data/jungian_symbolic_probe_v1.json \
             --source-revision "$SOURCE_REVISION" \
