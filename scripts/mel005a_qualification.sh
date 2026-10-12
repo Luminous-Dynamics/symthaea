@@ -21,8 +21,8 @@ printf 'git_tree_sha=%s\n' "$tree_sha"
 printf 'git_subject=%s\n' "$commit_subject"
 printf 'expected_head=%s\n' "$expected_head"
 printf 'rustup_active_toolchain=%s\n' "$rustup_toolchain"
-printf '--- rustc --version --verbose ---\n%s\n' "$rustc_version"
-printf '--- cargo --version --verbose ---\n%s\n' "$cargo_version"
+printf '%s\n' '--- rustc --version --verbose ---' "$rustc_version"
+printf '%s\n' '--- cargo --version --verbose ---' "$cargo_version"
 git status --short --branch
 
 steps=(format importer_test studio_check state_space_test world_state_test)

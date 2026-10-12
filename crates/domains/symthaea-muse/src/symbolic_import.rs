@@ -1455,9 +1455,8 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         });
     }
 
-    let rhythm_near_matches = normalized_onset_gap_shape(representative_notes).map(|shape| {
-        rhythm_near_match_summary(&notes, &pitch_interval_pattern, shape)
-    });
+    let rhythm_near_matches = normalized_onset_gap_shape(representative_notes)
+        .map(|shape| rhythm_near_match_summary(&notes, &pitch_interval_pattern, shape));
 
     let mut occurrence_count = 0_usize;
     let mut independent_occurrence_count = 0_usize;
@@ -1621,7 +1620,10 @@ mod tests {
     fn monophonic_midi_track(pitches: &[u8], extra_rest_before_note: &[u8]) -> Vec<u8> {
         let mut track = Vec::new();
         for (index, pitch) in pitches.iter().copied().enumerate() {
-            let rest = extra_rest_before_note.get(index).copied().unwrap_or_default();
+            let rest = extra_rest_before_note
+                .get(index)
+                .copied()
+                .unwrap_or_default();
             track.extend_from_slice(&[rest, 0x90, pitch, 100, 100, 0x80, pitch, 0]);
         }
         track.extend_from_slice(&[0, 0xFF, 0x2F, 0]);
@@ -1758,12 +1760,9 @@ mod tests {
         assert!(near.occurrences[0].observed_max_normalized_onset_gap_error < 1e-12);
     }
 
-
     #[test]
     fn rhythm_near_matches_do_not_duplicate_exact_contours_with_changed_rhythm() {
-        let pitches = [
-            60_u8, 62, 64, 65, 60, 62, 64, 65, 70, 72, 74, 75,
-        ];
+        let pitches = [60_u8, 62, 64, 65, 60, 62, 64, 65, 70, 72, 74, 75];
         let mut extra_rest_before_note = vec![0_u8; pitches.len()];
         extra_rest_before_note[9] = 100;
         let track = monophonic_midi_track(&pitches, &extra_rest_before_note);
