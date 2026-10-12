@@ -811,14 +811,16 @@ fn discover_invariants_autonomous_with_mode(
         }
     }
     for (i, template) in seed_templates.into_iter().enumerate() {
-        if i < population.len() / 4 {
+        if i < population.len() / 4 && template.complexity() <= max_complexity {
             population[i] = template;
         }
     }
 
     let pinned_priors: Vec<Expr> = extra_seed_templates
         .iter()
-        .filter(|t| expr_uses_only_vars(t, var_names))
+        .filter(|template| {
+            expr_uses_only_vars(template, var_names) && template.complexity() <= max_complexity
+        })
         .cloned()
         .collect();
     let pinned_prior_keys: Vec<String> = pinned_priors.iter().map(macro_usage_key).collect();
@@ -985,7 +987,7 @@ fn discover_invariants_autonomous_with_mode(
 
             rng = lcg_step(rng);
             let roll = rng as f64 / u64::MAX as f64;
-            let child = if pinned_priors.len() >= 2 && roll < config.prior_composition_rate {
+            let mut child = if pinned_priors.len() >= 2 && roll < config.prior_composition_rate {
                 rng = lcg_step(rng);
                 let i = (rng as usize) % pinned_priors.len();
                 rng = lcg_step(rng);
@@ -1011,6 +1013,11 @@ fn discover_invariants_autonomous_with_mode(
                 let other = if fitnesses[c] < fitnesses[d] { c } else { d };
                 crossover(&population[winner], &population[other], &mut rng)
             };
+            // Crossover and mutation can increase AST size; bound the tree before
+            // it is carried into the next generation or evaluated for fitness.
+            if child.complexity() > max_complexity {
+                child = random_expr_multivar(&mut rng, max_depth.min(3), var_names, exclude_trig);
+            }
             new_pop.push(child);
         }
         population = new_pop;
@@ -1020,6 +1027,9 @@ fn discover_invariants_autonomous_with_mode(
         .iter()
         .enumerate()
         .map(|(i, expr)| {
+            if expr.complexity() > max_complexity || expr.complexity() < 3 {
+                return (i, f64::MAX, 0.0);
+            }
             if matches!(simplify(expr), Expr::Const(_)) {
                 return (i, f64::MAX, 0.0);
             }
