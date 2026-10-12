@@ -116,6 +116,48 @@ def wireCertifiedFactorizationFieldsFit
   (List.zip certificate.factorization.factors certificate.primeProofs).all
     (fun entry => entry.1.1 == entry.2.value)
 
+/-- Pocklington soundness with an independent witness for each distinct
+prime divisor. Unlike the common-root variant, this matches the certificate wire
+format directly: each predecessor prime can carry its own witness.
+
+The only arithmetic premises are the Pocklington divisibility and size bounds,
+plus the witness congruence and GCD conditions for every prime divisor of F. -/
+theorem pocklington_certify_independent_witnesses
+    (N F : Nat) (h2n : 2 ≤ N) (hF : F ∣ N - 1) (hFlarge : N.sqrt < F)
+    (witnesses : ∀ q ∈ F.primeFactors, ∃ a : Nat,
+      a ^ (N - 1) ≡ 1 [MOD N] ∧
+      Nat.gcd (a ^ ((N - 1) / q) - 1) N = 1) :
+    Nat.Prime N := by
+  by_contra hNprime
+  rw [Nat.sqrt_lt, ← sq] at hFlarge
+  have hfactor := pocklington_test N F (by omega) hF witnesses
+    N.minFac (Nat.minFac_prime (by omega)) N.minFac_dvd
+  have hminFac : 2 ≤ N.minFac := (Nat.minFac_prime (by omega)).two_le
+  rw [Nat.ModEq.comm, Nat.modEq_iff_dvd' (by omega)] at hfactor
+  have hfactorLowerBound :=
+    Nat.succ_le_iff.mp <| (Nat.le_sub_iff_add_le (by omega)).mp <|
+      Nat.le_of_dvd (by omega) hfactor
+  exact lt_asymm hFlarge <|
+    ((Nat.pow_lt_pow_iff_left (by omega)).mpr hfactorLowerBound).trans_le <|
+      Nat.minFac_sq_le_self (by omega) hNprime
+
+/-- A small, explicit regression: 13 is prime using different witness obligations
+for q = 2 and q = 3, without constructing a shared witness in Python. -/
+theorem prime_thirteen_from_independent_witnesses : Nat.Prime 13 := by
+  apply pocklington_certify_independent_witnesses (N := 13) (F := 12)
+  · norm_num
+  · norm_num
+  · norm_num
+  · intro q hq
+    have hqPrime : Nat.Prime q := (Nat.mem_primeFactors.mp hq).1
+    have hqDvd : q ∣ 12 := (Nat.mem_primeFactors.mp hq).2.1
+    have hqBound : q ≤ 12 := Nat.le_of_dvd (by norm_num) hqDvd
+    have hqCases : q = 2 ∨ q = 3 := by
+      interval_cases q <;> norm_num at hqPrime ⊢
+    rcases hqCases with rfl | rfl
+    · exact ⟨2, by norm_num [Nat.ModEq], by norm_num⟩
+    · exact ⟨2, by norm_num [Nat.ModEq], by norm_num⟩
+
 /-- A kernel-checked Pocklington proof for the minimal cross-language vector. -/
 theorem golden_prime_three : Nat.Prime 3 := by
   prime_cert [small {2}, pock (3, 2, 2)]
