@@ -175,6 +175,41 @@ References:
 - Optical leak-detection research with false positives due to rainfall, irrigation, natural water flow and vegetation: https://doi.org/10.3390/s22031057
 - ASTERRA is a vendor/source for its product claims; treat the site's claimed leak thresholds and cumulative outcomes as vendor-reported, not independently validated Johannesburg performance.
 
+### Johannesburg-specific pilot targeting and data stewardship
+
+#### Do not conflate non-revenue water with physical leakage
+
+Johannesburg Water's public reports distinguish non-revenue water (NRW) from physical/real losses. NRW can include physical losses (leaking mains, service connections, reservoirs), commercial/apparent losses (metering or billing issues), and authorized unbilled consumption. A satellite/moisture or acoustic pipeline product primarily targets a subset of physical-loss candidates. It cannot, by itself, detect or explain the full NRW metric, including commercial losses.
+
+- Johannesburg Water Annual Report 2023/24 reports NRW of 46.18%; its breakdown identifies 24.83% as physical losses, 9.66% as commercial losses, and 11.69% as authorized unbilled use. These are historical 2023/24 figures and must not be represented as the 2024/25 breakdown: https://www.johannesburgwater.co.za/wp-content/uploads/2025/02/FINAL-JOHANNESBURG-WATER-ANNUAL-REPORT-23_2024-20-02-2025.pdf
+- City of Johannesburg Annual Integrated Report 2025 reports audited NRW of 44.8% for 2024/25 versus 46.2% in 2023/24. This is the broader NRW KPI, not a satellite-detectable physical leak percentage: https://joburg.org.za/work_/Documents/Annual-Integrated-Report-2025/City-of-Johannesburg-Annual-Intergrated-Report-2025.pdf
+- Johannesburg Water Business Plan 2025/26 also describes NRW as including real losses, commercial losses and authorized unbilled consumption: https://www.johannesburgwater.co.za/wp-content/uploads/2025/07/JHB-Water_Business-Plan-2025_For-Upload_FINAL_070725.pdf
+
+Never estimate water saved by multiplying an anomaly count or a model's conditional hit-rate by total NRW. Quantify savings from measured leak flow/validated repair outcomes where those data are available and water accounting permits the attribution.
+
+#### Candidate assets are a hypothesis, not a target list yet
+
+The City of Johannesburg Annual Integrated Report 2025 describes 42 leaking reservoirs having been identified, with 23 considered critical, and discusses an inventory of 730 zonal pressure-reducing valves (PRVs), including many previously vandalized or inoperative. It reports 211 PRVs (29%) had been returned to operational status during 2024/25 and 26 smart pressure controllers were added that year, bringing the report's stated installed total to 51. Those numbers are dated annual-report descriptions, not a verified current asset register or evidence that any listed asset remains faulty in October 2026.
+
+These facts justify asking the data owner whether a suitable, currently valid pilot site exists; they do not justify declaring a leak location. Consider two candidate profiles, chosen only after data and permission review:
+
+1. **Known, physically confirmed leak/repair segment:** best for a retrospective sensor/image study because event time, spatial uncertainty and outcome can potentially be aligned.
+2. **Authorized reservoir or PRV/pressure-zone site:** potentially useful for a prospective multimodal pilot because asset location and operational context may be known. Use pressure/flow/controller telemetry and technician inspection as primary evidence; satellite surface anomalies are only supplementary and may be too coarse to resolve a small asset.
+
+A pilot should choose the area where labels, repeat imagery, field access and operational comparator are strongest—not simply the place with the most alarming reported count.
+
+#### Data-access route
+
+The City of Johannesburg Corporate Geo-Informatics (CGIS) site describes a Spatial Data Inventory with dataset names, descriptions, formats, dates, data owners/contacts and usage limitations; digital data requests follow its GIS/task-request process. Use it to identify the right custodian and request permission instead of assuming water-main GIS is public or available for commercial use.
+
+- City CGIS maps / Spatial Data Inventory entry point: https://eservices.joburg.org.za/sites/cgismaps/Pages/default.aspx
+- City CGIS overview and task-request information: https://eservices.joburg.org.za/corporate-geo-informatics/overview
+
+Request the minimum necessary, permissioned layers: pipe centerlines and spatial accuracy; material/diameter/age where recorded; pressure zones, PRVs and reservoirs; timestamped confirmed leak/repair work orders; inspected no-leak outcomes; maintenance/inspection method; and any available flow/pressure measurements. Record owner, licence/allowed purpose, permitted retention, spatial precision, timestamp quality, suppression rules and whether derived model outputs may be commercialized or redistributed.
+
+The 2025 University of Johannesburg / Johannesburg Water satellite research initiative is a priority partner-discovery lead. Ask what area, sensor/wavelength, leak records, validation design and operating status it actually covered before running an overlapping study:
+https://pure.uj.ac.za/en/publications/satellite-imagery-for-water-leak-detection-a-joint-research-initi/
+
 ### Why fusion is more credible than satellite-only detection
 
 A wet or thermally unusual area is not automatically a leak. Confounders include rainfall, irrigation, groundwater seepage, stormwater, leaking sewers, broken drains, ponds, changes in vegetation, slope/runoff, soil composition, excavation, surface materials, shadow, traffic, and land-cover change. Satellite anomalies can also miss leaks that stay contained underground, are small/short-lived, occur under impermeable surfaces, or produce a signal below the sensor's spatial resolution.
