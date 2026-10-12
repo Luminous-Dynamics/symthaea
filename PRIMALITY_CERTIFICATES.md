@@ -159,8 +159,14 @@ not trust the root-combination algorithm: the emitted claim is checked using the
 pinned `PrimeCert` Pocklington tactic, and the resulting theorem is checked by Lean's
 kernel.
 
-`formal/math-certificate/` pins Lean 4.33.0, the `PrimeCert` source revision, and
-its resolved Mathlib dependency graph. The new focused workflow builds the project,
+`formal/math-certificate/` pins Lean 4.33.1, the `PrimeCert` source revision, and
+its resolved Mathlib dependency graph. The workspace directly pins Mathlib tag
+`v4.33.1` and its resolved commit so the kernel/runtime patch level is explicit
+rather than inherited from the older `PrimeCert` snapshot. Lean's [official
+4.33.1 release notes](https://lean-lang.org/doc/reference/latest/releases/v4.33.1/)
+recommend upgrading from 4.33.0 or earlier and document kernel soundness fixes;
+this pin is part of the proof-trust boundary, not a claim that Symthaea's Rust
+or Python code is formally verified. The new focused workflow builds the project,
 runs an axiom audit, generates Lean source from both cross-language golden vectors and a separate
 152-byte multi-factor fixture for 13, and asks Lean to check all three generated
 claims. The extra fixture exercises combining per-factor witnesses for
