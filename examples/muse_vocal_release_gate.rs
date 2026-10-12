@@ -90,6 +90,7 @@ struct BlindClip {
 /// Listener-facing metadata only. Keep experimental labels and source case IDs
 /// out of the shareable manifest to reduce expectancy bias during rating.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ListeningClip {
     clip_id: String,
     lyrics: String,
@@ -726,6 +727,15 @@ fn run_saved_ratings_review(
             && clip_by_id.keys().all(|clip_id| key_by_id.contains_key(*clip_id)),
         "private answer key and manifest identities differ"
     );
+    for (clip_id, internal) in &clip_by_id {
+        let entry = key_by_id
+            .get(*clip_id)
+            .context("private answer key is missing a manifest clip")?;
+        anyhow::ensure!(
+            entry.case_id == internal.case_id && !entry.backend.trim().is_empty(),
+            "answer key disagrees with private manifest for clip {clip_id}"
+        );
+    }
 
     let mut objective_by_id = BTreeMap::new();
     for entry in &objective {
@@ -811,6 +821,13 @@ fn render_one(
     // a custom/backend implementation must not save malformed audio for ratings.
     stem.validate()?;
     let id = blind_id(salt, &stem.backend, case_id);
+    anyhow::ensure!(
+        !clips.iter().any(|clip| clip.clip_id == id)
+            && !key.iter().any(|entry| entry.clip_id == id),
+        "blind clip ID collision for backend {} and case {}",
+        stem.backend,
+        case_id
+    );
     let filename = format!("{id}.wav");
     save(&output.join(&filename), &stem)?;
     let metrics = analyze_vocal_stem(performance, &stem);
