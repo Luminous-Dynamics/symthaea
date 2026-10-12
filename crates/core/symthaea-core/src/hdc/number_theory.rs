@@ -308,7 +308,7 @@ impl PrimalityProof {
         }
 
         let mut reader = PrimalityProofByteReader { bytes, offset: 0 };
-        if reader.read(8)? != PRIMALITY_PROOF_WIRE_MAGIC {
+        if reader.read(8)? != &PRIMALITY_PROOF_WIRE_MAGIC[..] {
             return Err(PrimalityProofWireError::InvalidMagicOrVersion);
         }
         let value = reader.read_u64()?;
@@ -453,6 +453,25 @@ pub enum CertifiedFactorizationError {
     PrimeProofGenerationFailed { factor: u64, reason: PrimalityProofError },
 }
 
+/// Versioned, bounded wire-format failures for proof-carrying factorization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CertifiedFactorizationWireError {
+    InvalidMagicOrVersion,
+    TruncatedInput,
+    TrailingBytes { count: usize },
+    InputTooLarge { length: usize },
+    TooManyFactors { count: u32 },
+    TooManyProofs { count: u32 },
+    LengthOverflow,
+    InvalidCertificate(CertifiedFactorizationError),
+    InvalidNestedProof { index: u32, reason: PrimalityProofWireError },
+}
+
+const CERTIFIED_FACTORIZATION_WIRE_MAGIC: &[u8; 8] = b"SYMFCER1";
+const CERTIFIED_FACTORIZATION_MAX_FACTORS: u32 = 4_096;
+const CERTIFIED_FACTORIZATION_MAX_PROOFS: u32 = 4_096;
+const CERTIFIED_FACTORIZATION_MAX_WIRE_BYTES: usize = 1_048_576;
+
 /// Check the canonical factor list and exact product without making any primality
 /// assumption. The certified variant follows this with a Pocklington proof per factor.
 fn verify_factorization_structure(
@@ -523,6 +542,137 @@ impl CertifiedFactorizationCertificate {
         }
         Ok(())
     }
+    /// Encode a verified factorization plus all per-factor Pocklington proofs.
+    /// Nested primality proofs use their own versioned canonical encoding.
+    pub fn to_canonical_bytes(&self) -> Result<Vec<u8>, CertifiedFactorizationWireError> {
+        self.verify().map_err(CertifiedFactorizationWireError::InvalidCertificate)?;
+
+        let factor_count = u32::try_from(self.factorization.factors.len())
+            .map_err(|_| CertifiedFactorizationWireError::LengthOverflow)?;
+        let proof_count = u32::try_from(self.prime_proofs.len())
+            .map_err(|_| CertifiedFactorizationWireError::LengthOverflow)?;
+        if factor_count > CERTIFIED_FACTORIZATION_MAX_FACTORS {
+            return Err(CertifiedFactorizationWireError::TooManyFactors { count: factor_count });
+        }
+        if proof_count > CERTIFIED_FACTORIZATION_MAX_PROOFS {
+            return Err(CertifiedFactorizationWireError::TooManyProofs { count: proof_count });
+        }
+
+        let mut nested = Vec::with_capacity(self.prime_proofs.len());
+        let mut encoded_len = 8usize + 8 + 4 + 4;
+        encoded_len = encoded_len
+            .checked_add(self.factorization.factors.len().checked_mul(12).ok_or(
+                CertifiedFactorizationWireError::LengthOverflow,
+            )?)
+            .ok_or(CertifiedFactorizationWireError::LengthOverflow)?;
+
+        for (index, proof) in self.prime_proofs.iter().enumerate() {
+            let proof_bytes = proof.to_canonical_bytes().map_err(|reason| {
+                CertifiedFactorizationWireError::InvalidNestedProof {
+                    index: u32::try_from(index).unwrap_or(u32::MAX),
+                    reason,
+                }
+            })?;
+            let _proof_length = u32::try_from(proof_bytes.len())
+                .map_err(|_| CertifiedFactorizationWireError::LengthOverflow)?;
+            encoded_len = encoded_len
+                .checked_add(4)
+                .and_then(|len| len.checked_add(proof_bytes.len()))
+                .ok_or(CertifiedFactorizationWireError::LengthOverflow)?;
+            if encoded_len > CERTIFIED_FACTORIZATION_MAX_WIRE_BYTES {
+                return Err(CertifiedFactorizationWireError::InputTooLarge { length: encoded_len });
+            }
+            nested.push(proof_bytes);
+        }
+
+        if encoded_len > CERTIFIED_FACTORIZATION_MAX_WIRE_BYTES {
+            return Err(CertifiedFactorizationWireError::InputTooLarge { length: encoded_len });
+        }
+
+        let mut bytes = Vec::with_capacity(encoded_len);
+        bytes.extend_from_slice(CERTIFIED_FACTORIZATION_WIRE_MAGIC);
+        bytes.extend_from_slice(&self.factorization.value.to_be_bytes());
+        bytes.extend_from_slice(&factor_count.to_be_bytes());
+        for &(factor, exponent) in &self.factorization.factors {
+            bytes.extend_from_slice(&factor.to_be_bytes());
+            bytes.extend_from_slice(&exponent.to_be_bytes());
+        }
+        bytes.extend_from_slice(&proof_count.to_be_bytes());
+        for proof_bytes in nested {
+            let length = u32::try_from(proof_bytes.len())
+                .map_err(|_| CertifiedFactorizationWireError::LengthOverflow)?;
+            bytes.extend_from_slice(&length.to_be_bytes());
+            bytes.extend_from_slice(&proof_bytes);
+        }
+
+        debug_assert_eq!(bytes.len(), encoded_len);
+        Ok(bytes)
+    }
+
+    /// Decode a proof-carrying factorization with strict version, size, framing,
+    /// canonical factor ordering, and recursive proof verification.
+    pub fn from_canonical_bytes(
+        bytes: &[u8],
+    ) -> Result<Self, CertifiedFactorizationWireError> {
+        if bytes.len() > CERTIFIED_FACTORIZATION_MAX_WIRE_BYTES {
+            return Err(CertifiedFactorizationWireError::InputTooLarge { length: bytes.len() });
+        }
+
+        let mut reader = PrimalityProofByteReader { bytes, offset: 0 };
+        if reader.read(8)? != &CERTIFIED_FACTORIZATION_WIRE_MAGIC[..] {
+            return Err(CertifiedFactorizationWireError::InvalidMagicOrVersion);
+        }
+        let value = reader.read_u64()?;
+        let factor_count = reader.read_u32()?;
+        if factor_count > CERTIFIED_FACTORIZATION_MAX_FACTORS {
+            return Err(CertifiedFactorizationWireError::TooManyFactors { count: factor_count });
+        }
+
+        let mut factors = Vec::with_capacity(factor_count as usize);
+        for _ in 0..factor_count {
+            factors.push((reader.read_u64()?, reader.read_u32()?));
+        }
+
+        let proof_count = reader.read_u32()?;
+        if proof_count > CERTIFIED_FACTORIZATION_MAX_PROOFS {
+            return Err(CertifiedFactorizationWireError::TooManyProofs { count: proof_count });
+        }
+        if proof_count != factor_count {
+            return Err(CertifiedFactorizationWireError::InvalidCertificate(
+                CertifiedFactorizationError::PrimeProofCountMismatch {
+                    factors: factor_count as usize,
+                    proofs: proof_count as usize,
+                },
+            ));
+        }
+
+        let mut prime_proofs = Vec::with_capacity(proof_count as usize);
+        for index in 0..proof_count {
+            let length = reader.read_u32()? as usize;
+            if length > PRIMALITY_PROOF_MAX_WIRE_BYTES {
+                return Err(CertifiedFactorizationWireError::InputTooLarge { length });
+            }
+            let proof_bytes = reader.read(length)?;
+            let proof = PrimalityProof::from_canonical_bytes(proof_bytes).map_err(|reason| {
+                CertifiedFactorizationWireError::InvalidNestedProof { index, reason }
+            })?;
+            prime_proofs.push(proof);
+        }
+
+        if reader.offset != bytes.len() {
+            return Err(CertifiedFactorizationWireError::TrailingBytes {
+                count: bytes.len() - reader.offset,
+            });
+        }
+
+        let certificate = Self {
+            factorization: FactorizationCertificate { value, factors },
+            prime_proofs,
+        };
+        certificate.verify().map_err(CertifiedFactorizationWireError::InvalidCertificate)?;
+        Ok(certificate)
+    }
+
 }
 
 impl FactorizationCertificate {
@@ -1576,6 +1726,69 @@ mod tests {
             assert_eq!(certificate.factorization.value, value);
             assert_eq!(certificate.verify(), Ok(()), "value={value}");
         }
+    }
+
+    #[test]
+    fn test_certified_factorization_canonical_bytes_round_trip() {
+        let engine = NumberTheoryEngine::new();
+        for value in [
+            1u64,
+            2,
+            30,
+            1_000_000_007u64 * 1_000_000_009,
+            18_446_744_073_709_551_557,
+        ] {
+            let certificate = engine.certified_factorization(value).unwrap();
+            let bytes = certificate.to_canonical_bytes().unwrap();
+            assert_eq!(&bytes[..8], b"SYMFCER1");
+            let decoded = CertifiedFactorizationCertificate::from_canonical_bytes(&bytes).unwrap();
+            assert_eq!(decoded, certificate);
+            assert_eq!(decoded.to_canonical_bytes().unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn test_certified_factorization_wire_rejects_malformed_and_tampered_bytes() {
+        let engine = NumberTheoryEngine::new();
+        let certificate = engine.certified_factorization(30).unwrap();
+        let bytes = certificate.to_canonical_bytes().unwrap();
+
+        let mut bad_magic = bytes.clone();
+        bad_magic[0] ^= 1;
+        assert_eq!(
+            CertifiedFactorizationCertificate::from_canonical_bytes(&bad_magic),
+            Err(CertifiedFactorizationWireError::InvalidMagicOrVersion)
+        );
+        assert_eq!(
+            CertifiedFactorizationCertificate::from_canonical_bytes(&bytes[..bytes.len() - 1]),
+            Err(CertifiedFactorizationWireError::TruncatedInput)
+        );
+
+        let mut trailing = bytes.clone();
+        trailing.push(0);
+        assert_eq!(
+            CertifiedFactorizationCertificate::from_canonical_bytes(&trailing),
+            Err(CertifiedFactorizationWireError::TrailingBytes { count: 1 })
+        );
+
+        let mut wrong_value = bytes.clone();
+        wrong_value[15] ^= 1;
+        assert!(matches!(
+            CertifiedFactorizationCertificate::from_canonical_bytes(&wrong_value),
+            Err(CertifiedFactorizationWireError::InvalidCertificate(
+                CertifiedFactorizationError::InvalidFactorization(
+                    FactorizationVerificationError::ProductMismatch { .. }
+                )
+            ))
+        ));
+
+        let last = bytes.len() - 1;
+        let mut bad_nested_witness = bytes;
+        bad_nested_witness[last] = 1;
+        assert!(matches!(
+            CertifiedFactorizationCertificate::from_canonical_bytes(&bad_nested_witness),
+            Err(CertifiedFactorizationWireError::InvalidNestedProof { .. })
+        ));
     }
 
     #[test]
