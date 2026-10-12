@@ -410,7 +410,7 @@ def _parse_grammar_dispatch(
             unknown_realizers = sorted(
                 set(
                     re.findall(
-                        r"\\bcrate::[A-Za-z0-9_:]+::realize_[A-Za-z0-9_]+\\b",
+                        r"\bcrate::[A-Za-z0-9_:]+::realize_[A-Za-z0-9_]+\b",
                         expression,
                     )
                 )
