@@ -113,7 +113,7 @@ def _validate_evaluation(evaluation: Any, where: str) -> None:
         _need(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value),
               f"{where}.evaluation.{key} must be a finite number")
     comparator = evaluation["comparator"]
-    _need(comparator in {"gte", "lte"}, f"{where}.evaluation.comparator must be gte or lte")
+    _need(isinstance(comparator, str) and comparator in {"gte", "lte"}, f"{where}.evaluation.comparator must be gte or lte")
     count = evaluation["sample_count"]
     _need(isinstance(count, int) and not isinstance(count, bool) and count > 0,
           f"{where}.evaluation.sample_count must be a positive integer")
@@ -121,7 +121,7 @@ def _validate_evaluation(evaluation: Any, where: str) -> None:
     _need(_nonempty(evaluation["split_description"]), f"{where}.evaluation.split_description must explain the held-out split")
     expected = (evaluation["value"] >= evaluation["threshold"] if comparator == "gte"
                 else evaluation["value"] <= evaluation["threshold"])
-    _need(evaluation["outcome"] in {"pass", "fail"}, f"{where}.evaluation.outcome must be pass or fail")
+    _need(isinstance(evaluation["outcome"], str) and evaluation["outcome"] in {"pass", "fail"}, f"{where}.evaluation.outcome must be pass or fail")
     _need(evaluation["outcome"] == ("pass" if expected else "fail"),
           f"{where}.evaluation.outcome contradicts value/threshold/comparator")
 
@@ -144,7 +144,7 @@ def _validate_speaker_review(review: Any, where: str) -> None:
 
 def validate_registry(registry: Any) -> dict[str, int]:
     _exact_keys(registry, {"schema_version", "capabilities", "languages"}, "registry")
-    _need(registry["schema_version"] == 1, "registry.schema_version must equal 1")
+    _need(isinstance(registry["schema_version"], int) and not isinstance(registry["schema_version"], bool) and registry["schema_version"] == 1, "registry.schema_version must equal integer 1")
     declared = registry["capabilities"]
     _need(isinstance(declared, list) and declared and all(_nonempty(x) for x in declared),
           "registry.capabilities must be a non-empty string array")
@@ -172,7 +172,7 @@ def validate_registry(registry: Any) -> dict[str, int]:
             cw = f"{where}.capabilities.{cap_name}"
             _exact_keys(record, CAPABILITY_KEYS, cw)
             status = record["status"]
-            _need(status in STATUSES, f"{cw}.status is not recognized")
+            _need(isinstance(status, str) and status in STATUSES, f"{cw}.status is not recognized")
             count_by_status[status] += 1
             backend = record["backend"]
             _need(backend is None or _nonempty(backend), f"{cw}.backend must be null or a non-empty string")
@@ -187,8 +187,9 @@ def validate_registry(registry: Any) -> dict[str, int]:
             _validate_evaluation(record["evaluation"], cw)
             _validate_speaker_review(record["speaker_review"], cw)
             if status == "unverified":
-                _need(backend is None and not refs and record["verification"] is None
-                      and record["evaluation"] is None and record["speaker_review"] is None,
+                _need(backend is None and not refs and record["model"] is None and record["dataset"] is None
+                      and record["verification"] is None and record["evaluation"] is None
+                      and record["speaker_review"] is None,
                       f"{cw}: unverified capability cannot include implementation or qualification claims")
             else:
                 _need(_nonempty(backend) and refs, f"{cw}: status {status} requires backend and source_refs")
