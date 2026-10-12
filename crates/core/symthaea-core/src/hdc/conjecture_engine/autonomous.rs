@@ -780,6 +780,8 @@ fn effective_discovery_config(
 const MAX_AUTONOMOUS_SEARCH_POPULATION: usize = 10_000;
 const MAX_AUTONOMOUS_SEARCH_GENERATIONS: usize = 10_000;
 const MAX_AUTONOMOUS_SEARCH_FITNESS_EVALUATIONS: usize = 1_000_000;
+const MAX_AUTONOMOUS_SEARCH_DIMENSION: usize = 128;
+const MAX_AUTONOMOUS_SEARCH_KNOWN_INVARIANTS: usize = 256;
 const MAX_AUTONOMOUS_SEARCH_TRAJECTORIES: usize = 4_096;
 const MAX_AUTONOMOUS_SEARCH_TOTAL_STEPS: f64 = 5_000_000.0;
 const MAX_AUTONOMOUS_SEARCH_TOTAL_STATE_UPDATES: f64 = 50_000_000.0;
@@ -792,10 +794,12 @@ fn autonomous_discovery_request_is_bounded(
     config: &RegressorConfig,
     t_max: f64,
     dt: f64,
+    extra_seed_templates: &[Expr],
 ) -> bool {
     let dimension = initial_state.len();
     if dimension == 0
-        || dimension > 4_096
+        || dimension > MAX_AUTONOMOUS_SEARCH_DIMENSION
+        || extra_seed_templates.len() > MAX_AUTONOMOUS_SEARCH_POPULATION
         || !t_max.is_finite()
         || t_max <= 0.0
         || !dt.is_finite()
@@ -810,6 +814,7 @@ fn autonomous_discovery_request_is_bounded(
         || config.max_depth == 0
         || config.max_depth > MAX_AUTONOMOUS_SEARCH_DEPTH
         || config.tournament_size == 0
+        || config.tournament_size > config.population_size
         || config.diverse_trajectory_count == 0
         || config.diverse_trajectory_count > MAX_AUTONOMOUS_SEARCH_TRAJECTORIES
         || !config.lambda.is_finite()
@@ -840,10 +845,16 @@ fn autonomous_discovery_request_is_bounded(
         .checked_add(config.population_size)
         .unwrap_or(usize::MAX);
     let samples_per_trajectory = (steps_per_trajectory + 1.0).min(200.0);
+    let orthogonality_work_factor = if config.orthogonality_penalty > 1.0 {
+        config.known_invariants.len().saturating_add(1) as f64
+    } else {
+        1.0
+    };
     let estimated_score_operations = total_candidate_scores as f64
         * trajectory_count as f64
         * samples_per_trajectory
-        * dimension as f64;
+        * dimension as f64
+        * orthogonality_work_factor;
 
     steps_per_trajectory <= 100_000.0
         && steps_per_trajectory * dimension as f64 <= 10_000_000.0
@@ -897,7 +908,13 @@ fn discover_invariants_autonomous_with_mode_and_metrics(
     if var_names.len() != ndim
         || var_names.is_empty()
         || initial_state.iter().any(|value| !value.is_finite())
-        || !autonomous_discovery_request_is_bounded(initial_state, config, t_max, dt)
+        || !autonomous_discovery_request_is_bounded(
+            initial_state,
+            config,
+            t_max,
+            dt,
+            extra_seed_templates,
+        )
     {
         return finish_discovery_run(Vec::new(), metrics, started_at);
     }
@@ -1863,6 +1880,49 @@ mod cold_discovery_provenance_tests {
         assert!(cold.disable_macro_seeds);
         assert_eq!(config.known_invariants.len(), 1);
         assert_eq!(config.orthogonality_penalty, 4.0);
+    }
+
+    #[test]
+    fn cold_entry_point_fails_closed_on_tournament_larger_than_population() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            tournament_size: usize::MAX,
+            ..RegressorConfig::default()
+        };
+        assert!(discover_invariants_autonomous_cold(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.01,
+        ).is_empty());
+    }
+
+    #[test]
+    fn cold_entry_point_fails_closed_on_excessive_search_dimension() {
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            ..RegressorConfig::default()
+        };
+        let initial_state = vec![0.0; MAX_AUTONOMOUS_SEARCH_DIMENSION + 1];
+        assert!(!autonomous_discovery_request_is_bounded(
+            &initial_state, &config, 1.0, 0.01, &[],
+        ));
+    }
+
+    #[test]
+    fn discovery_request_rejects_too_many_prior_templates_before_scoring() {
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            ..RegressorConfig::default()
+        };
+        let initial_state = vec![1.0, 0.0];
+        let templates = vec![Expr::Var("x".into()); MAX_AUTONOMOUS_SEARCH_POPULATION + 1];
+        assert!(!autonomous_discovery_request_is_bounded(
+            &initial_state, &config, 1.0, 0.01, &templates,
+        ));
     }
 
     #[test]
