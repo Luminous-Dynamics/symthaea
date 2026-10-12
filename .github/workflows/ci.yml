@@ -237,6 +237,10 @@ jobs:
 
       - name: Test DiffSinger phoneme and language contract
         run: python3 scripts/test_diffsinger_phonemes.py
+      - name: Validate voice language capability registry
+        run: python3 scripts/validate_voice_language_registry.py
+      - name: Test voice language capability evidence gates
+        run: python3 scripts/test_voice_language_registry.py
       - name: Test spoken-passage comprehension pack
         run: python3 scripts/test_voice_comprehension_gate.py
 
