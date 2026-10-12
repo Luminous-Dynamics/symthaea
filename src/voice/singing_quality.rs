@@ -12,6 +12,12 @@ pub struct VocalQualityMetrics {
     pub voiced_unvoiced_error_rate: f32,
     pub median_pitch_error_cents: f32,
     pub p95_pitch_error_cents: f32,
+    /// Broad-range autocorrelation diagnostic that does not use the target pitch
+    /// as a search prior. This is a cross-check, not a calibrated release gate.
+    pub score_blind_voiced_frame_fraction: f32,
+    pub score_blind_voiced_unvoiced_error_rate: f32,
+    pub score_blind_median_pitch_error_cents: f32,
+    pub score_blind_p95_pitch_error_cents: f32,
     pub stable_pitch_p95_cents: f32,
     pub transition_pitch_p95_cents: f32,
     pub median_onset_error_ms: f32,
@@ -103,6 +109,10 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let mut attempted = 0usize;
     let mut vuv_errors = 0usize;
     let mut all_frames = 0usize;
+    let mut score_blind_errors = Vec::new();
+    let mut score_blind_expected_voiced_frames = 0usize;
+    let mut score_blind_detected_voiced_frames = 0usize;
+    let mut score_blind_vuv_errors = 0usize;
     if stem.samples.len() >= frame {
         for start in (0..=stem.samples.len() - frame).step_by(hop.max(1)) {
             let time = (start + frame / 2) as f32 / rate as f32;
@@ -112,6 +122,24 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
                 .flat_map(|s| s.notes())
                 .any(|note| time >= note.start_time && time < note.start_time + note.duration);
             let expected_pitch = expected_pitch_at(performance, time);
+            // This broad-range autocorrelation estimate deliberately does not
+            // use the target pitch. Keep it separate from the score-guided
+            // estimate below so search-window censoring remains visible.
+            let score_blind_actual =
+                estimate_f0_in_range(&stem.samples[start..start + frame], rate, 55.0, 1_000.0);
+            if expected_voiced != score_blind_actual.is_some() {
+                score_blind_vuv_errors += 1;
+            }
+            if expected_voiced {
+                score_blind_expected_voiced_frames += 1;
+                if let Some(actual) = score_blind_actual {
+                    score_blind_detected_voiced_frames += 1;
+                    if let Some(expected) = expected_pitch {
+                        score_blind_errors
+                            .push((1200.0 * (actual / expected).log2()).abs());
+                    }
+                }
+            }
             // Conditional singing evaluation has the score available. Use it
             // as the octave/continuity prior, as production pitch trackers do,
             // while still estimating the actual local autocorrelation peak.
@@ -154,6 +182,13 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     errors.sort_by(f32::total_cmp);
     let median_pitch_error_cents = percentile(&errors, 0.5);
     let p95_pitch_error_cents = percentile(&errors, 0.95);
+    score_blind_errors.sort_by(f32::total_cmp);
+    let score_blind_voiced_frame_fraction = score_blind_detected_voiced_frames as f32
+        / score_blind_expected_voiced_frames.max(1) as f32;
+    let score_blind_voiced_unvoiced_error_rate =
+        score_blind_vuv_errors as f32 / all_frames.max(1) as f32;
+    let score_blind_median_pitch_error_cents = percentile(&score_blind_errors, 0.5);
+    let score_blind_p95_pitch_error_cents = percentile(&score_blind_errors, 0.95);
     stable_errors.sort_by(f32::total_cmp);
     transition_errors.sort_by(f32::total_cmp);
     let stable_pitch_p95_cents = percentile(&stable_errors, 0.95);
@@ -220,6 +255,10 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         voiced_unvoiced_error_rate,
         median_pitch_error_cents,
         p95_pitch_error_cents,
+        score_blind_voiced_frame_fraction,
+        score_blind_voiced_unvoiced_error_rate,
+        score_blind_median_pitch_error_cents,
+        score_blind_p95_pitch_error_cents,
         stable_pitch_p95_cents,
         transition_pitch_p95_cents,
         median_onset_error_ms,
@@ -361,12 +400,35 @@ fn onset_error_ms(samples: &[f32], rate: u32, expected_s: f32) -> Option<f32> {
 }
 
 fn estimate_f0(x: &[f32], rate: u32) -> Option<f32> {
+    estimate_f0_in_range(x, rate, 70.0, 500.0)
+}
+
+/// Estimate F0 without a score prior over an explicit frequency band.
+/// A broad band exposes errors hidden by the narrower target-conditioned search.
+fn estimate_f0_in_range(
+    x: &[f32],
+    rate: u32,
+    min_hz: f32,
+    max_hz: f32,
+) -> Option<f32> {
+    if rate == 0
+        || x.len() < 4
+        || !min_hz.is_finite()
+        || !max_hz.is_finite()
+        || min_hz <= 0.0
+        || min_hz >= max_hz
+    {
+        return None;
+    }
     let rms = (x.iter().map(|v| v * v).sum::<f32>() / x.len().max(1) as f32).sqrt();
     if rms < 0.003 {
         return None;
     }
-    let min_lag = rate as usize / 500;
-    let max_lag = (rate as usize / 70).min(x.len() / 2);
+    let min_lag = ((rate as f32 / max_hz).floor().max(1.0)) as usize;
+    let max_lag = ((rate as f32 / min_hz).floor() as usize).min(x.len() / 2);
+    if min_lag > max_lag {
+        return None;
+    }
     let mut scores = Vec::with_capacity(max_lag - min_lag + 1);
     let mut best_score = 0.0f64;
     for lag in min_lag..=max_lag {
@@ -489,8 +551,13 @@ mod tests {
         assert!(
             metrics.median_pitch_error_cents < 400.0
                 && metrics.median_pitch_error_cents < true_error_cents as f32 - 500.0,
-            "expected the reported error to saturate well below the true \
+            "expected the score-guided metric to saturate below the true \
              {true_error_cents:.1} cent mistracking, got {:?}",
+            metrics
+        );
+        assert!(
+            metrics.score_blind_median_pitch_error_cents > 1_000.0,
+            "score-blind diagnostic should expose the large pitch mismatch: {:?}",
             metrics
         );
     }
