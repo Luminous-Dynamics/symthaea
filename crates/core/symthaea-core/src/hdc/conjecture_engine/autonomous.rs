@@ -875,7 +875,12 @@ fn discover_invariants_autonomous_with_mode_and_metrics(
 ) -> AutonomousDiscoveryRunV1 {
     let started_at = std::time::Instant::now();
     let mut metrics = AutonomousDiscoveryWorkMetricsV1::default();
-    if mode == AutonomousDiscoveryMode::Cold && !extra_seed_templates.is_empty() {
+    if matches!(
+        mode,
+        AutonomousDiscoveryMode::Cold | AutonomousDiscoveryMode::RandomBaseline
+    ) && !extra_seed_templates.is_empty()
+    {
+        metrics.preflight_rejections = 1;
         return finish_discovery_run(Vec::new(), metrics, started_at);
     }
     let effective_config = effective_discovery_config(config, mode);
@@ -1951,6 +1956,62 @@ mod cold_discovery_provenance_tests {
         assert!(discover_invariants_autonomous_cold(
             harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.01,
         ).is_empty());
+    }
+
+    #[test]
+    fn random_baseline_uses_same_score_budget_without_evolution() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            max_depth: 3,
+            max_complexity: 16,
+            diverse_trajectory_count: 1,
+            seed: 4242,
+            ..RegressorConfig::default()
+        };
+        let run = discover_invariants_autonomous_random_baseline_with_metrics(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.01,
+        );
+
+        assert_eq!(
+            run.metrics.candidate_fitness_evaluations,
+            (config.population_size * (config.generations + 1)) as u64
+        );
+        assert_eq!(run.metrics.trajectory_attempts, 1);
+        assert_eq!(run.metrics.trajectories_completed, 1);
+        assert!(run.candidates.iter().all(|candidate| {
+            candidate.discovery_mode == AutonomousDiscoveryMode::RandomBaseline
+        }));
+    }
+
+    #[test]
+    fn random_baseline_rejects_explicit_prior_templates() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+        let config = RegressorConfig {
+            population_size: 10,
+            generations: 1,
+            ..RegressorConfig::default()
+        };
+        let run = discover_invariants_autonomous_with_mode_and_metrics(
+            harmonic_rhs,
+            &[1.0, 0.0],
+            &["x", "v"],
+            None,
+            &config,
+            1.0,
+            0.01,
+            &[Expr::Var("x".into())],
+            AutonomousDiscoveryMode::RandomBaseline,
+        );
+        assert!(run.candidates.is_empty());
+        assert_eq!(run.metrics.preflight_rejections, 1);
+        assert_eq!(run.metrics.candidate_fitness_evaluations, 0);
     }
 
     #[test]
