@@ -29,6 +29,7 @@ use symthaea_music_theory::{
 };
 
 const BASE_SEED: u64 = 90_210;
+const BASE_SEED_SET: [u64; 4] = [90_210, 130_363, 222_731, 918_273];
 const BASE_TONIC: i32 = 0; // C
 const BASE_VALENCE: f32 = 0.0;
 const BASE_AROUSAL: f32 = 0.5;
@@ -112,14 +113,18 @@ struct Observation {
     form_section_count: Option<usize>,
 }
 
-fn control_points(control: &str) -> Vec<ControlPoint> {
+fn control_points(control: &str, base_seed: u64) -> Vec<ControlPoint> {
+    let baseline = InputConfig {
+        seed: base_seed,
+        ..InputConfig::BASE
+    };
     match control {
         "tonic" => [(0, "C"), (3, "Eb"), (4, "E"), (7, "G"), (10, "Bb")]
             .into_iter()
             .map(|(tonic, label)| ControlPoint {
                 value_label: label.into(),
                 numeric_value: None,
-                input: InputConfig { tonic, ..InputConfig::BASE },
+                input: InputConfig { tonic, ..baseline },
             })
             .collect(),
         "valence" => [-1.0_f32, -0.5, 0.0, 0.5, 1.0]
@@ -127,7 +132,7 @@ fn control_points(control: &str) -> Vec<ControlPoint> {
             .map(|value| ControlPoint {
                 value_label: format!("{value:.2}"),
                 numeric_value: Some(value as f64),
-                input: InputConfig { valence: value, ..InputConfig::BASE },
+                input: InputConfig { valence: value, ..baseline },
             })
             .collect(),
         "arousal" => [0.0_f32, 0.25, 0.5, 0.75, 1.0]
@@ -135,7 +140,7 @@ fn control_points(control: &str) -> Vec<ControlPoint> {
             .map(|value| ControlPoint {
                 value_label: format!("{value:.2}"),
                 numeric_value: Some(value as f64),
-                input: InputConfig { arousal: value, ..InputConfig::BASE },
+                input: InputConfig { arousal: value, ..baseline },
             })
             .collect(),
         "energy" => [0.0_f32, 0.25, 0.5, 0.75, 1.0]
@@ -143,7 +148,7 @@ fn control_points(control: &str) -> Vec<ControlPoint> {
             .map(|value| ControlPoint {
                 value_label: format!("{value:.2}"),
                 numeric_value: Some(value as f64),
-                input: InputConfig { energy: value, ..InputConfig::BASE },
+                input: InputConfig { energy: value, ..baseline },
             })
             .collect(),
         "bars" => [8_usize, 12, 16, 20, 24]
@@ -151,15 +156,15 @@ fn control_points(control: &str) -> Vec<ControlPoint> {
             .map(|value| ControlPoint {
                 value_label: value.to_string(),
                 numeric_value: Some(value as f64),
-                input: InputConfig { bars: value, ..InputConfig::BASE },
+                input: InputConfig { bars: value, ..baseline },
             })
             .collect(),
-        "seed" => [BASE_SEED, BASE_SEED + 1, BASE_SEED + 2, BASE_SEED + 3]
+        "seed" => [base_seed, base_seed + 1, base_seed + 2, base_seed + 3]
             .into_iter()
             .map(|value| ControlPoint {
                 value_label: value.to_string(),
                 numeric_value: None,
-                input: InputConfig { seed: value, ..InputConfig::BASE },
+                input: InputConfig { seed: value, ..baseline },
             })
             .collect(),
         other => panic!("unknown control {other}"),
@@ -338,11 +343,14 @@ fn observation_json(observation: &Observation, base_hash: u64) -> serde_json::Va
     })
 }
 
-fn curve_json(style: Style, control: &str) -> serde_json::Value {
+fn curve_json(style: Style, control: &str, base_seed: u64) -> serde_json::Value {
     let base = ControlPoint {
         value_label: "baseline".into(),
         numeric_value: None,
-        input: InputConfig::BASE,
+        input: InputConfig {
+            seed: base_seed,
+            ..InputConfig::BASE
+        },
     };
     let baseline_intent = base.input.intent();
     let spec = style.spec();
@@ -358,7 +366,7 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         &baseline_realization.form,
     );
 
-    let points = control_points(control);
+    let points = control_points(control, base_seed);
     let observations: Vec<Observation> = points
         .iter()
         .map(|point| observe(style, point, base_hash, &base_structure))
@@ -512,6 +520,7 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
 
     serde_json::json!({
         "control": control,
+        "baseline_seed": base_seed,
         "baseline_value": base.input.json(),
         "point_count": observations.len(),
         "unique_exact_fingerprints": unique_fingerprints.len(),
@@ -573,17 +582,12 @@ fn main() {
         .iter()
         .copied()
         .map(|style| {
-            let curves: Vec<serde_json::Value> = [
-                "tonic",
-                "valence",
-                "arousal",
-                "energy",
-                "bars",
-                "seed",
-            ]
-            .into_iter()
-            .map(|control| curve_json(style, control))
-            .collect();
+            let mut curves = Vec::new();
+            for base_seed in BASE_SEED_SET {
+                for control in ["tonic", "valence", "arousal", "energy", "bars", "seed"] {
+                    curves.push(curve_json(style, control, base_seed));
+                }
+            }
 
             serde_json::json!({
                 "style": format!("{style:?}"),
@@ -602,7 +606,7 @@ fn main() {
             "fixed_base": InputConfig::BASE.json(),
             "one_factor_at_a_time": true,
             "style_count": profiles.len(),
-            "curve_count": profiles.len() * 6,
+            "curve_count": profiles.len() * BASE_SEED_SET.len() * 6,
             "point_count": profiles.iter().map(|profile| {
                 profile["curves"].as_array().unwrap().iter().map(|curve| {
                     curve["point_count"].as_u64().unwrap_or(0)
@@ -618,7 +622,8 @@ fn main() {
                 "arousal": [0.0, 0.25, 0.5, 0.75, 1.0],
                 "energy": [0.0, 0.25, 0.5, 0.75, 1.0],
                 "bars": [8, 12, 16, 20, 24],
-                "seed": [BASE_SEED, BASE_SEED + 1, BASE_SEED + 2, BASE_SEED + 3],
+                "baseline_seed_set": BASE_SEED_SET,
+                "seed_offsets_within_each_curve": [0, 1, 2, 3],
             },
         },
         "interpretation": concat!(
@@ -656,17 +661,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_control_grid_contains_the_unchanged_baseline() {
-        for control in ["tonic", "valence", "arousal", "energy", "bars", "seed"] {
-            let points = control_points(control);
-            assert!(points.iter().any(|point| point.input == InputConfig::BASE), "{control}");
+    fn every_control_grid_contains_its_unchanged_seeded_baseline() {
+        for base_seed in BASE_SEED_SET {
+            let baseline = InputConfig {
+                seed: base_seed,
+                ..InputConfig::BASE
+            };
+            for control in ["tonic", "valence", "arousal", "energy", "bars", "seed"] {
+                let points = control_points(control, base_seed);
+                assert!(
+                    points.iter().any(|point| point.input == baseline),
+                    "control={control}, seed={base_seed}"
+                );
+            }
         }
     }
 
     #[test]
     fn continuous_controls_have_five_ordered_levels() {
         for control in ["valence", "arousal", "energy", "bars"] {
-            let points = control_points(control);
+            let points = control_points(control, BASE_SEED);
             assert_eq!(points.len(), 5, "{control}");
             let values: Vec<f64> = points
                 .iter()
@@ -686,7 +700,7 @@ mod tests {
 
     #[test]
     fn routed_curve_reports_dynamic_channels_and_observed_change_flags() {
-        let curve = curve_json(Style::Classical, "arousal");
+        let curve = curve_json(Style::Classical, "arousal", BASE_SEED);
         assert_eq!(curve["point_count"].as_u64(), Some(5));
         assert_eq!(
             curve["observed_changes_from_baseline"]
