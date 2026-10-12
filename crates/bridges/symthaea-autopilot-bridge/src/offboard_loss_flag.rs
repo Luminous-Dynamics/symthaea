@@ -12,9 +12,7 @@ use std::collections::HashSet;
 use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::embodiment_evidence::{
-    ClockDomainId, EvidenceValidationError, TimestampV1,
-};
+use symthaea_core::embodiment_evidence::{ClockDomainId, EvidenceValidationError, TimestampV1};
 use thiserror::Error;
 
 /// Schema version for PX4 Offboard-loss-flag evidence.
@@ -329,9 +327,7 @@ impl Px4OffboardLossFlagAssessmentV1 {
     }
 
     /// Report the newest flag without conflating it with VehicleStatus.failsafe.
-    pub fn outcome(
-        &self,
-    ) -> Result<Px4OffboardLossFlagOutcomeV1, Px4OffboardLossFlagError> {
+    pub fn outcome(&self) -> Result<Px4OffboardLossFlagOutcomeV1, Px4OffboardLossFlagError> {
         self.validate()?;
         let Some(latest) = self.samples.last() else {
             return Ok(Px4OffboardLossFlagOutcomeV1::Incomplete {
@@ -408,9 +404,9 @@ impl Px4OffboardLossFlagAssessmentV1 {
             if !seen_sequence.insert(sample.capture_sequence) {
                 return Err(Px4OffboardLossFlagError::DuplicateSequence);
             }
-            if previous_receive_ns.is_some_and(|previous| {
-                sample.received_at.nanoseconds <= previous
-            }) {
+            if previous_receive_ns
+                .is_some_and(|previous| sample.received_at.nanoseconds <= previous)
+            {
                 return Err(Px4OffboardLossFlagError::NonAdvancingReceiveTime);
             }
             if previous_source_us.is_some_and(|previous| sample.source_timestamp_us <= previous) {
@@ -468,10 +464,7 @@ fn validate_schema(schema_version: u16) -> Result<(), Px4OffboardLossFlagError> 
     Ok(())
 }
 
-fn validate_identifier(
-    value: &str,
-    field: &'static str,
-) -> Result<(), Px4OffboardLossFlagError> {
+fn validate_identifier(value: &str, field: &'static str) -> Result<(), Px4OffboardLossFlagError> {
     let trimmed = value.trim();
     if trimmed.is_empty()
         || trimmed.len() != value.len()
@@ -701,7 +694,10 @@ mod tests {
             ],
             2_100_000_001,
         );
-        assert!(matches!(over.outcome().unwrap(), Px4OffboardLossFlagOutcomeV1::Stale { .. }));
+        assert!(matches!(
+            over.outcome().unwrap(),
+            Px4OffboardLossFlagOutcomeV1::Stale { .. }
+        ));
     }
 
     #[test]
@@ -734,7 +730,10 @@ mod tests {
         );
         assert_eq!(
             gap.unwrap_err(),
-            Px4OffboardLossFlagError::CaptureSequenceGap { previous: 10, found: 12 }
+            Px4OffboardLossFlagError::CaptureSequenceGap {
+                previous: 10,
+                found: 12
+            }
         );
         let regressed = Px4OffboardLossFlagObservationV1::new(
             "px4.failsafe-flags.decoder.fixture.v1",
@@ -799,12 +798,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Px4OffboardLossFlagAssessmentV1::new(
-                profile(),
-                ts(1_100_000_000),
-                vec![wrong_target],
-            )
-            .unwrap_err(),
+            Px4OffboardLossFlagAssessmentV1::new(profile(), ts(1_100_000_000), vec![wrong_target],)
+                .unwrap_err(),
             Px4OffboardLossFlagError::TargetMismatch
         );
         let wrong_producer = Px4OffboardLossFlagObservationV1::new(
@@ -841,12 +836,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Px4OffboardLossFlagAssessmentV1::new(
-                profile(),
-                ts(1_100_000_000),
-                vec![wrong_clock],
-            )
-            .unwrap_err(),
+            Px4OffboardLossFlagAssessmentV1::new(profile(), ts(1_100_000_000), vec![wrong_clock],)
+                .unwrap_err(),
             Px4OffboardLossFlagError::ReceiverClockMismatch
         );
     }
@@ -867,7 +858,10 @@ mod tests {
             vec![later, earlier],
         )
         .unwrap();
-        assert_eq!(forward.assessment_id().unwrap(), reverse.assessment_id().unwrap());
+        assert_eq!(
+            forward.assessment_id().unwrap(),
+            reverse.assessment_id().unwrap()
+        );
     }
 
     #[test]
@@ -895,7 +889,10 @@ mod tests {
         let bytes = serde_json::to_vec(&value).unwrap();
         let mut restored: Px4OffboardLossFlagAssessmentV1 = serde_json::from_slice(&bytes).unwrap();
         restored.validate().unwrap();
-        assert_eq!(restored.assessment_id().unwrap(), value.assessment_id().unwrap());
+        assert_eq!(
+            restored.assessment_id().unwrap(),
+            value.assessment_id().unwrap()
+        );
         restored.samples[0].offboard_control_signal_lost = true;
         assert!(restored.validate().is_err());
         let mut changed_profile = value.clone();
