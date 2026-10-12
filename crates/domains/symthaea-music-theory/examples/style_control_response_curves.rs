@@ -1034,7 +1034,7 @@ fn main() {
                 }).sum::<u64>()
             }).sum::<u64>(),
             "layer_change_threshold": LAYER_CHANGE_THRESHOLD,
-            "control_evaluation_schema": "muse-control-evaluation-v1",
+            "control_evaluation_schema": "muse-control-evaluation-v2",
             "fingerprint_layers": LAYERS.iter().map(|(name, start, len)| {
                 serde_json::json!({"name": name, "start": start, "length": len})
             }).collect::<Vec<_>>(),
@@ -1372,6 +1372,35 @@ mod tests {
                 target["points"]
             );
             assert_eq!(target["mismatching_point_count"].as_u64(), Some(0));
+        }
+    }
+
+    #[test]
+    fn valence_target_checks_major_minor_mapping_when_not_preset_pinned() {
+        let style = Style::Classical;
+        let curve = curve_json(style, "valence", BASE_SEED);
+        let target = &curve["control_target_evaluation"]["target_fidelity"];
+        if style.spec().mode.is_some() {
+            assert_eq!(target["status"].as_str(), Some("preset_mode_override"));
+        } else {
+            assert_eq!(target["status"].as_str(), Some("measured"));
+            assert_eq!(target["tested_point_count"].as_u64(), Some(5));
+            assert_eq!(
+                target["matching_point_count"].as_u64(),
+                Some(5),
+                "{:?}",
+                target["points"]
+            );
+            assert_eq!(target["mismatching_point_count"].as_u64(), Some(0));
+            let points = target["points"].as_array().unwrap();
+            assert!(points.iter().any(|point| {
+                point["control_value"] == "-1.00"
+                    && point["expected_tonality"] == "Minor"
+            }));
+            assert!(points.iter().any(|point| {
+                point["control_value"] == "0.00"
+                    && point["expected_tonality"] == "Major"
+            }));
         }
     }
 
