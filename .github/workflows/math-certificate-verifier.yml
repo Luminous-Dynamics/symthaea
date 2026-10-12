@@ -15,6 +15,7 @@ on:
       - main
     paths:
       - "tools/verify_math_certificate.py"
+      - "tools/math_certificate_golden_vectors.py"
       - "tests/test_verify_math_certificate.py"
       - "PRIMALITY_CERTIFICATES.md"
       - "crates/core/symthaea-core/src/hdc/number_theory.rs"
