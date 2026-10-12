@@ -1,0 +1,1 @@
+One-shot, metadata-only Copernicus catalogue reconnaissance trigger for Johannesburg bbox and date range defaults defined in water-leak-satellite-inventory.yml. No raster assets are downloaded; output is discovery only.
