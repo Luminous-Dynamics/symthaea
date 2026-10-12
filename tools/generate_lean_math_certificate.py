@@ -108,7 +108,7 @@ def _wire_proof_definition(
     node_list = "[\n" + ",\n".join(nodes) + "\n  ]"
     return (
         f"def {identifier} : WirePrimalityProof :=\n"
-        f"  {{ value := {proof.value}\n"
+        f"  {{ value := {proof.value},\n"
         f"    certificates := {node_list} }}"
     )
 
