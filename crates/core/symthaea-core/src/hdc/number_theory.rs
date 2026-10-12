@@ -462,6 +462,8 @@ fn certificate_gcd(mut a: u64, mut b: u64) -> u64 {
 pub enum FactorizationVerificationError {
     /// Zero has no prime factorization under this certificate format.
     ZeroInput,
+    /// In-memory factor lists use the same resource ceiling as the wire format.
+    TooManyFactors { count: usize },
     /// Canonical factors must be strictly increasing; duplicates belong in the exponent.
     FactorsNotStrictlyIncreasing { previous: u64, current: u64 },
     /// A factor with exponent zero is not a canonical factorization entry.
@@ -497,6 +499,7 @@ pub struct CertifiedFactorizationCertificate {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CertifiedFactorizationError {
     InvalidFactorization(FactorizationVerificationError),
+    TooManyPrimeProofs { count: usize },
     PrimeProofCountMismatch { factors: usize, proofs: usize },
     PrimeProofRootMismatch { factor: u64, proof_root: u64 },
     InvalidPrimeProof { factor: u64, reason: PrimalityProofError },
@@ -531,6 +534,9 @@ fn verify_factorization_structure(
 ) -> Result<(), FactorizationVerificationError> {
     if value == 0 {
         return Err(FactorizationVerificationError::ZeroInput);
+    }
+    if factors.len() > CERTIFIED_FACTORIZATION_MAX_FACTORS as usize {
+        return Err(FactorizationVerificationError::TooManyFactors { count: factors.len() });
     }
     let mut previous = 1u64;
     let mut reconstructed = 1u64;
@@ -567,6 +573,11 @@ impl CertifiedFactorizationCertificate {
     /// Miller-Rabin helper: primality is established only by the explicit Pocklington
     /// certificate bundles.
     pub fn verify(&self) -> Result<(), CertifiedFactorizationError> {
+        if self.prime_proofs.len() > CERTIFIED_FACTORIZATION_MAX_PROOFS as usize {
+            return Err(CertifiedFactorizationError::TooManyPrimeProofs {
+                count: self.prime_proofs.len(),
+            });
+        }
         verify_factorization_structure(
             self.factorization.value,
             &self.factorization.factors,
@@ -2107,6 +2118,36 @@ mod tests {
         assert!(matches!(
             proof.verify(),
             Err(PrimalityProofError::CertificateTableNotStrictlyIncreasing { .. })
+        ));
+    }
+
+    #[test]
+    fn test_factorization_certificate_verifiers_enforce_in_memory_resource_budgets() {
+        let too_many_factors = FactorizationCertificate {
+            value: 1,
+            factors: (2u64..(2 + CERTIFIED_FACTORIZATION_MAX_FACTORS as u64 + 1))
+                .map(|prime| (prime, 1))
+                .collect(),
+        };
+        assert!(matches!(
+            too_many_factors.verify(),
+            Err(FactorizationVerificationError::TooManyFactors { count })
+                if count == CERTIFIED_FACTORIZATION_MAX_FACTORS as usize + 1
+        ));
+
+        let engine = NumberTheoryEngine::new();
+        let prime_two = engine.primality_proof(2).unwrap();
+        let too_many_proofs = CertifiedFactorizationCertificate {
+            factorization: FactorizationCertificate { value: 1, factors: vec![] },
+            prime_proofs: vec![
+                prime_two;
+                CERTIFIED_FACTORIZATION_MAX_PROOFS as usize + 1
+            ],
+        };
+        assert!(matches!(
+            too_many_proofs.verify(),
+            Err(CertifiedFactorizationError::TooManyPrimeProofs { count })
+                if count == CERTIFIED_FACTORIZATION_MAX_PROOFS as usize + 1
         ));
     }
 
