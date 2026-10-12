@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Chrome DevTools Protocol session wrapper.
 //!
-//! Observation methods are public. Mutating primitives are crate-private and
-//! are dispatched through [`crate::executor::BrowserExecutor`], which records a
-//! policy decision and action receipt for every attempt.
+//! The low-level page-observation and mutation methods are crate-private. Public
+//! page reads and actions should go through [`crate::executor::BrowserExecutor`]
+/! which applies capability, Phi and URL checks before exposing page state.
 
 use std::time::Duration;
 
@@ -157,7 +157,7 @@ impl CdpSession {
     }
 
     /// Query the full accessibility tree and return a bounded observation.
-    pub async fn get_accessibility_tree(&self) -> Result<PageObservation> {
+    pub(crate) async fn get_accessibility_tree(&self) -> Result<PageObservation> {
         let page = self.page.lock().await;
 
         let url = page
@@ -392,7 +392,7 @@ impl CdpSession {
     }
 
     /// Capture a PNG screenshot of the current page.
-    pub async fn screenshot(&self) -> Result<Vec<u8>> {
+    pub(crate) async fn screenshot(&self) -> Result<Vec<u8>> {
         let page = self.page.lock().await;
         let bytes = page
             .screenshot(
@@ -411,7 +411,7 @@ impl CdpSession {
     /// Prefer the native accessibility-tree API. This shim is kept for source
     /// compatibility and no longer evaluates page JavaScript.
     #[deprecated(note = "JavaScript observation fallback removed; use get_accessibility_tree")]
-    pub async fn get_page_state_js(&self) -> Result<PageObservation> {
+    pub(crate) async fn get_page_state_js(&self) -> Result<PageObservation> {
         self.get_accessibility_tree().await
     }
 
@@ -419,7 +419,7 @@ impl CdpSession {
     ///
     /// An unavailable tree is returned as an error; there is no silent JavaScript
     /// fallback that could hide a degraded observation path.
-    pub async fn observe(&self) -> Result<PageObservation> {
+    pub(crate) async fn observe(&self) -> Result<PageObservation> {
         self.get_accessibility_tree()
             .await
             .context("Accessibility observation unavailable; JavaScript fallback is disabled")
