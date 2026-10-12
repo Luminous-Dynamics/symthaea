@@ -154,6 +154,8 @@ Every contrast should carry a resolution receipt binding the recipe/profile dige
 
 This protocol is motivated by recent evidence that nominally disentangled music representations do not always encode their intended semantics (Ibáñez-Martínez et al., ICASSP 2026, https://arxiv.org/abs/2602.10058), alongside the broader 2026 survey conclusion that no single objective metric captures music-generation quality and that controllability and evaluation remain open problems (Duan, Yu & Briot, https://link.springer.com/article/10.1007/s10462-026-11582-x). The lesson for Muse is to measure intended control, non-target invariance, realization, and perceptual evidence separately—not to treat an embedding distance or a genre classifier as proof of success.
 
+A study published on 1 October 2026 examined 75 Suno outputs using the same Turkish lyric pattern, five style-influence settings (0/25/50/75/100), and five styles. Its qualitative analysis found that the effect of style influence varied by genre, and was not consistently monotonic for every style (Yücebağ, 2026, https://doi.org/10.7456/tojdac.1993191). This is a single-platform qualitative case study, not a universal result, but it motivates one more evaluation requirement for Muse: for tunable controls, measure a predeclared response curve over multiple levels and fixed seeds, not only one baseline/perturbation pair. Record whether the intended feature changes, whether non-target features remain stable, and whether responses are monotonic, thresholded, or context-dependent. Do not assume a higher setting inherently means a more correct or authentic style.
+
 ## Implementation sequence
 
 ### M0a — Bidirectional source-routing inventory (implemented foundation)
