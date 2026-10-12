@@ -218,6 +218,53 @@ Where remote trunk mains, reservoirs or pump stations lack reliable cellular con
 
 This lane should share device identity, calibration, freshness and provenance semantics with the Mycelix operations plane. Sensor messages and Mycelix work-order events remain operational facts, not proof of water quality or leak confirmation.
 
+## 2026 evidence update: radar source selection and independent comparison
+
+Research reviewed on 2026-10-12 adds two decision-relevant sources:
+
+### Arabi & Grau (2026): paved-surface pipeline leaks using L-band radar
+
+Arabi and Grau, *Automated detection of pipe water leaks under paved surfaces with machine learning analysis of satellite radar data*, Journal of Environmental Management 403 (1 April 2026), 129209. DOI: https://doi.org/10.1016/j.jenvman.2026.129209
+
+- The study investigates anomalies from ALOS-2 PALSAR-2 **L-band polarimetric SAR** in a paved, arid, sparsely vegetated setting, using leak records supplied by the City of Phoenix.
+- The abstract reports that its best unsupervised anomaly-detection model identified about 81% of actual leaks and reduced field inspection effort by 93%; the abstract also describes false-positive trade-offs as thresholds change.
+- Do not reuse these figures as expected Johannesburg performance. Before cross-study comparison, obtain the paper's complete evaluation definitions and denominators (what counts as a leak found, a false positive, and an inspection reduction), sample counts, selection procedure, geography and all thresholding details. The reported operating point must be read together with false alarms and the crew's true inspection capacity.
+- This is strong support for evaluating L-band/PALSAR-2 as a candidate modality for buried pipes, not evidence that Sentinel-1 C-band alone will work equally well.
+
+Source records:
+- PubMed bibliographic record and abstract: https://pubmed.ncbi.nlm.nih.gov/41785796/
+- ScienceDirect article: https://www.sciencedirect.com/science/article/pii/S0301479726006699
+- JAXA PALSAR-2 ScanSAR L2.2 products: https://www.eorc.jaxa.jp/ALOS/en/dataset/palsar2_l22_e.htm
+
+### Independent programme evaluation: California Energy Commission (2021)
+
+The California Energy Commission published the final report *Demonstrating Innovative Water Leakage Reduction Strategies* (CEC-500-2021-036). Its project compared satellite imagery leak pre-location, continuous acoustic monitoring and flow-sensitive pressure-reducing valve systems. The official abstract says both satellite imagery and acoustic monitoring located subsurface leaks and suggests utilities consider combined deployment according to network, budget and operating conditions.
+
+Source: https://www.energy.ca.gov/publications/2021/demonstrating-innovative-water-leakage-reduction-strategies-correlating
+
+A vendor-published summary of the same project reports a higher hit rate for satellite points than acoustic points among the subset crews investigated; however, only a fraction of the satellite points of interest were field-investigated, so verification selection and denominators must be examined in the official report before adopting its quoted hit rates or cost comparisons. Vendor-reported results are not a substitute for a local, independently reported trial.
+
+### Revised source-selection decision
+
+1. **Do not make Sentinel-1 C-band the only candidate.** Keep it as the low-cost, open-data baseline, since open repeat coverage is valuable and scene inventory can be reproduced.
+2. **Investigate L-band feasibility in parallel.** Check historical ALOS-2 PALSAR-2 observations and rights for the selected Johannesburg pilot area. JAXA's ScanSAR L2.2 archive describes free products subject to each distribution platform's terms; commercial rights must be confirmed on the actual item/platform. Data currently documented by JAXA covers historical periods through July 2025 in the stated L2.2 archive, with subsequent data released progressively; do not assume all latest observations are in the archive.
+3. **Seek access to the local research design before duplication.** The UJ/Joburg Water chapter establishes that satellite-based monitoring/SAR was proposed as a joint research initiative, but its public abstract does not confirm current deployment status or give a reproducible validation set. Ask for target geography, radar source/wavelength, labeled leak records, sample size, validation method, false-positive distribution, current operational status and permitted sharing.
+4. **Keep commercial product use gated.** The full rights chain must cover source imagery, derived products, historical leak labels, model training, and distribution of outputs. "Free to download" or "public for research" is not enough for unrestricted commercial use.
+
+### Near-term go/no-go decision
+
+The immediate scientific question is not "can an algorithm draw a hotspot map?" It is whether repeatable satellite-derived anomalies overlap with independently confirmed leaks often enough to reduce real inspection burden in the selected area.
+
+Do not start model training until a feasibility packet contains:
+- actual catalog results for Sentinel-1 and Sentinel-2 covering the exact agreed area/time window;
+- an ALOS-2 PALSAR-2 availability and rights assessment for the same area;
+- historical confirmed leak/repair records with usable timestamps, spatial accuracy and outcome labels;
+- image-to-event matching tolerance justified by imagery resolution and the field-label accuracy;
+- a record of missingness, acquisition geometry, weather/land cover, and confounders;
+- a predeclared top-N inspection budget and baseline practice for evaluation.
+
+If leak labels or spatial accuracy are not sufficient, stop at the data-gap finding and seek a utility/university partner; synthetic examples must not be presented as remote-sensing evidence.
+
 ### Satellite-specific claim ceiling
 
 A satellite anomaly establishes at most a remotely sensed surface/subsurface indicator consistent with excess moisture under a stated sensor/model profile. It does not by itself establish a water-main leak, potable water identity, leak flow rate, precise pipe location, water savings, pipe condition, or repair necessity. Every operational leak claim requires independent field verification under a recorded method.
