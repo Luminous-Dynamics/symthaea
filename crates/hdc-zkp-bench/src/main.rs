@@ -31,6 +31,9 @@
 //! - Proof size (bytes) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
 
 mod boolean_gadgets;
+
+#[cfg(test)]
+mod spartan_privacy;
 mod bundling;
 mod cfc_temporal;
 mod fl_triple_stack;
