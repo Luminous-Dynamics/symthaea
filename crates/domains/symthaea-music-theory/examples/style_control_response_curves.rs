@@ -422,6 +422,7 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         .find(|point| point.input == InputConfig::BASE)
         .expect("every control grid includes the unchanged baseline");
     let exact_events_changed = unique_fingerprints.len() > 1;
+    let structural_distance_changed = max_structural_distance > MONOTONIC_EPSILON;
     let structural_layers_changed = !layers_changed.is_empty();
     let tempo_changed = observations
         .iter()
@@ -475,6 +476,7 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
     });
     let no_observed_change_at_tested_points = !(
         exact_events_changed
+            || structural_distance_changed
             || structural_layers_changed
             || tempo_changed
             || meter_changed
@@ -502,6 +504,7 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         "layers_changed_at_least_once": layers_changed,
         "observed_changes_from_baseline": {
             "exact_note_event_fingerprint": exact_events_changed,
+            "overall_structural_distance": structural_distance_changed,
             "structural_layers": structural_layers_changed,
             "tempo_bpm": tempo_changed,
             "meter_beats": meter_changed,
