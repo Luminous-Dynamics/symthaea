@@ -1,0 +1,48 @@
+name: Energy Telemetry Privacy Contract
+
+on:
+  push:
+    branches:
+      - "research/privacy-preserving-satellite-energy-telemetry"
+    paths:
+      - "tools/energy_telemetry/**"
+      - "tests/test_energy_telemetry_privacy_contract.py"
+      - "docs/research/energy_telemetry_envelope.schema.json"
+      - ".github/workflows/energy-telemetry-privacy-tests.yml"
+  pull_request:
+    paths:
+      - "tools/energy_telemetry/**"
+      - "tests/test_energy_telemetry_privacy_contract.py"
+      - "docs/research/energy_telemetry_envelope.schema.json"
+      - ".github/workflows/energy-telemetry-privacy-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: energy-telemetry-privacy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  privacy-contract:
+    name: Compile and test telemetry privacy contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify Python runtime
+        run: python3 --version
+
+      - name: Compile privacy contract and tests
+        run: python3 -m py_compile tools/energy_telemetry/privacy_contract.py tests/test_energy_telemetry_privacy_contract.py
+
+      - name: Run deterministic privacy contract tests
+        run: python3 -m unittest discover -s tests -p 'test_energy_telemetry_privacy_contract.py' -v
