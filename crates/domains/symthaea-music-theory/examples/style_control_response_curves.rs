@@ -682,6 +682,22 @@ mod tests {
     }
 
     #[test]
+    fn seed_robustness_set_is_unique_and_seed_offsets_are_reproducible() {
+        let unique_seeds: BTreeSet<u64> = BASE_SEED_SET.into_iter().collect();
+        assert_eq!(unique_seeds.len(), BASE_SEED_SET.len());
+
+        for base_seed in BASE_SEED_SET {
+            let points = control_points("seed", base_seed);
+            let observed_seeds: Vec<u64> =
+                points.iter().map(|point| point.input.seed).collect();
+            assert_eq!(
+                observed_seeds,
+                vec![base_seed, base_seed + 1, base_seed + 2, base_seed + 3]
+            );
+        }
+    }
+
+    #[test]
     fn continuous_controls_have_five_ordered_levels() {
         for control in ["valence", "arousal", "energy", "bars"] {
             let points = control_points(control, BASE_SEED);
