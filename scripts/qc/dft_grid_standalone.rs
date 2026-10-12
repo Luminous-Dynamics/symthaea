@@ -17,6 +17,16 @@ pub mod molecule {
             Self { atomic_number, position: [x, y, z] }
         }
 
+        pub fn from_angstrom(atomic_number: u8, x: f64, y: f64, z: f64) -> Self {
+            const ANGSTROM_TO_BOHR: f64 = 1.889_726_125_457_828_1;
+            Self::new(
+                atomic_number,
+                x * ANGSTROM_TO_BOHR,
+                y * ANGSTROM_TO_BOHR,
+                z * ANGSTROM_TO_BOHR,
+            )
+        }
+
         pub fn distance_to(&self, other: &Atom) -> f64 {
             let dx = self.position[0] - other.position[0];
             let dy = self.position[1] - other.position[1];
@@ -33,16 +43,21 @@ pub mod molecule {
     impl Molecule {
         pub fn h2() -> Self {
             Self { atoms: vec![
-                Atom::new(1, 0.0, 0.0, -0.7),
-                Atom::new(1, 0.0, 0.0, 0.7),
+                Atom::new(1, 0.0, 0.0, 0.0),
+                Atom::new(1, 0.0, 0.0, 1.4),
             ] }
         }
 
         pub fn water() -> Self {
             Self { atoms: vec![
-                Atom::new(8, 0.0, 0.0, 0.0),
-                Atom::new(1, 1.43, 0.0, 1.10),
-                Atom::new(1, -1.43, 0.0, 1.10),
+                Atom::from_angstrom(8, 0.0, 0.0, 0.0),
+                Atom::from_angstrom(1, 0.9572, 0.0, 0.0),
+                Atom::from_angstrom(
+                    1,
+                    0.9572 * 104.52_f64.to_radians().cos(),
+                    0.9572 * 104.52_f64.to_radians().sin(),
+                    0.0,
+                ),
             ] }
         }
     }
