@@ -265,6 +265,8 @@ fn build_run_record(
     let mut candidate_records = Vec::with_capacity(discovery.candidates.len());
     let mut holdout_attempted_steps = 0u64;
     let mut holdout_completed_steps = 0u64;
+    let mut holdout_integration_rhs_evaluations = 0u64;
+    let mut holdout_scoring_rhs_evaluations = 0u64;
     let mut holdout_rhs_evaluations = 0u64;
     let mut holdout_state_updates = 0u64;
     let mut holdout_passing_candidates = 0usize;
@@ -292,6 +294,10 @@ fn build_run_record(
         );
         holdout_attempted_steps = holdout_attempted_steps.saturating_add(holdout.attempted_integration_steps);
         holdout_completed_steps = holdout_completed_steps.saturating_add(holdout.completed_integration_steps);
+        holdout_integration_rhs_evaluations = holdout_integration_rhs_evaluations
+            .saturating_add(holdout.integration_rhs_evaluations);
+        holdout_scoring_rhs_evaluations = holdout_scoring_rhs_evaluations
+            .saturating_add(holdout.scoring_rhs_evaluations);
         holdout_rhs_evaluations = holdout_rhs_evaluations.saturating_add(holdout.rhs_evaluations);
         holdout_state_updates = holdout_state_updates.saturating_add(holdout.state_updates);
         if holdout.passed {
@@ -387,6 +393,8 @@ fn build_run_record(
         "holdout_work_across_returned_candidates": {
             "attempted_integration_steps": holdout_attempted_steps,
             "completed_integration_steps": holdout_completed_steps,
+            "integration_rhs_evaluations": holdout_integration_rhs_evaluations,
+            "scoring_rhs_evaluations": holdout_scoring_rhs_evaluations,
             "rhs_evaluations": holdout_rhs_evaluations,
             "state_updates": holdout_state_updates
         },
