@@ -1163,6 +1163,102 @@ mod tests {
     }
 
     #[test]
+    fn ratings_only_reviews_saved_pack_without_rerendering() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "symthaea-vocal-ratings-only-{}-{nonce}",
+            std::process::id()
+        ));
+        let output = root.join("pack");
+        let private = root.join("pack.private");
+        let ratings_path = root.join("ratings.completed.json");
+        std::fs::create_dir_all(&output).unwrap();
+        std::fs::create_dir_all(&private).unwrap();
+
+        let clip = clip();
+        std::fs::write(output.join(&clip.audio), b"fake wav fixture").unwrap();
+        let public_manifest = vec![ListeningClip {
+            clip_id: clip.clip_id.clone(),
+            lyrics: clip.lyrics.clone(),
+            audio: clip.audio.clone(),
+        }];
+        std::fs::write(
+            output.join("blind_manifest.json"),
+            serde_json::to_vec_pretty(&public_manifest).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(output.join("ratings.template.json"), b"[]").unwrap();
+        std::fs::write(
+            private.join("internal_manifest.json"),
+            serde_json::to_vec_pretty(&[clip]).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            private.join("private_backend_key.json"),
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "format_version": 2,
+                "salt": "0".repeat(64),
+                "entries": [{
+                    "clip_id": "clip-1",
+                    "backend": "synthetic-test",
+                    "case_id": 7
+                }]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            private.join("objective_report.json"),
+            serde_json::to_vec_pretty(&serde_json::json!([{
+                "clip_id": "clip-1",
+                "backend": "synthetic-test",
+                "case_id": 7,
+                "metrics": {"objective_pass": true}
+            }]))
+            .unwrap(),
+        )
+        .unwrap();
+        std::fs::write(private.join("human_case_report.json"), b"[]").unwrap();
+        std::fs::write(private.join("release_status.json"), b"{}").unwrap();
+
+        let ratings: Vec<_> = (0..5)
+            .map(|index| {
+                serde_json::json!({
+                    "listener_id": format!("listener-{index}"),
+                    "clip_id": "clip-1",
+                    "naturalness": 5.0,
+                    "emotional_fit": 5.0,
+                    "identity_consistency": 5.0,
+                    "artifact_free": 5.0,
+                    "lyric_words_understood": 3,
+                    "lyric_words_total": 3
+                })
+            })
+            .collect();
+        std::fs::write(&ratings_path, serde_json::to_vec_pretty(&ratings).unwrap()).unwrap();
+
+        run_saved_ratings_review(&output, &private, &ratings_path, 5).unwrap();
+
+        let status: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(private.join("release_status.json")).unwrap())
+                .unwrap();
+        assert_eq!(status["release_pass"], true);
+        assert_eq!(status["per_clip_pass"], true);
+        assert_eq!(status["synthetic_clip_count"], 1);
+        let case_report: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(private.join("human_case_report.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(case_report[0]["clip_id"], "clip-1");
+        assert_eq!(case_report[0]["pass"], true);
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn per_clip_gate_rejects_catastrophic_case_hidden_by_overall_mean() {
         let mut clips = Vec::new();
         for index in 0..10 {
