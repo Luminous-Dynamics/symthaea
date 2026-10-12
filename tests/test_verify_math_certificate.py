@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 import tempfile
@@ -266,6 +267,100 @@ class CertifiedFactorizationTests(unittest.TestCase):
             {"verified": True, "format": "SYMPPRF1", "value": 17, "certificate_nodes": 2},
         )
 
+
+
+def _reference_is_prime(value: int) -> bool:
+    """Simple trial-division oracle, independent of the Pocklington checker."""
+    if value < 2:
+        return False
+    divisor = 2
+    while divisor <= value // divisor:
+        if value % divisor == 0:
+            return False
+        divisor += 1
+    return True
+
+
+def _reference_factorization(value: int) -> tuple[tuple[int, int], ...]:
+    """Factor a small positive integer using test-local trial division."""
+    factors: list[tuple[int, int]] = []
+    divisor = 2
+    remaining = value
+    while divisor <= remaining // divisor:
+        if remaining % divisor == 0:
+            exponent = 0
+            while remaining % divisor == 0:
+                remaining //= divisor
+                exponent += 1
+            factors.append((divisor, exponent))
+        divisor += 1
+    if remaining > 1:
+        factors.append((remaining, 1))
+    return tuple(factors)
+
+
+def _small_domain_claim(
+    value: int,
+    verified_prime_cache: dict[int, verifier.PrimalityProof],
+) -> verifier.PrimalityProof:
+    """Build a Pocklington-shaped claim; composite roots deliberately use base 2."""
+    is_prime = _reference_is_prime(value)
+    if is_prime and value in verified_prime_cache:
+        return verified_prime_cache[value]
+    if value < 3:
+        raise ValueError("the base proof for 2 must be supplied in the cache")
+
+    predecessor_factors = _reference_factorization(value - 1)
+    dependencies: dict[int, verifier.PrimeNode] = {}
+    for prime, _ in predecessor_factors:
+        child = _small_domain_claim(prime, verified_prime_cache)
+        dependencies.update({node.prime: node for node in child.certificates})
+
+    if is_prime:
+        witnesses = []
+        for prime, _ in predecessor_factors:
+            witness = next(
+                (
+                    base
+                    for base in range(2, value)
+                    if pow(base, value - 1, value) == 1
+                    and math.gcd((pow(base, (value - 1) // prime, value) - 1) % value, value) == 1
+                ),
+                None,
+            )
+            if witness is None:
+                raise AssertionError(f"no Pocklington witness found for prime {value}, factor {prime}")
+            witnesses.append((prime, witness))
+    else:
+        # A composite cannot satisfy all Pocklington conditions; use deterministic
+        # candidate witnesses to test that the verifier rejects the claim.
+        witnesses = [(prime, 2) for prime, _ in predecessor_factors]
+
+    root = verifier.PrimeNode(value, predecessor_factors, tuple(witnesses))
+    proof = verifier.PrimalityProof(
+        value,
+        tuple(sorted((*dependencies.values(), root), key=lambda node: node.prime)),
+    )
+    if is_prime:
+        verified_prime_cache[value] = proof
+    return proof
+
+
+class ExhaustiveSmallDomainTests(unittest.TestCase):
+    def test_acceptance_matches_trial_division_for_values_two_through_five_hundred(self) -> None:
+        # The expected primality classification comes from a separate, deliberately
+        # simple trial-division oracle—not from either certificate implementation.
+        cache = {2: proof_two()}
+        for value in range(2, 501):
+            with self.subTest(value=value):
+                claim = _small_domain_claim(value, cache)
+                if _reference_is_prime(value):
+                    verifier.verify_primality_proof(claim)
+                    encoded = verifier.encode_primality_proof(claim)
+                    self.assertEqual(verifier.decode_primality_proof(encoded), claim)
+                else:
+                    with self.assertRaises(verifier.CertificateError):
+                        verifier.verify_primality_proof(claim)
 
 if __name__ == "__main__":
     unittest.main()
