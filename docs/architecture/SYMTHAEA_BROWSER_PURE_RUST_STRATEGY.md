@@ -188,9 +188,9 @@ The P1 property is accepted only when:
 
 ## 10. Implementation update — 2026-10-13
 
-A first native-CDP implementation slice is available for review in [PR #7429](https://github.com/Luminous-Dynamics/symthaea/pull/7429), on branch `feat/symthaea-browser-native-cdp-actions-001`. The code-change head documented for this slice was `62ad424be7e8fe33ded649e00245d89f58b02ed2`.
+A first native-CDP implementation slice is available for review in [PR #7429](https://github.com/Luminous-Dynamics/symthaea/pull/7429), on branch `feat/symthaea-browser-native-cdp-actions-001`. The code-change head documented for this slice was `b92468073d631cfb493672aa20174f3f23de80f4`.
 
-The branch replaces authored page evaluation in the normal `cdp.rs` controller path for click/accessibility-target resolution, scrolling, history navigation, focus detection, title retrieval and DOM text extraction. It uses typed CDP operations and Rust HTML parsing. Input insertion is guarded by AX role/disabled checks and a postcondition requiring the observed value to change and contain the requested text. The JavaScript fallback observation path and arbitrary `eval_js` helper were removed from that controller module.
+The branch replaces authored page evaluation in the normal `cdp.rs` controller path for click/accessibility-target resolution, scrolling, history navigation, focus detection, title retrieval and DOM text extraction. It uses typed CDP operations and Rust HTML parsing. Input insertion is guarded by AX role/disabled checks and a postcondition requiring the observed value to change and contain the requested text. CSS selectors for actions/extraction fail closed on zero or multiple matches. The JavaScript fallback observation path and arbitrary `eval_js` helper were removed from that controller module.
 
 The raw Praxis exploration examples are preserved under `examples/archive/` with archive banners; the maintained `examples/praxis_journey.rs` continues to exercise `BrowserExecutor`. This moves the unsafe example pattern out of the maintained example list without destroying the research record.
 
@@ -209,4 +209,4 @@ The raw Praxis exploration examples are preserved under `examples/archive/` with
 
 ---
 
-**Qualification note:** This strategy is a proposed decision document. It changes no browser behavior, does not remove the current JavaScript snippets, does not certify Chromium/Servo/Boa, and does not claim compilation or test success.
+**Qualification note:** This strategy document itself changes no browser behavior. The separate behavior changes are under PR #7429 and remain unqualified until exact-head Cargo, formatting, Clippy, unit/integration and live-browser evidence is recorded. No document here certifies Chromium/Servo/Boa as a pure-Rust browser engine.
