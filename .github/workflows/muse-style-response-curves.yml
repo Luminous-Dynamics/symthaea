@@ -11,6 +11,8 @@ on:
       - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
       - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
       - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.toml"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/muse-style-response-curves.yml"
   push:
@@ -23,6 +25,8 @@ on:
       - "crates/domains/symthaea-music-theory/src/score.rs"
       - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
       - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.toml"
       - "crates/domains/symthaea-music-theory/Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/muse-style-response-curves.yml"
@@ -84,6 +88,8 @@ jobs:
               "crates/domains/symthaea-music-theory/src/score.rs",
               "crates/domains/symthaea-music-theory/examples/diversity_census.rs",
               "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs",
+              "Cargo.toml",
+              "crates/domains/symthaea-music-theory/Cargo.toml",
               "Cargo.lock",
           ]
           blob_digests = {
@@ -102,7 +108,13 @@ jobs:
           ]
           receipt = {
               "schema": "muse-style-response-run-receipt-v1",
-              "git_commit": os.environ["GITHUB_SHA"],
+              "tested_checkout_sha": subprocess.check_output(
+                  ["git", "rev-parse", "HEAD"], text=True
+              ).strip(),
+              "github_event_sha": os.environ["GITHUB_SHA"],
+              "pull_request_head_sha": json.loads(
+                  Path(os.environ["GITHUB_EVENT_PATH"]).read_text()
+              ).get("pull_request", {}).get("head", {}).get("sha"),
               "workflow_run_id": os.environ["GITHUB_RUN_ID"],
               "workflow_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
               "report_path": report_path.as_posix(),
@@ -129,7 +141,12 @@ jobs:
           summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
           with summary.open("a", encoding="utf-8") as stream:
               stream.write("# Muse routed style-control response curves\n\n")
-              stream.write(f"- Commit: `{receipt['git_commit']}`\n")
+              stream.write(
+                  f"- Tested checkout SHA: `{receipt['tested_checkout_sha']}`\n"
+              )
+              stream.write(
+                  f"- PR head SHA: `{receipt['pull_request_head_sha'] or 'push event'}`\n"
+              )
               stream.write(f"- Styles: {report['protocol']['style_count']}\n")
               stream.write(f"- Curves: {report['protocol']['curve_count']}\n")
               stream.write(f"- Control points: {report['protocol']['point_count']}\n")
