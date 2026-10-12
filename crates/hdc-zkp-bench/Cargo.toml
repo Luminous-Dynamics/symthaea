@@ -32,6 +32,14 @@ rand = "0.9"
 sha2 = "0.10"
 serde_json = "1.0"
 
+
+[dev-dependencies]
+# Minimal privacy-capable comparison: Iron Spartan is separate from the non-ZK Binius64 backend.
+binius-field = { path = "../../vendor/binius64/crates/field" }
+binius-spartan-frontend = { path = "../../vendor/binius64/crates/spartan-frontend" }
+binius-spartan-prover = { path = "../../vendor/binius64/crates/spartan-prover" }
+binius-spartan-verifier = { path = "../../vendor/binius64/crates/spartan-verifier" }
+
 # Cargo does not support nested workspaces: this crate path-depends on
 # vendor/binius64/crates/*, which is itself a full [workspace] with its
 # own workspace.package/workspace.dependencies inheritance. If this crate
