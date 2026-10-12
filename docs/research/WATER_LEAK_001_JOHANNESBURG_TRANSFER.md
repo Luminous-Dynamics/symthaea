@@ -133,6 +133,95 @@ A small bench device can be attempted within weeks; a credible field-tested prod
 2. Create a canonical, versioned known-answer test matrix and independent stdlib-only validator before production Rust adapters. Minimum cases must include plastic-pipe attenuation, weak leak, pump/valve/noise negatives, sensor fault, stale calibration, and out-of-profile operation.
 3. Make no commercial cost or accuracy claim until the bill of materials, lawful datasets, exact denominators and held-out evidence are reviewed.
 
+
+## Satellite-assisted screening and satellite-connected telemetry
+
+### Terminology: two complementary technologies
+
+"Satellite telemetry" usually means transmitting measurements from a remote device via satellite. The primary idea here—using imagery to find leaks—is more accurately called **satellite remote sensing**. We should investigate both:
+
+1. **Satellite remote sensing:** satellites observe indirect surface/subsurface moisture, vegetation or temperature anomalies to rank suspect areas for ground inspection.
+2. **Satellite-connected telemetry:** low-power pressure, flow, acoustic or reservoir sensors send measurements over a satellite IoT link where cellular or utility communications are unreliable. This can monitor a known network point but cannot locate an uninstrumented buried leak by itself.
+
+For dense urban Johannesburg, test remote sensing as a wide-area screening layer and ground sensors as the localization/confirmation layer. Satellite IoT connectivity is a separate later option for remote bulk mains, reservoirs or pump stations lacking reliable terrestrial communications.
+
+### A local research lead to follow before duplicating work
+
+A peer-reviewed 2025 chapter by Telukdarie and Nkadimeng documents a satellite-imagery leak-detection research initiative involving the City of Johannesburg's water department and the University of Johannesburg. Public metadata says SAR-based monitoring was proposed; it does not establish city-scale verified performance or tell us which parts are deployed now. Contact/coordinate with this research stream and ask for methodology, trial boundaries, leak labels, sensor/satellite sources, validation counts, false-positive causes, current deployment status and data-access terms before claiming novelty or building a competing pipeline.
+
+Source: https://pure.uj.ac.za/en/publications/satellite-imagery-for-water-leak-detection-a-joint-research-initi/
+DOI: https://doi.org/10.1108/978-1-83662-642-820251005
+
+### What each data source is actually good for
+
+| Source | Useful role | Critical limit |
+|---|---|---|
+| Sentinel-1 C-band SAR (open Copernicus data) | Repeat backscatter/change features; all-weather/night acquisition; cheap city-wide research baseline | Standard Interferometric Wide Swath imagery has about 5 × 20 m spatial resolution and roughly 6-day revisit at the equator for a two-satellite constellation. Moisture sensitivity is indirect; urban buildings, surface roughness, soil cover and mixed pixels complicate attribution. C-band results cannot simply inherit L-band claims. |
+| Sentinel-2 multispectral optical imagery (open Copernicus data) | Vegetation/moisture-index changes, wet patches and land-cover context; 10 m bands and nominal 5-day revisit | Clouds, illumination, vegetation changes, irrigation, parks and mixed urban pixels create gaps/false alarms. It cannot directly see buried water through concrete or asphalt. |
+| Landsat thermal infrared | Coarse surface-temperature anomalies over broad areas or large assets | Thermal bands have 100 m ground sampling; this is not a street-level pipe locator. Clouds, emissivity, shade, time of day and water/air temperature contrast matter. |
+| NASA SMAP soil-moisture products | Regional rainfall/soil-moisture context, not individual pipes | Approximate 9 km products are far too coarse for individual urban leaks. Never treat SMAP pixels as pipe-level evidence. |
+| Higher-resolution commercial L-band SAR analytics (e.g. ASTERRA Recover) | Potential partner/vendor comparator, designed specifically to rank likely treated-water leak locations | Proprietary costs and algorithms; vendor-published performance and “minimum detectable leak” claims are not independent guarantees. Require transparent denominators, local trial evidence, data rights, POI-to-confirmed-leak yield and a paid/pilot quote before procurement. |
+| Drone/airborne thermal or hyperspectral survey | Follow-up over small suspect sites when surface moisture/temperature signals may be observable | More detailed but limited area, flight/weather/permission constraints, staffing and cost. It is still a screening measurement, not proof of a leaking pipe. |
+
+References:
+- ESA Sentinel-1 mission characteristics: https://www.esa.int/Applications/Observing_the_Earth/Copernicus/Sentinel-1/Facts_and_figures
+- ESA Sentinel-2 mission characteristics: https://www.esa.int/Applications/Observing_the_Earth/Copernicus/Sentinel-2/
+- Open Copernicus data access: https://dataspace.copernicus.eu/explore-data
+- USGS Landsat 9 thermal resolution: https://www.usgs.gov/landsat-missions/landsat-9
+- NASA SMAP spatial resolution/context: https://science.nasa.gov/missions/smap/soil-moisture-mission-begins-science-operations/
+- ASTERRA description of its satellite SAR technology: https://asterra.io/about/
+- Arabi & Grau (2025), radar-multispectral fusion: https://doi.org/10.1016/j.rsase.2025.101594
+- Ali et al. (2025), L-band SAR and machine learning, 6 ALOS-2 images; 80% reported accuracy, with generalization limitations: https://doi.org/10.5194/isprs-archives-XLVIII-G-2025-147-2025
+- Optical leak-detection research with false positives due to rainfall, irrigation, natural water flow and vegetation: https://doi.org/10.3390/s22031057
+- ASTERRA is a vendor/source for its product claims; treat the site's claimed leak thresholds and cumulative outcomes as vendor-reported, not independently validated Johannesburg performance.
+
+### Why fusion is more credible than satellite-only detection
+
+A wet or thermally unusual area is not automatically a leak. Confounders include rainfall, irrigation, groundwater seepage, stormwater, leaking sewers, broken drains, ponds, changes in vegetation, slope/runoff, soil composition, excavation, surface materials, shadow, traffic, and land-cover change. Satellite anomalies can also miss leaks that stay contained underground, are small/short-lived, occur under impermeable surfaces, or produce a signal below the sensor's spatial resolution.
+
+The proposed output is a **ranked area/pipe-segment inspection queue with explicit uncertainty and contributing evidence**, not a map that asserts every flagged coordinate is a leak.
+
+### Candidate open-data experiment
+
+Begin with a small, historical, retrospective pilot, not an all-city model:
+
+1. Agree on a permitted spatial boundary and evaluation time window with a data owner. Obtain a versioned GIS water-main network and historical confirmed-leak/repair records with timestamps, pipe class/material if known, and investigation outcomes. Do not infer leak coordinates from vague service complaints or label every unreported location as a true non-leak.
+2. Use free Copernicus Sentinel-1 scenes as the primary open SAR baseline; add Sentinel-2 when valid cloud-free imagery exists. Add time-matched rainfall/weather, land cover, terrain/slope, drainage/irrigation context, network topology and repair history where permitted. Record acquisition dates, processing versions and per-pixel quality masks.
+3. Estimate temporal anomaly features against a local seasonal baseline; explicitly mask water bodies, invalid/layover areas where applicable, fresh excavation, heavy cloud for optical scenes, and pixels with poor observation quality. Keep rainfall/irrigation controls as features and evaluation strata, not informal caveats.
+4. Compare three methods on the same frozen cases: a non-AI baseline, conventional statistical/ML baseline, and optional Symthaea-assisted fusion. Avoid a complex model until enough independently labelled outcomes exist.
+5. Split evaluation by geography and time—for example, hold out whole zones and later periods—not random adjacent pixels from the same scene. Make sure the same leak event and its correlated image neighbourhood cannot appear in both train and test.
+6. If utility rights permit, benchmark commercial L-band analytics on the same study area and compare every method against the same field-confirmed outcomes. Do not assume Sentinel-1's C-band will reproduce commercial L-band results.
+7. Only proceed to a prospective pilot if the retrospective study shows a useful signal and the field owner approves the protocol. A blind crew confirms or rejects points using standard acoustic/correlation practice; record all investigated points, not just successful discoveries.
+
+### Metrics that determine whether satellite screening adds value
+
+Measure:
+- precision/yield among the top N points a field team can realistically inspect;
+- confirmed leaks per 100 inspections and per crew-day versus current practice and existing logger/acoustic workflows;
+- recall on a timestamped set of confirmed leaks that should have left an observable signal;
+- false-positive causes and false-positive rate by land cover, weather/rainfall, pipe type and urban setting;
+- spatial error between the satellite point-of-interest and the field-confirmed leak, distinguishing a broad anomaly zone from actual leak localization;
+- cost per confirmed leak, analyst time, data/licensing cost, time from imagery acquisition to action, and repair verification;
+- abstention/unknown rates when cloud, mixed pixels, outdated network maps or weak ground labels prevent a reliable score.
+
+Preregister the acceptance threshold based on the utility's cost per inspection and crew capacity. Do not set a universal accuracy target after looking at the test outcomes. Class imbalance makes overall accuracy insufficient on its own.
+
+### Staged plan
+
+- **2–4 weeks:** scope the Johannesburg/UJ workstream, obtain data rights and map layers, make a Copernicus acquisition inventory for a small permitted area, and test preprocessing/repeatability.
+- **4–8 additional weeks:** produce a frozen retrospective benchmark if adequate historical leak labels and valid imagery exist; compare no-model, conventional ML and optional Symthaea. If the labels or image archive are insufficient, report that as a no-go/blocker rather than manufacture cases.
+- **3–6 months or longer:** prospective silent-mode field pilot, requiring written access, technician verification, operational baseline and outcome tracking. Procurement and municipal coordination may dominate the timeline.
+
+### Satellite-connected telemetry: a second lane
+
+Where remote trunk mains, reservoirs or pump stations lack reliable cellular connectivity, investigate low-power satellite IoT for **known instrumented points**: pressure trends, flow/level measurements, pump health, acoustic features and heartbeat/battery health. Prefer sending compact features and alerts rather than continuous raw audio. Compare satellite modem/device cost, antenna visibility, power budget, message latency, subscription costs and coverage against cellular/LoRaWAN/store-and-forward alternatives. Satellite messaging can transport sensor readings; it does not make an uninstrumented pipe observable.
+
+This lane should share device identity, calibration, freshness and provenance semantics with the Mycelix operations plane. Sensor messages and Mycelix work-order events remain operational facts, not proof of water quality or leak confirmation.
+
+### Satellite-specific claim ceiling
+
+A satellite anomaly establishes at most a remotely sensed surface/subsurface indicator consistent with excess moisture under a stated sensor/model profile. It does not by itself establish a water-main leak, potable water identity, leak flow rate, precise pipe location, water savings, pipe condition, or repair necessity. Every operational leak claim requires independent field verification under a recorded method.
+
 ## Claim ceiling
 
 This document is a research and design plan. It establishes no functioning detector, current local build price, sensitivity, specificity, battery life, localization precision, Johannesburg transfer performance, water saved, commercial rights to third-party data, utility acceptance, drinking-water safety or operation authority.
