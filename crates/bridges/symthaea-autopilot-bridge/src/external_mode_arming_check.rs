@@ -1373,7 +1373,7 @@ pub enum Px4ExternalModeArmingCheckError {
     #[error("invalid {0}")]
     InvalidIdentifier(&'static str),
     /// Registration component name exceeded PX4 v1's 25-byte NUL-terminated field.
-    #[error("registration component name is {found} bytes; PX4 v1 allows at most 24 bytes plus NUL")]
+    #[error("registration name has {found} bytes; PX4 limit is 24 plus NUL")]
     ComponentNameTooLong { found: usize },
     /// Registration reply supplied a raw ID below PX4's invalid sentinel.
     #[error("registration IDs below -1 are invalid")]
