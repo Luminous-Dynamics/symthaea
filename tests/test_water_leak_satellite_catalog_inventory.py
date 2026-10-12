@@ -17,6 +17,7 @@ from tools.water_leak_satellite.catalog_inventory import (
     parse_bbox,
     _validate_next_url,
 )
+from tools.water_leak_satellite.verify_inventory import verify_inventory
 
 
 class FakeResponse:
@@ -247,6 +248,7 @@ class InventoryTests(unittest.TestCase):
             self.assertEqual(document["collections"][0]["item_count"], 1)
             self.assertEqual(len(document["inventory_manifest_sha256"]), 64)
             self.assertEqual(len(document["collections"][0]["items"][0]["summary_sha256"]), 64)
+            self.assertEqual(verify_inventory(document), [])
             self.assertIn("overall_claim_ceiling", document)
 
 
