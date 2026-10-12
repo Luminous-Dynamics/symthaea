@@ -32,7 +32,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 - `format_summary.py` - Summary formatting
 - `generate_benchmark_report.py` - Report generation
 - `muse_style_coverage.py` - Source-derived Muse route audit in both directions; `--report` emits per-constellation gaps and unreferenced executable styles, `--check` fails on frozen-baseline drift
-- `muse_style_capability_inventory.py` - Extracts per-style grammar family/dispatch mode, composition spec, meter, tempo range, census-informed intent-axis declarations, and instrument-pool choices from Rust source; mappings are not render/quality evidence
+- `muse_style_capability_inventory.py` - Extracts per-style grammar family/dispatch mode, composition spec, meter, tempo range, census-informed intent-axis declarations, and instrument-pool choices from Rust source; pins the census-source digest without executing the census or claiming render/quality evidence
 - `gpu_smoke.sh` - NVIDIA/CUDA environment preflight and optional Broca CUDA smoke test
 - `post_to_dashboard.py` - Dashboard posting
 - `precompute_ethics_embeddings.py` - Ethics embeddings
