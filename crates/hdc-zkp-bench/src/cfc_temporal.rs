@@ -3,7 +3,7 @@
 //! Binius demonstration: gated bitwise state recurrence over packed u64 words.
 //!
 //! The circuit proves only the recurrence `h_next = h XOR (gate AND (target XOR h))`
-//! independently for each bit lane. Each gate is an unconstrained private witness
+//! independently for each bit lane. Each gate is an unconstrained witness
 //! word; it is not derived from a sigmoid or a numerical time constant.
 //!
 //! This is not a proof of real-valued or fixed-point CfC dynamics and establishes
@@ -184,7 +184,7 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
         "  Verifier time: {:.3} ms",
         verify_time.as_secs_f64() * 1000.0
     );
-    println!("  Verification: PASSED (real cryptographic proof)");
+    println!("  Verification: PASSED (integrity proof; no Binius64 ZK privacy guarantee)");
 
     CfcBenchResult {
         neurons,
