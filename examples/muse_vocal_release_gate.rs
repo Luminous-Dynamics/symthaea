@@ -499,6 +499,40 @@ fn write_private_artifact(path: &Path, contents: &[u8]) -> Result<()> {
         .with_context(|| format!("failed to write private artifact {}", path.display()))
 }
 
+fn ensure_directory_contains_exact_files(
+    directory: &Path,
+    expected: &std::collections::BTreeSet<String>,
+    description: &str,
+) -> Result<()> {
+    let mut actual = std::collections::BTreeSet::new();
+    for entry in std::fs::read_dir(directory)
+        .with_context(|| format!("failed to inspect {description} {}", directory.display()))?
+    {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        anyhow::ensure!(
+            file_type.is_file() && !file_type.is_symlink(),
+            "{description} contains a non-regular or symlinked entry: {}",
+            entry.path().display()
+        );
+        let name = entry
+            .file_name()
+            .into_string()
+            .map_err(|_| anyhow::anyhow!("{description} contains a non-UTF8 filename"))?;
+        anyhow::ensure!(
+            expected.contains(&name),
+            "{description} contains unexpected/stale entry {name}"
+        );
+        actual.insert(name);
+    }
+    anyhow::ensure!(
+        &actual == expected,
+        "{description} is incomplete; missing expected files: {:?}",
+        expected.difference(&actual).collect::<Vec<_>>()
+    );
+    Ok(())
+}
+
 fn run_saved_ratings_review(
     output: &Path,
     private_output: &Path,
@@ -534,6 +568,42 @@ fn run_saved_ratings_review(
     let private_key: PrivateKeyFile = serde_json::from_slice(&std::fs::read(&key_path)?)?;
     let objective: Vec<SavedObjectiveEntry> =
         serde_json::from_slice(&std::fs::read(&objective_path)?)?;
+
+    let mut expected_public_files =
+        std::collections::BTreeSet::from(["blind_manifest.json".to_string(), "ratings.template.json".to_string()]);
+    for clip in &clips {
+        anyhow::ensure!(
+            expected_public_files.insert(clip.audio.clone()),
+            "private manifest contains duplicate audio filename {}",
+            clip.audio
+        );
+    }
+    ensure_directory_contains_exact_files(
+        output,
+        &expected_public_files,
+        "shareable listening pack",
+    )?;
+    let expected_private_files: std::collections::BTreeSet<String> = [
+        "internal_manifest.json",
+        "private_backend_key.json",
+        "objective_report.json",
+        "human_case_report.json",
+        "release_status.json",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect();
+    ensure_directory_contains_exact_files(
+        private_output,
+        &expected_private_files,
+        "organizer-only run state",
+    )?;
+    let ratings_canonical = ratings_path.canonicalize()?;
+    anyhow::ensure!(
+        !ratings_canonical.starts_with(output.canonicalize()?)
+            && !ratings_canonical.starts_with(private_output.canonicalize()?),
+        "ratings input must be outside both the shareable pack and organizer-only directory"
+    );
     anyhow::ensure!(private_key.format_version == 2, "unsupported private-key format");
     anyhow::ensure!(
         private_key.salt.len() == 64
