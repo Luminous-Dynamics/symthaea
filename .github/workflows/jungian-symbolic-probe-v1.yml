@@ -184,7 +184,7 @@ jobs:
               )
           lines.extend([
               "",
-              "> Seed packets preserve emitted text, evidence links, and the frozen synthetic case context. No human labels are prefilled; an empty review list means unreviewed, not correct.",
+              "> Seed packets preserve emitted text, evidence links, and the frozen synthetic case context. The serialized sidecar is checked against its bound sources, and eight hostile mutations must be rejected. No human labels are prefilled; an empty review list means unreviewed, not correct.",
               "",
           ])
           lines.extend([
