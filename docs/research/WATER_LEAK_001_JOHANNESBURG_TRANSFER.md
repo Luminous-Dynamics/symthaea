@@ -251,6 +251,26 @@ A vendor-published summary of the same project reports a higher hit rate for sat
 3. **Seek access to the local research design before duplication.** The UJ/Joburg Water chapter establishes that satellite-based monitoring/SAR was proposed as a joint research initiative, but its public abstract does not confirm current deployment status or give a reproducible validation set. Ask for target geography, radar source/wavelength, labeled leak records, sample size, validation method, false-positive distribution, current operational status and permitted sharing.
 4. **Keep commercial product use gated.** The full rights chain must cover source imagery, derived products, historical leak labels, model training, and distribution of outputs. "Free to download" or "public for research" is not enough for unrestricted commercial use.
 
+### Reproducible catalogue inventory utility
+
+The feature branch now includes a standard-library-only catalogue metadata collector:
+- `tools/water_leak_satellite/catalog_inventory.py`
+- `tests/test_water_leak_satellite_catalog_inventory.py`
+
+Run from the repository root to perform only catalogue reconnaissance:
+
+```sh
+python3 -m unittest tests.test_water_leak_satellite_catalog_inventory -v
+python3 tools/water_leak_satellite/catalog_inventory.py \
+  --bbox 27.7,-26.5,28.4,-25.8 \
+  --start 2023-01-01 --end 2026-10-12 \
+  --out artifacts/water-leak/satellite-catalog-inventory.json
+```
+
+The bounding box is a coarse Johannesburg reconnaissance extent, not an approved evaluation area. The utility queries Copernicus STAC for Sentinel-1 GRD and Sentinel-2 L2A, writes item metadata plus per-item and per-page SHA-256 hashes, records the explicit query and retrieval time, follows only HTTPS pagination links on the official STAC host, deduplicates repeated item IDs and fails closed when pagination is ambiguous or incomplete. It does not download raster imagery or claim that scenes are suitable for detecting leaks.
+
+Six offline unit tests were run locally against mocked catalog responses and passed. **A live catalogue query has not yet been run in this environment**, so there is no measured Johannesburg scene count or coverage result yet. A live inventory must be created and reviewed before any model or benchmark eligibility claim.
+
 ### Near-term go/no-go decision
 
 The immediate scientific question is not "can an algorithm draw a hotspot map?" It is whether repeatable satellite-derived anomalies overlap with independently confirmed leaks often enough to reduce real inspection burden in the selected area.
