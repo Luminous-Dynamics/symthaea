@@ -273,14 +273,20 @@ impl CdpSession {
         validate_text_entry_target(&page, &backend_node_id)
             .await
             .context("Text target is not a supported editable control")?;
+        let previous_value = accessibility_value(&page, &backend_node_id).await?;
         click_backend_node(&page, &backend_node_id)
             .await
             .context("Focus text target with native CDP input")?;
         page.execute(InsertTextParams::new(text.to_owned()))
             .await
             .context("Input.insertText failed")?;
-        if !accessibility_value_contains(&page, &backend_node_id, text).await? {
-            bail!("Input.insertText was dispatched, but the AX tree did not confirm the requested text");
+        let current_value = accessibility_value(&page, &backend_node_id).await?;
+        let value_changed = current_value != previous_value;
+        let contains_inserted_text = current_value
+            .as_deref()
+            .is_some_and(|value| value.contains(text));
+        if !value_changed || !contains_inserted_text {
+            bail!("Input.insertText was dispatched, but the AX tree did not confirm a changed value containing the requested text");
         }
 
         debug!(text_len = text.len(), "Typed text with native CDP input");
@@ -509,25 +515,23 @@ async fn validate_text_entry_target(page: &Page, backend_node_id: &BackendNodeId
     Ok(())
 }
 
-async fn accessibility_value_contains(
+async fn accessibility_value(
     page: &Page,
     backend_node_id: &BackendNodeId,
-    expected: &str,
-) -> Result<bool> {
+) -> Result<Option<String>> {
     let tree = page
         .execute(GetFullAxTreeParams::builder().build())
         .await
-        .context("Read accessibility tree after text entry")?;
+        .context("Read accessibility tree for text value verification")?;
     let node = tree.result.nodes.iter().find(|node| {
         node.backend_dom_node_id
             .as_ref()
             .is_some_and(|id| *id.inner() == *backend_node_id.inner())
     });
     let Some(node) = node else {
-        return Ok(false);
+        return Ok(None);
     };
-    let value = node.value.as_ref().and_then(|value| ax_value_to_string(&value.value));
-    Ok(value.is_some_and(|value| value.contains(expected)))
+    Ok(node.value.as_ref().and_then(|value| ax_value_to_string(&value.value)))
 }
 
 async fn scroll_backend_node_into_view(
