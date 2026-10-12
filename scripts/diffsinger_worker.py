@@ -43,7 +43,12 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
-from diffsinger_phonemes import ipa_to_arpabet, resolve_language_id
+from diffsinger_phonemes import (
+    duration_per_mapped_phone,
+    map_syllable_phones,
+    require_melisma_vowel,
+    resolve_language_id,
+)
 
 HEAD_FRAMES = 8
 TAIL_FRAMES = 8
@@ -111,22 +116,29 @@ class DiffSingerModel:
         durations_ms = []
         target_hz = []
 
-        for syllable in performance["syllables"]:
+        for syllable_index, syllable in enumerate(performance["syllables"]):
             phonemes = syllable["phonemes"]
+            mapped_groups, last_vowel_arpabet = map_syllable_phones(phonemes, syllable_index)
             total_natural_ms = max(sum(p["natural_duration_s"] * 1000.0 for p in phonemes), 1.0)
             note_ms = max(syllable["note"]["duration"] * 1000.0, 1.0)
-            last_arpabet = "ax"
-            for phoneme in phonemes:
-                for arpabet in ipa_to_arpabet(phoneme["ipa"]):
+            for phoneme, mapped_phones in zip(phonemes, mapped_groups, strict=True):
+                share = (phoneme["natural_duration_s"] * 1000.0) / total_natural_ms
+                token_duration_ms = duration_per_mapped_phone(
+                    share * note_ms, len(mapped_phones)
+                )
+                for arpabet in mapped_phones:
                     arpabet_phonemes.append(arpabet)
-                    share = (phoneme["natural_duration_s"] * 1000.0) / total_natural_ms
-                    durations_ms.append(max(share * note_ms, 1.0))
+                    durations_ms.append(max(token_duration_ms, 1.0))
                     target_hz.append(syllable["note"]["frequency"])
-                    last_arpabet = arpabet
-            for melisma_note in syllable["melisma_notes"]:
-                arpabet_phonemes.append(last_arpabet)
-                durations_ms.append(max(melisma_note["duration"] * 1000.0, 1.0))
-                target_hz.append(melisma_note["frequency"])
+            melisma_notes = syllable["melisma_notes"]
+            if melisma_notes:
+                sustained_vowel = require_melisma_vowel(
+                    last_vowel_arpabet, syllable_index
+                )
+                for melisma_note in melisma_notes:
+                    arpabet_phonemes.append(sustained_vowel)
+                    durations_ms.append(max(melisma_note["duration"] * 1000.0, 1.0))
+                    target_hz.append(melisma_note["frequency"])
 
         if not arpabet_phonemes:
             return None
