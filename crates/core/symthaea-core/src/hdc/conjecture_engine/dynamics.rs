@@ -127,11 +127,13 @@ pub(crate) fn rk4_trajectory_with_work(
         for i in 0..dimension {
             state[i] += h / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
         }
+        // Count the state arithmetic actually performed, including a step that
+        // overflows and is then rejected before it can be marked completed.
+        work.state_updates = work.state_updates.saturating_add(dimension as u64);
         if state.iter().any(|value| !value.is_finite()) {
             return (Vec::new(), Vec::new(), work);
         }
         work.completed_steps += 1;
-        work.state_updates += dimension as u64;
         times.push(next_t);
         states.push(state.clone());
         if next_t == t_end {
@@ -354,6 +356,22 @@ mod bounded_rk4_trajectory_tests {
         assert_eq!(work.completed_steps, 0);
         assert_eq!(work.rhs_evaluations, 2);
         assert_eq!(work.state_updates, 0);
+    }
+
+    #[test]
+    fn overflowed_state_update_work_is_counted_before_rejection() {
+        let (_times, states, work) = rk4_trajectory_with_work(
+            |state, _time| vec![f64::MAX; state.len()],
+            &[f64::MAX],
+            1.0,
+            0.1,
+        );
+        assert!(states.is_empty());
+        assert!(!work.completed);
+        assert_eq!(work.attempted_steps, 1);
+        assert_eq!(work.completed_steps, 0);
+        assert_eq!(work.rhs_evaluations, 4);
+        assert_eq!(work.state_updates, 1);
     }
 
     #[test]
