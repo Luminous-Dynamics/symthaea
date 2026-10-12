@@ -286,6 +286,33 @@ class DurableQueueTests(unittest.TestCase):
         with self.assertRaisesRegex(TelemetryQueueError, "unsupported telemetry queue schema"):
             self.reopen()
 
+    def test_application_id_is_set_and_preserved_across_restart(self):
+        with sqlite3.connect(self.database) as db:
+            self.assertEqual(db.execute("PRAGMA application_id").fetchone()[0], 0x53594D54)
+        self.assertEqual(self.reopen().integrity_check(), "ok")
+        with sqlite3.connect(self.database) as db:
+            self.assertEqual(db.execute("PRAGMA application_id").fetchone()[0], 0x53594D54)
+
+    def test_foreign_application_id_is_rejected(self):
+        with sqlite3.connect(self.database) as db:
+            db.execute("PRAGMA application_id = 123456")
+        with self.assertRaisesRegex(TelemetryQueueError, "different application"):
+            self.reopen()
+
+    def test_unowned_database_with_other_tables_is_not_modified(self):
+        other = str(Path(self.temp.name) / "other.sqlite3")
+        with sqlite3.connect(other) as db:
+            db.execute("CREATE TABLE customer_records (id INTEGER PRIMARY KEY)")
+        with self.assertRaisesRegex(TelemetryQueueError, "unowned SQLite database"):
+            DurableTelemetryQueue(other)
+        with sqlite3.connect(other) as db:
+            self.assertEqual(db.execute("PRAGMA application_id").fetchone()[0], 0)
+            self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0].lower(), "delete")
+            tables = {row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+            )}
+        self.assertEqual(tables, {"customer_records"})
+
     def test_invalid_busy_timeout_and_numeric_overflow_are_rejected(self):
         for timeout in (float("nan"), float("inf"), float("-inf"), 0, -1, 301, 1e300, 10 ** 1000):
             with self.subTest(timeout=timeout):
