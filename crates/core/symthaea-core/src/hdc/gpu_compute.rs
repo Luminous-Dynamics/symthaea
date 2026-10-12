@@ -261,17 +261,23 @@ mod capability_report_tests {
         assert_eq!(decoded, report);
     }
 
-    /// Run in CI only when the software-Vulkan lane explicitly opts in.
+    /// Run in CI only when a software-Vulkan or NVIDIA-hardware lane opts in.
     ///
-    /// This dispatches a real WGSL compute shader through WGPU/Vulkan, copies
-    /// the result to a mappable buffer, and checks the readback. On GitHub's
-    /// ordinary hosted runner, the workflow forces Mesa lavapipe; a pass here
-    /// proves software-Vulkan dispatch/readback, never physical-GPU execution.
+    /// This dispatches a WGSL compute shader through WGPU/Vulkan, copies the
+    /// result to a mappable buffer, and checks the readback. The software lane
+    /// explicitly selects Mesa lavapipe; the hardware lane requires NVIDIA.
+    /// Passing on software Vulkan never qualifies physical-GPU execution.
     #[tokio::test]
-    async fn software_vulkan_compute_dispatch_and_readback_when_requested() {
-        if std::env::var_os("SYTHAEA_GPU_SMOKE_REQUIRED").is_none() {
+    async fn vulkan_compute_dispatch_and_readback_when_requested() {
+        let expect_software = std::env::var_os("SYTHAEA_GPU_EXPECT_SOFTWARE").is_some();
+        let expect_nvidia = std::env::var_os("SYTHAEA_GPU_EXPECT_NVIDIA").is_some();
+        if !expect_software && !expect_nvidia {
             return;
         }
+        assert_ne!(
+            expect_software, expect_nvidia,
+            "select exactly one GPU qualification mode"
+        );
 
         use std::time::Duration;
 
@@ -289,8 +295,13 @@ mod capability_report_tests {
             "expected Vulkan backend, got {}",
             report.backend
         );
-        assert!(report.is_cpu_device, "software-Vulkan lane expected a CPU-classified adapter");
         assert!(!report.is_noop_backend, "NOOP backend cannot qualify compute execution");
+        if expect_software {
+            assert!(report.is_cpu_device, "software-Vulkan lane expected a CPU-classified adapter");
+        } else {
+            assert!(!report.is_cpu_device, "NVIDIA hardware lane rejected a CPU-classified adapter");
+            assert_eq!(report.vendor_id, 0x10DE, "hardware lane expected NVIDIA vendor ID");
+        }
         assert!(report.supports_storage_binding(4));
 
         const SHADER: &str = r#"
