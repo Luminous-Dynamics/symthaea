@@ -67,14 +67,14 @@ fn command_text(program: &str, args: &[&str]) -> Result<String, Box<dyn Error>> 
 }
 
 fn source_revision() -> Result<String, Box<dyn Error>> {
-    let revision = match env::var("SYMPHAEA_SOURCE_REVISION") {
+    let revision = match env::var("SYMTHAEA_SOURCE_REVISION") {
         Ok(value) => value.trim().to_ascii_lowercase(),
         Err(_) => command_text("git", &["rev-parse", "HEAD"])?.to_ascii_lowercase(),
     };
     if !matches!(revision.len(), 40 | 64)
         || !revision.bytes().all(|byte| byte.is_ascii_hexdigit())
     {
-        return Err("SYMPHAEA_SOURCE_REVISION / git HEAD must be a full 40- or 64-character hex revision".into());
+        return Err("SYMTHAEA_SOURCE_REVISION / git HEAD must be a full 40- or 64-character hex revision".into());
     }
     Ok(revision)
 }
@@ -395,12 +395,18 @@ fn build_run_record(
 }
 
 fn append_hashed_record(output: &mut BufWriter<std::fs::File>, mut record: Value) -> Result<(), Box<dyn Error>> {
-    let object = record
+    if !record.is_object() {
+        return Err("pilot run record unexpectedly not a JSON object".into());
+    }
+    record
         .as_object_mut()
-        .ok_or("pilot run record unexpectedly not a JSON object")?;
-    object.remove("record_blake3");
+        .expect("record object shape checked")
+        .remove("record_blake3");
     let digest = blake3::hash(&serde_json::to_vec(&record)?).to_hex().to_string();
-    object.insert("record_blake3".into(), Value::String(digest));
+    record
+        .as_object_mut()
+        .expect("record object shape checked")
+        .insert("record_blake3".into(), Value::String(digest));
     serde_json::to_writer(&mut *output, &record)?;
     output.write_all(b"\n")?;
     output.flush()?;
@@ -438,8 +444,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(parent) = output_path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         fs::create_dir_all(parent)?;
     }
+    if output_path.exists() {
+        return Err(format!(
+            "refusing to overwrite evidence file {}",
+            output_path.display()
+        ).into());
+    }
     let file = OpenOptions::new().write(true).create_new(true).open(output_path)
-        .map_err(|error| format!("refusing to overwrite evidence file {}: {error}", output_path.display()))?;
+        .map_err(|error| format!("cannot create evidence file {}: {error}", output_path.display()))?;
     let mut output = BufWriter::new(file);
 
     let conditions = [
