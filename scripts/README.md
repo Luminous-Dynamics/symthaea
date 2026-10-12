@@ -34,7 +34,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 - `muse_style_coverage.py` - Source-derived Muse route audit in both directions; `--report` emits per-constellation gaps and unreferenced executable styles, `--check` fails on frozen-baseline drift
 - `muse_style_capability_inventory.py` - Extracts per-style grammar family/dispatch mode, composition spec, meter, tempo range, census-informed intent-axis declarations, and instrument-pool choices from Rust source; pins the census-source digest without executing the census or claiming render/quality evidence
 - `examples/style_control_response_curves.rs` - Records 696 control curves / 3,364 points across 29 styles and four fixed baseline seeds, with exact fingerprints, 11 structural-layer distances, tonic, tempo/meter, duration, velocity/spread, section intensity, emphasis, pitch/range, optional form metadata, and no-change triage flags; symbolic evidence only
-  - `.github/workflows/muse-style-response-curves.yml` executes the probe for relevant source changes and uploads a source-bound JSON report plus SHA-256 receipt.
+  - `.github/workflows/muse-style-response-curves.yml` executes the probe for relevant source changes and uploads a source-bound JSON report plus SHA-256 receipt, including a per-style/control seed-robustness table and exact baseline seeds for no-change triage.
   - The dedicated workflow publishes a per-style capability table and source blob digests in its job summary; the JSON report joins catalog entries to their runtime profiles and marks catalog-only rows explicitly.
 - `gpu_smoke.sh` - NVIDIA/CUDA environment preflight and optional Broca CUDA smoke test
 - `post_to_dashboard.py` - Dashboard posting
