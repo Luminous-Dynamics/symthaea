@@ -18,11 +18,15 @@ From the repository root with Nix and the required Rust features/dependencies av
 ```bash
 nix develop -c cargo run --example muse_vocal_release_gate \
   --features "singing,voice-tts" -- \
-  --output audio_output/muse_vocal_gate \
+  --output audio_output/muse_vocal_gate-run-001 \
   --voice af_bella
 ```
 
-This uses the in-tree Kokoro and functional-singing paths. It renders the 60 fixed cases and writes audio, objective diagnostics, a concealed listening manifest/key, and a ratings template. It is a test harness, not evidence of passing quality by itself.
+This uses the in-tree Kokoro and functional-singing paths. It renders the 60 fixed cases and writes WAVs, a listener manifest, and a ratings template to the shareable `--output` directory. The listener manifest includes only `clip_id`, `lyrics`, and `audio`; it omits backend, case ID, category, and challenge labels.
+
+Organizer-only artifacts are written to the sibling `audio_output/muse_vocal_gate-run-001.private/`: the backend answer key, objective report (which includes backend/case mappings), and release status. On Unix this directory is restricted to owner access (`0700`). **Share only the non-private `--output` directory with listeners; never share the `.private` sibling.** On non-Unix systems, set and verify restrictive ACLs on the private directory before sharing anything.
+
+Each run requires fresh, empty `--output` and `.private` directories. The gate fails closed if either contains files, preventing stale WAVs/manifests from mixing across runs. Archive earlier run directories rather than reusing or deleting them. When upgrading an older output directory, any legacy answer key/report/status found in it is moved to the private sibling, then the run stops if that private directory is non-empty; archive those artifacts and choose a fresh run-specific output path to proceed. This is a test harness, not evidence of passing quality by itself.
 
 To include the optional DiffSinger worker, provision a voicebank outside the repository and point `SYMTHAEA_DIFFSINGER_VOICEBANK` at its root. The worker expects the ONNX stages and metadata under `dsmain/`, `dsvariance/`, and `dsvocoder/`; it does not download models or validate voicebank licensing for you. Then run:
 
@@ -30,7 +34,7 @@ To include the optional DiffSinger worker, provision a voicebank outside the rep
 SYMTHAEA_DIFFSINGER_VOICEBANK=/absolute/path/to/voicebank \
 nix develop -c cargo run --example muse_vocal_release_gate \
   --features "singing,voice-tts" -- \
-  --output audio_output/muse_vocal_gate \
+  --output audio_output/muse_vocal_gate-run-002 \
   --voice af_bella \
   --diffsinger-worker scripts/diffsinger_worker.sh
 ```
@@ -43,7 +47,7 @@ Keep each backend/case result—not just an average. The existing target-conditi
 
 The harness supports concealed listening and a complete listener-by-clip rating matrix. Use dry, loudness-matched audio and rate naturalness, emotional fit, identity consistency, artifact-free quality, and lyric comprehension separately. Keep human reference anchors concealed and exclude them from synthetic pass-rate calculations. The rating parser rejects unknown clip IDs, blank listener IDs, duplicate listener/clip pairs, invalid score ranges, and lyric-word totals that differ from the frozen manifest. The render gate validates each stem before saving it so malformed backend output cannot enter the listening pack. A build, successful render, or pitch metric is not itself a release pass.
 
-Before comparing revisions, preserve the source SHA, backend/provider, voicebank/model hash, voicebank authorization/license, exact input case IDs, output hashes, observed sample rate/channels/duration, metric configuration, and all missing fields. Prefer a fresh secure blind key for each evaluation; use a fixed seed only for diagnostic reproduction.
+Before comparing revisions, preserve the source SHA, backend/provider, voicebank/model hash, voicebank authorization/license, exact input case IDs, output hashes, observed sample rate/channels/duration, metric configuration, and all missing fields. Treat the listener manifest as shareable and the `.private` answer-key/report directory as organizer-only. Prefer a fresh secure blind key for each evaluation; use a fixed seed only for diagnostic reproduction. Archive both output directories together as one run, but never distribute the private sibling with the listening pack.
 
 ## Existing historical evidence and limitations
 
