@@ -64,6 +64,9 @@ pub struct AutonomousHoldoutValidation {
     /// Work spent integrating holdout orbits, including failed attempts.
     pub attempted_integration_steps: u64,
     pub completed_integration_steps: u64,
+    pub integration_rhs_evaluations: u64,
+    pub scoring_rhs_evaluations: u64,
+    /// Integration plus candidate-score RHS calls.
     pub rhs_evaluations: u64,
     pub state_updates: u64,
     pub max_lie_derivative_variance: f64,
@@ -110,6 +113,8 @@ fn failed_holdout(
         trajectories_checked,
         attempted_integration_steps: 0,
         completed_integration_steps: 0,
+        integration_rhs_evaluations: 0,
+        scoring_rhs_evaluations: 0,
         rhs_evaluations: 0,
         state_updates: 0,
         max_lie_derivative_variance: max_variance,
@@ -277,6 +282,8 @@ fn validate_invariant_holdout_inner(
     let mut gradient_fractions = Vec::with_capacity(holdout_trajectories);
     let mut attempted_integration_steps = 0u64;
     let mut completed_integration_steps = 0u64;
+    let mut integration_rhs_evaluations = 0u64;
+    let mut scoring_rhs_evaluations = 0u64;
     let mut rhs_evaluations = 0u64;
     let mut state_updates = 0u64;
     let mut invalid_rhs_at_start = false;
@@ -291,6 +298,8 @@ fn validate_invariant_holdout_inner(
         let (orbit_result, work) = sample_orbit(&initial);
         attempted_integration_steps = attempted_integration_steps.saturating_add(work.attempted_steps);
         completed_integration_steps = completed_integration_steps.saturating_add(work.completed_steps);
+        integration_rhs_evaluations =
+            integration_rhs_evaluations.saturating_add(work.rhs_evaluations);
         rhs_evaluations = rhs_evaluations.saturating_add(work.rhs_evaluations);
         state_updates = state_updates.saturating_add(work.state_updates);
         if orbit_result.is_none()
@@ -304,7 +313,11 @@ fn validate_invariant_holdout_inner(
             continue;
         };
         let informativeness = gradient_informativeness_fraction(candidate, &orbit, var_names);
-        let variance = lie_derivative_variance(candidate, rhs, &orbit, var_names);
+        let (variance, score_rhs_calls) =
+            lie_derivative_variance_with_work(candidate, rhs, &orbit, var_names);
+        scoring_rhs_evaluations =
+            scoring_rhs_evaluations.saturating_add(score_rhs_calls);
+        rhs_evaluations = rhs_evaluations.saturating_add(score_rhs_calls);
         // Invalid scores or invalid informativeness results do not count as a
         // successfully scored holdout trajectory.
         if variance.is_finite()
@@ -344,6 +357,8 @@ fn validate_invariant_holdout_inner(
         );
         result.attempted_integration_steps = attempted_integration_steps;
         result.completed_integration_steps = completed_integration_steps;
+        result.integration_rhs_evaluations = integration_rhs_evaluations;
+        result.scoring_rhs_evaluations = scoring_rhs_evaluations;
         result.rhs_evaluations = rhs_evaluations;
         result.state_updates = state_updates;
         return result;
@@ -375,6 +390,8 @@ fn validate_invariant_holdout_inner(
         trajectories_checked: checked,
         attempted_integration_steps,
         completed_integration_steps,
+        integration_rhs_evaluations,
+        scoring_rhs_evaluations,
         rhs_evaluations,
         state_updates,
         max_lie_derivative_variance: max_variance,
@@ -705,6 +722,9 @@ pub struct AutonomousDiscoveryReceiptV1 {
     /// Exact holdout integration work, including failed trajectories.
     pub attempted_integration_steps: u64,
     pub completed_integration_steps: u64,
+    pub integration_rhs_evaluations: u64,
+    pub scoring_rhs_evaluations: u64,
+    /// Integration plus candidate-score RHS calls.
     pub rhs_evaluations: u64,
     pub state_updates: u64,
     pub max_lie_derivative_variance: f64,
@@ -841,6 +861,8 @@ pub fn build_autonomous_discovery_receipt_v1(
         trajectories_checked: holdout.trajectories_checked,
         attempted_integration_steps: holdout.attempted_integration_steps,
         completed_integration_steps: holdout.completed_integration_steps,
+        integration_rhs_evaluations: holdout.integration_rhs_evaluations,
+        scoring_rhs_evaluations: holdout.scoring_rhs_evaluations,
         rhs_evaluations: holdout.rhs_evaluations,
         state_updates: holdout.state_updates,
         max_lie_derivative_variance: holdout.max_lie_derivative_variance,
@@ -883,6 +905,8 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         trajectories_checked: receipt.trajectories_checked,
         attempted_integration_steps: receipt.attempted_integration_steps,
         completed_integration_steps: receipt.completed_integration_steps,
+        integration_rhs_evaluations: receipt.integration_rhs_evaluations,
+        scoring_rhs_evaluations: receipt.scoring_rhs_evaluations,
         rhs_evaluations: receipt.rhs_evaluations,
         state_updates: receipt.state_updates,
         max_lie_derivative_variance: receipt.max_lie_derivative_variance,
@@ -983,8 +1007,10 @@ fn holdout_record_is_consistent(
         || holdout.trajectories_checked > holdout.requested_trajectories
         || holdout.completed_integration_steps > holdout.attempted_integration_steps
         || holdout.state_updates != holdout.completed_integration_steps.saturating_mul(state_dimension as u64)
-        || holdout.rhs_evaluations < holdout.completed_integration_steps.saturating_mul(4)
-        || holdout.rhs_evaluations > holdout.attempted_integration_steps.saturating_mul(4)
+        || holdout.integration_rhs_evaluations < holdout.completed_integration_steps.saturating_mul(4)
+        || holdout.integration_rhs_evaluations > holdout.attempted_integration_steps.saturating_mul(4)
+        || holdout.rhs_evaluations
+            != holdout.integration_rhs_evaluations.saturating_add(holdout.scoring_rhs_evaluations)
     {
         return false;
     }
@@ -1012,7 +1038,8 @@ fn holdout_record_is_consistent(
             && holdout.trajectories_checked == holdout.requested_trajectories
             && holdout.attempted_integration_steps as f64 == maximum_actual_steps
             && holdout.completed_integration_steps == holdout.attempted_integration_steps
-            && holdout.rhs_evaluations == holdout.completed_integration_steps.saturating_mul(4)
+            && holdout.integration_rhs_evaluations
+                == holdout.completed_integration_steps.saturating_mul(4)
             && holdout.max_lie_derivative_variance < f64::MAX
             && holdout.median_lie_derivative_variance <= holdout.max_lie_derivative_variance
             && holdout.max_lie_derivative_variance <= holdout.threshold
@@ -1114,6 +1141,8 @@ fn compute_receipt_digest(receipt: &AutonomousDiscoveryReceiptV1) -> String {
     hash_usize(&mut hasher, receipt.trajectories_checked);
     hash_u64(&mut hasher, receipt.attempted_integration_steps);
     hash_u64(&mut hasher, receipt.completed_integration_steps);
+    hash_u64(&mut hasher, receipt.integration_rhs_evaluations);
+    hash_u64(&mut hasher, receipt.scoring_rhs_evaluations);
     hash_u64(&mut hasher, receipt.rhs_evaluations);
     hash_u64(&mut hasher, receipt.state_updates);
     hash_f64(&mut hasher, receipt.max_lie_derivative_variance);
