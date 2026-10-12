@@ -39,7 +39,7 @@ pub struct OpaqueXorBenchResult {
 /// words are ciphertexts, that masks were generated or applied correctly, or
 /// that witness values remain confidential under the selected Binius64 backend.
 pub fn bench_opaque_xor_relation(dim_words: usize) -> OpaqueXorBenchResult {
-    let dim_bits = dim_words * 64;
+    let dim_bits = dim_words.checked_mul(64).expect("dimension overflow");
     println!(
         "\n=== OPAQUE XOR RELATION: Binius64 ({} bits) ===\n",
         dim_bits
@@ -56,10 +56,10 @@ pub fn bench_opaque_xor_relation(dim_words: usize) -> OpaqueXorBenchResult {
     // Public output: the XOR result
     let word_c: Vec<_> = (0..dim_words).map(|_| builder.add_inout()).collect();
 
-    // XOR binding on ciphertexts: word_c = word_a XOR word_b (FREE in Binius!)
+    // Constrain the opaque-word XOR relation: word_c = word_a XOR word_b.
     for i in 0..dim_words {
         let result = builder.bxor(word_a[i], word_b[i]);
-        builder.assert_eq(&format!("enc_bind_{}", i), result, word_c[i]);
+        builder.assert_eq(&format!("opaque_xor_{}", i), result, word_c[i]);
     }
 
     let circuit = builder.build();
