@@ -55,7 +55,7 @@ jobs:
       - name: Run Lean-bridge and witness-combination regressions
         run: python3 -m unittest discover -s tests -p 'test_generate_lean_math_certificate.py' -v
 
-      - name: Generate Lean claims from the exact wire golden vectors
+      - name: Generate Lean claims from fixed wire fixtures
         run: |
           python3 tools/generate_lean_math_certificate.py \
             --golden-vector primality-3 \
@@ -78,7 +78,7 @@ jobs:
           axiom-audit-root: "SymthaeaMathCertificates"
           axiom-audit-allow: "propext,Classical.choice,Quot.sound"
 
-      - name: Kernel-check generated claims from both wire formats
+      - name: Kernel-check byte-bound claims including multi-factor Pocklington
         working-directory: formal/math-certificate
         run: |
           lake env lean "$RUNNER_TEMP/SymthaeaPrimeThree.lean"
