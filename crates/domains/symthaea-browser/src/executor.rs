@@ -52,6 +52,20 @@ impl ActionReceipt {
     }
 }
 
+/// Actions that read or manipulate current page state must revalidate the
+/// current URL. Explicit navigation and checked history navigation have their
+/// own destination-policy gates; NoOp does not touch the browser.
+fn requires_current_page_url_check(action: &BrowserAction) -> bool {
+    matches!(
+        action,
+        BrowserAction::Click { .. }
+            | BrowserAction::Type { .. }
+            | BrowserAction::ScrollTo { .. }
+            | BrowserAction::ExtractText { .. }
+            | BrowserAction::Screenshot
+    )
+}
+
 /// The only normal route from a cognitive action proposal to browser mutation.
 pub struct BrowserExecutor<'a> {
     session: &'a CdpSession,
@@ -81,6 +95,36 @@ impl<'a> BrowserExecutor<'a> {
                 output: ActionOutput::None,
                 elapsed_ms: started.elapsed().as_millis(),
             };
+        }
+
+        // A prior navigation may have been redirected by the browser or site.
+        // Re-check the currently displayed page before any observation or
+        // interaction that could expose data or cause a side effect. History
+        // actions perform their own destination check and remain available as
+        // a path away from an unsafe current page.
+        if requires_current_page_url_check(&action) {
+            let current_url = match self.session.current_url().await {
+                Ok(url) => url,
+                Err(error) => {
+                    return ActionReceipt {
+                        action,
+                        policy_decision: decision,
+                        outcome: ActionOutcome::Failed(error.to_string()),
+                        output: ActionOutput::None,
+                        elapsed_ms: started.elapsed().as_millis(),
+                    };
+                }
+            };
+            let current_url_decision = self.policy.evaluate_url(&current_url);
+            if let PolicyDecision::Deny { ref reason, .. } = current_url_decision {
+                return ActionReceipt {
+                    action,
+                    policy_decision: current_url_decision,
+                    outcome: ActionOutcome::Denied(reason.clone()),
+                    output: ActionOutput::None,
+                    elapsed_ms: started.elapsed().as_millis(),
+                };
+            }
         }
 
         let execution = match &action {
@@ -174,5 +218,37 @@ impl<'a> BrowserExecutor<'a> {
             output,
             elapsed_ms: started.elapsed().as_millis(),
         }
+    }
+}
+
+#[cfg(test)]
+mod current_page_policy_tests {
+    use super::*;
+    use crate::actions::ElementSelector;
+
+    #[test]
+    fn current_url_is_required_for_page_reads_and_interactions() {
+        assert!(requires_current_page_url_check(&BrowserAction::Screenshot));
+        assert!(requires_current_page_url_check(&BrowserAction::ExtractText { selector: None }));
+        assert!(requires_current_page_url_check(&BrowserAction::ScrollTo {
+            selector: ElementSelector::Css("main".into())
+        }));
+        assert!(requires_current_page_url_check(&BrowserAction::Click {
+            selector: ElementSelector::Css("button".into())
+        }));
+        assert!(requires_current_page_url_check(&BrowserAction::Type {
+            selector: ElementSelector::Css("input".into()),
+            text: "test".into()
+        }));
+    }
+
+    #[test]
+    fn destination_checked_navigation_and_noop_use_their_own_policy_path() {
+        assert!(!requires_current_page_url_check(&BrowserAction::Navigate {
+            url: "https://example.com".into()
+        }));
+        assert!(!requires_current_page_url_check(&BrowserAction::GoBack));
+        assert!(!requires_current_page_url_check(&BrowserAction::GoForward));
+        assert!(!requires_current_page_url_check(&BrowserAction::NoOp));
     }
 }
