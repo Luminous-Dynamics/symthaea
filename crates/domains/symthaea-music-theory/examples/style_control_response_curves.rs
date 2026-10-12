@@ -645,13 +645,17 @@ fn seed_robustness_summary(curves: &[serde_json::Value]) -> Vec<serde_json::Valu
             })
             .collect();
 
+        let expected_seed_count = BASE_SEED_SET.len();
+        let coverage_complete = matching.len() == expected_seed_count;
         summaries.push(serde_json::json!({
             "control": control,
             "seed_count": matching.len(),
+            "expected_seed_count": expected_seed_count,
+            "coverage_complete": coverage_complete,
             "seeds_with_any_observed_change": changed_count,
             "seeds_with_no_observed_change": unchanged_seeds,
             "all_seeds_changed_at_least_one_recorded_channel":
-                !matching.is_empty() && changed_count == matching.len(),
+                coverage_complete && changed_count == expected_seed_count,
             "per_channel_seed_counts": channel_seed_counts,
             "interpretation": (
                 "Counts describe source-measured output changes at tested seed/grid points; "
@@ -841,6 +845,8 @@ mod tests {
             .find(|summary| summary["control"] == "arousal")
             .expect("arousal summary");
         assert_eq!(arousal["seed_count"].as_u64(), Some(4));
+        assert_eq!(arousal["expected_seed_count"].as_u64(), Some(4));
+        assert_eq!(arousal["coverage_complete"].as_bool(), Some(true));
         assert_eq!(arousal["seeds_with_any_observed_change"].as_u64(), Some(3));
         assert_eq!(arousal["seeds_with_no_observed_change"][0].as_u64(), Some(130_363));
         let velocity = arousal["per_channel_seed_counts"]
@@ -851,6 +857,19 @@ mod tests {
             .unwrap();
         assert_eq!(velocity["seeds_with_observed_change"].as_u64(), Some(2));
         assert!(arousal["interpretation"].as_str().unwrap().contains("not target-correctness"));
+
+        let incomplete = seed_robustness_summary(&curves[..3]);
+        let incomplete_arousal = incomplete
+            .iter()
+            .find(|summary| summary["control"] == "arousal")
+            .expect("incomplete arousal summary");
+        assert_eq!(incomplete_arousal["seed_count"].as_u64(), Some(3));
+        assert_eq!(incomplete_arousal["expected_seed_count"].as_u64(), Some(4));
+        assert_eq!(incomplete_arousal["coverage_complete"].as_bool(), Some(false));
+        assert_eq!(
+            incomplete_arousal["all_seeds_changed_at_least_one_recorded_channel"].as_bool(),
+            Some(false)
+        );
     }
 
     #[test]
