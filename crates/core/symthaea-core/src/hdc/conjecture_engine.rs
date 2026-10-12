@@ -1582,7 +1582,7 @@ mod tests {
 
     #[test]
     fn test_lorenz_trajectory_generated() {
-        let (times, states) = rk45_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 10.0, 0.01);
+        let (times, states) = rk4_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 10.0, 0.01);
         assert!(times.len() > 100, "should have many time steps");
         assert_eq!(states[0].len(), 3, "Lorenz is 3D");
         // After transient, z should be positive (attractor lives at z > 0)
@@ -5495,7 +5495,7 @@ mod tests {
     #[test]
     fn test_virial_theorem_kepler() {
         // Integrate Kepler orbit for many periods to get good time averages
-        let (_, states) = rk45_trajectory(kepler_rhs, &[1.0, 0.0, 0.0, 0.8], 50.0, 0.001);
+        let (_, states) = rk4_trajectory(kepler_rhs, &[1.0, 0.0, 0.0, 0.8], 50.0, 0.001);
 
         // Kinetic energy: T = ½(vx² + vy²)
         let kinetic = |s: &[f64]| 0.5 * (s[2] * s[2] + s[3] * s[3]);
@@ -5803,7 +5803,7 @@ mod tests {
         fn rhs(s: &[f64], _t: f64) -> Vec<f64> {
             vec![s[0] * (1.0 - s[1]), s[1] * (s[0] - 1.0)]
         }
-        let (_t, states) = rk45_trajectory(rhs, &[2.0, 1.0], 30.0, 0.005);
+        let (_t, states) = rk4_trajectory(rhs, &[2.0, 1.0], 30.0, 0.005);
         eprintln!("LV trajectory: {} states", states.len());
         assert!(states.len() > 100);
 
