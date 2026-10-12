@@ -724,7 +724,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_treutler_adjustment_leaves_homonuclear_coordinates_unchanged() {
         let radius = bragg_slater_radius(1);
@@ -748,7 +747,7 @@ mod tests {
             (-0.75_f64, -0.672_572_470_269_286),
             (-0.50_f64, -0.367_267_091_890_204_7),
             (-0.25_f64, -0.084_083_864_862_755_79),
-            (0.00_f64,  0.176_977_210_813_060_48),
+            (0.00_f64, 0.176_977_210_813_060_48),
             (0.25_f64,  0.415_916_135_137_244_24),
             (0.50_f64,  0.632_732_908_109_795_3),
             (0.75_f64,  0.827_427_529_730_714),
@@ -771,8 +770,14 @@ mod tests {
     fn test_treutler_adjustment_clamps_radius_asymmetry() {
         let forward = treutler_adjust_becke_mu(0.0, 1e-6, 1e6);
         let reverse = treutler_adjust_becke_mu(0.0, 1e6, 1e-6);
-        assert!((forward - 0.5).abs() < 1e-15, "forward coefficient should clamp at +0.5");
-        assert!((reverse + 0.5).abs() < 1e-15, "reverse coefficient should clamp at -0.5");
+        assert!(
+            (forward - 0.5).abs() < 1e-15,
+            "forward coefficient should clamp at +0.5"
+        );
+        assert!(
+            (reverse + 0.5).abs() < 1e-15,
+            "reverse coefficient should clamp at -0.5"
+        );
     }
 
     #[test]
