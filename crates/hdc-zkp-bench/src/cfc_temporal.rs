@@ -6,7 +6,7 @@
 //! independently for each bit lane. Each gate is an unconstrained private witness
 //! word; it is not derived from a sigmoid or a numerical time constant.
 //!
-//! This is not a proof of real-valued or fixed-point bitwise recurrence dynamics and establishes
+//! This is not a proof of real-valued or fixed-point CfC dynamics and establishes
 //! no performance advantage over LTC/RK4. Historical function/type names remain
 //! for harness compatibility; labels describe the actual Boolean relation.
 
@@ -39,7 +39,7 @@ pub struct CfcBenchResult {
 /// Prove a sequence of bitwise gate-controlled updates over packed 64-bit words.
 ///
 /// The private gate word is unconstrained apart from its use in the recurrence.
-/// The historical function name is retained, but it does not encode numeric bitwise recurrence.
+/// The historical function name is retained, but it does not encode numeric CfC.
 pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     println!(
         "\n=== BINIUS: Packed-bit Gated Recurrence ({} words × {} timesteps) ===\n",
@@ -48,7 +48,7 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
 
     let builder = CircuitBuilder::new();
 
-    // Per neuron: initial state h(0), target state x_inf
+    // Per packed word: initial state h(0), target state x_inf
     let mut h_wires = Vec::with_capacity(neurons);
     let mut x_inf_wires = Vec::with_capacity(neurons);
     let mut final_h_wires = Vec::with_capacity(neurons);
@@ -60,7 +60,7 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
         final_h_wires.push(builder.add_inout()); // h(T) — public
     }
 
-    // Build bitwise recurrence circuit: for each timestep, for each neuron
+    // Build the gated bitwise recurrence for each timestep and packed word
     let mut current_h: Vec<_> = h_wires.clone();
 
     for _t in 0..timesteps {
@@ -89,7 +89,7 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
 
     let stat = binius_frontend::CircuitStat::collect(&circuit);
     println!(
-        "  AND constraints: {} (1 per neuron per timestep)",
+        "  AND constraints: {} (1 per packed word per timestep)",
         stat.n_and_constraints
     );
     println!("  MUL constraints: {}", stat.n_mul_constraints);
@@ -102,7 +102,7 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     println!("  XOR operations: {} (all FREE)", neurons * timesteps * 2);
 
     // Fill witness: simulate bitwise recurrence evolution matching circuit construction order
-    // Circuit builds: for each timestep, for each neuron (timestep-major)
+    // Circuit builds: timestep-major, with one private gate word per packed word
     // Witness must fill gate_wires in the SAME order
     let mut witness = circuit.new_witness_filler();
 
