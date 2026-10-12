@@ -46,7 +46,7 @@ jobs:
   routed-response-curves:
     name: Generate fixed-grid routed response curves
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout exact source revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -99,7 +99,11 @@ jobs:
               for path in source_paths
           }
           curves_without_observed_change = [
-              {"style": profile["style"], "control": curve["control"]}
+              {
+                  "style": profile["style"],
+                  "control": curve["control"],
+                  "baseline_seed": curve["baseline_seed"],
+              }
               for profile in report["profiles"]
               for curve in profile["curves"]
               if curve["observed_changes_from_baseline"][
@@ -157,10 +161,12 @@ jobs:
               if curves_without_observed_change:
                   stream.write("## Curves with no observed output change\n\n")
                   stream.write("These are triage signals, not automatic failures.\n\n")
-                  stream.write("| Style | Control |\n|---|---|\n")
+                  stream.write("| Style | Control | Baseline seed |\\n|---|---|---:|\\n")
                   for item in curves_without_observed_change:
-                      stream.write(f"| {item['style']} | {item['control']} |\n")
-                  stream.write("\n")
+                      stream.write(
+                          f"| {item['style']} | {item['control']} | {item['baseline_seed']} |\\n"
+                      )
+                  stream.write("\\n")
               stream.write(f"- Report SHA-256: `{receipt['report_sha256']}`\n\n")
               stream.write("## Source blob digests\n\n")
               stream.write("| Source | Git blob SHA |\n|---|---|\n")
