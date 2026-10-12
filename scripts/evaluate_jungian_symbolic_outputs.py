@@ -23,6 +23,8 @@ EXPECTED_CORPUS_GIT_BLOB_SHA1 = "7503a660f0062571fe1d7094a00b80631680500a"
 CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
 OUTPUT_SCHEMA = "symthaea-jungian-normalized-results-v1"
 EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v7"
+ANNOTATION_SEED_SCHEMA = "symthaea-jungian-claim-annotation-seed-v1"
+ANNOTATION_PROTOCOL_ID = "JUNG-CLAIM-ANNOTATION-DRAFT-v1"
 RESULT_KEYS = {"case_id", "observations", "interpretations", "open_questions", "abstention"}
 OBSERVATION_KEYS = {"evidence_id", "exact_span", "source_scope"}
 INTERPRETATION_KEYS = {
@@ -444,13 +446,284 @@ def case_contract_checks(case_id: str, result: dict[str, Any]) -> list[dict[str,
     return checks
 
 
+
+def _annotation_unit(
+    *,
+    method_id: str,
+    case_id: str,
+    unit_kind: str,
+    source_paths: dict[str, str],
+    text_fields: dict[str, str],
+    evidence_links: dict[str, list[str]],
+    detail: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Create an unlabelled review unit without inferring any annotation labels."""
+    rendered_fields = {
+        name: {
+            "text": value,
+            # Code-point coordinates within this exact decoded JSON string field,
+            # half-open [start, end); not byte offsets into the serialized bundle.
+            "field_extent_codepoints": [0, len(value)],
+        }
+        for name, value in text_fields.items()
+    }
+    identity = {
+        "method_id": method_id,
+        "case_id": case_id,
+        "unit_kind": unit_kind,
+        "source_paths": source_paths,
+        "text_fields": rendered_fields,
+    }
+    unit_id = hashlib.sha256(canonical_json(identity)).hexdigest()
+    return {
+        "unit_id": unit_id,
+        "case_id": case_id,
+        "unit_kind": unit_kind,
+        "source_paths": source_paths,
+        "text_fields": rendered_fields,
+        "evidence_links": evidence_links,
+        "detail": detail or {},
+        "annotation_state": "UNANNOTATED",
+        "independent_reviews": [],
+        "adjudication": None,
+    }
+
+
+def build_annotation_seed(
+    bundle_bytes: bytes,
+    results: dict[str, dict[str, Any]],
+    method_id: str,
+    source_revision: str,
+    corpus: dict[str, Any],
+    corpus_bytes: bytes,
+) -> dict[str, Any]:
+    """Export output units and source context for annotation; do not score them."""
+    corpus_sha256 = hashlib.sha256(corpus_bytes).hexdigest()
+    case_contexts = []
+    units = []
+    for case_index, case in enumerate(corpus["cases"]):
+        case_id = case["id"]
+        result = results[case_id]
+        evidence = [
+            {"evidence_id": span["id"], "exact_text": span["text"]}
+            for span in case["evidence_spans"]
+        ]
+        case_contexts.append({
+            "case_context_id": case_id,
+            "task": case["task"],
+            "input_text": case["input_text"],
+            "input_text_sha256": hashlib.sha256(case["input_text"].encode("utf-8")).hexdigest(),
+            "evidence_spans": evidence,
+        })
+
+        for index, observation in enumerate(result["observations"]):
+            units.append(_annotation_unit(
+                method_id=method_id,
+                case_id=case_id,
+                unit_kind="observation",
+                source_paths={
+                    "exact_span": f"/results/{case_index}/observations/{index}/exact_span",
+                    "source_scope": f"/results/{case_index}/observations/{index}/source_scope",
+                },
+                text_fields={
+                    "exact_span": observation["exact_span"],
+                    "source_scope": observation["source_scope"],
+                },
+                evidence_links={
+                    "observed_evidence_ids": [observation["evidence_id"]],
+                    "supporting_evidence_ids": [],
+                    "contradicting_evidence_ids": [],
+                },
+            ))
+
+        for index, interpretation in enumerate(result["interpretations"]):
+            # Keep the complete interpretation object intact as a candidate.
+            # Atomic-claim segmentation is left to the reviewer, not guessed by regex.
+            units.append(_annotation_unit(
+                method_id=method_id,
+                case_id=case_id,
+                unit_kind="interpretation_candidate",
+                source_paths={
+                    "statement": f"/results/{case_index}/interpretations/{index}/statement",
+                    "scope": f"/results/{case_index}/interpretations/{index}/scope",
+                },
+                text_fields={
+                    "statement": interpretation["statement"],
+                    "scope": interpretation["scope"],
+                },
+                evidence_links={
+                    "supporting_evidence_ids": list(interpretation["supporting_evidence_ids"]),
+                    "contradicting_evidence_ids": list(interpretation["contradicting_evidence_ids"]),
+                },
+                detail={
+                    "hypothesis_id": interpretation["hypothesis_id"],
+                    "epistemic_status_as_emitted": interpretation["epistemic_status"],
+                    "review_instruction": "Split into atomic claims during annotation when independently checkable claims are combined; do not alter these source fields.",
+                },
+            ))
+
+        for index, question in enumerate(result["open_questions"]):
+            units.append(_annotation_unit(
+                method_id=method_id,
+                case_id=case_id,
+                unit_kind="open_question",
+                source_paths={"text": f"/results/{case_index}/open_questions/{index}"},
+                text_fields={"text": question},
+                evidence_links={
+                    "supporting_evidence_ids": [],
+                    "contradicting_evidence_ids": [],
+                },
+            ))
+
+        abstention = result["abstention"]
+        units.append(_annotation_unit(
+            method_id=method_id,
+            case_id=case_id,
+            unit_kind="abstention_rationale",
+            source_paths={
+                "reason": f"/results/{case_index}/abstention/reason",
+                "abstain": f"/results/{case_index}/abstention/abstain",
+            },
+            text_fields={"reason": abstention["reason"]},
+            evidence_links={
+                "supporting_evidence_ids": [],
+                "contradicting_evidence_ids": [],
+            },
+            detail={"abstain_as_emitted": abstention["abstain"]},
+        ))
+
+    return {
+        "schema": ANNOTATION_SEED_SCHEMA,
+        "annotation_protocol_id": ANNOTATION_PROTOCOL_ID,
+        "annotation_protocol_status": "DRAFT_NOT_YET_APPLIED",
+        "annotation_state": "UNANNOTATED",
+        "method_id": method_id,
+        "corpus_id": corpus["corpus_id"],
+        "corpus_version": corpus["version"],
+        "corpus_git_blob_sha1": git_blob_sha1(corpus_bytes),
+        "corpus_sha256": corpus_sha256,
+        "source_revision": source_revision,
+        "normalized_bundle_sha256": hashlib.sha256(bundle_bytes).hexdigest(),
+        "evaluator_source_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
+        "case_count": len(case_contexts),
+        "unit_count": len(units),
+        "case_contexts": case_contexts,
+        "units": units,
+        "limitations": [
+            "This is a deterministic annotation-ready export, not an annotation, semantic score, or human-evaluation result.",
+            "An interpretation candidate may contain multiple atomic claims; reviewers must segment it where needed.",
+            "Unit text is preserved from decoded normalized-bundle fields; field extents use Unicode code-point coordinates, not serialized JSON byte offsets.",
+            "No labels are prefilled. An empty review list means unreviewed, not correct or safe.",
+        ],
+    }
+
+
+def annotation_seed_self_test() -> list[str]:
+    """Test packet completeness and label-free behavior on a synthetic bundle."""
+    failures: list[str] = []
+    try:
+        corpus_bytes = DEFAULT_CORPUS.read_bytes()
+        corpus = load_json_bytes(corpus_bytes)
+        require(isinstance(corpus, dict), "annotation self-test corpus must be an object")
+        require(git_blob_sha1(corpus_bytes) == EXPECTED_CORPUS_GIT_BLOB_SHA1,
+                "annotation self-test corpus identity mismatch")
+        source_revision = "0" * 40
+        bundle = {
+            "schema": OUTPUT_SCHEMA,
+            "corpus_id": corpus["corpus_id"],
+            "corpus_version": corpus["version"],
+            "corpus_sha256": hashlib.sha256(corpus_bytes).hexdigest(),
+            "source_revision": source_revision,
+            "implementation_id": "annotation_seed_self_test",
+            "config_sha256": "0" * 64,
+            "results": [
+                {
+                    "case_id": case["id"],
+                    "observations": [
+                        {
+                            "evidence_id": span["id"],
+                            "exact_span": span["text"],
+                            "source_scope": "Synthetic case input; exact frozen span",
+                        }
+                        for span in case["evidence_spans"]
+                    ],
+                    "interpretations": [],
+                    "open_questions": [],
+                    "abstention": {
+                        "abstain": False,
+                        "reason": "Self-test fixture; no interpretation asserted.",
+                    },
+                }
+                for case in corpus["cases"]
+            ],
+        }
+        first = bundle["results"][0]
+        first["interpretations"] = [{
+            "hypothesis_id": "SELFTEST-H1",
+            "statement": "The key may suggest access, but it also functions as a physical object here.",
+            "scope": "Synthetic vignette only.",
+            "supporting_evidence_ids": ["JSP-001-E1"],
+            "contradicting_evidence_ids": [],
+            "epistemic_status": "InterpretationHypothesis",
+        }]
+        first["open_questions"] = ["What additional context would distinguish these readings?"]
+        first["abstention"] = {"abstain": True, "reason": "Personal meaning is not established."}
+        bundle_bytes = canonical_json(bundle)
+        results, method_id, bound_revision = validate_bundle(
+            bundle_bytes, corpus_bytes, corpus,
+            hashlib.sha256(corpus_bytes).hexdigest(), source_revision,
+        )
+        seed = build_annotation_seed(
+            bundle_bytes, results, method_id, bound_revision, corpus, corpus_bytes
+        )
+        replay = build_annotation_seed(
+            bundle_bytes, results, method_id, bound_revision, corpus, corpus_bytes
+        )
+        checks = [
+            ("schema and draft protocol identity", seed["schema"] == ANNOTATION_SEED_SCHEMA
+             and seed["annotation_protocol_status"] == "DRAFT_NOT_YET_APPLIED"),
+            ("every frozen case has source context", len(seed["case_contexts"]) == len(corpus["cases"])
+             and {item["case_context_id"] for item in seed["case_contexts"]} == {case["id"] for case in corpus["cases"]}),
+            ("interpretation text and scope preserved", any(
+                unit["unit_kind"] == "interpretation_candidate"
+                and unit["text_fields"]["statement"]["text"] == first["interpretations"][0]["statement"]
+                and unit["text_fields"]["scope"]["text"] == first["interpretations"][0]["scope"]
+                for unit in seed["units"])),
+            ("question and abstention are separate units", any(
+                unit["unit_kind"] == "open_question"
+                and unit["text_fields"]["text"]["text"] == first["open_questions"][0]
+                for unit in seed["units"]) and any(
+                unit["unit_kind"] == "abstention_rationale"
+                and unit["text_fields"]["reason"]["text"] == first["abstention"]["reason"]
+                and unit["detail"]["abstain_as_emitted"] is True
+                for unit in seed["units"])),
+            ("all units unannotated with no inferred labels", all(
+                unit["annotation_state"] == "UNANNOTATED"
+                and unit["independent_reviews"] == []
+                and unit["adjudication"] is None
+                for unit in seed["units"])),
+            ("unique deterministic unit identities", len({unit["unit_id"] for unit in seed["units"]}) == len(seed["units"])
+             and [u["unit_id"] for u in seed["units"]] == [u["unit_id"] for u in replay["units"]]),
+            ("evidence links resolve to case context", all(
+                set(ref for refs in unit["evidence_links"].values() for ref in refs)
+                <= {span["evidence_id"] for span in next(
+                    case for case in seed["case_contexts"] if case["case_context_id"] == unit["case_id"]
+                )["evidence_spans"]}
+                for unit in seed["units"])),
+        ]
+        failures.extend(f"{name} failed" for name, passed in checks if not passed)
+    except Exception as exc:
+        failures.append(f"annotation seed self-test raised {type(exc).__name__}: {exc}")
+    return failures
+
+
 def evaluate(
     bundle_path: Path,
     corpus_bytes: bytes,
     corpus: dict[str, Any],
     corpus_sha256: str,
     expected_source_revision: str,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], bytes]:
     bundle_bytes = bundle_path.read_bytes()
     results, method_id, source_revision = validate_bundle(
         bundle_bytes, corpus_bytes, corpus, corpus_sha256, expected_source_revision
@@ -512,6 +785,14 @@ def evaluate(
             "Passing these exposed synthetic development checks is not semantic validation, psychological accuracy, human evaluation, clinical utility, or holdout performance.",
         ],
     }
+    seed = build_annotation_seed(
+        bundle_bytes, results, method_id, source_revision, corpus, corpus_bytes
+    )
+    seed_bytes = canonical_json(seed)
+    report["annotation_seed_schema"] = ANNOTATION_SEED_SCHEMA
+    report["annotation_seed_unit_count"] = len(seed["units"])
+    report["annotation_seed_sha256"] = hashlib.sha256(seed_bytes).hexdigest()
+    return report, seed_bytes
 
 
 def self_test() -> list[str]:
@@ -722,12 +1003,16 @@ def main() -> int:
 
     if args.self_test:
         failures = self_test()
-        if failures:
+        annotation_failures = annotation_seed_self_test()
+        if failures or annotation_failures:
             print("FAIL: independent output evaluator self-test", file=sys.stderr)
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
+            for failure in annotation_failures:
+                print(f"- annotation seed: {failure}", file=sys.stderr)
             return 1
         print("PASS: 36 evaluator controls (31 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
+        print("PASS: 7 annotation-seed controls (identity, case context, exact text, unit separation, unannotated state, deterministic IDs, evidence binding)")
     if not args.results:
         return 0
     if args.output_dir is None:
@@ -747,10 +1032,16 @@ def main() -> int:
         corpus_sha256 = hashlib.sha256(corpus_bytes).hexdigest()
         args.output_dir.mkdir(parents=True, exist_ok=True)
         for results_path in args.results:
-            report = evaluate(results_path, corpus_bytes, corpus, corpus_sha256, args.source_revision)
+            report, seed_bytes = evaluate(results_path, corpus_bytes, corpus, corpus_sha256, args.source_revision)
+            seed_path = args.output_dir / f"{report['method_id']}.annotation_seed.json"
+            seed_path.write_bytes(seed_bytes)
             output_path = args.output_dir / f"{report['method_id']}.output_evaluation.json"
             output_bytes = canonical_json(report)
             output_path.write_bytes(output_bytes)
+            print(
+                f"{report['method_id']}: annotation_units={report['annotation_seed_unit_count']} "
+                f"annotation_seed_sha256={report['annotation_seed_sha256']} path={seed_path}"
+            )
             print(
                 f"{report['method_id']}: output_contract_checks="
                 f"{report['checks_passed']}/{report['checks_total']} "
