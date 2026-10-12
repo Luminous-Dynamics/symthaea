@@ -95,12 +95,88 @@ def date_range(start: date, end: date) -> str:
     return f"{begin.isoformat().replace('+00:00', 'Z')}/{finish.isoformat().replace('+00:00', 'Z')}"
 
 
+def _redacted_catalog_uri(current_url: str, href: str) -> str | None:
+    """Return a credential-free, query-free URI for provenance, or None if untrusted."""
+    try:
+        resolved = urljoin(current_url, href)
+        parsed = urlparse(resolved)
+        port = parsed.port
+    except (TypeError, ValueError):
+        return None
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != ALLOWED_HOST
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in (None, 443)
+    ):
+        return None
+    # Query parameters can contain opaque pagination tokens or signed URLs.
+    # Keep host/path for discovery, and bind the complete URI separately by SHA-256.
+    return f"https://{ALLOWED_HOST}{parsed.path or '/'}"
+
+
 def _validate_next_url(current_url: str, href: str) -> str:
     resolved = urljoin(current_url, href)
-    parsed = urlparse(resolved)
-    if parsed.scheme != "https" or parsed.hostname != ALLOWED_HOST:
-        raise CatalogError("catalog pagination returned a non-approved host or non-HTTPS URL")
+    if _redacted_catalog_uri(current_url, href) is None:
+        raise CatalogError("catalog pagination returned a non-approved URL")
     return resolved
+
+
+SAFE_PROPERTY_KEYS = (
+    "datetime", "start_datetime", "end_datetime", "created", "updated",
+    "platform", "constellation", "instruments", "mission", "eo:cloud_cover",
+    "sar:instrument_mode", "sar:polarizations", "sat:relative_orbit",
+    "sar:product_type", "sar:frequency_band", "sar:center_frequency",
+    "processing:level", "s1:resolution", "s1:product_timeliness",
+    "s2:mgrs_tile", "proj:epsg", "view:incidence_angle", "view:off_nadir",
+    "sar:looks_range", "sar:looks_azimuth",
+)
+SAFE_ASSET_KEYS = ("type", "title", "roles", "gsd", "eo:bands", "raster:bands", "file:size")
+
+
+def summarize_item_feature(
+    feature: dict[str, Any], collection: str, current_url: str
+) -> dict[str, Any]:
+    """Keep research-relevant STAC metadata without signed asset URLs or raw links."""
+    item_id = feature.get("id")
+    if not isinstance(item_id, str) or not item_id:
+        raise CatalogError("catalog feature is missing a non-empty string id")
+    properties = feature.get("properties", {})
+    if not isinstance(properties, dict):
+        raise CatalogError(f"catalog item {item_id!r} has invalid properties")
+    raw_links = feature.get("links", [])
+    if not isinstance(raw_links, list):
+        raise CatalogError(f"catalog item {item_id!r} has invalid links")
+    self_uri = None
+    for link in raw_links:
+        if isinstance(link, dict) and link.get("rel") == "self" and isinstance(link.get("href"), str):
+            self_uri = _redacted_catalog_uri(current_url, link["href"])
+            if self_uri is not None:
+                break
+
+    raw_assets = feature.get("assets", {})
+    if not isinstance(raw_assets, dict):
+        raise CatalogError(f"catalog item {item_id!r} has invalid assets")
+    asset_summaries: dict[str, dict[str, Any]] = {}
+    for asset_name, asset in sorted(raw_assets.items()):
+        if not isinstance(asset_name, str) or not isinstance(asset, dict):
+            raise CatalogError(f"catalog item {item_id!r} has invalid asset entry")
+        asset_summaries[asset_name] = {
+            key: asset[key] for key in SAFE_ASSET_KEYS if key in asset
+        }
+
+    return {
+        "collection": collection,
+        "id": item_id,
+        "self_uri_redacted": self_uri,
+        "item_sha256": sha256_bytes(canonical_json_bytes(feature)),
+        "bbox": feature.get("bbox"),
+        "geometry": feature.get("geometry"),
+        "properties": {key: properties[key] for key in SAFE_PROPERTY_KEYS if key in properties},
+        # Hrefs intentionally omitted: remote catalogues may supply signed/query-bearing URLs.
+        "assets": asset_summaries,
+    }
 
 
 def request_json(url: str, method: str, payload: dict[str, Any] | None, timeout: float) -> tuple[bytes, dict[str, Any]]:
@@ -162,7 +238,8 @@ def inventory_collection(
         pages.append({
             "page": page_number,
             "request_method": method,
-            "request_url": current_url,
+            "request_url_redacted": _redacted_catalog_uri(current_url, current_url),
+            "request_url_sha256": sha256_bytes(current_url.encode("utf-8")),
             "request_payload_sha256": sha256_bytes(canonical_json_bytes(payload)) if payload is not None else None,
             "response_sha256": sha256_bytes(raw),
             "feature_count": len(feature_list),
@@ -175,18 +252,14 @@ def inventory_collection(
             item_collection = feature.get("collection", collection)
             if not isinstance(item_id, str) or not item_id:
                 raise CatalogError("catalog feature is missing a non-empty string id")
-            key = (str(item_collection), item_id)
+            if not isinstance(item_collection, str) or not item_collection:
+                raise CatalogError(f"catalog item {item_id!r} has an invalid collection id")
+            key = (item_collection, item_id)
             if key in seen:
                 duplicate_count += 1
                 continue
             seen.add(key)
-            # Keep the full catalog feature for audit; hash canonical item metadata independently.
-            items.append({
-                "collection": item_collection,
-                "id": item_id,
-                "item_sha256": sha256_bytes(canonical_json_bytes(feature)),
-                "feature": feature,
-            })
+            items.append(summarize_item_feature(feature, item_collection, current_url))
 
         next_links = [link for link in response.get("links", []) if isinstance(link, dict) and link.get("rel") == "next"]
         if not next_links:

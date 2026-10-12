@@ -167,6 +167,73 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(json.loads(second_request.data)["next"], "opaque-token")
         self.assertEqual(report["page_count"], 2)
 
+    def test_tokens_and_signed_asset_hrefs_are_not_retained(self):
+        self.feature["links"] = [{
+            "rel": "self",
+            "href": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-grd/items/S1_TEST_001?sig=SELFSECRET",
+        }]
+        self.feature["assets"] = {
+            "vv": {
+                "href": "https://example.org/download.tif?token=ASSETSECRET",
+                "type": "image/tiff",
+                "roles": ["data"],
+                "title": "VV",
+            }
+        }
+        response = {"type": "FeatureCollection", "features": [self.feature], "links": []}
+        with patch("tools.water_leak_satellite.catalog_inventory.urlopen", return_value=FakeResponse(response)):
+            report = inventory_collection(
+                endpoint="https://stac.dataspace.copernicus.eu/v1/search",
+                collection="sentinel-1-grd", bbox=[27.7, -26.5, 28.4, -25.8],
+                interval="2025-01-01T00:00:00Z/2025-01-02T23:59:59Z",
+                limit=100, max_pages=10, timeout=2,
+            )
+        serialized = json.dumps(report)
+        self.assertNotIn("SELFSECRET", serialized)
+        self.assertNotIn("ASSETSECRET", serialized)
+        item = report["items"][0]
+        self.assertNotIn("feature", item)
+        self.assertEqual(item["self_uri_redacted"], "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-grd/items/S1_TEST_001")
+        self.assertEqual(item["assets"]["vv"]["type"], "image/tiff")
+        self.assertNotIn("href", item["assets"]["vv"])
+        self.assertEqual(len(item["item_sha256"]), 64)
+
+    def test_pagination_tokens_are_redacted_in_inventory_output(self):
+        first = {
+            "type": "FeatureCollection", "features": [],
+            "links": [{
+                "rel": "next",
+                "href": "https://stac.dataspace.copernicus.eu/v1/search?token=PAGINATIONSECRET",
+                "method": "GET",
+            }],
+        }
+        second = {"type": "FeatureCollection", "features": [], "links": []}
+        with patch("tools.water_leak_satellite.catalog_inventory.urlopen", side_effect=[FakeResponse(first), FakeResponse(second)]):
+            report = inventory_collection(
+                endpoint="https://stac.dataspace.copernicus.eu/v1/search",
+                collection="sentinel-1-grd", bbox=[27.7, -26.5, 28.4, -25.8],
+                interval="2025-01-01T00:00:00Z/2025-01-02T23:59:59Z",
+                limit=100, max_pages=10, timeout=2,
+            )
+        serialized = json.dumps(report)
+        self.assertNotIn("PAGINATIONSECRET", serialized)
+        self.assertEqual(report["page_records"][1]["request_url_redacted"], "https://stac.dataspace.copernicus.eu/v1/search")
+        self.assertEqual(len(report["page_records"][1]["request_url_sha256"]), 64)
+
+    def test_rejects_catalog_url_with_userinfo_or_nonstandard_port(self):
+        for href in (
+            "https://user@stac.dataspace.copernicus.eu/v1/search",
+            "https://stac.dataspace.copernicus.eu:444/v1/search",
+        ):
+            with self.subTest(href=href):
+                with self.assertRaises(CatalogError):
+                    inventory_collection(
+                        endpoint="https://stac.dataspace.copernicus.eu/v1/search",
+                        collection="sentinel-1-grd", bbox=[27.7, -26.5, 28.4, -25.8],
+                        interval="2025-01-01T00:00:00Z/2025-01-02T23:59:59Z",
+                        limit=100, max_pages=10, timeout=2,
+                    ) if False else _validate_next_url("https://stac.dataspace.copernicus.eu/v1/search", href)
+
     def test_main_writes_auditable_json_with_mock_catalog(self):
         response = {"type": "FeatureCollection", "features": [self.feature], "links": []}
         with tempfile.TemporaryDirectory() as tmp, patch(
