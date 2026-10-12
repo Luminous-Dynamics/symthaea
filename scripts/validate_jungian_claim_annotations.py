@@ -172,7 +172,7 @@ def validate_adjudication(adjudication: Any, *, unit_id: str, guide_sha: str, re
 
 
 def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_bytes: bytes,
-                       expected_seed_sha256: str, minimum_reviewers: int = 2,
+                       expected_seed_sha256: str, submission_bytes: bytes | None = None, minimum_reviewers: int = 2,
                        require_complete: bool = False, require_adjudication: bool = False) -> dict[str, Any]:
     require(isinstance(seed, dict) and isinstance(submission, dict), "seed and submission must be JSON objects")
     require(minimum_reviewers >= 2, "minimum_reviewers must be >= 2 to preserve independent-review semantics")
@@ -249,7 +249,7 @@ def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_b
         "schema": "symthaea-jungian-annotation-validation-report-v1",
         "validation_scope": "annotation_integrity_and_coverage_not_label_correctness",
         "seed_sha256": sha256(seed_bytes),
-        "submission_sha256": sha256(canonical(submission)),
+        "submission_sha256": sha256(submission_bytes if submission_bytes is not None else canonical(submission)),
         "annotation_guide_sha256": guide_sha,
         "method_id": seed.get("method_id"),
         "case_count": seed.get("case_count"),
@@ -386,7 +386,7 @@ def main() -> int:
         seed = strict_json(seed_bytes, "seed")
         submission = strict_json(submission_bytes, "submission")
         report = validate_documents(seed,submission,seed_bytes=seed_bytes,guide_bytes=guide_bytes,
-            expected_seed_sha256=args.expected_seed_sha256,minimum_reviewers=args.minimum_reviewers,
+            expected_seed_sha256=args.expected_seed_sha256,submission_bytes=submission_bytes,minimum_reviewers=args.minimum_reviewers,
             require_complete=args.require_complete or args.require_adjudication,
             require_adjudication=args.require_adjudication)
         print(json.dumps(report,ensure_ascii=False,indent=2,sort_keys=True))
