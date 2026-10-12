@@ -107,7 +107,7 @@ impl DftGrid {
 
 /// Becke partition weight for atom `atom_idx` at point (x, y, z).
 ///
-/// Uses the Becke fuzzy-cell scheme with Stratmann step function.
+/// Uses Becke's original three-pass polynomial step function, not Stratmann's variant.
 fn becke_partition_weight(atom_idx: usize, x: f64, y: f64, z: f64, atoms: &[Atom]) -> f64 {
     let n_atoms = atoms.len();
     if n_atoms == 1 {
