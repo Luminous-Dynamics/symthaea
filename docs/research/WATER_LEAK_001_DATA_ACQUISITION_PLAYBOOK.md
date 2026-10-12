@@ -125,7 +125,7 @@ Similarly, a customer report or water outage may help prioritize sampling but ca
 
 ## Concrete next sequence
 
-1. **Now:** run the 42-case offline suite on the exact branch checkout; keep the result distinct from hosted Actions status.
+1. **Now:** run the 54-case offline suite on the exact branch checkout; keep the result distinct from hosted Actions status.
 2. **Data inventory:** produce a source-by-source rights register; begin with the 2026 Zenodo acoustic release and the 2023 lab benchmark, keeping unlicensed records quarantined.
 3. **Local entry point:** send a bounded research-data feasibility enquiry to Johannesburg Water's RDI function and the University of Johannesburg authors of the 2025 satellite initiative. Ask for the prior validation design and whether a secure aggregate join can be performed; do not request unrestricted raw data as the first move.
 4. **Public geodata:** use the City's CGIS task request and contact the named custodian for any needed spatial layer, recording exact access and licence conditions rather than assuming the map viewer grants reuse rights. [CGIS request route](https://eservices.joburg.org.za/corporate-geo-informatics/overview).

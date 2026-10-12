@@ -107,10 +107,11 @@ class ODataInventoryTests(unittest.TestCase):
         with self.assertRaises(ODataError):
             validate_next_url(DEFAULT_ENDPOINT, "https://example.invalid/steal")
 
-    def test_wrong_host_and_nonstandard_port_are_rejected(self):
+    def test_wrong_host_nonstandard_port_and_wrong_path_are_rejected(self):
         for url in (
             "https://user@catalogue.dataspace.copernicus.eu/odata/v1/Products",
             "https://catalogue.dataspace.copernicus.eu:444/odata/v1/Products",
+            "https://catalogue.dataspace.copernicus.eu/odata/v1/Users",
         ):
             with self.subTest(url=url), self.assertRaises(ODataError):
                 validate_next_url(DEFAULT_ENDPOINT, url)
@@ -151,6 +152,23 @@ class ODataInventoryTests(unittest.TestCase):
             self.assertEqual(len(document["queries"]), 2)
             self.assertEqual(verify_inventory(document), [])
             self.assertEqual(main(["--verify", str(out)]), 0)
+
+    def test_invalid_bbox_type_fails_closed_without_exception(self):
+        with patch("tools.water_leak_satellite.odata_inventory.urlopen", side_effect=[
+            FakeResponse({"value": []}), FakeResponse({"value": []})
+        ]):
+            queries = [
+                inventory_query(profile=p, bbox=self.bbox, start=date(2025, 1, 1),
+                    end_exclusive=date(2025, 1, 2), limit=100, max_pages=5, timeout=2)
+                for p in PROFILES
+            ]
+        doc = build_document(self.bbox, date(2025, 1, 1), date(2025, 1, 1), queries)
+        doc["scope"]["bbox_wgs84"] = "malformed"
+        from tools.water_leak_satellite.odata_inventory import sha256_json
+        doc.pop("inventory_manifest_sha256")
+        doc["inventory_manifest_sha256"] = sha256_json(doc)
+        errors = verify_inventory(doc)
+        self.assertTrue(any("scope.bbox_wgs84" in err for err in errors))
 
     def test_query_scope_tamper_is_detected_even_after_rehash(self):
         # Build an otherwise valid full document via fake responses.

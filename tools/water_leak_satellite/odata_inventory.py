@@ -153,8 +153,12 @@ def _redacted_url(url: str) -> str | None:
 
 def validate_next_url(current_url: str, href: str) -> str:
     resolved = urljoin(current_url, href)
-    if _redacted_url(resolved) is None:
-        raise ODataError("OData pagination returned a non-approved URL")
+    parsed = urlparse(resolved)
+    if (
+        _redacted_url(resolved) is None
+        or parsed.path.rstrip("/") != "/odata/v1/Products"
+    ):
+        raise ODataError("OData pagination returned a non-approved URL/path")
     return resolved
 
 
@@ -328,10 +332,16 @@ def verify_inventory(document: Any) -> list[str]:
         errors.append("scope: must be an object")
         return errors
     bbox = scope.get("bbox_wgs84")
-    if not isinstance(bbox, list) or len(bbox) != 4 or any(not _finite_number(v) for v in bbox):
+    bbox_valid = (
+        isinstance(bbox, list)
+        and len(bbox) == 4
+        and all(_finite_number(v) for v in bbox)
+    )
+    if not bbox_valid:
         errors.append("scope.bbox_wgs84: must contain four finite numeric bounds")
     elif not (-180 <= bbox[0] < bbox[2] <= 180 and -90 <= bbox[1] < bbox[3] <= 90):
         errors.append("scope.bbox_wgs84: WGS84 bounds are not ordered")
+        bbox_valid = False
     try:
         start = date.fromisoformat(scope.get("start_date_inclusive", ""))
         end = date.fromisoformat(scope.get("end_date_inclusive", ""))
@@ -371,9 +381,11 @@ def verify_inventory(document: Any) -> list[str]:
         actual_keys.append((profile["profile_id"], q_start, q_end))
         if query.get("collection") != profile["collection"] or query.get("product_type") != profile["product_type"]:
             errors.append(f"{prefix}: collection/product type do not match the declared profile")
+        if query.get("query_id") != f"{profile['profile_id']}:{q_start.isoformat()}:{q_end.isoformat()}":
+            errors.append(f"{prefix}.query_id: does not match profile and query dates")
         if q_end <= q_start or q_start < start or q_end > end + timedelta(days=1):
             errors.append(f"{prefix}: query interval falls outside the declared scope")
-        expected_filter = build_filter(profile, bbox, q_start, q_end) if q_end > q_start else None
+        expected_filter = build_filter(profile, bbox, q_start, q_end) if bbox_valid and q_end > q_start else None
         if query.get("filter") != expected_filter:
             errors.append(f"{prefix}.filter: does not match declared profile, AOI and query dates")
 
