@@ -720,7 +720,7 @@ mod tests {
             "direction":{"kind":"unknown"},
             "sample_unit":"independent_seed_run",
             "uncertainty":{"kind":"empirical","method":"bootstrap","confidence_level":0.95},
-            "comparison":{"kind":"relative_delta","warning_fraction":0.05,"critical_fraction":0.10}
+            "comparison":{"kind":"relative_delta","warning_fraction":0.05,"critical_fraction":0.10,"minimum_reference_magnitude":0.01}
         }"#;
         assert!(serde_json::from_str::<MetricDefinitionV1>(json).is_err());
     }
