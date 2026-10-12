@@ -997,7 +997,8 @@ fn actual_rk4_step_count(t_end: f64, dt: f64) -> Option<u64> {
         } else {
             ((step + 1) as f64 * dt).min(t_end)
         };
-        if !next_t.is_finite() || next_t <= t {
+        let h = next_t - t;
+        if !next_t.is_finite() || !h.is_finite() || h <= 0.0 || t + h <= t {
             return None;
         }
         completed = completed.saturating_add(1);
@@ -1037,7 +1038,10 @@ fn holdout_record_is_consistent(
             != MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION
         || holdout.trajectories_checked > holdout.requested_trajectories
         || holdout.completed_integration_steps > holdout.attempted_integration_steps
-        || holdout.state_updates != holdout.completed_integration_steps.saturating_mul(state_dimension as u64)
+        || holdout.state_updates
+            < holdout.completed_integration_steps.saturating_mul(state_dimension as u64)
+        || holdout.state_updates
+            > holdout.attempted_integration_steps.saturating_mul(state_dimension as u64)
         || holdout.integration_rhs_evaluations < holdout.completed_integration_steps.saturating_mul(4)
         || holdout.integration_rhs_evaluations > holdout.attempted_integration_steps.saturating_mul(4)
         || holdout.rhs_evaluations
@@ -1081,6 +1085,8 @@ fn holdout_record_is_consistent(
             && holdout.trajectories_checked == holdout.requested_trajectories
             && holdout.attempted_integration_steps == maximum_actual_steps
             && holdout.completed_integration_steps == holdout.attempted_integration_steps
+            && holdout.state_updates
+                == holdout.completed_integration_steps.saturating_mul(state_dimension as u64)
             && holdout.integration_rhs_evaluations
                 == holdout.completed_integration_steps.saturating_mul(4)
             && holdout.max_lie_derivative_variance < f64::MAX
