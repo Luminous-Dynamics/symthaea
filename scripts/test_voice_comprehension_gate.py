@@ -95,6 +95,24 @@ class VoiceComprehensionGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "coverage .* do not match"):
             score_responses(self.public, key, self.correct_responses)
 
+
+    def test_malformed_unhashable_response_fields_fail_closed(self):
+        rows = copy.deepcopy(self.correct_responses)
+        rows[0]["answer"] = ["A"]
+        with self.assertRaisesRegex(ValueError, "must select A, B, C, or D"):
+            score_responses(self.public, self.key, rows)
+
+        rows = copy.deepcopy(self.correct_responses)
+        rows[0]["clip_id"] = ["VC-001"]
+        with self.assertRaisesRegex(ValueError, "non-empty string clip/question IDs"):
+            score_responses(self.public, self.key, rows)
+
+    def test_duplicate_public_clip_identity_fails_closed(self):
+        public = copy.deepcopy(self.public)
+        public["cases"].append(copy.deepcopy(public["cases"][0]))
+        with self.assertRaisesRegex(ValueError, "duplicate public clip ID"):
+            score_responses(public, self.key, self.correct_responses)
+
     def test_prepare_separates_public_questions_and_private_answer_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "listening-pack"

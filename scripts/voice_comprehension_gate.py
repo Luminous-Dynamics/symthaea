@@ -158,40 +158,67 @@ def score_responses(
     responses: Any,
 ) -> dict[str, Any]:
     """Strictly score one response for every published question."""
+    if not isinstance(public_doc, dict) or public_doc.get("format_version") != 1:
+        raise ValueError("public question pack must be an object with format_version=1")
+    if not isinstance(answer_key, dict) or answer_key.get("format_version") != 1:
+        raise ValueError("private answer key must be an object with format_version=1")
     if not isinstance(responses, list):
         raise ValueError("responses must be a JSON array")
+    public_cases = public_doc.get("cases")
+    if not isinstance(public_cases, list) or not public_cases:
+        raise ValueError("public question pack requires a non-empty cases array")
     public_questions: dict[tuple[str, str], set[str]] = {}
-    for case in public_doc.get("cases", []):
-        if not isinstance(case, dict) or not isinstance(case.get("clip_id"), str):
+    seen_clip_ids: set[str] = set()
+    for case in public_cases:
+        if not isinstance(case, dict):
             raise ValueError("public question pack has malformed case identity")
-        clip_id = case["clip_id"]
-        for question in case.get("questions", []):
+        clip_id = case.get("clip_id")
+        questions = case.get("questions")
+        if not isinstance(clip_id, str) or not clip_id.strip():
+            raise ValueError("public question pack has malformed case identity")
+        if clip_id in seen_clip_ids:
+            raise ValueError(f"duplicate public clip ID {clip_id}")
+        seen_clip_ids.add(clip_id)
+        if not isinstance(questions, list) or not questions:
+            raise ValueError(f"public case {clip_id} requires a non-empty question list")
+        for question in questions:
             if not isinstance(question, dict):
                 raise ValueError(f"public questions for {clip_id} are malformed")
-            qid = question.get("question_id")
-            options = question.get("options")
-            if not isinstance(qid, str) or not isinstance(options, list):
-                raise ValueError(f"public question for {clip_id} lacks ID/options")
+            qid, prompt, options = question.get("question_id"), question.get("question"), question.get("options")
+            if not isinstance(qid, str) or not qid.strip() or not isinstance(prompt, str) or not prompt.strip():
+                raise ValueError(f"public question for {clip_id} lacks a valid ID/prompt")
+            if not isinstance(options, list) or len(options) != 4:
+                raise ValueError(f"{clip_id}/{qid} must expose exactly four options A-D")
+            option_ids = []
+            for option in options:
+                if not isinstance(option, dict):
+                    raise ValueError(f"{clip_id}/{qid} contains a malformed option")
+                option_id, label = option.get("id"), option.get("text")
+                if not isinstance(option_id, str) or not isinstance(label, str) or not label.strip():
+                    raise ValueError(f"{clip_id}/{qid} contains a malformed option")
+                option_ids.append(option_id)
+            if tuple(option_ids) != OPTION_IDS:
+                raise ValueError(f"{clip_id}/{qid} must expose options A-D exactly")
             key = (clip_id, qid)
             if key in public_questions:
                 raise ValueError(f"duplicate public question {clip_id}/{qid}")
-            option_ids = {option.get("id") for option in options if isinstance(option, dict)}
-            if option_ids != set(OPTION_IDS):
-                raise ValueError(f"{clip_id}/{qid} must expose options A-D exactly")
-            public_questions[key] = option_ids
+            public_questions[key] = set(option_ids)
 
     key_rows = answer_key.get("answers")
-    if not isinstance(key_rows, list):
-        raise ValueError("private answer key requires an answers array")
+    if not isinstance(key_rows, list) or not key_rows:
+        raise ValueError("private answer key requires a non-empty answers array")
     expected: dict[tuple[str, str], tuple[str, str]] = {}
     for row in key_rows:
         if not isinstance(row, dict):
             raise ValueError("private answer-key row must be an object")
-        key = (row.get("clip_id"), row.get("question_id"))
+        clip_id, question_id = row.get("clip_id"), row.get("question_id")
         answer, category = row.get("answer"), row.get("category")
-        if key[0] not in {clip for clip, _ in public_questions} or key not in public_questions:
+        if not isinstance(clip_id, str) or not clip_id.strip() or not isinstance(question_id, str) or not question_id.strip():
+            raise ValueError("answer-key rows require non-empty string clip/question IDs")
+        key = (clip_id, question_id)
+        if key not in public_questions:
             raise ValueError(f"answer key references unpublished question {key}")
-        if answer not in public_questions[key] or not isinstance(category, str) or not category:
+        if not isinstance(answer, str) or answer not in public_questions[key] or not isinstance(category, str) or not category:
             raise ValueError(f"answer key has invalid answer/category for {key}")
         if key in expected:
             raise ValueError(f"duplicate answer-key question {key}")
@@ -203,14 +230,20 @@ def score_responses(
     for index, row in enumerate(responses):
         if not isinstance(row, dict) or set(row) != {"clip_id", "question_id", "answer"}:
             raise ValueError(f"response row {index} must contain only clip_id, question_id, answer")
-        key = (row["clip_id"], row["question_id"])
+        clip_id, question_id, answer = row["clip_id"], row["question_id"], row["answer"]
+        if (
+            not isinstance(clip_id, str) or not clip_id.strip()
+            or not isinstance(question_id, str) or not question_id.strip()
+        ):
+            raise ValueError(f"response row {index} requires non-empty string clip/question IDs")
+        key = (clip_id, question_id)
         if key not in expected:
             raise ValueError(f"response row {index} references unknown question {key}")
         if key in received:
             raise ValueError(f"duplicate response for {key}")
-        if row["answer"] not in public_questions[key]:
+        if not isinstance(answer, str) or answer not in public_questions[key]:
             raise ValueError(f"response for {key} must select A, B, C, or D")
-        received[key] = row["answer"]
+        received[key] = answer
     missing = set(expected) - set(received)
     if missing:
         sample = sorted(missing)[:5]
@@ -320,15 +353,48 @@ def score(output: Path, responses_path: Path) -> None:
     if not isinstance(render_cases, list):
         raise ValueError("private render manifest is malformed")
     render_ids = [case.get("clip_id") for case in render_cases if isinstance(case, dict)]
-    if len(render_ids) != len(render_cases) or len(set(render_ids)) != len(render_ids):
-        raise ValueError("private render manifest has malformed/duplicate clip IDs")
-    answer_ids = {row.get("clip_id") for row in answer_key.get("answers", []) if isinstance(row, dict)}
+    if len(render_ids) != len(render_cases):
+        raise ValueError("private render manifest has malformed case records")
+    if not all(isinstance(clip_id, str) and clip_id.strip() for clip_id in render_ids):
+        raise ValueError("private render manifest contains invalid clip IDs")
+    if len(set(render_ids)) != len(render_ids):
+        raise ValueError("private render manifest has duplicate clip IDs")
+    key_document = _read_json(key_path)
+    key_rows = key_document.get("answers") if isinstance(key_document, dict) else None
+    if not isinstance(key_rows, list) or not key_rows:
+        raise ValueError("private answer key requires a non-empty answers array")
+    answer_ids = set()
+    for row in key_rows:
+        if not isinstance(row, dict) or not isinstance(row.get("clip_id"), str):
+            raise ValueError("private answer key contains malformed clip identity")
+        answer_ids.add(row["clip_id"])
     if set(render_ids) != answer_ids:
         raise ValueError("render manifest and answer-key clip inventory differ")
+    public_doc = _read_json(public_path)
+    public_case_map = {}
+    for case in public_doc.get("cases", []) if isinstance(public_doc, dict) else []:
+        if not isinstance(case, dict) or not isinstance(case.get("clip_id"), str):
+            raise ValueError("public question pack has malformed case identity")
+        questions = case.get("questions")
+        if not isinstance(questions, list):
+            raise ValueError(f"public questions for {case['clip_id']} are malformed")
+        qids = [question.get("question_id") for question in questions if isinstance(question, dict)]
+        if len(qids) != len(questions) or not all(isinstance(qid, str) for qid in qids):
+            raise ValueError(f"public question IDs are malformed for {case['clip_id']}")
+        if case["clip_id"] in public_case_map:
+            raise ValueError(f"duplicate public clip ID {case['clip_id']}")
+        public_case_map[case["clip_id"]] = set(qids)
     for case in render_cases:
+        if not isinstance(case, dict):
+            raise ValueError("private render manifest contains a malformed case")
         text = case.get("text")
         if not isinstance(text, str) or hashlib.sha256(text.encode("utf-8")).hexdigest() != case.get("text_sha256"):
             raise ValueError(f"source text digest mismatch for {case.get('clip_id')}")
+        expected_question_ids = case.get("question_ids")
+        if not isinstance(expected_question_ids, list) or not all(isinstance(qid, str) for qid in expected_question_ids):
+            raise ValueError(f"private question IDs are malformed for {case.get('clip_id')}")
+        if public_case_map.get(case.get("clip_id")) != set(expected_question_ids):
+            raise ValueError(f"render manifest/public question IDs differ for {case.get('clip_id')}")
     report = score_responses(public_doc, answer_key, responses)
     report["render_text_digests_verified"] = True
     report_path = private / "comprehension_report.json"
