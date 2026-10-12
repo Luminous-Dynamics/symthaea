@@ -63,6 +63,9 @@ pub enum ComparisonRuleV1 {
     RelativeDelta {
         warning_fraction: f64,
         critical_fraction: f64,
+        /// Metric-specific lower bound for using a percentage delta, in the
+        /// metric's declared unit. No global fallback is permitted.
+        minimum_reference_magnitude: f64,
     },
     NoClassification {
         rationale: String,
@@ -182,6 +185,7 @@ impl MetricDefinitionV1 {
             ComparisonRuleV1::RelativeDelta {
                 warning_fraction,
                 critical_fraction,
+                minimum_reference_magnitude,
             } => {
                 if !warning_fraction.is_finite()
                     || !critical_fraction.is_finite()
@@ -190,6 +194,14 @@ impl MetricDefinitionV1 {
                 {
                     errors.push(
                         "relative thresholds must be finite/non-negative and critical_fraction must exceed warning_fraction"
+                            .to_string(),
+                    );
+                }
+                if !minimum_reference_magnitude.is_finite()
+                    || *minimum_reference_magnitude <= 0.0
+                {
+                    errors.push(
+                        "relative comparisons require a finite, positive metric-specific minimum_reference_magnitude"
                             .to_string(),
                     );
                 }
@@ -391,6 +403,23 @@ impl MetricContractV1 {
                         definition.benchmark, definition.metric, value.n
                     ));
                 }
+                if let ComparisonRuleV1::RelativeDelta {
+                    minimum_reference_magnitude,
+                    ..
+                } = &definition.comparison
+                {
+                    if !value.mean.is_finite()
+                        || value.mean.abs() < *minimum_reference_magnitude
+                    {
+                        errors.push(format!(
+                            "{}/{}: absolute mean {} is below the metric-specific minimum reference magnitude {} for relative comparison",
+                            definition.benchmark,
+                            definition.metric,
+                            value.mean,
+                            minimum_reference_magnitude
+                        ));
+                    }
+                }
                 validate_value_domain(definition, value, &mut errors);
             }
         }
@@ -470,6 +499,7 @@ mod tests {
             ComparisonRuleV1::RelativeDelta {
                 warning_fraction: 0.05,
                 critical_fraction: 0.10,
+                minimum_reference_magnitude: 0.01,
             },
         )
     }
@@ -559,6 +589,22 @@ mod tests {
     }
 
     #[test]
+    fn relative_comparison_requires_metric_specific_scale_floor() {
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let near_zero = snapshot(&[("B", "accuracy", 0.001, 10)]);
+        let errors = contract.validate_snapshot_population(&near_zero).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("below the metric-specific minimum reference magnitude")));
+
+        let mut invalid = empirical_definition("B", "accuracy");
+        invalid.comparison = ComparisonRuleV1::RelativeDelta {
+            warning_fraction: 0.05,
+            critical_fraction: 0.10,
+            minimum_reference_magnitude: 0.0,
+        };
+        assert!(invalid.validate().unwrap_err().iter().any(|message| message.contains("minimum_reference_magnitude")));
+    }
+
+    #[test]
     fn empirical_policy_rejects_single_sample_and_bad_interval() {
         let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
         let one_sample = snapshot(&[("B", "accuracy", 0.8, 1)]);
@@ -575,6 +621,7 @@ mod tests {
             ComparisonRuleV1::RelativeDelta {
                 warning_fraction: 0.05,
                 critical_fraction: 0.10,
+                minimum_reference_magnitude: 0.01,
             },
         );
         assert!(invalid.validate().unwrap_err().iter().any(|message| message.contains("confidence_level")));
@@ -595,6 +642,7 @@ mod tests {
             ComparisonRuleV1::RelativeDelta {
                 warning_fraction: 0.05,
                 critical_fraction: 0.10,
+                minimum_reference_magnitude: 0.01,
             },
         );
         assert!(not_estimated.validate().unwrap_err().iter().any(|message| message.contains("must use NoClassification")));
