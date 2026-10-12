@@ -357,7 +357,7 @@ fn main() {
     );
     println!("  Circuit constrains popcount(XOR) and sums counts; re-run before comparing historical timings.");
 
-    // CfC temporal proofs
+    // Packed-bit temporal recurrence proofs
     println!("\n\n{}", "=".repeat(60));
     println!("BITWISE TEMPORAL RECURRENCE PROOF BENCHMARKS");
     println!("{}", "=".repeat(60));
@@ -366,18 +366,18 @@ fn main() {
     let cfc_medium = cfc_temporal::bench_cfc_temporal(64, 100); // 64 neurons, 100 steps
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║              CfC TEMPORAL PROOF SUMMARY                      ║");
+    println!("║          BITWISE GATED RECURRENCE SUMMARY                    ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║ Config           │ Constraints │ Prove (ms) │ Proof (KB) ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!(
-        "║  8N × 10T        │ {:>11} │ {:>10.1} │ {:>10.1} ║",
+        "║  8W × 10T        │ {:>11} │ {:>10.1} │ {:>10.1} ║",
         cfc_small.and_constraints,
         cfc_small.prove_time_ms,
         cfc_small.proof_size_bytes as f64 / 1024.0
     );
     println!(
-        "║ 64N × 100T       │ {:>11} │ {:>10.1} │ {:>10.1} ║",
+        "║ 64W × 100T       │ {:>11} │ {:>10.1} │ {:>10.1} ║",
         cfc_medium.and_constraints,
         cfc_medium.prove_time_ms,
         cfc_medium.proof_size_bytes as f64 / 1024.0
@@ -388,7 +388,7 @@ fn main() {
     println!("They do not encode numeric fixed-point CfC arithmetic.");
     println!("Historical timing and LTC/RK4 ratios are not numerical-CfC comparisons.");
 
-    // CfC with sigmoid (Sprint 8.3)
+    // Legacy-named low-byte gate-mask recurrence (not a sigmoid)
     println!("\n\n{}", "=".repeat(60));
     println!("MASKED-GATE TEMPORAL RECURRENCE BENCHMARK");
     println!("{}", "=".repeat(60));
