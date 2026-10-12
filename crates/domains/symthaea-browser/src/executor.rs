@@ -102,8 +102,52 @@ impl<'a> BrowserExecutor<'a> {
                 .scroll_to(selector)
                 .await
                 .map(|_| ActionOutput::None),
-            BrowserAction::GoBack => self.session.go_back().await.map(|_| ActionOutput::None),
-            BrowserAction::GoForward => self.session.go_forward().await.map(|_| ActionOutput::None),
+            BrowserAction::GoBack => {
+                match self
+                    .session
+                    .go_back_with_url_policy(|url| self.policy.evaluate_url(url))
+                    .await
+                {
+                    Ok(target_decision) if !target_decision.is_allowed() => {
+                        let reason = target_decision
+                            .denial_reason()
+                            .cloned()
+                            .unwrap_or(PolicyDenial::InvalidUrl);
+                        return ActionReceipt {
+                            action,
+                            policy_decision: target_decision,
+                            outcome: ActionOutcome::Denied(reason),
+                            output: ActionOutput::None,
+                            elapsed_ms: started.elapsed().as_millis(),
+                        };
+                    }
+                    Ok(_) => Ok(ActionOutput::None),
+                    Err(error) => Err(error),
+                }
+            }
+            BrowserAction::GoForward => {
+                match self
+                    .session
+                    .go_forward_with_url_policy(|url| self.policy.evaluate_url(url))
+                    .await
+                {
+                    Ok(target_decision) if !target_decision.is_allowed() => {
+                        let reason = target_decision
+                            .denial_reason()
+                            .cloned()
+                            .unwrap_or(PolicyDenial::InvalidUrl);
+                        return ActionReceipt {
+                            action,
+                            policy_decision: target_decision,
+                            outcome: ActionOutcome::Denied(reason),
+                            output: ActionOutput::None,
+                            elapsed_ms: started.elapsed().as_millis(),
+                        };
+                    }
+                    Ok(_) => Ok(ActionOutput::None),
+                    Err(error) => Err(error),
+                }
+            },
             BrowserAction::ExtractText { selector } => self
                 .session
                 .extract_text(selector.as_deref())
