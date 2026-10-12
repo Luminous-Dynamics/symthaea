@@ -6,7 +6,7 @@
 //! The legacy [`crate::embodiment::EmbodimentBridge`] API exposes several bare
 //! numerical getters whose defaults are compatibility conveniences rather than
 //! observed evidence. This module provides a parallel, opt-in contract whose
-//! defaults are explicitly [`EvidenceAvailability::Unavailable`].
+//! defaults are explicitly [`crate::embodiment_evidence::EvidenceAvailability::Unavailable`].
 //!
 //! New claim-bearing, safety, trust, and HIL consumers should depend on
 //! [`EmbodimentEvidenceProviderV1`] (or a later version), not infer evidence
@@ -14,7 +14,7 @@
 
 use crate::embodiment::EmbodimentBridge;
 use crate::embodiment_evidence::{
-    EmbodimentEvidenceKind, EvidenceAvailability, EvidenceMetadataV1, EvidenceSourceClass,
+    EmbodimentEvidenceKind, EvidenceMetadataV1, EvidenceSourceClass,
     EvidenceValidationError, NormalizedScalarEvidenceV1, NormalizedVectorEvidenceV1,
 };
 
@@ -164,9 +164,10 @@ impl EmbodimentEvidenceProviderV1 for LegacyCompatibilityEvidenceAdapter<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::embodiment_evidence::EvidenceAvailability;
     use crate::embodiment::{
-        AgentIdentity, EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel,
-        GROUNDING_SENSORIMOTOR,
+        AgentIdentity, EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry,
+        GROUNDING_SENSORIMOTOR, MotorSafetyLevel,
     };
     use crate::hdc::{ContinuousHV, HDC_DIMENSION};
 
@@ -268,19 +269,25 @@ mod tests {
             provider.observation_confidence_evidence().unwrap(),
         ] {
             assert_eq!(scalar.value, None);
-            assert_eq!(scalar.metadata.availability, EvidenceAvailability::Unavailable);
+            assert_eq!(
+                scalar.metadata.availability,
+                EvidenceAvailability::Unavailable
+            );
             assert_eq!(scalar.metadata.source, None);
         }
         let health = provider.actuator_health_evidence().unwrap();
         assert_eq!(health.values, None);
-        assert_eq!(health.metadata.availability, EvidenceAvailability::Unavailable);
+        assert_eq!(
+            health.metadata.availability,
+            EvidenceAvailability::Unavailable
+        );
     }
 
     #[test]
     fn legacy_perfect_defaults_are_labelled_compatibility_assumptions() {
         let bridge = MockBridge::default();
-        let adapter = LegacyCompatibilityEvidenceAdapter::new(&bridge, "mock.actuators.v1")
-            .unwrap();
+        let adapter =
+            LegacyCompatibilityEvidenceAdapter::new(&bridge, "mock.actuators.v1").unwrap();
 
         let health = adapter.actuator_health_evidence().unwrap();
         assert_eq!(health.values.as_deref(), Some(&[1.0, 1.0][..]));
@@ -288,7 +295,10 @@ mod tests {
             health.metadata.source,
             Some(EvidenceSourceClass::CompatibilityAssumption)
         );
-        assert_eq!(health.metadata.profile_id.as_deref(), Some("mock.actuators.v1"));
+        assert_eq!(
+            health.metadata.profile_id.as_deref(),
+            Some("mock.actuators.v1")
+        );
 
         let accuracy = adapter.sensorimotor_accuracy_evidence().unwrap();
         let reliability = adapter.physical_reliability_evidence().unwrap();
@@ -307,15 +317,23 @@ mod tests {
     #[test]
     fn legacy_prediction_and_confidence_are_not_promoted_to_evidence() {
         let bridge = MockBridge::default();
-        let adapter = LegacyCompatibilityEvidenceAdapter::new(&bridge, "mock.actuators.v1")
-            .unwrap();
+        let adapter =
+            LegacyCompatibilityEvidenceAdapter::new(&bridge, "mock.actuators.v1").unwrap();
 
         assert_eq!(
-            adapter.predictive_residual_evidence().unwrap().metadata.availability,
+            adapter
+                .predictive_residual_evidence()
+                .unwrap()
+                .metadata
+                .availability,
             EvidenceAvailability::Unavailable
         );
         assert_eq!(
-            adapter.observation_confidence_evidence().unwrap().metadata.availability,
+            adapter
+                .observation_confidence_evidence()
+                .unwrap()
+                .metadata
+                .availability,
             EvidenceAvailability::Unavailable
         );
     }
@@ -327,8 +345,8 @@ mod tests {
             accuracy: f32::NAN,
             reliability: 2.0,
         };
-        let adapter = LegacyCompatibilityEvidenceAdapter::new(&bridge, "mock.actuators.v1")
-            .unwrap();
+        let adapter =
+            LegacyCompatibilityEvidenceAdapter::new(&bridge, "mock.actuators.v1").unwrap();
 
         assert!(matches!(
             adapter.actuator_health_evidence(),
@@ -350,10 +368,13 @@ mod tests {
             health: Vec::new(),
             ..MockBridge::default()
         };
-        let adapter = LegacyCompatibilityEvidenceAdapter::new(&bridge, "mock.actuators.v1")
-            .unwrap();
+        let adapter =
+            LegacyCompatibilityEvidenceAdapter::new(&bridge, "mock.actuators.v1").unwrap();
         let health = adapter.actuator_health_evidence().unwrap();
-        assert_eq!(health.metadata.availability, EvidenceAvailability::Unavailable);
+        assert_eq!(
+            health.metadata.availability,
+            EvidenceAvailability::Unavailable
+        );
         assert_eq!(health.values, None);
     }
 

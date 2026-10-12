@@ -10,9 +10,7 @@
 
 use std::fmt::Write as _;
 
-use symthaea_core::embodiment_evidence::{
-    ClockDomainId, EvidenceValidationError, TimestampV1,
-};
+use symthaea_core::embodiment_evidence::{ClockDomainId, EvidenceValidationError, TimestampV1};
 use thiserror::Error;
 
 use crate::readiness::{
@@ -164,7 +162,10 @@ mod tests {
         let vehicle_restored: Px4VehicleStatusReadinessEvidenceV1 =
             serde_json::from_slice(&vehicle_bytes).unwrap();
         vehicle_restored.validate().unwrap();
-        assert_eq!(vehicle_restored.status_id().unwrap(), vehicle.status_id().unwrap());
+        assert_eq!(
+            vehicle_restored.status_id().unwrap(),
+            vehicle.status_id().unwrap()
+        );
 
         let failsafe = Px4FailsafeFlagsReadinessEvidenceV1::new(
             "px4.failsafe-flags.fixture.v1",
@@ -186,7 +187,10 @@ mod tests {
         let failsafe_restored: Px4FailsafeFlagsReadinessEvidenceV1 =
             serde_json::from_slice(&failsafe_bytes).unwrap();
         failsafe_restored.validate().unwrap();
-        assert_eq!(failsafe_restored.status_id().unwrap(), failsafe.status_id().unwrap());
+        assert_eq!(
+            failsafe_restored.status_id().unwrap(),
+            failsafe.status_id().unwrap()
+        );
 
         let armed = Px4ActuatorArmedReadinessEvidenceV1::new(
             "px4.actuator-armed.fixture.v1",
@@ -204,7 +208,10 @@ mod tests {
         let armed_restored: Px4ActuatorArmedReadinessEvidenceV1 =
             serde_json::from_slice(&armed_bytes).unwrap();
         armed_restored.validate().unwrap();
-        assert_eq!(armed_restored.status_id().unwrap(), armed.status_id().unwrap());
+        assert_eq!(
+            armed_restored.status_id().unwrap(),
+            armed.status_id().unwrap()
+        );
     }
 
     #[test]
