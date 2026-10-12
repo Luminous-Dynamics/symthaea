@@ -10,10 +10,17 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from muse_style_capability_inventory import _runtime_report  # noqa: E402
-from muse_style_coverage import CoverageError, STYLE_RELATIVE  # noqa: E402
+from muse_style_coverage import CATALOG_RELATIVE, CoverageError, STYLE_RELATIVE  # noqa: E402
 from muse_style_capability_inventory import REALIZATION_RELATIVE  # noqa: E402
 from muse_style_capability_inventory import GRAMMAR_RELATIVE  # noqa: E402
 from muse_style_capability_inventory import CAUSAL_EVIDENCE_RELATIVE  # noqa: E402
+
+CATALOG_FIXTURE = r'''
+style!(1, "Default", A, "Default", Developing),
+style!(2, "Other", B, "Other", Developing),
+style!(3, "Research Only", C),
+'''
+
 
 STYLE_FIXTURE = r'''
 pub enum Style {
@@ -115,6 +122,9 @@ pub(crate) fn instruments_for(style: Style, seed: u64) -> Pool {
 
 class RuntimeInventoryTests(unittest.TestCase):
     def make_root(self, root: Path) -> None:
+        catalog_path = root / CATALOG_RELATIVE
+        catalog_path.parent.mkdir(parents=True, exist_ok=True)
+        catalog_path.write_text(CATALOG_FIXTURE, encoding="utf-8")
         style_path = root / STYLE_RELATIVE
         realization_path = root / REALIZATION_RELATIVE
         style_path.parent.mkdir(parents=True, exist_ok=True)
@@ -137,6 +147,9 @@ class RuntimeInventoryTests(unittest.TestCase):
             report = _runtime_report(root)
             profiles = {item["style"]: item for item in report["profiles"]}
 
+            self.assertEqual(report["summary"]["catalog_entries"], 3)
+            self.assertEqual(report["summary"]["catalog_entries_with_runtime_profile"], 2)
+            self.assertEqual(report["summary"]["catalog_entries_without_runtime_profile"], 1)
             self.assertEqual(report["summary"]["executable_styles"], 2)
             self.assertEqual(report["summary"]["styles_with_grammar_family"], 2)
             self.assertEqual(report["summary"]["styles_with_composition_spec"], 2)
@@ -166,6 +179,24 @@ class RuntimeInventoryTests(unittest.TestCase):
             )
             self.assertTrue(report["intent_axis_evidence"]["required_marker_present"])
             self.assertFalse(report["intent_axis_evidence"]["census_executed_by_inventory"])
+
+    def test_catalog_rows_join_to_runtime_profiles_by_composer_route(self) -> None:
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_root(root)
+            report = _runtime_report(root)
+            rows = {row["id"]: row for row in report["catalog_entries"]}
+
+            self.assertEqual(rows[1]["runtime_capability"]["style"], "Default")
+            self.assertEqual(rows[2]["runtime_capability"]["style"], "Other")
+            self.assertIsNone(rows[3]["composer_style"])
+            self.assertIsNone(rows[3]["runtime_capability"])
+            self.assertEqual(
+                report["source"]["catalog_blob_sha"],
+                report["source"]["catalog_blob_sha"],
+            )
 
     def test_reports_grammar_dispatch_modes_separately(self) -> None:
         from tempfile import TemporaryDirectory
