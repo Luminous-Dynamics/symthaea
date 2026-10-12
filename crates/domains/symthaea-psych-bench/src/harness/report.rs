@@ -2895,11 +2895,14 @@ mod tests {
             MetricValueInputError::EmptySamples
         );
         let m = MetricValue::from_samples(&[]);
+        let bootstrap = MetricValue::from_samples_bootstrap(&[], 42);
         assert_eq!(m.n, 0);
         assert!(!m.mean.is_finite());
         assert!(!m.std_dev.is_finite());
         assert!(!m.ci_lower.is_finite());
         assert!(!m.ci_upper.is_finite());
+        assert!(!bootstrap.mean.is_finite());
+        assert!(!bootstrap.ci_lower.is_finite());
     }
 
     #[test]
