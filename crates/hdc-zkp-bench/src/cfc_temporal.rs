@@ -66,7 +66,7 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     for _t in 0..timesteps {
         let mut new_h = Vec::with_capacity(neurons);
         for n in 0..neurons {
-            let gate = builder.add_witness(); // Sigmoid value (witness)
+            let gate = builder.add_witness(); // Unconstrained private gate word
             gate_wires.push(gate);
 
             // delta = x_inf XOR h_old (FREE in Binius)
