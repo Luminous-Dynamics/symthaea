@@ -5,7 +5,9 @@
 //!
 //! This contract does not infer meaning from metric names. Every comparison-qualified
 //! metric must declare its estimand, unit/domain, direction, sample unit, uncertainty
-//! treatment, and comparison rule. Missing semantics remain missing.
+//! treatment, and comparison rule. Snapshot values currently do not bind CI method or
+//! confidence level, so empirical uncertainty cannot yet qualify a snapshot. Missing
+//! semantics or observation-level provenance remain missing.
 
 use crate::harness::report::MetricValue;
 use crate::harness::snapshot::{RegressionSnapshot, SNAPSHOT_SCHEMA_VERSION};
@@ -416,12 +418,19 @@ impl MetricContractV1 {
                 .get(&definition.benchmark)
                 .and_then(|metrics| metrics.get(&definition.metric))
             {
-                if matches!(&definition.uncertainty, UncertaintyPolicyV1::Empirical { .. })
-                    && value.n < 2
-                {
+                if matches!(&definition.uncertainty, UncertaintyPolicyV1::Empirical { .. }) {
+                    if value.n < 2 {
+                        errors.push(format!(
+                            "{}/{}: empirical uncertainty requires n >= 2; found n={}",
+                            definition.benchmark, definition.metric, value.n
+                        ));
+                    }
+                    // MetricValue currently serializes CI bounds but not the method or
+                    // confidence level that produced them. A contract declaration is
+                    // not evidence that those bounds were actually generated as declared.
                     errors.push(format!(
-                        "{}/{}: empirical uncertainty requires n >= 2; found n={}",
-                        definition.benchmark, definition.metric, value.n
+                        "{}/{}: empirical uncertainty is unqualified because snapshot MetricValue does not bind the observed CI method or confidence level; add observation-level uncertainty provenance before claiming empirical qualification",
+                        definition.benchmark, definition.metric
                     ));
                 }
                 if let ComparisonRuleV1::RelativeDelta {
@@ -529,6 +538,21 @@ mod tests {
         )
     }
 
+    fn deterministic_definition(benchmark: &str, metric: &str) -> MetricDefinitionV1 {
+        definition(
+            benchmark,
+            metric,
+            UncertaintyPolicyV1::Deterministic {
+                verification_method: "deterministic_fixture_repeatability_v1".to_string(),
+            },
+            ComparisonRuleV1::RelativeDelta {
+                warning_fraction: 0.05,
+                critical_fraction: 0.10,
+                minimum_reference_magnitude: 0.01,
+            },
+        )
+    }
+
     fn snapshot(values: &[(&str, &str, f64, usize)]) -> RegressionSnapshot {
         let mut metrics: BTreeMap<String, BTreeMap<String, MetricValue>> = BTreeMap::new();
         for (benchmark, metric, mean, n) in values {
@@ -586,8 +610,8 @@ mod tests {
     #[test]
     fn exact_snapshot_population_is_required() {
         let contract = MetricContractV1::new(vec![
-            empirical_definition("B", "accuracy"),
-            empirical_definition("A", "latency"),
+            deterministic_definition("B", "accuracy"),
+            deterministic_definition("A", "latency"),
         ])
         .unwrap();
         let exact = snapshot(&[
@@ -604,7 +628,7 @@ mod tests {
 
     #[test]
     fn snapshot_metric_without_definition_is_rejected() {
-        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let contract = MetricContractV1::new(vec![deterministic_definition("B", "accuracy")]).unwrap();
         let expanded = snapshot(&[
             ("B", "accuracy", 0.8, 10),
             ("B", "latency", 0.4, 10),
@@ -615,7 +639,7 @@ mod tests {
 
     #[test]
     fn relative_comparison_requires_metric_specific_scale_floor() {
-        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let contract = MetricContractV1::new(vec![deterministic_definition("B", "accuracy")]).unwrap();
         let near_zero = snapshot(&[("B", "accuracy", 0.001, 10)]);
         let errors = contract.validate_snapshot_population(&near_zero).unwrap_err();
         assert!(errors.iter().any(|message| message.contains("below the metric-specific minimum reference magnitude")));
@@ -635,6 +659,7 @@ mod tests {
         let one_sample = snapshot(&[("B", "accuracy", 0.8, 1)]);
         let errors = contract.validate_snapshot_population(&one_sample).unwrap_err();
         assert!(errors.iter().any(|message| message.contains("empirical uncertainty requires n >= 2")));
+        assert!(errors.iter().any(|message| message.contains("does not bind the observed CI method or confidence level")));
 
         let invalid = definition(
             "B",
@@ -650,6 +675,16 @@ mod tests {
             },
         );
         assert!(invalid.validate().unwrap_err().iter().any(|message| message.contains("confidence_level")));
+    }
+
+    #[test]
+    fn empirical_snapshot_cannot_qualify_without_observation_level_ci_provenance() {
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let complete_sample = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        let errors = contract.validate_snapshot_population(&complete_sample).unwrap_err();
+        assert!(errors.iter().any(|message| {
+            message.contains("does not bind the observed CI method or confidence level")
+        }));
     }
 
     #[test]
