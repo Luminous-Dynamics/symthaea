@@ -1,6 +1,8 @@
 """Tests for the independent standard-library certificate verifier."""
 from __future__ import annotations
 
+import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -91,10 +93,11 @@ class PrimalityProofTests(unittest.TestCase):
             (
                 verifier.PrimeNode(2, (), ()),
                 verifier.PrimeNode(3, ((2, 1),), ((2, 2),)),
+                verifier.PrimeNode(7, ((2, 1), (3, 1)), ((2, 3), (3, 3))),
                 verifier.PrimeNode(15, ((2, 1), (7, 1)), ((2, 2), (7, 2))),
             ),
         )
-        with self.assertRaises(verifier.CertificateError):
+        with self.assertRaisesRegex(verifier.CertificateError, "Fermat congruence"):
             verifier.verify_primality_proof(composite)
 
         bad = proof_seventeen()
@@ -202,6 +205,23 @@ class CertifiedFactorizationTests(unittest.TestCase):
                 verifier.verify_file(path),
                 {"verified": True, "format": "SYMPPRF1", "value": 17, "certificate_nodes": 2},
             )
+
+    def test_cli_emits_verified_json_for_valid_file(self) -> None:
+        proof_bytes = verifier.encode_primality_proof(proof_seventeen())
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "prime.cert"
+            path.write_bytes(proof_bytes)
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "tools" / "verify_math_certificate.py"), str(path)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            json.loads(result.stdout),
+            {"verified": True, "format": "SYMPPRF1", "value": 17, "certificate_nodes": 2},
+        )
 
 
 if __name__ == "__main__":
