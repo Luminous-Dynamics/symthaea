@@ -88,6 +88,7 @@ jobs:
               "crates/domains/symthaea-music-theory/src/score.rs",
               "crates/domains/symthaea-music-theory/examples/diversity_census.rs",
               "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs",
+              ".github/workflows/muse-style-response-curves.yml",
               "Cargo.toml",
               "crates/domains/symthaea-music-theory/Cargo.toml",
               "Cargo.lock",
