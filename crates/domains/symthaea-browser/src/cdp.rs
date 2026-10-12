@@ -292,7 +292,7 @@ impl CdpSession {
                     .context("CSS text target must match exactly one element")?
             },
             ElementSelector::BackendNodeId(id) => {
-                bail!("raw integer backend node selector {id} is unsupported; use CSS or accessibility targeting");
+                bail!("unsupported raw backend node selector: {id}");
             }
             ElementSelector::Accessible { role, name } => {
                 resolve_accessible_backend_node(&page, role, name).await?
