@@ -57,6 +57,17 @@ class VoiceLanguageRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires backend and source_refs"):
             validate_registry(registry)
 
+    def test_source_refs_reject_windows_paths_and_parent_components(self):
+        registry = copy.deepcopy(REGISTRY)
+        record = registry["languages"][0]["capabilities"]["g2p"]
+        record["source_refs"] = [r"C:\\private\\source.py"]
+        with self.assertRaisesRegex(ValueError, "safe repository-relative paths"):
+            validate_registry(registry)
+
+        record["source_refs"] = ["../private/source.py"]
+        with self.assertRaisesRegex(ValueError, "safe repository-relative paths"):
+            validate_registry(registry)
+
     def test_automated_status_requires_receipt(self):
         registry = copy.deepcopy(REGISTRY)
         registry["languages"][0]["capabilities"]["g2p"]["status"] = "automated_checks_passed"
