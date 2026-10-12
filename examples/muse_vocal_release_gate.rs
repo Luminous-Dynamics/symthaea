@@ -123,6 +123,18 @@ struct HumanRating {
     lyric_words_total: usize,
 }
 
+#[derive(Serialize)]
+struct PerClipHumanResult {
+    clip_id: String,
+    rating_count: usize,
+    naturalness_mean: f32,
+    emotional_fit_mean: f32,
+    identity_consistency_mean: f32,
+    artifact_free_mean: f32,
+    word_comprehension: f32,
+    pass: bool,
+}
+
 /// Optional authorized human anchors. Paths remain private; imported copies
 /// receive the same salted concealment as synthetic clips.
 #[derive(Deserialize)]
@@ -166,6 +178,7 @@ fn relocate_legacy_private_artifacts(output: &Path, private_output: &Path) -> Re
     for name in [
         "private_backend_key.json",
         "objective_report.json",
+        "human_case_report.json",
         "release_status.json",
     ] {
         let legacy_path = output.join(name);
@@ -304,6 +317,56 @@ fn validate_human_rating(rating: &HumanRating, clips: &[BlindClip]) -> Result<()
         );
     }
     Ok(())
+}
+
+fn per_clip_human_results(
+    values: &[HumanRating],
+    clips: &[BlindClip],
+    backend_by_id: &BTreeMap<&str, &str>,
+) -> Vec<PerClipHumanResult> {
+    clips
+        .iter()
+        .filter(|clip| backend_by_id.get(clip.clip_id.as_str()) != Some(&"human-reference"))
+        .map(|clip| {
+            let clip_values: Vec<_> = values
+                .iter()
+                .filter(|rating| rating.clip_id == clip.clip_id)
+                .collect();
+            let mean = |field: fn(&HumanRating) -> f32| {
+                clip_values.iter().map(|rating| field(rating)).sum::<f32>()
+                    / clip_values.len().max(1) as f32
+            };
+            let naturalness_mean = mean(|rating| rating.naturalness);
+            let emotional_fit_mean = mean(|rating| rating.emotional_fit);
+            let identity_consistency_mean = mean(|rating| rating.identity_consistency);
+            let artifact_free_mean = mean(|rating| rating.artifact_free);
+            let understood: usize = clip_values
+                .iter()
+                .map(|rating| rating.lyric_words_understood)
+                .sum();
+            let total: usize = clip_values
+                .iter()
+                .map(|rating| rating.lyric_words_total)
+                .sum();
+            let word_comprehension = understood as f32 / total.max(1) as f32;
+            let pass = !clip_values.is_empty()
+                && naturalness_mean >= 4.0
+                && emotional_fit_mean >= 4.0
+                && identity_consistency_mean >= 4.0
+                && artifact_free_mean >= 4.0
+                && word_comprehension >= 0.95;
+            PerClipHumanResult {
+                clip_id: clip.clip_id.clone(),
+                rating_count: clip_values.len(),
+                naturalness_mean,
+                emotional_fit_mean,
+                identity_consistency_mean,
+                artifact_free_mean,
+                word_comprehension,
+                pass,
+            }
+        })
+        .collect()
 }
 
 fn blind_salt(args: &[String], output: &Path) -> Result<String> {
@@ -534,9 +597,13 @@ fn main() -> Result<()> {
     )?;
 
     let objective_pass = objective.iter().all(|entry| entry.metrics.objective_pass);
+    let mut per_clip_results = Vec::new();
     let mut status = serde_json::json!({
         "objective_pass": objective_pass,
         "human_complete": false,
+        "per_clip_pass": false,
+        "failing_synthetic_clip_count": null,
+        "synthetic_clip_count": 0,
         "release_pass": false,
         "required": {"minimum_listeners": minimum_listeners, "naturalness_mean": 4.0,
                      "emotional_fit_mean": 4.0, "identity_consistency_mean": 4.0,
@@ -588,17 +655,29 @@ fn main() -> Result<()> {
         let understood: usize = model_values.iter().map(|r| r.lyric_words_understood).sum();
         let total: usize = model_values.iter().map(|r| r.lyric_words_total).sum();
         let comprehension = understood as f32 / total.max(1) as f32;
+        per_clip_results = per_clip_human_results(&values, &clips, &backend_by_id);
+        let failing_synthetic_clip_count =
+            per_clip_results.iter().filter(|result| !result.pass).count();
+        let per_clip_pass = !per_clip_results.is_empty() && failing_synthetic_clip_count == 0;
         status = serde_json::json!({
             "objective_pass": objective_pass, "human_complete": complete,
+            "per_clip_pass": per_clip_pass,
+            "failing_synthetic_clip_count": failing_synthetic_clip_count,
+            "synthetic_clip_count": per_clip_results.len(),
             "listener_count": listeners.len(), "naturalness_mean": naturalness,
             "human_reference_rating_count": reference_values.len(),
             "emotional_fit_mean": emotional_fit, "identity_consistency_mean": identity_consistency,
             "artifact_free_mean": artifact_free, "word_comprehension": comprehension,
-            "release_pass": objective_pass && complete && naturalness >= 4.0
-                && emotional_fit >= 4.0 && identity_consistency >= 4.0
-                && artifact_free >= 4.0 && comprehension >= 0.95
+            "release_pass": objective_pass && complete && per_clip_pass
+                && naturalness >= 4.0 && emotional_fit >= 4.0
+                && identity_consistency >= 4.0 && artifact_free >= 4.0
+                && comprehension >= 0.95
         });
     }
+    std::fs::write(
+        private_output.join("human_case_report.json"),
+        serde_json::to_vec_pretty(&per_clip_results)?,
+    )?;
     std::fs::write(
         private_output.join("release_status.json"),
         serde_json::to_vec_pretty(&status)?,
@@ -774,6 +853,50 @@ mod tests {
             PathBuf::from("audio_output/muse_vocal_gate.private")
         );
         assert!(!private.starts_with(output));
+    }
+
+    #[test]
+    fn per_clip_gate_rejects_catastrophic_case_hidden_by_overall_mean() {
+        let mut clips = Vec::new();
+        for index in 0..10 {
+            let mut test_clip = clip();
+            test_clip.clip_id = format!("clip-{index}");
+            test_clip.audio = format!("clip-{index}.wav");
+            test_clip.case_id = index;
+            clips.push(test_clip);
+        }
+        let backend_by_id: BTreeMap<&str, &str> = clips
+            .iter()
+            .map(|test_clip| (test_clip.clip_id.as_str(), "synthetic-test"))
+            .collect();
+        let mut values = Vec::new();
+        for listener_index in 0..5 {
+            let listener = format!("listener-{listener_index}");
+            for (clip_index, test_clip) in clips.iter().enumerate() {
+                let mut row = rating(&listener, &test_clip.clip_id, 3);
+                if clip_index == 0 {
+                    row.naturalness = 1.0;
+                    row.emotional_fit = 1.0;
+                    row.identity_consistency = 1.0;
+                    row.artifact_free = 1.0;
+                    row.lyric_words_understood = 0;
+                } else {
+                    row.naturalness = 5.0;
+                    row.emotional_fit = 5.0;
+                    row.identity_consistency = 5.0;
+                    row.artifact_free = 5.0;
+                }
+                values.push(row);
+            }
+        }
+        let overall_naturalness =
+            values.iter().map(|row| row.naturalness).sum::<f32>() / values.len() as f32;
+        assert!(overall_naturalness >= 4.0, "fixture must pass global mean");
+        let per_clip = per_clip_human_results(&values, &clips, &backend_by_id);
+        assert_eq!(per_clip.len(), 10);
+        assert!(!per_clip[0].pass, "catastrophic case must fail per clip");
+        assert!(per_clip[1..].iter().all(|result| result.pass));
+        assert_eq!(per_clip.iter().filter(|result| !result.pass).count(), 1);
     }
 
     #[test]
