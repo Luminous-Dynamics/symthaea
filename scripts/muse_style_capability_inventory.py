@@ -16,7 +16,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from muse_style_coverage import CoverageError, STYLE_RELATIVE, git_blob_sha, parse_style_contract
+from muse_style_coverage import (
+    CATALOG_RELATIVE,
+    CoverageError,
+    STYLE_RELATIVE,
+    build_current_report,
+    git_blob_sha,
+    parse_style_contract,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 REALIZATION_RELATIVE = Path("crates/domains/symthaea-muse/src/theory_realize.rs")
@@ -461,6 +468,7 @@ def _runtime_report(root: Path) -> dict[str, Any]:
         )
 
     variants, all_names, declared_count = parse_style_contract(style_source)
+    catalog_report = build_current_report(root)
     family_arms = _method_match_arms(style_source, FAMILY_METHOD, FAMILY_METHOD)
     family_expr, _ = _parse_mapping(family_arms, variants, "grammar_family")
     grammar_families = {style: expr.rstrip(",") for style, expr in family_expr.items()}
@@ -562,10 +570,26 @@ def _runtime_report(root: Path) -> dict[str, Any]:
             family.split("::")[-1], 0
         ) + 1
 
+    profile_by_style = {profile["style"]: profile for profile in profiles}
+    catalog_entries = []
+    for entry in catalog_report["entries"]:
+        route = entry["composer_style"]
+        catalog_entries.append(
+            {
+                **entry,
+                "runtime_capability": profile_by_style.get(route),
+            }
+        )
+    catalog_entries_with_runtime_profile = sum(
+        entry["runtime_capability"] is not None for entry in catalog_entries
+    )
+
     return {
         "schema": "muse-runtime-style-capability-source-inventory-v1",
-        "kind": "source_declared_capability_inventory_not_render_validation",
+        "kind": "catalog_to_runtime_crosswalk_not_render_validation",
         "source": {
+            "catalog_path": CATALOG_RELATIVE.as_posix(),
+            "catalog_blob_sha": catalog_report["source"]["catalog_blob_sha"],
             "style_path": STYLE_RELATIVE.as_posix(),
             "style_blob_sha": git_blob_sha(style_bytes),
             "realization_path": REALIZATION_RELATIVE.as_posix(),
@@ -578,6 +602,9 @@ def _runtime_report(root: Path) -> dict[str, Any]:
             "style_all_variant_count": declared_count,
         },
         "summary": {
+            "catalog_entries": len(catalog_entries),
+            "catalog_entries_with_runtime_profile": catalog_entries_with_runtime_profile,
+            "catalog_entries_without_runtime_profile": len(catalog_entries) - catalog_entries_with_runtime_profile,
             "executable_styles": len(variants),
             "styles_with_grammar_family": len(grammar_families),
             "styles_with_composition_spec": len(spec_styles),
@@ -617,6 +644,7 @@ def _runtime_report(root: Path) -> dict[str, Any]:
             "routed_does_not_prove_distinct_or_rendered": True,
         },
         "profiles": profiles,
+        "catalog_entries": catalog_entries,
         "intent_axis_evidence": {
             "source_path": CAUSAL_EVIDENCE_RELATIVE.as_posix(),
             "source_blob_sha": git_blob_sha(causal_evidence_bytes),
@@ -654,8 +682,9 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(report, indent=2, ensure_ascii=False))
     summary = report["summary"]
     print(
-        "Source inventory: {executable_styles} executable styles; "
-        "{styles_with_grammar_family} grammar mappings; "
+        "Source inventory: {catalog_entries} catalog rows; "
+        "{catalog_entries_with_runtime_profile} rows enriched with a runtime profile; "
+        "{executable_styles} executable styles; {styles_with_grammar_family} grammar mappings; "
         "{styles_with_composition_spec} CompositionSpec presets; "
         "{styles_with_instrument_pool} instrument pools".format(**summary),
         file=sys.stderr,
