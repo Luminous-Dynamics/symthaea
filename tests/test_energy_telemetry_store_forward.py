@@ -144,6 +144,10 @@ class StoreForwardTests(unittest.TestCase):
             self.queue.enqueue(event(observed="2026-10-12T12:00:00+02:00"), now_utc=self.now)
         with self.assertRaisesRegex(TelemetryQueueError, "unsupported telemetry domain"):
             self.queue.enqueue(event(domain="other"), now_utc=self.now)
+        with self.assertRaisesRegex(TelemetryQueueError, "unsupported telemetry domain"):
+            self.queue.enqueue(event(domain=[]), now_utc=self.now)
+        with self.assertRaisesRegex(TelemetryQueueError, "unsupported measurement quality"):
+            self.queue.enqueue(event(quality=[]), now_utc=self.now)
 
     def test_invalid_wire_size_and_priority_types_fail_closed(self):
         for bad in (0, -1, True, 65_537):
