@@ -125,6 +125,14 @@ def verify_primality_proof(proof: PrimalityProof) -> None:
     nodes = proof.certificates
     if not nodes:
         raise CertificateError("proof table is empty")
+    if len(nodes) > MAX_CERTIFICATES:
+        raise CertificateError("too many primality certificate nodes")
+
+    total_entries = 0
+    for node in nodes:
+        total_entries += len(node.predecessor_factors) + len(node.witnesses)
+        if total_entries > MAX_PROOF_ENTRIES:
+            raise CertificateError("too many proof entries")
 
     by_prime: dict[int, PrimeNode] = {}
     previous_node = 0
@@ -207,15 +215,14 @@ def verify_primality_proof(proof: PrimalityProof) -> None:
 
 
 def encode_primality_proof(proof: PrimalityProof) -> bytes:
-    verify_primality_proof(proof)
     if len(proof.certificates) > MAX_CERTIFICATES:
         raise CertificateError("too many certificate nodes")
-    total_entries = sum(
-        len(node.predecessor_factors) + len(node.witnesses)
-        for node in proof.certificates
-    )
-    if total_entries > MAX_PROOF_ENTRIES:
-        raise CertificateError("too many proof entries")
+    total_entries = 0
+    for node in proof.certificates:
+        total_entries += len(node.predecessor_factors) + len(node.witnesses)
+        if total_entries > MAX_PROOF_ENTRIES:
+            raise CertificateError("too many proof entries")
+    verify_primality_proof(proof)
 
     out = bytearray(PRIMALITY_MAGIC)
     out += _pack_u64(proof.value)
@@ -285,11 +292,15 @@ def verify_factorization(factorization: Factorization) -> None:
 
 
 def verify_certified_factorization(certificate: CertifiedFactorization) -> None:
-    verify_factorization(certificate.factorization)
     factors = certificate.factorization.factors
     proofs = certificate.prime_proofs
+    if len(factors) > MAX_FACTORS:
+        raise CertificateError("too many factor entries")
+    if len(proofs) > MAX_PROOFS:
+        raise CertificateError("too many nested prime proofs")
     if len(proofs) != len(factors):
         raise CertificateError("prime-proof count does not match factor count")
+    verify_factorization(certificate.factorization)
     for (factor, _), proof in zip(factors, proofs):
         if proof.value != factor:
             raise CertificateError(f"prime proof root {proof.value} does not match factor {factor}")
@@ -297,27 +308,28 @@ def verify_certified_factorization(certificate: CertifiedFactorization) -> None:
 
 
 def encode_certified_factorization(certificate: CertifiedFactorization) -> bytes:
-    verify_certified_factorization(certificate)
     factors = certificate.factorization.factors
     proofs = certificate.prime_proofs
     if len(factors) > MAX_FACTORS:
         raise CertificateError("too many factor entries")
     if len(proofs) > MAX_PROOFS:
         raise CertificateError("too many nested prime proofs")
+    verify_certified_factorization(certificate)
 
-    nested = [encode_primality_proof(proof) for proof in proofs]
     out = bytearray(FACTORIZATION_MAGIC)
     out += _pack_u64(certificate.factorization.value)
     out += _pack_u32(len(factors))
     for prime, exponent in factors:
         out += _pack_u64(prime)
         out += _pack_u32(exponent)
-    out += _pack_u32(len(nested))
-    for proof_bytes in nested:
+    out += _pack_u32(len(proofs))
+    for proof in proofs:
+        proof_bytes = encode_primality_proof(proof)
+        projected_length = len(out) + 4 + len(proof_bytes)
+        if projected_length > MAX_WIRE_BYTES:
+            raise CertificateError("certified factorization exceeds 1 MiB")
         out += _pack_u32(len(proof_bytes))
         out += proof_bytes
-        if len(out) > MAX_WIRE_BYTES:
-            raise CertificateError("certified factorization exceeds 1 MiB")
     if len(out) > MAX_WIRE_BYTES:
         raise CertificateError("certified factorization exceeds 1 MiB")
     return bytes(out)
