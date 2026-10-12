@@ -150,6 +150,30 @@ fn build_invariant_candidates(
     candidates
 }
 
+/// Sample trajectory states across the full interval, including both endpoints.
+/// The previous floor-step sampler could systematically omit the final state.
+pub(crate) fn sample_trajectory_evenly(
+    states: &[Vec<f64>],
+    max_samples: usize,
+) -> Vec<Vec<f64>> {
+    if states.is_empty() || max_samples == 0 {
+        return Vec::new();
+    }
+    let sample_count = states.len().min(max_samples);
+    if sample_count == 1 {
+        return vec![states[0].clone()];
+    }
+
+    (0..sample_count)
+        .map(|sample_index| {
+            let numerator = (sample_index as u128) * ((states.len() - 1) as u128);
+            let denominator = (sample_count - 1) as u128;
+            let state_index = (numerator / denominator) as usize;
+            states[state_index].clone()
+        })
+        .collect()
+}
+
 pub fn discover_conservation_laws(
     rhs: fn(&[f64], f64) -> Vec<f64>,
     initial_state: &[f64],
@@ -162,16 +186,12 @@ pub fn discover_conservation_laws(
     assert_eq!(var_names.len(), ndim);
 
     let (_times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
-    let n_samples = 100.min(states.len());
-    let step = states.len() / n_samples.max(1);
+    let sampled_states = sample_trajectory_evenly(&states, 100);
     let candidates = build_invariant_candidates(var_names);
 
     let mut results = Vec::new();
     for (name, eval_fn, sym_expr) in &candidates {
-        let values: Vec<f64> = states
-            .iter()
-            .step_by(step.max(1))
-            .take(n_samples)
+        let values: Vec<f64> = sampled_states.iter()
             .map(|s| eval_fn(s))
             .filter(|v| v.is_finite())
             .collect();
@@ -214,8 +234,7 @@ pub fn discover_conservation_laws_with_custom(
     assert_eq!(var_names.len(), ndim);
 
     let (_times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
-    let n_samples = 200.min(states.len());
-    let step = states.len() / n_samples.max(1);
+    let sampled_states = sample_trajectory_evenly(&states, 200);
 
     let mut results = Vec::new();
     let auto_candidates = build_invariant_candidates(var_names);
@@ -491,13 +510,7 @@ pub fn compose_top_k_invariants(
     if n_samples < 20 {
         return None;
     }
-    let step = states.len() / n_samples.max(1);
-    let trajectory: Vec<Vec<f64>> = states
-        .iter()
-        .step_by(step.max(1))
-        .take(n_samples)
-        .cloned()
-        .collect();
+    let trajectory = sample_trajectory_evenly(&states, n_samples);
 
     let baseline: f64 = invariants[..k]
         .iter()
@@ -666,14 +679,7 @@ fn discover_invariants_autonomous_with_mode(
 
     let sample_one = |ic: &[f64]| -> Vec<Vec<f64>> {
         let (_t, states) = rk45_trajectory(rhs, ic, t_max, dt);
-        let n_samples = 200.min(states.len());
-        let step = states.len() / n_samples.max(1);
-        states
-            .iter()
-            .step_by(step.max(1))
-            .take(n_samples)
-            .cloned()
-            .collect()
+        sample_trajectory_evenly(&states, 200)
     };
     let sampled = sample_one(initial_state);
     if sampled.len() < 20 {
@@ -1601,5 +1607,33 @@ mod cold_discovery_provenance_tests {
             0.01,
         );
         assert!(result.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod endpoint_inclusive_sampling_tests {
+    use super::sample_trajectory_evenly;
+
+    #[test]
+    fn evenly_spaced_sampling_preserves_both_endpoints() {
+        let states: Vec<Vec<f64>> = (0..=400).map(|i| vec![i as f64]).collect();
+        let sampled = sample_trajectory_evenly(&states, 200);
+
+        assert_eq!(sampled.len(), 200);
+        assert_eq!(sampled.first().unwrap()[0], 0.0);
+        assert_eq!(sampled.last().unwrap()[0], 400.0);
+        assert!(sampled.windows(2).all(|pair| pair[0][0] < pair[1][0]));
+    }
+
+    #[test]
+    fn sampling_below_cap_keeps_every_state() {
+        let states: Vec<Vec<f64>> = (0..7).map(|i| vec![i as f64]).collect();
+        assert_eq!(sample_trajectory_evenly(&states, 200), states);
+    }
+
+    #[test]
+    fn empty_input_or_zero_budget_returns_no_samples() {
+        assert!(sample_trajectory_evenly(&[], 200).is_empty());
+        assert!(sample_trajectory_evenly(&[vec![1.0]], 0).is_empty());
     }
 }
