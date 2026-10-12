@@ -23,7 +23,7 @@ from tools.energy_telemetry.store_forward import (
     make_transmission,
 )
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 
 class DurableTelemetryQueue:
@@ -90,7 +90,7 @@ class DurableTelemetryQueue:
     def _initialize(self) -> None:
         with self._connection() as db:
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, _SCHEMA_VERSION):
+            if version not in (0, 1, _SCHEMA_VERSION):
                 raise TelemetryQueueError(f"unsupported telemetry queue schema version: {version}")
             journal_mode = db.execute("PRAGMA journal_mode").fetchone()[0].lower()
             if journal_mode != "wal":
