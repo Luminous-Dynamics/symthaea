@@ -171,8 +171,9 @@ impl MetricDefinitionV1 {
                         let alpha = parameters.get("alpha").and_then(|v| v.parse::<f64>().ok());
                         if parameters.get("resamples").map(String::as_str) != Some("2000")
                             || alpha.is_none()
+                            || parameters.len() != 2
                         {
-                            errors.push("BCa bootstrap policy requires resamples=2000 and alpha".to_string());
+                            errors.push("BCa bootstrap policy requires exactly alpha and resamples=2000".to_string());
                         }
                         if let Some(alpha) = alpha {
                             if !alpha.is_finite()
@@ -691,6 +692,16 @@ mod tests {
         let loaded: MetricContractV1 = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.fingerprint().unwrap(), first.fingerprint().unwrap());
         assert_eq!(loaded.schema_version(), METRIC_CONTRACT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn empirical_policy_rejects_unrecognized_parameters() {
+        let mut definition = empirical_definition("B", "accuracy");
+        if let UncertaintyPolicyV1::Empirical { parameters, .. } = &mut definition.uncertainty {
+            parameters.insert("unrecognized".to_string(), "value".to_string());
+        }
+        let errors = definition.validate().unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("exactly alpha and resamples=2000")));
     }
 
     #[test]
