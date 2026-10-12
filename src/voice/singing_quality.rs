@@ -20,7 +20,8 @@ pub struct VocalQualityMetrics {
     pub score_blind_median_pitch_error_cents: Option<f32>,
     pub score_blind_p95_pitch_error_cents: Option<f32>,
     /// Number of eligible voiced frames contributing to score-blind pitch errors.
-    pub score_blind_pitch_error_frame_count: usize,
+    /// None only when reading a report written before this field existed.
+    pub score_blind_pitch_error_frame_count: Option<usize>,
     pub stable_pitch_p95_cents: f32,
     pub transition_pitch_p95_cents: f32,
     pub median_onset_error_ms: f32,
@@ -186,7 +187,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let median_pitch_error_cents = percentile(&errors, 0.5);
     let p95_pitch_error_cents = percentile(&errors, 0.95);
     score_blind_errors.sort_by(f32::total_cmp);
-    let score_blind_pitch_error_frame_count = score_blind_errors.len();
+    let score_blind_pitch_error_frame_count = Some(score_blind_errors.len());
     let score_blind_voiced_frame_fraction = (score_blind_expected_voiced_frames > 0).then(|| {
         score_blind_detected_voiced_frames as f32 / score_blind_expected_voiced_frames as f32
     });
@@ -516,7 +517,7 @@ mod tests {
         };
 
         let metrics = analyze_vocal_stem(&performance, &stem);
-        assert_eq!(metrics.score_blind_pitch_error_frame_count, 0);
+        assert_eq!(metrics.score_blind_pitch_error_frame_count, Some(0));
         assert_eq!(metrics.score_blind_voiced_frame_fraction, None);
         assert_eq!(metrics.score_blind_voiced_unvoiced_error_rate, None);
         assert_eq!(metrics.score_blind_median_pitch_error_cents, None);
@@ -525,11 +526,38 @@ mod tests {
         // The persisted report must preserve undefined evidence as JSON null,
         // never coerce it to 0.0 (which could be mistaken for perfect pitch).
         let report = serde_json::to_value(&metrics).unwrap();
-        assert_eq!(report["score_blind_voiced_frame_fraction"], serde_json::Value::Null);
-        assert_eq!(report["score_blind_voiced_unvoiced_error_rate"], serde_json::Value::Null);
-        assert_eq!(report["score_blind_median_pitch_error_cents"], serde_json::Value::Null);
-        assert_eq!(report["score_blind_p95_pitch_error_cents"], serde_json::Value::Null);
+        for field in [
+            "score_blind_voiced_frame_fraction",
+            "score_blind_voiced_unvoiced_error_rate",
+            "score_blind_median_pitch_error_cents",
+            "score_blind_p95_pitch_error_cents",
+        ] {
+            assert_eq!(
+                report[field],
+                serde_json::Value::Null,
+                "undefined diagnostic {field} must serialize as null"
+            );
+        }
         assert_eq!(report["score_blind_pitch_error_frame_count"], 0);
+
+        // Historical objective reports predate the score-blind fields. Keep
+        // ratings-only review compatible with those saved artifacts.
+        let mut legacy_report = report;
+        for field in [
+            "score_blind_voiced_frame_fraction",
+            "score_blind_voiced_unvoiced_error_rate",
+            "score_blind_median_pitch_error_cents",
+            "score_blind_p95_pitch_error_cents",
+            "score_blind_pitch_error_frame_count",
+        ] {
+            legacy_report.as_object_mut().unwrap().remove(field);
+        }
+        let restored: VocalQualityMetrics = serde_json::from_value(legacy_report).unwrap();
+        assert_eq!(restored.score_blind_voiced_frame_fraction, None);
+        assert_eq!(restored.score_blind_voiced_unvoiced_error_rate, None);
+        assert_eq!(restored.score_blind_median_pitch_error_cents, None);
+        assert_eq!(restored.score_blind_p95_pitch_error_cents, None);
+        assert_eq!(restored.score_blind_pitch_error_frame_count, None);
     }
 
     #[test]
