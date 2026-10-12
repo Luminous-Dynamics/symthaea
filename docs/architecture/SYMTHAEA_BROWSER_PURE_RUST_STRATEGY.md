@@ -188,7 +188,7 @@ The P1 property is accepted only when:
 
 ## 10. Implementation update — 2026-10-13
 
-The native-CDP implementation is under review in [PR #7429](https://github.com/Luminous-Dynamics/symthaea/pull/7429), on branch `feat/symthaea-browser-native-cdp-actions-001`. The current implementation head at the time of this update is `8f8cd13d01fc4b2040d7895e3d27dc6599f79d16`.
+The native-CDP implementation is under review in [PR #7429](https://github.com/Luminous-Dynamics/symthaea/pull/7429), on branch `feat/symthaea-browser-native-cdp-actions-001`. The current implementation head at the time of this update is `49196d6e592948baf25b43b226f285aa0af61b33`.
 
 The branch replaces authored page evaluation in the normal `cdp.rs` controller path for click/accessibility-target resolution, scrolling, history navigation, focus detection, title retrieval and DOM text extraction. It uses typed CDP operations and Rust HTML parsing. Input insertion is guarded by AX role/disabled/read-only checks and a postcondition requiring the observed value to change and contain the requested text. CSS targets for actions and extraction fail closed on zero or multiple matches; click targets require non-ignored Accessibility-tree evidence and explicitly disabled targets are rejected.
 
@@ -196,7 +196,7 @@ The executor checks the current page URL before click, typing, scroll, extractio
 
 Text extraction uses typed `DOM.getOuterHTML` with Rust `scraper` parsing, omits script/style/noscript/template and explicit hidden-state subtrees, bounds markup parsing at 2 MiB, and caps output at 32 Ki characters. The HTML-size check runs after CDP has returned the markup, so it is not a transport-level response-size bound. The result is DOM text, not a claim of exact computed CSS visibility, shadow-root flattening, or iframe text.
 
-The raw Praxis exploration examples are preserved under `examples/archive/` with archive banners; the maintained `examples/praxis_journey.rs` continues to exercise `BrowserExecutor`. A structural unit test scans the maintained controller modules and active journey example for JavaScript-evaluation helper calls.
+The raw Praxis exploration examples are preserved under `examples/archive/` with archive banners; the maintained `examples/praxis_journey.rs` continues to exercise `BrowserExecutor`. A structural unit test scans the maintained controller modules and active journey example for direct evaluation and JS-backed Chromiumoxide convenience APIs.
 
 **Verification status remains unqualified.** At the last check, the broad repository CI, formatting, Clippy, and regression jobs were queued or skipped; no Cargo formatting, compilation, unit/integration, or live-Chromium hostile-page pass is confirmed for the current exact head. The current-page URL gate is not a substitute for redirect interception or network sandboxing; this separate requirement is tracked in [issue #7435](https://github.com/Luminous-Dynamics/symthaea/issues/7435). The patch does not replace Chromium's renderer or its website JavaScript engine.
 
