@@ -433,24 +433,54 @@ impl MetricContractV1 {
                         definition.benchmark, definition.metric
                     ));
                 }
-                if let ComparisonRuleV1::RelativeDelta {
+                validate_value_domain(definition, value, &mut errors);
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Validate a snapshot when it will be used as the reference/baseline in a
+    /// relative-delta comparison. The magnitude floor belongs only to the reference
+    /// denominator, not to the current observation (which may legitimately approach zero).
+    pub fn validate_reference_population(
+        &self,
+        snapshot: &RegressionSnapshot,
+    ) -> Result<(), Vec<String>> {
+        let mut errors = self
+            .validate_snapshot_population(snapshot)
+            .err()
+            .unwrap_or_default();
+
+        for definition in &self.definitions {
+            if let (
+                ComparisonRuleV1::RelativeDelta {
                     minimum_reference_magnitude,
                     ..
-                } = &definition.comparison
+                },
+                Some(value),
+            ) = (
+                &definition.comparison,
+                snapshot
+                    .metrics
+                    .get(&definition.benchmark)
+                    .and_then(|metrics| metrics.get(&definition.metric)),
+            ) {
+                if !value.mean.is_finite()
+                    || value.mean.abs() < *minimum_reference_magnitude
                 {
-                    if !value.mean.is_finite()
-                        || value.mean.abs() < *minimum_reference_magnitude
-                    {
-                        errors.push(format!(
-                            "{}/{}: absolute mean {} is below the metric-specific minimum reference magnitude {} for relative comparison",
-                            definition.benchmark,
-                            definition.metric,
-                            value.mean,
-                            minimum_reference_magnitude
-                        ));
-                    }
+                    errors.push(format!(
+                        "{}/{}: reference mean {} is below the metric-specific minimum reference magnitude {} for relative comparison",
+                        definition.benchmark,
+                        definition.metric,
+                        value.mean,
+                        minimum_reference_magnitude
+                    ));
                 }
-                validate_value_domain(definition, value, &mut errors);
             }
         }
 
@@ -641,8 +671,12 @@ mod tests {
     fn relative_comparison_requires_metric_specific_scale_floor() {
         let contract = MetricContractV1::new(vec![deterministic_definition("B", "accuracy")]).unwrap();
         let near_zero = snapshot(&[("B", "accuracy", 0.001, 10)]);
-        let errors = contract.validate_snapshot_population(&near_zero).unwrap_err();
-        assert!(errors.iter().any(|message| message.contains("below the metric-specific minimum reference magnitude")));
+        // A current observation may legitimately approach zero; only a baseline used
+        // as the denominator of a relative-delta comparison must clear this floor.
+        assert!(contract.validate_snapshot_population(&near_zero).is_ok());
+        let errors = contract.validate_reference_population(&near_zero).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("reference mean")));
+        assert!(errors.iter().any(|message| message.contains("minimum reference magnitude")));
 
         let mut invalid = empirical_definition("B", "accuracy");
         invalid.comparison = ComparisonRuleV1::RelativeDelta {
