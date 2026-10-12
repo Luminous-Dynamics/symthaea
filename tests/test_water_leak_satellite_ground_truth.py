@@ -100,6 +100,38 @@ class GroundTruthTests(unittest.TestCase):
         errors, _ = validate_corpus(corpus([a, b]))
         self.assertTrue(any("duplicate record_id" in error for error in errors))
 
+    def test_zone_cannot_cross_splits_when_group_id_is_changed(self):
+        a = record(record_id="evt-a", split="train", group="block-1")
+        b = record(record_id="evt-b", split="held_out_test", group="block-2")
+        b["asset_segment_id"] = "pipe-seg-2"
+        b["observed_at"] = "2026-09-01T10:00:00Z"
+        errors, _ = validate_corpus(corpus([a, b]))
+        self.assertTrue(any("zone crosses evaluation splits" in error for error in errors))
+
+    def test_heldout_test_must_be_later_than_training(self):
+        a = record(record_id="evt-a", split="train", group="block-train")
+        b = record(record_id="evt-b", split="held_out_test", group="block-test")
+        b["zone_id"] = "zone-b"
+        b["asset_segment_id"] = "pipe-seg-2"
+        b["observed_at"] = "2026-07-01T10:00:00Z"
+        errors, _ = validate_corpus(corpus([a, b]))
+        self.assertTrue(any("strictly later" in error for error in errors))
+
+    def test_malformed_enum_values_do_not_crash_validator(self):
+        bad_outcome = record()
+        bad_outcome["outcome"] = {"unexpected": "mapping"}
+        bad_method = record()
+        bad_method["verification"]["method"] = ["not", "a", "method"]
+        bad_uses = record()
+        bad_uses["rights"]["allowed_uses"] = [[]]
+        huge_coordinate = record()
+        huge_coordinate["location"]["longitude"] = 10 ** 400
+        for item in (bad_outcome, bad_method, bad_uses, huge_coordinate):
+            with self.subTest(record_id=item["record_id"]):
+                self.assertTrue(validate_record(item))
+        errors, _ = validate_corpus(corpus([bad_outcome]))
+        self.assertTrue(errors)
+
     def test_space_time_group_cannot_cross_splits(self):
         a = record(record_id="evt-a", split="train", group="same-spatiotemporal-block")
         b = record(record_id="evt-b", split="held_out_test", group="same-spatiotemporal-block")

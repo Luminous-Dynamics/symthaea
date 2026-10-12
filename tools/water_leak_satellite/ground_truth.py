@@ -61,14 +61,29 @@ def _sha256(value: Any) -> bool:
     return isinstance(value, str) and SHA_RE.fullmatch(value) is not None
 
 
-def _timestamp(value: Any) -> bool:
-    if not isinstance(value, str):
+def _finite_number(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
+    try:
+        return math.isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return False
-    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed
+
+
+def _timestamp(value: Any) -> bool:
+    return _parse_timestamp(value) is not None
 
 
 def validate_record(record: Any, index: int = 0) -> list[str]:
@@ -94,11 +109,11 @@ def validate_record(record: Any, index: int = 0) -> list[str]:
         errors.append(f"{prefix}.observed_at: must be an ISO-8601 timestamp with timezone")
 
     outcome = record.get("outcome")
-    if outcome not in OUTCOMES:
+    if not isinstance(outcome, str) or outcome not in OUTCOMES:
         errors.append(f"{prefix}.outcome: unsupported outcome")
 
     split = record.get("evaluation_split")
-    if split not in SPLITS:
+    if not isinstance(split, str) or split not in SPLITS:
         errors.append(f"{prefix}.evaluation_split: unsupported split")
 
     location = record.get("location")
@@ -111,10 +126,10 @@ def validate_record(record: Any, index: int = 0) -> list[str]:
             errors.append(f"{prefix}.location: unexpected keys: {', '.join(sorted(extra_location))}")
         for key, low, high in (("longitude", -180.0, 180.0), ("latitude", -90.0, 90.0)):
             value = location.get(key)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not low <= value <= high:
+            if not _finite_number(value) or not low <= value <= high:
                 errors.append(f"{prefix}.location.{key}: invalid coordinate")
         uncertainty = location.get("horizontal_uncertainty_m")
-        if isinstance(uncertainty, bool) or not isinstance(uncertainty, (int, float)) or not math.isfinite(uncertainty) or uncertainty <= 0:
+        if not _finite_number(uncertainty) or uncertainty <= 0:
             errors.append(f"{prefix}.location.horizontal_uncertainty_m: must be finite and > 0")
         crs = location.get("coordinate_reference_system", "EPSG:4326")
         if crs != "EPSG:4326":
@@ -136,7 +151,7 @@ def validate_record(record: Any, index: int = 0) -> list[str]:
         if missing_verification:
             errors.append(f"{prefix}.verification: missing keys: {', '.join(sorted(missing_verification))}")
         verified_method = verification.get("method")
-        if verified_method not in METHODS:
+        if not isinstance(verified_method, str) or verified_method not in METHODS:
             errors.append(f"{prefix}.verification.method: unsupported method")
         independent = verification.get("independent") is True
         if not isinstance(verification.get("independent"), bool):
@@ -179,7 +194,7 @@ def validate_record(record: Any, index: int = 0) -> list[str]:
         if not isinstance(owner, str) or not owner.strip() or len(owner) > 256:
             errors.append(f"{prefix}.rights.owner: must identify the data owner")
         uses = rights.get("allowed_uses")
-        if not isinstance(uses, list) or not uses or any(use not in ALLOWED_USES for use in uses) or len(set(uses)) != len(uses):
+        if not isinstance(uses, list) or not uses or any(not isinstance(use, str) or use not in ALLOWED_USES for use in uses) or len(set(uses)) != len(uses):
             errors.append(f"{prefix}.rights.allowed_uses: must be a non-empty unique list of explicit permitted purposes")
         if not _sha256(rights.get("permission_reference_sha256")):
             errors.append(f"{prefix}.rights.permission_reference_sha256: must hash the permission/licence evidence")
@@ -191,10 +206,13 @@ def label_class(record: dict[str, Any]) -> str:
     """Return positive, negative, or excluded under the strict label contract."""
     outcome = record.get("outcome")
     verification = record.get("verification", {})
-    if outcome == "confirmed_leak" and verification.get("independent") is True and verification.get("method") in POSITIVE_METHODS:
-        if verification.get("method") != "repair_postchange_verified" or verification.get("post_repair_change_observed") is True:
+    if not isinstance(verification, dict):
+        return "excluded"
+    method = verification.get("method")
+    if outcome == "confirmed_leak" and verification.get("independent") is True and isinstance(method, str) and method in POSITIVE_METHODS:
+        if method != "repair_postchange_verified" or verification.get("post_repair_change_observed") is True:
             return "positive"
-    if outcome == "inspected_no_leak" and verification.get("independent") is True and verification.get("method") == "documented_no_leak_inspection":
+    if outcome == "inspected_no_leak" and verification.get("independent") is True and method == "documented_no_leak_inspection":
         return "negative"
     return "excluded"
 
@@ -205,7 +223,7 @@ def validate_corpus(document: Any, purpose: str = "internal_research") -> tuple[
         "records": 0, "positive": 0, "negative": 0, "excluded": 0,
         "purpose_eligible": 0,
     }
-    if purpose not in ALLOWED_USES:
+    if not isinstance(purpose, str) or purpose not in ALLOWED_USES:
         return [f"unsupported purpose: {purpose}"], counts
     if not isinstance(document, dict):
         return ["corpus: must be an object"], counts
@@ -221,6 +239,9 @@ def validate_corpus(document: Any, purpose: str = "internal_research") -> tuple[
     counts["records"] = len(records)
     identifiers: set[str] = set()
     group_splits: dict[str, str] = {}
+    zone_splits: dict[str, str] = {}
+    segment_splits: dict[str, str] = {}
+    temporal_by_split: dict[str, list[datetime]] = {}
     for index, record in enumerate(records):
         errors.extend(validate_record(record, index))
         if not isinstance(record, dict):
@@ -233,10 +254,23 @@ def validate_corpus(document: Any, purpose: str = "internal_research") -> tuple[
             identifiers.add(record_id)
         group = record.get("split_group_id")
         split = record.get("evaluation_split")
-        if isinstance(group, str) and split in SPLITS:
+        if isinstance(group, str) and isinstance(split, str) and split in SPLITS:
             previous = group_splits.setdefault(group, split)
             if previous != split:
                 errors.append(f"records[{index}].split_group_id: group crosses splits ({previous} and {split})")
+        zone = record.get("zone_id")
+        if isinstance(zone, str) and isinstance(split, str) and split in SPLITS:
+            previous_zone_split = zone_splits.setdefault(zone, split)
+            if previous_zone_split != split:
+                errors.append(f"records[{index}].zone_id: zone crosses evaluation splits ({previous_zone_split} and {split})")
+        segment = record.get("asset_segment_id")
+        if isinstance(segment, str) and isinstance(split, str) and split in SPLITS:
+            previous_segment_split = segment_splits.setdefault(segment, split)
+            if previous_segment_split != split:
+                errors.append(f"records[{index}].asset_segment_id: segment crosses evaluation splits ({previous_segment_split} and {split})")
+        observed = _parse_timestamp(record.get("observed_at"))
+        if observed is not None and isinstance(split, str) and split in SPLITS:
+            temporal_by_split.setdefault(split, []).append(observed)
         cls = label_class(record)
         counts[cls] += 1
         rights = record.get("rights")
@@ -245,6 +279,10 @@ def validate_corpus(document: Any, purpose: str = "internal_research") -> tuple[
             counts["purpose_eligible"] += 1
         else:
             errors.append(f"records[{index}].rights: does not explicitly permit {purpose}")
+    baseline_times = temporal_by_split.get("train", []) + temporal_by_split.get("threshold_validation", [])
+    heldout_times = temporal_by_split.get("held_out_test", [])
+    if baseline_times and heldout_times and min(heldout_times) <= max(baseline_times):
+        errors.append("held_out_test: timestamps must be strictly later than all train/threshold_validation timestamps")
     return errors, counts
 
 
