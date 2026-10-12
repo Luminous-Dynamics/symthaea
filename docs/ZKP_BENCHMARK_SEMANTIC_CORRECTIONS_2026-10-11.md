@@ -57,3 +57,10 @@
 - Reframed the multi-backend section as a proposal, not an automatically routed or deployed system. The public harness uses the standard non-zero-knowledge Binius64 backend; the separate Iron Spartan check is only a tiny Boolean-XOR smoke test, and does not show that the HDC circuits provide witness privacy.
 - Replaced outdated limitations text that still asserted an unmeasured Winterfell proof-size/speed advantage and referred to the packed-bit recurrence as a numerical CfC/sigmoid proof.
 - These documentation/source-comment changes do not substitute for the still-pending Rust build, proof tests, or fresh measurements.
+
+
+## Algebraic-cost and permutation-scope follow-up (2026-10-12)
+
+- Rewrote the XOR theorem to distinguish the absence of nonlinear AND/MUL gates from the wordwise equality assertions that bind the public output. A nonlinear-gate count is not a count of all circuit structure or a performance result.
+- Withdrawn the unqualified claim that a general HDC cyclic permutation requires zero constraints. Whole-word reordering can be an index permutation; general bit-level shifts across packed-word boundaries require separate rotation/shift logic and a measured circuit.
+- Removed the stale source-header claim that an executable Winterfell XOR circuit is available at a monorepo path absent from this standalone artifact. The benchmark now describes the Winterfell side only as an analytic estimate.

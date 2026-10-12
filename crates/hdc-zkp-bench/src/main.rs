@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! HDC XOR Binding Integrity-Proof Benchmark
 //!
-//! Proves a 16,384-bit Hyperdimensional XOR binding operation across:
+//! Benchmarks a 16,384-bit HDC XOR integrity relation with Binius64, and prints a model-only Winterfell estimate.
 //! 1. **Binius64** — Binary tower field STARK (XOR = native field addition, FREE).
 //!    Real prover + verifier; runtime timings and proof bytes are measured for Binius only.
 //! 2. **Winterfell** — Prime field STARK (XOR requires constraint decomposition).
 //!    **ANALYTIC ESTIMATE ONLY**: this crate implements NO Winterfell AIR and never
 //!    invokes a Winterfell prover or verifier. The Winterfell numbers are computed from
 //!    a constraint-count model (~50us/constraint prove, ~2us/constraint verify) — they
-//!    are NOT measured proving results. A real, measured Winterfell 16,384-bit XOR
-//!    circuit lives separately in
-//!    `crates/mycelix-zkp-core/src/circuits/winterfell_xor.rs` (monorepo root).
+//!    are NOT measured proving results. This standalone artifact contains no executable
+//!    Winterfell XOR circuit, so its output cannot establish a cross-backend comparison.
 //!
 //! This benchmark generates the core data for the paper:
 //! "Binary-Field Proofs for Hyperdimensional Computing"

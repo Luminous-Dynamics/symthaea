@@ -103,12 +103,12 @@ where $\sigma$ is sigmoid and $f(t) = -\Delta t / \tau$. Unlike ODE-based Liquid
 
 We now formalize the alignment between HDC operations and binary-field STARK constraints.
 
-\begin{theorem}[Free XOR Binding]
-Let $\mathbf{a}, \mathbf{b} \in \{0,1\}^D$ be binary hypervectors. In a Binius STARK over $\mathrm{GF}(2^{64})$ with $D/64$ word-level columns, the XOR binding $\mathbf{c} = \mathbf{a} \oplus \mathbf{b}$ requires \textbf{zero AND/MUL constraints}. The binding is expressed as $D/64$ linear constraints (field additions), which are absorbed into the constraint polynomial without increasing its degree.
+\begin{theorem}[Free Nonlinear XOR Cost]
+Let $\mathbf{a}, \mathbf{b} \in \{0,1\}^D$ be binary hypervectors packed into 64-bit words. In the standard Binius64 circuit, computing each wordwise XOR introduces no nonlinear AND/MUL gate. The complete public-output relation still needs wordwise equality assertions to bind the claimed output $\mathbf{c}$ to $\mathbf{a} \oplus \mathbf{b}$; those statement checks must not be confused with zero total constraints or zero proving cost.
 \end{theorem}
 
 \begin{proof}
-In $\mathrm{GF}(2^{64})$, addition is bitwise XOR on the underlying 64-bit representation. The Binius constraint system separates operations into linear (addition) and non-linear (AND/MUL). Since $\mathbf{c}_i = \mathbf{a}_i + \mathbf{b}_i$ for each 64-bit word $i$, the binding is purely linear. Linear constraints do not contribute to the AND/MUL constraint count and are verified at negligible cost during the FRI commitment phase. \qed
+The Binius64 circuit operation $\operatorname{bxor}$ computes the packed-word XOR using a linear relation. The benchmark separately asserts equality between each XOR result and its public output word. These assertions bind the public statement, while the reported AND/MUL statistic measures nonlinear gates only. This algebraic accounting alone establishes neither total constraint count nor end-to-end proving performance. \qed
 \end{proof}
 
 \begin{corollary}[Bundling Cost]
@@ -116,7 +116,7 @@ The corrected generic circuit uses a bit-sliced binary counter followed by a per
 \end{corollary}
 
 \begin{corollary}[Permutation Cost]
-Cyclic permutation $\rho^k(\mathbf{v})$ requires zero constraints---it is a reindexing of the multilinear polynomial's variables in the Binius commitment scheme.
+A permutation that only reorders whole packed words can be represented as an index reordering in the circuit. A general HDC cyclic bit permutation that shifts bits within or across packed words requires shift/rotation logic; this artifact does not implement or measure a general permutation circuit, so no zero-constraint claim is made for it.
 \end{corollary}
 
 Table~\ref{tab:alignment} summarizes the constraint costs.
