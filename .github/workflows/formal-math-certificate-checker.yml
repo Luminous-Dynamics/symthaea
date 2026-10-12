@@ -67,6 +67,35 @@ jobs:
             --golden-vector prime-13-multifactor \
             --output "$RUNNER_TEMP/SymthaeaPrimeThirteen.lean"
 
+      - name: Guard the patched kernel and exact dependency lock
+        working-directory: formal/math-certificate
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          expected_toolchain = "leanprover/lean4:v4.33.1"
+          expected_mathlib = "0df444a360eaa60ab8c11dca51a86af692955474"
+          expected_primecert = "7d3a2de13bb08f111a95203634f9ea52e50e246e"
+
+          toolchain = Path("lean-toolchain").read_text(encoding="utf-8").strip()
+          if toolchain != expected_toolchain:
+              raise SystemExit(f"unexpected Lean kernel pin: {toolchain!r}")
+
+          manifest = json.loads(Path("lake-manifest.json").read_text(encoding="utf-8"))
+          packages = {package["name"]: package for package in manifest["packages"]}
+          mathlib = packages.get("mathlib")
+          primecert = packages.get("PrimeCert")
+          if not mathlib or mathlib["rev"] != expected_mathlib or mathlib["inputRev"] != "v4.33.1":
+              raise SystemExit("Mathlib lock does not match the patched Lean 4.33.1 release")
+          if not primecert or primecert["rev"] != expected_primecert:
+              raise SystemExit("PrimeCert source revision does not match the reviewed pin")
+          lakefile = Path("lakefile.toml").read_text(encoding="utf-8")
+          if 'rev = "v4.33.1"' not in lakefile:
+              raise SystemExit("Lakefile does not directly pin Mathlib v4.33.1")
+          print("Formal kernel and dependency pins match the reviewed trust configuration.")
+          PY
+
       - name: Build the pinned Lean proof project
         uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6
         with:
