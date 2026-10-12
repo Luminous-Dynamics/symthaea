@@ -131,6 +131,24 @@ class InventoryVerifierTests(unittest.TestCase):
         errors = verify_inventory(document)
         self.assertTrue(any("query.datetime" in error for error in errors))
 
+    def test_extremely_large_bbox_integer_fails_closed_without_overflow(self):
+        document = fixture()
+        document["scope"]["bbox_wgs84"][0] = 10 ** 10000
+        errors = verify_inventory(document)
+        self.assertTrue(any("scope.bbox_wgs84" in error for error in errors))
+
+    def test_deep_nested_href_is_rejected_without_recursion_failure(self):
+        document = fixture()
+        nested = {}
+        document["extension"] = nested
+        for _ in range(1500):
+            child = {}
+            nested["child"] = child
+            nested = child
+        nested["href"] = "https://example.invalid/next?token=secret"
+        errors = verify_inventory(document)
+        self.assertTrue(any("inventory: contains an href field" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

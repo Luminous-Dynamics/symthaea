@@ -24,7 +24,13 @@ def canonical_json_bytes(value: Any) -> bytes:
 
 
 def sha256_json(value: Any) -> str:
-    return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+    try:
+        encoded = canonical_json_bytes(value)
+    except (TypeError, ValueError, OverflowError, RecursionError, UnicodeError):
+        # Invalid or pathologically nested JSON-like values must fail verification,
+        # rather than terminating the verifier with an exception.
+        return ""
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def is_sha256(value: Any) -> bool:
@@ -40,11 +46,28 @@ def _valid_iso_date(value: Any) -> bool:
         return False
 
 
+def _finite_number(value: Any) -> bool:
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
+
+
 def _contains_href_key(value: Any) -> bool:
-    if isinstance(value, dict):
-        return any(str(key).lower() == "href" or _contains_href_key(nested) for key, nested in value.items())
-    if isinstance(value, list):
-        return any(_contains_href_key(item) for item in value)
+    # Iterative traversal avoids recursion-depth failure on malformed artifacts.
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            for key, nested in current.items():
+                if str(key).lower() == "href":
+                    return True
+                if isinstance(nested, (dict, list)):
+                    stack.append(nested)
+        elif isinstance(current, list):
+            stack.extend(nested for nested in current if isinstance(nested, (dict, list)))
     return False
 
 
@@ -77,7 +100,7 @@ def verify_inventory(document: Any) -> list[str]:
         if (
             not isinstance(bbox, list)
             or len(bbox) != 4
-            or any(type(value) not in (int, float) or not math.isfinite(value) for value in bbox)
+            or any(not _finite_number(value) for value in bbox)
         ):
             errors.append("scope.bbox_wgs84: must contain four finite numeric bounds")
         elif not (-180 <= bbox[0] < bbox[2] <= 180 and -90 <= bbox[1] < bbox[3] <= 90):
@@ -213,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         document = json.loads(args.inventory.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         print(f"FAIL: cannot read valid UTF-8 JSON inventory: {exc}", file=sys.stderr)
         return 2
     errors = verify_inventory(document)
