@@ -16,7 +16,8 @@ fn main() {
         .ok()
         .or_else(|| env::var("SYMTHAEA_SOURCE_REVISION").ok());
     let report = run_sym_arch_001(SymArch001Config::default(), source_revision);
-    let json = serde_json::to_string_pretty(&report).expect("failed to serialize SYM-ARCH-001 report");
+    let json =
+        serde_json::to_string_pretty(&report).expect("failed to serialize SYM-ARCH-001 report");
     fs::write(&output, &json).expect("failed to write SYM-ARCH-001 report");
 
     println!("SYM-ARCH-001 verdict: {}", report.decision.verdict);
