@@ -292,6 +292,12 @@ Source: official report PDF, printed page 108 / Table 33: https://www.energy.ca.
 
 **Interpret zero-result inventories narrowly.** The [official Copernicus Data Space STAC documentation](https://documentation.dataspace.copernicus.eu/APIs/STAC.html) states that STAC is complementary to the Open Data Protocol (OData), and currently covers a limited set of collections. Therefore, zero Sentinel-1/Sentinel-2 items from this workflow means only that no items were returned for the exact endpoint, collection, AOI and time-window query at that retrieval time. It does **not** establish that no relevant acquisitions exist anywhere in the broader Copernicus catalogue. Before declaring acquisition coverage unavailable, cross-check the identical AOI/time window and product family through the [official CDSE OData catalogue](https://documentation.dataspace.copernicus.eu/APIs/OData.html), retain the query and retrieval timestamp, and record any mismatch as a catalogue-access gap rather than a global no-data conclusion.
 
+
+
+### Independent OData catalogue cross-check
+
+The [OData inventory utility](https://github.com/Luminous-Dynamics/symthaea/blob/research/water-leak-001-johannesburg-transfer/tools/water_leak_satellite/odata_inventory.py) provides an independent metadata-only cross-check via the official Copernicus Data Space Products API. It uses the documented `Collection/Name`, `productType`, `OData.CSC.Intersects`, `ContentDate/Start`, `$select`, `$orderby`, `$top` and `@odata.nextLink` interfaces. Broad date ranges are partitioned by calendar year to follow CDSE's query-performance guidance. It records per-page response digests, redacted request URLs plus URL hashes, product summaries, and a manifest; its local verifier binds the AOI and time partitions back to the saved filters. OData and STAC results are independent inventories, and discrepancies should be investigated rather than silently merged. A product record or intersecting footprint is still not proof of useful resolution, acquisition suitability, a leak or commercial rights. No live OData response has been verified as of this commit.
+
 ### Reproducible catalogue inventory utility
 
 The feature branch now includes a standard-library-only catalogue metadata collector:

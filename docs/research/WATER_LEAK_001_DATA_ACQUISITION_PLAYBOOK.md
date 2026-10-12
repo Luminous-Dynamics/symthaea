@@ -113,6 +113,10 @@ Required safeguards:
 
 This creates genuinely local acoustic and repair evidence even before satellite feasibility is known. If the goal remains satellite detection, it is useful only if the events also have adequate coordinates/time and rights for imagery matching.
 
+## Independent catalogue cross-check: OData
+
+The STAC collector should not be the sole test of catalogue availability. The companion [OData inventory utility](https://github.com/Luminous-Dynamics/symthaea/blob/research/water-leak-001-johannesburg-transfer/tools/water_leak_satellite/odata_inventory.py) is designed to query the Copernicus Products endpoint independently for Sentinel-1 GRD and Sentinel-2 L2A product families. It partitions date ranges by calendar year, uses a closed WGS84 AOI polygon, and records page and product evidence hashes. Compare counts and footprints across both catalogues, but do not assume equal product semantics or item counts. If a query is empty, retain the exact filter and retrieval evidence; it is a query-specific result, not a global no-data conclusion. The API is not successfully queried by this documentation change and must be run in GitHub Actions before drawing coverage conclusions.
+
 ## Environmental covariates: valuable, but never labels
 
 The 2026 review of Sentinel-1 soil-moisture retrieval says that vegetation, surface roughness, spatial/temporal constraints and sensor/model limitations affect retrieval quality. Use public rainfall, soil-moisture, land-cover, roadworks and vegetation series to test alternative explanations for radar anomalies, not to label leaks. See [Rahmati et al., *Remote Sensing of Environment* (2026)](https://doi.org/10.1016/j.rse.2025.115146).
