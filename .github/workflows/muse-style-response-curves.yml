@@ -171,21 +171,44 @@ jobs:
               stream.write("## Seed robustness by style/control\n\n")
               stream.write(
                   "| Style | Control | Seeds with any observed change | "
-                  "Observed/expected seeds | Coverage complete | "
-                  "Baseline seeds with no observed change |\n"
+                  "Observed/expected records | Coverage complete | "
+                  "Unchanged seeds | Seed identity anomalies |\n"
               )
-              stream.write("|---|---|---:|---|---|---|\n")
+              stream.write("|---|---|---:|---|---|---|---|\n")
               for profile in report["profiles"]:
                   for summary_row in profile["seed_robustness_summary"]:
                       unchanged = ", ".join(
                           str(seed)
                           for seed in summary_row["seeds_with_no_observed_change"]
                       ) or "none"
+                      anomalies = []
+                      if summary_row["missing_seed_ids"]:
+                          anomalies.append(
+                              "missing: " + ", ".join(
+                                  str(seed) for seed in summary_row["missing_seed_ids"]
+                              )
+                          )
+                      if summary_row["unexpected_seed_ids"]:
+                          anomalies.append(
+                              "unexpected: " + ", ".join(
+                                  str(seed) for seed in summary_row["unexpected_seed_ids"]
+                              )
+                          )
+                      if summary_row["duplicate_seed_record_count"]:
+                          anomalies.append(
+                              f"duplicate records: {summary_row['duplicate_seed_record_count']}"
+                          )
+                      if summary_row["invalid_seed_record_count"]:
+                          anomalies.append(
+                              f"invalid identities: {summary_row['invalid_seed_record_count']}"
+                          )
+                      anomaly_text = "; ".join(anomalies) or "none"
                       stream.write(
                           f"| {profile['style']} | {summary_row['control']} | "
                           f"{summary_row['seeds_with_any_observed_change']} | "
                           f"{summary_row['seed_count']}/{summary_row['expected_seed_count']} | "
-                          f"{summary_row['coverage_complete']} | {unchanged} |\n"
+                          f"{summary_row['coverage_complete']} | {unchanged} | "
+                          f"{anomaly_text} |\n"
                       )
               stream.write("\n")
               stream.write(f"- Report SHA-256: `{receipt['report_sha256']}`\n\n")
