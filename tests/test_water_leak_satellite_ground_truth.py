@@ -141,6 +141,9 @@ class GroundTruthTests(unittest.TestCase):
     def test_explicitly_permitted_corpus_passes_contract_only(self):
         a = record(record_id="evt-a", split="train", group="block-train")
         b = record(record_id="evt-b", split="held_out_test", group="block-test")
+        b["zone_id"] = "zone-b"
+        b["asset_segment_id"] = "pipe-seg-2"
+        b["observed_at"] = "2026-09-01T10:00:00Z"
         a["rights"]["allowed_uses"] = ["internal_research", "commercial_model_training"]
         b["rights"]["allowed_uses"] = ["internal_research", "commercial_model_training"]
         errors, counts = validate_corpus(corpus([a, b]), purpose="commercial_model_training")
