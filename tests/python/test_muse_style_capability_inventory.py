@@ -13,6 +13,7 @@ from muse_style_capability_inventory import _runtime_report  # noqa: E402
 from muse_style_coverage import CoverageError, STYLE_RELATIVE  # noqa: E402
 from muse_style_capability_inventory import REALIZATION_RELATIVE  # noqa: E402
 from muse_style_capability_inventory import GRAMMAR_RELATIVE  # noqa: E402
+from muse_style_capability_inventory import CAUSAL_EVIDENCE_RELATIVE  # noqa: E402
 
 STYLE_FIXTURE = r'''
 pub enum Style {
@@ -64,6 +65,11 @@ impl Style {
     }
 }
 '''
+
+CAUSAL_EVIDENCE_FIXTURE = r'''
+fn causal_sensitivity_matrix() { /* fixture representing the census source */ }
+'''
+
 
 GRAMMAR_FIXTURE = r'''
 pub fn compose_with_grammar_plan(profile: GrammarProfile, intent: &Intent, spec: &CompositionSpec) -> Realization {
@@ -118,6 +124,9 @@ class RuntimeInventoryTests(unittest.TestCase):
         grammar_path = root / GRAMMAR_RELATIVE
         grammar_path.parent.mkdir(parents=True, exist_ok=True)
         grammar_path.write_text(GRAMMAR_FIXTURE, encoding="utf-8")
+        evidence_path = root / CAUSAL_EVIDENCE_RELATIVE
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        evidence_path.write_text(CAUSAL_EVIDENCE_FIXTURE, encoding="utf-8")
 
     def test_reports_source_declared_controls_and_instrument_pools(self) -> None:
         from tempfile import TemporaryDirectory
@@ -146,6 +155,17 @@ class RuntimeInventoryTests(unittest.TestCase):
                 ["Bass", "Harp", "Pad", "Sitar"],
             )
             self.assertIn("do not prove", report["interpretation"])
+
+            self.assertEqual(
+                report["source"]["intent_axis_evidence_path"],
+                CAUSAL_EVIDENCE_RELATIVE.as_posix(),
+            )
+            self.assertEqual(
+                report["source"]["intent_axis_evidence_blob_sha"],
+                report["intent_axis_evidence"]["source_blob_sha"],
+            )
+            self.assertTrue(report["intent_axis_evidence"]["required_marker_present"])
+            self.assertFalse(report["intent_axis_evidence"]["census_executed_by_inventory"])
 
     def test_reports_grammar_dispatch_modes_separately(self) -> None:
         from tempfile import TemporaryDirectory
@@ -221,6 +241,23 @@ class RuntimeInventoryTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(CoverageError, "no compatibility fallback arm"):
+                _runtime_report(root)
+
+    def test_fails_closed_when_census_evidence_marker_is_missing(self) -> None:
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_root(root)
+            evidence_path = root / CAUSAL_EVIDENCE_RELATIVE
+            evidence_path.write_text(
+                "fn unrelated_report() {}",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                CoverageError,
+                "Causal intent-axis evidence source is missing",
+            ):
                 _runtime_report(root)
 
     def test_fails_closed_when_grammar_mapping_omits_executable_style(self) -> None:
