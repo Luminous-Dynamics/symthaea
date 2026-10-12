@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from contextlib import redirect_stdout
+from io import StringIO
 import sys
 import tempfile
 import unittest
@@ -22,6 +24,7 @@ from muse_style_coverage import (  # noqa: E402
     git_blob_sha,
     parse_catalog,
     parse_style_contract,
+    print_summary,
 )
 
 CATALOG_FIXTURE = r'''
@@ -147,6 +150,28 @@ class CoverageReportTests(unittest.TestCase):
             self.assertEqual(by_constellation["B"]["unrouted_catalog_ids"], [3])
             self.assertEqual(by_constellation["D"]["routed_catalog_ids"], [])
             self.assertIn("not evidence", analysis["interpretation"])
+
+    def test_summary_prints_actionable_routing_gaps_without_overclaiming(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_root(root)
+            catalog_path = root / CATALOG_RELATIVE
+            source = catalog_path.read_text(encoding="utf-8").replace(
+                'style!(3, "Research Only", C),',
+                'style!(3, "Research Only", B),\n'
+                '    style!(4, "Unrouted Family", D),',
+            )
+            catalog_path.write_text(source, encoding="utf-8")
+            report = build_current_report(root)
+
+            output = StringIO()
+            with redirect_stdout(output):
+                print_summary(report)
+            rendered = output.getvalue()
+            self.assertIn("B: 1/2 routed; unrouted catalog IDs: 3", rendered)
+            self.assertIn("Zero-route constellations: D", rendered)
+            self.assertIn("Partial-route constellations: B", rendered)
+            self.assertIn("no claim about musical distinctness", rendered)
 
     def test_report_fails_closed_on_duplicate_composer_routes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
