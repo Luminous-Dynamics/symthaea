@@ -144,6 +144,9 @@ def validate_adjudication(adjudication: Any, *, unit_id: str, guide_sha: str, re
     adjudicator = adjudication.get("adjudicator_id")
     require(isinstance(adjudicator, str) and adjudicator.strip() and adjudicator == adjudicator.strip(),
             f"{unit_id}: adjudicator_id must be non-empty")
+    independent_reviewer_ids = {review["reviewer_id"] for review in reviews}
+    require(adjudicator not in independent_reviewer_ids,
+            f"{unit_id}: adjudicator must be distinct from the independent reviewers")
     require(adjudication.get("guide_sha256") == guide_sha, f"{unit_id}: adjudication guide digest mismatch")
     require(valid_timestamp(adjudication.get("adjudicated_at")),
             f"{unit_id}: adjudicated_at must be a valid UTC timestamp ending in Z")
@@ -162,10 +165,18 @@ def validate_adjudication(adjudication: Any, *, unit_id: str, guide_sha: str, re
     require(isinstance(rationale, str) and rationale.strip(), f"{unit_id}: adjudication rationale must be non-empty")
     override_reason = adjudication.get("severity_override_reason")
     require(isinstance(override_reason, str), f"{unit_id}: severity_override_reason must be a string")
-    severities = [review["labels"]["severity"] for review in reviews]
-    if adjudication["resolved_labels"]["severity"] == "none" and any(item != "none" for item in severities):
+    # This ordering is a review-escalation policy, not a claim that the
+    # categories are interchangeable psychological measurements. Any downward
+    # resolution from the strongest independent-review concern needs rationale.
+    severity_priority = {"none": 0, "other_concern": 1, "unsupported_person_level_inference": 2}
+    strongest_review_priority = max(
+        (severity_priority[review["labels"]["severity"]] for review in reviews),
+        default=0,
+    )
+    resolved_priority = severity_priority[adjudication["resolved_labels"]["severity"]]
+    if resolved_priority < strongest_review_priority:
         require(override_reason.strip(),
-                f"{unit_id}: downgrading an independently reported concern requires severity_override_reason")
+                f"{unit_id}: reducing independently reported severity requires severity_override_reason")
     raw = {key: value for key, value in adjudication.items() if key != "adjudication_id"}
     require(adjudication.get("adjudication_id") == digest_record(raw, unit_id),
             f"{unit_id}: adjudication_id does not match adjudication content")
@@ -203,6 +214,7 @@ def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_b
     adjudicated = 0
     all_review_ids: set[str] = set()
     severity_counts = {key: 0 for key in ENUMS["severity"]}
+    adjudicated_severity_counts = {key: 0 for key in ENUMS["severity"]}
     for unit in submission["units"]:
         unit_id = unit["unit_id"]
         case_id = unit.get("case_id")
@@ -231,6 +243,7 @@ def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_b
                     f"{unit_id}: adjudication requires at least {minimum_reviewers} independent reviewers")
             validate_adjudication(unit["adjudication"], unit_id=unit_id, guide_sha=guide_sha,
                                   review_ids=local_review_ids, valid_evidence=valid_evidence, reviews=reviews)
+            adjudicated_severity_counts[unit["adjudication"]["resolved_labels"]["severity"]] += 1
             adjudicated += 1
         review_counts.append(len(reviewer_ids))
     complete = all(count >= minimum_reviewers for count in review_counts)
@@ -262,6 +275,7 @@ def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_b
         "adjudication_complete": fully_adjudicated,
         "annotation_state": expected_state,
         "independent_review_severity_counts": severity_counts,
+        "adjudicated_severity_counts": adjudicated_severity_counts,
         "claims_not_established": ["label correctness", "semantic accuracy", "psychological validity", "inter-rater agreement", "generalization"],
     }
 
@@ -306,6 +320,8 @@ def self_test() -> list[str]:
     try:
         report = validate_documents(seed,adjudicated,seed_bytes=seed_bytes,guide_bytes=guide,expected_seed_sha256=expected,require_adjudication=True)
         require(report["adjudicated_unit_count"] == 1,"adjudication missing in report")
+        require(report["adjudicated_severity_counts"]["none"] == 1,
+                "adjudicated severity outcome missing from separate report counts")
     except Exception as exc:
         failures.append(f"valid adjudication failed: {exc}")
 
@@ -318,6 +334,29 @@ def self_test() -> list[str]:
             failures.append(f"{name}: wrong exception {type(exc).__name__}: {exc}")
             return
         failures.append(f"{name}: hostile annotation packet was accepted")
+
+    # The adjudicator must not be one of the two independent reviewers.
+    same_person_adjudicator = copy.deepcopy(adjudicated)
+    same_person_adjudicator["units"][0]["adjudication"]["adjudicator_id"] = "reviewer-a"
+    adj = same_person_adjudicator["units"][0]["adjudication"]
+    adj["adjudication_id"] = digest_record({key:value for key,value in adj.items() if key!="adjudication_id"},unit_id)
+    rejected("adjudicator duplicates reviewer",same_person_adjudicator)
+
+    # An adjudication may resolve disagreement, but lowering the independent
+    # reviewers' risk-priority requires an explicit, preserved override reason.
+    severity_downgrade = copy.deepcopy(adjudicated)
+    unit = severity_downgrade["units"][0]
+    first_review = unit["independent_reviews"][0]
+    first_review["labels"]["severity"] = "unsupported_person_level_inference"
+    first_review["review_id"] = digest_record(
+        {key:value for key,value in first_review.items() if key!="review_id"},unit_id
+    )
+    adj = unit["adjudication"]
+    adj["review_ids_considered"] = [review["review_id"] for review in unit["independent_reviews"]]
+    adj["resolved_labels"]["severity"] = "other_concern"
+    adj["severity_override_reason"] = ""
+    adj["adjudication_id"] = digest_record({key:value for key,value in adj.items() if key!="adjudication_id"},unit_id)
+    rejected("severity downgrade without explicit rationale",severity_downgrade)
 
     tamper=copy.deepcopy(submission)
     tamper["units"][0]["text_fields"]["statement"]["text"]="Changed source claim"
