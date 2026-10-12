@@ -680,28 +680,46 @@ mod native_cdp_tests {
     }
 
     #[test]
-    fn core_action_paths_do_not_call_page_evaluate() {
-        let source = include_str!("cdp.rs");
-        let sections = [
-            ("pub async fn get_accessibility_tree", "    /// Click a CSS or accessibility target"),
-            ("pub(crate) async fn click", "    /// Type text"),
-            ("pub(crate) async fn type_text", "    /// Scroll a CSS-selected"),
-            ("pub(crate) async fn scroll_to", "    pub(crate) async fn extract_text"),
-            ("pub(crate) async fn go_back", "    pub(crate) async fn go_forward"),
-            ("pub(crate) async fn go_forward", "    /// Extract current DOM text"),
-            ("pub(crate) async fn extract_text", "    /// Capture a PNG screenshot"),
-            ("pub async fn observe", "async fn read_outer_html"),
+    fn maintained_browser_control_surface_has_no_injected_js_helpers() {
+        let cdp_source = include_str!("cdp.rs");
+        // Exclude this file's test modules so the forbidden-token list below
+        // cannot satisfy itself by containing the strings it is checking.
+        let cdp_production = cdp_source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("production source prefix exists");
+        let sources = [
+            ("cdp.rs", cdp_production),
+            ("actions.rs", include_str!("actions.rs")),
+            ("config.rs", include_str!("config.rs")),
+            ("embodiment.rs", include_str!("embodiment.rs")),
+            ("encoder.rs", include_str!("encoder.rs")),
+            ("executor.rs", include_str!("executor.rs")),
+            ("lib.rs", include_str!("lib.rs")),
+            ("observation.rs", include_str!("observation.rs")),
+            ("safety.rs", include_str!("safety.rs")),
+            ("web_agent.rs", include_str!("web_agent.rs")),
+            (
+                "examples/praxis_journey.rs",
+                include_str!("../examples/praxis_journey.rs"),
+            ),
         ];
-        for (start, end) in sections {
-            let start_at = source.find(start).expect("source section start exists");
-            let end_at = source[start_at..]
-                .find(end)
-                .map(|offset| start_at + offset)
-                .expect("source section end exists");
-            assert!(
-                !source[start_at..end_at].contains(".evaluate("),
-                "JavaScript evaluation remains in action path starting at {start}"
-            );
+        let forbidden = [
+            ".evaluate(",
+            ".get_title(",
+            ".content(",
+            "eval_js(",
+            "call_js_fn(",
+            "Runtime.evaluate",
+        ];
+
+        for (path, source) in sources {
+            for token in forbidden {
+                assert!(
+                    !source.contains(token),
+                    "forbidden in-page evaluation helper {token:?} remains in maintained {path}"
+                );
+            }
         }
     }
 }
