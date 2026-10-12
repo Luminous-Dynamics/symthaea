@@ -518,17 +518,13 @@ mod tests {
         assert!(metrics.median_pitch_error_cents < 15.0, "{:?}", metrics);
     }
 
-    /// `estimate_f0_near`'s octave-safety window is fixed at +/-300 cents
-    /// (line: `let ratio = 2.0f32.powf(300.0 / 1200.0)`). When the actual
-    /// pitch is further from the expected note than that, the search can
-    /// only find its best match at the window's edge -- so the reported
-    /// error saturates near the window boundary rather than reflecting the
-    /// true (potentially much larger) mistracking. This reproduces that
-    /// saturation with a sine wave synthesized nearly an octave away from
-    /// the note it is meant to represent, and confirms the reported error
-    /// sits near the window edge (~300-320 cents), not the true ~1421 cents.
+    /// `estimate_f0_near` searches only within +/-300 cents of the target.
+    /// For a 500 Hz sine against a 220 Hz target, that excludes the true F0
+    /// but includes the correlated 250 Hz subharmonic (two periods per lag).
+    /// The score-guided error is therefore substantially smaller than the
+    /// true ~1421-cent mismatch; the broad score-blind diagnostic must expose it.
     #[test]
-    fn pitch_error_saturates_at_octave_safety_window_edge() {
+    fn score_guided_pitch_error_is_censored_and_score_blind_exposes_mismatch() {
         let note = symthaea_muse::Note {
             frequency: 220.0,
             start_time: 0.0,
