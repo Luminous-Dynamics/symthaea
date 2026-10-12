@@ -35,11 +35,13 @@ except ImportError as exc:
 # Values come from the canonical VWN5 expression at its published unpolarized
 # parameter set. This script checks those independently against PySCF's Libxc.
 REFERENCES = (
+    (1e-12, -6.468832650253371e-5, -8.590250098688473e-5),
     (1e-6, -0.004776617504447303, -0.006099907725695197),
     (1e-3, -0.02486479492898193, -0.0297181942740259),
     (1e-2, -0.037645190262171425, -0.04387265644739365),
     (1e-1, -0.05339728918594983, -0.06081203033126156),
     (1.0, -0.07159261230679066, -0.07993838317598562),
+    (1e3, -0.13530412095922653, -0.14513547186348566),
 )
 ABS_TOL = 3e-11
 
