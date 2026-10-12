@@ -138,6 +138,18 @@ class CriterionBaselineTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "non-finite"):
                 load_criterion_results(root)
 
+    def test_rejects_non_finite_thresholds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            stderr = io.StringIO()
+            with patch.object(sys, "argv", [
+                "check_regressions.py", "--results", str(root), "--threshold", "nan"
+            ]), redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                main()
+
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("Thresholds must be finite", stderr.getvalue())
+
     def test_rejects_incoherent_thresholds(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
