@@ -87,6 +87,15 @@ struct BlindClip {
     challenge: String,
 }
 
+/// Listener-facing metadata only. Keep experimental labels and source case IDs
+/// out of the shareable manifest to reduce expectancy bias during rating.
+#[derive(Serialize)]
+struct ListeningClip<'a> {
+    clip_id: &'a str,
+    lyrics: &'a str,
+    audio: &'a str,
+}
+
 #[derive(Serialize)]
 struct KeyEntry {
     clip_id: String,
@@ -466,9 +475,17 @@ fn main() -> Result<()> {
     // Deterministic IDs conceal the backend; sort by ID so presentation order
     // does not reveal alternating render order.
     clips.sort_by(|a, b| a.clip_id.cmp(&b.clip_id));
+    let listening_manifest: Vec<_> = clips
+        .iter()
+        .map(|clip| ListeningClip {
+            clip_id: &clip.clip_id,
+            lyrics: &clip.lyrics,
+            audio: &clip.audio,
+        })
+        .collect();
     std::fs::write(
         output.join("blind_manifest.json"),
-        serde_json::to_vec_pretty(&clips)?,
+        serde_json::to_vec_pretty(&listening_manifest)?,
     )?;
     std::fs::write(
         private_output.join("private_backend_key.json"),
@@ -612,6 +629,26 @@ mod tests {
         std::fs::write(output.join("stale.wav"), b"not-a-valid-wav").unwrap();
         assert!(ensure_empty_listening_pack(&output).is_err());
         std::fs::remove_dir_all(&output).unwrap();
+    }
+
+    #[test]
+    fn listener_manifest_does_not_expose_experimental_condition_labels() {
+        let clip = clip();
+        let manifest = ListeningClip {
+            clip_id: &clip.clip_id,
+            lyrics: &clip.lyrics,
+            audio: &clip.audio,
+        };
+        let value = serde_json::to_value(manifest).unwrap();
+        assert!(value.get("clip_id").is_some());
+        assert!(value.get("lyrics").is_some());
+        assert!(value.get("audio").is_some());
+        for private_field in ["case_id", "category", "challenge", "backend"] {
+            assert!(
+                value.get(private_field).is_none(),
+                "listener manifest leaked {private_field}"
+            );
+        }
     }
 
     #[test]
