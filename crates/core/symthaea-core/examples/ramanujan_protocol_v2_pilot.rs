@@ -533,3 +533,81 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn square(variable: &str) -> Expr {
+        Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var(variable.to_string())),
+            Box::new(Expr::Const(2.0)),
+        )
+    }
+
+    fn candidate(formula: Expr) -> AutonomousInvariant {
+        AutonomousInvariant {
+            formula_str: format!("{formula}"),
+            formula,
+            variance: 0.0,
+            mean_value: 1.0,
+            complexity: 3,
+            symbolically_proven: false,
+            discovery_mode: AutonomousDiscoveryMode::Cold,
+        }
+    }
+
+    #[test]
+    fn oracle_accepts_scaled_and_offset_harmonic_energy() {
+        let energy = Expr::BinOp(
+            BinOp::Add,
+            Box::new(square("x")),
+            Box::new(square("v")),
+        );
+        let scaled_and_offset = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Const(7.0)),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Const(0.5)),
+                Box::new(energy),
+            )),
+        );
+        assert!(is_oracle_equivalent_harmonic_energy(&candidate(scaled_and_offset)));
+    }
+
+    #[test]
+    fn oracle_rejects_anisotropic_quadratic_and_cross_term() {
+        let anisotropic = Expr::BinOp(
+            BinOp::Add,
+            Box::new(square("x")),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Const(2.0)),
+                Box::new(square("v")),
+            )),
+        );
+        let cross_term = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Var("v".into())),
+        );
+        assert!(!is_oracle_equivalent_harmonic_energy(&candidate(anisotropic)));
+        assert!(!is_oracle_equivalent_harmonic_energy(&candidate(cross_term)));
+    }
+
+    #[test]
+    fn oracle_rejects_unsupported_non_polynomial_form() {
+        let expression = Expr::BinOp(
+            BinOp::Add,
+            Box::new(square("x")),
+            Box::new(Expr::Func(
+                symthaea_core::hdc::conjecture_engine::UnaryFn::Sin,
+                Box::new(Expr::Var("v".into())),
+            )),
+        );
+        assert!(!is_oracle_equivalent_harmonic_energy(&candidate(expression)));
+    }
+}
