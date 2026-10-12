@@ -139,7 +139,7 @@ impl<'a> BrowserExecutor<'a> {
                         Err(error) => Err(error),
                         Ok(landed_url) => {
                             let landing_decision = self.policy.evaluate_url(&landed_url);
-                            if let PolicyDecision::Deny { .. } = landing_decision {
+                            if !landing_decision.is_allowed() {
                                 return ActionReceipt {
                                     action,
                                     policy_decision: landing_decision,
