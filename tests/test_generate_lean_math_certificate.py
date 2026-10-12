@@ -105,5 +105,6 @@ class LeanCertificateBridgeTests(unittest.TestCase):
             self.assertIn("written", stdout.getvalue())
             self.assertIn("prime_cert [small {2}, pock (3, 2, 2)]", output.read_text())
 
+
 if __name__ == "__main__":
     unittest.main()
