@@ -120,16 +120,16 @@ jobs:
           text = manifest.read_text(encoding="utf-8")
           exclusion = '    "crates/core/symthaea-observation-attestation",'
           if exclusion not in text:
-              anchor = "exclude = [\\n"
+              anchor = "exclude = [\n"
               if anchor not in text:
                   raise SystemExit("Cargo.toml has no workspace exclude list; refusing an unreviewed baseline edit")
-              text = text.replace(anchor, anchor + exclusion + "\\n", 1)
+              text = text.replace(anchor, anchor + exclusion + "\n", 1)
               manifest.write_text(text, encoding="utf-8")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
               summary.write(
                   "Baseline compatibility adjustment: excluded only the manifestless "
                   "crates/core/symthaea-observation-attestation source directory from Cargo "
-                  "workspace discovery. Benchmark source and dependency declarations were not changed.\\n\\n"
+                  "workspace discovery. Benchmark source and dependency declarations were not changed.\n\n"
               )
           PY
 
