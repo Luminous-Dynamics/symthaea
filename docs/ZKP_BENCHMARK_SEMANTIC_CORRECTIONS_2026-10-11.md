@@ -41,6 +41,8 @@
 - Therefore the current HDC circuits demonstrate constraint satisfaction / computational integrity only. They do **not** guarantee that witness inputs remain confidential. Calling a wire a witness or omitting it from `public_words` is not, by itself, a zero-knowledge guarantee.
 - Replaced the misleading triple-stack runtime demo with an opaque-word XOR integrity proof. It no longer simulates host-side OTP values and then reports encryption or perfect secrecy as verified.
 - Re-scoped README and paper language to remove any implication that the bundled Binius64 HDC circuit is privacy-preserving. A ZK-capable backend and privacy/security review are prerequisites for those claims.
+- Added `spartan_privacy.rs`, a minimal Iron Spartan proof smoke test with two private Boolean witness bits, a public XOR output, and a regression check rejecting a non-Boolean field value. This is not yet a migration of the large HDC circuits and has not passed CI in this session.
+- The vendored Iron Spartan verifier declares `SECURITY_BITS = 96`; evaluate the target security policy and parameters before production adoption.
 
 ## CI follow-up
 
