@@ -31,9 +31,14 @@ Reviewed against the current Symthaea `main` tree on 2026-10-12:
 - [`src/actions.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-browser/src/actions.rs) defines typed actions and capabilities.
 - [`src/executor.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-browser/src/executor.rs) is intended to be the only normal route from a cognitive action proposal to a browser mutation.
 - [`src/safety.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-browser/src/safety.rs) validates action policy, URL structure, origin scope and local-network restrictions before CDP dispatch.
+- [`examples/praxis_active.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-browser/examples/praxis_active.rs) and [`examples/praxis_conscious.rs`](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-browser/examples/praxis_conscious.rs) contain direct CDP/JS exploration helpers and explicitly warn that they bypass `BrowserExecutor`; they are not production safety evidence, but should also be retired or rewritten if the no-authored-JS rule is applied to maintained examples.
 - [Patch Sets 79–84 verification report](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-browser/symthaea-browser-hardening-bundle-79-84/symthaea-browser-hardening-verification-79-84.md) explicitly says Cargo compilation, unit/integration tests and live Chromium tests were not run in its environment because Cargo was unavailable.
 
 This distinction is important: the existing crate has meaningful Rust safety/control logic, but it currently still contains authored JavaScript **strings sent into the page runtime**. The proposed policy must not claim those strings have already been removed.
+
+### Scope beyond production code
+
+The same inventory found direct `Page::evaluate` helper functions in the two active Praxis exploration examples. Their source comments already label them raw CDP harnesses that bypass `BrowserExecutor`; this is an important scope distinction, not an excuse to treat them as production. The implementation issue should either rewrite them to use the typed executor or move them to an explicitly archived / opt-in research area. Maintained examples should not teach a shortcut that the product safety architecture prohibits.
 
 ## 3. What “pure Rust” should mean
 
