@@ -18369,7 +18369,6 @@ dependencies = [
  "approx",
  "chromiumoxide",
  "futures",
- "html5ever",
  "scraper",
  "serde",
  "serde_json",
