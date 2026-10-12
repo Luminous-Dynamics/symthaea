@@ -122,6 +122,32 @@ class CoverageReportTests(unittest.TestCase):
                 (root / CATALOG_RELATIVE).read_bytes()
             ))
 
+    def test_report_exposes_zero_partial_and_full_constellation_routing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_root(root)
+            catalog_path = root / CATALOG_RELATIVE
+            source = catalog_path.read_text(encoding="utf-8").replace(
+                'style!(3, "Research Only", C),',
+                'style!(3, "Research Only", B),\n'
+                '    style!(4, "Unrouted Family", D),',
+            )
+            catalog_path.write_text(source, encoding="utf-8")
+
+            analysis = build_current_report(root)["coverage_analysis"]
+            by_constellation = {
+                item["constellation"]: item
+                for item in analysis["by_constellation"]
+            }
+            self.assertEqual(analysis["zero_route_constellations"], ["D"])
+            self.assertEqual(analysis["partial_route_constellations"], ["B"])
+            self.assertEqual(analysis["fully_routed_constellations"], ["A"])
+            self.assertEqual(by_constellation["B"]["catalog_entries"], 2)
+            self.assertEqual(by_constellation["B"]["composer_routed_entries"], 1)
+            self.assertEqual(by_constellation["B"]["unrouted_catalog_ids"], [3])
+            self.assertEqual(by_constellation["D"]["routed_catalog_ids"], [])
+            self.assertIn("not evidence", analysis["interpretation"])
+
     def test_report_fails_closed_on_duplicate_composer_routes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
