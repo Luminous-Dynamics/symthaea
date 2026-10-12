@@ -127,17 +127,28 @@ class StoreForwardTests(unittest.TestCase):
         second = self.queue.select_batch(now_utc=self.now, max_bytes=100)
         self.assertEqual(first, second)
         with self.assertRaises(EventIdentityConflict):
-            self.queue.acknowledge(event_id=e.event_id, payload_sha256="c" * 64)
+            self.queue.acknowledge(event_id=e.event_id, payload_sha256="c" * 64, now_utc=self.now)
         self.assertEqual(self.queue.pending_count, 1)
-        self.assertEqual(self.queue.acknowledge(event_id=e.event_id, payload_sha256=e.payload_sha256), "acknowledged")
-        self.assertEqual(self.queue.acknowledge(event_id=e.event_id, payload_sha256=e.payload_sha256), "idempotent_ack")
+        self.assertEqual(self.queue.acknowledge(event_id=e.event_id, payload_sha256=e.payload_sha256, now_utc=self.now), "acknowledged")
+        self.assertEqual(self.queue.acknowledge(event_id=e.event_id, payload_sha256=e.payload_sha256, now_utc=self.now), "idempotent_ack")
         self.assertEqual(self.queue.pending_count, 0)
 
     def test_ack_before_selection_is_rejected(self):
         e = event()
         self.queue.enqueue(e, now_utc=self.now)
         with self.assertRaisesRegex(TelemetryQueueError, "not selected"):
-            self.queue.acknowledge(event_id=e.event_id, payload_sha256=e.payload_sha256)
+            self.queue.acknowledge(event_id=e.event_id, payload_sha256=e.payload_sha256, now_utc=self.now)
+
+    def test_expired_event_cannot_be_acked_as_delivered(self):
+        e = event(expires="2026-10-12T10:06:00Z")
+        self.queue.enqueue(e, now_utc=self.now)
+        self.queue.select_batch(now_utc=self.now, max_bytes=100)
+        with self.assertRaisesRegex(TelemetryQueueError, "expired before ACK"):
+            self.queue.acknowledge(
+                event_id=e.event_id, payload_sha256=e.payload_sha256,
+                now_utc=dt("2026-10-12T10:06:00Z"),
+            )
+        self.assertEqual(self.queue.expire(now_utc=dt("2026-10-12T10:06:00Z")), (e.event_id,))
 
     def test_wrong_timezone_and_invalid_domain_fail_closed(self):
         with self.assertRaisesRegex(TelemetryQueueError, "must be UTC"):
