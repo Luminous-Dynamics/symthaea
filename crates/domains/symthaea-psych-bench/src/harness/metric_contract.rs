@@ -178,7 +178,7 @@ impl MetricDefinitionV1 {
                             if !alpha.is_finite()
                                 || alpha <= 0.0
                                 || alpha >= 1.0
-                                || (1.0 - alpha - confidence_level).abs() > 1e-12
+                                || (1.0 - alpha - *confidence_level).abs() > 1e-12
                             {
                                 errors.push("BCa bootstrap alpha must match the declared confidence level".to_string());
                             }
@@ -477,13 +477,13 @@ impl MetricContractV1 {
                                         format!("{}/{}: {error}", definition.benchmark, definition.metric)
                                     }));
                                 }
-                                if observed.method() != method {
+                                if observed.method() != method.as_str() {
                                     errors.push(format!(
                                         "{}/{}: observed estimator method {:?} does not match contract method {:?}",
                                         definition.benchmark, definition.metric, observed.method(), method
                                     ));
                                 }
-                                if (observed.confidence_level() - confidence_level).abs() > 1e-12 {
+                                if (observed.confidence_level() - *confidence_level).abs() > 1e-12 {
                                     errors.push(format!(
                                         "{}/{}: observed confidence level {} does not match contract level {}",
                                         definition.benchmark, definition.metric, observed.confidence_level(), confidence_level
@@ -735,7 +735,7 @@ mod tests {
 
     #[test]
     fn relative_comparison_requires_metric_specific_scale_floor() {
-        let contract = MetricContractV1::new(vec![deterministic_definition("B", "accuracy")]).unwrap();
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
         let near_zero = snapshot(&[("B", "accuracy", 0.001, 10)]);
         // A current observation may legitimately approach zero; only a baseline used
         // as the denominator of a relative-delta comparison must clear this floor.
