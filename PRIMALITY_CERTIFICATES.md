@@ -60,7 +60,10 @@ size requirement `(p - 1)^2 > p` explicitly. This implementation supplies the
 complete factorization of (p-1), so the factored part (F) is (p-1).
 
 Limits: at most 4,096 certificate nodes and at most 65,536 combined predecessor
-factor entries plus witness entries.
+factor entries plus witness entries. The Rust in-memory verifier applies these same
+limits before constructing its lookup table or evaluating witness conditions, so a
+caller cannot bypass the wire decoder's resource ceilings by constructing a proof
+object directly.
 
 ## Proof-carrying factorization: `SYMFCER1`
 
