@@ -1205,7 +1205,7 @@ jobs:
               # because feature legs were check-only and never built tests.
               cargo check -p symthaea --features "$FEATURES" \
                 --test voice_integration --test voice_pipeline_integration
-              # Compile/run the round-trip evaluator's dependency-free manifest-contract tests.
+              # Compile/run the round-trip evaluator's manifest-contract tests without loading a voice model or ASR worker.
               # This ensures the example cannot drift out of sync with its frozen case manifests.
               cargo test -p symthaea --example voice_roundtrip_wer --features "$FEATURES" -- --test-threads=1
               ;;

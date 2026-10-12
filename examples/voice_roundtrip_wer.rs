@@ -130,7 +130,10 @@ fn parse_case_manifest(root: &serde_json::Value) -> anyhow::Result<Vec<Utterance
             .get("text")
             .and_then(|value| value.as_str())
             .ok_or_else(|| anyhow::anyhow!("manifest case {clip_id} has no source text"))?;
-        anyhow::ensure!(!text.trim().is_empty(), "manifest case {clip_id} has empty source text");
+        anyhow::ensure!(
+            !text.trim().is_empty(),
+            "manifest case {clip_id} has empty source text"
+        );
         let expected_digest = case
             .get("text_sha256")
             .and_then(|value| value.as_str())
@@ -144,12 +147,15 @@ fn parse_case_manifest(root: &serde_json::Value) -> anyhow::Result<Vec<Utterance
             .get("question_ids")
             .and_then(|value| value.as_array())
             .ok_or_else(|| anyhow::anyhow!("manifest case {clip_id} has no question_ids array"))?;
-        anyhow::ensure!(!question_ids.is_empty(), "manifest case {clip_id} has no comprehension questions");
+        anyhow::ensure!(
+        !question_ids.is_empty(),
+        "manifest case {clip_id} has no comprehension questions"
+    );
         let mut seen_question_ids = HashSet::new();
         for question in question_ids {
-            let question_id = question
-                .as_str()
-                .ok_or_else(|| anyhow::anyhow!("manifest case {clip_id} has a non-string question ID"))?;
+            let question_id = question.as_str().ok_or_else(|| {
+                anyhow::anyhow!("manifest case {clip_id} has a non-string question ID")
+            })?;
             anyhow::ensure!(
                 !question_id.trim().is_empty() && seen_question_ids.insert(question_id.to_string()),
                 "manifest case {clip_id} has an empty or duplicate question ID"
@@ -833,6 +839,10 @@ fn main() -> anyhow::Result<()> {
     } else {
         default_utterances(&mode)
     };
+    let case_manifest_sha256 = case_manifest
+        .as_ref()
+        .map(|path| sha256_file(path))
+        .transpose()?;
 
     let mut rows = Vec::new();
     let mut synthesis_failures = Vec::new();
@@ -856,14 +866,22 @@ fn main() -> anyhow::Result<()> {
                 let reason = "synthesis returned empty audio".to_string();
                 println!("  [{i:2}] SYNTHESIS FAILED {clip_id}: {sentence:?} ({reason})");
                 synthesis_failures.push(serde_json::json!({
-                    "index": i, "clip_id": clip_id, "sentence": sentence, "reason": reason, "synth_ms": synth_ms
+                    "index": i,
+                    "clip_id": clip_id,
+                    "sentence": sentence,
+                    "reason": reason,
+                    "synth_ms": synth_ms,
                 }));
                 continue;
             }
             Err(reason) => {
                 println!("  [{i:2}] SYNTHESIS FAILED {clip_id}: {sentence:?} ({reason})");
                 synthesis_failures.push(serde_json::json!({
-                    "index": i, "clip_id": clip_id, "sentence": sentence, "reason": reason, "synth_ms": synth_ms
+                    "index": i,
+                    "clip_id": clip_id,
+                    "sentence": sentence,
+                    "reason": reason,
+                    "synth_ms": synth_ms,
                 }));
                 continue;
             }
@@ -934,6 +952,7 @@ fn main() -> anyhow::Result<()> {
             "voice": if mode == "kokoro" { "KokoroEngine (neural, onnx-community)" } else { "ReplVoiceOutput (formant/vocal-tract)" },
             "mode": mode,
             "case_manifest": case_manifest.as_ref().map(|path| path.display().to_string()),
+            "case_manifest_sha256": case_manifest_sha256,
             "audio_saved": save_wavs.is_some(),
             "rate": rate,
             "f0": f0,
@@ -1029,6 +1048,32 @@ mod case_manifest_tests {
         wrong_language["cases"][0]["language"] = serde_json::json!("fr");
         let language_error = parse_case_manifest(&wrong_language).unwrap_err().to_string();
         assert!(language_error.contains("supports language='en' only"), "{language_error}");
+    }
+
+    #[test]
+    fn case_manifest_rejects_empty_cases_and_unsupported_version() {
+        let mut empty = valid_manifest();
+        empty["cases"] = serde_json::json!([]);
+        let empty_error = parse_case_manifest(&empty).unwrap_err().to_string();
+        assert!(empty_error.contains("must not be empty"), "{empty_error}");
+
+        let mut wrong_version = valid_manifest();
+        wrong_version["format_version"] = serde_json::json!(2);
+        let version_error = parse_case_manifest(&wrong_version).unwrap_err().to_string();
+        assert!(version_error.contains("format_version=1"), "{version_error}");
+    }
+
+    #[test]
+    fn case_manifest_rejects_empty_or_duplicate_question_ids() {
+        let mut empty_id = valid_manifest();
+        empty_id["cases"][0]["question_ids"] = serde_json::json!(["q1", "  "]);
+        let empty_error = parse_case_manifest(&empty_id).unwrap_err().to_string();
+        assert!(empty_error.contains("empty or duplicate question ID"), "{empty_error}");
+
+        let mut duplicate_id = valid_manifest();
+        duplicate_id["cases"][0]["question_ids"] = serde_json::json!(["q1", "q1"]);
+        let duplicate_error = parse_case_manifest(&duplicate_id).unwrap_err().to_string();
+        assert!(duplicate_error.contains("empty or duplicate question ID"), "{duplicate_error}");
     }
 
     #[test]
