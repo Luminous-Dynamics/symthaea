@@ -362,7 +362,7 @@ mod bounded_rk4_trajectory_tests {
     fn overflowed_state_update_work_is_counted_before_rejection() {
         let (_times, states, work) = rk4_trajectory_with_work(
             |state, _time| vec![f64::MAX; state.len()],
-            &[f64::MAX],
+            &[0.0],
             1.0,
             0.1,
         );
