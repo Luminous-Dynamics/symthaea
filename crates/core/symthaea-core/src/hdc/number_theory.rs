@@ -83,6 +83,7 @@ pub enum PrimalityProofError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimalityProofWireError {
     InvalidMagicOrVersion,
+    NonCanonicalEncoding,
     TruncatedInput,
     TrailingBytes { count: usize },
     InputTooLarge { length: usize },
@@ -364,6 +365,10 @@ impl PrimalityProof {
 
         let proof = Self { value, certificates };
         proof.verify().map_err(PrimalityProofWireError::InvalidProof)?;
+        let canonical = proof.to_canonical_bytes()?;
+        if canonical.as_slice() != bytes {
+            return Err(PrimalityProofWireError::NonCanonicalEncoding);
+        }
         Ok(proof)
     }
 }
@@ -484,6 +489,7 @@ pub enum CertifiedFactorizationError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CertifiedFactorizationWireError {
     InvalidMagicOrVersion,
+    NonCanonicalEncoding,
     TruncatedInput,
     TrailingBytes { count: usize },
     InputTooLarge { length: usize },
@@ -600,8 +606,6 @@ impl CertifiedFactorizationCertificate {
                     reason,
                 }
             })?;
-            let _proof_length = u32::try_from(proof_bytes.len())
-                .map_err(|_| CertifiedFactorizationWireError::LengthOverflow)?;
             encoded_len = encoded_len
                 .checked_add(4)
                 .and_then(|len| len.checked_add(proof_bytes.len()))
@@ -696,7 +700,13 @@ impl CertifiedFactorizationCertificate {
             factorization: FactorizationCertificate { value, factors },
             prime_proofs,
         };
-        certificate.verify().map_err(CertifiedFactorizationWireError::InvalidCertificate)?;
+        certificate
+            .verify()
+            .map_err(CertifiedFactorizationWireError::InvalidCertificate)?;
+        let canonical = certificate.to_canonical_bytes()?;
+        if canonical.as_slice() != bytes {
+            return Err(CertifiedFactorizationWireError::NonCanonicalEncoding);
+        }
         Ok(certificate)
     }
 
