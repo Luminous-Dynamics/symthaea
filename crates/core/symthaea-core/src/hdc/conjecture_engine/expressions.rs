@@ -18,7 +18,7 @@ pub enum Expr {
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     /// Unary function
     Func(UnaryFn, Box<Expr>),
-    /// Summation: Σ_{k=1}^{n} body(k)
+    /// Inclusive finite summation: Σ_{k=0}^{n} body(k)
     Sum(Box<Expr>, String),
 }
 
@@ -42,56 +42,108 @@ pub enum UnaryFn {
     Floor,
 }
 
-impl Expr {
-    /// Evaluate the expression with variable bindings.
-    pub fn eval(&self, vars: &[(&str, f64)]) -> f64 {
+/// Hard cap on the inclusive upper bound of a symbolic finite sum.
+pub const MAX_SUMMATION_UPPER_BOUND: u64 = 100;
+
+/// Typed failures from strict evaluation of a symbolic-regression expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExprEvalError {
+    MissingVariable(String),
+    DuplicateVariableBinding(String),
+    NonFiniteVariableBinding(String),
+    DivisionByZero,
+    IndeterminatePower,
+    DomainError(&'static str),
+    InvalidSummationBound,
+    SummationLimitExceeded { bound: u64, max: u64 },
+    NonFiniteResult,
+}
+
+impl fmt::Display for ExprEvalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expr::Var(name) => vars
-                .iter()
-                .find(|(n, _)| *n == name.as_str())
-                .map(|(_, v)| *v)
-                .unwrap_or(f64::NAN),
-            Expr::Const(c) => *c,
+            Self::MissingVariable(name) => write!(f, "missing variable binding: {name}"),
+            Self::DuplicateVariableBinding(name) => write!(f, "duplicate variable binding: {name}"),
+            Self::NonFiniteVariableBinding(name) => write!(f, "non-finite variable binding: {name}"),
+            Self::DivisionByZero => write!(f, "division by zero"),
+            Self::IndeterminatePower => write!(f, "zero raised to zero is indeterminate"),
+            Self::DomainError(reason) => write!(f, "expression domain error: {reason}"),
+            Self::InvalidSummationBound => {
+                write!(f, "summation bound n must be a finite nonnegative integer")
+            }
+            Self::SummationLimitExceeded { bound, max } => {
+                write!(f, "summation upper bound {bound} exceeds configured maximum {max}")
+            }
+            Self::NonFiniteResult => write!(f, "expression produced a non-finite result"),
+        }
+    }
+}
+
+impl std::error::Error for ExprEvalError {}
+
+impl Expr {
+    /// Evaluate with strict mathematical-domain and environment checks.
+    ///
+    /// Finite sums use the inclusive convention Σ_{k=0}^{n}; n must be a
+    /// supplied nonnegative integer no greater than MAX_SUMMATION_UPPER_BOUND.
+    /// A sum's bound variable lexically shadows an outer binding of the same name.
+    pub fn eval_checked(&self, vars: &[(&str, f64)]) -> Result<f64, ExprEvalError> {
+        for (index, (name, value)) in vars.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(ExprEvalError::NonFiniteVariableBinding((*name).to_string()));
+            }
+            if vars[index + 1..].iter().any(|(other, _)| *other == *name) {
+                return Err(ExprEvalError::DuplicateVariableBinding((*name).to_string()));
+            }
+        }
+        self.eval_in_environment(vars)
+    }
+
+    /// Compatibility evaluator. Invalid or undefined expressions return NaN;
+    /// evidence-producing callers should use eval_checked to retain the reason.
+    pub fn eval(&self, vars: &[(&str, f64)]) -> f64 {
+        self.eval_checked(vars).unwrap_or(f64::NAN)
+    }
+
+    fn eval_in_environment(&self, vars: &[(&str, f64)]) -> Result<f64, ExprEvalError> {
+        let value = match self {
+            Expr::Var(name) => {
+                let mut matches = vars.iter().filter(|(candidate, _)| *candidate == name.as_str());
+                let (_, value) = matches
+                    .next()
+                    .ok_or_else(|| ExprEvalError::MissingVariable(name.clone()))?;
+                if matches.next().is_some() {
+                    return Err(ExprEvalError::DuplicateVariableBinding(name.clone()));
+                }
+                *value
+            }
+            Expr::Const(value) => *value,
             Expr::BinOp(op, left, right) => {
-                let l = left.eval(vars);
-                let r = right.eval(vars);
+                let lhs = left.eval_in_environment(vars)?;
+                let rhs = right.eval_in_environment(vars)?;
                 match op {
-                    BinOp::Add => l + r,
-                    BinOp::Sub => l - r,
-                    BinOp::Mul => l * r,
-                    BinOp::Div => {
-                        if r != 0.0 {
-                            l / r
-                        } else {
-                            f64::NAN
-                        }
+                    BinOp::Add => lhs + rhs,
+                    BinOp::Sub => lhs - rhs,
+                    BinOp::Mul => lhs * rhs,
+                    BinOp::Div if rhs == 0.0 => return Err(ExprEvalError::DivisionByZero),
+                    BinOp::Div => lhs / rhs,
+                    BinOp::Pow if lhs == 0.0 && rhs == 0.0 => {
+                        return Err(ExprEvalError::IndeterminatePower);
                     }
-                    BinOp::Pow => {
-                        if l == 0.0 && r == 0.0 {
-                            f64::NAN
-                        } else {
-                            l.powf(r)
-                        }
-                    }
+                    BinOp::Pow => lhs.powf(rhs),
                 }
             }
-            Expr::Func(f, arg) => {
-                let x = arg.eval(vars);
-                match f {
-                    UnaryFn::Sqrt => {
-                        if x >= 0.0 {
-                            x.sqrt()
-                        } else {
-                            f64::NAN
-                        }
+            Expr::Func(function, argument) => {
+                let x = argument.eval_in_environment(vars)?;
+                match function {
+                    UnaryFn::Sqrt if x < 0.0 => {
+                        return Err(ExprEvalError::DomainError("sqrt requires a nonnegative argument"));
                     }
-                    UnaryFn::Log => {
-                        if x > 0.0 {
-                            x.ln()
-                        } else {
-                            f64::NAN
-                        }
+                    UnaryFn::Sqrt => x.sqrt(),
+                    UnaryFn::Log if x <= 0.0 => {
+                        return Err(ExprEvalError::DomainError("log requires a positive argument"));
                     }
+                    UnaryFn::Log => x.ln(),
                     UnaryFn::Exp => x.exp(),
                     UnaryFn::Sin => x.sin(),
                     UnaryFn::Cos => x.cos(),
@@ -100,23 +152,55 @@ impl Expr {
                 }
             }
             Expr::Sum(body, var_name) => {
-                let n = vars
+                let upper = vars
                     .iter()
                     .find(|(name, _)| *name == "n")
-                    .map(|(_, v)| *v as usize)
-                    .unwrap_or(0)
-                    .min(100);
+                    .map(|(_, value)| *value)
+                    .ok_or_else(|| ExprEvalError::MissingVariable("n".to_string()))?;
+                if upper < 0.0 || upper.fract() != 0.0 {
+                    return Err(ExprEvalError::InvalidSummationBound);
+                }
+                if upper > MAX_SUMMATION_UPPER_BOUND as f64 {
+                    return Err(ExprEvalError::SummationLimitExceeded {
+                        bound: upper as u64,
+                        max: MAX_SUMMATION_UPPER_BOUND,
+                    });
+                }
+                let upper = upper as u64;
+
+                // Neumaier compensated summation reduces loss of low-order terms
+                // when the summand mixes values with very different magnitudes.
                 let mut sum = 0.0f64;
-                for k in 0..=n {
-                    let mut inner_vars: Vec<(&str, f64)> = vars.to_vec();
+                let mut compensation = 0.0f64;
+                for k in 0..=upper {
+                    // A bound variable shadows, rather than duplicates, any
+                    // outer variable with the same name.
+                    let mut inner_vars: Vec<(&str, f64)> = vars
+                        .iter()
+                        .copied()
+                        .filter(|(name, _)| *name != var_name.as_str())
+                        .collect();
                     inner_vars.push((var_name.as_str(), k as f64));
-                    sum += body.eval(&inner_vars);
-                    if !sum.is_finite() {
-                        return f64::NAN;
+                    let term = body.eval_in_environment(&inner_vars)?;
+                    let next = sum + term;
+                    if sum.abs() >= term.abs() {
+                        compensation += (sum - next) + term;
+                    } else {
+                        compensation += (term - next) + sum;
+                    }
+                    sum = next;
+                    if !sum.is_finite() || !compensation.is_finite() {
+                        return Err(ExprEvalError::NonFiniteResult);
                     }
                 }
-                sum
+                sum + compensation
             }
+        };
+
+        if value.is_finite() {
+            Ok(value)
+        } else {
+            Err(ExprEvalError::NonFiniteResult)
         }
     }
 
