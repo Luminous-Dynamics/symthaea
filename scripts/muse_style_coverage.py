@@ -532,6 +532,28 @@ def print_summary(report: dict[str, Any]) -> None:
         )
     )
     print(f"Status counts: {json.dumps(summary['status_counts'], sort_keys=True)}")
+
+    analysis = report.get("coverage_analysis")
+    if analysis is not None:
+        print("Per-constellation routing (routed/catalog; inventory IDs only):")
+        for item in analysis["by_constellation"]:
+            missing_ids = ", ".join(
+                str(catalog_id) for catalog_id in item["unrouted_catalog_ids"]
+            ) or "none"
+            print(
+                f"  {item['constellation']}: "
+                f"{item['composer_routed_entries']}/{item['catalog_entries']} routed; "
+                f"unrouted catalog IDs: {missing_ids}"
+            )
+        print(
+            "Zero-route constellations: "
+            + (", ".join(analysis["zero_route_constellations"]) or "none")
+        )
+        print(
+            "Partial-route constellations: "
+            + (", ".join(analysis["partial_route_constellations"]) or "none")
+        )
+
     print(
         "Interpretation: route/status coverage only; no claim about musical "
         "distinctness, rendering quality, or cultural authenticity."
