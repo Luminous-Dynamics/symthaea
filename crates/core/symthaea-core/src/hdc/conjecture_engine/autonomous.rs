@@ -488,6 +488,72 @@ pub struct AutonomousInvariant {
     pub discovery_mode: AutonomousDiscoveryMode,
 }
 
+/// Exact work counters from one autonomous discovery invocation.
+/// Rejection counters count scoring attempts, not unique formulas: the same
+/// expression can be evaluated or rejected in multiple generations.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct AutonomousDiscoveryWorkMetricsV1 {
+    pub schema_version: u32,
+    pub preflight_rejections: u64,
+    pub candidate_fitness_evaluations: u64,
+    pub rejected_complexity: u64,
+    pub rejected_invalid: u64,
+    pub rejected_degenerate: u64,
+    pub rejected_gradient_policy: u64,
+    pub rejected_duplicate: u64,
+    pub trajectory_attempts: u64,
+    pub trajectories_completed: u64,
+    pub trajectories_failed: u64,
+    pub attempted_integration_steps: u64,
+    pub completed_integration_steps: u64,
+    pub rhs_evaluations: u64,
+    pub state_updates: u64,
+    pub returned_candidates: u64,
+    pub search_wall_time_ns: u64,
+}
+
+/// Discovery candidates together with instrumentation from the search itself.
+/// Holdout work is recorded separately by the holdout assessment.
+#[derive(Debug, Clone)]
+pub struct AutonomousDiscoveryRunV1 {
+    pub candidates: Vec<AutonomousInvariant>,
+    pub metrics: AutonomousDiscoveryWorkMetricsV1,
+}
+
+fn add_trajectory_work(
+    metrics: &mut AutonomousDiscoveryWorkMetricsV1,
+    work: Rk4TrajectoryWorkV1,
+) {
+    metrics.trajectory_attempts = metrics.trajectory_attempts.saturating_add(1);
+    metrics.attempted_integration_steps = metrics
+        .attempted_integration_steps
+        .saturating_add(work.attempted_steps);
+    metrics.completed_integration_steps = metrics
+        .completed_integration_steps
+        .saturating_add(work.completed_steps);
+    metrics.rhs_evaluations = metrics.rhs_evaluations.saturating_add(work.rhs_evaluations);
+    metrics.state_updates = metrics.state_updates.saturating_add(work.state_updates);
+    if work.completed {
+        metrics.trajectories_completed = metrics.trajectories_completed.saturating_add(1);
+    } else {
+        metrics.trajectories_failed = metrics.trajectories_failed.saturating_add(1);
+    }
+}
+
+fn finish_discovery_run(
+    candidates: Vec<AutonomousInvariant>,
+    mut metrics: AutonomousDiscoveryWorkMetricsV1,
+    started_at: std::time::Instant,
+) -> AutonomousDiscoveryRunV1 {
+    metrics.schema_version = 1;
+    metrics.returned_candidates = candidates.len() as u64;
+    metrics.search_wall_time_ns = started_at
+        .elapsed()
+        .as_nanos()
+        .min(u64::MAX as u128) as u64;
+    AutonomousDiscoveryRunV1 { candidates, metrics }
+}
+
 pub fn compose_top_k_invariants(
     invariants: &[AutonomousInvariant],
     rhs: fn(&[f64], f64) -> Vec<f64>,
@@ -618,6 +684,23 @@ pub fn discover_invariants_autonomous_with_seed_templates(
     )
 }
 
+/// Primed discovery with exact search-work counters for research harnesses.
+pub fn discover_invariants_autonomous_with_seed_templates_and_metrics(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>,
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+    extra_seed_templates: &[Expr],
+) -> AutonomousDiscoveryRunV1 {
+    discover_invariants_autonomous_with_mode_and_metrics(
+        rhs, initial_state, var_names, dynamics, config, t_max, dt,
+        extra_seed_templates, AutonomousDiscoveryMode::Primed,
+    )
+}
+
 /// Cold autonomous discovery: built-in invariant templates and caller-supplied
 /// priors are excluded. The results remain candidate proposals, not evidence of truth.
 pub fn discover_invariants_autonomous_cold(
@@ -630,6 +713,22 @@ pub fn discover_invariants_autonomous_cold(
     dt: f64,
 ) -> Vec<AutonomousInvariant> {
     discover_invariants_autonomous_with_mode(
+        rhs, initial_state, var_names, dynamics, config, t_max, dt,
+        &[], AutonomousDiscoveryMode::Cold,
+    )
+}
+
+/// Cold discovery with exact search-work counters for research harnesses.
+pub fn discover_invariants_autonomous_cold_with_metrics(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>,
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+) -> AutonomousDiscoveryRunV1 {
+    discover_invariants_autonomous_with_mode_and_metrics(
         rhs, initial_state, var_names, dynamics, config, t_max, dt,
         &[], AutonomousDiscoveryMode::Cold,
     )
@@ -738,8 +837,26 @@ fn discover_invariants_autonomous_with_mode(
     extra_seed_templates: &[Expr],
     mode: AutonomousDiscoveryMode,
 ) -> Vec<AutonomousInvariant> {
+    discover_invariants_autonomous_with_mode_and_metrics(
+        rhs, initial_state, var_names, dynamics, config, t_max, dt, extra_seed_templates, mode,
+    ).candidates
+}
+
+fn discover_invariants_autonomous_with_mode_and_metrics(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>,
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+    extra_seed_templates: &[Expr],
+    mode: AutonomousDiscoveryMode,
+) -> AutonomousDiscoveryRunV1 {
+    let started_at = std::time::Instant::now();
+    let mut metrics = AutonomousDiscoveryWorkMetricsV1::default();
     if mode == AutonomousDiscoveryMode::Cold && !extra_seed_templates.is_empty() {
-        return Vec::new();
+        return finish_discovery_run(Vec::new(), metrics, started_at);
     }
     let effective_config = effective_discovery_config(config, mode);
     let config = &effective_config;
@@ -749,16 +866,17 @@ fn discover_invariants_autonomous_with_mode(
         || initial_state.iter().any(|value| !value.is_finite())
         || !autonomous_discovery_request_is_bounded(initial_state, config, t_max, dt)
     {
-        return Vec::new();
+        return finish_discovery_run(Vec::new(), metrics, started_at);
     }
 
-    let sample_one = |ic: &[f64]| -> Vec<Vec<f64>> {
-        let (_t, states) = rk4_trajectory(rhs, ic, t_max, dt);
+    let sample_one = |ic: &[f64], metrics: &mut AutonomousDiscoveryWorkMetricsV1| -> Vec<Vec<f64>> {
+        let (_times, states, work) = rk4_trajectory_with_work(rhs, ic, t_max, dt);
+        add_trajectory_work(metrics, work);
         sample_trajectory_evenly(&states, 200)
     };
-    let sampled = sample_one(initial_state);
+    let sampled = sample_one(initial_state, &mut metrics);
     if sampled.len() < 20 {
-        return Vec::new();
+        return finish_discovery_run(Vec::new(), metrics, started_at);
     }
 
     let mut sampled_orbits: Vec<Vec<Vec<f64>>> = vec![sampled.clone()];
@@ -774,7 +892,7 @@ fn discover_invariants_autonomous_with_mode(
                 let scale = x.abs().max(0.05);
                 *x += u * 0.1 * scale;
             }
-            let extra = sample_one(&ic);
+            let extra = sample_one(&ic, &mut metrics);
             if extra.len() >= 20 {
                 sampled_orbits.push(extra);
             }
@@ -886,7 +1004,10 @@ fn discover_invariants_autonomous_with_mode(
         let fitnesses: Vec<f64> = population
             .iter()
             .map(|expr| {
+                metrics.candidate_fitness_evaluations =
+                    metrics.candidate_fitness_evaluations.saturating_add(1);
                 if expr.complexity() > max_complexity || expr.complexity() < 3 {
+                    metrics.rejected_complexity = metrics.rejected_complexity.saturating_add(1);
                     return f64::MAX;
                 }
 
@@ -899,6 +1020,7 @@ fn discover_invariants_autonomous_with_mode(
                         .collect();
                     let v = expr.eval(&bindings);
                     if !v.is_finite() {
+                        metrics.rejected_invalid = metrics.rejected_invalid.saturating_add(1);
                         return f64::MAX;
                     }
                     values.push(v);
@@ -909,6 +1031,7 @@ fn discover_invariants_autonomous_with_mode(
                 let spread = var.sqrt();
                 let scale = mean.abs().max(1e-6);
                 if spread / scale < 1e-6 {
+                    metrics.rejected_degenerate = metrics.rejected_degenerate.saturating_add(1);
                     return f64::MAX;
                 }
 
@@ -920,6 +1043,7 @@ fn discover_invariants_autonomous_with_mode(
                         compute_trajectory_variance(expr, orbit, var_names)
                     };
                     if !v.is_finite() {
+                        metrics.rejected_invalid = metrics.rejected_invalid.saturating_add(1);
                         return f64::MAX;
                     }
                     if v > worst {
@@ -948,6 +1072,8 @@ fn discover_invariants_autonomous_with_mode(
                     if orth_n > 0 {
                         let mean_orth = orth_sum / orth_n as f64;
                         if mean_orth < orth_threshold_sin {
+                            metrics.rejected_gradient_policy =
+                                metrics.rejected_gradient_policy.saturating_add(1);
                             return f64::MAX;
                         }
                     }
@@ -1027,10 +1153,14 @@ fn discover_invariants_autonomous_with_mode(
         .iter()
         .enumerate()
         .map(|(i, expr)| {
+            metrics.candidate_fitness_evaluations =
+                metrics.candidate_fitness_evaluations.saturating_add(1);
             if expr.complexity() > max_complexity || expr.complexity() < 3 {
+                metrics.rejected_complexity = metrics.rejected_complexity.saturating_add(1);
                 return (i, f64::MAX, 0.0);
             }
             if matches!(simplify(expr), Expr::Const(_)) {
+                metrics.rejected_degenerate = metrics.rejected_degenerate.saturating_add(1);
                 return (i, f64::MAX, 0.0);
             }
             let mut nt_vals = Vec::with_capacity(nt_test_points.len());
@@ -1042,6 +1172,7 @@ fn discover_invariants_autonomous_with_mode(
                     .collect();
                 let v = expr.eval(&bindings);
                 if !v.is_finite() {
+                    metrics.rejected_invalid = metrics.rejected_invalid.saturating_add(1);
                     return (i, f64::MAX, 0.0);
                 }
                 nt_vals.push(v);
@@ -1052,6 +1183,7 @@ fn discover_invariants_autonomous_with_mode(
                 .sqrt();
             let nt_scale = nt_mean.abs().max(1e-6);
             if nt_spread / nt_scale < 1e-6 {
+                metrics.rejected_degenerate = metrics.rejected_degenerate.saturating_add(1);
                 return (i, f64::MAX, 0.0);
             }
 
@@ -1071,6 +1203,8 @@ fn discover_invariants_autonomous_with_mode(
                 if orth_n > 0 {
                     let mean_orth = orth_sum / orth_n as f64;
                     if mean_orth < orth_threshold_sin {
+                        metrics.rejected_gradient_policy =
+                            metrics.rejected_gradient_policy.saturating_add(1);
                         return (i, f64::MAX, 0.0);
                     }
                 }
@@ -1118,6 +1252,7 @@ fn discover_invariants_autonomous_with_mode(
     for &(idx, var, mean) in scored.iter().take(100) {
         let expr_simplified = simplify(&population[idx]);
         if matches!(expr_simplified, Expr::Const(_)) {
+            metrics.rejected_degenerate = metrics.rejected_degenerate.saturating_add(1);
             continue;
         }
 
@@ -1136,9 +1271,11 @@ fn discover_invariants_autonomous_with_mode(
         let v0 = expr_simplified.eval(&test_states[0]);
         let v1 = expr_simplified.eval(&test_states[1]);
         if v0.is_finite() && v1.is_finite() && (v0 - v1).abs() < 1e-8 * v0.abs().max(1.0) {
+            metrics.rejected_degenerate = metrics.rejected_degenerate.saturating_add(1);
             continue;
         }
         if !v0.is_finite() || !v1.is_finite() {
+            metrics.rejected_invalid = metrics.rejected_invalid.saturating_add(1);
             continue;
         }
 
@@ -1146,6 +1283,7 @@ fn discover_invariants_autonomous_with_mode(
             .iter()
             .any(|m| (m - mean).abs() < mean.abs() * 0.01 + 1e-6);
         if is_duplicate {
+            metrics.rejected_duplicate = metrics.rejected_duplicate.saturating_add(1);
             continue;
         }
         seen_means.push(mean);
@@ -1180,7 +1318,7 @@ fn discover_invariants_autonomous_with_mode(
         }
     }
 
-    results
+    finish_discovery_run(results, metrics, started_at)
 }
 
 /// Nearest-neighbor-chain energy template: for a system whose variables are
