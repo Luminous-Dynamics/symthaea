@@ -173,6 +173,36 @@ class RuntimeInventoryTests(unittest.TestCase):
                 {"dedicated_engine": 1, "period_sentence_pipeline": 1},
             )
 
+    def test_classifies_families_using_the_dispatch_fallback(self) -> None:
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_root(root)
+            style_path = root / STYLE_RELATIVE
+            style_path.write_text(
+                STYLE_FIXTURE.replace(
+                    "Style::Other => GrooveCycle",
+                    "Style::Other => Developmental",
+                ),
+                encoding="utf-8",
+            )
+            report = _runtime_report(root)
+            profiles = {item["style"]: item for item in report["profiles"]}
+
+            self.assertEqual(
+                profiles["Other"]["grammar_dispatch"]["mode"],
+                "compatibility_fallback",
+            )
+            self.assertEqual(
+                report["summary"]["styles_using_compatibility_fallback"],
+                ["Other"],
+            )
+            self.assertEqual(
+                report["summary"]["grammar_dispatch_modes"],
+                {"compatibility_fallback": 1, "period_sentence_pipeline": 1},
+            )
+
     def test_fails_closed_when_grammar_dispatcher_has_no_compatibility_fallback(self) -> None:
         from tempfile import TemporaryDirectory
 
@@ -220,8 +250,8 @@ class RuntimeInventoryTests(unittest.TestCase):
             realization_path.write_text(
                 REALIZATION_FIXTURE.replace(
                     "        Style::Other => &[\n"
-                    "            (Instrument::Sitar, Instrument::Pad, Instrument::Bass),\n"
-                    "            (Instrument::Sitar, Instrument::Harp, Instrument::Bass),\n"
+                    "            (Instrument::Sitar, Instrument::Pad, Instrument::Bass,),\n"
+                    "            (Instrument::Sitar, Instrument::Harp, Instrument::Bass,),\n"
                     "        ],",
                     "",
                 ),
