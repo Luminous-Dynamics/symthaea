@@ -226,7 +226,15 @@ impl PhiTrajectory {
     /// from an externally measured clock. The compatibility method intentionally
     /// keeps the original simple call surface.
     pub fn observe(&mut self, phi: f64) {
-        let _ = self.observe_at(phi, self.started_at.elapsed());
+        let _ = self.try_observe(phi);
+    }
+
+    /// Record Φ using the trajectory's local monotonic clock and report admission.
+    ///
+    /// Returns false without changing trajectory state if Φ is non-finite or
+    /// the elapsed offset is not strictly greater than the last accepted offset.
+    pub fn try_observe(&mut self, phi: f64) -> bool {
+        self.observe_at(phi, self.started_at.elapsed())
     }
 
     /// Record an interval-representative Φ sample at an elapsed offset from the
@@ -854,10 +862,26 @@ impl TemporalConsciousnessAnalyzer {
         narrative: Option<&NarrativeSelfModel>,
         predictive: Option<&PredictiveSelfModel>,
     ) {
+        let _ = self.try_observe(state, phi, narrative, predictive);
+    }
+
+    /// Update temporal analyses only after Φ is admitted by the trajectory.
+    ///
+    /// A rejected Φ sample must not contaminate continuity, temporal binding,
+    /// Husserlian state, identity metrics, or observation counters.
+    pub(crate) fn try_observe(
+        &mut self,
+        state: &BinaryHV,
+        phi: f64,
+        narrative: Option<&NarrativeSelfModel>,
+        predictive: Option<&PredictiveSelfModel>,
+    ) -> bool {
         let phi_prev = self.phi_trajectory.ema;
 
-        // Update Φ trajectory
-        self.phi_trajectory.observe(phi);
+        // Fail closed before mutating any downstream temporal analysis.
+        if !self.phi_trajectory.try_observe(phi) {
+            return false;
+        }
 
         // Update continuity
         self.continuity.observe(state, phi, phi_prev);
@@ -889,6 +913,7 @@ impl TemporalConsciousnessAnalyzer {
         let current_coherence = self.overall_temporal_coherence();
         self.stats.avg_temporal_coherence =
             (self.stats.avg_temporal_coherence * (n - 1.0) + current_coherence) / n;
+        true
     }
 
     /// Add protentions (future predictions) to Husserlian analysis
@@ -1151,6 +1176,19 @@ mod tests {
         assert!(!trajectory.observe_at(f64::NAN, Duration::from_secs(2)));
         assert_eq!(trajectory.history().len(), 1);
         assert_eq!(trajectory.ema, 0.4);
+    }
+
+    #[test]
+    fn analyzer_rejects_nonfinite_phi_before_mutating_downstream_state() {
+        let mut analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        let state = BinaryHV::random(73);
+
+        assert!(!analyzer.try_observe(&state, f64::NAN, None, None));
+        assert_eq!(analyzer.stats.observations, 0);
+        assert!(analyzer.phi_trajectory.history().is_empty());
+        assert!(analyzer.continuity.recent_states.is_empty());
+        assert!(analyzer.husserlian.primal_impression.is_none());
     }
 
     #[test]
