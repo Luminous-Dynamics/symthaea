@@ -101,7 +101,7 @@ struct Observation {
     score_note_count: usize,
     distinct_midi_pitches: usize,
     pitch_span_semitones: i32,
-    form_section_count: usize,
+    form_section_count: Option<usize>,
 }
 
 fn control_points(control: &str) -> Vec<ControlPoint> {
@@ -158,7 +158,12 @@ fn control_points(control: &str) -> Vec<ControlPoint> {
     }
 }
 
-fn observe(style: Style, control_point: &ControlPoint, base_hash: u64, base_structure: &[f64; STRUCT_DIMS]) -> Observation {
+fn observe(
+    style: Style,
+    control_point: &ControlPoint,
+    base_hash: u64,
+    base_structure: &[f64; STRUCT_DIMS],
+) -> Observation {
     let intent = control_point.input.intent();
     let spec = style.spec();
     let realization = compose_with_grammar_plan(style.grammar_profile(), &intent, &spec);
@@ -190,7 +195,7 @@ fn observe(style: Style, control_point: &ControlPoint, base_hash: u64, base_stru
         score_note_count: score.notes.len(),
         distinct_midi_pitches: midi_pitches.len(),
         pitch_span_semitones,
-        form_section_count: realization.form.as_ref().map_or(0, |form| form.sections.len()),
+        form_section_count: realization.form.as_ref().map(|form| form.sections.len()),
     }
 }
 
@@ -276,7 +281,8 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
     let mut max_structural_distance = 0.0_f64;
     for observation in &observations {
         unique_fingerprints.insert(observation.exact_hash);
-        max_structural_distance = max_structural_distance.max(observation.overall_structural_distance);
+        max_structural_distance =
+            max_structural_distance.max(observation.overall_structural_distance);
         for (&(name, _, _), &distance) in LAYERS.iter().zip(observation.layer_distances.iter()) {
             if distance > LAYER_CHANGE_THRESHOLD {
                 layers_changed.insert(name.to_string());
@@ -301,7 +307,6 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         .iter()
         .filter(|point| point.numeric_value.is_some())
         .collect::<Vec<_>>();
-    observations_sorted.sort_by(|a, b| a.numeric_value.unwrap().total_cmp(&b.numeric_value.unwrap()));
 
     serde_json::json!({
         "control": control,
@@ -321,10 +326,6 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         "points": observations
             .iter()
             .map(|observation| observation_json(observation, base_hash))
-            .collect::<Vec<_>>(),
-        "numeric_points_sorted_by_control": observations_sorted
-            .iter()
-            .map(|observation| observation.numeric_value.unwrap())
             .collect::<Vec<_>>(),
     })
 }
@@ -419,7 +420,10 @@ mod tests {
         for control in ["valence", "arousal", "energy", "bars"] {
             let points = control_points(control);
             assert_eq!(points.len(), 5, "{control}");
-            let values: Vec<f64> = points.iter().map(|point| point.numeric_value.unwrap()).collect();
+            let values: Vec<f64> = points
+                .iter()
+                .map(|point| point.numeric_value.unwrap())
+                .collect();
             assert!(values.windows(2).all(|pair| pair[0] < pair[1]), "{control}: {values:?}");
         }
     }
