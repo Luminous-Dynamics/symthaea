@@ -11,6 +11,7 @@ pub mod cross_domain_prediction;
 pub mod difficulty;
 pub mod html;
 pub mod live_runner;
+pub mod metric_contract;
 pub mod neuromod_correlation;
 pub mod neuromod_profiles;
 pub mod normative_comparison;
@@ -29,6 +30,10 @@ pub use cross_domain_prediction::{
     CrossDomainMatrix, DomainCorrelation, PredictionModel, SharedMechanism,
 };
 pub use difficulty::{DifficultyModel, DifficultyModelType, difficulty_model_for};
+pub use metric_contract::{
+    ComparisonRuleV1, METRIC_CONTRACT_SCHEMA_VERSION, MetricContractV1, MetricDefinitionV1,
+    MetricDirectionV1, MetricValueDomainV1, UncertaintyPolicyV1,
+};
 pub use neuromod_correlation::NeuromodCorrelationMatrix;
 pub use normative_comparison::{NormativeReport, NormativeScore};
 pub use psychometric_report::{BenchmarkDetail, PsychometricReport, ReportSummary};
@@ -38,7 +43,8 @@ pub use reliability_analysis::{
 };
 pub use report::{
     BaselineComparison, BenchmarkReport, BenchmarkResult, CompositeScore, ForestPlotRow,
-    LearningCurveRow, MetricValue, RtSummary, key_metric_for_benchmark, provenance_table,
+    LearningCurveRow, MetricValue, RtSummary, UncertaintyProvenanceV1,
+    UNCERTAINTY_PROVENANCE_SCHEMA_VERSION, key_metric_for_benchmark, provenance_table,
 };
 pub use sat_curves::{SatBattery, SatCurve, SatFit, SatPoint, run_sat_curve};
 pub use snapshot::{

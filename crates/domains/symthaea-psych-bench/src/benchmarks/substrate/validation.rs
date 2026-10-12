@@ -188,6 +188,7 @@ impl PsychBenchmark for SubstrateValidationBenchmark {
                 n: 1,
                 ci_lower: tested_f,
                 ci_upper: tested_f,
+                uncertainty_provenance: None,
             },
         );
         result.insert(
@@ -198,6 +199,7 @@ impl PsychBenchmark for SubstrateValidationBenchmark {
                 n: 1,
                 ci_lower: passed_f,
                 ci_upper: passed_f,
+                uncertainty_provenance: None,
             },
         );
         let pass_rate = if tested > 0 { passed_f / tested_f } else { 0.0 };
@@ -209,6 +211,7 @@ impl PsychBenchmark for SubstrateValidationBenchmark {
                 n: 1,
                 ci_lower: pass_rate,
                 ci_upper: pass_rate,
+                uncertainty_provenance: None,
             },
         );
 
@@ -223,6 +226,7 @@ impl PsychBenchmark for SubstrateValidationBenchmark {
                     n: 1,
                     ci_lower: conf,
                     ci_upper: conf,
+                    uncertainty_provenance: None,
                 },
             );
             let p = summary.passed as f64;
@@ -234,6 +238,7 @@ impl PsychBenchmark for SubstrateValidationBenchmark {
                     n: 1,
                     ci_lower: p,
                     ci_upper: p,
+                    uncertainty_provenance: None,
                 },
             );
             // Evidence level stored as a note since MetricValue is numeric-only

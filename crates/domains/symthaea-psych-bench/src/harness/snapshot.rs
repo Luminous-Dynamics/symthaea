@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Current schema version for snapshot files.
-pub const SNAPSHOT_SCHEMA_VERSION: &str = "1.1";
+pub const SNAPSHOT_SCHEMA_VERSION: &str = "1.2";
 
 fn default_schema_version() -> String {
     "1.0".to_string()
@@ -269,6 +269,14 @@ impl RegressionSnapshot {
                         bench, metric_name, val.ci_lower, val.ci_upper
                     ));
                 }
+
+                if let Some(provenance) = val.uncertainty_provenance() {
+                    if let Err(provenance_errors) = provenance.validate_for_value(val) {
+                        errors.extend(provenance_errors.into_iter().map(|error| {
+                            format!("{}/{}: {error}", bench, metric_name)
+                        }));
+                    }
+                }
             }
         }
 
@@ -286,12 +294,12 @@ impl RegressionSnapshot {
 
     /// Migrate a JSON string to the current schema version.
     ///
-    /// Handles version-aware deserialization: v1.0 snapshots (no `schema_version`
-    /// field) are upgraded to v1.1 with the field set.
+    /// Handles version-aware deserialization: v1.0/v1.1 snapshots are upgraded to
+    /// the current schema. Missing uncertainty provenance remains absent and therefore
+    /// cannot qualify an empirical comparison after migration.
     pub fn migrate(json: &str) -> Result<Self, serde_json::Error> {
         let mut snapshot: Self = serde_json::from_str(json)?;
-        // v1.0 files lack schema_version; serde default fills "1.0"
-        if snapshot.schema_version == "1.0" {
+        if snapshot.schema_version == "1.0" || snapshot.schema_version == "1.1" {
             snapshot.schema_version = SNAPSHOT_SCHEMA_VERSION.to_string();
         }
         Ok(snapshot)
@@ -818,6 +826,7 @@ mod strict_population_tests {
                         n: 20,
                         ci_lower: *mean - 0.02,
                         ci_upper: *mean + 0.02,
+                        uncertainty_provenance: None,
                     },
                 );
             }
@@ -1055,6 +1064,7 @@ mod tests {
                 n: 20,
                 ci_lower: accuracy - 0.02,
                 ci_upper: accuracy + 0.02,
+                uncertainty_provenance: None,
             },
         );
         metrics.insert("TestBench".to_string(), bench_metrics);
@@ -1259,6 +1269,7 @@ mod tests {
                     n: 20,
                     ci_lower: 0.88,
                     ci_upper: 0.92,
+                    uncertainty_provenance: None,
                 },
             )]),
         );
@@ -1285,6 +1296,7 @@ mod tests {
                 n: 20,
                 ci_lower: 4.98,
                 ci_upper: 5.02,
+                uncertainty_provenance: None,
             },
         );
         let mut current = make_test_snapshot("current", 0.90);
@@ -1296,6 +1308,7 @@ mod tests {
                 n: 20,
                 ci_lower: 2.98,
                 ci_upper: 3.02,
+                uncertainty_provenance: None,
             },
         );
         let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
@@ -1319,6 +1332,7 @@ mod tests {
                 n: 10,
                 ci_lower: 0.0,
                 ci_upper: 0.0,
+                uncertainty_provenance: None,
             },
         );
         let mut current = make_test_snapshot("current", 0.90);
@@ -1330,6 +1344,7 @@ mod tests {
                 n: 10,
                 ci_lower: 0.4,
                 ci_upper: 0.6,
+                uncertainty_provenance: None,
             },
         );
         let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
@@ -1454,6 +1469,27 @@ mod tests {
     }
 
     #[test]
+    fn test_migrate_v1_1_snapshot_keeps_missing_provenance_unknown() {
+        let json = r#"{
+            "name": "legacy-v1.1",
+            "timestamp": "2026-10-10T00:00:00Z",
+            "git_hash": null,
+            "config_summary": "",
+            "schema_version": "1.1",
+            "metrics": {
+                "Bench": {
+                    "accuracy": {"mean": 0.8, "std_dev": 0.1, "n": 10, "ci_lower": 0.6, "ci_upper": 1.0}
+                }
+            }
+        }"#;
+        let migrated = RegressionSnapshot::migrate(json).unwrap();
+        assert_eq!(migrated.schema_version, SNAPSHOT_SCHEMA_VERSION);
+        assert!(migrated.metrics["Bench"]["accuracy"]
+            .uncertainty_provenance()
+            .is_none());
+    }
+
+    #[test]
     fn test_validate_valid() {
         let s = make_test_snapshot("valid", 0.85);
         assert!(s.validate().is_ok());
@@ -1492,6 +1528,7 @@ mod tests {
                 n: 10,
                 ci_lower: 0.0,
                 ci_upper: 1.0,
+                uncertainty_provenance: None,
             },
         );
         let errs = s.validate().unwrap_err();
@@ -1499,7 +1536,7 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_v1_0_to_v1_1() {
+    fn test_migrate_v1_0_to_current_schema_without_inventing_provenance() {
         let json = r#"{
             "name": "legacy",
             "timestamp": "2026-01-15T00:00:00Z",
@@ -1515,11 +1552,14 @@ mod tests {
         assert_eq!(migrated.schema_version, SNAPSHOT_SCHEMA_VERSION);
         assert_eq!(migrated.name, "legacy");
         assert!(migrated.metrics.contains_key("Stroop"));
+        assert!(migrated.metrics["Stroop"]["interference"]
+            .uncertainty_provenance()
+            .is_none());
     }
 
     #[test]
     fn test_backward_compat_roundtrip() {
-        // Create v1.1 snapshot, serialize, deserialize — schema_version preserved
+        // Create current-schema snapshot, serialize, deserialize — schema_version preserved
         let s = make_test_snapshot("roundtrip", 0.90);
         assert_eq!(s.schema_version, SNAPSHOT_SCHEMA_VERSION);
         let json = s.to_json().unwrap();

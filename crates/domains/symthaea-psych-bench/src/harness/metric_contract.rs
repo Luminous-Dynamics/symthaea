@@ -1,0 +1,941 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Versioned metric semantics for psychological benchmark comparisons.
+//!
+//! This contract does not infer meaning from metric names. Every comparison-qualified
+//! metric must declare its estimand, unit/domain, direction, sample unit, uncertainty
+//! treatment, and comparison rule. Snapshot values currently do not bind sample unit,
+//! CI method, or confidence level, so empirical uncertainty cannot yet qualify a snapshot.
+//! Missing semantics or observation-level provenance remain missing.
+
+use crate::harness::report::MetricValue;
+use crate::harness::snapshot::{RegressionSnapshot, SNAPSHOT_SCHEMA_VERSION};
+use serde::de::Error as DeError;
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
+
+pub const METRIC_CONTRACT_SCHEMA_VERSION: &str = "symthaea-psych-metric-contract-v1";
+const METRIC_CONTRACT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:psych-bench-metric-contract:v1\n";
+
+/// Numeric support/domain of a metric's reported values. Units are separate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricValueDomainV1 {
+    Real,
+    NonNegative,
+    UnitInterval,
+    IntegerCount,
+}
+
+/// Direction is explicit even for metrics that are diagnostic-only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum MetricDirectionV1 {
+    HigherIsBetter,
+    LowerIsBetter,
+    TargetRange { lower: f64, upper: f64 },
+    DiagnosticOnly,
+}
+
+/// Declared uncertainty treatment, including deterministic outputs and missing estimates.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum UncertaintyPolicyV1 {
+    Empirical {
+        method: String,
+        confidence_level: f64,
+        /// Required algorithm parameters, which must match recorded observation metadata.
+        parameters: BTreeMap<String, String>,
+    },
+    Deterministic {
+        verification_method: String,
+    },
+    NotEstimated {
+        reason: String,
+    },
+}
+
+/// Per-metric comparison rule, with thresholds in the metric's declared scale.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ComparisonRuleV1 {
+    AbsoluteDelta {
+        warning_delta: f64,
+        critical_delta: f64,
+    },
+    RelativeDelta {
+        warning_fraction: f64,
+        critical_fraction: f64,
+        /// Metric-specific lower bound for using a percentage delta, in the
+        /// metric's declared unit. No global fallback is permitted.
+        minimum_reference_magnitude: f64,
+    },
+    NoClassification {
+        rationale: String,
+    },
+}
+
+/// Versioned interpretation for one benchmark/metric key.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MetricDefinitionV1 {
+    pub benchmark: String,
+    pub metric: String,
+    pub definition_version: u32,
+    pub estimand: String,
+    pub unit: String,
+    pub value_domain: MetricValueDomainV1,
+    pub direction: MetricDirectionV1,
+    /// The sample unit represented by MetricValue.n for empirical uncertainty.
+    pub sample_unit: String,
+    pub uncertainty: UncertaintyPolicyV1,
+    pub comparison: ComparisonRuleV1,
+}
+
+impl MetricDefinitionV1 {
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        for (field, value) in [
+            ("benchmark", self.benchmark.as_str()),
+            ("metric", self.metric.as_str()),
+            ("estimand", self.estimand.as_str()),
+            ("unit", self.unit.as_str()),
+            ("sample_unit", self.sample_unit.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                errors.push(format!("{field} must not be empty"));
+            }
+            if value.chars().any(char::is_control) {
+                errors.push(format!("{field} must not contain control characters"));
+            }
+        }
+        if self.definition_version == 0 {
+            errors.push("definition_version must be greater than zero".to_string());
+        }
+
+        if let MetricDirectionV1::TargetRange { lower, upper } = &self.direction {
+            if !lower.is_finite() || !upper.is_finite() || *lower > *upper {
+                errors.push(
+                    "target-range bounds must be finite and lower must not exceed upper"
+                        .to_string(),
+                );
+            } else {
+                match self.value_domain {
+                    MetricValueDomainV1::UnitInterval
+                        if *lower < 0.0 || *upper > 1.0 =>
+                    {
+                        errors.push(
+                            "unit-interval target bounds must be contained in [0, 1]".to_string(),
+                        );
+                    }
+                    MetricValueDomainV1::NonNegative | MetricValueDomainV1::IntegerCount
+                        if *lower < 0.0 =>
+                    {
+                        errors.push(
+                            "non-negative metric target bounds must not be negative".to_string(),
+                        );
+                    }
+                    MetricValueDomainV1::Real
+                    | MetricValueDomainV1::NonNegative
+                    | MetricValueDomainV1::UnitInterval
+                    | MetricValueDomainV1::IntegerCount => {}
+                }
+            }
+        }
+
+        match &self.uncertainty {
+            UncertaintyPolicyV1::Empirical {
+                method,
+                confidence_level,
+                parameters,
+            } => {
+                if !confidence_level.is_finite()
+                    || *confidence_level <= 0.0
+                    || *confidence_level >= 1.0
+                {
+                    errors.push(
+                        "empirical confidence_level must be finite and strictly between zero and one"
+                            .to_string(),
+                    );
+                }
+                if parameters.is_empty()
+                    || parameters.iter().any(|(key, value)| {
+                        key.trim().is_empty() || value.trim().is_empty()
+                    })
+                {
+                    errors.push("empirical uncertainty requires non-empty, explicit method parameters".to_string());
+                }
+                match method.as_str() {
+                    "bca_bootstrap_v1" => {
+                        let alpha = parameters.get("alpha").and_then(|v| v.parse::<f64>().ok());
+                        if parameters.get("resamples").map(String::as_str) != Some("2000")
+                            || parameters.get("rng").map(String::as_str)
+                                != Some("xorshift64_seed_xor_9e3779b97f4a7c15_v1")
+                            || alpha.is_none()
+                            || parameters.len() != 3
+                        {
+                            errors.push("BCa bootstrap policy requires exactly alpha, rng, and resamples=2000".to_string());
+                        }
+                        if let Some(alpha) = alpha {
+                            if !alpha.is_finite()
+                                || alpha <= 0.0
+                                || alpha >= 1.0
+                                || (1.0 - alpha - *confidence_level).abs() > 1e-12
+                            {
+                                errors.push("BCa bootstrap alpha must match the declared confidence level".to_string());
+                            }
+                        }
+                    }
+                    "t_table_df_1_to_29_else_z_1_96_v1" => {
+                        if *confidence_level != 0.95
+                            || parameters.get("df_table_max").map(String::as_str) != Some("29")
+                            || parameters.get("fallback_z").map(String::as_str) != Some("1.96")
+                            || parameters.len() != 2
+                        {
+                            errors.push("t-table policy parameters do not match the supported 95% implementation".to_string());
+                        }
+                    }
+                    _ => errors.push(format!("unsupported empirical uncertainty method {:?}", method)),
+                }
+            }
+            UncertaintyPolicyV1::Deterministic {
+                verification_method,
+            } => {
+                if verification_method.trim().is_empty() {
+                    errors.push(
+                        "deterministic verification_method must not be empty".to_string(),
+                    );
+                }
+            }
+            UncertaintyPolicyV1::NotEstimated { reason } => {
+                if reason.trim().is_empty() {
+                    errors.push("not-estimated uncertainty requires a reason".to_string());
+                }
+                if !matches!(&self.comparison, ComparisonRuleV1::NoClassification { .. }) {
+                    errors.push(
+                        "metrics without an uncertainty estimate must use NoClassification"
+                            .to_string(),
+                    );
+                }
+            }
+        }
+
+        match &self.comparison {
+            ComparisonRuleV1::AbsoluteDelta {
+                warning_delta,
+                critical_delta,
+            } => {
+                if !warning_delta.is_finite()
+                    || !critical_delta.is_finite()
+                    || *warning_delta < 0.0
+                    || *critical_delta <= *warning_delta
+                {
+                    errors.push(
+                        "absolute thresholds must be finite/non-negative and critical_delta must exceed warning_delta"
+                            .to_string(),
+                    );
+                }
+                if self.value_domain == MetricValueDomainV1::UnitInterval
+                    && *critical_delta > 1.0
+                {
+                    errors.push(
+                        "unit-interval absolute critical_delta must not exceed one".to_string(),
+                    );
+                }
+            }
+            ComparisonRuleV1::RelativeDelta {
+                warning_fraction,
+                critical_fraction,
+                minimum_reference_magnitude,
+            } => {
+                if !warning_fraction.is_finite()
+                    || !critical_fraction.is_finite()
+                    || *warning_fraction < 0.0
+                    || *critical_fraction <= *warning_fraction
+                {
+                    errors.push(
+                        "relative thresholds must be finite/non-negative and critical_fraction must exceed warning_fraction"
+                            .to_string(),
+                    );
+                }
+                if !minimum_reference_magnitude.is_finite()
+                    || *minimum_reference_magnitude <= 0.0
+                {
+                    errors.push(
+                        "relative comparisons require a finite, positive metric-specific minimum_reference_magnitude"
+                            .to_string(),
+                    );
+                }
+            }
+            ComparisonRuleV1::NoClassification { rationale } => {
+                if rationale.trim().is_empty() {
+                    errors.push("NoClassification requires a non-empty rationale".to_string());
+                }
+            }
+        }
+
+        if matches!(&self.direction, MetricDirectionV1::DiagnosticOnly)
+            && !matches!(&self.comparison, ComparisonRuleV1::NoClassification { .. })
+        {
+            errors.push("DiagnosticOnly metrics must use NoClassification".to_string());
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+/// A complete policy for one exact benchmark/metric population. Entries are
+/// canonicalized by key order and duplicate keys are rejected.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MetricContractV1 {
+    schema_version: String,
+    definitions: Vec<MetricDefinitionV1>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MetricContractV1Wire {
+    schema_version: String,
+    definitions: Vec<MetricDefinitionV1>,
+}
+
+impl<'de> Deserialize<'de> for MetricContractV1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = MetricContractV1Wire::deserialize(deserializer)?;
+        if wire.schema_version != METRIC_CONTRACT_SCHEMA_VERSION {
+            return Err(D::Error::custom(format!(
+                "unsupported metric contract schema {:?}; expected {:?}",
+                wire.schema_version, METRIC_CONTRACT_SCHEMA_VERSION
+            )));
+        }
+        Self::new(wire.definitions).map_err(|errors| D::Error::custom(errors.join("; ")))
+    }
+}
+
+impl MetricContractV1 {
+    pub fn new(
+        mut definitions: Vec<MetricDefinitionV1>,
+    ) -> Result<Self, Vec<String>> {
+        definitions.sort_by(|left, right| {
+            (&left.benchmark, &left.metric).cmp(&(&right.benchmark, &right.metric))
+        });
+        let contract = Self {
+            schema_version: METRIC_CONTRACT_SCHEMA_VERSION.to_string(),
+            definitions,
+        };
+        contract.validate()?;
+        Ok(contract)
+    }
+
+    pub fn schema_version(&self) -> &str {
+        &self.schema_version
+    }
+
+    pub fn definitions(&self) -> &[MetricDefinitionV1] {
+        &self.definitions
+    }
+
+    pub fn definition(&self, benchmark: &str, metric: &str) -> Option<&MetricDefinitionV1> {
+        self.definitions
+            .binary_search_by(|item| {
+                (item.benchmark.as_str(), item.metric.as_str()).cmp(&(benchmark, metric))
+            })
+            .ok()
+            .map(|index| &self.definitions[index])
+    }
+
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if self.schema_version != METRIC_CONTRACT_SCHEMA_VERSION {
+            errors.push(format!(
+                "unsupported metric contract schema {:?}; expected {:?}",
+                self.schema_version, METRIC_CONTRACT_SCHEMA_VERSION
+            ));
+        }
+        if self.definitions.is_empty() {
+            errors.push("metric contract contains no definitions".to_string());
+        }
+        let mut seen = BTreeSet::new();
+        for definition in &self.definitions {
+            if !seen.insert((definition.benchmark.clone(), definition.metric.clone())) {
+                errors.push(format!(
+                    "duplicate metric definition for {}/{}",
+                    definition.benchmark, definition.metric
+                ));
+            }
+            if let Err(definition_errors) = definition.validate() {
+                errors.extend(definition_errors.into_iter().map(|error| {
+                    format!("{}/{}: {error}", definition.benchmark, definition.metric)
+                }));
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Fingerprint the canonical, validated policy bytes using a domain-separated
+    /// BLAKE3 digest. This binds the chosen contract, not its scientific adequacy.
+    pub fn fingerprint(&self) -> Result<String, Vec<String>> {
+        self.validate()?;
+        let bytes = serde_json::to_vec(self)
+            .map_err(|error| vec![format!("cannot serialize metric contract: {error}")])?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(METRIC_CONTRACT_DOMAIN_SEPARATOR);
+        hasher.update(&bytes);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+
+    /// Require exact equality between this contract's keys and every key in a
+    /// snapshot. Empirical values qualify only when versioned observation provenance
+    /// matches the declared sample unit, estimator, confidence level, and parameters.
+    pub fn validate_snapshot_population(
+        &self,
+        snapshot: &RegressionSnapshot,
+    ) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if let Err(contract_errors) = self.validate() {
+            errors.extend(contract_errors);
+        }
+        if snapshot.schema_version != SNAPSHOT_SCHEMA_VERSION {
+            errors.push(format!(
+                "snapshot schema {:?} is not supported; expected {:?}",
+                snapshot.schema_version, SNAPSHOT_SCHEMA_VERSION
+            ));
+        }
+        if let Err(snapshot_errors) = snapshot.validate() {
+            errors.extend(
+                snapshot_errors
+                    .into_iter()
+                    .map(|error| format!("snapshot: {error}")),
+            );
+        }
+
+        let contract_keys: BTreeSet<(String, String)> = self
+            .definitions
+            .iter()
+            .map(|definition| {
+                (definition.benchmark.clone(), definition.metric.clone())
+            })
+            .collect();
+        let snapshot_keys: BTreeSet<(String, String)> = snapshot
+            .metrics
+            .iter()
+            .flat_map(|(benchmark, metrics)| {
+                metrics
+                    .keys()
+                    .map(move |metric| (benchmark.clone(), metric.clone()))
+            })
+            .collect();
+
+        for key in snapshot_keys.difference(&contract_keys) {
+            errors.push(format!(
+                "missing metric definition for snapshot key {}/{}",
+                key.0, key.1
+            ));
+        }
+        for key in contract_keys.difference(&snapshot_keys) {
+            errors.push(format!(
+                "metric definition has no snapshot value for {}/{}",
+                key.0, key.1
+            ));
+        }
+
+        for definition in &self.definitions {
+            if let Some(value) = snapshot
+                .metrics
+                .get(&definition.benchmark)
+                .and_then(|metrics| metrics.get(&definition.metric))
+            {
+                match &definition.uncertainty {
+                    UncertaintyPolicyV1::Empirical {
+                        method,
+                        confidence_level,
+                        parameters,
+                    } => {
+                        if value.n < 2 {
+                            errors.push(format!(
+                                "{}/{}: empirical uncertainty requires n >= 2; found n={}",
+                                definition.benchmark, definition.metric, value.n
+                            ));
+                        }
+                        match value.uncertainty_provenance() {
+                            None => errors.push(format!(
+                                "{}/{}: empirical uncertainty is unqualified because the snapshot has no estimator provenance",
+                                definition.benchmark, definition.metric
+                            )),
+                            Some(observed) => {
+                                if let Err(provenance_errors) = observed.validate_for_value(value) {
+                                    errors.extend(provenance_errors.into_iter().map(|error| {
+                                        format!("{}/{}: {error}", definition.benchmark, definition.metric)
+                                    }));
+                                }
+                                if observed.method() != method.as_str() {
+                                    errors.push(format!(
+                                        "{}/{}: observed estimator method {:?} does not match contract method {:?}",
+                                        definition.benchmark, definition.metric, observed.method(), method
+                                    ));
+                                }
+                                if (observed.confidence_level() - *confidence_level).abs() > 1e-12 {
+                                    errors.push(format!(
+                                        "{}/{}: observed confidence level {} does not match contract level {}",
+                                        definition.benchmark, definition.metric, observed.confidence_level(), confidence_level
+                                    ));
+                                }
+                                if observed.sample_unit() != Some(definition.sample_unit.as_str()) {
+                                    errors.push(format!(
+                                        "{}/{}: observed sample unit {:?} does not match declared sample unit {:?}",
+                                        definition.benchmark, definition.metric, observed.sample_unit(), definition.sample_unit
+                                    ));
+                                }
+                                for (key, expected) in parameters {
+                                    if observed.parameters().get(key) != Some(expected) {
+                                        errors.push(format!(
+                                            "{}/{}: observed estimator parameter {:?}={:?} does not match contract value {:?}",
+                                            definition.benchmark, definition.metric, key, observed.parameters().get(key), expected
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    UncertaintyPolicyV1::Deterministic { .. } => {
+                        errors.push(format!(
+                            "{}/{}: deterministic qualification is unsupported until a separately verifiable deterministic-observation provenance type is implemented",
+                            definition.benchmark, definition.metric
+                        ));
+                    }
+                    UncertaintyPolicyV1::NotEstimated { .. } => {}
+                }
+                validate_value_domain(definition, value, &mut errors);
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Validate a snapshot when it will be used as the reference/baseline in a
+    /// relative-delta comparison. The magnitude floor belongs only to the reference
+    /// denominator, not to the current observation (which may legitimately approach zero).
+    pub fn validate_reference_population(
+        &self,
+        snapshot: &RegressionSnapshot,
+    ) -> Result<(), Vec<String>> {
+        let mut errors = self
+            .validate_snapshot_population(snapshot)
+            .err()
+            .unwrap_or_default();
+
+        for definition in &self.definitions {
+            if let (
+                ComparisonRuleV1::RelativeDelta {
+                    minimum_reference_magnitude,
+                    ..
+                },
+                Some(value),
+            ) = (
+                &definition.comparison,
+                snapshot
+                    .metrics
+                    .get(&definition.benchmark)
+                    .and_then(|metrics| metrics.get(&definition.metric)),
+            ) {
+                if !value.mean.is_finite()
+                    || value.mean.abs() < *minimum_reference_magnitude
+                {
+                    errors.push(format!(
+                        "{}/{}: reference mean {} is below the metric-specific minimum reference magnitude {} for relative comparison",
+                        definition.benchmark,
+                        definition.metric,
+                        value.mean,
+                        minimum_reference_magnitude
+                    ));
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+fn validate_value_domain(
+    definition: &MetricDefinitionV1,
+    value: &MetricValue,
+    errors: &mut Vec<String>,
+) {
+    let valid_domain = |number: f64| match definition.value_domain {
+        MetricValueDomainV1::Real => number.is_finite(),
+        MetricValueDomainV1::NonNegative | MetricValueDomainV1::IntegerCount => {
+            number.is_finite() && number >= 0.0
+        }
+        MetricValueDomainV1::UnitInterval => {
+            number.is_finite() && (0.0..=1.0).contains(&number)
+        }
+    };
+
+    if !valid_domain(value.mean) {
+        errors.push(format!(
+            "{}/{}: mean {} violates declared {:?} domain",
+            definition.benchmark, definition.metric, value.mean, definition.value_domain
+        ));
+    }
+    if matches!(
+        definition.value_domain,
+        MetricValueDomainV1::NonNegative
+            | MetricValueDomainV1::UnitInterval
+            | MetricValueDomainV1::IntegerCount
+    ) && (!valid_domain(value.ci_lower) || !valid_domain(value.ci_upper))
+    {
+        errors.push(format!(
+            "{}/{}: confidence bounds violate the declared {:?} domain",
+            definition.benchmark, definition.metric, definition.value_domain
+        ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::harness::report::MetricValue;
+
+    fn definition(
+        benchmark: &str,
+        metric: &str,
+        uncertainty: UncertaintyPolicyV1,
+        comparison: ComparisonRuleV1,
+    ) -> MetricDefinitionV1 {
+        MetricDefinitionV1 {
+            benchmark: benchmark.to_string(),
+            metric: metric.to_string(),
+            definition_version: 1,
+            estimand: "mean_response_accuracy".to_string(),
+            unit: "proportion".to_string(),
+            value_domain: MetricValueDomainV1::UnitInterval,
+            direction: MetricDirectionV1::HigherIsBetter,
+            sample_unit: "fixture_metric_observation".to_string(),
+            uncertainty,
+            comparison,
+        }
+    }
+
+    fn empirical_definition(benchmark: &str, metric: &str) -> MetricDefinitionV1 {
+        definition(
+            benchmark,
+            metric,
+            UncertaintyPolicyV1::Empirical {
+                method: "bca_bootstrap_v1".to_string(),
+                confidence_level: 0.95,
+                parameters: BTreeMap::from([
+                    ("alpha".to_string(), "0.05".to_string()),
+                    ("resamples".to_string(), "2000".to_string()),
+                    ("rng".to_string(), "xorshift64_seed_xor_9e3779b97f4a7c15_v1".to_string()),
+                ]),
+            },
+            ComparisonRuleV1::RelativeDelta {
+                warning_fraction: 0.05,
+                critical_fraction: 0.10,
+                minimum_reference_magnitude: 0.01,
+            },
+        )
+    }
+
+    fn snapshot(values: &[(&str, &str, f64, usize)]) -> RegressionSnapshot {
+        let mut metrics: BTreeMap<String, BTreeMap<String, MetricValue>> = BTreeMap::new();
+        for (benchmark, metric, mean, n) in values {
+            let samples = vec![*mean; *n];
+            metrics.entry((*benchmark).to_string()).or_default().insert(
+                (*metric).to_string(),
+                MetricValue::from_samples_bootstrap(&samples, 42)
+                    .with_sample_unit("fixture_metric_observation"),
+            );
+        }
+        RegressionSnapshot {
+            name: "fixture".to_string(),
+            timestamp: "2026-10-12T00:00:00Z".to_string(),
+            git_hash: Some("0123456789012345678901234567890123456789".to_string()),
+            config_summary: "fixture-only".to_string(),
+            schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
+            metrics,
+        }
+    }
+
+    #[test]
+    fn contract_fingerprint_is_deterministic_and_roundtrips() {
+        let first = MetricContractV1::new(vec![
+            empirical_definition("B", "accuracy"),
+            empirical_definition("A", "latency"),
+        ])
+        .unwrap();
+        let second = MetricContractV1::new(vec![
+            empirical_definition("A", "latency"),
+            empirical_definition("B", "accuracy"),
+        ])
+        .unwrap();
+        assert_eq!(first.fingerprint().unwrap(), second.fingerprint().unwrap());
+
+        let json = serde_json::to_string(&first).unwrap();
+        let loaded: MetricContractV1 = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.fingerprint().unwrap(), first.fingerprint().unwrap());
+        assert_eq!(loaded.schema_version(), METRIC_CONTRACT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn empirical_policy_rejects_unrecognized_parameters() {
+        let mut definition = empirical_definition("B", "accuracy");
+        if let UncertaintyPolicyV1::Empirical { parameters, .. } = &mut definition.uncertainty {
+            parameters.insert("unrecognized".to_string(), "value".to_string());
+        }
+        let errors = definition.validate().unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("exactly alpha, rng, and resamples=2000")));
+    }
+
+    #[test]
+    fn duplicate_metric_definitions_are_rejected() {
+        let error = MetricContractV1::new(vec![
+            empirical_definition("B", "accuracy"),
+            empirical_definition("B", "accuracy"),
+        ])
+        .unwrap_err();
+        assert!(error.iter().any(|message| message.contains("duplicate metric definition")));
+    }
+
+    #[test]
+    fn exact_snapshot_population_is_required() {
+        let contract = MetricContractV1::new(vec![
+            empirical_definition("B", "accuracy"),
+            empirical_definition("A", "latency"),
+        ])
+        .unwrap();
+        let exact = snapshot(&[
+            ("B", "accuracy", 0.8, 10),
+            ("A", "latency", 0.4, 10),
+        ]);
+        assert!(contract.validate_snapshot_population(&exact).is_ok());
+
+        let partial = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        let errors = contract.validate_snapshot_population(&partial).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("metric definition has no snapshot value for A/latency")));
+        assert!(!errors.iter().any(|message| message.contains("missing metric definition for snapshot key")));
+    }
+
+    #[test]
+    fn snapshot_metric_without_definition_is_rejected() {
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let expanded = snapshot(&[
+            ("B", "accuracy", 0.8, 10),
+            ("B", "latency", 0.4, 10),
+        ]);
+        let errors = contract.validate_snapshot_population(&expanded).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("missing metric definition for snapshot key B/latency")));
+    }
+
+    #[test]
+    fn relative_comparison_requires_metric_specific_scale_floor() {
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let near_zero = snapshot(&[("B", "accuracy", 0.001, 10)]);
+        // A current observation may legitimately approach zero; only a baseline used
+        // as the denominator of a relative-delta comparison must clear this floor.
+        assert!(contract.validate_snapshot_population(&near_zero).is_ok());
+        let errors = contract.validate_reference_population(&near_zero).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("reference mean")));
+        assert!(errors.iter().any(|message| message.contains("minimum reference magnitude")));
+
+        let mut invalid = empirical_definition("B", "accuracy");
+        invalid.comparison = ComparisonRuleV1::RelativeDelta {
+            warning_fraction: 0.05,
+            critical_fraction: 0.10,
+            minimum_reference_magnitude: 0.0,
+        };
+        assert!(invalid.validate().unwrap_err().iter().any(|message| message.contains("minimum_reference_magnitude")));
+    }
+
+    #[test]
+    fn empirical_policy_rejects_single_sample_and_bad_interval() {
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let one_sample = snapshot(&[("B", "accuracy", 0.8, 1)]);
+        let errors = contract.validate_snapshot_population(&one_sample).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("empirical uncertainty requires n >= 2")));
+
+        let invalid = definition(
+            "B",
+            "accuracy",
+            UncertaintyPolicyV1::Empirical {
+                method: "bca_bootstrap_v1".to_string(),
+                confidence_level: 1.0,
+                parameters: BTreeMap::from([
+                    ("alpha".to_string(), "0.05".to_string()),
+                    ("resamples".to_string(), "2000".to_string()),
+                    ("rng".to_string(), "xorshift64_seed_xor_9e3779b97f4a7c15_v1".to_string()),
+                ]),
+            },
+            ComparisonRuleV1::RelativeDelta {
+                warning_fraction: 0.05,
+                critical_fraction: 0.10,
+                minimum_reference_magnitude: 0.01,
+            },
+        );
+        assert!(invalid.validate().unwrap_err().iter().any(|message| message.contains("confidence_level")));
+    }
+
+    #[test]
+    fn empirical_snapshot_cannot_qualify_without_observation_level_ci_provenance() {
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let mut missing_provenance = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        missing_provenance.metrics.get_mut("B").unwrap().get_mut("accuracy").unwrap().uncertainty_provenance = None;
+        let errors = contract.validate_snapshot_population(&missing_provenance).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("has no estimator provenance")));
+    }
+
+    #[test]
+    fn constructor_emits_the_interval_method_actually_used() {
+        let student_t = MetricValue::from_samples(&[0.2, 0.4, 0.6]);
+        let provenance = student_t.uncertainty_provenance().unwrap();
+        assert_eq!(provenance.method(), "t_table_df_1_to_29_else_z_1_96_v1");
+        assert_eq!(provenance.confidence_level(), 0.95);
+        assert!(provenance.sample_unit().is_none());
+        assert!(provenance.validate_for_value(&student_t).is_ok());
+
+        let bootstrap = MetricValue::from_samples_bootstrap(&[0.2, 0.4, 0.6], 17)
+            .with_sample_unit("independent_seed_run");
+        let serialized = serde_json::to_string(&bootstrap).unwrap();
+        let loaded: MetricValue = serde_json::from_str(&serialized).unwrap();
+        let provenance = loaded.uncertainty_provenance().unwrap();
+        assert_eq!(provenance.method(), "bca_bootstrap_v1");
+        assert_eq!(provenance.sample_unit(), Some("independent_seed_run"));
+        assert_eq!(provenance.parameters().get("seed").map(String::as_str), Some("17"));
+        assert_eq!(
+            provenance.parameters().get("rng").map(String::as_str),
+            Some("xorshift64_seed_xor_9e3779b97f4a7c15_v1")
+        );
+        assert!(provenance.validate_for_value(&loaded).is_ok());
+    }
+
+    #[test]
+    fn unsupported_provenance_schema_is_rejected() {
+        let metric = MetricValue::from_samples_bootstrap(&[0.2, 0.4, 0.6], 17)
+            .with_sample_unit("independent_seed_run");
+        let mut json = serde_json::to_value(&metric).unwrap();
+        json["uncertainty_provenance"]["schema_version"] =
+            serde_json::Value::String("symthaea-psych-uncertainty-provenance-v999".to_string());
+        let tampered: MetricValue = serde_json::from_value(json).unwrap();
+        let errors = tampered
+            .uncertainty_provenance()
+            .unwrap()
+            .validate_for_value(&tampered)
+            .unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("unsupported uncertainty provenance schema")));
+    }
+
+    #[test]
+    fn legacy_metric_value_deserializes_without_invented_provenance() {
+        let json = r#"{"mean":0.8,"std_dev":0.1,"n":10,"ci_lower":0.6,"ci_upper":1.0}"#;
+        let value: MetricValue = serde_json::from_str(json).unwrap();
+        assert!(value.uncertainty_provenance().is_none());
+    }
+
+    #[test]
+    fn empirical_provenance_must_match_method_parameters_and_sample_unit() {
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let mut wrong_unit = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        let value = wrong_unit.metrics.get_mut("B").unwrap().get_mut("accuracy").unwrap();
+        *value = value.clone().with_sample_unit("different_sample_unit");
+        let errors = contract.validate_snapshot_population(&wrong_unit).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("does not match declared sample unit")));
+    }
+
+    #[test]
+    fn empirical_contract_rejects_confidence_and_parameter_mismatch() {
+        let mut definition = empirical_definition("B", "accuracy");
+        if let UncertaintyPolicyV1::Empirical {
+            confidence_level,
+            parameters,
+            ..
+        } = &mut definition.uncertainty
+        {
+            *confidence_level = 0.90;
+            parameters.insert("alpha".to_string(), "0.10".to_string());
+        }
+        let contract = MetricContractV1::new(vec![definition]).unwrap();
+        let observed = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        let errors = contract.validate_snapshot_population(&observed).unwrap_err();
+        assert!(errors.iter().any(|message| {
+            message.contains("observed confidence level")
+                && message.contains("does not match contract level")
+        }));
+        assert!(errors.iter().any(|message| {
+            message.contains("observed estimator parameter")
+                && message.contains("alpha")
+                && message.contains("does not match contract value")
+        }));
+    }
+
+    #[test]
+    fn uncertainty_digest_detects_summary_tampering() {
+        let mut tampered = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        tampered.metrics.get_mut("B").unwrap().get_mut("accuracy").unwrap().ci_upper += 0.01;
+        let errors = tampered.validate().unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("observation digest does not match")));
+    }
+
+    #[test]
+    fn diagnostic_or_not_estimated_metrics_cannot_receive_regression_thresholds() {
+        let mut diagnostic = empirical_definition("B", "effect");
+        diagnostic.direction = MetricDirectionV1::DiagnosticOnly;
+        assert!(diagnostic.validate().unwrap_err().iter().any(|message| message.contains("DiagnosticOnly")));
+
+        let not_estimated = definition(
+            "B",
+            "diagnostic",
+            UncertaintyPolicyV1::NotEstimated {
+                reason: "Single deterministic fixture with no sampling model".to_string(),
+            },
+            ComparisonRuleV1::RelativeDelta {
+                warning_fraction: 0.05,
+                critical_fraction: 0.10,
+                minimum_reference_magnitude: 0.01,
+            },
+        );
+        assert!(not_estimated.validate().unwrap_err().iter().any(|message| message.contains("must use NoClassification")));
+    }
+
+    #[test]
+    fn unknown_direction_cannot_deserialize() {
+        let json = r#"{
+            "benchmark":"B",
+            "metric":"accuracy",
+            "definition_version":1,
+            "estimand":"mean_response_accuracy",
+            "unit":"proportion",
+            "value_domain":"unit_interval",
+            "direction":{"kind":"unknown"},
+            "sample_unit":"independent_seed_run",
+            "uncertainty":{"kind":"empirical","method":"bca_bootstrap_v1","confidence_level":0.95,"parameters":{"alpha":"0.05","resamples":"2000","rng":"xorshift64_seed_xor_9e3779b97f4a7c15_v1"}},
+            "comparison":{"kind":"relative_delta","warning_fraction":0.05,"critical_fraction":0.10,"minimum_reference_magnitude":0.01}
+        }"#;
+        assert!(serde_json::from_str::<MetricDefinitionV1>(json).is_err());
+    }
+
+    #[test]
+    fn unsupported_contract_version_cannot_deserialize() {
+        let json = r#"{"schema_version":"symthaea-psych-metric-contract-v999","definitions":[]}"#;
+        assert!(serde_json::from_str::<MetricContractV1>(json).is_err());
+    }
+}
