@@ -229,12 +229,18 @@ impl PhiTrajectory {
         let _ = self.observe_at(phi, self.started_at.elapsed());
     }
 
-    /// Record Φ at an elapsed offset from the trajectory's monotonic origin.
+    /// Record an interval-representative Φ sample at an elapsed offset from the
+    /// trajectory's monotonic origin.
+    ///
+    /// The sample is interpreted as representative of the interval ending at
+    /// `elapsed`; the current value is applied over the elapsed gap since the
+    /// preceding accepted sample. This makes subdivision invariant only when
+    /// the subdivisions represent the same interval-valued input. Point-in-time
+    /// samples requiring forward-held input semantics need a separate integrator.
     ///
     /// Returns false and leaves state unchanged for non-finite Φ values or
     /// duplicate/backwards timestamps. The first valid observation initializes
-    /// the EMA; later observations use alpha = 1 - exp(-dt / tau), making the
-    /// smoothing time-constant invariant to subdividing a constant-value interval.
+    /// the EMA; later observations use alpha = 1 - exp(-dt / tau).
     pub fn observe_at(&mut self, phi: f64, elapsed: Duration) -> bool {
         if !phi.is_finite() {
             return false;
@@ -1117,14 +1123,22 @@ mod tests {
         assert!(coarse.observe_at(0.8, Duration::from_secs(1)));
 
         assert!(fine.observe_at(0.2, Duration::ZERO));
-        assert!(fine.observe_at(0.2, Duration::from_millis(250)));
-        assert!(fine.observe_at(0.2, Duration::from_millis(500)));
-        assert!(fine.observe_at(0.2, Duration::from_millis(750)));
+        // Each sample represents the interval ending at its timestamp.
+        // The fine sequence therefore subdivides the same one-second 0.8 input
+        // interval represented by the coarse endpoint sample.
+        assert!(fine.observe_at(0.8, Duration::from_millis(250)));
+        assert!(fine.observe_at(0.8, Duration::from_millis(500)));
+        assert!(fine.observe_at(0.8, Duration::from_millis(750)));
         assert!(fine.observe_at(0.8, Duration::from_secs(1)));
 
+        let expected = 0.8 + (0.2 - 0.8) * (-1.0_f64).exp();
+        assert!(
+            (coarse.ema - expected).abs() < 1e-12,
+            "one time constant should apply the expected continuous-time decay"
+        );
         assert!(
             (coarse.ema - fine.ema).abs() < 1e-12,
-            "EMA should depend on elapsed time, not the number of identical samples"
+            "equivalent interval-valued input should be invariant to subdivision"
         );
     }
 
