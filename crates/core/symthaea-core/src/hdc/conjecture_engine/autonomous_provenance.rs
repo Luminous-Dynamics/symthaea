@@ -839,6 +839,10 @@ pub fn build_autonomous_discovery_receipt_v1(
         dt,
         requested_trajectories: holdout.requested_trajectories,
         trajectories_checked: holdout.trajectories_checked,
+        attempted_integration_steps: holdout.attempted_integration_steps,
+        completed_integration_steps: holdout.completed_integration_steps,
+        rhs_evaluations: holdout.rhs_evaluations,
+        state_updates: holdout.state_updates,
         max_lie_derivative_variance: holdout.max_lie_derivative_variance,
         median_lie_derivative_variance: holdout.median_lie_derivative_variance,
         min_gradient_informativeness_fraction: holdout.min_gradient_informativeness_fraction,
@@ -877,6 +881,10 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         holdout_seed: receipt.holdout_seed,
         requested_trajectories: receipt.requested_trajectories,
         trajectories_checked: receipt.trajectories_checked,
+        attempted_integration_steps: receipt.attempted_integration_steps,
+        completed_integration_steps: receipt.completed_integration_steps,
+        rhs_evaluations: receipt.rhs_evaluations,
+        state_updates: receipt.state_updates,
         max_lie_derivative_variance: receipt.max_lie_derivative_variance,
         median_lie_derivative_variance: receipt.median_lie_derivative_variance,
         min_gradient_informativeness_fraction: receipt.min_gradient_informativeness_fraction,
@@ -973,12 +981,20 @@ fn holdout_record_is_consistent(
         || holdout.required_gradient_informativeness_fraction
             != MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION
         || holdout.trajectories_checked > holdout.requested_trajectories
+        || holdout.completed_integration_steps > holdout.attempted_integration_steps
+        || holdout.state_updates != holdout.completed_integration_steps.saturating_mul(state_dimension as u64)
+        || holdout.rhs_evaluations < holdout.completed_integration_steps.saturating_mul(4)
+        || holdout.rhs_evaluations > holdout.attempted_integration_steps.saturating_mul(4)
     {
         return false;
     }
     let estimated_steps = (t_max / dt).ceil();
     let state_updates_per_trajectory = estimated_steps * state_dimension as f64;
     let total_steps = estimated_steps * holdout.requested_trajectories as f64;
+    let maximum_actual_steps = total_steps;
+    if holdout.attempted_integration_steps as f64 > maximum_actual_steps {
+        return false;
+    }
     let total_state_updates = state_updates_per_trajectory
         * holdout.requested_trajectories as f64;
     let budget_exceeded = holdout.requested_trajectories
@@ -994,6 +1010,9 @@ fn holdout_record_is_consistent(
             && holdout.failure.is_none()
             && holdout.requested_trajectories > 0
             && holdout.trajectories_checked == holdout.requested_trajectories
+            && holdout.attempted_integration_steps as f64 == maximum_actual_steps
+            && holdout.completed_integration_steps == holdout.attempted_integration_steps
+            && holdout.rhs_evaluations == holdout.completed_integration_steps.saturating_mul(4)
             && holdout.max_lie_derivative_variance < f64::MAX
             && holdout.median_lie_derivative_variance <= holdout.max_lie_derivative_variance
             && holdout.max_lie_derivative_variance <= holdout.threshold
@@ -1093,6 +1112,10 @@ fn compute_receipt_digest(receipt: &AutonomousDiscoveryReceiptV1) -> String {
     hash_f64(&mut hasher, receipt.dt);
     hash_usize(&mut hasher, receipt.requested_trajectories);
     hash_usize(&mut hasher, receipt.trajectories_checked);
+    hash_u64(&mut hasher, receipt.attempted_integration_steps);
+    hash_u64(&mut hasher, receipt.completed_integration_steps);
+    hash_u64(&mut hasher, receipt.rhs_evaluations);
+    hash_u64(&mut hasher, receipt.state_updates);
     hash_f64(&mut hasher, receipt.max_lie_derivative_variance);
     hash_f64(&mut hasher, receipt.median_lie_derivative_variance);
     hash_f64(&mut hasher, receipt.min_gradient_informativeness_fraction);
