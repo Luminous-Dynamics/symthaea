@@ -124,6 +124,34 @@ Every label must point to the relevant output span and, where applicable, the co
 
 The static evaluator remains useful for inexpensive regression triage, not for deciding disputed meaning. Human adjudication is not a prerequisite to continue implementation; it is a prerequisite to claims that these outputs have demonstrated contextual or psychological validity. A separately custodied, permissioned holdout should be considered only after the exposed annotation guide and scoring rules are stable, with a recorded custodian and digest.
 
+
+## Annotation submission integrity validator
+
+The annotation-seed sidecars are intentionally unannotated exports. To make the next stage operational without allowing review to silently overwrite its evidence, `scripts/validate_jungian_claim_annotations.py` validates a reviewer-populated copy against the original seed. It is a provenance, shape, and coverage checker—not a semantic judge and not proof that any label is correct.
+
+The validator requires the exact seed SHA-256 recorded in the capture summary and verifies the supplied guide bytes against the guide digest bound into the seed. It compares all immutable packet fields (case context, output text, source pointers, evidence links, unit identities, and source digests) after removing only the permitted annotation-state, independent-review, and adjudication slots. Strict JSON parsing rejects duplicate keys and non-standard number tokens. Label fields are closed enums; confidence must be an integer from 1 to 4 (a JSON boolean is not accepted as an integer); timestamps must be valid UTC whole-second timestamps; and evidence references must resolve inside the relevant case.
+
+Each unit can carry separate independent-review records with pseudonymous reviewer IDs, guide digests, rationales, evidence references, and content-bound review IDs. Duplicate reviewers cannot count twice for the same unit. The default minimum is two independent reviewers; `--require-complete` requires that threshold for every unit. Adjudication is stored separately and must cite every preserved independent review exactly once. If adjudication downgrades an independently reported concern to severity `none`, it must record an explicit override reason. The tool reports review coverage and severity counts but does not compute inter-rater agreement or infer label correctness.
+
+Run its local controls with:
+
+```sh
+python3 scripts/validate_jungian_claim_annotations.py --self-test
+```
+
+After obtaining a capture packet and its digest from the workflow summary, validate a reviewed copy with:
+
+```sh
+python3 scripts/validate_jungian_claim_annotations.py \
+  --seed keyword_dictionary_foil_v0.annotation_seed.json \
+  --submission keyword_dictionary_foil_v0.annotation_seed.reviewed.json \
+  --expected-seed-sha256 <digest-from-capture-summary> \
+  --require-complete
+```
+
+Use `--require-adjudication` only after every unit has both the required independent reviews and a completed adjudication. A structurally valid packet remains an annotation record, not evidence of psychological validity, behavioral accuracy, or generalization.
+
+
 ## Next implementation step
 
 The capture will now package deterministic, unannotated review units alongside the static audit so the first raw-output inspection can move directly into claim-level annotation. After the exact-head capture completes, inspect the normalized outputs and HDC geometry, compare static cue findings against the raw claim text, and use those cases to refine the guide. Do not expand the regex vocabulary without a reproducible miss; freeze a separately custodied holdout only after the exposed suite and annotation rules stop changing. Any future model adapter still needs independently adjudicated evaluation before making behavioral claims.

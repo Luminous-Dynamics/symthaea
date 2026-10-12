@@ -9,6 +9,7 @@ on:
       - 'scripts/validate_jungian_symbolic_probe.py'
       - 'scripts/run_jungian_symbolic_baselines.py'
       - 'scripts/evaluate_jungian_symbolic_outputs.py'
+      - 'scripts/validate_jungian_claim_annotations.py'
       - 'src/bin/jungian_glyph_projection_probe.rs'
       - '.github/workflows/jungian-symbolic-probe-v1.yml'
   workflow_dispatch:
@@ -40,7 +41,7 @@ jobs:
           BASE=b9af191f380d635f0459b24284c1d1fd6a5516aa
           git merge-base --is-ancestor "$BASE" HEAD
           actual="$(git diff --name-only "$BASE" HEAD | sort)"
-          expected="$(printf '%s\n' '.github/workflows/jungian-symbolic-probe-v1.yml' 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md' 'docs/research/data/jungian_symbolic_probe_v1.json' 'scripts/run_jungian_symbolic_baselines.py' 'scripts/evaluate_jungian_symbolic_outputs.py' 'scripts/validate_jungian_symbolic_probe.py' 'src/bin/jungian_glyph_projection_probe.rs' 'Cargo.toml' | sort)"
+          expected="$(printf '%s\n' '.github/workflows/jungian-symbolic-probe-v1.yml' 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md' 'docs/research/data/jungian_symbolic_probe_v1.json' 'scripts/run_jungian_symbolic_baselines.py' 'scripts/evaluate_jungian_symbolic_outputs.py' 'scripts/validate_jungian_claim_annotations.py' 'scripts/validate_jungian_symbolic_probe.py' 'src/bin/jungian_glyph_projection_probe.rs' 'Cargo.toml' | sort)"
           test "$actual" = "$expected"
 
       - name: Capture exact runtime and source identities
@@ -69,6 +70,7 @@ jobs:
           set -euo pipefail
           python3 scripts/validate_jungian_symbolic_probe.py --self-test
           python3 scripts/evaluate_jungian_symbolic_outputs.py --self-test
+          python3 scripts/validate_jungian_claim_annotations.py --self-test
 
       - name: Run deterministic lexical and context-rule baselines
         id: baselines
