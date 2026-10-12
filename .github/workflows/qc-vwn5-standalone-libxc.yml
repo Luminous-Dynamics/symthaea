@@ -93,7 +93,8 @@ jobs:
             --output /tmp/vwn5-pyscf-reference.json
 
       - name: Fetch and verify exact PR merge context
-        if: github.event_name == 'pull_request'
+        id: merge_context
+        if: ${{ always() && github.event_name == 'pull_request' && steps.source_identity.outcome == 'success' }}
         shell: bash
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -127,7 +128,7 @@ jobs:
           } | tee /tmp/vwn5-merge-context-receipt.txt
 
       - name: Run quantum-chemistry crate LDA tests on the exact merge context
-        if: github.event_name == 'pull_request'
+        if: ${{ always() && github.event_name == 'pull_request' && steps.merge_context.outcome == 'success' }}
         shell: bash
         working-directory: /tmp/qc-merge-context
         run: |
