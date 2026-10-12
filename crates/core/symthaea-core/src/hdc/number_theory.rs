@@ -2128,6 +2128,40 @@ mod tests {
     }
 
     #[test]
+    fn test_pocklington_proof_rejects_carmichael_when_fermat_passes() {
+        let engine = NumberTheoryEngine::new();
+        let mut nodes = std::collections::BTreeMap::new();
+        for prime in [2u64, 3, 5, 7] {
+            let proof = engine.primality_proof(prime).expect("small prime proof");
+            for certificate in proof.certificates {
+                nodes.insert(certificate.prime, certificate);
+            }
+        }
+
+        // 561 is composite but Carmichael. A Fermat-only checker accepts base 2:
+        // 2^560 = 1 (mod 561). The Pocklington GCD condition for q=2 must reject it.
+        assert_eq!(certificate_pow_mod(2, 560, 561), 1);
+        assert_eq!(certificate_pow_mod(2, 280, 561), 1);
+        assert_eq!(certificate_gcd(certificate_pow_mod(2, 280, 561).abs_diff(1), 561), 561);
+
+        let mut certificates: Vec<PrimalityCertificate> = nodes.into_values().collect();
+        certificates.push(PrimalityCertificate {
+            prime: 561,
+            predecessor_factors: vec![(2, 4), (5, 1), (7, 1)],
+            witnesses: vec![(2, 2), (5, 2), (7, 2)],
+        });
+        let claim = PrimalityProof { value: 561, certificates };
+        assert!(matches!(
+            claim.verify(),
+            Err(PrimalityProofError::InvalidPocklingtonWitness {
+                prime: 561,
+                factor: 2,
+                base: 2
+            })
+        ));
+    }
+
+    #[test]
     fn test_pocklington_proof_rejects_unreachable_certificate_nodes() {
         let engine = NumberTheoryEngine::new();
         let mut proof = engine.primality_proof(17).unwrap();
