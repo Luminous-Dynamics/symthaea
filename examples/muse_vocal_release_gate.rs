@@ -755,6 +755,21 @@ fn main() -> Result<()> {
         .parse()
         .context("invalid --minimum-listeners")?;
     anyhow::ensure!(minimum_listeners > 0, "--minimum-listeners must be positive");
+    let ratings_only = args.iter().any(|argument| argument == "--ratings-only");
+    if ratings_only {
+        let ratings_path = ratings
+            .as_deref()
+            .context("--ratings-only requires --ratings <path>")?;
+        anyhow::ensure!(
+            worker.is_none() && reference_manifest.is_none() && arg(&args, "--blind-seed").is_none(),
+            "--ratings-only accepts an existing run, a ratings file, and an optional listener minimum; remove render-only flags"
+        );
+        return run_saved_ratings_review(&output, &private_output, ratings_path, minimum_listeners);
+    }
+    anyhow::ensure!(
+        ratings.is_none(),
+        "--ratings is a review-only input; first render a fresh pack, then rerun with --ratings-only --ratings <path>"
+    );
     std::fs::create_dir_all(&output)?;
     std::fs::create_dir_all(&private_output)?;
     ensure_private_output_is_separate(&output, &private_output)?;
@@ -878,94 +893,34 @@ fn main() -> Result<()> {
         serde_json::to_vec_pretty(&rating_template)?,
     )?;
 
-    let objective_pass = objective.iter().all(|entry| entry.metrics.objective_pass);
-    let mut per_clip_results = Vec::new();
-    let mut status = serde_json::json!({
+    let objective_pass = !objective.is_empty()
+        && objective.iter().all(|entry| entry.metrics.objective_pass);
+    let status = serde_json::json!({
         "objective_pass": objective_pass,
         "human_complete": false,
         "per_clip_pass": false,
         "failing_synthetic_clip_count": null,
-        "synthetic_clip_count": 0,
+        "synthetic_clip_count": objective.len(),
         "release_pass": false,
-        "required": {"minimum_listeners": minimum_listeners, "naturalness_mean": 4.0,
-                     "emotional_fit_mean": 4.0, "identity_consistency_mean": 4.0,
-                     "artifact_free_mean": 4.0, "word_comprehension": 0.95}
-    });
-    if let Some(path) = ratings {
-        let values: Vec<HumanRating> = serde_json::from_slice(&std::fs::read(path)?)?;
-        let backend_by_id: BTreeMap<_, _> = key
-            .iter()
-            .map(|entry| (entry.clip_id.as_str(), entry.backend.as_str()))
-            .collect();
-        let listeners: std::collections::BTreeSet<_> =
-            values.iter().map(|r| r.listener_id.clone()).collect();
-        let mut by_clip_listener = BTreeMap::new();
-        for rating in &values {
-            validate_human_rating(rating, &clips)?;
-            if by_clip_listener
-                .insert((rating.clip_id.clone(), rating.listener_id.clone()), ())
-                .is_some()
-            {
-                anyhow::bail!("duplicate listener/clip rating");
-            }
+        "required": {
+            "minimum_listeners": minimum_listeners,
+            "naturalness_mean": 4.0,
+            "emotional_fit_mean": 4.0,
+            "identity_consistency_mean": 4.0,
+            "artifact_free_mean": 4.0,
+            "word_comprehension": 0.95
         }
-        let complete = listeners.len() >= minimum_listeners
-            && clips.iter().all(|c| {
-                listeners.iter().all(|listener| {
-                    by_clip_listener.contains_key(&(c.clip_id.clone(), listener.clone()))
-                })
-            });
-        let model_values: Vec<_> = values
-            .iter()
-            .filter(|rating| backend_by_id.get(rating.clip_id.as_str()) != Some(&"human-reference"))
-            .collect();
-        let reference_values: Vec<_> = values
-            .iter()
-            .filter(|rating| backend_by_id.get(rating.clip_id.as_str()) == Some(&"human-reference"))
-            .collect();
-        let naturalness = if model_values.is_empty() {
-            0.0
-        } else {
-            model_values.iter().map(|r| r.naturalness).sum::<f32>() / model_values.len() as f32
-        };
-        let mean = |f: fn(&HumanRating) -> f32| {
-            model_values.iter().map(|r| f(r)).sum::<f32>() / model_values.len().max(1) as f32
-        };
-        let emotional_fit = mean(|r| r.emotional_fit);
-        let identity_consistency = mean(|r| r.identity_consistency);
-        let artifact_free = mean(|r| r.artifact_free);
-        let understood: usize = model_values.iter().map(|r| r.lyric_words_understood).sum();
-        let total: usize = model_values.iter().map(|r| r.lyric_words_total).sum();
-        let comprehension = understood as f32 / total.max(1) as f32;
-        per_clip_results = per_clip_human_results(&values, &clips, &backend_by_id);
-        let failing_synthetic_clip_count =
-            per_clip_results.iter().filter(|result| !result.pass).count();
-        let per_clip_pass = !per_clip_results.is_empty() && failing_synthetic_clip_count == 0;
-        status = serde_json::json!({
-            "objective_pass": objective_pass, "human_complete": complete,
-            "per_clip_pass": per_clip_pass,
-            "failing_synthetic_clip_count": failing_synthetic_clip_count,
-            "synthetic_clip_count": per_clip_results.len(),
-            "listener_count": listeners.len(), "naturalness_mean": naturalness,
-            "human_reference_rating_count": reference_values.len(),
-            "emotional_fit_mean": emotional_fit, "identity_consistency_mean": identity_consistency,
-            "artifact_free_mean": artifact_free, "word_comprehension": comprehension,
-            "release_pass": objective_pass && complete && per_clip_pass
-                && naturalness >= 4.0 && emotional_fit >= 4.0
-                && identity_consistency >= 4.0 && artifact_free >= 4.0
-                && comprehension >= 0.95
-        });
-    }
-    std::fs::write(
-        private_output.join("human_case_report.json"),
-        serde_json::to_vec_pretty(&per_clip_results)?,
+    });
+    write_private_artifact(
+        &private_output.join("human_case_report.json"),
+        &serde_json::to_vec_pretty(&Vec::<PerClipHumanResult>::new())?,
     )?;
-    std::fs::write(
-        private_output.join("release_status.json"),
-        serde_json::to_vec_pretty(&status)?,
+    write_private_artifact(
+        &private_output.join("release_status.json"),
+        &serde_json::to_vec_pretty(&status)?,
     )?;
     eprintln!(
-        "organizer-only artifacts (backend key, objective report, release status): {}",
+        "organizer-only artifacts (answer key, internal manifest, objective report, per-clip report, release status): {}",
         private_output.display()
     );
     println!("{}", serde_json::to_string_pretty(&status)?);
