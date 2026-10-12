@@ -8,7 +8,7 @@
 
 A process-local queue loses delivery and terminal state when the daemon restarts. A delayed link amplifies the consequences: the sender cannot know whether an unacknowledged batch reached the receiver, so the correct baseline is at-least-once delivery plus idempotent receiver behavior—not pretending to provide exactly-once network delivery.
 
-The new module, tools/energy_telemetry/durable_queue.py, uses Python's standard sqlite3 module and a SQLite database file. It is distinct from the in-memory reference policy in store_forward.py.
+The new module, tools/energy_telemetry/durable_queue.py, uses Python's standard sqlite3 module and a persistent SQLite database file. It explicitly rejects the :memory: path because each public operation opens a new connection. It is distinct from the in-memory reference policy in store_forward.py.
 
 ## Persisted state
 
@@ -47,7 +47,7 @@ This is a reasoned local persistence configuration, not proof against all hardwa
 
 ## Test plan added
 
-The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files and synthetic event metadata. It covers:
+The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files and synthetic event metadata. Thirteen deterministic tests are added; they cover:
 - enqueue and pending-byte recovery after creating a fresh process-like queue instance;
 - re-transmission after restart and persisted attempt counts;
 - ACK and duplicate ACK behavior across queue instances;
