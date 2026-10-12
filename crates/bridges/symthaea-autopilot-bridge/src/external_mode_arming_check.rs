@@ -2582,6 +2582,12 @@ mod tests {
                 "msg/versioned/ArmingCheckReply.msg",
             ),
             (
+                "Event v1",
+                "e0488b19e573e4e016a8066ad00164099a22e46c",
+                "ed8d841ebd80449927989af3b24038149825a1f4",
+                "msg/versioned/Event.msg",
+            ),
+            (
                 "RegisterExtComponentReply v1",
                 "e0488b19e573e4e016a8066ad00164099a22e46c",
                 "17ff6765c9a1980f1cec163a0ff38aea07491a12",
