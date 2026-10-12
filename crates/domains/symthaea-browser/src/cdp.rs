@@ -656,7 +656,7 @@ mod native_cdp_tests {
     fn core_action_paths_do_not_call_page_evaluate() {
         let source = include_str!("cdp.rs");
         let sections = [
-            ("pub async fn get_accessibility_tree", "    /// Click an element"),
+            ("pub async fn get_accessibility_tree", "    /// Click a CSS or accessibility target"),
             ("pub(crate) async fn click", "    /// Type text"),
             ("pub(crate) async fn type_text", "    /// Scroll a CSS-selected"),
             ("pub(crate) async fn scroll_to", "    pub(crate) async fn extract_text"),
