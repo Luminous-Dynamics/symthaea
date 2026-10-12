@@ -31,6 +31,11 @@ use crate::actions::ElementSelector;
 use crate::config::BrowserAgentConfig;
 use crate::observation::{AccessibleElement, PageObservation};
 
+/// Refuse to parse unusually large page fragments after CDP has returned them.
+const MAX_TEXT_EXTRACTION_HTML_BYTES: usize = 2 * 1024 * 1024;
+/// Bound text delivered to downstream cognition / receipts.
+const MAX_TEXT_EXTRACTION_CHARS: usize = 32 * 1024;
+
 /// CDP session wrapping a `chromiumoxide::Browser` and its active page.
 pub struct CdpSession {
     _browser: Browser,
@@ -335,8 +340,21 @@ impl CdpSession {
         let outer_html = read_outer_html(&page, target_selector)
             .await
             .context("Read text target with DOM.getOuterHTML")?;
-        extract_html_text(&outer_html)
-            .context("Parse and extract native DOM text")
+        if outer_html.len() > MAX_TEXT_EXTRACTION_HTML_BYTES {
+            bail!(
+                "DOM text target exceeded the {} byte HTML extraction limit",
+                MAX_TEXT_EXTRACTION_HTML_BYTES
+            );
+        }
+        let text = extract_html_text(&outer_html)
+            .context("Parse and extract native DOM text")?;
+        if text.chars().count() > MAX_TEXT_EXTRACTION_CHARS {
+            bail!(
+                "DOM text target exceeded the {} character extraction limit",
+                MAX_TEXT_EXTRACTION_CHARS
+            );
+        }
+        Ok(text)
     }
 
     /// Capture a PNG screenshot of the current page.
