@@ -83,7 +83,7 @@ The policy model does not implement a durable DP accountant, secure aggregation,
 
 The accompanying unittest suite uses synthetic timestamps, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
 
-Local verification recorded during implementation: **17 store-forward tests passed** under Python's unittest runner. This is a local result for the new prototype tests; it is not the GitHub Actions result, not a run of the full repository test suite, and not field evidence. The exact-head GitHub workflow remains the authority for CI status.
+Local verification recorded during implementation: **18 store-forward tests passed** under Python's unittest runner. This is a local result for the new prototype tests; it is not the GitHub Actions result, not a run of the full repository test suite, and not field evidence. The exact-head GitHub workflow remains the authority for CI status.
 
 ## Required next steps before deployment
 
