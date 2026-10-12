@@ -93,6 +93,10 @@ jobs:
             printf 'merge_sha=%s\n' "$merge_sha"
             printf 'merge_parent1_base_sha=%s\n' "$merge_base"
             printf 'merge_parent2_head_sha=%s\n' "$merge_head"
+            printf 'lockfile_blob_sha=%s\n' "$(git rev-parse --verify "${merge_sha}:Cargo.lock")"
+            printf 'observation_manifest_blob_sha=%s\n' "$(git rev-parse --verify "${merge_sha}:crates/core/symthaea-observation-attestation/Cargo.toml")"
+            printf 'scientific_source_path=%s\n' "crates/domains/symthaea-quantum-chemistry/src/dft/lda.rs"
+            printf 'scientific_source_blob_sha=%s\n' "$(git rev-parse --verify "${merge_sha}:crates/domains/symthaea-quantum-chemistry/src/dft/lda.rs")"
             printf 'workspace_manifest_present=true\n'
           } | tee /tmp/vwn5-merge-context-receipt.txt
 
