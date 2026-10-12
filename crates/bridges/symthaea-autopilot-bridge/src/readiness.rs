@@ -136,7 +136,11 @@ impl Px4ReadinessFactV1 {
         requirement: Px4ReadinessRequirementV1,
         evidence_id: impl Into<String>,
     ) -> Result<Self, Px4ReadinessValidationError> {
-        Self::observed(requirement, Px4ReadinessFactStateV1::Unsatisfied, evidence_id)
+        Self::observed(
+            requirement,
+            Px4ReadinessFactStateV1::Unsatisfied,
+            evidence_id,
+        )
     }
 
     /// Construct an explicitly unobserved proposition without fabricated evidence.
@@ -152,12 +156,9 @@ impl Px4ReadinessFactV1 {
     pub fn validate(&self) -> Result<(), Px4ReadinessValidationError> {
         match self.state {
             Px4ReadinessFactStateV1::Satisfied | Px4ReadinessFactStateV1::Unsatisfied => {
-                let evidence_id = self
-                    .evidence_id
-                    .as_deref()
-                    .ok_or(Px4ReadinessValidationError::ObservedFactMissingEvidence(
-                        self.requirement,
-                    ))?;
+                let evidence_id = self.evidence_id.as_deref().ok_or(
+                    Px4ReadinessValidationError::ObservedFactMissingEvidence(self.requirement),
+                )?;
                 validate_identifier(evidence_id, "evidence_id")?;
             }
             Px4ReadinessFactStateV1::Unobserved => {
@@ -223,7 +224,9 @@ impl Px4ReadinessProfileV1 {
     pub fn validate(&self) -> Result<(), Px4ReadinessValidationError> {
         self.validate_without_digest()?;
         if self.profile_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ReadinessValidationError::DigestMismatch("readiness_profile"));
+            return Err(Px4ReadinessValidationError::DigestMismatch(
+                "readiness_profile",
+            ));
         }
         Ok(())
     }
@@ -247,7 +250,9 @@ impl Px4ReadinessProfileV1 {
         let mut previous = None;
         for requirement in &self.required_facts {
             if !seen.insert(*requirement) {
-                return Err(Px4ReadinessValidationError::DuplicateRequirement(*requirement));
+                return Err(Px4ReadinessValidationError::DuplicateRequirement(
+                    *requirement,
+                ));
             }
             let token = requirement.wire_token();
             if previous.is_some_and(|prev: &str| prev >= token) {
@@ -439,7 +444,9 @@ fn canonicalize_requirements(
     let mut seen = HashSet::with_capacity(requirements.len());
     for requirement in requirements.iter().copied() {
         if !seen.insert(requirement) {
-            return Err(Px4ReadinessValidationError::DuplicateRequirement(requirement));
+            return Err(Px4ReadinessValidationError::DuplicateRequirement(
+                requirement,
+            ));
         }
     }
     requirements.sort_by_key(|requirement| requirement.wire_token());
@@ -562,15 +569,14 @@ mod tests {
             .copied()
             .map(satisfied)
             .collect();
-        let assessment = Px4ReadinessAssessmentV1::new(
-            "px4.readiness.fixture.v1",
-            profile,
-            ts(1_000),
-            facts,
-        )
-        .unwrap();
+        let assessment =
+            Px4ReadinessAssessmentV1::new("px4.readiness.fixture.v1", profile, ts(1_000), facts)
+                .unwrap();
 
-        assert_eq!(assessment.outcome().unwrap(), Px4ReadinessOutcomeV1::Qualified);
+        assert_eq!(
+            assessment.outcome().unwrap(),
+            Px4ReadinessOutcomeV1::Qualified
+        );
     }
 
     #[test]
@@ -586,18 +592,15 @@ mod tests {
         let missing = Px4ReadinessRequirementV1::OffboardSignalPresent;
         for fact in &mut facts {
             if fact.requirement == block {
-                *fact = Px4ReadinessFactV1::unsatisfied(block, "evidence:attitude-invalid").unwrap();
+                *fact =
+                    Px4ReadinessFactV1::unsatisfied(block, "evidence:attitude-invalid").unwrap();
             } else if fact.requirement == missing {
                 *fact = Px4ReadinessFactV1::unobserved(missing);
             }
         }
-        let assessment = Px4ReadinessAssessmentV1::new(
-            "px4.readiness.fixture.v1",
-            profile,
-            ts(1_000),
-            facts,
-        )
-        .unwrap();
+        let assessment =
+            Px4ReadinessAssessmentV1::new("px4.readiness.fixture.v1", profile, ts(1_000), facts)
+                .unwrap();
 
         assert_eq!(
             assessment.outcome().unwrap(),
@@ -621,17 +624,15 @@ mod tests {
                 }
             })
             .collect();
-        let assessment = Px4ReadinessAssessmentV1::new(
-            "px4.readiness.fixture.v1",
-            profile,
-            ts(1_000),
-            facts,
-        )
-        .unwrap();
+        let assessment =
+            Px4ReadinessAssessmentV1::new("px4.readiness.fixture.v1", profile, ts(1_000), facts)
+                .unwrap();
 
         assert_eq!(
             assessment.outcome().unwrap(),
-            Px4ReadinessOutcomeV1::Incomplete { facts: vec![missing] }
+            Px4ReadinessOutcomeV1::Incomplete {
+                facts: vec![missing]
+            }
         );
     }
 
@@ -655,7 +656,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(first, second);
-        assert_eq!(first.profile_identity().unwrap(), second.profile_identity().unwrap());
+        assert_eq!(
+            first.profile_identity().unwrap(),
+            second.profile_identity().unwrap()
+        );
     }
 
     #[test]
@@ -676,12 +680,7 @@ mod tests {
         let profile = profile();
         let facts = vec![satisfied(profile.required_facts[0])];
         assert!(matches!(
-            Px4ReadinessAssessmentV1::new(
-                "px4.readiness.fixture.v1",
-                profile,
-                ts(1_000),
-                facts,
-            ),
+            Px4ReadinessAssessmentV1::new("px4.readiness.fixture.v1", profile, ts(1_000), facts,),
             Err(Px4ReadinessValidationError::FactSetMismatch)
         ));
     }
@@ -746,7 +745,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_ne!(first.assessment_id().unwrap(), second.assessment_id().unwrap());
+        assert_ne!(
+            first.assessment_id().unwrap(),
+            second.assessment_id().unwrap()
+        );
     }
 
     #[test]
@@ -757,21 +759,15 @@ mod tests {
         )
         .unwrap();
         let facts = vec![satisfied(Px4ReadinessRequirementV1::HeartbeatFresh)];
-        let first = Px4ReadinessAssessmentV1::new(
-            "producer:v1",
-            profile.clone(),
-            ts(1_000),
-            facts.clone(),
-        )
-        .unwrap();
-        let second = Px4ReadinessAssessmentV1::new(
-            "producer:v1",
-            profile,
-            ts(1_001),
-            facts,
-        )
-        .unwrap();
-        assert_ne!(first.assessment_id().unwrap(), second.assessment_id().unwrap());
+        let first =
+            Px4ReadinessAssessmentV1::new("producer:v1", profile.clone(), ts(1_000), facts.clone())
+                .unwrap();
+        let second =
+            Px4ReadinessAssessmentV1::new("producer:v1", profile, ts(1_001), facts).unwrap();
+        assert_ne!(
+            first.assessment_id().unwrap(),
+            second.assessment_id().unwrap()
+        );
 
         let mut tampered = first;
         tampered.facts[0] = Px4ReadinessFactV1::unsatisfied(
@@ -804,6 +800,9 @@ mod tests {
         let bytes = serde_json::to_vec(&assessment).unwrap();
         let restored: Px4ReadinessAssessmentV1 = serde_json::from_slice(&bytes).unwrap();
         restored.validate().unwrap();
-        assert_eq!(restored.assessment_id().unwrap(), assessment.assessment_id().unwrap());
+        assert_eq!(
+            restored.assessment_id().unwrap(),
+            assessment.assessment_id().unwrap()
+        );
     }
 }
