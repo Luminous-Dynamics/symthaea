@@ -127,6 +127,15 @@ impl CdpSession {
         })
     }
 
+    /// Read the URL of the current top-level page using Chromiumoxide's CDP URL path.
+    pub(crate) async fn current_url(&self) -> Result<String> {
+        let page = self.page.lock().await;
+        page.url()
+            .await
+            .context("Read current page URL")?
+            .context("Current page URL is unavailable")
+    }
+
     /// Navigate to a URL and wait for the page to load.
     pub(crate) async fn navigate(&self, url: &str) -> Result<()> {
         let page = self.page.lock().await;
