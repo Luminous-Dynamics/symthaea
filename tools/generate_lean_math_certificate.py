@@ -14,6 +14,10 @@ import math
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from tools import verify_math_certificate as verifier
 from tools.math_certificate_golden_vectors import (
     SYMFCER1_FACTOR_2,
