@@ -135,15 +135,15 @@ jobs:
               stream.write(f"- Control points: {report['protocol']['point_count']}\n")
               stream.write(
                   "- Curves with no observed change at tested points: "
-                  f"{len(curves_without_observed_change)} / {report['protocol']['curve_count']}\\n"
+                  f"{len(curves_without_observed_change)} / {report['protocol']['curve_count']}\n"
               )
               if curves_without_observed_change:
-                  stream.write("## Curves with no observed output change\\n\\n")
-                  stream.write("These are triage signals, not automatic failures.\\n\\n")
-                  stream.write("| Style | Control |\\n|---|---|\\n")
+                  stream.write("## Curves with no observed output change\n\n")
+                  stream.write("These are triage signals, not automatic failures.\n\n")
+                  stream.write("| Style | Control |\n|---|---|\n")
                   for item in curves_without_observed_change:
-                      stream.write(f"| {item['style']} | {item['control']} |\\n")
-                  stream.write("\\n")
+                      stream.write(f"| {item['style']} | {item['control']} |\n")
+                  stream.write("\n")
               stream.write(f"- Report SHA-256: `{receipt['report_sha256']}`\n\n")
               stream.write("## Source blob digests\n\n")
               stream.write("| Source | Git blob SHA |\n|---|---|\n")
