@@ -107,6 +107,24 @@ class InventoryTests(unittest.TestCase):
                     limit=100, max_pages=10, timeout=2,
                 )
 
+    def test_limit_above_copernicus_cap_is_rejected(self):
+        with self.assertRaises(SystemExit) as raised:
+            main([
+                "--start", "2025-01-01", "--end", "2025-01-02",
+                "--limit", "101", "--out", "unused.json",
+            ])
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_atomic_write_failure_does_not_leave_partial_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "inventory.json"
+            with patch("tools.water_leak_satellite.catalog_inventory.os.replace", side_effect=OSError("simulated replace failure")):
+                from tools.water_leak_satellite.catalog_inventory import atomic_write_text
+                with self.assertRaises(OSError):
+                    atomic_write_text(target, '{"incomplete":')
+            self.assertFalse(target.exists())
+            self.assertEqual(list(Path(tmp).glob(".inventory.json.*.tmp")), [])
+
     def test_main_writes_auditable_json_with_mock_catalog(self):
         response = {"type": "FeatureCollection", "features": [self.feature], "links": []}
         with tempfile.TemporaryDirectory() as tmp, patch(

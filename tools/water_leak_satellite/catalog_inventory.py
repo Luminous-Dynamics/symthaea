@@ -11,7 +11,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
+import tempfile
 from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Any
@@ -38,6 +40,29 @@ def canonical_json_bytes(value: Any) -> bytes:
 
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    """Publish the complete JSON artifact atomically."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", prefix=f".{path.name}.",
+            suffix=".tmp", dir=path.parent, delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+    except BaseException:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
 
 
 def parse_bbox(value: str) -> list[float]:
@@ -218,8 +243,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if not 1 <= args.limit <= 500:
-        parser.error("--limit must be between 1 and 500")
+    if not 1 <= args.limit <= 100:
+        parser.error("--limit must be between 1 and the Copernicus STAC maximum of 100")
     if args.max_pages < 1:
         parser.error("--max-pages must be >= 1")
     if args.timeout <= 0:
@@ -257,8 +282,7 @@ def main(argv: list[str] | None = None) -> int:
                 timeout=args.timeout,
             ))
         output = json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(output, encoding="utf-8")
+        atomic_write_text(args.out, output)
     except (CatalogError, OSError) as exc:
         print(f"catalog inventory failed closed: {exc}", file=sys.stderr)
         return 2
