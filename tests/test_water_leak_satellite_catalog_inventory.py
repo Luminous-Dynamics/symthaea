@@ -125,6 +125,48 @@ class InventoryTests(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertEqual(list(Path(tmp).glob(".inventory.json.*.tmp")), [])
 
+    def test_page_limit_fails_closed_if_catalog_has_next_link(self):
+        response = {
+            "type": "FeatureCollection", "features": [],
+            "links": [{"rel": "next", "href": "https://stac.dataspace.copernicus.eu/v1/search?token=page2", "method": "GET"}],
+        }
+        with patch("tools.water_leak_satellite.catalog_inventory.urlopen", return_value=FakeResponse(response)):
+            with self.assertRaises(CatalogError):
+                inventory_collection(
+                    endpoint="https://stac.dataspace.copernicus.eu/v1/search",
+                    collection="sentinel-1-grd", bbox=[27.7, -26.5, 28.4, -25.8],
+                    interval="2025-01-01T00:00:00Z/2025-01-02T23:59:59Z",
+                    limit=1, max_pages=1, timeout=2,
+                )
+
+    def test_post_next_link_uses_explicit_server_body(self):
+        first = {
+            "type": "FeatureCollection", "features": [self.feature],
+            "links": [{
+                "rel": "next", "href": "https://stac.dataspace.copernicus.eu/v1/search",
+                "method": "POST",
+                "body": {
+                    "collections": ["sentinel-1-grd"], "bbox": [27.7, -26.5, 28.4, -25.8],
+                    "datetime": "2025-01-01T00:00:00Z/2025-01-02T23:59:59Z",
+                    "limit": 1, "next": "opaque-token",
+                },
+            }],
+        }
+        second = {"type": "FeatureCollection", "features": [], "links": []}
+        with patch(
+            "tools.water_leak_satellite.catalog_inventory.urlopen",
+            side_effect=[FakeResponse(first), FakeResponse(second)],
+        ) as mock_open:
+            report = inventory_collection(
+                endpoint="https://stac.dataspace.copernicus.eu/v1/search",
+                collection="sentinel-1-grd", bbox=[27.7, -26.5, 28.4, -25.8],
+                interval="2025-01-01T00:00:00Z/2025-01-02T23:59:59Z",
+                limit=1, max_pages=10, timeout=2,
+            )
+        second_request = mock_open.call_args_list[1].args[0]
+        self.assertEqual(json.loads(second_request.data)["next"], "opaque-token")
+        self.assertEqual(report["page_count"], 2)
+
     def test_main_writes_auditable_json_with_mock_catalog(self):
         response = {"type": "FeatureCollection", "features": [self.feature], "links": []}
         with tempfile.TemporaryDirectory() as tmp, patch(
