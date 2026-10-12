@@ -43,6 +43,8 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
+from diffsinger_phonemes import ipa_to_arpabet, resolve_language_id
+
 HEAD_FRAMES = 8
 TAIL_FRAMES = 8
 SAMPLE_RATE = 44100
@@ -50,28 +52,6 @@ HOP_SIZE = 512
 FRAME_MS = 1000.0 * HOP_SIZE / SAMPLE_RATE  # ~11.61 ms
 PROTOCOL_VERSION = 1
 PROVIDER_ID = "diffsinger-local"
-
-# IPA -> ARPAbet-style phone (matches src/voice/diffsinger_phonemes.rs's
-# now-removed Rust table 1:1 -- kept here since this is the only remaining
-# copy after the Rust ONNX path was replaced by this worker).
-IPA_TO_ARPABET = {
-    "aɪ": ["ay"], "aʊ": ["aw"], "eɪ": ["ey"], "oʊ": ["ow"], "ɔɪ": ["oy"],
-    "iː": ["iy"], "uː": ["uw"], "ɑː": ["aa"], "ɔː": ["ao"], "ɜː": ["er"],
-    "æ": ["ae"], "ɑ": ["aa"], "ɒ": ["aa"], "ɔ": ["ao"], "ə": ["ax"],
-    "ɛ": ["eh"], "ɪ": ["ih"], "ʊ": ["uh"], "ʌ": ["ah"], "i": ["iy"],
-    "u": ["uw"], "a": ["ah"],
-    "tʃ": ["ch"], "dʒ": ["jh"], "ð": ["dh"], "ŋ": ["ng"], "ɹ": ["r"],
-    "ʃ": ["sh"], "ʒ": ["zh"], "θ": ["th"],
-    "b": ["b"], "d": ["d"], "f": ["f"], "ɡ": ["g"], "g": ["g"], "h": ["hh"],
-    "j": ["y"], "k": ["k"], "l": ["l"], "m": ["m"], "n": ["n"], "p": ["p"],
-    "s": ["s"], "t": ["t"], "v": ["v"], "w": ["w"], "z": ["z"],
-    "ks": ["k", "s"],
-}
-
-
-def ipa_to_arpabet(ipa: str):
-    return IPA_TO_ARPABET.get(ipa, ["ax"])
-
 
 def hz_to_tone(hz: float) -> float:
     return 69.0 + 12.0 * math.log2(hz / 440.0)
@@ -117,7 +97,7 @@ class DiffSingerModel:
         return self.phoneme_ids.get(phoneme)
 
     def language_id(self, lang: str) -> int:
-        return self.language_ids.get(lang, 0)
+        return resolve_language_id(self.language_ids, lang)
 
     def build_score(self, performance: dict):
         """Walk a serialized VocalPerformance into (tokens, languages,
@@ -125,6 +105,8 @@ class DiffSingerModel:
         (now-removed) design: proportional per-syllable phoneme timing from
         natural_duration_s, melisma notes held on the syllable's last
         phoneme."""
+        language = performance.get("language")
+        language_token_id = self.language_id(language)
         arpabet_phonemes = []
         durations_ms = []
         target_hz = []
@@ -152,12 +134,12 @@ class DiffSingerModel:
         tokens = [self.phoneme_token("SP")]
         languages = [0]
         for arpabet in arpabet_phonemes:
-            namespaced = f"en/{arpabet}"
+            namespaced = f"{language}/{arpabet}"
             token = self.phoneme_token(namespaced)
             if token is None:
                 raise ValueError(f"voicebank phonemes.json has no entry for '{namespaced}'")
             tokens.append(token)
-            languages.append(self.language_id("en"))
+            languages.append(language_token_id)
         tokens.append(self.phoneme_token("SP"))
         languages.append(0)
 

@@ -33,8 +33,11 @@ struct PhoneSpan {
     syllable: usize,
 }
 
-fn ipa_to_arpa(ipa: &str) -> &'static str {
-    match ipa.trim_matches(|c: char| c == 'ː' || c.is_ascii_digit()) {
+/// Map supported English IPA symbols to the tract planner's phone inventory.
+/// Unknown symbols are rejected; mapping them to AX would silently alter words.
+fn ipa_to_arpa(ipa: &str) -> Option<&'static str> {
+    let normalized = ipa.trim_matches(|c: char| c == 'ː' || c.is_ascii_digit());
+    let mapped = match normalized {
         "i" | "iː" => "IY",
         "ɪ" => "IH",
         "e" | "eɪ" => "EY",
@@ -75,11 +78,13 @@ fn ipa_to_arpa(ipa: &str) -> &'static str {
         "r" | "ɹ" => "R",
         "w" => "W",
         "j" => "Y",
-        _ => "AX",
-    }
+        _ => return None,
+    };
+    Some(mapped)
 }
 
-fn phone_spans(performance: &VocalPerformance) -> Vec<PhoneSpan> {
+
+fn phone_spans(performance: &VocalPerformance) -> Result<Vec<PhoneSpan>> {
     let mut spans = Vec::new();
     for (syllable_index, syllable) in performance.syllables.iter().enumerate() {
         let total: f32 = syllable.notes().map(|note| note.duration).sum();
@@ -99,6 +104,13 @@ fn phone_spans(performance: &VocalPerformance) -> Vec<PhoneSpan> {
         let vowel_budget = (total - consonant_total * consonant_scale).max(0.03);
         let mut cursor = (syllable.note.start_time - syllable.consonant_advance_s).max(0.0);
         for phone in &syllable.phonemes {
+            let mapped = ipa_to_arpa(&phone.ipa).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "functional singing does not support IPA phoneme {:?} in syllable {}; refusing silent schwa substitution",
+                    phone.ipa,
+                    syllable_index
+                )
+            })?;
             let duration = if phone.is_vowel {
                 vowel_budget * phone.natural_duration_s.max(0.01) / vowel_weight.max(1e-6)
             } else {
@@ -108,13 +120,13 @@ fn phone_spans(performance: &VocalPerformance) -> Vec<PhoneSpan> {
             spans.push(PhoneSpan {
                 start: cursor,
                 end: cursor + duration,
-                phoneme: ipa_to_arpa(&phone.ipa).to_string(),
+                phoneme: mapped.to_string(),
                 syllable: syllable_index,
             });
             cursor += duration;
         }
     }
-    spans
+    Ok(spans)
 }
 
 fn interpolate_curve(points: &[(f32, f32)], time: f32, fallback: f32) -> f32 {
@@ -491,7 +503,7 @@ impl FunctionalSingingEngine {
     ) -> Result<Vec<ArticulatoryState>> {
         performance.validate()?;
         self.pipeline.reset();
-        let spans = phone_spans(performance);
+        let spans = phone_spans(performance)?;
         let pitch: Vec<_> = performance
             .pitch_curve
             .iter()
@@ -555,7 +567,7 @@ impl FunctionalSingingEngine {
     /// `motor_states`, this contains no absolute tube geometry.
     pub fn gesture_frames(&mut self, performance: &VocalPerformance) -> Result<Vec<GestureFrame>> {
         let states = self.motor_states(performance)?;
-        let spans = phone_spans(performance);
+        let spans = phone_spans(performance)?;
         Ok(states
             .iter()
             .enumerate()
@@ -675,5 +687,27 @@ mod tests {
         assert_eq!(stem.backend, "functional-tract-hdc-cfc");
         assert!(stem.samples.iter().any(|sample| sample.abs() > 1e-6));
         assert!(stem.samples.iter().all(|sample| sample.is_finite()));
+    }
+
+    #[test]
+    fn unsupported_ipa_fails_closed_instead_of_becoming_schwa() {
+        let mut performance = VocalPerformance::from_melody(
+            "light",
+            &[Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.16,
+                velocity: 0.72,
+            }],
+            "en",
+        )
+        .unwrap();
+        performance.syllables[0].phonemes[0].ipa = "ʎ".to_string();
+
+        let mut engine = FunctionalSingingEngine::new(24_000);
+        let error = engine.motor_states(&performance).unwrap_err().to_string();
+        assert!(error.contains("unsupported IPA phoneme") || error.contains("does not support IPA phoneme"), "{error}");
+        assert!(error.contains("ʎ"), "{error}");
+        assert!(error.contains("schwa"), "{error}");
     }
 }

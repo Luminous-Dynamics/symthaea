@@ -105,6 +105,37 @@ Research links:
 11. Run a pinned SwiftF0 shadow evaluation on the same WAV digests and compare it with at least one independent tracker. Do not gate on it until confidence handling, out-of-range behavior, model/runtime pinning, and licensing are reviewed.
 12. Add an external singing-generation backend adapter only after capability mapping, licensing, language coverage, model pinning, and host resource budget are recorded.
 
+## Human communication and spoken speech (separate evaluation track)
+
+The existing 60-case suite is a sung-lyrics benchmark; it is **not** evidence that everyday spoken communication is natural, intelligible, or conversationally competent. The current repository describes the speech/singing backends as experimental, and no current-head audio has been supplied for a direct perceptual critique. Keep any statement about audible quality provisional until actual output is reviewed.
+
+A source audit found two pronunciation-integrity defects and one language-contract limitation:
+
+- The functional tract singing adapter mapped any unrecognized IPA symbol to `AX`, silently substituting a schwa-like vowel. It now returns an explicit error for a phoneme outside its declared English inventory.
+- The DiffSinger worker had the same unknown-IPA-to-`ax` fallback. The mapping now lives in a small dependency-light module and rejects unsupported symbols rather than producing plausible but incorrect audio.
+- The DiffSinger adapter always constructed `en/<phone>` tokens and used language ID 0 for an unknown language. The worker now requires an explicit English (`en`) mapping and rejects non-English requests until language-specific G2P, phone inventory, and model tokens are implemented together. This is an honest capability limit, not a claim of multilingual support.
+
+These checks prevent a subset of hidden pronunciation corruption; they do not prove improved naturalness or speech intelligibility. A future non-English path should use language-specific grapheme-to-phoneme rules, a declared phone inventory, and exact token coverage rather than reusing English phone labels.
+
+### Evaluation dimensions for spoken communication
+
+Keep this evaluation separate from sustained-note singing:
+
+1. **Message fidelity:** preserve negation, names, acronyms, dates, numbers, units, and user-supplied wording. Use transcript round-trips (WER/CER) as alarms, then exact checks for critical tokens; ASR output is a noisy proxy, not ground truth.
+2. **Diction and phoneme coverage:** test minimal pairs and confusable consonants, clusters, multisyllabic words, unstressed syllables, and phrase-final consonants. Report unsupported phones explicitly; never convert unsupported phones to silence or a default vowel.
+3. **Listener-oriented prosody:** control phrase boundaries, sentence-final questions versus statements, contrastive emphasis, information focus, uncertainty, reassurance, and urgency. Test whether emphasis lands on the words that carry the message, not just whether F0 varies. Conversation research suggests that prosodic prominence and word predictability are related to intelligibility-oriented pressures ([Clark et al., 2025](https://doi.org/10.1111/cogs.70134)).
+4. **Emotional congruence:** compare intended conversational function with acoustic delivery (rate, pause length, pitch range, intensity, and voice quality). Do not infer a listener's emotional state from prosody alone or force an affect label onto every utterance.
+5. **Timing and turn-taking:** if used interactively, measure time-to-first-audio, real-time factor, chunk gaps, end-of-turn delay, stop/cancel latency, and interruption handling at p50/p95. A fluent offline WAV is not necessarily a usable conversational voice system.
+6. **Listening comfort and identity:** check loudness stability, sibilance, breath noise, pitch/timbre consistency, and fatigue across long passages. Speech and singing should share identity constraints where desired, but singing-specific vibrato and sustained vowels must not be forced into ordinary speech.
+
+### Automated-first validation sequence
+
+- Build a deterministic 60–100 prompt spoken suite spanning short answers, long explanations, questions, contrastive stress, numbers/dates, names/acronyms, negation/minimal pairs, low-energy delivery, and multi-clause sentences.
+- Freeze expected text, language, phoneme/word coverage, prompt SHA, backend/model SHA, sample-rate path, and output WAV digests.
+- Compute ASR WER/CER with a pinned recognizer, phoneme/word timing coverage where alignment is available, pause and speaking-rate distributions, clipped/silent duration, and synthesis latency. Any ASR mismatch is a review trigger; it is not by itself proof the audio is wrong.
+- Add deterministic stress fixtures for unsupported symbols, unknown language IDs, missing dictionary words, and malformed audio. The engine should return a typed/clear error and must not quietly emit a substitute pronunciation.
+- Reserve owner listening/capture review for meaningful audible milestones, not as a substitute for automated coverage or a requirement for every code change. Do not claim an improvement until both exact-head automated results and a recorded audio review support it.
+
 ## Promotion rule
 
 A candidate is not “better” because it builds, has more features, follows pitch under a score-guided tracker, or scores well on a speech-trained estimator. Promotion requires no contract/integrity failures; documented lyric and musical fidelity; improved blinded perceptual outcomes on relevant cases; no unacceptable identity/language/register regressions; reproducible artifacts and model provenance; and a rights review appropriate to intended deployment.
