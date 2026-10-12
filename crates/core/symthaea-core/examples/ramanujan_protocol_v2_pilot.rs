@@ -41,6 +41,8 @@ const T_MAX: f64 = 4.0;
 const DT: f64 = 0.01;
 const HOLDOUT_TRAJECTORIES: usize = 3;
 const HOLDOUT_THRESHOLD: f64 = 1e-2;
+/// Exploratory instrumentation threshold, to be frozen before confirmatory runs.
+const STEP_SIZE_STABILITY_RELATIVE_TOLERANCE: f64 = 0.10;
 const MAX_REPLICATES: usize = 100;
 
 type Monomial = (u8, u8);
@@ -270,9 +272,13 @@ fn build_run_record(
     let mut holdout_rhs_evaluations = 0u64;
     let mut holdout_state_updates = 0u64;
     let mut holdout_passing_candidates = 0usize;
+    let mut stable_holdout_candidates = 0usize;
+    let mut holdout_stability_passes = 0usize;
     let mut oracle_equivalent_candidates = 0usize;
     let mut oracle_and_holdout_candidates = 0usize;
+    let mut oracle_and_stable_holdout_candidates = 0usize;
     let mut holdout_false_discoveries = 0usize;
+    let mut stable_holdout_false_discoveries = 0usize;
     let mut receipt_errors = 0usize;
 
     for candidate in &discovery.candidates {
@@ -292,20 +298,66 @@ fn build_run_record(
             holdout_seed,
             HOLDOUT_THRESHOLD,
         );
-        holdout_attempted_steps = holdout_attempted_steps.saturating_add(holdout.attempted_integration_steps);
-        holdout_completed_steps = holdout_completed_steps.saturating_add(holdout.completed_integration_steps);
+        // Re-assess the same sealed initial-condition stream at half the step
+        // size. A separate receipt binds the distinct numerical context.
+        let stability_holdout = validate_invariant_holdout(
+            &system,
+            &candidate.formula,
+            &[1.0, 0.0],
+            &["x", "v"],
+            config,
+            T_MAX,
+            DT / 2.0,
+            HOLDOUT_TRAJECTORIES,
+            holdout_seed,
+            HOLDOUT_THRESHOLD,
+        );
+        holdout_attempted_steps = holdout_attempted_steps
+            .saturating_add(holdout.attempted_integration_steps)
+            .saturating_add(stability_holdout.attempted_integration_steps);
+        holdout_completed_steps = holdout_completed_steps
+            .saturating_add(holdout.completed_integration_steps)
+            .saturating_add(stability_holdout.completed_integration_steps);
         holdout_integration_rhs_evaluations = holdout_integration_rhs_evaluations
-            .saturating_add(holdout.integration_rhs_evaluations);
+            .saturating_add(holdout.integration_rhs_evaluations)
+            .saturating_add(stability_holdout.integration_rhs_evaluations);
         holdout_scoring_rhs_evaluations = holdout_scoring_rhs_evaluations
-            .saturating_add(holdout.scoring_rhs_evaluations);
-        holdout_rhs_evaluations = holdout_rhs_evaluations.saturating_add(holdout.rhs_evaluations);
-        holdout_state_updates = holdout_state_updates.saturating_add(holdout.state_updates);
+            .saturating_add(holdout.scoring_rhs_evaluations)
+            .saturating_add(stability_holdout.scoring_rhs_evaluations);
+        holdout_rhs_evaluations = holdout_rhs_evaluations
+            .saturating_add(holdout.rhs_evaluations)
+            .saturating_add(stability_holdout.rhs_evaluations);
+        holdout_state_updates = holdout_state_updates
+            .saturating_add(holdout.state_updates)
+            .saturating_add(stability_holdout.state_updates);
+
+        let coarse_variance = holdout.max_lie_derivative_variance;
+        let fine_variance = stability_holdout.max_lie_derivative_variance;
+        let variance_scale = coarse_variance.abs().max(fine_variance.abs()).max(1e-12);
+        let relative_step_size_difference = if coarse_variance.is_finite() && fine_variance.is_finite() {
+            (coarse_variance - fine_variance).abs() / variance_scale
+        } else {
+            f64::MAX
+        };
+        let step_size_stable = holdout.passed
+            && stability_holdout.passed
+            && relative_step_size_difference <= STEP_SIZE_STABILITY_RELATIVE_TOLERANCE;
+
         if holdout.passed {
             holdout_passing_candidates += 1;
             if oracle_equivalent {
                 oracle_and_holdout_candidates += 1;
             } else {
                 holdout_false_discoveries += 1;
+            }
+        }
+        if step_size_stable {
+            holdout_stability_passes += 1;
+            stable_holdout_candidates += 1;
+            if oracle_equivalent {
+                oracle_and_stable_holdout_candidates += 1;
+            } else {
+                stable_holdout_false_discoveries += 1;
             }
         }
 
@@ -334,6 +386,31 @@ fn build_run_record(
                 json!({"verified": false, "error": format!("{error:?}")})
             }
         };
+        let stability_receipt_value = match build_autonomous_discovery_receipt_v1(
+            source_revision,
+            SYSTEM_ID,
+            SYSTEM_DEFINITION,
+            config,
+            &[],
+            candidate,
+            &["x", "v"],
+            &[1.0, 0.0],
+            T_MAX,
+            DT / 2.0,
+            &stability_holdout,
+        ) {
+            Ok(receipt) => {
+                let verified = verify_autonomous_discovery_receipt_v1(&receipt);
+                if !verified {
+                    receipt_errors += 1;
+                }
+                json!({"verified": verified, "receipt": receipt})
+            }
+            Err(error) => {
+                receipt_errors += 1;
+                json!({"verified": false, "error": format!("{error:?}")})
+            }
+        };
 
         candidate_records.push(json!({
             "formula": candidate.formula_str,
@@ -344,7 +421,15 @@ fn build_run_record(
             "discovery_mode": mode_name(candidate.discovery_mode),
             "oracle_equivalent_harmonic_energy": oracle_equivalent,
             "holdout": holdout,
-            "receipt": receipt_value
+            "step_size_stability": {
+                "second_dt": DT / 2.0,
+                "relative_variance_difference": relative_step_size_difference,
+                "relative_tolerance": STEP_SIZE_STABILITY_RELATIVE_TOLERANCE,
+                "passed": step_size_stable,
+                "assessment": stability_holdout
+            },
+            "receipt": receipt_value,
+            "stability_receipt": stability_receipt_value
         }));
     }
 
@@ -401,9 +486,14 @@ fn build_run_record(
         "outcome": {
             "returned_candidates": discovery.candidates.len(),
             "holdout_passing_candidates": holdout_passing_candidates,
+            "stable_holdout_candidates": stable_holdout_candidates,
+            "holdout_stability_passes": holdout_stability_passes,
             "oracle_equivalent_candidates": oracle_equivalent_candidates,
             "oracle_and_holdout_candidates": oracle_and_holdout_candidates,
+            "oracle_and_stable_holdout_candidates": oracle_and_stable_holdout_candidates,
             "holdout_false_discoveries": holdout_false_discoveries,
+            "stable_holdout_false_discoveries": stable_holdout_false_discoveries,
+            "run_recovery_success": oracle_and_stable_holdout_candidates > 0,
             "receipt_errors": receipt_errors
         },
         "candidates": candidate_records,
