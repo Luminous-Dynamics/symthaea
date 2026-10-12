@@ -137,10 +137,7 @@ impl Px4TimesyncQualificationProfileV1 {
         if self.max_inter_sample_gap_us == Some(0) {
             return Err(Px4TimesyncQualificationError::ZeroInterSampleGap);
         }
-        micros_to_nanos(
-            self.max_latest_status_age_us,
-            "max_latest_status_age_us",
-        )?;
+        micros_to_nanos(self.max_latest_status_age_us, "max_latest_status_age_us")?;
         Ok(())
     }
 
@@ -287,13 +284,17 @@ impl Px4TimesyncQualificationV1 {
     }
 
     /// Recompute diagnostics from retained status evidence.
-    pub fn metrics(&self) -> Result<Px4TimesyncQualificationMetricsV1, Px4TimesyncQualificationError> {
+    pub fn metrics(
+        &self,
+    ) -> Result<Px4TimesyncQualificationMetricsV1, Px4TimesyncQualificationError> {
         self.validate()?;
         self.metrics_after_structure()
     }
 
     /// Derive qualification status under the exact stored profile.
-    pub fn outcome(&self) -> Result<Px4TimesyncQualificationOutcomeV1, Px4TimesyncQualificationError> {
+    pub fn outcome(
+        &self,
+    ) -> Result<Px4TimesyncQualificationOutcomeV1, Px4TimesyncQualificationError> {
         self.validate()?;
         if self.samples.len() < usize::from(self.profile.min_samples) {
             return Ok(Px4TimesyncQualificationOutcomeV1::Incomplete {
@@ -434,10 +435,9 @@ impl Px4TimesyncQualificationV1 {
             max_gap = max_gap.max(gap);
         }
 
-        let estimated_offset_span_us = u64::try_from(
-            i128::from(max_offset) - i128::from(min_offset),
-        )
-        .map_err(|_| Px4TimesyncQualificationError::OffsetSpanOutOfRange)?;
+        let estimated_offset_span_us =
+            u64::try_from(i128::from(max_offset) - i128::from(min_offset))
+                .map_err(|_| Px4TimesyncQualificationError::OffsetSpanOutOfRange)?;
         let latest_at = self
             .samples
             .last()
@@ -662,7 +662,10 @@ mod tests {
             Px4TimesyncQualificationOutcomeV1::Qualified
         );
         let fact = value.readiness_fact().unwrap();
-        assert_eq!(fact.requirement, Px4ReadinessRequirementV1::TimesyncQualified);
+        assert_eq!(
+            fact.requirement,
+            Px4ReadinessRequirementV1::TimesyncQualified
+        );
         assert_eq!(fact.state, Px4ReadinessFactStateV1::Satisfied);
         assert_eq!(fact.evidence_id, Some(value.qualification_id().unwrap()));
     }
@@ -671,9 +674,18 @@ mod tests {
     fn absolute_clock_origin_offset_is_not_a_qualification_threshold() {
         let near = qualification(good_samples(500), 1_250);
         let far = qualification(good_samples(5_000_000_000), 1_250);
-        assert_eq!(near.outcome().unwrap(), Px4TimesyncQualificationOutcomeV1::Qualified);
-        assert_eq!(far.outcome().unwrap(), Px4TimesyncQualificationOutcomeV1::Qualified);
-        assert_ne!(near.qualification_id().unwrap(), far.qualification_id().unwrap());
+        assert_eq!(
+            near.outcome().unwrap(),
+            Px4TimesyncQualificationOutcomeV1::Qualified
+        );
+        assert_eq!(
+            far.outcome().unwrap(),
+            Px4TimesyncQualificationOutcomeV1::Qualified
+        );
+        assert_ne!(
+            near.qualification_id().unwrap(),
+            far.qualification_id().unwrap()
+        );
     }
 
     #[test]
@@ -703,7 +715,10 @@ mod tests {
 
     #[test]
     fn insufficient_window_is_unobserved_not_negative_including_zero_samples() {
-        for samples in [vec![], vec![sample("px4.fixture", 1_000, 1, 10_000, 500, 40)]] {
+        for samples in [
+            vec![],
+            vec![sample("px4.fixture", 1_000, 1, 10_000, 500, 40)],
+        ] {
             let value = qualification(samples, 1_050);
             assert!(matches!(
                 value.outcome().unwrap(),
@@ -806,7 +821,10 @@ mod tests {
         let bytes = serde_json::to_vec(&value).unwrap();
         let mut restored: Px4TimesyncQualificationV1 = serde_json::from_slice(&bytes).unwrap();
         restored.validate().unwrap();
-        assert_eq!(restored.qualification_id().unwrap(), value.qualification_id().unwrap());
+        assert_eq!(
+            restored.qualification_id().unwrap(),
+            value.qualification_id().unwrap()
+        );
 
         restored.samples[0].estimated_offset_us += 1;
         assert!(restored.validate().is_err());
