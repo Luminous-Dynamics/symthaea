@@ -15,6 +15,7 @@ on:
       - "scripts/muse_style_coverage.py"
       - "tests/python/test_muse_style_coverage.py"
       - ".github/workflows/muse-style-coverage.yml"
+      - ".github/workflows/muse-style-response-curves.yml"
   push:
     branches: [main]
     paths:
@@ -30,6 +31,7 @@ on:
       - "scripts/muse_style_coverage.py"
       - "tests/python/test_muse_style_coverage.py"
       - ".github/workflows/muse-style-coverage.yml"
+      - ".github/workflows/muse-style-response-curves.yml"
 
 permissions:
   contents: read
