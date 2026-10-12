@@ -87,3 +87,13 @@
 ## Standalone package metadata cleanup (2026-10-12)
 
 - Removed the remaining `Cargo.toml` comment claiming a measured Winterfell XOR circuit lives at a monorepo-only path. The standalone package now consistently states that it only prints an analytical estimate for Winterfell and does not provide a measured same-scale comparison.
+
+
+## Upstream Binius64 wrapper disclosure report (2026-10-12)
+
+- A fresh upstream review identified [binius-zk/binius64 PR #2505](https://github.com/binius-zk/binius64/pull/2505), titled “Reject private words in the ZK prover and verifier, since proofs leak them.” At the time inspected, this security-relevant PR was open and unmerged.
+- The report describes a composed-wrapper leak: `ZKWrappedProverChannel::prove_oracle_relation` sends inner oracle-relation claims through the inner channel rather than the wrapper path that applies its one-time-pad key. The verifier can compute the relevant linear functional from public data / Fiat–Shamir challenges. The report provides a public-API reproduction on its stated base revision and records disclosure in the stated test cases.
+- The proposed upstream patch rejects constraints/witnesses with private words as a stopgap; it is not the cryptographic protocol repair. The open report also says hiding of witness-dependent oracle openings has not been established. Do not treat the existence or naming of `ZKProver` / `ZKVerifier` as evidence that private HDC witnesses are hidden.
+- Scope discipline: this report concerns the composed Binius64 ZK wrapper. It does not establish that the separate, direct Iron Spartan proof system exercised by this repository's tiny smoke test has the same flaw. That smoke test itself remains too small to establish privacy for the HDC relations and is not an independent cryptographic audit.
+- Migration gate is strengthened: do not integrate the current upstream wrapper as a private-witness solution until a protocol fix is reviewed, the disclosure reproduction is converted into a failing regression test against the vulnerable code / passing test against the fix, tests cover transcript noninterference and hidden-word layouts, and independent review supports the claimed zero-knowledge property. Public-only wrapper operation does not meet the private-witness HDC requirement.
+- This is an upstream security finding and an integration blocker. The standard non-ZK Binius64 harness in this PR remains accurately described as computational-integrity-only. No new claim about standalone Iron Spartan is made.
