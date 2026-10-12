@@ -1,0 +1,39 @@
+name: Water Leak Satellite Catalog Tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/water_leak_satellite/**"
+      - "tests/test_water_leak_satellite_catalog_inventory.py"
+      - ".github/workflows/water-leak-catalog-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: water-leak-catalog-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-tests:
+    name: Offline catalog inventory tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout exact PR revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify Python runtime
+        run: python3 --version
+
+      - name: Compile inventory utility and tests
+        run: python3 -m py_compile tools/water_leak_satellite/catalog_inventory.py tests/test_water_leak_satellite_catalog_inventory.py
+
+      - name: Run deterministic offline tests
+        run: python3 -m unittest discover -s tests -p 'test_water_leak_satellite_catalog_inventory.py' -v
