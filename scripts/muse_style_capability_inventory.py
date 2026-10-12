@@ -327,7 +327,7 @@ def _runtime_report(root: Path) -> dict[str, Any]:
         choices = len(re.findall(
             r"\(\s*Instrument::[A-Z][A-Za-z0-9_]*\s*,\s*"
             r"Instrument::[A-Z][A-Za-z0-9_]*\s*,\s*"
-            r"Instrument::[A-Z][A-Za-z0-9_]*\s*\)",
+            r"Instrument::[A-Z][A-Za-z0-9_]*(?:\s*,)?\s*\)",
             code,
         ))
         if not instruments or choices == 0:
@@ -390,10 +390,11 @@ def _runtime_report(root: Path) -> dict[str, Any]:
         },
         "profiles": profiles,
         "interpretation": (
-            "These fields are extracted from executable source declarations. "
-            "They do not prove an intent axis has a measurable causal effect, "
-            "that an instrument has an available sample/render path, or that "
-            "a style is perceptually distinct or culturally authentic."
+            "These fields are extracted from executable source declarations, "
+            "including the existing census-informed intent-axis declaration. "
+            "This inventory does not independently rerun causal-effect probes, "
+            "prove sample/render availability, or validate perceptual distinctness "
+            "or cultural authenticity."
         ),
     }
 
