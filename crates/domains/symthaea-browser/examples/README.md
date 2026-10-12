@@ -2,7 +2,7 @@
 
 ## Maintained example
 
-- `praxis_journey.rs` is the maintained local Praxis journey. It routes navigation through `BrowserExecutor`, checks each receipt, and observes pages through the native accessibility path. It requires a local Praxis server and an explicitly configured development browser.
+- `praxis_journey.rs` is the maintained local Praxis journey. It routes navigation through `BrowserExecutor`, checks each receipt, and obtains observations through `BrowserExecutor::observe()`, which checks the observation capability/Phi and current URL before exposing the accessibility tree. It requires a local Praxis server and an explicitly configured development browser.
 
 ## Archived exploration harnesses
 
