@@ -499,6 +499,9 @@ def build_annotation_seed(
 ) -> dict[str, Any]:
     """Export output units and source context for annotation; do not score them."""
     corpus_sha256 = hashlib.sha256(corpus_bytes).hexdigest()
+    annotation_guide_path = ROOT / "docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md"
+    annotation_guide_bytes = annotation_guide_path.read_bytes()
+    annotation_guide_sha256 = hashlib.sha256(annotation_guide_bytes).hexdigest()
     case_contexts = []
     units = []
     for case_index, case in enumerate(corpus["cases"]):
@@ -555,9 +558,10 @@ def build_annotation_seed(
                     "supporting_evidence_ids": list(interpretation["supporting_evidence_ids"]),
                     "contradicting_evidence_ids": list(interpretation["contradicting_evidence_ids"]),
                 },
+                # Deliberately omit the system-declared epistemic status from
+                # the first-pass review view to reduce anchoring. It remains
+                # traceable via the bound source bundle and source paths.
                 detail={
-                    "hypothesis_id": interpretation["hypothesis_id"],
-                    "epistemic_status_as_emitted": interpretation["epistemic_status"],
                     "review_instruction": "Split into atomic claims during annotation when independently checkable claims are combined; do not alter these source fields.",
                 },
             ))
@@ -605,6 +609,8 @@ def build_annotation_seed(
         "source_revision": source_revision,
         "normalized_bundle_sha256": hashlib.sha256(bundle_bytes).hexdigest(),
         "evaluator_source_sha256": hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
+        "annotation_guide_path": "docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md",
+        "annotation_guide_sha256": annotation_guide_sha256,
         "case_count": len(case_contexts),
         "unit_count": len(units),
         "case_contexts": case_contexts,
@@ -710,6 +716,13 @@ def annotation_seed_self_test() -> list[str]:
                     case for case in seed["case_contexts"] if case["case_context_id"] == unit["case_id"]
                 )["evidence_spans"]}
                 for unit in seed["units"])),
+            ("annotation guide is digest-bound and system status is not exposed", 
+             seed["annotation_guide_path"] == "docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md"
+             and seed["annotation_guide_sha256"] == hashlib.sha256(
+                 (ROOT / seed["annotation_guide_path"]).read_bytes()
+             ).hexdigest()
+             and all("epistemic_status_as_emitted" not in unit.get("detail", {})
+                     for unit in seed["units"])),
         ]
         failures.extend(f"{name} failed" for name, passed in checks if not passed)
     except Exception as exc:
@@ -1012,7 +1025,7 @@ def main() -> int:
                 print(f"- annotation seed: {failure}", file=sys.stderr)
             return 1
         print("PASS: 36 evaluator controls (31 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
-        print("PASS: 7 annotation-seed controls (identity, case context, exact text, unit separation, unannotated state, deterministic IDs, evidence binding)")
+        print("PASS: 8 annotation-seed controls (identity, case context, exact text, unit separation, unannotated state, deterministic IDs, evidence binding, guide digest/blinding)")
     if not args.results:
         return 0
     if args.output_dir is None:
