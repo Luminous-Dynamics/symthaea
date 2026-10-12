@@ -2658,6 +2658,46 @@ mod tests {
     }
 
     #[test]
+    fn registration_id_mask_upper_boundary_is_explicit() {
+        let highest_bit = assessment(
+            registration(true, 31, 42),
+            config_assessment(42, true, 0, 1_200_000_000),
+            arming_request(1_u32 << 31),
+            Some(arming_reply(8, 31, false, 1_350_000_000)),
+            1_400_000_000,
+        );
+        assert!(matches!(
+            highest_bit.outcome().unwrap(),
+            Px4ExternalModeArmingCheckOutcomeV1::RequirementsMatch {
+                registration_id: 31,
+                mode_id: 42,
+                ..
+            }
+        ));
+
+        let outside_mask = Px4ExternalModeRegistrationBindingV1::new(
+            "px4.registration.decoder.fixture.v1",
+            "vehicle.slot-a",
+            "px4.v1.18.external-mode.fixture.v1",
+            "px4.boot.fixture.session-a",
+            850_000,
+            991,
+            "org.luminous.fixture.mode",
+            1,
+            true,
+            32,
+            42,
+            -1,
+            false,
+            ts(900_000_000),
+        );
+        assert_eq!(
+            outside_mask.unwrap_err(),
+            Px4ExternalModeArmingCheckError::RegistrationIdOutsideMask
+        );
+    }
+
+    #[test]
     fn zero_timing_bounds_fail_closed() {
         assert_eq!(
             Px4ExternalModeArmingCheckProfileV1::new(
