@@ -126,6 +126,25 @@ class PrimalityProofTests(unittest.TestCase):
                 with self.assertRaises(verifier.CertificateError):
                     verifier.decode_primality_proof(data)
 
+    def test_object_verification_and_encoding_enforce_resource_budgets_first(self) -> None:
+        too_many_nodes = verifier.PrimalityProof(
+            2,
+            tuple(verifier.PrimeNode(2, (), ()) for _ in range(verifier.MAX_CERTIFICATES + 1)),
+        )
+        with self.assertRaisesRegex(verifier.CertificateError, "too many primality certificate nodes"):
+            verifier.verify_primality_proof(too_many_nodes)
+        with self.assertRaisesRegex(verifier.CertificateError, "too many certificate nodes"):
+            verifier.encode_primality_proof(too_many_nodes)
+
+        over_budget_node = verifier.PrimeNode(
+            2,
+            tuple((2, 1) for _ in range(verifier.MAX_PROOF_ENTRIES + 1)),
+            (),
+        )
+        over_budget_entries = verifier.PrimalityProof(2, (over_budget_node,))
+        with self.assertRaisesRegex(verifier.CertificateError, "too many proof entries"):
+            verifier.verify_primality_proof(over_budget_entries)
+
     def test_decoder_checks_node_and_entry_budgets_before_looping(self) -> None:
         encoded = bytearray(verifier.encode_primality_proof(proof_seventeen()))
         encoded[16:20] = (verifier.MAX_CERTIFICATES + 1).to_bytes(4, "big")
