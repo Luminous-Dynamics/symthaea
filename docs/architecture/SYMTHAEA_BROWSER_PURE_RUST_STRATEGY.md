@@ -186,7 +186,17 @@ The P1 property is accepted only when:
 - Cargo, formatting, Clippy, unit/integration and live-browser tests have visible passing results bound to the exact source revision.
 - The documentation says **Rust controller / Chromium engine** until an alternative engine itself passes a separate qualification.
 
-## 10. References
+## 10. Implementation update — 2026-10-13
+
+A first native-CDP implementation slice is available for review in [PR #7429](https://github.com/Luminous-Dynamics/symthaea/pull/7429), on branch `feat/symthaea-browser-native-cdp-actions-001`. The code-change head documented for this slice was `62ad424be7e8fe33ded649e00245d89f58b02ed2`.
+
+The branch replaces authored page evaluation in the normal `cdp.rs` controller path for click/accessibility-target resolution, scrolling, history navigation, focus detection, title retrieval and DOM text extraction. It uses typed CDP operations and Rust HTML parsing. Input insertion is guarded by AX role/disabled checks and a postcondition requiring the observed value to change and contain the requested text. The JavaScript fallback observation path and arbitrary `eval_js` helper were removed from that controller module.
+
+The raw Praxis exploration examples are preserved under `examples/archive/` with archive banners; the maintained `examples/praxis_journey.rs` continues to exercise `BrowserExecutor`. This moves the unsafe example pattern out of the maintained example list without destroying the research record.
+
+**Verification status remains unqualified.** Repository CI was triggered after the PR was made ready for review, but jobs were still queued/pending at the last check. Cargo formatting, compilation, Clippy, unit/integration execution and live Chromium hostile-page tests must all be verified against the final exact head before the no-authored-JS controller claim is treated as qualified. The patch does not replace Chromium's renderer or its website JavaScript engine.
+
+## 11. References
 
 - Symthaea Browser manifest: https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-browser/Cargo.toml
 - Symthaea Browser CDP wrapper: https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-browser/src/cdp.rs
