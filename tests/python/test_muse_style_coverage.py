@@ -27,7 +27,7 @@ from muse_style_coverage import (  # noqa: E402
 CATALOG_FIXTURE = r'''
 // This commented invocation is deliberately not a catalog row:
 // style!(99, "Comment only", Z, "Default", Developing)
-const EXAMPLE: &str = "style!(98, \\"String only\\", Z)";
+const EXAMPLE: &str = "style!(98, \"String only\", Z)";
 macro_rules! style { ($id:literal) => { $id }; }
 pub const CATALOG: [CanonicalStyle; 3] = [
     style!(1, "Default", A, "Default", Developing),
