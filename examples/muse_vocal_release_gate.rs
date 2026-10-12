@@ -1255,6 +1255,18 @@ mod tests {
         assert_eq!(case_report[0]["clip_id"], "clip-1");
         assert_eq!(case_report[0]["pass"], true);
 
+        let mut tampered_manifest = public_manifest.clone();
+        tampered_manifest[0].lyrics = "different lyrics".into();
+        std::fs::write(
+            output.join("blind_manifest.json"),
+            serde_json::to_vec_pretty(&tampered_manifest).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            run_saved_ratings_review(&output, &private, &ratings_path, 5).is_err(),
+            "review must fail closed when the public manifest no longer matches the private run"
+        );
+
         std::fs::remove_dir_all(root).unwrap();
     }
 
