@@ -66,6 +66,45 @@ jobs:
           set -euo pipefail
           /tmp/dft-grid-tests --nocapture 2>&1 | tee /tmp/dft-grid-tests.log
 
+      - name: Fetch and verify exact PR merge context
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "refs/pull/${PR_NUMBER}/merge"
+          merge_sha="$(git rev-parse --verify 'FETCH_HEAD^{commit}')"
+          merge_head="$(git rev-parse --verify "${merge_sha}^2")"
+          merge_base="$(git rev-parse --verify "${merge_sha}^1")"
+          if [[ "$merge_head" != "$EXPECTED_HEAD_SHA" ]]; then
+            printf 'merge head mismatch: expected=%s actual=%s\n' "$EXPECTED_HEAD_SHA" "$merge_head" >&2
+            exit 1
+          fi
+          if [[ "$merge_base" != "$EXPECTED_BASE_SHA" ]]; then
+            printf 'merge base mismatch: expected=%s actual=%s\n' "$EXPECTED_BASE_SHA" "$merge_base" >&2
+            exit 1
+          fi
+          git worktree add --detach /tmp/qc-merge-context "$merge_sha"
+          test -f /tmp/qc-merge-context/crates/core/symthaea-observation-attestation/Cargo.toml
+          {
+            printf 'merge_sha=%s\n' "$merge_sha"
+            printf 'merge_parent1_base_sha=%s\n' "$merge_base"
+            printf 'merge_parent2_head_sha=%s\n' "$merge_head"
+            printf 'workspace_manifest_present=true\n'
+          } | tee /tmp/qc-grid-merge-context-receipt.txt
+
+      - name: Compile and run quantum-chemistry crate grid tests on the exact merge context
+        if: github.event_name == 'pull_request'
+        shell: bash
+        working-directory: /tmp/qc-merge-context
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 > /tmp/qc-grid-cargo-metadata.json
+          cargo test --locked -p symthaea-quantum-chemistry dft::grid::tests -- --nocapture 2>&1 | tee /tmp/qc-grid-cargo-tests.log
+
       - name: Summarize and upload evidence
         if: always()
         shell: bash
@@ -88,7 +127,22 @@ jobs:
               echo "- Test log was not produced; compilation or an earlier step may have failed."
             fi
             echo
-            echo "Scope: this gate runs the production grid module and its embedded tests. Minimal molecule stubs isolate it from the workspace manifest blocker, so this does not establish Cargo package integration, SCF convergence, molecular-energy agreement, or chemical accuracy."
+            if [[ -f /tmp/qc-grid-merge-context-receipt.txt ]]; then
+              echo
+              echo "### Exact PR merge-context receipt"
+              echo
+              cat /tmp/qc-grid-merge-context-receipt.txt
+            fi
+            if [[ -f /tmp/qc-grid-cargo-tests.log ]]; then
+              echo
+              echo "### Quantum-chemistry crate tests"
+              echo
+              echo '```text'
+              tail -n 40 /tmp/qc-grid-cargo-tests.log
+              echo '```'
+            fi
+            echo
+            echo "Scope: the standalone run isolates the production grid module. The PR merge-context run additionally tests the actual quantum-chemistry crate against the exact base/head merge parents. Neither result alone establishes SCF convergence, molecular-energy agreement, or chemical accuracy."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload source-scoped grid evidence
@@ -99,5 +153,8 @@ jobs:
           path: |
             /tmp/dft-grid-rustc-version.txt
             /tmp/dft-grid-tests.log
+            /tmp/qc-grid-merge-context-receipt.txt
+            /tmp/qc-grid-cargo-metadata.json
+            /tmp/qc-grid-cargo-tests.log
           if-no-files-found: warn
           retention-days: 30
