@@ -1798,6 +1798,23 @@ mod tests {
             Err(CertifiedFactorizationWireError::TrailingBytes { count: 1 })
         );
 
+        let mut too_many_factors = bytes.clone();
+        too_many_factors[16..20]
+            .copy_from_slice(&(CERTIFIED_FACTORIZATION_MAX_FACTORS + 1).to_be_bytes());
+        assert!(matches!(
+            CertifiedFactorizationCertificate::from_canonical_bytes(&too_many_factors),
+            Err(CertifiedFactorizationWireError::TooManyFactors { .. })
+        ));
+
+        let mut missing_proof_count = bytes.clone();
+        missing_proof_count[56..60].copy_from_slice(&2u32.to_be_bytes());
+        assert!(matches!(
+            CertifiedFactorizationCertificate::from_canonical_bytes(&missing_proof_count),
+            Err(CertifiedFactorizationWireError::InvalidCertificate(
+                CertifiedFactorizationError::PrimeProofCountMismatch { .. }
+            ))
+        ));
+
         let mut wrong_value = bytes.clone();
         wrong_value[15] ^= 1;
         assert!(matches!(
@@ -1899,6 +1916,14 @@ mod tests {
         assert!(matches!(
             PrimalityProof::from_canonical_bytes(&too_many_certificates),
             Err(PrimalityProofWireError::TooManyCertificates { .. })
+        ));
+
+        let mut too_many_entries = bytes;
+        too_many_entries[28..32]
+            .copy_from_slice(&(PRIMALITY_PROOF_MAX_ENTRIES as u32 + 1).to_be_bytes());
+        assert!(matches!(
+            PrimalityProof::from_canonical_bytes(&too_many_entries),
+            Err(PrimalityProofWireError::TooManyEntries { .. })
         ));
     }
 
