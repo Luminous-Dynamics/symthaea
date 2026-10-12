@@ -12,7 +12,8 @@
 //!   cargo run --release -p symthaea-music-theory --example style_control_response_curves
 //!
 //! Write the JSON artifact:
-//!   MUSE_STYLE_RESPONSE_JSON_OUT=/tmp/muse-style-response.json cargo run --release -p symthaea-music-theory --example style_control_response_curves
+//!   MUSE_STYLE_RESPONSE_JSON_OUT=/tmp/muse-style-response.json \
+//!     cargo run --release -p symthaea-music-theory --example style_control_response_curves
 //!
 //! Output is symbolic evidence only. It does not verify audio rendering,
 //! perceptual distinctness, or cultural authenticity.
@@ -323,7 +324,8 @@ fn observation_json(observation: &Observation, base_hash: u64) -> serde_json::Va
             "velocity_standard_deviation": observation.velocity_standard_deviation,
             "mean_note_duration_beats": observation.mean_note_duration_beats,
             "mean_section_intensity": observation.mean_section_intensity,
-            "section_intensity_standard_deviation": observation.section_intensity_standard_deviation,
+            "section_intensity_standard_deviation": observation
+                .section_intensity_standard_deviation,
             "emphasis_counts": {
                 "normal": observation.emphasis_counts[0],
                 "climax": observation.emphasis_counts[1],
@@ -386,7 +388,11 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         .collect();
     let note_count_points: Vec<(f64, f64)> = observations
         .iter()
-        .filter_map(|point| point.numeric_value.map(|value| (value, point.score_note_count as f64)))
+        .filter_map(|point| {
+            point
+                .numeric_value
+                .map(|value| (value, point.score_note_count as f64))
+        })
         .collect();
     let velocity_points: Vec<(f64, f64)> = observations
         .iter()
@@ -394,11 +400,19 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         .collect();
     let duration_mean_points: Vec<(f64, f64)> = observations
         .iter()
-        .filter_map(|point| point.numeric_value.map(|value| (value, point.mean_note_duration_beats)))
+        .filter_map(|point| {
+            point
+                .numeric_value
+                .map(|value| (value, point.mean_note_duration_beats))
+        })
         .collect();
     let intensity_points: Vec<(f64, f64)> = observations
         .iter()
-        .filter_map(|point| point.numeric_value.map(|value| (value, point.mean_section_intensity)))
+        .filter_map(|point| {
+            point
+                .numeric_value
+                .map(|value| (value, point.mean_section_intensity))
+        })
         .collect();
     let velocity_spread_points: Vec<(f64, f64)> = observations
         .iter()
@@ -426,7 +440,9 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
     let structural_layers_changed = !layers_changed.is_empty();
     let tempo_changed = observations
         .iter()
-        .any(|point| (point.tempo_bpm - baseline_observation.tempo_bpm).abs() > MONOTONIC_EPSILON);
+        .any(|point| {
+            (point.tempo_bpm - baseline_observation.tempo_bpm).abs() > MONOTONIC_EPSILON
+        });
     let meter_changed = observations
         .iter()
         .any(|point| point.meter_beats != baseline_observation.meter_beats);
@@ -499,7 +515,8 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         "baseline_value": base.input.json(),
         "point_count": observations.len(),
         "unique_exact_fingerprints": unique_fingerprints.len(),
-        "distinct_exact_output_fraction": unique_fingerprints.len() as f64 / observations.len().max(1) as f64,
+        "distinct_exact_output_fraction": unique_fingerprints.len() as f64
+            / observations.len().max(1) as f64,
         "max_structural_distance": max_structural_distance,
         "layers_changed_at_least_once": layers_changed,
         "observed_changes_from_baseline": {
@@ -531,8 +548,18 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
             "mean_section_intensity_vs_control": monotonicity(&intensity_points),
             "velocity_spread_vs_control": monotonicity(&velocity_spread_points),
             "section_intensity_spread_vs_control": monotonicity(&intensity_spread_points),
-            "structural_distance_note": "Per-point distance from baseline is recorded below. It is a displacement magnitude, not a directional target metric, so no monotonicity class is assigned to it.",
-            "note": "Shape labels describe observed points only; they are not correctness or quality scores. Tonic and seed are not treated as ordinal axes. Dynamics and key are reported separately because the exact fingerprint omits velocity/emphasis and pitch-class structural features are transposition-invariant."
+            "structural_distance_note": concat!(
+                "Per-point distance from baseline is recorded below. It is a ",
+                "displacement magnitude, not a directional target metric, so no ",
+                "monotonicity class is assigned to it."
+            ),
+            "note": concat!(
+                "Shape labels describe observed points only; they are not correctness ",
+                "or quality scores. Tonic and seed are not treated as ordinal axes. ",
+                "Dynamics and key are reported separately because the exact fingerprint ",
+                "omits velocity/emphasis and pitch-class structural features are ",
+                "transposition-invariant."
+            )
         },
         "points": observations
             .iter()
@@ -594,11 +621,18 @@ fn main() {
                 "seed": [BASE_SEED, BASE_SEED + 1, BASE_SEED + 2, BASE_SEED + 3],
             },
         },
-        "interpretation": "Observed deterministic symbolic response curves only. A structural or exact-output change does not itself imply improved quality, a correct target effect, audio-render success, style distinctness, or cultural authenticity. Compare per-layer effects and non-target invariance before making capability claims.",
+        "interpretation": concat!(
+            "Observed deterministic symbolic response curves only. A structural or ",
+            "exact-output change does not itself imply improved quality, a correct target ",
+            "effect, audio-render success, style distinctness, or cultural authenticity. ",
+            "Compare per-layer effects and non-target invariance before making capability ",
+            "claims."
+        ),
         "profiles": profiles,
     });
 
-    let rendered = serde_json::to_string_pretty(&report).expect("serialize response curve report");
+    let rendered =
+        serde_json::to_string_pretty(&report).expect("serialize response curve report");
     if let Ok(path) = std::env::var("MUSE_STYLE_RESPONSE_JSON_OUT") {
         let path = Path::new(&path);
         fs::write(path, &rendered).expect("write response curve report");
@@ -608,7 +642,10 @@ fn main() {
             path.display()
         );
         eprintln!(
-            "This artifact is symbolic evidence only; it does not assert render success or perceptual distinctness."
+            concat!(
+                "This artifact is symbolic evidence only; it does not assert render ",
+                "success or perceptual distinctness."
+            )
         );
     }
     println!("{rendered}");
