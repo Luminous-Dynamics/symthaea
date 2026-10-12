@@ -13,9 +13,7 @@
 use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::embodiment_evidence::{
-    ClockDomainId, EvidenceValidationError, TimestampV1,
-};
+use symthaea_core::embodiment_evidence::{ClockDomainId, EvidenceValidationError, TimestampV1};
 use thiserror::Error;
 
 use super::external_mode_setpoint_config::{
@@ -31,11 +29,9 @@ const REGISTRATION_DOMAIN: &[u8] =
     b"symthaea.autopilot.px4.external-mode-registration-binding.v1\0";
 const REQUEST_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-request.v1\0";
 const REPLY_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-reply.v2\0";
-const REPLY_PAYLOAD_DOMAIN: &[u8] =
-    b"symthaea.autopilot.px4.arming-check-reply-payload.v1\0";
+const REPLY_PAYLOAD_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-reply-payload.v1\0";
 const PROFILE_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-coherence-profile.v1\0";
-const ASSESSMENT_DOMAIN: &[u8] =
-    b"symthaea.autopilot.px4.arming-check-coherence-assessment.v1\0";
+const ASSESSMENT_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-coherence-assessment.v1\0";
 
 /// Successful or failed external-component registration as observed from PX4.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,7 +117,9 @@ impl Px4ExternalModeRegistrationBindingV1 {
     pub fn validate(&self) -> Result<(), Px4ExternalModeArmingCheckError> {
         self.validate_without_digest()?;
         if self.registration_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ExternalModeArmingCheckError::DigestMismatch("registration"));
+            return Err(Px4ExternalModeArmingCheckError::DigestMismatch(
+                "registration",
+            ));
         }
         Ok(())
     }
@@ -145,9 +143,7 @@ impl Px4ExternalModeRegistrationBindingV1 {
         self.received_at
             .validate()
             .map_err(Px4ExternalModeArmingCheckError::Timestamp)?;
-        if self.arming_check_id_raw < -1
-            || self.mode_id_raw < -1
-            || self.mode_executor_id_raw < -1
+        if self.arming_check_id_raw < -1 || self.mode_id_raw < -1 || self.mode_executor_id_raw < -1
         {
             return Err(Px4ExternalModeArmingCheckError::InvalidRegistrationSentinel);
         }
@@ -250,7 +246,9 @@ impl Px4ExternalModeArmingCheckRequestV1 {
     pub fn validate(&self) -> Result<(), Px4ExternalModeArmingCheckError> {
         self.validate_without_digest()?;
         if self.request_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ExternalModeArmingCheckError::DigestMismatch("arming-check request"));
+            return Err(Px4ExternalModeArmingCheckError::DigestMismatch(
+                "arming-check request",
+            ));
         }
         Ok(())
     }
@@ -540,7 +538,9 @@ impl Px4ExternalModeArmingCheckReplyV1 {
             ));
         }
         if self.reply_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ExternalModeArmingCheckError::DigestMismatch("arming-check reply"));
+            return Err(Px4ExternalModeArmingCheckError::DigestMismatch(
+                "arming-check reply",
+            ));
         }
         Ok(())
     }
@@ -558,9 +558,7 @@ impl Px4ExternalModeArmingCheckReplyV1 {
     ///
     /// Equal fingerprints indicate equal decoded PX4 payload fields, not equal capture
     /// contexts. Callers must scope deduplication to a declared target and boot session.
-    pub fn source_payload_fingerprint_hex(
-        &self,
-    ) -> Result<&str, Px4ExternalModeArmingCheckError> {
+    pub fn source_payload_fingerprint_hex(&self) -> Result<&str, Px4ExternalModeArmingCheckError> {
         self.validate()?;
         Ok(&self.source_payload_digest_hex)
     }
@@ -963,7 +961,9 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
     pub fn validate(&self) -> Result<(), Px4ExternalModeArmingCheckError> {
         self.validate_without_digest()?;
         if self.assessment_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ExternalModeArmingCheckError::DigestMismatch("assessment"));
+            return Err(Px4ExternalModeArmingCheckError::DigestMismatch(
+                "assessment",
+            ));
         }
         Ok(())
     }
@@ -988,20 +988,24 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
             .elapsed_since(&self.setpoint_configuration.assessed_at)
             .map_err(Px4ExternalModeArmingCheckError::Timestamp)?;
         if config_age_ns > self.profile.max_setpoint_config_age_ns {
-            return Ok(Px4ExternalModeArmingCheckOutcomeV1::SetpointConfigurationEvidenceStale {
-                configuration_age_ns: config_age_ns,
-                max_setpoint_config_age_ns: self.profile.max_setpoint_config_age_ns,
-            });
+            return Ok(
+                Px4ExternalModeArmingCheckOutcomeV1::SetpointConfigurationEvidenceStale {
+                    configuration_age_ns: config_age_ns,
+                    max_setpoint_config_age_ns: self.profile.max_setpoint_config_age_ns,
+                },
+            );
         }
         let registration_age_ns = self
             .assessed_at
             .elapsed_since(&self.registration.received_at)
             .map_err(Px4ExternalModeArmingCheckError::Timestamp)?;
         if registration_age_ns > self.profile.max_registration_age_ns {
-            return Ok(Px4ExternalModeArmingCheckOutcomeV1::RegistrationEvidenceStale {
-                registration_age_ns: registration_age_ns,
-                max_registration_age_ns: self.profile.max_registration_age_ns,
-            });
+            return Ok(
+                Px4ExternalModeArmingCheckOutcomeV1::RegistrationEvidenceStale {
+                    registration_age_ns: registration_age_ns,
+                    max_registration_age_ns: self.profile.max_registration_age_ns,
+                },
+            );
         }
         let config_outcome = self.setpoint_configuration.outcome()?;
         let is_applied_config = matches!(
@@ -1013,9 +1017,9 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
                 Px4ExternalModeSetpointConfigOutcomeV1::AwaitingReply { .. } => {
                     Px4SetpointConfigBlockReasonV1::AwaitingReply
                 }
-                Px4ExternalModeSetpointConfigOutcomeV1::ReplyNotObservedBeforeDeadline { .. } => {
-                    Px4SetpointConfigBlockReasonV1::ReplyNotObservedBeforeDeadline
-                }
+                Px4ExternalModeSetpointConfigOutcomeV1::ReplyNotObservedBeforeDeadline {
+                    ..
+                } => Px4SetpointConfigBlockReasonV1::ReplyNotObservedBeforeDeadline,
                 Px4ExternalModeSetpointConfigOutcomeV1::StaleReply { .. } => {
                     Px4SetpointConfigBlockReasonV1::StaleReply
                 }
@@ -1032,7 +1036,9 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
                     Px4SetpointConfigBlockReasonV1::CheckOnlyRequest
                 }
                 Px4ExternalModeSetpointConfigOutcomeV1::ApplyRequestAccepted { .. } => {
-                    return Err(Px4ExternalModeArmingCheckError::OutcomeClassificationContradiction);
+                    return Err(
+                        Px4ExternalModeArmingCheckError::OutcomeClassificationContradiction,
+                    );
                 }
             };
             return Ok(
@@ -1049,10 +1055,12 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
             & (1_u32 << (self.registration.arming_check_id_raw as u32)))
             == 0
         {
-            return Ok(Px4ExternalModeArmingCheckOutcomeV1::RegistrationNotMarkedValid {
-                registration_id: self.registration.arming_check_id_raw as u8,
-                valid_registrations_mask: self.request.valid_registrations_mask,
-            });
+            return Ok(
+                Px4ExternalModeArmingCheckOutcomeV1::RegistrationNotMarkedValid {
+                    registration_id: self.registration.arming_check_id_raw as u8,
+                    valid_registrations_mask: self.request.valid_registrations_mask,
+                },
+            );
         }
         let Some(reply) = &self.reply else {
             let request_age_ns = self
@@ -1060,10 +1068,12 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
                 .elapsed_since(&self.request.received_at)
                 .map_err(Px4ExternalModeArmingCheckError::Timestamp)?;
             return if request_age_ns > self.profile.max_reply_wait_ns {
-                Ok(Px4ExternalModeArmingCheckOutcomeV1::ReplyNotObservedBeforeDeadline {
-                    request_age_ns,
-                    max_reply_wait_ns: self.profile.max_reply_wait_ns,
-                })
+                Ok(
+                    Px4ExternalModeArmingCheckOutcomeV1::ReplyNotObservedBeforeDeadline {
+                        request_age_ns,
+                        max_reply_wait_ns: self.profile.max_reply_wait_ns,
+                    },
+                )
             } else {
                 Ok(Px4ExternalModeArmingCheckOutcomeV1::AwaitingReply {
                     request_age_ns,
@@ -1092,9 +1102,10 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
             });
         }
         let expected = Px4ComparableModeRequirementsV1::from_setpoint_reply(
-            self.setpoint_configuration.reply.as_ref().ok_or(
-                Px4ExternalModeArmingCheckError::MissingSetpointConfigReply,
-            )?,
+            self.setpoint_configuration
+                .reply
+                .as_ref()
+                .ok_or(Px4ExternalModeArmingCheckError::MissingSetpointConfigReply)?,
         );
         let observed = Px4ComparableModeRequirementsV1::from_arming_reply(reply);
         let differing_fields = expected.differences(observed);
@@ -1303,7 +1314,10 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
         hasher.update(&self.schema_version.to_le_bytes());
         feed_str(&mut hasher, &self.profile.profile_digest_hex);
         feed_str(&mut hasher, &self.registration.registration_digest_hex);
-        feed_str(&mut hasher, &self.setpoint_configuration.assessment_digest_hex);
+        feed_str(
+            &mut hasher,
+            &self.setpoint_configuration.assessment_digest_hex,
+        );
         feed_str(&mut hasher, &self.request.request_digest_hex);
         match &self.reply {
             Some(reply) => {
@@ -1603,13 +1617,8 @@ mod tests {
             500_000_000,
         )
         .unwrap();
-        Px4ExternalModeSetpointConfigAssessmentV1::new(
-            profile,
-            req,
-            Some(reply),
-            ts(assessed_ns),
-        )
-        .unwrap()
+        Px4ExternalModeSetpointConfigAssessmentV1::new(profile, req, Some(reply), ts(assessed_ns))
+            .unwrap()
     }
 
     fn arming_request(valid_mask: u32) -> Px4ExternalModeArmingCheckRequestV1 {
@@ -1660,10 +1669,8 @@ mod tests {
             false,
             false,
             0,
-            [
-                Px4ExternalModeArmingCheckEventV1::default();
-                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-            ],
+            [Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
         )
     }
 
@@ -1747,9 +1754,7 @@ mod tests {
         profile_with_window("arming-check.fixture.cycle-1")
     }
 
-    fn profile_with_window(
-        capture_window_id: &str,
-    ) -> Px4ExternalModeArmingCheckProfileV1 {
+    fn profile_with_window(capture_window_id: &str) -> Px4ExternalModeArmingCheckProfileV1 {
         Px4ExternalModeArmingCheckProfileV1::new(
             "px4.external-mode.arming-check.fixture.v1",
             "vehicle.slot-a",
@@ -1803,9 +1808,12 @@ mod tests {
                 can_arm_and_run: true,
             }
         ));
-        assert!(value.assessment_id().unwrap().starts_with(
-            "symthaea.autopilot.px4.arming-check-coherence-assessment.v1:"
-        ));
+        assert!(
+            value
+                .assessment_id()
+                .unwrap()
+                .starts_with("symthaea.autopilot.px4.arming-check-coherence-assessment.v1:")
+        );
     }
 
     #[test]
@@ -1879,10 +1887,8 @@ mod tests {
             false,
             false,
             0,
-            [
-                Px4ExternalModeArmingCheckEventV1::default();
-                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-            ],
+            [Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
             true,
             true,
             false,
@@ -1923,7 +1929,10 @@ mod tests {
             Some(arming_reply(8, 3, false, 1_350_000_000)),
             ts(1_400_000_000),
         );
-        assert_eq!(value.unwrap_err(), Px4ExternalModeArmingCheckError::ModeRegistrationMismatch);
+        assert_eq!(
+            value.unwrap_err(),
+            Px4ExternalModeArmingCheckError::ModeRegistrationMismatch
+        );
     }
 
     #[test]
@@ -1983,10 +1992,8 @@ mod tests {
             false,
             false,
             0,
-            [
-                Px4ExternalModeArmingCheckEventV1::default();
-                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-            ],
+            [Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
         )
         .unwrap();
         let value = Px4ExternalModeArmingCheckAssessmentV1::new(
@@ -2159,10 +2166,8 @@ mod tests {
 
     #[test]
     fn reply_preserves_health_diagnostics_and_raw_event_payload_in_digest() {
-        let mut events = [
-            Px4ExternalModeArmingCheckEventV1::default();
-            PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-        ];
+        let mut events = [Px4ExternalModeArmingCheckEventV1::default();
+            PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1];
         events[0] = Px4ExternalModeArmingCheckEventV1 {
             timestamp_us_raw: 1_249_000,
             id: 0x1234,
@@ -2171,7 +2176,17 @@ mod tests {
             log_levels: 0xA5,
         };
         let reply = arming_reply_with_diagnostics(
-            8, 3, false, 1_350_000_000, 1_250_000, 2, true, true, false, 1, events,
+            8,
+            3,
+            false,
+            1_350_000_000,
+            1_250_000,
+            2,
+            true,
+            true,
+            false,
+            1,
+            events,
         )
         .unwrap();
         assert_eq!(reply.health_component_index, 2);
@@ -2190,18 +2205,14 @@ mod tests {
         mutated_health.health_component_warning = false;
         assert_eq!(
             mutated_health.validate().unwrap_err(),
-            Px4ExternalModeArmingCheckError::DigestMismatch(
-                "arming-check source payload",
-            )
+            Px4ExternalModeArmingCheckError::DigestMismatch("arming-check source payload",)
         );
 
         let mut mutated_event = reply;
         mutated_event.events[0].arguments[24] ^= 1;
         assert_eq!(
             mutated_event.validate().unwrap_err(),
-            Px4ExternalModeArmingCheckError::DigestMismatch(
-                "arming-check source payload",
-            )
+            Px4ExternalModeArmingCheckError::DigestMismatch("arming-check source payload",)
         );
     }
 
@@ -2213,13 +2224,18 @@ mod tests {
             PX4_EXTERNAL_MODE_ARMING_CHECK_REPLY_SCHEMA_V2
         );
         assert_eq!(reply.message_version, 1);
-        assert!(reply
-            .reply_evidence_id()
-            .unwrap()
-            .starts_with("symthaea.autopilot.px4.arming-check-reply.v2:"));
+        assert!(
+            reply
+                .reply_evidence_id()
+                .unwrap()
+                .starts_with("symthaea.autopilot.px4.arming-check-reply.v2:")
+        );
 
         let request = arming_request(1 << 3);
-        assert_eq!(request.schema_version, PX4_EXTERNAL_MODE_ARMING_CHECK_SCHEMA_V1);
+        assert_eq!(
+            request.schema_version,
+            PX4_EXTERNAL_MODE_ARMING_CHECK_SCHEMA_V1
+        );
 
         let mut old_schema = reply;
         old_schema.schema_version = PX4_EXTERNAL_MODE_ARMING_CHECK_SCHEMA_V1;
@@ -2231,16 +2247,34 @@ mod tests {
 
     #[test]
     fn duplicate_captures_share_source_fingerprint_but_keep_distinct_observation_ids() {
-        let events = [
-            Px4ExternalModeArmingCheckEventV1::default();
-            PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-        ];
+        let events = [Px4ExternalModeArmingCheckEventV1::default();
+            PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1];
         let first = arming_reply_with_diagnostics(
-            8, 3, false, 1_350_000_000, 1_250_000, 0, false, false, false, 0, events,
+            8,
+            3,
+            false,
+            1_350_000_000,
+            1_250_000,
+            0,
+            false,
+            false,
+            false,
+            0,
+            events,
         )
         .unwrap();
         let duplicate = arming_reply_with_diagnostics(
-            8, 3, false, 1_360_000_000, 1_250_000, 0, false, false, false, 0, events,
+            8,
+            3,
+            false,
+            1_360_000_000,
+            1_250_000,
+            0,
+            false,
+            false,
+            false,
+            0,
+            events,
         )
         .unwrap();
 
@@ -2249,7 +2283,10 @@ mod tests {
             duplicate.source_payload_fingerprint_hex().unwrap()
         );
         assert_ne!(first.reply_digest_hex, duplicate.reply_digest_hex);
-        assert_ne!(first.received_at.nanoseconds, duplicate.received_at.nanoseconds);
+        assert_ne!(
+            first.received_at.nanoseconds,
+            duplicate.received_at.nanoseconds
+        );
         first.validate().unwrap();
         duplicate.validate().unwrap();
     }
@@ -2260,8 +2297,7 @@ mod tests {
         // request_id=0, and the old payload is mislabeled into the new capture window.
         // The PX4 source timestamp still proves that it predates the new request.
         let window = "arming-check.fixture.cycle-after-wrap";
-        let request =
-            arming_request_in_window(0, 257_250_000, window, 1 << 3, 1_300_000_000);
+        let request = arming_request_in_window(0, 257_250_000, window, 1 << 3, 1_300_000_000);
         let previous_cycle_reply = arming_reply_in_window_with_diagnostics(
             window,
             0,
@@ -2274,10 +2310,8 @@ mod tests {
             false,
             false,
             0,
-            [
-                Px4ExternalModeArmingCheckEventV1::default();
-                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-            ],
+            [Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
         )
         .unwrap();
 
@@ -2309,10 +2343,8 @@ mod tests {
             false,
             false,
             0,
-            [
-                Px4ExternalModeArmingCheckEventV1::default();
-                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-            ],
+            [Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
         )
         .unwrap();
 
@@ -2343,13 +2375,14 @@ mod tests {
             false,
             false,
             (PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1 + 1) as u8,
-            [
-                Px4ExternalModeArmingCheckEventV1::default();
-                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-            ],
+            [Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
         )
         .unwrap_err();
-        assert_eq!(error, Px4ExternalModeArmingCheckError::InvalidEventCount { found: 6 });
+        assert_eq!(
+            error,
+            Px4ExternalModeArmingCheckError::InvalidEventCount { found: 6 }
+        );
     }
 
     #[test]
@@ -2367,7 +2400,10 @@ mod tests {
         );
         assert!(!corpus.provenance.raw_wire_capture);
         assert!(
-            corpus.provenance.note.contains("no captured PX4 frame bytes"),
+            corpus
+                .provenance
+                .note
+                .contains("no captured PX4 frame bytes"),
             "synthetic fixture must not be confused with recorded transport data"
         );
 
@@ -2393,7 +2429,10 @@ mod tests {
                 "msg/versioned/SetpointConfigReply.msg",
             ),
         ];
-        assert_eq!(corpus.provenance.source_contracts.len(), pinned_contracts.len());
+        assert_eq!(
+            corpus.provenance.source_contracts.len(),
+            pinned_contracts.len()
+        );
         for (message, blob_sha, expected_path) in pinned_contracts {
             let matching = corpus
                 .provenance
@@ -2401,7 +2440,11 @@ mod tests {
                 .iter()
                 .filter(|contract| contract.message == message)
                 .collect::<Vec<_>>();
-            assert_eq!(matching.len(), 1, "expected one source reference for {message}");
+            assert_eq!(
+                matching.len(),
+                1,
+                "expected one source reference for {message}"
+            );
             let contract = matching[0];
             assert_eq!(
                 contract.source_blob_sha, blob_sha,
@@ -2454,10 +2497,7 @@ mod tests {
                     );
                 }
                 (None, None) => {}
-                _ => panic!(
-                    "partial previous-request identity in case {}",
-                    case.case_id
-                ),
+                _ => panic!("partial previous-request identity in case {}", case.case_id),
             }
 
             match case.kind.as_str() {
@@ -2476,10 +2516,8 @@ mod tests {
                             && case.previous_request_source_timestamp_us.is_none(),
                         "duplicate case must not carry previous-request metadata"
                     );
-                    let events = [
-                        Px4ExternalModeArmingCheckEventV1::default();
-                        PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-                    ];
+                    let events = [Px4ExternalModeArmingCheckEventV1::default();
+                        PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1];
                     let first = arming_reply_in_window_with_diagnostics(
                         &case.reply_window_id,
                         case.request_id,
@@ -2540,10 +2578,8 @@ mod tests {
                         1_u32 << u32::from(case.registration_id),
                         case.request_received_at_ns,
                     );
-                    let events = [
-                        Px4ExternalModeArmingCheckEventV1::default();
-                        PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
-                    ];
+                    let events = [Px4ExternalModeArmingCheckEventV1::default();
+                        PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1];
                     let reply = arming_reply_in_window_with_diagnostics(
                         &case.reply_window_id,
                         case.request_id,
@@ -2561,17 +2597,8 @@ mod tests {
                     .unwrap();
                     let result = Px4ExternalModeArmingCheckAssessmentV1::new(
                         profile_with_window(&case.request_window_id),
-                        registration(
-                            true,
-                            case.registration_id as i8,
-                            42,
-                        ),
-                        config_assessment(
-                            42,
-                            true,
-                            0,
-                            case.config_assessed_at_ns,
-                        ),
+                        registration(true, case.registration_id as i8, 42),
+                        config_assessment(42, true, 0, case.config_assessed_at_ns),
                         request,
                         Some(reply),
                         ts(case.assessment_at_ns),
@@ -2593,9 +2620,7 @@ mod tests {
                         "requirements_match" => assert!(
                             matches!(
                                 result.unwrap().outcome().unwrap(),
-                                Px4ExternalModeArmingCheckOutcomeV1::RequirementsMatch {
-                                    ..
-                                }
+                                Px4ExternalModeArmingCheckOutcomeV1::RequirementsMatch { .. }
                             ),
                             "expected requirement match for {}",
                             case.case_id
@@ -2603,9 +2628,7 @@ mod tests {
                         "reply_observed_too_late" => assert!(
                             matches!(
                                 result.unwrap().outcome().unwrap(),
-                                Px4ExternalModeArmingCheckOutcomeV1::ReplyObservedTooLate {
-                                    ..
-                                }
+                                Px4ExternalModeArmingCheckOutcomeV1::ReplyObservedTooLate { .. }
                             ),
                             "expected late-reply classification for {}",
                             case.case_id
