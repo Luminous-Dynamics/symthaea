@@ -521,6 +521,15 @@ mod tests {
         assert_eq!(metrics.score_blind_voiced_unvoiced_error_rate, None);
         assert_eq!(metrics.score_blind_median_pitch_error_cents, None);
         assert_eq!(metrics.score_blind_p95_pitch_error_cents, None);
+
+        // The persisted report must preserve undefined evidence as JSON null,
+        // never coerce it to 0.0 (which could be mistaken for perfect pitch).
+        let report = serde_json::to_value(&metrics).unwrap();
+        assert_eq!(report["score_blind_voiced_frame_fraction"], serde_json::Value::Null);
+        assert_eq!(report["score_blind_voiced_unvoiced_error_rate"], serde_json::Value::Null);
+        assert_eq!(report["score_blind_median_pitch_error_cents"], serde_json::Value::Null);
+        assert_eq!(report["score_blind_p95_pitch_error_cents"], serde_json::Value::Null);
+        assert_eq!(report["score_blind_pitch_error_frame_count"], 0);
     }
 
     #[test]
