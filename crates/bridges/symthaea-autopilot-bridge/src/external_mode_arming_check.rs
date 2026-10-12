@@ -589,6 +589,25 @@ impl Px4ExternalModeArmingCheckReplyV1 {
                 found: self.num_events,
             });
         }
+        // Event and reply timestamps share PX4's boot-relative microsecond clock.
+        // Check only the declared event prefix; unused fixed-size tail slots are raw
+        // diagnostic payload and may contain stale/default values.
+        for (index, event) in self
+            .events
+            .iter()
+            .take(usize::from(self.num_events))
+            .enumerate()
+        {
+            if event.timestamp_us_raw > self.source_timestamp_us_raw {
+                return Err(
+                    Px4ExternalModeArmingCheckError::EventTimestampAfterReply {
+                        index,
+                        event_timestamp_us_raw: event.timestamp_us_raw,
+                        reply_timestamp_us_raw: self.source_timestamp_us_raw,
+                    },
+                );
+            }
+        }
         Ok(())
     }
 
@@ -1400,6 +1419,15 @@ pub enum Px4ExternalModeArmingCheckError {
     /// The outcome classifier contradicted the computed SetpointConfig outcome.
     #[error("SetpointConfig outcome classification contradicted its source value")]
     OutcomeClassificationContradiction,
+    /// A declared Event timestamp postdates the ArmingCheckReply timestamp.
+    #[error(
+        "ArmingCheckReply event {index} timestamp {event_timestamp_us_raw} exceeds reply timestamp {reply_timestamp_us_raw}"
+    )]
+    EventTimestampAfterReply {
+        index: usize,
+        event_timestamp_us_raw: u64,
+        reply_timestamp_us_raw: u64,
+    },
     /// ArmingCheckReply's event count exceeded the fixed Event array capacity.
     #[error("ArmingCheckReply num_events {found} exceeds the fixed event capacity of 5")]
     InvalidEventCount { found: u8 },
@@ -2255,7 +2283,7 @@ mod tests {
         let mut events = [Px4ExternalModeArmingCheckEventV1::default();
             PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1];
         events[0] = Px4ExternalModeArmingCheckEventV1 {
-            timestamp_us_raw: 1_249_000,
+            timestamp_us_raw: 1_250_000,
             id: 0x1234,
             event_sequence: 7,
             arguments: core::array::from_fn(|index| index as u8),
@@ -2280,7 +2308,7 @@ mod tests {
         assert!(reply.health_component_warning);
         assert!(!reply.health_component_error);
         assert_eq!(reply.num_events, 1);
-        assert_eq!(reply.events[0].timestamp_us_raw, 1_249_000);
+        assert_eq!(reply.events[0].timestamp_us_raw, 1_250_000);
         assert_eq!(reply.events[0].id, 0x1234);
         assert_eq!(reply.events[0].event_sequence, 7);
         assert_eq!(reply.events[0].arguments[24], 24);
@@ -2446,6 +2474,53 @@ mod tests {
             .unwrap_err(),
             Px4ExternalModeArmingCheckError::CaptureWindowMismatch
         );
+    }
+
+    #[test]
+    fn declared_event_timestamp_after_reply_fails_closed_but_equal_time_is_valid() {
+        let mut events = [Px4ExternalModeArmingCheckEventV1::default();
+            PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1];
+        events[0].timestamp_us_raw = 1_250_001;
+        let future_event = arming_reply_with_diagnostics(
+            8,
+            3,
+            false,
+            1_350_000_000,
+            1_250_000,
+            0,
+            false,
+            false,
+            false,
+            1,
+            events,
+        );
+        assert_eq!(
+            future_event.unwrap_err(),
+            Px4ExternalModeArmingCheckError::EventTimestampAfterReply {
+                index: 0,
+                event_timestamp_us_raw: 1_250_001,
+                reply_timestamp_us_raw: 1_250_000,
+            }
+        );
+
+        let mut equal_events = [Px4ExternalModeArmingCheckEventV1::default();
+            PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1];
+        equal_events[0].timestamp_us_raw = 1_250_000;
+        let equal_time = arming_reply_with_diagnostics(
+            8,
+            3,
+            false,
+            1_350_000_000,
+            1_250_000,
+            0,
+            false,
+            false,
+            false,
+            1,
+            equal_events,
+        )
+        .unwrap();
+        equal_time.validate().unwrap();
     }
 
     #[test]
