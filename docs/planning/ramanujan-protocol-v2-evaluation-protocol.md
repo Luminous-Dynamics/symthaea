@@ -27,7 +27,7 @@ A hypothesis is allowed to fail. No post-hoc changes to thresholds, systems, or 
 
 Before interpreting benchmark results, expose deterministic counters for at least:
 - candidate fitness evaluations;
-- RHS evaluations and attempted/completed numerical integration steps;
+- **total RHS evaluations**, split into integration calls and candidate-scoring calls, plus attempted/completed numerical integration steps;
 - candidate rejection reasons for invalidity, excessive complexity, degeneracy, duplicate formulas, and gradient policy;
 - completed and failed trajectories, state updates, and search/holdout wall time.
 
@@ -53,7 +53,7 @@ cargo run --locked -p symthaea-core --example ramanujan_protocol_v2_pilot -- tar
 
 The arguments are a **new output path**, replicate count, and first discovery seed. The runner refuses to overwrite an existing output, rejects dirty/untracked source trees, and emits one hashed JSONL record for each `(seed, condition)` pair plus a final batch manifest listing all per-run digests. The initial instrumentation batch uses the dimensionless one-dimensional harmonic oscillator, 80 candidates, 8 generations, a maximum expression depth of 4, maximum complexity 18, three search trajectories, and three independent holdout trajectories per returned candidate. Conditions are cold, primed, and random-expression control; each replicate shares a discovery seed label and a distinct, deterministic holdout seed namespace.
 
-Each record binds the git revision, Rust toolchain string, protocol-file digest, Cargo.lock digest, both workspace manifest digests, system-definition digest, candidate formulas, search work counters, per-candidate holdout counters, serialized receipts, oracle classifications, and a content digest. The oracle is an analytic polynomial coefficient-map check for (a(x^2+v^2)+b) with nonzero (a); formulas outside the supported degree-2 polynomial grammar fail oracle classification rather than being guessed equivalent. Holdout acceptance and oracle-equivalence are recorded separately.
+Each record binds the git revision, Rust toolchain string, protocol-file digest, Cargo.lock digest, both workspace manifest digests, system-definition digest, candidate formulas, search work counters, per-candidate holdout counters, serialized receipts, oracle classifications, and a content digest. RHS accounting is split into integration RHS calls and candidate-scoring RHS calls, with a total that must equal their sum. This is important because Lie-derivative fitness invokes the system RHS during scoring in addition to the calls made by the integrator. The oracle is an analytic polynomial coefficient-map check for (a(x^2+v^2)+b) with nonzero (a); formulas outside the supported degree-2 polynomial grammar fail oracle classification rather than being guessed equivalent. Holdout acceptance and oracle-equivalence are recorded separately.
 
 This runner is an **instrumentation smoke pilot**, not the full Stage 1 system suite or Stage 2 confirmatory test. It does not yet perform the required second-step-size stability check, does not validate new system families, and must not be used to claim cold discovery superiority. It is designed to make work counts, failed receipts, and every returned candidate auditable before the larger suite is frozen.
 
