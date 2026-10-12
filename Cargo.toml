@@ -20,6 +20,11 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # Quarantine the historical observation-attestation adapter until its
+    # receipt/envelope imports are reconciled with the current core API.
+    # See issue #7291; its source remains in-tree, but it is not a buildable
+    # workspace member and must not be treated as qualified functionality.
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",

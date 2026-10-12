@@ -1,0 +1,212 @@
+name: GPU Capability Smoke
+
+on:
+  # Main pushes run after merge; PR updates use pull_request only so one
+  # change does not enqueue duplicate push + PR jobs that cancel each other.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/gpu-capability-smoke.yml'
+      - 'crates/core/symthaea-core/src/hdc/gpu_compute.rs'
+      - 'crates/core/symthaea-core/src/hdc/binary_hv.rs'
+      - 'crates/core/symthaea-core/src/hdc/simd_ops.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/gpu-capability-smoke.yml'
+      - 'crates/core/symthaea-core/src/hdc/gpu_compute.rs'
+      - 'crates/core/symthaea-core/src/hdc/binary_hv.rs'
+      - 'crates/core/symthaea-core/src/hdc/simd_ops.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Manual hardware qualification is deliberate evidence collection and must
+  # not be cancelled by a push. Automatic software smoke runs may supersede.
+  group: gpu-capability-smoke-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  WGPU_BACKEND: vulkan
+  XDG_RUNTIME_DIR: /tmp/symthaea-xdg-runtime
+
+jobs:
+  software-vulkan:
+    name: WGPU compute dispatch on Mesa lavapipe (software Vulkan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SYTHAEA_GPU_EXPECT_SOFTWARE: '1'
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache Cargo dependencies and build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-gpu-capability-smoke-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('crates/core/symthaea-core/src/hdc/gpu_compute.rs') }}-${{ hashFiles('crates/core/symthaea-core/src/hdc/binary_hv.rs') }}-${{ hashFiles('crates/core/symthaea-core/src/hdc/simd_ops.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-gpu-capability-smoke-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-gpu-capability-smoke-
+
+      - name: Install Vulkan loader, Mesa software driver, and diagnostic tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers vulkan-tools
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          ICD="$(find /usr/share/vulkan/icd.d -maxdepth 1 -type f \( -name 'lvp_icd*.json' -o -name '*lvp*.json' \) -print | sort | head -n 1)"
+          if [ -z "$ICD" ]; then
+            echo "::error::Mesa lavapipe ICD manifest was not found; refusing to report a Vulkan smoke pass."
+            exit 1
+          fi
+          echo "VK_ICD_FILENAMES=$ICD" >> "$GITHUB_ENV"
+          export VK_ICD_FILENAMES="$ICD"
+          {
+            echo "revision=$(git rev-parse HEAD)"
+            rustc --version
+            cargo --version
+            echo "VK_ICD_FILENAMES=$ICD"
+            echo "WGPU_BACKEND=$WGPU_BACKEND"
+            dpkg-query -W libvulkan-dev mesa-vulkan-drivers vulkan-tools
+          } | tee gpu-smoke-environment.txt
+          vulkaninfo --summary 2>&1 | tee vulkan-summary.txt
+
+      - name: Run adapter-report unit tests and real software-Vulkan dispatch/readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Fail closed if the opt-in guard or Vulkan ICD selection regresses.
+          # The test intentionally skips GPU initialization outside qualification
+          # mode, so this workflow must prove that mode is explicitly enabled.
+          if [ "${SYTHAEA_GPU_EXPECT_SOFTWARE:-}" != "1" ]; then
+            echo "::error::Software-Vulkan qualification requires SYTHAEA_GPU_EXPECT_SOFTWARE=1."
+            exit 1
+          fi
+          if [ "${WGPU_BACKEND:-}" != "vulkan" ]; then
+            echo "::error::Software-Vulkan qualification requires WGPU_BACKEND=vulkan."
+            exit 1
+          fi
+          if [ -z "${VK_ICD_FILENAMES:-}" ] || [ ! -f "${VK_ICD_FILENAMES}" ]; then
+            echo "::error::VK_ICD_FILENAMES must point to an existing ICD manifest."
+            exit 1
+          fi
+          case "${VK_ICD_FILENAMES}" in
+            *lvp_icd*.json) ;;
+            *)
+              echo "::error::Expected Mesa lavapipe ICD, got ${VK_ICD_FILENAMES}."
+              exit 1
+              ;;
+          esac
+          cargo test -p symthaea-core --features gpu --lib \
+            hdc::gpu_compute::capability_report_tests -- --nocapture \
+            2>&1 | tee gpu-capability-smoke.log
+
+      - name: Summarize evidence level
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## GPU capability smoke"
+            echo
+            REV="$(git rev-parse HEAD)"
+            echo "- Tested revision: ${REV}"
+            echo "- Required backend: Vulkan using the Mesa lavapipe ICD"
+            echo "- Qualification scope: WGPU adapter report, one WGSL compute dispatch, buffer copy, mapped readback, and expected-value assertion"
+            echo "- Evidence classification: software-Vulkan execution only; this job does not qualify NVIDIA, AMD, Intel, Apple, or Pixel physical-GPU execution."
+            echo
+            if [ -f gpu-capability-smoke.log ]; then
+              echo '### Test summary'
+              grep -E 'test result:|test .* \.\.\.' gpu-capability-smoke.log || true
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload raw smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-capability-smoke-${{ github.sha }}
+          path: |
+            gpu-smoke-environment.txt
+            vulkan-summary.txt
+            gpu-capability-smoke.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  # Physical-GPU qualification is intentionally manual and main-only. Never
+  # execute pull-request-controlled source on this public repository's
+  # self-hosted runner. The existing runner labels are used by benchmarks.yml.
+  hardware-nvidia:
+    name: WGPU compute dispatch on NVIDIA physical GPU
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.software-vulkan.result == 'success'
+    needs: [software-vulkan]
+    runs-on: [self-hosted, gpu, nixos]
+    timeout-minutes: 45
+    env:
+      SYTHAEA_GPU_EXPECT_NVIDIA: '1'
+    steps:
+      - name: Checkout trusted main revision only
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Verify exact trusted revision and inventory physical GPU
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          command -v nvidia-smi
+          nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv | tee gpu-hardware-inventory.txt
+          if command -v vulkaninfo >/dev/null 2>&1; then
+            vulkaninfo --summary 2>&1 | tee -a gpu-hardware-inventory.txt
+          else
+            echo "vulkaninfo is not installed; runtime WGPU adapter report remains the source of backend identity."
+          fi
+
+      - name: Run real NVIDIA Vulkan dispatch/readback under the pinned Nix development environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix develop --command bash -lc '
+            set -euo pipefail
+            export SYTHAEA_GPU_EXPECT_NVIDIA=1
+            export WGPU_BACKEND=vulkan
+            rustc --version
+            cargo test -p symthaea-core --features gpu --lib \
+              hdc::gpu_compute::capability_report_tests -- --nocapture 2>&1 \
+              | tee gpu-capability-hardware.log
+          '
+
+      - name: Upload physical-GPU evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-hardware-smoke-${{ github.sha }}
+          path: |
+            gpu-hardware-inventory.txt
+            gpu-capability-hardware.log
+          if-no-files-found: warn
+          retention-days: 90
