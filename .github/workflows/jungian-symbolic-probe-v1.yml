@@ -111,7 +111,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 - "$RUNNER_TEMP/jungian-baseline-capture/baseline_comparison.json" "$GITHUB_STEP_SUMMARY" <<'PY'
-          import json, sys
+          import hashlib, json, sys
           data = json.load(open(sys.argv[1], encoding="utf-8"))
           lines = [
               "# JUNG-001C baseline capture",
