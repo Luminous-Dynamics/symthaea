@@ -111,26 +111,39 @@ fn main() {
 
     // Load baseline and compare
     if baseline_path.exists() {
-        let baseline = RegressionSnapshot::load(&baseline_path).expect("failed to load baseline");
+        let baseline = match RegressionSnapshot::load(&baseline_path) {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                eprintln!(
+                    "Comparison integrity failure: could not load baseline {}: {error}",
+                    baseline_path.display()
+                );
+                std::process::exit(2);
+            }
+        };
         let current = RegressionSnapshot::from_report(&report, "full-backend");
         let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
 
         println!("\n{}", regression.format_summary());
 
         // Per-domain delta summary
-        println!("\nPer-Domain Delta Summary");
+        println!("\nExploratory Per-Domain Delta Summary (unqualified rows are not ranked)");
         println!(
-            "{:<16} {:>8} {:>8} {:>8}",
-            "Domain", "Better", "Same", "Worse"
+            "{:<16} {:>8} {:>8} {:>8} {:>8}",
+            "Domain", "Better", "Same", "Worse", "Unqual"
         );
-        println!("{}", "-".repeat(44));
+        println!("{}", "-".repeat(55));
 
-        let mut domain_counts: std::collections::BTreeMap<String, (usize, usize, usize)> =
+        let mut domain_counts: std::collections::BTreeMap<String, (usize, usize, usize, usize)> =
             std::collections::BTreeMap::new();
         for r in &regression.results {
             let domain = domain_of(&r.benchmark).to_string();
-            let entry = domain_counts.entry(domain).or_insert((0, 0, 0));
-            if r.delta_pct > 0.02 {
+            let entry = domain_counts.entry(domain).or_insert((0, 0, 0, 0));
+            if regression.has_qualification_gaps()
+                || r.severity == symthaea_psych_bench::harness::RegressionSeverity::Unqualified
+            {
+                entry.3 += 1; // direction/identity not qualified: do not classify the delta
+            } else if r.delta_pct > 0.02 {
                 entry.0 += 1; // better
             } else if r.delta_pct < -0.02 {
                 entry.2 += 1; // worse
@@ -138,15 +151,32 @@ fn main() {
                 entry.1 += 1; // same
             }
         }
-        for (domain, (better, same, worse)) in &domain_counts {
-            println!("{:<16} {:>8} {:>8} {:>8}", domain, better, same, worse);
+        for (domain, (better, same, worse, unqualified)) in &domain_counts {
+            println!(
+                "{:<16} {:>8} {:>8} {:>8} {:>8}",
+                domain, better, same, worse, unqualified
+            );
+        }
+
+        // Exit status 2 denotes an incomplete/unqualified comparison. The current
+        // legacy comparator lacks metric semantics and execution identity, so its
+        // severity labels cannot establish a qualified critical regression.
+        // Status 1 remains for a future fully qualified comparison path.
+        if regression.has_comparison_integrity_errors() || regression.has_qualification_gaps() {
+            eprintln!("Comparison is not a qualified scientific/release gate; refusing a pass-like exit status.");
+            std::process::exit(2);
+        }
+        if regression.has_critical() {
+            eprintln!("Critical backend regression detected.");
+            std::process::exit(1);
         }
     } else {
         eprintln!(
-            "Baseline not found at {}. Printing summary only.",
+            "Baseline not found at {}. Printing profile only; no comparison was performed.",
             baseline_path.display()
         );
         println!("\n{}", report.format_profile());
+        std::process::exit(2);
     }
 }
 

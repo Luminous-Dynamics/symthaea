@@ -80,9 +80,27 @@ pub struct RegressionReport {
     pub summary: RegressionSummary,
 }
 
+/// Version of the comparison-integrity metadata stored in a report summary.
+const COMPARISON_INTEGRITY_METADATA_VERSION: u8 = 1;
+
+/// Qualification gaps known to prevent a regression report from acting as a
+/// scientific or release gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ComparisonQualificationGap {
+    /// Snapshot fields do not bind the exact workload/source/dependency/toolchain
+    /// execution identity needed to interpret the comparison.
+    ExecutionIdentityNotBound,
+    /// No versioned per-metric direction, estimand, scale, or uncertainty policy
+    /// is supplied to the exploratory intersection comparator.
+    MetricSemanticsNotDeclared,
+}
+
 /// Aggregate counts for a regression report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegressionSummary {
+    /// Integrity metadata version. Missing/unsupported versions are not qualified.
+    #[serde(default)]
+    pub integrity_metadata_version: u8,
     /// Total number of metrics compared.
     pub total_metrics: usize,
     /// Number of metrics that passed.
@@ -91,6 +109,32 @@ pub struct RegressionSummary {
     pub warnings: usize,
     /// Number of metrics with critical regressions.
     pub critical: usize,
+    /// Number of baseline benchmarks absent from the current snapshot.
+    #[serde(default)]
+    pub missing_benchmarks: usize,
+    /// Number of current benchmarks absent from the baseline snapshot.
+    #[serde(default)]
+    pub unexpected_benchmarks: usize,
+    /// Number of baseline metrics absent within shared benchmark keys.
+    #[serde(default)]
+    pub missing_metrics: usize,
+    /// Number of current metrics absent within shared benchmark keys.
+    #[serde(default)]
+    pub unexpected_metrics: usize,
+    /// Whether baseline snapshot validation or schema admission failed.
+    #[serde(default)]
+    pub invalid_baseline_snapshot: bool,
+    /// Whether current snapshot validation or schema admission failed.
+    #[serde(default)]
+    pub invalid_current_snapshot: bool,
+    /// Whether the percentage-comparison threshold policy is invalid.
+    #[serde(default)]
+    pub invalid_threshold_policy: bool,
+    /// Qualification gaps that remain even when the numeric report is structurally
+    /// valid. Older serialized summaries default to no entries, but their missing
+    /// integrity metadata version still prevents admission.
+    #[serde(default)]
+    pub qualification_gaps: Vec<ComparisonQualificationGap>,
     /// Number of metrics for which this comparison could not be qualified.
     #[serde(default)]
     pub unqualified: usize,
@@ -350,12 +394,41 @@ impl RegressionReport {
         warning_pct: f64,
         critical_pct: f64,
     ) -> Self {
+        let invalid_baseline_snapshot = baseline.schema_version != SNAPSHOT_SCHEMA_VERSION
+            || baseline.validate().is_err();
+        let invalid_current_snapshot = current.schema_version != SNAPSHOT_SCHEMA_VERSION
+            || current.validate().is_err();
+        let invalid_threshold_policy = !warning_pct.is_finite()
+            || warning_pct < 0.0
+            || !critical_pct.is_finite()
+            || critical_pct <= warning_pct;
+
         let mut results = Vec::new();
 
         for (bench_name, baseline_metrics) in &baseline.metrics {
             if let Some(current_metrics) = current.metrics.get(bench_name) {
                 for (metric_name, baseline_val) in baseline_metrics {
                     if let Some(current_val) = current_metrics.get(metric_name) {
+                        // If either input snapshot or the threshold policy is invalid,
+                        // these rows may be shown diagnostically but must never become
+                        // metric-level PASS/WARN/CRITICAL evidence.
+                        if invalid_baseline_snapshot
+                            || invalid_current_snapshot
+                            || invalid_threshold_policy
+                        {
+                            results.push(RegressionResult {
+                                benchmark: bench_name.clone(),
+                                metric: metric_name.clone(),
+                                baseline_mean: baseline_val.mean,
+                                baseline_ci_lower: baseline_val.ci_lower,
+                                baseline_ci_upper: baseline_val.ci_upper,
+                                current_mean: current_val.mean,
+                                delta_pct: 0.0,
+                                severity: RegressionSeverity::Unqualified,
+                            });
+                            continue;
+                        }
+
                         // Percentage changes are undefined/unreliable for near-zero baselines.
                         // The strict comparison API rejects these before reaching
                         // this exploratory comparator. This legacy path avoids
@@ -406,6 +479,34 @@ impl RegressionReport {
             }
         }
 
+        // Preserve the intersection-based rows for compatibility, but account for
+        // everything omitted by that intersection so callers cannot mistake partial
+        // coverage for a complete comparison.
+        let missing_benchmarks = baseline
+            .metrics
+            .keys()
+            .filter(|benchmark| !current.metrics.contains_key(*benchmark))
+            .count();
+        let unexpected_benchmarks = current
+            .metrics
+            .keys()
+            .filter(|benchmark| !baseline.metrics.contains_key(*benchmark))
+            .count();
+        let mut missing_metrics = 0;
+        let mut unexpected_metrics = 0;
+        for (benchmark, baseline_metrics) in &baseline.metrics {
+            if let Some(current_metrics) = current.metrics.get(benchmark) {
+                missing_metrics += baseline_metrics
+                    .keys()
+                    .filter(|metric| !current_metrics.contains_key(*metric))
+                    .count();
+                unexpected_metrics += current_metrics
+                    .keys()
+                    .filter(|metric| !baseline_metrics.contains_key(*metric))
+                    .count();
+            }
+        }
+
         let total = results.len();
         let warnings = results
             .iter()
@@ -425,11 +526,26 @@ impl RegressionReport {
             current_name: current.name.clone(),
             results,
             summary: RegressionSummary {
+                integrity_metadata_version: COMPARISON_INTEGRITY_METADATA_VERSION,
                 total_metrics: total,
                 passed: total - warnings - critical - unqualified,
                 warnings,
                 critical,
                 unqualified,
+                missing_benchmarks,
+                unexpected_benchmarks,
+                missing_metrics,
+                unexpected_metrics,
+                invalid_baseline_snapshot,
+                invalid_current_snapshot,
+                invalid_threshold_policy,
+                // The legacy snapshot format and exploratory comparator do not
+                // carry exact execution identity or a declared metric policy.
+                // Keep these gaps explicit rather than inferring them from names.
+                qualification_gaps: vec![
+                    ComparisonQualificationGap::ExecutionIdentityNotBound,
+                    ComparisonQualificationGap::MetricSemanticsNotDeclared,
+                ],
             },
         }
     }
@@ -535,6 +651,31 @@ impl RegressionReport {
         self.summary.unqualified > 0
     }
 
+    /// Returns `true` when the exploratory comparison is empty, contains
+    /// unqualified values, silently omitted keys, or malformed inputs.
+    ///
+    /// This is a comparison-integrity guard, not full scientific qualification:
+    /// execution identity and per-metric semantics still require separate checks.
+    pub fn has_comparison_integrity_errors(&self) -> bool {
+        self.summary.integrity_metadata_version != COMPARISON_INTEGRITY_METADATA_VERSION
+            || self.results.is_empty()
+            || self.summary.unqualified > 0
+            || self.summary.missing_benchmarks > 0
+            || self.summary.unexpected_benchmarks > 0
+            || self.summary.missing_metrics > 0
+            || self.summary.unexpected_metrics > 0
+            || self.summary.invalid_baseline_snapshot
+            || self.summary.invalid_current_snapshot
+            || self.summary.invalid_threshold_policy
+    }
+
+    /// Returns `true` when the report lacks requirements for a qualified gate,
+    /// even if its structure and the shared metric rows are otherwise valid.
+    pub fn has_qualification_gaps(&self) -> bool {
+        self.summary.integrity_metadata_version != COMPARISON_INTEGRITY_METADATA_VERSION
+            || !self.summary.qualification_gaps.is_empty()
+    }
+
     /// Format as a human-readable summary string.
     pub fn format_summary(&self) -> String {
         let mut out = String::new();
@@ -542,14 +683,77 @@ impl RegressionReport {
             "Regression Report: {} vs {}\n",
             self.current_name, self.baseline_name
         ));
-        out.push_str(&format!(
-            "Metrics: {} total, {} pass, {} warning, {} critical, {} unqualified\n\n",
-            self.summary.total_metrics,
-            self.summary.passed,
-            self.summary.warnings,
-            self.summary.critical,
-            self.summary.unqualified
-        ));
+        out.push_str(
+            "Interpretation: regression summary only; not a complete evidence qualification gate.\n",
+        );
+        if self.has_qualification_gaps() {
+            out.push_str(&format!(
+                "Exploratory classifications: {} rows, {} heuristic-pass, {} warning, {} critical, {} unqualified; not a qualified gate.\n\n",
+                self.summary.total_metrics,
+                self.summary.passed,
+                self.summary.warnings,
+                self.summary.critical,
+                self.summary.unqualified
+            ));
+        } else {
+            out.push_str(&format!(
+                "Metrics: {} total, {} pass, {} warning, {} critical, {} unqualified\n\n",
+                self.summary.total_metrics,
+                self.summary.passed,
+                self.summary.warnings,
+                self.summary.critical,
+                self.summary.unqualified
+            ));
+        }
+
+        if self.summary.integrity_metadata_version != COMPARISON_INTEGRITY_METADATA_VERSION {
+            out.push_str(
+                "Integrity metadata is absent or unsupported; recompute this report before using it as a gate.\n",
+            );
+        }
+        if !self.summary.qualification_gaps.is_empty() {
+            let gaps = self
+                .summary
+                .qualification_gaps
+                .iter()
+                .map(|gap| match gap {
+                    ComparisonQualificationGap::ExecutionIdentityNotBound => {
+                        "exact execution identity is not bound"
+                    }
+                    ComparisonQualificationGap::MetricSemanticsNotDeclared => {
+                        "per-metric direction/estimand/scale/uncertainty semantics are not declared"
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            out.push_str(&format!(
+                "Qualification gaps: {gaps}. This report is exploratory, not a qualified scientific/release gate.\n"
+            ));
+        }
+        if self.summary.invalid_baseline_snapshot
+            || self.summary.invalid_current_snapshot
+            || self.summary.invalid_threshold_policy
+        {
+            out.push_str(&format!(
+                "Input integrity failure: baseline invalid={}, current invalid={}, threshold policy invalid={}.\n",
+                self.summary.invalid_baseline_snapshot,
+                self.summary.invalid_current_snapshot,
+                self.summary.invalid_threshold_policy
+            ));
+        }
+        if self.summary.missing_benchmarks > 0
+            || self.summary.unexpected_benchmarks > 0
+            || self.summary.missing_metrics > 0
+            || self.summary.unexpected_metrics > 0
+        {
+            out.push_str(&format!(
+                "Metric population mismatch: {} missing benchmarks, {} unexpected benchmarks, {} missing metrics, {} unexpected metrics.\n",
+                self.summary.missing_benchmarks,
+                self.summary.unexpected_benchmarks,
+                self.summary.missing_metrics,
+                self.summary.unexpected_metrics
+            ));
+        }
 
         // Only show non-passing metrics
         for r in &self.results {
@@ -579,7 +783,11 @@ impl RegressionReport {
             out.push_str("No comparable metrics; this report is not a qualified comparison.\n");
         } else if self.summary.unqualified > 0 {
             out.push_str(
-                "At least one baseline metric is near zero; percentage comparison is not qualified.\n",
+                "At least one metric row is unqualified due to a near zero baseline or invalid comparison inputs; percentage comparison is not qualified.\n",
+            );
+        } else if self.has_comparison_integrity_errors() || self.has_qualification_gaps() {
+            out.push_str(
+                "Integrity or qualification gaps prevent treating this summary as a clean scientific/release pass.\n",
             );
         } else if !self.has_regressions() {
             out.push_str("All metrics within baseline CI. No regressions detected.\n");
@@ -861,12 +1069,21 @@ mod tests {
     }
 
     #[test]
-    fn test_no_regression() {
+    fn test_exploratory_comparison_is_never_qualified_as_a_gate() {
         let baseline = make_test_snapshot("baseline", 0.90);
         let current = make_test_snapshot("current", 0.91);
         let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+
+        // A clean numeric comparison does not provide source/run identity or
+        // direction/scale semantics, so it cannot authorize a scientific PASS.
+        assert!(!report.has_comparison_integrity_errors());
+        assert!(report.has_qualification_gaps());
         assert!(!report.has_regressions());
         assert_eq!(report.summary.passed, 1);
+        let summary = report.format_summary();
+        assert!(summary.contains("exact execution identity is not bound"));
+        assert!(summary.contains("per-metric direction/estimand/scale/uncertainty semantics"));
+        assert!(!summary.contains("All metrics within baseline CI"));
     }
 
     #[test]
@@ -886,6 +1103,126 @@ mod tests {
         let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
         assert!(report.has_critical());
         assert_eq!(report.summary.critical, 1);
+    }
+
+    #[test]
+    fn test_empty_intersection_is_a_comparison_integrity_error() {
+        let baseline = make_test_snapshot("baseline", 0.90);
+        let mut current = make_test_snapshot("current", 0.91);
+        let shared = current.metrics.remove("TestBench").unwrap();
+        current.metrics.insert("DifferentBench".to_string(), shared);
+
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        assert!(report.results.is_empty());
+        assert_eq!(report.summary.missing_benchmarks, 1);
+        assert_eq!(report.summary.unexpected_benchmarks, 1);
+        assert!(report.has_comparison_integrity_errors());
+        assert!(report.format_summary().contains("No comparable metrics"));
+        assert!(!report
+            .format_summary()
+            .contains("All metrics within baseline CI"));
+    }
+
+    #[test]
+    fn test_invalid_snapshot_input_is_not_reported_as_qualified() {
+        let mut baseline = make_test_snapshot("baseline", 0.90);
+        baseline.metrics.get_mut("TestBench").unwrap().get_mut("accuracy").unwrap().mean =
+            f64::NAN;
+        let current = make_test_snapshot("current", 0.91);
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+
+        assert!(report.summary.invalid_baseline_snapshot);
+        assert!(!report.summary.invalid_current_snapshot);
+        assert_eq!(report.summary.passed, 0);
+        assert_eq!(report.summary.unqualified, 1);
+        assert!(report
+            .results
+            .iter()
+            .all(|row| row.severity == RegressionSeverity::Unqualified));
+        assert!(report.has_comparison_integrity_errors());
+        assert!(!report
+            .format_summary()
+            .contains("All metrics within baseline CI"));
+    }
+
+    #[test]
+    fn test_unsupported_schema_is_reported_as_input_integrity_error() {
+        let mut baseline = make_test_snapshot("baseline", 0.90);
+        baseline.schema_version = "999.0".to_string();
+        let current = make_test_snapshot("current", 0.91);
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+
+        assert!(report.summary.invalid_baseline_snapshot);
+        assert!(report.has_comparison_integrity_errors());
+    }
+
+    #[test]
+    fn test_invalid_threshold_policy_is_not_qualified() {
+        let baseline = make_test_snapshot("baseline", 0.90);
+        let current = make_test_snapshot("current", 0.91);
+        let report = RegressionReport::compare(&baseline, &current, f64::NAN, 0.10);
+
+        assert!(report.summary.invalid_threshold_policy);
+        assert_eq!(report.summary.passed, 0);
+        assert_eq!(report.summary.unqualified, 1);
+        assert!(report.has_comparison_integrity_errors());
+        assert!(!report
+            .format_summary()
+            .contains("All metrics within baseline CI"));
+    }
+
+    #[test]
+    fn test_legacy_summary_json_defaults_new_integrity_fields() {
+        // Existing serialized reports predate the integrity counters/flags.
+        let legacy = r#"{"total_metrics":1,"passed":1,"warnings":0,"critical":0}"#;
+        let summary: RegressionSummary = serde_json::from_str(legacy).unwrap();
+
+        assert_eq!(summary.total_metrics, 1);
+        assert_eq!(summary.passed, 1);
+        assert_eq!(summary.integrity_metadata_version, 0);
+        assert!(summary.qualification_gaps.is_empty());
+        assert_eq!(summary.missing_benchmarks, 0);
+        assert_eq!(summary.unexpected_benchmarks, 0);
+        assert_eq!(summary.missing_metrics, 0);
+        assert_eq!(summary.unexpected_metrics, 0);
+        assert!(!summary.invalid_baseline_snapshot);
+        assert!(!summary.invalid_current_snapshot);
+        assert!(!summary.invalid_threshold_policy);
+        assert_eq!(summary.unqualified, 0);
+    }
+
+    #[test]
+    fn test_legacy_serialized_report_cannot_qualify_without_integrity_metadata() {
+        let legacy = r#"{
+            "baseline_name":"baseline",
+            "current_name":"current",
+            "results":[{
+                "benchmark":"TestBench",
+                "metric":"accuracy",
+                "baseline_mean":0.90,
+                "baseline_ci_lower":0.88,
+                "baseline_ci_upper":0.92,
+                "current_mean":0.91,
+                "delta_pct":0.011,
+                "severity":"Pass"
+            }],
+            "summary":{
+                "total_metrics":1,
+                "passed":1,
+                "warnings":0,
+                "critical":0
+            }
+        }"#;
+        let report: RegressionReport = serde_json::from_str(legacy).unwrap();
+
+        assert_eq!(report.summary.integrity_metadata_version, 0);
+        assert!(report.has_comparison_integrity_errors());
+        assert!(report
+            .format_summary()
+            .contains("Integrity metadata is absent or unsupported"));
+        assert!(!report
+            .format_summary()
+            .contains("All metrics within baseline CI"));
     }
 
     #[test]
@@ -909,15 +1246,65 @@ mod tests {
     }
 
     #[test]
-    fn test_missing_benchmark_ignored() {
+    fn test_missing_benchmark_is_reported_as_population_error() {
         let baseline = make_test_snapshot("baseline", 0.90);
         let mut current = make_test_snapshot("current", 0.90);
-        current
-            .metrics
-            .insert("NewBench".to_string(), BTreeMap::new());
+        current.metrics.insert(
+            "NewBench".to_string(),
+            BTreeMap::from([(
+                "accuracy".to_string(),
+                MetricValue {
+                    mean: 0.90,
+                    std_dev: 0.05,
+                    n: 20,
+                    ci_lower: 0.88,
+                    ci_upper: 0.92,
+                },
+            )]),
+        );
         let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
-        // Only compares benchmarks that exist in baseline
+        // The compatibility comparator still reports the shared row, but it
+        // explicitly records that its result is not a complete population.
         assert_eq!(report.summary.total_metrics, 1);
+        assert_eq!(report.summary.unexpected_benchmarks, 1);
+        assert!(report.has_comparison_integrity_errors());
+        assert!(report.has_qualification_gaps());
+        assert!(report
+            .format_summary()
+            .contains("Metric population mismatch"));
+    }
+
+    #[test]
+    fn test_missing_and_unexpected_metrics_are_reported() {
+        let mut baseline = make_test_snapshot("baseline", 0.90);
+        baseline.metrics.get_mut("TestBench").unwrap().insert(
+            "latency".to_string(),
+            MetricValue {
+                mean: 5.0,
+                std_dev: 0.05,
+                n: 20,
+                ci_lower: 4.98,
+                ci_upper: 5.02,
+            },
+        );
+        let mut current = make_test_snapshot("current", 0.90);
+        current.metrics.get_mut("TestBench").unwrap().insert(
+            "throughput".to_string(),
+            MetricValue {
+                mean: 3.0,
+                std_dev: 0.05,
+                n: 20,
+                ci_lower: 2.98,
+                ci_upper: 3.02,
+            },
+        );
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        assert_eq!(report.summary.missing_metrics, 1);
+        assert_eq!(report.summary.unexpected_metrics, 1);
+        assert!(report.has_comparison_integrity_errors());
+        assert!(!report
+            .format_summary()
+            .contains("All metrics within baseline CI"));
     }
 
     #[test]

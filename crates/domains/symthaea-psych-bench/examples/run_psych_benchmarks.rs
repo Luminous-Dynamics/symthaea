@@ -410,10 +410,30 @@ fn main() {
 
     // Compare against baseline if --compare was specified
     if let Some(ref path) = compare_path {
-        let baseline = RegressionSnapshot::load(path).expect("failed to load baseline snapshot");
+        let baseline = match RegressionSnapshot::load(path) {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                eprintln!(
+                    "Comparison integrity failure: could not load baseline {}: {error}",
+                    path.display()
+                );
+                std::process::exit(2);
+            }
+        };
         let current = RegressionSnapshot::from_report(&report, "current");
         let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
         println!("\n{}", regression.format_summary());
+        // Status 2 means the comparison is unqualified: input/population integrity,
+        // exact execution identity, and/or per-metric semantics are missing. A numeric
+        // critical label from the exploratory heuristic is not a qualified verdict.
+        // Status 1 remains available to a future fully qualified gate.
+        if regression.has_comparison_integrity_errors() || regression.has_qualification_gaps() {
+            eprintln!(
+                "Comparison is not a qualified scientific/release gate; refusing a pass-like exit status.\n{}",
+                regression.format_summary()
+            );
+            std::process::exit(2);
+        }
         if regression.has_critical() {
             std::process::exit(1);
         }
