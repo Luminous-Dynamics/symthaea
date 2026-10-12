@@ -284,10 +284,6 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         }
     }
 
-    let numeric_points: Vec<(f64, f64)> = observations
-        .iter()
-        .filter_map(|point| point.numeric_value.map(|value| (value, point.overall_structural_distance)))
-        .collect();
     let tempo_points: Vec<(f64, f64)> = observations
         .iter()
         .filter_map(|point| point.numeric_value.map(|value| (value, point.tempo_bpm as f64)))
@@ -316,10 +312,10 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         "max_structural_distance": max_structural_distance,
         "layers_changed_at_least_once": layers_changed,
         "response_shape": {
-            "overall_structural_distance_vs_control": monotonicity(&numeric_points),
             "tempo_bpm_vs_control": monotonicity(&tempo_points),
             "total_duration_beats_vs_control": monotonicity(&duration_points),
             "score_note_count_vs_control": monotonicity(&note_count_points),
+            "structural_distance_note": "Per-point distance from baseline is recorded below. It is a displacement magnitude, not a directional target metric, so no monotonicity class is assigned to it.",
             "note": "Shape labels describe observed points only; they are not correctness or quality scores. Tonic and seed are not treated as ordinal axes."
         },
         "points": observations
