@@ -1537,7 +1537,15 @@ mod tests {
             4.0, 0.01, &holdout,
         ).expect("valid holdout work record should be receipted");
         assert!(verify_autonomous_discovery_receipt_v1(&receipt));
-        assert_eq!(receipt.rhs_evaluations, receipt.completed_integration_steps * 4);
+        assert_eq!(
+            receipt.integration_rhs_evaluations,
+            receipt.completed_integration_steps * 4
+        );
+        assert!(receipt.scoring_rhs_evaluations > 0);
+        assert_eq!(
+            receipt.rhs_evaluations,
+            receipt.integration_rhs_evaluations + receipt.scoring_rhs_evaluations
+        );
         assert_eq!(receipt.state_updates, receipt.completed_integration_steps * 4);
 
         receipt.rhs_evaluations += 1;
