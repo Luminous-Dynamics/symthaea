@@ -111,7 +111,7 @@ pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> MaskedG
         witness[x_inf_wires[n]] = Word(x_inf_vals[n]);
     }
 
-    // Pre-generate f values
+    // Pre-generate private gate inputs
     let gate_input_values: Vec<u64> = (0..timesteps * neurons).map(|_| rand::random()).collect();
     for (i, &value) in gate_input_values.iter().enumerate() {
         witness[gate_input_wires[i]] = Word(value);
