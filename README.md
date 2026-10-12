@@ -62,9 +62,9 @@ open https://symthaea.luminousdynamics.io
 
 ### Publicly reproducible Binius evidence
 
-The public harness generates and verifies a real Binius proof for packed-word XOR. XOR itself is linear in this representation and contributes no nonlinear AND/MUL gate, but the circuit's equality wiring still contributes measured structural constraints.
+The public harness generates and verifies a Binius proof for packed-word XOR. XOR is linear in this representation and contributes no nonlinear AND/MUL constraints. Equality checks still define the public statement, but this benchmark's AND/MUL statistic is not a count of all circuit structure.
 
-An earlier internal run recorded 256 reported AND constraints, approximately 430 ms proving time, 10.4 ms verification time, and a 75 KB proof for the 16,384-bit XOR demo. These are historical reference values, not fresh measurements from this correction branch.
+An earlier internal run recorded approximately 430 ms proving time, 10.4 ms verification time, and a 75 KB proof for the 16,384-bit XOR demo. These are historical reference values, not fresh measurements from this correction branch. An older 256-count used different constraint accounting and must not be read as the current nonlinear AND/MUL gate count.
 
 The public code computes the Winterfell comparator with an analytic model and does not construct or run a Winterfell prover. **No measured same-scale speedup or constraint-reduction ratio is claimed by this public artifact.**
 
@@ -189,8 +189,8 @@ soft warning report.
                     └──────────┬──────┘  └────────┬────────┘
                                │                  │
                     ┌──────────▼──────────────────▼────────┐
-                    │        DASTARK ZKP Layer              │
-                    │  Binius (HDC) + Winterfell (range)    │
+                    │        PROPOSED PROOF LAYER              │
+                    │  Binius integrity + future ZK backend    │
                     │  + RISC0 (complex) + Dilithium5 (PQ)  │
                     └──────────┬──────────────────┬────────┘
                                │                  │

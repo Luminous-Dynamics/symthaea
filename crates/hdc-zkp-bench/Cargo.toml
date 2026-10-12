@@ -3,7 +3,7 @@ name = "hdc-zkp-bench"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Benchmark: HDC XOR binding proof on Binius (real prover, measured) plus an analytic Winterfell estimate (no real Winterfell prover)"
+description = "HDC XOR computational-integrity benchmark: measured Binius proof execution and analytic Winterfell estimate; standard Binius64 backend does not provide witness privacy"
 authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
 
 [[bin]]

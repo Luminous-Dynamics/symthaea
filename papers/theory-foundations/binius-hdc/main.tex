@@ -149,16 +149,16 @@ The numerical CfC update contains ordinary numeric subtraction, multiplication, 
 \label{sec:system}
 % ============================================================================
 
-We describe a proposed dual-backend ZKP architecture for Mycelix. The public artifacts in this repository do not independently establish a production deployment across the Mycelix platform:
+We sketch a possible proof-system architecture, not an implemented deployment. The vendored \texttt{vendor/binius64/ARCHITECTURE.md} distinguishes two backends: the standard \texttt{binius-prover}/\texttt{binius-verifier} pair is marked non-zero-knowledge, while Iron Spartan is listed separately as zero-knowledge-capable. The public HDC benchmark in this repository uses the standard Binius64 backend. Iron Spartan is exercised only by a minimal private-Boolean XOR smoke test; the larger HDC circuits have not been migrated to it, and that smoke test is not an independent cryptographic audit.
 
 \begin{itemize}
-    \item \textbf{Binius backend}: HDC-native operations (binding, bundling, CfC evolution). Zero-cost XOR, minimal AND constraints.
-    \item \textbf{Winterfell backend}: Domain-specific AIR circuits (range proofs, threshold checks). Used where prime-field arithmetic is natural.
-    \item \textbf{RISC0 backend}: General-purpose zkVM for complex multi-step logic. Write arbitrary Rust as the guest program.
-    \item \textbf{Dilithium5 authentication}: Post-quantum digital signatures (CRYSTALS-Dilithium, NIST Level 5) for prover identity binding.
+    \item \textbf{Standard Binius64 backend (implemented):} a packed-word XOR computational-integrity proof. The correction branch also contains constrained Hamming-distance and strict bitwise-majority relations, plus a packed-bit recurrence. This backend does not guarantee witness confidentiality; it does not prove numerical CfC execution or end-to-end applications.
+    \item \textbf{Iron Spartan (experimental smoke test):} a separate zero-knowledge-capable backend over $\mathrm{GF}(2^{128})$. The current test covers two private Boolean bits and a public XOR result only. Full HDC migration, independent security review, and security-parameter review remain open; the vendored verifier declares \texttt{SECURITY\_BITS = 96}.
+    \item \textbf{Winterfell and RISC0 (proposed integrations):} this paper does not establish automatic routing, a matched cross-backend comparison, or an end-to-end production system.
+    \item \textbf{Dilithium5 authentication (proposed integration):} no integration with this HDC harness is established by the public artifacts.
 \end{itemize}
 
-Backend selection is automatic based on circuit type: HDC operations route to Binius, simple comparisons to Winterfell, and complex logic to RISC0. The \texttt{ZKBackend} trait provides a uniform interface:
+Backend selection is not automatic in the current public artifact. The \texttt{ProofBackend} snippet below is an architectural sketch, not an active dispatcher or a production interface:
 
 \begin{lstlisting}[language=Rust,basicstyle=\small\ttfamily]
 pub trait ProofBackend: Send + Sync {
@@ -181,7 +181,7 @@ To prevent overreading the ``zero-cost XOR'' claim, we explicitly enumerate the 
 \begin{itemize}
     \item \textbf{Free} (zero non-linear constraints): word-level XOR/addition. A permutation that only reorders whole packed words can be a reindexing; arbitrary bit-level cyclic rotation within/across packed words requires rotation/shift logic and must be costed separately.
     \item \textbf{Cheap} (1 AND per operation): Bitwise AND, comparison gates, threshold checks.
-    \item \textbf{Structural overhead}: \texttt{assert\_eq} bookkeeping (256 ANDs for 16,384-bit binding in our benchmark---from constraint wiring, not the XOR operation itself).
+    \item \textbf{Statement wiring}: public-output equality checks remain part of the relation. Report total circuit structure separately from nonlinear AND/MUL counts; the current XOR benchmark reports the latter, and no fresh total-constraint count is claimed here.
     \item \textbf{Witness assumptions}: temporal demos use witness-supplied packed-bit gates. They do not constrain or verify a numerical sigmoid or prove the numerical CfC update.
     \item \textbf{Bundling evidence}: the former generic $n>3$ circuit implemented AND reduction, not majority. The correction branch uses a bit-sliced counter; all prior n>3 measurements are superseded until rerun.
 \end{itemize}
@@ -192,7 +192,7 @@ We distinguish four levels of evidence strength:
 
 \begin{enumerate}
     \item \textbf{Provable algebraic result}: XOR binding is linear in binary-field STARK AIR and incurs zero non-linear constraints. This follows from the definition of $\mathrm{GF}(2^k)$ addition.
-    \item \textbf{Measured implementation result}: the public harness generates and verifies a Binius proof for a 16,384-bit packed-word XOR relation; 256 structural AND constraints were reported in a historical run and must be refreshed on this branch.
+    \item \textbf{Measured implementation result}: the public harness is designed to generate and verify a Binius proof for a 16,384-bit packed-word XOR relation. Fresh runtime, proof-size, and constraint measurements must be recorded from the corrected branch before publication; the current AND/MUL statistic is a nonlinear-gate count, not a count of equality wiring.
     \item \textbf{Cross-backend comparison}: not established by the public harness. Its Winterfell figures are analytic estimates; no same-scale Winterfell XOR proof is executed by the public benchmark.
     \item \textbf{Forward-looking implication}: binary-field proof systems are a promising fit for XOR-dominant workloads. The triple-stack and application-level conclusions remain speculative until their complete semantics and deployment paths are independently validated.
 \end{enumerate}
@@ -221,7 +221,7 @@ The public harness contains a real Binius64 proof for the XOR relation. The Bini
 \textbf{Metric} & \textbf{Binius} & \textbf{Winterfell} \\
 \midrule
 Circuit execution & Real proof generated and verified & No public XOR prover run \\
-Constraint count & 256 reported structural AND constraints & Not measured \\
+Nonlinear AND/MUL count & Fresh run required; pure XOR is expected to use zero nonlinear gates & Not measured \\
 Prover / verifier time & Historical internal values; refresh required & Not measured \\
 Proof size & Historical internal value; refresh required & Not measured \\
 \bottomrule
@@ -230,7 +230,7 @@ Proof size & Historical internal value; refresh required & Not measured \\
 \end{tabular}
 \end{table}
 
-The 256 reported Binius AND constraints come from structural \texttt{assert\_eq} bookkeeping; XOR itself is linear and contributes zero nonlinear AND/MUL gates. The cross-backend reduction ratio is not reported here because the public artifact does not contain a measured same-scale Winterfell XOR proof.
+The current harness reports AND and MUL constraints separately, and the XOR-only operation is expected to introduce zero nonlinear gates. Equality checks still define the public statement, but their wiring must not be relabelled as nonlinear AND constraints. No fresh timing, proof-size, total-constraint, or same-scale cross-backend comparison is claimed until the corrected branch is executed and its exact output is captured.
 
 \subsection{Temporal Recurrence Demonstration}
 
@@ -273,17 +273,17 @@ The earlier health-attestation latency table and federated-learning aggregate fi
 % ============================================================================
 
 \begin{enumerate}
-    \item \textbf{Scale asymmetry in proof sizes.} Winterfell produces smaller proofs at 16,384 bits (47.6~KB vs 75~KB for Binius). The constraint advantage translates to prover speedup but not proof compactness. This is because Binius uses a different commitment structure (multilinear polynomials over hypercubes) with larger constant factors.
+    \item \textbf{Witness privacy is backend-specific.} The public HDC benchmark uses the standard Binius64 backend, which the vendored architecture document marks as non-zero-knowledge. The separate Iron Spartan smoke test does not migrate the full HDC relations or establish production-grade privacy. No HDC witness-confidentiality claim is made.
 
-    \item \textbf{Sigmoid approximation.} Our CfC benchmark with in-circuit sigmoid uses an 8-bit mask approximation ($\sigma(x) \approx x \wedge \texttt{0xFF}$), not a numerically accurate sigmoid. A production-grade piecewise linear sigmoid would require additional AND constraints (estimated 5--10 per neuron per step vs our current 2).
+    \item \textbf{No measured cross-backend baseline.} The public harness does not implement or run a same-scale Winterfell XOR proof. Its Winterfell figures are analytical estimates and must not be used as measured proof times, proof sizes, or speedup ratios.
 
-    \item \textbf{Prior bundling results superseded.} The former generic $n>3$ circuit used pairwise AND reduction, not majority. The correction branch replaces it with bit-sliced strict majority; historical timing and constraint counts require rerunning.
+    \item \textbf{Relation scope.} Hamming distance is defined by constrained population counts of XOR words, and bundling by strict per-bit majority; the correction branch includes regression tests, but those tests and their performance measurements must pass/rerun before publication. The temporal demo is a packed-bit recurrence, not numerical CfC or sigmoid execution.
 
-    \item \textbf{Single-machine benchmarks.} All measurements use a single AMD Ryzen workstation. Network effects, DHT storage costs, and multi-validator verification latency are not captured.
+    \item \textbf{Application claims are not reproduced.} The current public path does not establish a deployed health-attestation pipeline, age credential, one-time-pad encryption correctness, encrypted numeric-gradient aggregation, or production Holochain deployment.
 
-    \item \textbf{No WASM integration.} Our health attestation prototype uses off-chain verification (following the attribution cluster's production pattern). In-zome Winterfell verification is feasible (winterfell supports \texttt{no\_std}) but untested in Holochain's wasmer runtime.
+    \item \textbf{Historical performance data.} Previously reported local timings and proof sizes are historical reference values, not fresh measurements from the correction branch. No performance conclusion should be drawn from them until the current reproduction script completes and exact output is archived.
 
-    \item \textbf{Binius is pre-1.0.} The Binius64 library is version 0.1.0 and under active development. API changes may affect reproducibility. We pin to a specific git commit.
+    \item \textbf{Experimental dependency.} The vendored proof-system code is evolving cryptographic software. Passing integration tests alone is not a security audit or deployment qualification.
 \end{enumerate}
 
 % ============================================================================

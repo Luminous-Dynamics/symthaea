@@ -49,3 +49,11 @@
 - Registered the new HDC test job in the top-level draft-safety census.
 - Fixed the workflow-safety checker so manual-only runner roots are not incorrectly required to include `ready_for_review`; its existing self-test covers this branch.
 - The latest automated HDC build, test, reproduction, and workflow checks still need a completed run. No green result is claimed yet.
+
+## Benchmark metric and architecture follow-up (2026-10-12)
+
+- The main XOR harness reads CircuitStat::n_and_constraints and CircuitStat::n_mul_constraints; its reported count is specifically the nonlinear AND/MUL count. It must not be described as a count of all equality wiring or all circuit rows.
+- Removed stale prose that called an older 256-count “structural AND constraints” and implied it was the current nonlinear metric. Earlier timing/proof-size values remain historical only until the corrected branch is executed and exact output is retained.
+- Reframed the multi-backend section as a proposal, not an automatically routed or deployed system. The public harness uses the standard non-zero-knowledge Binius64 backend; the separate Iron Spartan check is only a tiny Boolean-XOR smoke test, and does not show that the HDC circuits provide witness privacy.
+- Replaced outdated limitations text that still asserted an unmeasured Winterfell proof-size/speed advantage and referred to the packed-bit recurrence as a numerical CfC/sigmoid proof.
+- These documentation/source-comment changes do not substitute for the still-pending Rust build, proof tests, or fresh measurements.

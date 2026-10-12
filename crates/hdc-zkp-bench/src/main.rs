@@ -4,7 +4,7 @@
 //!
 //! Proves a 16,384-bit Hyperdimensional XOR binding operation across:
 //! 1. **Binius64** — Binary tower field STARK (XOR = native field addition, FREE).
-//!    REAL prover + verifier: every Binius number here is a measured cryptographic proof.
+//!    Real prover + verifier; runtime timings and proof bytes are measured for Binius only.
 //! 2. **Winterfell** — Prime field STARK (XOR requires constraint decomposition).
 //!    **ANALYTIC ESTIMATE ONLY**: this crate implements NO Winterfell AIR and never
 //!    invokes a Winterfell prover or verifier. The Winterfell numbers are computed from
@@ -20,7 +20,7 @@
 //!
 //! In Binius (GF(2^k)), XOR is field addition — zero AND constraints.
 //! In prime-field STARKs, XOR on N bits requires O(N) constraints for bit decomposition.
-//! For 16,384-bit HDC vectors, this is the difference between ~0 and ~65,536 constraints.
+//! This is an algebraic observation, not a measured cross-backend comparison; this crate does not run a Winterfell prover.
 //!
 //! ## Metrics Captured
 //!
