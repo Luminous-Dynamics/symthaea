@@ -4,8 +4,8 @@
 //! Chrome DevTools Protocol session wrapper.
 //!
 //! The low-level page-observation and mutation methods are crate-private. Public
-//! page reads and actions should go through [`crate::executor::BrowserExecutor`]
-/! which applies capability, Phi and URL checks before exposing page state.
+//! page reads and actions should go through [`crate::executor::BrowserExecutor`],
+//! which applies capability, Phi and URL checks before exposing page state.
 
 use std::time::Duration;
 
