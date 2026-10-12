@@ -14,7 +14,7 @@ use chromiumoxide::Page;
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::accessibility::GetFullAxTreeParams;
 use chromiumoxide::cdp::browser_protocol::dom::{
-    BackendNodeId, GetContentQuadsParams, ScrollIntoViewIfNeededParams,
+    BackendNodeId, GetContentQuadsParams, GetOuterHtmlParams, ScrollIntoViewIfNeededParams,
 };
 use chromiumoxide::cdp::browser_protocol::input::InsertTextParams;
 use chromiumoxide::cdp::browser_protocol::page::{
@@ -23,6 +23,8 @@ use chromiumoxide::cdp::browser_protocol::page::{
 use chromiumoxide::handler::viewport::Viewport;
 use chromiumoxide::layout::Point;
 use futures::StreamExt;
+use html5ever::tree_builder::TreeSink;
+use scraper::{Html, Selector};
 use tokio::sync::Mutex;
 use tracing::debug;
 
@@ -140,11 +142,9 @@ impl CdpSession {
             .await
             .unwrap_or(None)
             .unwrap_or_else(|| "unknown".to_string());
-        let title = page
-            .get_title()
+        let title = native_document_title(&page)
             .await
-            .unwrap_or(None)
-            .unwrap_or_else(|| "Untitled".to_string());
+            .unwrap_or_else(|_| "Untitled".to_string());
 
         let params = GetFullAxTreeParams::builder().build();
         let response = page
@@ -313,37 +313,20 @@ impl CdpSession {
         navigate_history(&page, 1).await.context("History forward failed")
     }
 
-    /// Extract page text for the explicit ExtractText action.
+    /// Extract current DOM text through typed CDP and Rust HTML parsing.
     ///
-    /// This is the remaining fixed-expression JavaScript helper. Migration to a
-    /// DOMSnapshot/text-node implementation remains open; the CSS selector is
-    /// JSON-serialized before it is included in the expression.
+    /// This is a DOM-text extraction contract, not a promise of pixel-perfect
+    /// browser text-layout semantics. The parser drops executable/non-content
+    /// elements and explicit hidden-state attributes; computed CSS visibility,
+    /// shadow roots, and subframe flattening are not synthesized by this path.
     pub(crate) async fn extract_text(&self, selector: Option<&str>) -> Result<String> {
         let page = self.page.lock().await;
-        let selector = serde_json::to_string(&selector).context("Serialize text selector")?;
-        let raw = page
-            .evaluate(format!(
-                r#"(() => {{
-                    const selector = {selector};
-                    const element = selector === null ? document.body : document.querySelector(selector);
-                    if (!element) return JSON.stringify({{status:'not_found', text:''}});
-                    return JSON.stringify({{status:'ok', text:(element.innerText || element.textContent || '')}});
-                }})()"#
-            ))
+        let target_selector = selector.unwrap_or("body");
+        let outer_html = read_outer_html(&page, target_selector)
             .await
-            .context("Text extraction failed")?
-            .into_value::<String>()
-            .unwrap_or_default();
-        let parsed: serde_json::Value =
-            serde_json::from_str(&raw).context("Invalid extraction result")?;
-        if parsed.get("status").and_then(|value| value.as_str()) != Some("ok") {
-            bail!("text extraction target not found");
-        }
-        Ok(parsed
-            .get("text")
-            .and_then(|value| value.as_str())
-            .unwrap_or_default()
-            .to_string())
+            .context("Read text target with DOM.getOuterHTML")?;
+        extract_html_text(&outer_html)
+            .context("Parse and extract native DOM text")
     }
 
     /// Capture a PNG screenshot of the current page.
@@ -379,6 +362,55 @@ impl CdpSession {
             .await
             .context("Accessibility observation unavailable; JavaScript fallback is disabled")
     }
+}
+
+async fn read_outer_html(page: &Page, selector: &str) -> Result<String> {
+    let element = page
+        .find_element(selector)
+        .await
+        .with_context(|| format!("DOM selector did not match a node: {selector}"))?;
+    let response = page
+        .execute(
+            GetOuterHtmlParams::builder()
+                .backend_node_id(element.backend_node_id.clone())
+                .build(),
+        )
+        .await
+        .context("DOM.getOuterHTML failed")?;
+    Ok(response.result.outer_html)
+}
+
+async fn native_document_title(page: &Page) -> Result<String> {
+    let title_html = read_outer_html(page, "title").await?;
+    let title = extract_html_text(&title_html)?;
+    if title.is_empty() {
+        bail!("document title is empty");
+    }
+    Ok(title)
+}
+
+fn extract_html_text(html: &str) -> Result<String> {
+    let mut document = Html::parse_fragment(html);
+    let excluded = Selector::parse(
+        "script, style, noscript, template, [hidden], [aria-hidden='true']",
+    )
+    .context("Invalid internal exclusion selector")?;
+    let excluded_nodes: Vec<_> = document
+        .select(&excluded)
+        .map(|element| element.id())
+        .collect();
+
+    // Reverse document order so descendants are detached before an ancestor.
+    for id in excluded_nodes.into_iter().rev() {
+        document.remove_from_parent(&id);
+    }
+
+    let text = document
+        .root_element()
+        .text()
+        .collect::<Vec<_>>()
+        .join(" ");
+    Ok(text.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 
 async fn navigate_history(page: &Page, offset: i64) -> Result<()> {
@@ -597,6 +629,30 @@ mod native_cdp_tests {
     }
 
     #[test]
+    fn native_html_extraction_excludes_non_content_and_hidden_subtrees() {
+        let html = r#"
+            <main>
+                <p>Alpha <em>beta</em></p>
+                <script>secret_script()</script>
+                <style>.concealed { display: none }</style>
+                <noscript>no script</noscript>
+                <template>template content</template>
+                <p hidden>hidden content</p>
+                <p aria-hidden="true">screen-reader-hidden content</p>
+                <p>Gamma</p>
+            </main>
+        "#;
+        let text = extract_html_text(html).expect("HTML extraction should succeed");
+        assert!(text.contains("Alpha beta"));
+        assert!(text.contains("Gamma"));
+        assert!(!text.contains("secret_script"));
+        assert!(!text.contains("concealed"));
+        assert!(!text.contains("template content"));
+        assert!(!text.contains("hidden content"));
+        assert!(!text.contains("screen-reader-hidden content"));
+    }
+
+    #[test]
     fn core_action_paths_do_not_call_page_evaluate() {
         let source = include_str!("cdp.rs");
         let sections = [
@@ -605,8 +661,9 @@ mod native_cdp_tests {
             ("pub(crate) async fn type_text", "    /// Scroll a CSS-selected"),
             ("pub(crate) async fn scroll_to", "    pub(crate) async fn extract_text"),
             ("pub(crate) async fn go_back", "    pub(crate) async fn go_forward"),
-            ("pub(crate) async fn go_forward", "    /// Extract page text"),
-            ("pub async fn observe", "/// Extract a string from"),
+            ("pub(crate) async fn go_forward", "    /// Extract current DOM text"),
+            ("pub(crate) async fn extract_text", "    /// Capture a PNG screenshot"),
+            ("pub async fn observe", "async fn read_outer_html"),
         ];
         for (start, end) in sections {
             let start_at = source.find(start).expect("source section start exists");
