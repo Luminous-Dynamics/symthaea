@@ -119,3 +119,10 @@ Most tests live in prover crates rather than verifier crates. This is a natural 
 - [binius.xyz](https://www.binius.xyz) - Documentation website
 - [docs.binius.xyz](https://docs.binius.xyz) - Rust API documentation
 - Individual crate documentation via `cargo doc`
+
+
+## Snapshot scope and upstream version boundary
+
+This architecture table describes the APIs in this vendored source snapshot, not every released or current upstream Binius64 API. In this checkout, `binius-prover::Prover` and `binius-verifier::Verifier` are the non-zero-knowledge path, while the separately vendored Iron Spartan frontend/prover/verifier implements a ZK-capable path over `GF(2^128)`.
+
+The current upstream [Binius64 prover source](https://github.com/binius-zk/binius64/blob/main/crates/prover/src/zk_config.rs) and [verifier source](https://github.com/binius-zk/binius64/blob/main/crates/verifier/src/zk_config.rs) contain additional `ZKProver` and `ZKVerifier` wrappers around the word-oriented Binius64 constraint system. Those files are absent from this vendored snapshot. This distinction suggests a better next experiment than immediately bit-decomposing every HDC circuit: evaluate a pinned upstream update or a reviewed backport of these wrappers while retaining the 64-bit circuit frontend. Neither option is implemented or qualified by this PR.

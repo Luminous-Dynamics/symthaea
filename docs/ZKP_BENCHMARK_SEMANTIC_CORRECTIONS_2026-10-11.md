@@ -74,3 +74,11 @@
 - Extended the minimal Iron Spartan smoke test to serialize the proof and verify it through a fresh verifier transcript.
 - Added a negative case that changes the public XOR output from one to zero and requires verification to fail. This tests proof binding to the public statement rather than only checking that a valid proof verifies.
 - The regression is authored but remains unconfirmed until the current CI head runs the Rust test successfully.
+
+
+## Upstream Binius64 ZK API research (2026-10-12)
+
+- Current upstream `binius-zk/binius64` exposes `binius_prover::zk_config::ZKProver` and `binius_verifier::zk_config::ZKVerifier`, which wrap the word-oriented Binius64 IOP proof with an Iron Spartan-based ZK wrapper. Official upstream source: [prover](https://github.com/binius-zk/binius64/blob/main/crates/prover/src/zk_config.rs), [verifier](https://github.com/binius-zk/binius64/blob/main/crates/verifier/src/zk_config.rs).
+- The vendored Symthaea snapshot lacks those wrapper modules, while retaining older non-ZK standard APIs plus separate Spartan crates. Accordingly, the current public benchmark's non-ZK limitation is real, but must be scoped to the vendored API snapshot rather than generalized to the entire Binius64 project.
+- Preferred next experiment: pin a known upstream revision (or perform a reviewed backport) and prove the existing packed-word XOR statement with the word-oriented ZK wrapper. Compare security parameters, transcript/public-input binding, proof verification, build reproducibility, and performance against the existing non-ZK path. Avoid reimplementing all HDC circuits over the older GF(2^128) frontend unless the wrapper route proves infeasible.
+- Research finding only: this integration/migration is not part of this PR and no current upstream security claim substitutes for testing and reviewing the exact code vendored in Symthaea.

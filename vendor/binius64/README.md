@@ -2,7 +2,9 @@
 
 # Binius64
 
-Binius64 is a zero-knowledge succinct argument system (zk-SNARK), implemented in Rust. Binius64 is capable of proving arbitrary computations, expressed as non-deterministic circuits over 64-bit words.
+Binius64 is a proof system implemented in Rust for computations expressed as non-deterministic circuits over 64-bit words.
+
+**Snapshot-specific security note:** this vendored tree does not contain the newer upstream `binius_prover::zk_config::ZKProver` / `binius_verifier::zk_config::ZKVerifier` API. In this snapshot, the standard `binius-prover` / `binius-verifier` API pair is documented in [ARCHITECTURE.md](ARCHITECTURE.md) as non-zero-knowledge; the separate Iron Spartan crates provide a distinct ZK-capable path. Do not interpret this general project README as a witness-confidentiality guarantee for the APIs present in this checkout. Newer upstream wrappers can be inspected in [ZKProver](https://github.com/binius-zk/binius64/blob/main/crates/prover/src/zk_config.rs) and [ZKVerifier](https://github.com/binius-zk/binius64/blob/main/crates/verifier/src/zk_config.rs), but they must be pinned, integrated, and tested before this repository can use them.
 
 Binius64 is a successor to the [original Binius protocol](https://github.com/IrreducibleOSS/binius), with a focus on simplicity and CPU performance. The constraint system natively encodes bitwise operations on 64-bit words through *shifted value indices*, which combine value references with shift operations. This design achieves a 64-fold reduction in constraint complexity compared to bit-level approaches while maintaining the efficiency advantages of binary field arithmetic. The protocol targets modern 64-bit CPUs with SIMD instructions, making it practical for real-world applications requiring zero-knowledge proofs.
 
