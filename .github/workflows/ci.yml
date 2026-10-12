@@ -62,7 +62,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             crates/hdc-zkp-bench/target
-          key: ${{ runner.os }}-cargo-hdc-zkp-${{ hashFiles('crates/hdc-zkp-bench/Cargo.toml', 'vendor/binius64/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-hdc-zkp-${{ hashFiles('crates/hdc-zkp-bench/Cargo.toml', 'crates/hdc-zkp-bench/Cargo.lock', 'vendor/binius64/**/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-cargo-hdc-zkp-
 
