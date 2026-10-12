@@ -181,15 +181,19 @@ impl CdpSession {
                 .as_ref()
                 .map(|id| *id.inner())
                 .unwrap_or(0);
-            let focused = node.properties.as_ref().is_some_and(|properties| {
-                properties.iter().any(|property| {
-                    let property_name = serde_json::to_value(&property.name).ok();
-                    property_name.as_ref().and_then(serde_json::Value::as_str)
-                        == Some("focused")
-                        && property.value.value.as_ref()
-                            .and_then(serde_json::Value::as_bool) == Some(true)
+            let ax_property_is_true = |wanted: &str| {
+                node.properties.as_ref().is_some_and(|properties| {
+                    properties.iter().any(|property| {
+                        let property_name = serde_json::to_value(&property.name).ok();
+                        property_name.as_ref().and_then(serde_json::Value::as_str)
+                            == Some(wanted)
+                            && property.value.value.as_ref()
+                                .and_then(serde_json::Value::as_bool) == Some(true)
+                    })
                 })
-            });
+            };
+            let focused = ax_property_is_true("focused");
+            let disabled = ax_property_is_true("disabled");
             if focused {
                 focused_element.get_or_insert(elements.len());
             }
@@ -201,9 +205,7 @@ impl CdpSession {
                 value,
                 description,
                 focused,
-                // AX `ignored` means omitted from the accessibility projection;
-                // it is not the HTML/ARIA disabled state.
-                disabled: false,
+                disabled,
             });
         }
 
@@ -503,6 +505,33 @@ async fn resolve_accessible_backend_node(
         .context("accessible selector has no associated DOM backend node")
 }
 
+async fn validate_click_target_enabled(page: &Page, backend_node_id: &BackendNodeId) -> Result<()> {
+    let tree = page
+        .execute(GetFullAxTreeParams::builder().build())
+        .await
+        .context("Read accessibility tree before click")?;
+    let node = tree.result.nodes.iter().find(|node| {
+        node.backend_dom_node_id
+            .as_ref()
+            .is_some_and(|id| *id.inner() == *backend_node_id.inner())
+    });
+
+    if let Some(node) = node {
+        let disabled = node.properties.as_ref().is_some_and(|properties| {
+            properties.iter().any(|property| {
+                let property_name = serde_json::to_value(&property.name).ok();
+                property_name.as_ref().and_then(serde_json::Value::as_str) == Some("disabled")
+                    && property.value.value.as_ref()
+                        .and_then(serde_json::Value::as_bool) == Some(true)
+            })
+        });
+        if disabled {
+            bail!("click target is disabled in the accessibility tree");
+        }
+    }
+    Ok(())
+}
+
 async fn validate_text_entry_target(page: &Page, backend_node_id: &BackendNodeId) -> Result<()> {
     let tree = page
         .execute(GetFullAxTreeParams::builder().build())
@@ -571,6 +600,9 @@ async fn scroll_backend_node_into_view(
 }
 
 async fn click_backend_node(page: &Page, backend_node_id: &BackendNodeId) -> Result<()> {
+    validate_click_target_enabled(page, backend_node_id)
+        .await
+        .context("Click target enablement check failed")?;
     scroll_backend_node_into_view(page, backend_node_id).await?;
     let quads = page
         .execute(
