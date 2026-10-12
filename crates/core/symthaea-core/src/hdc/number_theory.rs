@@ -61,6 +61,8 @@ pub struct PrimalityProof {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimalityProofError {
     InvalidRoot { value: u64 },
+    TooManyCertificates { count: usize },
+    TooManyEntries { count: usize },
     CertificateTableNotStrictlyIncreasing { previous: u64, current: u64 },
     MissingPrimeCertificate { prime: u64 },
     CompositeCandidate { prime: u64 },
@@ -108,6 +110,23 @@ impl PrimalityProof {
     pub fn verify(&self) -> Result<(), PrimalityProofError> {
         if self.value < 2 {
             return Err(PrimalityProofError::InvalidRoot { value: self.value });
+        }
+
+        // Enforce the same ceilings for public in-memory objects as for wire input.
+        // Do this before allocating the lookup table or evaluating any witnesses.
+        if self.certificates.len() > PRIMALITY_PROOF_MAX_CERTIFICATES as usize {
+            return Err(PrimalityProofError::TooManyCertificates {
+                count: self.certificates.len(),
+            });
+        }
+        let mut total_entries = 0usize;
+        for certificate in &self.certificates {
+            total_entries = total_entries
+                .saturating_add(certificate.predecessor_factors.len())
+                .saturating_add(certificate.witnesses.len());
+            if total_entries > PRIMALITY_PROOF_MAX_ENTRIES as usize {
+                return Err(PrimalityProofError::TooManyEntries { count: total_entries });
+            }
         }
 
         let mut nodes = std::collections::BTreeMap::new();
@@ -2002,6 +2021,51 @@ mod tests {
             assert_eq!(proof.value, prime);
             assert_eq!(proof.verify(), Ok(()), "prime={prime}");
         }
+    }
+
+    #[test]
+    fn test_primality_proof_verifier_enforces_in_memory_resource_budgets() {
+        let engine = NumberTheoryEngine::new();
+        let valid = engine.primality_proof(3).unwrap();
+
+        let mut too_many_nodes = valid.clone();
+        too_many_nodes.certificates = vec![
+            PrimalityCertificate {
+                prime: 2,
+                predecessor_factors: vec![],
+                witnesses: vec![],
+            };
+            PRIMALITY_PROOF_MAX_CERTIFICATES as usize + 1
+        ];
+        assert!(matches!(
+            too_many_nodes.verify(),
+            Err(PrimalityProofError::TooManyCertificates { count })
+                if count == PRIMALITY_PROOF_MAX_CERTIFICATES as usize + 1
+        ));
+
+        let too_many_entries = PrimalityProof {
+            value: 3,
+            certificates: vec![
+                PrimalityCertificate {
+                    prime: 2,
+                    predecessor_factors: vec![],
+                    witnesses: vec![],
+                },
+                PrimalityCertificate {
+                    prime: 3,
+                    predecessor_factors: vec![
+                        (2, 1);
+                        PRIMALITY_PROOF_MAX_ENTRIES as usize + 1
+                    ],
+                    witnesses: vec![],
+                },
+            ],
+        };
+        assert!(matches!(
+            too_many_entries.verify(),
+            Err(PrimalityProofError::TooManyEntries { count })
+                if count == PRIMALITY_PROOF_MAX_ENTRIES as usize + 1
+        ));
     }
 
     #[test]
