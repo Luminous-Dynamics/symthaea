@@ -151,7 +151,8 @@ fn private_output_dir(output: &Path) -> Result<PathBuf> {
 }
 
 /// Migrate legacy organizer-only artifacts out of older listening packs.
-/// Refuse a collision rather than overwrite or leave a key in the public pack.
+/// Never overwrite prior private evidence; move colliding legacy files under a
+/// distinct archived name so the shareable directory no longer contains them.
 fn relocate_legacy_private_artifacts(output: &Path, private_output: &Path) -> Result<()> {
     for name in [
         "private_backend_key.json",
@@ -162,12 +163,22 @@ fn relocate_legacy_private_artifacts(output: &Path, private_output: &Path) -> Re
         if !legacy_path.is_file() {
             continue;
         }
-        let private_path = private_output.join(name);
-        anyhow::ensure!(
-            !private_path.exists(),
-            "refusing to overwrite organizer-only artifact while isolating {}",
-            legacy_path.display()
-        );
+        let preferred_path = private_output.join(name);
+        let private_path = if !preferred_path.exists() {
+            preferred_path
+        } else {
+            let mut suffix = 0usize;
+            loop {
+                let candidate =
+                    private_output.join(format!("{name}.legacy-{suffix}"));
+                if !candidate.exists() {
+                    break candidate;
+                }
+                suffix = suffix
+                    .checked_add(1)
+                    .context("legacy private artifact suffix overflow")?;
+            }
+        };
         std::fs::rename(&legacy_path, &private_path).with_context(|| {
             format!(
                 "failed to move legacy private artifact {} outside the listening pack",
@@ -663,6 +674,43 @@ mod tests {
         std::fs::create_dir_all(&actual_private).unwrap();
         symlink(&actual_private, &private_link).unwrap();
         assert!(ensure_private_output_is_separate(&public, &private_link).is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn legacy_private_artifact_collision_migrates_without_overwriting() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "symthaea-vocal-legacy-migration-{}-{nonce}",
+            std::process::id()
+        ));
+        let public = root.join("pack");
+        let private = root.join("pack.private");
+        std::fs::create_dir_all(&public).unwrap();
+        std::fs::create_dir_all(&private).unwrap();
+        std::fs::write(public.join("private_backend_key.json"), b"legacy-key").unwrap();
+        std::fs::write(private.join("private_backend_key.json"), b"existing-key").unwrap();
+        std::fs::write(public.join("objective_report.json"), b"legacy-report").unwrap();
+
+        relocate_legacy_private_artifacts(&public, &private).unwrap();
+
+        assert!(!public.join("private_backend_key.json").exists());
+        assert!(!public.join("objective_report.json").exists());
+        assert_eq!(
+            std::fs::read(private.join("private_backend_key.json")).unwrap(),
+            b"existing-key"
+        );
+        assert_eq!(
+            std::fs::read(private.join("private_backend_key.json.legacy-0")).unwrap(),
+            b"legacy-key"
+        );
+        assert_eq!(
+            std::fs::read(private.join("objective_report.json")).unwrap(),
+            b"legacy-report"
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 
