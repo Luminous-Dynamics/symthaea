@@ -185,7 +185,7 @@ class RuntimeInventoryTests(unittest.TestCase):
             )
             self.assertEqual(
                 report["source"]["intent_axis_evidence_blob_sha"],
-                report["intent_axis_evidence"]["source_blob_sha"],
+                git_blob_sha((root / CAUSAL_EVIDENCE_RELATIVE).read_bytes()),
             )
             self.assertTrue(report["intent_axis_evidence"]["required_marker_present"])
             self.assertFalse(report["intent_axis_evidence"]["census_executed_by_inventory"])
