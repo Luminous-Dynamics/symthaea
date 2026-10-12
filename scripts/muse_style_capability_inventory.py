@@ -564,6 +564,16 @@ def _runtime_report(root: Path) -> dict[str, Any]:
         axis: sum(axis in axes_by_style[style] for style in variants)
         for axis in axis_names
     }
+    intent_axis_count_distribution: dict[str, int] = {}
+    for style in variants:
+        key = str(len(axes_by_style[style]))
+        intent_axis_count_distribution[key] = intent_axis_count_distribution.get(key, 0) + 1
+    zero_intent_axis_styles = sorted(
+        style for style in variants if not axes_by_style[style]
+    )
+    partial_intent_axis_styles = sorted(
+        style for style in variants if 0 < len(axes_by_style[style]) < 4
+    )
     family_counts: dict[str, int] = {}
     for family in grammar_families.values():
         family_counts[family.split("::")[-1]] = family_counts.get(
@@ -638,6 +648,11 @@ def _runtime_report(root: Path) -> dict[str, Any]:
             ),
             "grammar_family_counts": dict(sorted(family_counts.items())),
             "intent_axis_style_counts": dict(sorted(axis_counts.items())),
+            "intent_axis_count_distribution": dict(
+                sorted(intent_axis_count_distribution.items(), key=lambda item: int(item[0]))
+            ),
+            "styles_with_zero_intent_axes": zero_intent_axis_styles,
+            "styles_with_partial_intent_axes": partial_intent_axis_styles,
             "styles_with_fewer_than_four_intent_axes": sorted(
                 style for style in variants if len(axes_by_style[style]) < 4
             ),
@@ -697,6 +712,16 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "Dedicated-engine styles: "
         + (", ".join(summary["styles_with_dedicated_grammar_engine"]) or "none"),
+        file=sys.stderr,
+    )
+    print(
+        "Intent-axis support counts: "
+        + json.dumps(summary["intent_axis_count_distribution"], sort_keys=True),
+        file=sys.stderr,
+    )
+    print(
+        "Zero-declared-axis styles: "
+        + (", ".join(summary["styles_with_zero_intent_axes"]) or "none"),
         file=sys.stderr,
     )
     print(
