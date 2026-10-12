@@ -241,7 +241,9 @@ impl Px4HeartbeatFreshnessProfileV1 {
                 hasher.update(&[1]);
                 hasher.update(&value.to_le_bytes());
             }
-            None => hasher.update(&[0]),
+            None => {
+                hasher.update(&[0]);
+            }
         }
         digest_hex(hasher.finalize().as_bytes())
     }
@@ -646,6 +648,29 @@ mod tests {
         assert_eq!(fact.requirement, Px4ReadinessRequirementV1::HeartbeatFresh);
         assert_eq!(fact.state, Px4ReadinessFactStateV1::Satisfied);
         assert_eq!(fact.evidence_id, Some(value.freshness_id().unwrap()));
+    }
+
+    #[test]
+    fn optional_inter_heartbeat_gap_policy_is_digest_bound() {
+        let profile = Px4HeartbeatFreshnessProfileV1::new(
+            "px4.heartbeat.no-gap-limit.fixture.v1",
+            1,
+            1,
+            clock("companion.monotonic"),
+            2,
+            1_000_000_000,
+            None,
+        )
+        .unwrap();
+        assert_eq!(profile.max_inter_heartbeat_gap_ns, None);
+        profile.validate().unwrap();
+
+        let mut changed = profile;
+        changed.max_inter_heartbeat_gap_ns = Some(1_000_000_000);
+        assert_eq!(
+            changed.validate().unwrap_err(),
+            Px4HeartbeatEvidenceError::DigestMismatch("freshness_profile")
+        );
     }
 
     #[test]
