@@ -1,6 +1,13 @@
 name: Water Leak Satellite Catalog Tests
 
 on:
+  push:
+    branches:
+      - "research/water-leak-001-johannesburg-transfer"
+    paths:
+      - "tools/water_leak_satellite/**"
+      - "tests/test_water_leak_satellite_catalog_inventory.py"
+      - ".github/workflows/water-leak-catalog-tests.yml"
   pull_request:
     paths:
       - "tools/water_leak_satellite/**"
@@ -23,7 +30,7 @@ jobs:
     env:
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
-      - name: Checkout exact PR revision
+      - name: Checkout exact revision
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
@@ -37,3 +44,57 @@ jobs:
 
       - name: Run deterministic offline tests
         run: python3 -m unittest discover -s tests -p 'test_water_leak_satellite_catalog_inventory.py' -v
+
+  live-catalog-inventory:
+    name: Live Copernicus scene inventory (reconnaissance only)
+    if: github.event_name != 'pull_request'
+    needs: offline-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify tool still passes its offline tests
+        run: python3 -m unittest discover -s tests -p 'test_water_leak_satellite_catalog_inventory.py' -v
+
+      - name: Inventory Sentinel-1 and Sentinel-2 metadata
+        run: |
+          python3 tools/water_leak_satellite/catalog_inventory.py \
+            --bbox 27.7,-26.5,28.4,-25.8 \
+            --start 2023-01-01 \
+            --end 2026-10-12 \
+            --limit 100 \
+            --max-pages 100 \
+            --timeout 45 \
+            --out artifacts/water-leak/satellite-catalog-inventory.json
+
+      - name: Print bounded inventory summary
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("artifacts/water-leak/satellite-catalog-inventory.json")
+          data = json.loads(p.read_text())
+          print("catalog_discovery_only=true")
+          print("scope_status=" + data["scope"]["study_area_status"])
+          print("bbox_wgs84=" + json.dumps(data["scope"]["bbox_wgs84"]))
+          print("start_date=" + data["scope"]["start_date_inclusive"])
+          print("end_date=" + data["scope"]["end_date_inclusive"])
+          for item in data["collections"]:
+              print(f"collection={item['collection']} scenes={item['item_count']} pages={item['page_count']} duplicates_dropped={item['duplicate_items_dropped']}")
+          print("No raster assets downloaded; counts do not establish usable coverage or leak performance.")
+          PY
+
+      - name: Upload auditable metadata inventory
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: water-leak-satellite-catalog-inventory
+          path: artifacts/water-leak/satellite-catalog-inventory.json
+          if-no-files-found: error
+          retention-days: 7
