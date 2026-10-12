@@ -873,6 +873,21 @@ mod tests {
     }
 
     #[test]
+    fn sweep_cardinality_matches_the_published_seeded_protocol() {
+        assert_eq!(Style::ALL.len(), 29);
+        assert_eq!(BASE_SEED_SET.len(), 4);
+        let points_per_seed: usize = [
+            "tonic", "valence", "arousal", "energy", "bars", "seed",
+        ]
+        .into_iter()
+        .map(|control| control_points(control, BASE_SEED).len())
+        .sum();
+        assert_eq!(points_per_seed, 29);
+        assert_eq!(Style::ALL.len() * BASE_SEED_SET.len() * 6, 696);
+        assert_eq!(Style::ALL.len() * BASE_SEED_SET.len() * points_per_seed, 3_364);
+    }
+
+    #[test]
     fn routed_curve_reports_dynamic_channels_and_observed_change_flags() {
         let curve = curve_json(Style::Classical, "arousal", BASE_SEED);
         assert_eq!(curve["point_count"].as_u64(), Some(5));
