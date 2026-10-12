@@ -70,6 +70,7 @@ pub enum PrimalityProofError {
     PredecessorFactorNotYetProved { prime: u64, factor: u64 },
     PredecessorProductOverflow { prime: u64, factor: u64 },
     PredecessorProductMismatch { prime: u64, expected: u64, actual: u64 },
+    PredecessorProductNotLargeEnough { prime: u64, factor_product: u64 },
     WitnessesDoNotMatchPredecessorFactors { prime: u64 },
     InvalidWitnessBase { prime: u64, factor: u64, base: u64 },
     InvalidPocklingtonWitness { prime: u64, factor: u64, base: u64 },
@@ -154,6 +155,15 @@ impl PrimalityProof {
                     actual: product,
                 });
             }
+            // Pocklington requires a fully certified factor F of p - 1 with F² > p.
+            // Here F = p - 1, but check the theorem's size condition explicitly.
+            if u128::from(product) * u128::from(product) <= u128::from(prime) {
+                return Err(PrimalityProofError::PredecessorProductNotLargeEnough {
+                    prime,
+                    factor_product: product,
+                });
+            }
+
             if certificate.witnesses.len() != certificate.predecessor_factors.len() {
                 return Err(PrimalityProofError::WitnessesDoNotMatchPredecessorFactors { prime });
             }
@@ -1438,6 +1448,18 @@ mod tests {
                 "value={value} must not receive a prime proof"
             );
         }
+    }
+
+    #[test]
+    fn test_pocklington_proof_rejects_unreachable_certificate_nodes() {
+        let engine = NumberTheoryEngine::new();
+        let mut proof = engine.primality_proof(17).unwrap();
+        let unrelated = engine.primality_proof(3).unwrap();
+        proof.certificates.insert(1, unrelated.certificates[1].clone());
+        assert!(matches!(
+            proof.verify(),
+            Err(PrimalityProofError::UnreachableCertificate { prime: 3 })
+        ));
     }
 
     #[test]
