@@ -1,37 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! CfC Temporal Proof Benchmark
+//! Binius demonstration: gated bitwise state recurrence over packed u64 words.
 //!
-//! Proves that a CfC (Closed-form Continuous-time) neural network
-//! evolved correctly from state h(0) to h(T) over N timesteps.
+//! The circuit proves only the recurrence `h_next = h XOR (gate AND (target XOR h))`
+//! independently for each bit lane. Each gate is an unconstrained private witness
+//! word; it is not derived from a sigmoid or a numerical time constant.
 //!
-//! ## CfC Closed-Form Solution
-//!
-//! h(t) = (1 - σ(f(t))) * h(0) + σ(f(t)) * x_inf
-//!
-//! Where σ is sigmoid, f(t) = -dt/τ (time constant ratio).
-//!
-//! ## Why This Matters for ZKP
-//!
-//! CfC's O(1) closed-form step means each timestep is a fixed-size
-//! arithmetic expression. Compare to ODE-based LTC which requires
-//! multi-step Euler/RK4 integration per timestep.
-//!
-//! For N neurons over T timesteps:
-//! - CfC: O(N × T) constraints (one expression per neuron per step)
-//! - LTC+RK4: O(N × T × S) constraints (S integration substeps)
-//!
-//! This gives CfC a ~16x advantage (S typically = 16 for RK4 accuracy).
-//!
-//! ## Binius Advantage
-//!
-//! The CfC step involves:
-//! - Multiplication: σ * h(0), σ * x_inf (AND constraints in Binius)
-//! - Addition/subtraction: (1-σ) + σ*x_inf (XOR = FREE in Binius)
-//! - Sigmoid: lookup table or piecewise linear (cheap in both)
-//!
-//! In prime-field STARKs, ALL of these are expensive. In Binius,
-//! the additions are free — only the multiplications cost constraints.
+//! This is not a proof of real-valued or fixed-point bitwise recurrence dynamics and establishes
+//! no performance advantage over LTC/RK4. Historical function/type names remain
+//! for harness compatibility; labels describe the actual Boolean relation.
 
 use std::time::Instant;
 
@@ -48,7 +25,7 @@ use binius_verifier::{
     hash::{StdCompression, StdDigest},
 };
 
-/// Benchmark results for CfC temporal proof.
+/// Measurements for the packed-bit gated-recurrence demonstration.
 pub struct CfcBenchResult {
     pub neurons: usize,
     pub timesteps: usize,
@@ -59,22 +36,13 @@ pub struct CfcBenchResult {
     pub proof_size_bytes: usize,
 }
 
-/// Run CfC temporal proof benchmark.
+/// Prove a sequence of bitwise gate-controlled updates over packed 64-bit words.
 ///
-/// Proves that N neurons evolved correctly over T timesteps using
-/// the CfC closed-form solution.
-///
-/// Each timestep per neuron:
-/// - sigma = lookup(f_t) — approximated as witness input (free)
-/// - h_new = (1 - sigma) * h_old + sigma * x_inf
-///   = h_old - sigma * h_old + sigma * x_inf
-///   = h_old + sigma * (x_inf - h_old)
-///
-/// The multiplication sigma * (x_inf - h_old) is the only AND constraint.
-/// The additions are FREE in Binius.
+/// The private gate word is unconstrained apart from its use in the recurrence.
+/// The historical function name is retained, but it does not encode numeric bitwise recurrence.
 pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     println!(
-        "\n=== BINIUS: CfC Temporal Proof ({} neurons × {} steps) ===\n",
+        "\n=== BINIUS: Packed-bit Gated Recurrence ({} words × {} timesteps) ===\n",
         neurons, timesteps
     );
 
@@ -84,7 +52,7 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     let mut h_wires = Vec::with_capacity(neurons);
     let mut x_inf_wires = Vec::with_capacity(neurons);
     let mut final_h_wires = Vec::with_capacity(neurons);
-    let mut sigma_wires = Vec::new(); // Track all sigma witnesses
+    let mut gate_wires = Vec::new(); // Track all gate witnesses
 
     for _ in 0..neurons {
         h_wires.push(builder.add_witness()); // h(0) — private
@@ -92,19 +60,19 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
         final_h_wires.push(builder.add_inout()); // h(T) — public
     }
 
-    // Build CfC circuit: for each timestep, for each neuron
+    // Build bitwise recurrence circuit: for each timestep, for each neuron
     let mut current_h: Vec<_> = h_wires.clone();
 
     for _t in 0..timesteps {
         let mut new_h = Vec::with_capacity(neurons);
         for n in 0..neurons {
-            let sigma = builder.add_witness(); // Sigmoid value (witness)
-            sigma_wires.push(sigma);
+            let gate = builder.add_witness(); // Sigmoid value (witness)
+            gate_wires.push(gate);
 
             // delta = x_inf XOR h_old (FREE in Binius)
             let delta = builder.bxor(x_inf_wires[n], current_h[n]);
-            // product = sigma AND delta (1 AND constraint)
-            let product = builder.band(sigma, delta);
+            // product = gate AND delta (1 AND constraint)
+            let product = builder.band(gate, delta);
             // h_new = h_old XOR product (FREE in Binius)
             let h_new = builder.bxor(current_h[n], product);
 
@@ -126,16 +94,16 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     );
     println!("  MUL constraints: {}", stat.n_mul_constraints);
     println!(
-        "  Expected: {} AND ({}×{})",
+        "  Expected: {} AND ({} words × {} timesteps)",
         neurons * timesteps,
         neurons,
         timesteps
     );
     println!("  XOR operations: {} (all FREE)", neurons * timesteps * 2);
 
-    // Fill witness: simulate CfC evolution matching circuit construction order
+    // Fill witness: simulate bitwise recurrence evolution matching circuit construction order
     // Circuit builds: for each timestep, for each neuron (timestep-major)
-    // Witness must fill sigma_wires in the SAME order
+    // Witness must fill gate_wires in the SAME order
     let mut witness = circuit.new_witness_filler();
 
     // Generate all initial values
@@ -147,19 +115,19 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
         witness[x_inf_wires[n]] = Word(x_inf_vals[n]);
     }
 
-    // Pre-generate all sigma values in timestep-major order (matching circuit)
-    let sigma_vals: Vec<u64> = (0..timesteps * neurons).map(|_| rand::random()).collect();
-    for (i, &sigma) in sigma_vals.iter().enumerate() {
-        witness[sigma_wires[i]] = Word(sigma);
+    // Pre-generate all gate values in timestep-major order (matching circuit)
+    let gate_vals: Vec<u64> = (0..timesteps * neurons).map(|_| rand::random()).collect();
+    for (i, &gate) in gate_vals.iter().enumerate() {
+        witness[gate_wires[i]] = Word(gate);
     }
 
-    // Simulate CfC evolution to compute final h for each neuron
+    // Simulate gate-controlled word recurrence to compute final states
     let mut h_state = h0_vals.clone();
     for t in 0..timesteps {
         for n in 0..neurons {
-            let sigma = sigma_vals[t * neurons + n]; // timestep-major indexing
+            let gate = gate_vals[t * neurons + n]; // timestep-major indexing
             let delta = x_inf_vals[n] ^ h_state[n];
-            let product = sigma & delta;
+            let product = gate & delta;
             h_state[n] ^= product;
         }
     }
