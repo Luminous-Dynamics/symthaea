@@ -213,9 +213,11 @@ mod tests {
         // VWN5 expression (Libxc LDA_C_VWN=7; energies in Hartree per electron).
         // These are formula fixtures, not yet a Libxc runtime/API comparison.
         let cases = [
+            (1e-12_f64, -6.468_832_650_253_371e-5, -8.590_250_098_688_473e-5),
             (0.01_f64, -0.037_645_190_262_171_425, -0.043_872_656_447_393_65),
             (0.1_f64, -0.053_397_289_185_949_826, -0.060_812_030_331_261_556),
             (1.0_f64, -0.071_592_612_306_790_65, -0.079_938_383_175_985_62),
+            (1e3_f64, -0.135_304_120_959_226_53, -0.145_135_471_863_485_66),
         ];
 
         for (rho, expected_epsilon, expected_potential) in cases {
@@ -234,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_vwn5_analytic_potential_matches_density_derivative() {
-        for rho in [1e-6_f64, 1e-4, 1e-3, 1e-2, 0.1, 1.0, 10.0] {
+        for rho in [1e-12_f64, 1e-6, 1e-4, 1e-3, 1e-2, 0.1, 1.0, 10.0, 1e3] {
             let h = rho * 1e-5;
             let epsilon = VwnCorrelation::energy_density(rho);
             let epsilon_plus = VwnCorrelation::energy_density(rho + h);
