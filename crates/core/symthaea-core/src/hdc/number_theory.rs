@@ -830,9 +830,12 @@ mod tests {
         assert_eq!(factorization.value, semiprime);
         assert_eq!(factorization.factors, vec![(p, 1), (q, 1)]);
 
-        let reconstructed = factorization.factors.iter().fold(1u128, |product, &(prime, exponent)| {
-            product * u128::from(prime).pow(exponent)
-        });
+        let reconstructed = factorization
+            .factors
+            .iter()
+            .fold(1u128, |product, &(prime, exponent)| {
+                product * u128::from(prime).pow(exponent)
+            });
         assert_eq!(reconstructed, u128::from(semiprime));
     }
 
@@ -859,9 +862,12 @@ mod tests {
     fn test_factorize_large_prime_powers_and_mixed_composite() {
         let engine = NumberTheoryEngine::new();
         for (n, expected) in [
-            (2u64.pow(40), vec![(2, 40)]),
-            (3u64.pow(20), vec![(3, 20)]),
-            (3_215_031_751u64, vec![(151, 1), (751, 1), (28_351, 1)]),
+            (2u64.pow(40), vec![(2u64, 40u32)]),
+            (3u64.pow(20), vec![(3u64, 20u32)]),
+            (
+                3_215_031_751u64,
+                vec![(151u64, 1u32), (751u64, 1u32), (28_351u64, 1u32)],
+            ),
         ] {
             let result = engine.factorize(n);
             assert_eq!(result.factors, expected, "n={n}");
