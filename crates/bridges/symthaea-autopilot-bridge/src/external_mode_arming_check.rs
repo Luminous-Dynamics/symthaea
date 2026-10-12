@@ -1421,7 +1421,8 @@ pub enum Px4ExternalModeArmingCheckError {
     OutcomeClassificationContradiction,
     /// A declared Event timestamp postdates the ArmingCheckReply timestamp.
     #[error(
-        "ArmingCheckReply event {index} timestamp {event_timestamp_us_raw} exceeds reply timestamp {reply_timestamp_us_raw}"
+        "ArmingCheckReply event {index} timestamp {event_timestamp_us_raw} exceeds reply \
+        timestamp {reply_timestamp_us_raw}"
     )]
     EventTimestampAfterReply {
         index: usize,
