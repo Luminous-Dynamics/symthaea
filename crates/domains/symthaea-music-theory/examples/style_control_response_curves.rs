@@ -104,6 +104,8 @@ struct Observation {
     distinct_midi_pitches: usize,
     pitch_span_semitones: i32,
     score_key_tonic_pc: i32,
+    score_key_tonality: String,
+    phrase_model: Option<String>,
     mean_velocity: f64,
     velocity_standard_deviation: f64,
     mean_note_duration_beats: f64,
@@ -180,6 +182,12 @@ fn observe(
     let intent = control_point.input.intent();
     let spec = style.spec();
     let realization = compose_with_grammar_plan(style.grammar_profile(), &intent, &spec);
+    let phrase_model = match &realization.plan {
+        symthaea_music_theory::grammar::GrammarPlanEvidence::PeriodSentence(plan) => {
+            Some(plan.phrase_model.clone())
+        }
+        _ => None,
+    };
     let score = realization.score;
     let structural = fingerprint::structural_fingerprint(&score, &realization.form);
     let exact_hash = fingerprint::exact_fingerprint(&score);
@@ -268,6 +276,8 @@ fn observe(
         distinct_midi_pitches: midi_pitches.len(),
         pitch_span_semitones,
         score_key_tonic_pc: score.key.tonic.value() as i32,
+        score_key_tonality: format!("{:?}", score.key.tonality),
+        phrase_model,
         mean_velocity,
         velocity_standard_deviation,
         mean_note_duration_beats,
@@ -325,6 +335,8 @@ fn observation_json(observation: &Observation, base_hash: u64) -> serde_json::Va
             "distinct_midi_pitches": observation.distinct_midi_pitches,
             "pitch_span_semitones": observation.pitch_span_semitones,
             "score_key_tonic_pc": observation.score_key_tonic_pc,
+            "score_key_tonality": observation.score_key_tonality,
+            "phrase_model": observation.phrase_model,
             "mean_velocity": observation.mean_velocity,
             "velocity_standard_deviation": observation.velocity_standard_deviation,
             "mean_note_duration_beats": observation.mean_note_duration_beats,
@@ -359,15 +371,191 @@ const TONIC_CANDIDATE_INVARIANT_LAYERS: &[&str] = &[
 /// has a direct, source-grounded target contract here; other controls remain
 /// explicitly unscored until their per-style semantics are specified.
 fn control_target_evaluation(
+    style: Style,
     control: &str,
     observations: &[Observation],
 ) -> serde_json::Value {
+    let family = style.grammar_profile().family;
+    let spec = style.spec();
+
+    if control == "valence" {
+        if let Some(mode) = spec.mode {
+            return serde_json::json!({
+                "control": control,
+                "target_fidelity": {
+                    "status": "preset_mode_override",
+                    "pinned_mode": format!("{mode:?}"),
+                    "reason": "The style preset pins mode; valence-to-major/minor adherence is not scored.",
+                },
+                "non_target_invariance": {
+                    "status": "not_predeclared",
+                    "reason": "No valence-specific invariant set is declared for this style.",
+                },
+            });
+        }
+        if family == symthaea_music_theory::grammar::GrammarFamily::RagaModalArc {
+            return serde_json::json!({
+                "control": control,
+                "target_fidelity": {
+                    "status": "engine_owned_default",
+                    "reason": "RagaModalArc defaults to minor when no mode override exists; valence is not its tonality target.",
+                },
+                "non_target_invariance": {
+                    "status": "not_predeclared",
+                    "reason": "No valence-specific invariant set is declared for this style.",
+                },
+            });
+        }
+
+        let points: Vec<serde_json::Value> = observations
+            .iter()
+            .map(|observation| {
+                let expected_tonality = if observation.input.valence >= 0.0 {
+                    "Major"
+                } else {
+                    "Minor"
+                };
+                serde_json::json!({
+                    "control_value": observation.value_label,
+                    "expected_tonality": expected_tonality,
+                    "realized_tonality": observation.score_key_tonality,
+                    "matches_target": observation.score_key_tonality == expected_tonality,
+                })
+            })
+            .collect();
+        let matched = points
+            .iter()
+            .filter(|point| point["matches_target"].as_bool() == Some(true))
+            .count();
+        let count = points.len();
+        return serde_json::json!({
+            "control": control,
+            "target_fidelity": {
+                "status": "measured",
+                "target_metric": "major_for_nonnegative_valence_minor_for_negative_valence",
+                "tested_point_count": count,
+                "matching_point_count": matched,
+                "mismatching_point_count": count - matched,
+                "adherence_fraction": matched as f64 / count.max(1) as f64,
+                "points": points,
+            },
+            "non_target_invariance": {
+                "status": "not_predeclared",
+                "reason": "Valence can change tonality and downstream harmony; other target invariants need a style-aware contract.",
+            },
+        });
+    }
+
+    if control == "arousal" {
+        let attitude_multiplier = if matches!(
+            family,
+            symthaea_music_theory::grammar::GrammarFamily::BluesCallResponse
+                | symthaea_music_theory::grammar::GrammarFamily::JazzChorus
+        ) {
+            // These dedicated engines use spec.tempo(arousal) directly.
+            1.0_f32
+        } else {
+            match spec.attitude {
+                Some(symthaea_music_theory::spec::Attitude::Joy) => 1.08,
+                Some(symthaea_music_theory::spec::Attitude::Grief) => 0.85,
+                _ => 1.0,
+            }
+        };
+        let points: Vec<serde_json::Value> = observations
+            .iter()
+            .map(|observation| {
+                let expected_bpm = spec.tempo(observation.input.arousal) * attitude_multiplier;
+                let actual_bpm = observation.tempo_bpm;
+                let absolute_error = (actual_bpm - expected_bpm).abs();
+                serde_json::json!({
+                    "control_value": observation.value_label,
+                    "expected_tempo_bpm": expected_bpm,
+                    "realized_tempo_bpm": actual_bpm,
+                    "absolute_error_bpm": absolute_error,
+                    "matches_target_within_tolerance": absolute_error <= 0.001,
+                })
+            })
+            .collect();
+        let matched = points
+            .iter()
+            .filter(|point| point["matches_target_within_tolerance"].as_bool() == Some(true))
+            .count();
+        let max_error = points
+            .iter()
+            .filter_map(|point| point["absolute_error_bpm"].as_f64())
+            .fold(0.0_f64, f64::max);
+        let count = points.len();
+        return serde_json::json!({
+            "control": control,
+            "target_fidelity": {
+                "status": "measured",
+                "target_metric": "realized_tempo_matches_spec_linear_arousal_curve",
+                "tolerance_bpm": 0.001,
+                "tested_point_count": count,
+                "matching_point_count": matched,
+                "mismatching_point_count": count - matched,
+                "adherence_fraction": matched as f64 / count.max(1) as f64,
+                "max_absolute_error_bpm": max_error,
+                "points": points,
+            },
+            "non_target_invariance": {
+                "status": "not_predeclared",
+                "reason": "Changing arousal also selects motif tiers and can change phrase rhetoric; no universal invariant set is declared.",
+            },
+        });
+    }
+
+    if control == "energy"
+        && family == symthaea_music_theory::grammar::GrammarFamily::PeriodSentence
+    {
+        let points: Vec<serde_json::Value> = observations
+            .iter()
+            .map(|observation| {
+                let expected_model = if observation.input.arousal > 0.6
+                    || observation.input.energy > 0.75
+                {
+                    "sentence"
+                } else {
+                    "period"
+                };
+                let realized_model = observation.phrase_model.as_deref().unwrap_or("missing");
+                serde_json::json!({
+                    "control_value": observation.value_label,
+                    "expected_phrase_model": expected_model,
+                    "realized_phrase_model": realized_model,
+                    "matches_target": realized_model == expected_model,
+                })
+            })
+            .collect();
+        let matched = points
+            .iter()
+            .filter(|point| point["matches_target"].as_bool() == Some(true))
+            .count();
+        let count = points.len();
+        return serde_json::json!({
+            "control": control,
+            "target_fidelity": {
+                "status": "measured",
+                "target_metric": "period_sentence_model_matches_arousal_energy_threshold_rule",
+                "tested_point_count": count,
+                "matching_point_count": matched,
+                "mismatching_point_count": count - matched,
+                "adherence_fraction": matched as f64 / count.max(1) as f64,
+                "points": points,
+            },
+            "non_target_invariance": {
+                "status": "not_predeclared",
+                "reason": "The energy-triggered phrase model is an intended structural effect; other structural invariants need their own contract.",
+            },
+        });
+    }
+
     if control != "tonic" {
         return serde_json::json!({
             "control": control,
             "target_fidelity": {
                 "status": "not_predeclared",
-                "reason": "No control-target metric is currently justified for this axis.",
+                "reason": "No style-valid target metric is yet declared for this control and grammar route.",
             },
             "non_target_invariance": {
                 "status": "not_predeclared",
@@ -644,7 +832,7 @@ fn curve_json(style: Style, control: &str, base_seed: u64) -> serde_json::Value 
             / observations.len().max(1) as f64,
         "max_structural_distance": max_structural_distance,
         "layers_changed_at_least_once": layers_changed,
-        "control_target_evaluation": control_target_evaluation(control, &observations),
+        "control_target_evaluation": control_target_evaluation(style, control, &observations),
         "observed_changes_from_baseline": {
             "exact_note_event_fingerprint": exact_events_changed,
             "overall_structural_distance": structural_distance_changed,
