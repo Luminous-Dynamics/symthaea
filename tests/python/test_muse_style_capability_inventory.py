@@ -70,11 +70,11 @@ pub(crate) fn instruments_for(style: Style, seed: u64) -> Pool {
     // Style::Phantom => &[(Instrument::Fake, Instrument::Fake, Instrument::Fake)],
     let pool = match style {
         Style::Default => &[
-            (Instrument::Piano, Instrument::Flute, Instrument::Cello),
+            (Instrument::Piano,\n             Instrument::Flute,\n             Instrument::Cello,\n            ),
         ],
         Style::Other => &[
-            (Instrument::Sitar, Instrument::Pad, Instrument::Bass),
-            (Instrument::Sitar, Instrument::Harp, Instrument::Bass),
+            (Instrument::Sitar, Instrument::Pad, Instrument::Bass,),
+            (Instrument::Sitar, Instrument::Harp, Instrument::Bass,),
         ],
     };
     pool[(seed % pool.len() as u64) as usize]
