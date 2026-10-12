@@ -57,10 +57,7 @@ impl EvidenceSourceClass {
 
     /// Whether this source is explicitly an assumption rather than runtime evidence.
     pub const fn is_assumption(self) -> bool {
-        matches!(
-            self,
-            Self::DeclaredNominal | Self::CompatibilityAssumption
-        )
+        matches!(self, Self::DeclaredNominal | Self::CompatibilityAssumption)
     }
 }
 
@@ -497,9 +494,7 @@ fn validate_optional_identifier(
 ) -> Result<(), EvidenceValidationError> {
     if let Some(value) = value {
         let trimmed = value.trim();
-        if trimmed.is_empty()
-            || trimmed.len() != value.len()
-            || value.chars().any(char::is_control)
+        if trimmed.is_empty() || trimmed.len() != value.len() || value.chars().any(char::is_control)
         {
             return Err(EvidenceValidationError::InvalidIdentifier(field));
         }
@@ -572,14 +567,19 @@ impl std::fmt::Display for EvidenceValidationError {
             }
             Self::InvalidClockDomain => write!(f, "invalid clock-domain identifier"),
             Self::ClockDomainMismatch => write!(f, "cannot compare different clock domains"),
-            Self::NonMonotonicTimestamp => write!(f, "timestamp moved backward within one clock domain"),
+            Self::NonMonotonicTimestamp => {
+                write!(f, "timestamp moved backward within one clock domain")
+            }
             Self::InvalidIdentifier(field) => write!(f, "invalid {field} identifier"),
             Self::SourceRequired => write!(f, "available/stale evidence requires a source class"),
             Self::SourceForbiddenForUnavailable => {
                 write!(f, "unavailable evidence must not claim a source class")
             }
             Self::RuntimeTimestampRequired(source) => {
-                write!(f, "runtime source {source:?} requires an explicit timestamp")
+                write!(
+                    f,
+                    "runtime source {source:?} requires an explicit timestamp"
+                )
             }
             Self::StaleRequiresRuntimeSource => {
                 write!(f, "stale evidence requires a timestamped runtime source")
@@ -598,7 +598,10 @@ impl std::fmt::Display for EvidenceValidationError {
                 "available/stale vector evidence requires a profile defining vector positions"
             ),
             Self::CardinalityMismatch { kind, expected } => {
-                write!(f, "evidence kind {kind:?} does not have {expected:?} cardinality")
+                write!(
+                    f,
+                    "evidence kind {kind:?} does not have {expected:?} cardinality"
+                )
             }
             Self::NonFiniteValue { index: Some(index) } => {
                 write!(f, "normalized value at index {index} is non-finite")
@@ -667,20 +670,17 @@ mod tests {
             ))
         );
 
-        assert!(EvidenceMetadataV1::available(
-            EvidenceSourceClass::Measured,
-            Some(host_time(42))
-        )
-        .is_ok());
+        assert!(
+            EvidenceMetadataV1::available(EvidenceSourceClass::Measured, Some(host_time(42)))
+                .is_ok()
+        );
     }
 
     #[test]
     fn compatibility_assumption_is_explicit_and_may_be_timeless() {
-        let metadata = EvidenceMetadataV1::available(
-            EvidenceSourceClass::CompatibilityAssumption,
-            None,
-        )
-        .unwrap();
+        let metadata =
+            EvidenceMetadataV1::available(EvidenceSourceClass::CompatibilityAssumption, None)
+                .unwrap();
         assert!(metadata.source.unwrap().is_assumption());
         assert_eq!(metadata.observed_at, None);
     }
@@ -688,21 +688,16 @@ mod tests {
     #[test]
     fn stale_assumption_is_rejected() {
         assert_eq!(
-            EvidenceMetadataV1::stale(
-                EvidenceSourceClass::CompatibilityAssumption,
-                host_time(10)
-            ),
+            EvidenceMetadataV1::stale(EvidenceSourceClass::CompatibilityAssumption, host_time(10)),
             Err(EvidenceValidationError::StaleRequiresRuntimeSource)
         );
     }
 
     #[test]
     fn normalized_scalar_rejects_non_finite_and_out_of_range_values() {
-        let metadata = EvidenceMetadataV1::available(
-            EvidenceSourceClass::Derived,
-            Some(host_time(100)),
-        )
-        .unwrap();
+        let metadata =
+            EvidenceMetadataV1::available(EvidenceSourceClass::Derived, Some(host_time(100)))
+                .unwrap();
         assert!(matches!(
             NormalizedScalarEvidenceV1::new(
                 EmbodimentEvidenceKind::PredictiveResidual,
@@ -717,27 +712,24 @@ mod tests {
                 Some(1.01),
                 metadata
             ),
-            Err(EvidenceValidationError::OutOfRangeValue {
-                index: None,
-                ..
-            })
+            Err(EvidenceValidationError::OutOfRangeValue { index: None, .. })
         ));
     }
 
     #[test]
     fn actuator_health_is_vector_valued_and_non_empty_when_available() {
-        let mut metadata = EvidenceMetadataV1::available(
-            EvidenceSourceClass::Measured,
-            Some(host_time(200)),
-        )
-        .unwrap();
+        let mut metadata =
+            EvidenceMetadataV1::available(EvidenceSourceClass::Measured, Some(host_time(200)))
+                .unwrap();
         metadata.profile_id = Some("actuator-map.v1".into());
-        assert!(NormalizedVectorEvidenceV1::new(
-            EmbodimentEvidenceKind::ActuatorHealth,
-            Some(vec![1.0, 0.75, 0.5]),
-            metadata.clone()
-        )
-        .is_ok());
+        assert!(
+            NormalizedVectorEvidenceV1::new(
+                EmbodimentEvidenceKind::ActuatorHealth,
+                Some(vec![1.0, 0.75, 0.5]),
+                metadata.clone()
+            )
+            .is_ok()
+        );
         assert_eq!(
             NormalizedVectorEvidenceV1::new(
                 EmbodimentEvidenceKind::ActuatorHealth,
@@ -750,11 +742,9 @@ mod tests {
 
     #[test]
     fn actuator_health_requires_profile_identity() {
-        let metadata = EvidenceMetadataV1::available(
-            EvidenceSourceClass::Measured,
-            Some(host_time(200)),
-        )
-        .unwrap();
+        let metadata =
+            EvidenceMetadataV1::available(EvidenceSourceClass::Measured, Some(host_time(200)))
+                .unwrap();
         assert_eq!(
             NormalizedVectorEvidenceV1::new(
                 EmbodimentEvidenceKind::ActuatorHealth,
@@ -775,9 +765,7 @@ mod tests {
             })
         ));
         assert!(matches!(
-            NormalizedVectorEvidenceV1::unavailable(
-                EmbodimentEvidenceKind::ObservationConfidence
-            ),
+            NormalizedVectorEvidenceV1::unavailable(EmbodimentEvidenceKind::ObservationConfidence),
             Err(EvidenceValidationError::CardinalityMismatch {
                 expected: EvidenceCardinality::Vector,
                 ..
@@ -812,11 +800,9 @@ mod tests {
             Err(EvidenceValidationError::InvalidClockDomain)
         );
 
-        let mut metadata = EvidenceMetadataV1::available(
-            EvidenceSourceClass::Measured,
-            Some(host_time(1)),
-        )
-        .unwrap();
+        let mut metadata =
+            EvidenceMetadataV1::available(EvidenceSourceClass::Measured, Some(host_time(1)))
+                .unwrap();
         metadata.profile_id = Some(" ".into());
         assert_eq!(
             metadata.validate(),
@@ -826,11 +812,9 @@ mod tests {
 
     #[test]
     fn validity_window_requires_timestamp() {
-        let mut metadata = EvidenceMetadataV1::available(
-            EvidenceSourceClass::CompatibilityAssumption,
-            None,
-        )
-        .unwrap();
+        let mut metadata =
+            EvidenceMetadataV1::available(EvidenceSourceClass::CompatibilityAssumption, None)
+                .unwrap();
         metadata.valid_for_ns = Some(10);
         assert_eq!(
             metadata.validate(),
@@ -840,11 +824,9 @@ mod tests {
 
     #[test]
     fn freshness_uses_only_same_monotonic_clock_domain() {
-        let mut metadata = EvidenceMetadataV1::available(
-            EvidenceSourceClass::Measured,
-            Some(host_time(100)),
-        )
-        .unwrap();
+        let mut metadata =
+            EvidenceMetadataV1::available(EvidenceSourceClass::Measured, Some(host_time(100)))
+                .unwrap();
         metadata.valid_for_ns = Some(50);
 
         assert_eq!(
@@ -867,8 +849,8 @@ mod tests {
 
     #[test]
     fn stale_runtime_evidence_retains_value_but_is_not_available() {
-        let metadata = EvidenceMetadataV1::stale(EvidenceSourceClass::Estimated, host_time(5))
-            .unwrap();
+        let metadata =
+            EvidenceMetadataV1::stale(EvidenceSourceClass::Estimated, host_time(5)).unwrap();
         let evidence = NormalizedScalarEvidenceV1::new(
             EmbodimentEvidenceKind::SensorimotorAccuracy,
             Some(0.8),
