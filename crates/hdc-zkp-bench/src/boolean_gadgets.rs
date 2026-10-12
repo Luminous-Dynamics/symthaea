@@ -162,6 +162,16 @@ mod tests {
     }
 
     #[test]
+    fn popcount_handles_every_single_bit_position() {
+        for bit in 0..64 {
+            let value = 1u64 << bit;
+            assert!(
+                relation_holds_popcount(value, 1),
+                "single-bit population count failed at bit {bit}"
+            );
+        }
+    }
+    #[test]
     fn popcount_relation_rejects_a_wrong_claim() {
         assert!(!relation_holds_popcount(u64::MAX, 0));
     }
@@ -187,6 +197,29 @@ mod tests {
         }
     }
 
+    #[test]
+    fn strict_majority_threshold_boundaries_and_even_ties() {
+        for n in [2usize, 3, 4, 5, 8, 16] {
+            let threshold = n / 2 + 1;
+
+            let mut below_threshold = vec![u64::MAX; threshold - 1];
+            below_threshold.resize(n, 0);
+            assert_eq!(bitwise_majority_reference(&below_threshold), 0);
+            assert!(relation_holds_majority(&below_threshold, 0));
+
+            let mut at_threshold = vec![u64::MAX; threshold];
+            at_threshold.resize(n, 0);
+            assert_eq!(bitwise_majority_reference(&at_threshold), u64::MAX);
+            assert!(relation_holds_majority(&at_threshold, u64::MAX));
+
+            if n % 2 == 0 {
+                let mut tied = vec![u64::MAX; n / 2];
+                tied.resize(n, 0);
+                assert_eq!(bitwise_majority_reference(&tied), 0);
+                assert!(relation_holds_majority(&tied, 0));
+            }
+        }
+    }
     #[test]
     fn four_input_majority_is_not_all_input_and() {
         let inputs = [u64::MAX, u64::MAX, u64::MAX, 0];
