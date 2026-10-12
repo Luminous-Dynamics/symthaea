@@ -22,6 +22,7 @@ from muse_style_coverage import CoverageError, STYLE_RELATIVE, git_blob_sha, par
 ROOT = Path(__file__).resolve().parents[1]
 REALIZATION_RELATIVE = Path("crates/domains/symthaea-muse/src/theory_realize.rs")
 GRAMMAR_RELATIVE = Path("crates/domains/symthaea-music-theory/src/grammar.rs")
+CAUSAL_EVIDENCE_RELATIVE = Path("crates/domains/symthaea-music-theory/examples/diversity_census.rs")
 FAMILY_METHOD = "pub fn grammar_family"
 AXES_METHOD = "pub fn supported_intent_axes"
 METER_METHOD = "pub fn meter"
@@ -434,7 +435,8 @@ def _runtime_report(root: Path) -> dict[str, Any]:
     style_path = root / STYLE_RELATIVE
     realization_path = root / REALIZATION_RELATIVE
     grammar_path = root / GRAMMAR_RELATIVE
-    required = [style_path, realization_path, grammar_path]
+    causal_evidence_path = root / CAUSAL_EVIDENCE_RELATIVE
+    required = [style_path, realization_path, grammar_path, causal_evidence_path]
     if any(not path.is_file() for path in required):
         raise CoverageError(
             "Run from a checkout containing "
@@ -443,12 +445,21 @@ def _runtime_report(root: Path) -> dict[str, Any]:
     style_bytes = style_path.read_bytes()
     realization_bytes = realization_path.read_bytes()
     grammar_bytes = grammar_path.read_bytes()
+    causal_evidence_bytes = causal_evidence_path.read_bytes()
     try:
         style_source = style_bytes.decode("utf-8")
         realization_source = realization_bytes.decode("utf-8")
         grammar_source = grammar_bytes.decode("utf-8")
+        causal_evidence_source = causal_evidence_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise CoverageError(f"Rust runtime source is not UTF-8: {exc}") from exc
+
+    census_method = "fn causal_sensitivity_matrix"
+    if census_method not in _strip_comments(causal_evidence_source):
+        raise CoverageError(
+            "Causal intent-axis evidence source is missing "
+            + census_method
+        )
 
     variants, all_names, declared_count = parse_style_contract(style_source)
     family_arms = _method_match_arms(style_source, FAMILY_METHOD, FAMILY_METHOD)
@@ -562,6 +573,9 @@ def _runtime_report(root: Path) -> dict[str, Any]:
             "realization_blob_sha": git_blob_sha(realization_bytes),
             "grammar_dispatch_path": GRAMMAR_RELATIVE.as_posix(),
             "grammar_dispatch_blob_sha": git_blob_sha(grammar_bytes),
+            "intent_axis_evidence_path": CAUSAL_EVIDENCE_RELATIVE.as_posix(),
+            "intent_axis_evidence_blob_sha": git_blob_sha(causal_evidence_bytes),
+            "intent_axis_evidence_marker": census_method,
             "style_all_variant_count": declared_count,
         },
         "summary": {
@@ -604,12 +618,22 @@ def _runtime_report(root: Path) -> dict[str, Any]:
             "routed_does_not_prove_distinct_or_rendered": True,
         },
         "profiles": profiles,
+        "intent_axis_evidence": {
+            "source_path": CAUSAL_EVIDENCE_RELATIVE.as_posix(),
+            "source_blob_sha": git_blob_sha(causal_evidence_bytes),
+            "required_marker_present": True,
+            "census_executed_by_inventory": False,
+            "meaning": (
+                "Intent-axis declarations are traced to the repository's causal "
+                "sensitivity census source; this inventory verifies source presence "
+                "but does not run the census or independently confirm its results."
+            ),
+        },
         "interpretation": (
             "These fields are extracted from executable source declarations, "
-            "including the existing census-informed intent-axis declaration. "
-            "This inventory does not independently rerun causal-effect probes, "
-            "prove sample/render availability, or validate perceptual distinctness "
-            "or cultural authenticity."
+            "including census-informed intent-axis declarations. This inventory "
+            "does not execute the causal census, prove sample/render availability, "
+            "or validate perceptual distinctness or cultural authenticity."
         ),
     }
 
