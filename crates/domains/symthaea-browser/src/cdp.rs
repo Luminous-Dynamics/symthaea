@@ -225,12 +225,11 @@ impl CdpSession {
     pub(crate) async fn click(&self, selector: &ElementSelector) -> Result<()> {
         let page = self.page.lock().await;
         let backend_node_id = match selector {
-            ElementSelector::Css(css) => page
-                .find_element(css)
-                .await
-                .context("Element not found")?
-                .backend_node_id
-                .clone(),
+            ElementSelector::Css(css) => {
+                resolve_unique_css_backend_node(&page, css)
+                    .await
+                    .context("CSS click target must match exactly one element")?
+            },
             ElementSelector::BackendNodeId(id) => {
                 bail!("raw integer backend node selector {id} is unsupported; use CSS or accessibility targeting");
             }
@@ -256,12 +255,11 @@ impl CdpSession {
 
         let page = self.page.lock().await;
         let backend_node_id = match selector {
-            ElementSelector::Css(css) => page
-                .find_element(css)
-                .await
-                .context("Element not found")?
-                .backend_node_id
-                .clone(),
+            ElementSelector::Css(css) => {
+                resolve_unique_css_backend_node(&page, css)
+                    .await
+                    .context("CSS text target must match exactly one element")?
+            },
             ElementSelector::BackendNodeId(id) => {
                 bail!("raw integer backend node selector {id} is unsupported; use CSS or accessibility targeting");
             }
@@ -299,11 +297,10 @@ impl CdpSession {
             bail!("scroll currently requires a CSS selector");
         };
         let page = self.page.lock().await;
-        let element = page
-            .find_element(css)
+        let backend_node_id = resolve_unique_css_backend_node(&page, css)
             .await
-            .context("Scroll target not found")?;
-        scroll_backend_node_into_view(&page, &element.backend_node_id)
+            .context("CSS scroll target must match exactly one element")?;
+        scroll_backend_node_into_view(&page, &backend_node_id)
             .await
             .context("Native CDP scroll failed")?;
         Ok(())
@@ -370,15 +367,34 @@ impl CdpSession {
     }
 }
 
-async fn read_outer_html(page: &Page, selector: &str) -> Result<String> {
-    let element = page
-        .find_element(selector)
+async fn resolve_unique_css_backend_node(page: &Page, selector: &str) -> Result<BackendNodeId> {
+    let matches = page
+        .find_elements(selector)
         .await
-        .with_context(|| format!("DOM selector did not match a node: {selector}"))?;
+        .with_context(|| format!("DOM query failed for CSS selector: {selector}"))?;
+    require_unique_css_match_count(selector, matches.len())?;
+    matches
+        .first()
+        .map(|element| element.backend_node_id.clone())
+        .context("CSS selector match disappeared before target resolution")
+}
+
+fn require_unique_css_match_count(selector: &str, count: usize) -> Result<()> {
+    match count {
+        0 => bail!("CSS selector matched no elements: {selector}"),
+        1 => Ok(()),
+        multiple => bail!("CSS selector matched {multiple} elements; refusing ambiguous target: {selector}"),
+    }
+}
+
+async fn read_outer_html(page: &Page, selector: &str) -> Result<String> {
+    let backend_node_id = resolve_unique_css_backend_node(page, selector)
+        .await
+        .context("DOM text target must match exactly one element")?;
     let response = page
         .execute(
             GetOuterHtmlParams::builder()
-                .backend_node_id(element.backend_node_id.clone())
+                .backend_node_id(backend_node_id)
                 .build(),
         )
         .await
@@ -630,6 +646,13 @@ mod native_cdp_tests {
         assert!(quad_center(&[0.0, 0.0, 1.0, 1.0]).is_none());
         assert!(quad_center(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).is_none());
         assert!(quad_center(&[0.0, 0.0, f64::NAN, 0.0, 10.0, 10.0, 0.0, 10.0]).is_none());
+    }
+
+    #[test]
+    fn css_target_cardinality_fails_closed() {
+        assert!(require_unique_css_match_count("button.primary", 1).is_ok());
+        assert!(require_unique_css_match_count("button.primary", 0).is_err());
+        assert!(require_unique_css_match_count("button.primary", 2).is_err());
     }
 
     #[test]
