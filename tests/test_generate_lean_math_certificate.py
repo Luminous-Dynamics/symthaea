@@ -110,6 +110,7 @@ class LeanCertificateBridgeTests(unittest.TestCase):
             source,
         )
         self.assertIn("source_certificate.factorization.value = (2 * 3 * 5)", source)
+        self.assertIn("factors := [(2, 1), (3, 1), (5, 1)] },\n    primeProofs := [source_factor_proof_0, source_factor_proof_1, source_factor_proof_2]", source)
 
     def test_invalid_or_noncanonical_input_fails_closed(self) -> None:
         for data in (b"", b"not a certificate", SYMPPRF1_PRIME_3 + bytes([0])):
