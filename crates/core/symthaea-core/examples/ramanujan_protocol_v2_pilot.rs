@@ -299,6 +299,9 @@ fn build_run_record(
     config: &RegressorConfig,
     source_revision: &str,
     rustc_version: &str,
+    cargo_version: &str,
+    host_parallelism: usize,
+    replicate_order_index: usize,
     protocol_blake3: &str,
     cargo_lock_blake3: &str,
     workspace_manifest_blake3: &str,
@@ -503,7 +506,12 @@ fn build_run_record(
         "record_type": "ramanujan_protocol_v2_pilot_run",
         "protocol_id": PILOT_PROTOCOL_ID,
         "source_revision": source_revision,
-        "toolchain": rustc_version,
+        "toolchain": {
+            "rustc": rustc_version,
+            "cargo": cargo_version
+        },
+        "host_parallelism": host_parallelism,
+        "replicate_order_index": replicate_order_index,
         "preregistration_blake3": protocol_blake3,
         "cargo_lock_blake3": cargo_lock_blake3,
         "workspace_manifest_blake3": workspace_manifest_blake3,
@@ -624,6 +632,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let first_seed = args.get(2).map(|value| value.parse::<u64>()).transpose()?.unwrap_or(42);
     let revision = source_revision()?;
     let rustc_version = command_text("rustc", &["--version"])?;
+    let cargo_version = command_text("cargo", &["--version"])?;
+    let host_parallelism = std::thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(1);
     let protocol_blake3 = file_blake3("docs/planning/ramanujan-protocol-v2-evaluation-protocol.md")?;
     let cargo_lock_blake3 = file_blake3("Cargo.lock")?;
     let workspace_manifest_blake3 = file_blake3("Cargo.toml")?;
@@ -642,16 +654,37 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map_err(|error| format!("cannot create evidence file {}: {error}", output_path.display()))?;
     let mut output = BufWriter::new(file);
 
-    let conditions = [
+    let canonical_conditions = [
         AutonomousDiscoveryMode::Cold,
         AutonomousDiscoveryMode::Primed,
         AutonomousDiscoveryMode::RandomBaseline,
     ];
-    let mut run_record_digests = Vec::with_capacity(replicates * conditions.len());
+    // Counterbalance condition position with a deterministic 3-order Latin
+    // square to reduce systematic warm-cache and machine-load bias.
+    let orders = [
+        canonical_conditions,
+        [
+            AutonomousDiscoveryMode::Primed,
+            AutonomousDiscoveryMode::RandomBaseline,
+            AutonomousDiscoveryMode::Cold,
+        ],
+        [
+            AutonomousDiscoveryMode::RandomBaseline,
+            AutonomousDiscoveryMode::Cold,
+            AutonomousDiscoveryMode::Primed,
+        ],
+    ];
+    let mut run_record_digests = Vec::with_capacity(replicates * canonical_conditions.len());
+    let mut replicate_orders = Vec::with_capacity(replicates);
     for replicate in 0..replicates {
         let seed = first_seed.wrapping_add(replicate as u64);
         let holdout_seed = seed.wrapping_add(HOLDOUT_SEED_OFFSET);
-        for mode in conditions {
+        let run_order = orders[replicate % orders.len()];
+        replicate_orders.push(json!({
+            "replicate_id": seed,
+            "ordered_conditions": run_order.map(mode_name)
+        }));
+        for (replicate_order_index, mode) in run_order.into_iter().enumerate() {
             let config = RegressorConfig {
                 seed,
                 population_size: 80,
@@ -669,6 +702,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 &config,
                 &revision,
                 &rustc_version,
+                &cargo_version,
+                host_parallelism,
+                replicate_order_index,
                 &protocol_blake3,
                 &cargo_lock_blake3,
                 &workspace_manifest_blake3,
@@ -687,10 +723,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cargo_lock_blake3": cargo_lock_blake3,
         "workspace_manifest_blake3": workspace_manifest_blake3,
         "core_manifest_blake3": core_manifest_blake3,
+        "toolchain": {
+            "rustc": rustc_version,
+            "cargo": cargo_version
+        },
+        "host_parallelism": host_parallelism,
         "replicates": replicates,
         "first_discovery_seed": first_seed,
         "holdout_seed_offset": HOLDOUT_SEED_OFFSET,
-        "conditions": conditions.map(mode_name),
+        "conditions": canonical_conditions.map(mode_name),
+        "replicate_orders": replicate_orders,
         "run_record_count": run_record_digests.len(),
         "run_record_blake3s": run_record_digests
     });
