@@ -40,7 +40,7 @@ nix develop -c cargo run --example muse_vocal_release_gate \
   --ratings-only
 ```
 
-This phase does not initialize a voice backend or render audio. It validates the saved public manifest against the private internal manifest, answer key, objective report, and actual WAV files; rejects unexpected/stale files or mismatched identities; validates listener ratings; and updates only the private `human_case_report.json` and `release_status.json`. It requires the ratings file to live outside both output trees. You can rerun it with revised ratings without changing the blind IDs or rerendering; it preserves the exact audio/run mapping. Never distribute the private sibling.
+This phase does not initialize a voice backend or render audio. It validates the saved public manifest against the private internal manifest, answer key, objective report, and referenced regular WAV files; rejects unexpected/stale files or mismatched identities; and validates listener ratings. The latest results are written to private `human_case_report.json` and `release_status.json`; the previous versions are preserved as uniquely named `*.review-*.json` history files before replacement. It requires the ratings file to live outside both output trees. You can rerun it with revised ratings without changing the blind IDs or rerendering; it preserves the exact audio/run mapping and prior review evidence. Never distribute the private sibling.
 
 To include the optional DiffSinger worker, provision a voicebank outside the repository and point `SYMTHAEA_DIFFSINGER_VOICEBANK` at its root. The worker expects the ONNX stages and metadata under `dsmain/`, `dsvariance/`, and `dsvocoder/`; it does not download models or validate voicebank licensing for you. Then run:
 
