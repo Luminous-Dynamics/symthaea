@@ -1,10 +1,10 @@
 name: GPU Capability Smoke
 
 on:
+  # Main pushes run after merge; PR updates use pull_request only so one
+  # change does not enqueue duplicate push + PR jobs that cancel each other.
   push:
-    branches:
-      - main
-      - feat/gpu-adapter-capability-report
+    branches: [main]
     paths:
       - '.github/workflows/gpu-capability-smoke.yml'
       - 'crates/core/symthaea-core/src/hdc/gpu_compute.rs'
@@ -165,6 +165,8 @@ jobs:
           set -euo pipefail
           nix develop --command bash -lc '
             set -euo pipefail
+            export SYTHAEA_GPU_EXPECT_NVIDIA=1
+            export WGPU_BACKEND=vulkan
             rustc --version
             cargo test -p symthaea-core --features gpu --lib \
               hdc::gpu_compute::capability_report_tests -- --nocapture 2>&1 \
