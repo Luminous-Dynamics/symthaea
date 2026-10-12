@@ -144,7 +144,8 @@ impl<'a> BrowserExecutor<'a> {
                                     action,
                                     policy_decision: landing_decision,
                                     outcome: ActionOutcome::Failed(
-                                        "navigation landed on a URL denied by policy; the request may already have occurred".to_string(),
+                                        "post-navigation URL denied; request may already have occurred"
+                                            .to_string(),
                                     ),
                                     output: ActionOutput::None,
                                     elapsed_ms: started.elapsed().as_millis(),
