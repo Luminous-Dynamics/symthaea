@@ -201,6 +201,25 @@ class ODataInventoryTests(unittest.TestCase):
         errors = verify_inventory(doc)
         self.assertTrue(any("canonical YYYY-MM-DD" in err for err in errors))
 
+    def test_recorded_endpoint_and_page_paths_must_be_products_endpoint(self):
+        with patch("tools.water_leak_satellite.odata_inventory.urlopen", side_effect=[
+            FakeResponse({"value": []}), FakeResponse({"value": []})
+        ]):
+            queries = [
+                inventory_query(profile=p, bbox=self.bbox, start=date(2025, 1, 1),
+                    end_exclusive=date(2025, 1, 2), limit=100, max_pages=5, timeout=2)
+                for p in PROFILES
+            ]
+        doc = build_document(self.bbox, date(2025, 1, 1), date(2025, 1, 1), queries)
+        doc["catalogue_endpoint"] = "https://catalogue.dataspace.copernicus.eu/odata/v1/Users"
+        doc["queries"][0]["page_records"][0]["request_url_redacted"] = "https://catalogue.dataspace.copernicus.eu/odata/v1/Users"
+        from tools.water_leak_satellite.odata_inventory import sha256_json
+        doc.pop("inventory_manifest_sha256")
+        doc["inventory_manifest_sha256"] = sha256_json(doc)
+        errors = verify_inventory(doc)
+        self.assertTrue(any("catalogue_endpoint" in err for err in errors))
+        self.assertTrue(any("request_url_redacted" in err for err in errors))
+
     def test_query_scope_tamper_is_detected_even_after_rehash(self):
         # Build an otherwise valid full document via fake responses.
         responses = [{"value": [dict(self.product, Id=f"p{i}", Name=f"n{i}")]} for i in range(2)]

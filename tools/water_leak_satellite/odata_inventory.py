@@ -325,8 +325,12 @@ def verify_inventory(document: Any) -> list[str]:
 
     if document.get("schema_version") != "water-leak-odata-inventory/v1":
         errors.append("schema_version: unsupported OData inventory schema")
-    if _redacted_url(document.get("catalogue_endpoint", "")) is None:
-        errors.append("catalogue_endpoint: must be query-free HTTPS OData endpoint on the approved host")
+    endpoint = document.get("catalogue_endpoint", "")
+    if (
+        _redacted_url(endpoint) is None
+        or urlparse(endpoint).path.rstrip("/") != "/odata/v1/Products"
+    ):
+        errors.append("catalogue_endpoint: must be the query-free approved OData Products endpoint")
     scope = document.get("scope")
     if not isinstance(scope, dict):
         errors.append("scope: must be an object")
@@ -470,7 +474,11 @@ def verify_inventory(document: Any) -> list[str]:
 def _redacted_url_is_safe_redacted(value: Any) -> bool:
     if not isinstance(value, str) or "?" in value or "#" in value:
         return False
-    return _redacted_url(value) == value
+    parsed = urlparse(value)
+    return (
+        _redacted_url(value) == value
+        and parsed.path.rstrip("/") == "/odata/v1/Products"
+    )
 
 
 def build_document(bbox: list[float], start: date, end: date, queries: list[dict[str, Any]]) -> dict[str, Any]:
