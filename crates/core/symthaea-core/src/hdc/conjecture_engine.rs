@@ -37,6 +37,8 @@ use parking_lot::RwLock;
 
 #[path = "conjecture_engine/autonomous.rs"]
 mod autonomous;
+#[path = "conjecture_engine/autonomous_provenance.rs"]
+mod autonomous_provenance;
 #[path = "conjecture_engine/cfc_smoothing.rs"]
 mod cfc_smoothing;
 #[path = "conjecture_engine/conjecture_metadata.rs"]
@@ -68,6 +70,7 @@ mod symbolic;
 #[path = "conjecture_engine/verification.rs"]
 mod verification;
 pub use autonomous::*;
+pub use autonomous_provenance::*;
 /// CfC-style closed-form smoothing for noisy/irregular observations. See
 /// `cfc_smoothing.rs` module docs.
 pub use cfc_smoothing::{CfcSmoother, NaiveEmaSmoother};
@@ -107,8 +110,9 @@ use gp_support::{
 /// data) against the same metric the real search optimizes.
 pub use gp_support::{
     fd_gradient, gradient_informativeness_fraction, is_informatively_conserved,
-    lie_derivative_variance,
+    lie_derivative_variance, GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR,
 };
+pub(crate) use gp_support::lie_derivative_variance_with_work;
 /// IIT falsifiable-prediction test: does coupling hypothesis memory into
 /// experiment selection track measurable integration (Φ)? See
 /// `iit_coupling.rs` module docs.
@@ -1579,7 +1583,7 @@ mod tests {
 
     #[test]
     fn test_lorenz_trajectory_generated() {
-        let (times, states) = rk45_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 10.0, 0.01);
+        let (times, states) = rk4_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 10.0, 0.01);
         assert!(times.len() > 100, "should have many time steps");
         assert_eq!(states[0].len(), 3, "Lorenz is 3D");
         // After transient, z should be positive (attractor lives at z > 0)
@@ -3830,6 +3834,7 @@ mod tests {
             mean_value: 1.0,
             complexity: 3,
             symbolically_proven: false,
+            discovery_mode: AutonomousDiscoveryMode::Primed,
         }];
 
         engine.ingest_autonomous_invariants("autonomous_numeric", MathDomain::Physics, &invariants);
@@ -5491,7 +5496,7 @@ mod tests {
     #[test]
     fn test_virial_theorem_kepler() {
         // Integrate Kepler orbit for many periods to get good time averages
-        let (_, states) = rk45_trajectory(kepler_rhs, &[1.0, 0.0, 0.0, 0.8], 50.0, 0.001);
+        let (_, states) = rk4_trajectory(kepler_rhs, &[1.0, 0.0, 0.0, 0.8], 50.0, 0.001);
 
         // Kinetic energy: T = ½(vx² + vy²)
         let kinetic = |s: &[f64]| 0.5 * (s[2] * s[2] + s[3] * s[3]);
@@ -5799,7 +5804,7 @@ mod tests {
         fn rhs(s: &[f64], _t: f64) -> Vec<f64> {
             vec![s[0] * (1.0 - s[1]), s[1] * (s[0] - 1.0)]
         }
-        let (_t, states) = rk45_trajectory(rhs, &[2.0, 1.0], 30.0, 0.005);
+        let (_t, states) = rk4_trajectory(rhs, &[2.0, 1.0], 30.0, 0.005);
         eprintln!("LV trajectory: {} states", states.len());
         assert!(states.len() > 100);
 

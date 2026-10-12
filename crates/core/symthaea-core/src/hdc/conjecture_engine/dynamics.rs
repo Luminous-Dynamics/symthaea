@@ -1,34 +1,151 @@
 use super::*;
 
-pub(crate) fn rk45_trajectory(
+/// Maximum integration work accepted by the general conjecture-engine sampler.
+const MAX_RK4_STEPS_PER_TRAJECTORY: f64 = 100_000.0;
+const MAX_RK4_STATE_DIMENSION: usize = 4_096;
+const MAX_RK4_STATE_UPDATES_PER_TRAJECTORY: f64 = 10_000_000.0;
+
+/// Counters emitted by the shared RK4 integrator. Failed runs retain the work
+/// already performed, so rejected integrations are not silently counted as free.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Rk4TrajectoryWorkV1 {
+    pub(crate) attempted_steps: u64,
+    pub(crate) completed_steps: u64,
+    pub(crate) rhs_evaluations: u64,
+    pub(crate) state_updates: u64,
+    pub(crate) completed: bool,
+}
+
+fn evaluate_rk4_rhs(
+    f: &impl Fn(&[f64], f64) -> Vec<f64>,
+    state: &[f64],
+    time: f64,
+    dimension: usize,
+    work: &mut Rk4TrajectoryWorkV1,
+) -> Option<Vec<f64>> {
+    if state.len() != dimension
+        || state.iter().any(|value| !value.is_finite())
+        || !time.is_finite()
+    {
+        return None;
+    }
+    work.rhs_evaluations += 1;
+    let output = f(state, time);
+    if output.len() != dimension || output.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    Some(output)
+}
+
+/// Historical pair-returning wrapper retained for existing callers.
+pub(crate) fn rk4_trajectory(
     f: impl Fn(&[f64], f64) -> Vec<f64>,
     y0: &[f64],
     t_end: f64,
     dt: f64,
 ) -> (Vec<f64>, Vec<Vec<f64>>) {
-    let mut t = 0.0;
-    let mut y = y0.to_vec();
-    let mut times = vec![t];
-    let mut states = vec![y.clone()];
-    let dim = y0.len();
-
-    while t < t_end {
-        let h = dt.min(t_end - t);
-        let k1 = f(&y, t);
-        let y2: Vec<f64> = (0..dim).map(|i| y[i] + h * 0.5 * k1[i]).collect();
-        let k2 = f(&y2, t + 0.5 * h);
-        let y3: Vec<f64> = (0..dim).map(|i| y[i] + h * 0.5 * k2[i]).collect();
-        let k3 = f(&y3, t + 0.5 * h);
-        let y4: Vec<f64> = (0..dim).map(|i| y[i] + h * k3[i]).collect();
-        let k4 = f(&y4, t + h);
-        for i in 0..dim {
-            y[i] += h / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
-        }
-        t += h;
-        times.push(t);
-        states.push(y.clone());
-    }
+    let (times, states, _work) = rk4_trajectory_with_work(f, y0, t_end, dt);
     (times, states)
+}
+
+/// Fixed-step fourth-order Runge–Kutta trajectory generator (RK4), with exact
+/// counts for attempted/completed steps, RHS evaluations, and state updates.
+///
+/// Invalid inputs, excessive work, malformed/non-finite RHS values, or numerical
+/// overflow return an empty trajectory with the work completed before rejection.
+pub(crate) fn rk4_trajectory_with_work(
+    f: impl Fn(&[f64], f64) -> Vec<f64>,
+    y0: &[f64],
+    t_end: f64,
+    dt: f64,
+) -> (Vec<f64>, Vec<Vec<f64>>, Rk4TrajectoryWorkV1) {
+    let mut work = Rk4TrajectoryWorkV1::default();
+    let dimension = y0.len();
+    if dimension == 0
+        || dimension > MAX_RK4_STATE_DIMENSION
+        || y0.iter().any(|value| !value.is_finite())
+        || !t_end.is_finite()
+        || t_end < 0.0
+        || !dt.is_finite()
+        || dt <= 0.0
+    {
+        return (Vec::new(), Vec::new(), work);
+    }
+    if t_end == 0.0 {
+        work.completed = true;
+        return (vec![0.0], vec![y0.to_vec()], work);
+    }
+
+    let estimated_steps = (t_end / dt).ceil();
+    let estimated_updates = estimated_steps * dimension as f64;
+    if !estimated_steps.is_finite()
+        || estimated_steps < 1.0
+        || estimated_steps > MAX_RK4_STEPS_PER_TRAJECTORY
+        || estimated_updates > MAX_RK4_STATE_UPDATES_PER_TRAJECTORY
+    {
+        return (Vec::new(), Vec::new(), work);
+    }
+    let max_steps = estimated_steps as usize;
+    let mut state = y0.to_vec();
+    let mut times = Vec::with_capacity(max_steps.saturating_add(1));
+    let mut states = Vec::with_capacity(max_steps.saturating_add(1));
+    times.push(0.0);
+    states.push(state.clone());
+
+    for step in 0..max_steps {
+        let t = (step as f64 * dt).min(t_end);
+        if t >= t_end {
+            break;
+        }
+        let next_t = if step + 1 == max_steps {
+            t_end
+        } else {
+            ((step + 1) as f64 * dt).min(t_end)
+        };
+        let h = next_t - t;
+        if !h.is_finite() || h <= 0.0 || t + h <= t {
+            return (Vec::new(), Vec::new(), work);
+        }
+        work.attempted_steps += 1;
+
+        let Some(k1) = evaluate_rk4_rhs(&f, &state, t, dimension, &mut work) else {
+            return (Vec::new(), Vec::new(), work);
+        };
+        let y2: Vec<f64> = (0..dimension).map(|i| state[i] + h * 0.5 * k1[i]).collect();
+        let Some(k2) = evaluate_rk4_rhs(&f, &y2, t + 0.5 * h, dimension, &mut work) else {
+            return (Vec::new(), Vec::new(), work);
+        };
+        let y3: Vec<f64> = (0..dimension).map(|i| state[i] + h * 0.5 * k2[i]).collect();
+        let Some(k3) = evaluate_rk4_rhs(&f, &y3, t + 0.5 * h, dimension, &mut work) else {
+            return (Vec::new(), Vec::new(), work);
+        };
+        let y4: Vec<f64> = (0..dimension).map(|i| state[i] + h * k3[i]).collect();
+        let Some(k4) = evaluate_rk4_rhs(&f, &y4, t + h, dimension, &mut work) else {
+            return (Vec::new(), Vec::new(), work);
+        };
+
+        for i in 0..dimension {
+            state[i] += h / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
+        }
+        // Count the state arithmetic actually performed, including a step that
+        // overflows and is then rejected before it can be marked completed.
+        work.state_updates = work.state_updates.saturating_add(dimension as u64);
+        if state.iter().any(|value| !value.is_finite()) {
+            return (Vec::new(), Vec::new(), work);
+        }
+        work.completed_steps += 1;
+        times.push(next_t);
+        states.push(state.clone());
+        if next_t == t_end {
+            break;
+        }
+    }
+
+    if times.last().copied() != Some(t_end) {
+        return (Vec::new(), Vec::new(), work);
+    }
+    work.completed = true;
+    (times, states, work)
 }
 
 pub(crate) fn lorenz_rhs(s: &[f64], _t: f64) -> Vec<f64> {
@@ -176,4 +293,91 @@ pub fn check_virial_theorem(
     let mean = ratios.iter().sum::<f64>() / ratios.len() as f64;
     let var = ratios.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / ratios.len() as f64;
     (mean, var)
+}
+
+
+#[cfg(test)]
+mod bounded_rk4_trajectory_tests {
+    use super::{rk4_trajectory, rk4_trajectory_with_work};
+
+    fn constant_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+        vec![1.0; state.len()]
+    }
+
+    #[test]
+    fn indexed_rk4_reaches_exact_non_binary_endpoints() {
+        for (t_end, dt) in [(4.0, 0.01), (1.0, 0.1)] {
+            let (times, states) = rk4_trajectory(constant_rhs, &[0.0], t_end, dt);
+            assert!(!times.is_empty());
+            assert_eq!(times.last().copied(), Some(t_end));
+            assert_eq!(states.len(), times.len());
+            assert!((states.last().unwrap()[0] - t_end).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn invalid_timing_or_rhs_fails_closed_without_partial_trajectory() {
+        let (times, states) = rk4_trajectory(constant_rhs, &[0.0], 1.0, 0.0);
+        assert!(times.is_empty());
+        assert!(states.is_empty());
+
+        let (times, states) = rk4_trajectory(|_state, _time| vec![f64::NAN], &[0.0], 1.0, 0.1);
+        assert!(times.is_empty());
+        assert!(states.is_empty());
+
+        let (times, states) = rk4_trajectory(|_state, _time| vec![], &[0.0], 1.0, 0.1);
+        assert!(times.is_empty());
+        assert!(states.is_empty());
+    }
+
+    #[test]
+    fn successful_work_counters_match_completed_rk4_steps() {
+        let (times, states, work) = rk4_trajectory_with_work(constant_rhs, &[0.0, 1.0], 1.0, 0.1);
+        assert!(work.completed);
+        assert_eq!(work.attempted_steps, work.completed_steps);
+        assert_eq!(work.completed_steps as usize, states.len() - 1);
+        assert_eq!(times.len(), states.len());
+        assert_eq!(work.rhs_evaluations, work.completed_steps * 4);
+        assert_eq!(work.state_updates, work.completed_steps * 2);
+    }
+
+    #[test]
+    fn failed_work_counters_preserve_rhs_calls_without_partial_trajectory() {
+        let (times, states, work) = rk4_trajectory_with_work(
+            |_state, time| if time == 0.0 { vec![1.0] } else { vec![f64::NAN] },
+            &[0.0],
+            1.0,
+            0.1,
+        );
+        assert!(times.is_empty());
+        assert!(states.is_empty());
+        assert!(!work.completed);
+        assert_eq!(work.attempted_steps, 1);
+        assert_eq!(work.completed_steps, 0);
+        assert_eq!(work.rhs_evaluations, 2);
+        assert_eq!(work.state_updates, 0);
+    }
+
+    #[test]
+    fn overflowed_state_update_work_is_counted_before_rejection() {
+        let (_times, states, work) = rk4_trajectory_with_work(
+            |state, _time| vec![f64::MAX; state.len()],
+            &[0.0],
+            1.0,
+            0.1,
+        );
+        assert!(states.is_empty());
+        assert!(!work.completed);
+        assert_eq!(work.attempted_steps, 1);
+        assert_eq!(work.completed_steps, 0);
+        assert_eq!(work.rhs_evaluations, 4);
+        assert_eq!(work.state_updates, 1);
+    }
+
+    #[test]
+    fn excessive_step_budget_is_rejected_before_allocation() {
+        let (times, states) = rk4_trajectory(constant_rhs, &[0.0], 1.0e9, 1.0e-6);
+        assert!(times.is_empty());
+        assert!(states.is_empty());
+    }
 }
