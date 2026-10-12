@@ -885,6 +885,15 @@ mod domain_safe_simplification_tests {
     fn checked_sum_uses_lexical_binding_and_rejects_invalid_bounds() {
         let sum_k = Expr::Sum(Box::new(Expr::Var("k".into())), "k".into());
         assert_eq!(sum_k.eval_checked(&[("n", 5.0)]).unwrap(), 15.0);
+        // Closed-form triangular-number identity over the entire allowed bound grid.
+        for n in 0..=MAX_SUMMATION_UPPER_BOUND {
+            let expected = (n * (n + 1) / 2) as f64;
+            assert_eq!(
+                sum_k.eval_checked(&[("n", n as f64)]).unwrap(),
+                expected,
+                "sum(k=0..={n}) should equal n(n+1)/2",
+            );
+        }
         // The summation binder must shadow, not append behind, an outer k binding.
         assert_eq!(sum_k.eval_checked(&[("n", 5.0), ("k", 99.0)]).unwrap(), 15.0);
 
