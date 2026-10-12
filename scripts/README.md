@@ -31,6 +31,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 - `run_coding_validation.sh` - Run code-generation honesty tests and the verified HumanEval-style smoke benchmark
 - `format_summary.py` - Summary formatting
 - `generate_benchmark_report.py` - Report generation
+- `muse_style_coverage.py` - Source-derived Muse catalog/route coverage audit; `--check` fails on stale baseline drift
 - `gpu_smoke.sh` - NVIDIA/CUDA environment preflight and optional Broca CUDA smoke test
 - `post_to_dashboard.py` - Dashboard posting
 - `precompute_ethics_embeddings.py` - Ethics embeddings
@@ -59,7 +60,7 @@ python scripts/benchmark_causal_consciousness.py
 
 # Run Python smoke checks
 uv run --no-sync pytest tests/python -q
-uv run --no-sync ruff check python/symthaea_research scripts/analyze_nixos_config.py tests/python
+uv run --no-sync ruff check python/symthaea_research scripts/analyze_nixos_config.py scripts/muse_style_coverage.py tests/python
 
 # Run lane checks
 ./scripts/ci_check_lanes.sh core
