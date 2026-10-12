@@ -24,9 +24,23 @@ nix develop -c cargo run --example muse_vocal_release_gate \
 
 This uses the in-tree Kokoro and functional-singing paths. It renders the 60 fixed cases and writes WAVs, a listener manifest, and a ratings template to the shareable `--output` directory. The listener manifest includes only `clip_id`, `lyrics`, and `audio`; it omits backend, case ID, category, and challenge labels.
 
-Organizer-only artifacts are written to the sibling `audio_output/muse_vocal_gate-run-001.private/`: the backend answer key, objective report (which includes backend/case mappings), and release status. On Unix this directory is restricted to owner access (`0700`). **Share only the non-private `--output` directory with listeners; never share the `.private` sibling.** On non-Unix systems, set and verify restrictive ACLs on the private directory before sharing anything.
+Organizer-only artifacts are written to the sibling `audio_output/muse_vocal_gate-run-001.private/`: the internal manifest, backend answer key, objective report (which includes backend/case mappings), per-clip human case report, and release status. On Unix this directory is restricted to owner access (`0700`). **Share only the non-private `--output` directory with listeners; never share the `.private` sibling.** On non-Unix systems, set and verify restrictive ACLs on the private directory before sharing anything.
 
-Each run requires fresh, empty `--output` and `.private` directories. The gate rejects symlink output paths, checks that the canonical directories are separate and non-nested, and fails closed if either contains files, preventing stale WAVs/manifests from mixing across runs. Archive earlier run directories rather than reusing or deleting them. When upgrading an older output directory, any legacy answer key/report/status found in it is moved to the private sibling, then the run stops if that private directory is non-empty; archive those artifacts and choose a fresh run-specific output path to proceed. This is a test harness, not evidence of passing quality by itself.
+Each new render run requires fresh, empty `--output` and `.private` directories. The gate rejects symlink output paths, checks that the canonical directories are separate and non-nested, and fails closed if either contains files, preventing stale WAVs/manifests from mixing across runs. Archive earlier run directories rather than reusing or deleting them. When upgrading an older output directory, legacy answer-key, internal-manifest, objective-report, per-clip-report, or release-status files are moved to the private sibling without overwriting existing evidence; the run then stops because the private directory is non-empty. Archive that prior run and select a fresh run-specific path. The dedicated `--ratings-only` review phase described below intentionally reuses a completed run without rendering again.
+
+## Review completed blind ratings without rerendering
+
+After listeners complete the generated template, save the filled ratings JSON **outside both** the public listening-pack directory and the `.private` sibling. Then run the ratings-only phase against the same saved run:
+
+```bash
+nix develop -c cargo run --example muse_vocal_release_gate \
+  --features "singing,voice-tts" -- \
+  --output audio_output/muse_vocal_gate-run-001 \
+  --ratings /absolute/path/ratings.completed.json \
+  --ratings-only
+```
+
+This phase does not initialize a voice backend or render audio. It validates the saved public manifest against the private internal manifest, answer key, objective report, and actual WAV files; rejects unexpected/stale files or mismatched identities; validates listener ratings; and updates only the private `human_case_report.json` and `release_status.json`. It requires the ratings file to live outside both output trees. You can rerun it with revised ratings without changing the blind IDs or rerendering; it preserves the exact audio/run mapping. Never distribute the private sibling.
 
 To include the optional DiffSinger worker, provision a voicebank outside the repository and point `SYMTHAEA_DIFFSINGER_VOICEBANK` at its root. The worker expects the ONNX stages and metadata under `dsmain/`, `dsvariance/`, and `dsvocoder/`; it does not download models or validate voicebank licensing for you. Then run:
 
