@@ -170,13 +170,13 @@ jobs:
                   stream.write("\n")
               stream.write("## Tonic target fidelity and candidate invariance by style\n\n")
               stream.write(
+                  "Tonic target fidelity is an explicit requested-versus-realized pitch-class match. "
+                  "Invariant-layer deviations are diagnostic only; other controls remain not_predeclared.\n\n"
+              )
                   "| Style | Requested tonic matched | Candidate invariant-layer deviations |\n"
               )
               stream.write("|---|---:|---|\n")
               stream.write(
-                  "Tonic target fidelity is an explicit requested-versus-realized pitch-class match. "
-                  "Invariant-layer deviations are diagnostic only; other controls remain not_predeclared.\n\n"
-              )
               for profile in report["profiles"]:
                   tonic_curves = [
                       curve for curve in profile["curves"] if curve["control"] == "tonic"
