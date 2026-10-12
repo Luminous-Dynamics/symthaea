@@ -20,6 +20,15 @@ MAX_RELEASE_EPSILON = 1.0
 MAX_RELEASE_DELTA = 1e-6
 
 
+def _is_finite_number(value: object) -> bool:
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
+
+
 class ReleasePolicyError(ValueError):
     """A proposed aggregate release violates privacy policy."""
 
@@ -51,14 +60,12 @@ class ReleasePolicyGuard:
         minimum_cohort_size: int = MINIMUM_COHORT_SIZE,
     ) -> None:
         if (
-            type(max_epsilon_per_participant) not in (int, float)
-            or not math.isfinite(float(max_epsilon_per_participant))
+            not _is_finite_number(max_epsilon_per_participant)
             or max_epsilon_per_participant <= 0
         ):
             raise ValueError("max_epsilon_per_participant must be finite and positive")
         if (
-            type(max_delta_per_participant) not in (int, float)
-            or not math.isfinite(float(max_delta_per_participant))
+            not _is_finite_number(max_delta_per_participant)
             or max_delta_per_participant < 0
         ):
             raise ValueError("max_delta_per_participant must be finite and non-negative")
@@ -93,14 +100,12 @@ class ReleasePolicyGuard:
         if epsilon is None and delta is None:
             return
         if (
-            type(epsilon) not in (int, float)
-            or not math.isfinite(float(epsilon))
+            not _is_finite_number(epsilon)
             or not 0 < epsilon <= MAX_RELEASE_EPSILON
         ):
             raise ReleasePolicyError(f"epsilon must be finite and in (0,{MAX_RELEASE_EPSILON}]")
         if (
-            type(delta) not in (int, float)
-            or not math.isfinite(float(delta))
+            not _is_finite_number(delta)
             or not 0 <= delta <= MAX_RELEASE_DELTA
         ):
             raise ReleasePolicyError(f"delta must be finite and in [0,{MAX_RELEASE_DELTA}]")

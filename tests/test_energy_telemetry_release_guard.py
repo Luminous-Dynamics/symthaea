@@ -122,6 +122,14 @@ class ReleasePolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ReleasePolicyError, "end_utc must be later"):
             self.submit(start=self.b, end=self.a)
 
+    def test_extremely_large_epsilon_fails_closed_without_overflow(self):
+        with self.assertRaisesRegex(ReleasePolicyError, "epsilon must be finite"):
+            self.submit(recipient="approved_research", epsilon=10 ** 10000, delta=0.0)
+
+    def test_extremely_large_budget_configuration_fails_closed_without_overflow(self):
+        with self.assertRaisesRegex(ValueError, "max_epsilon_per_participant"):
+            ReleasePolicyGuard(max_epsilon_per_participant=10 ** 10000)
+
 
 if __name__ == "__main__":
     unittest.main()
