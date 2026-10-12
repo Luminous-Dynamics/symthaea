@@ -304,64 +304,108 @@ mod capability_report_tests {
         }
         assert!(report.supports_storage_binding(4));
 
-        const SHADER: &str = r#"
-@group(0) @binding(0) var<storage, read_write> result: array<u32>;
+        // Exercise a real HDC primitive rather than a constant-write shader.
+        // 257 elements force a partial final workgroup (5 * 64 invocations).
+        const ELEMENTS: usize = 257;
+        const BYTES: u64 = (ELEMENTS * std::mem::size_of::<u32>()) as u64;
+        let left: Vec<u32> = (0..ELEMENTS)
+            .map(|i| 0x9E37_79B9u32.wrapping_mul((i as u32).wrapping_add(1)))
+            .collect();
+        let right: Vec<u32> = (0..ELEMENTS)
+            .map(|i| (!(i as u32)).rotate_left((i % 31) as u32))
+            .collect();
+        let expected: Vec<u32> = left.iter().zip(&right).map(|(a, b)| a ^ b).collect();
 
-@compute @workgroup_size(1)
-fn main() {
-    result[0] = 0x00C0FFEEu;
+        const SHADER: &str = r#"
+@group(0) @binding(0) var<storage, read> left: array<u32>;
+@group(0) @binding(1) var<storage, read> right: array<u32>;
+@group(0) @binding(2) var<storage, read_write> result: array<u32>;
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let index = global_id.x;
+    if (index >= arrayLength(&result)) {
+        return;
+    }
+    result[index] = left[index] ^ right[index];
 }
 "#;
 
         let shader = context.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Symthaea GPU smoke shader"),
+            label: Some("Symthaea HDC XOR smoke shader"),
             source: wgpu::ShaderSource::Wgsl(SHADER.into()),
         });
         let pipeline = context.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("Symthaea GPU smoke pipeline"),
+            label: Some("Symthaea HDC XOR smoke pipeline"),
             layout: None,
             module: &shader,
             entry_point: Some("main"),
             compilation_options: Default::default(),
             cache: None,
         });
-        let storage = context.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Symthaea GPU smoke storage"),
-            size: 4,
+        let left_buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Symthaea HDC XOR left input"),
+            size: BYTES,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let right_buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Symthaea HDC XOR right input"),
+            size: BYTES,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let output_buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Symthaea HDC XOR output"),
+            size: BYTES,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
         let readback = context.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Symthaea GPU smoke readback"),
-            size: 4,
+            label: Some("Symthaea HDC XOR readback"),
+            size: BYTES,
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        context.queue.write_buffer(&left_buffer, 0, bytemuck::cast_slice(&left));
+        context.queue.write_buffer(&right_buffer, 0, bytemuck::cast_slice(&right));
+
         let bind_group_layout = pipeline.get_bind_group_layout(0);
         let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Symthaea GPU smoke bindings"),
+            label: Some("Symthaea HDC XOR bindings"),
             layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: storage.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: left_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: right_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: output_buffer.as_entire_binding(),
+                },
+            ],
         });
 
-        let mut encoder = context
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Symthaea GPU smoke commands"),
-            });
+        let mut encoder =
+            context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Symthaea HDC XOR commands"),
+                });
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("Symthaea GPU smoke pass"),
+                label: Some("Symthaea HDC XOR pass"),
                 timestamp_writes: None,
             });
             pass.set_pipeline(&pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
-            pass.dispatch_workgroups(1, 1, 1);
+            pass.dispatch_workgroups(5, 1, 1);
         }
-        encoder.copy_buffer_to_buffer(&storage, 0, &readback, 0, 4);
+        encoder.copy_buffer_to_buffer(&output_buffer, 0, &readback, 0, BYTES);
         context.queue.submit(Some(encoder.finish()));
 
         let (sender, receiver) = std::sync::mpsc::channel();
@@ -381,8 +425,12 @@ fn main() {
             .expect("Vulkan readback buffer should map");
 
         let bytes = readback.slice(..).get_mapped_range();
-        let actual = u32::from_le_bytes(bytes[0..4].try_into().expect("four-byte output"));
-        assert_eq!(actual, 0x00C0_FFEE, "GPU dispatch output mismatch");
+        let actual: Vec<u32> = bytes
+            .chunks_exact(4)
+            .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+        assert_eq!(actual.len(), ELEMENTS);
+        assert_eq!(actual, expected, "GPU HDC XOR output differs from CPU oracle");
         drop(bytes);
         readback.unmap();
     }
