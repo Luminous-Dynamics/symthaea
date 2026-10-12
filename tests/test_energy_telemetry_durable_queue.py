@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -262,6 +263,26 @@ class DurableQueueTests(unittest.TestCase):
             DurableTelemetryQueue(self.database, max_records=99_999)
         with self.assertRaisesRegex(TelemetryQueueError, "configuration mismatch"):
             DurableTelemetryQueue(self.database, max_future_skew_seconds=299)
+
+    def test_schema_v1_migrates_transactionally_to_v2(self):
+        with sqlite3.connect(self.database) as db:
+            db.execute("DROP TABLE telemetry_queue_config")
+            db.execute("PRAGMA user_version = 1")
+        migrated = self.reopen()
+        self.assertEqual(migrated.integrity_check(), "ok")
+        with sqlite3.connect(self.database) as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+            config = db.execute(
+                "SELECT max_queue_bytes, max_records, max_future_skew_seconds "
+                "FROM telemetry_queue_config WHERE singleton = 1"
+            ).fetchone()
+        self.assertEqual(config, (1000, 100_000, 300))
+
+    def test_unknown_schema_version_fails_closed(self):
+        with sqlite3.connect(self.database) as db:
+            db.execute("PRAGMA user_version = 999")
+        with self.assertRaisesRegex(TelemetryQueueError, "unsupported telemetry queue schema"):
+            self.reopen()
 
     def test_nonfinite_busy_timeout_is_rejected(self):
         for timeout in (float("nan"), float("inf"), float("-inf"), 0, -1):
