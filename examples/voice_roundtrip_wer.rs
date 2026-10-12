@@ -28,6 +28,7 @@
 //! intelligibility-optimized. The point is the number and its trend, not
 //! flattery.
 
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -465,10 +466,35 @@ fn main() -> anyhow::Result<()> {
         arg_value(&args, "--worker")
             .unwrap_or_else(|| "communication/worker/run_whisper_nixos.sh".to_string()),
     );
-    let report_path = arg_value(&args, "--report");
+    let report_path = arg_value(&args, "--report").map(PathBuf::from);
     let save_wavs = arg_value(&args, "--save-wavs").map(PathBuf::from);
     if let Some(ref dir) = save_wavs {
-        std::fs::create_dir_all(dir)?;
+        if dir.is_symlink() {
+            anyhow::bail!("--save-wavs directory must not be a symlink: {}", dir.display());
+        }
+        if dir.exists() {
+            if !dir.is_dir() {
+                anyhow::bail!("--save-wavs path is not a directory: {}", dir.display());
+            }
+            if std::fs::read_dir(dir)?.next().is_some() {
+                anyhow::bail!(
+                    "--save-wavs directory must be empty to prevent stale/mixed clips: {}",
+                    dir.display()
+                );
+            }
+        } else {
+            std::fs::create_dir_all(dir)?;
+        }
+    }
+    if let Some(ref path) = report_path {
+        if path.exists() || path.is_symlink() {
+            anyhow::bail!("--report refuses to overwrite an existing path: {}", path.display());
+        }
+    }
+    if let (Some(report), Some(audio_dir)) = (&report_path, &save_wavs) {
+        if report == audio_dir || report.starts_with(audio_dir) || audio_dir.starts_with(report) {
+            anyhow::bail!("--report and --save-wavs must use separate, non-nested paths");
+        }
     }
 
     // Diagnostic knobs (voice plan live-fire follow-up): isolate WHERE
@@ -791,8 +817,18 @@ fn main() -> anyhow::Result<()> {
             "mean_wer": mean_wer,
             "sentences": rows,
         });
-        std::fs::write(&path, serde_json::to_string_pretty(&report)?)?;
-        println!("  Report written to {path}");
+        let serialized = serde_json::to_vec_pretty(&report)?;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|error| anyhow::anyhow!(
+                "cannot create report without overwriting existing evidence at {}: {error}",
+                path.display()
+            ))?;
+        file.write_all(&serialized)?;
+        file.write_all(b"\n")?;
+        println!("  Report written to {}", path.display());
     }
 
     if !complete {
