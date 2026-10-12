@@ -2323,10 +2323,17 @@ mod tests {
             Px4ExternalModeArmingCheckError::DigestMismatch("arming-check source payload",)
         );
 
-        let mut mutated_event = reply;
+        let mut mutated_event = reply.clone();
         mutated_event.events[0].arguments[24] ^= 1;
         assert_eq!(
             mutated_event.validate().unwrap_err(),
+            Px4ExternalModeArmingCheckError::DigestMismatch("arming-check source payload",)
+        );
+
+        let mut mutated_event_timestamp = reply;
+        mutated_event_timestamp.events[0].timestamp_us_raw -= 1;
+        assert_eq!(
+            mutated_event_timestamp.validate().unwrap_err(),
             Px4ExternalModeArmingCheckError::DigestMismatch("arming-check source payload",)
         );
     }
