@@ -308,17 +308,35 @@ mod capability_report_tests {
         }
         assert!(report.supports_storage_binding(4));
 
-        // Exercise a real HDC primitive rather than a constant-write shader.
-        // 257 elements force a partial final workgroup (5 * 64 invocations).
-        const ELEMENTS: usize = 257;
+        // Exercise Symthaea's actual BinaryHV bind implementation as the CPU
+        // oracle. The first 512 words cover one complete 16,384-bit BinaryHV;
+        // one extra sentinel word forces a masked partial final workgroup.
+        use crate::hdc::binary_hv::BinaryHV;
+        const VECTOR_WORDS: usize = BinaryHV::BYTES / std::mem::size_of::<u32>();
+        const ELEMENTS: usize = VECTOR_WORDS + 1;
         const BYTES: u64 = (ELEMENTS * std::mem::size_of::<u32>()) as u64;
-        let left: Vec<u32> = (0..ELEMENTS)
-            .map(|i| 0x9E37_79B9u32.wrapping_mul((i as u32).wrapping_add(1)))
+
+        let left_hv = BinaryHV::random(0x5348_4456);
+        let right_hv = BinaryHV::random(0x4844_4342);
+        let bound_hv = left_hv.bind(&right_hv);
+        let mut left: Vec<u32> = left_hv
+            .0
+            .chunks_exact(4)
+            .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
             .collect();
-        let right: Vec<u32> = (0..ELEMENTS)
-            .map(|i| (!(i as u32)).rotate_left((i % 31) as u32))
+        let mut right: Vec<u32> = right_hv
+            .0
+            .chunks_exact(4)
+            .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
             .collect();
-        let expected: Vec<u32> = left.iter().zip(&right).map(|(a, b)| a ^ b).collect();
+        let mut expected: Vec<u32> = bound_hv
+            .0
+            .chunks_exact(4)
+            .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+        left.push(0xA55A_1234);
+        right.push(0x5AA5_FEDC);
+        expected.push(left[VECTOR_WORDS] ^ right[VECTOR_WORDS]);
 
         const SHADER: &str = r#"
 @group(0) @binding(0) var<storage, read> left: array<u32>;
