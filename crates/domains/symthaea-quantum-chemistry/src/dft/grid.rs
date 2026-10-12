@@ -62,8 +62,16 @@ impl DftGrid {
                 let r = r_bs * (1.0 + xi) / (1.0 - xi); // Becke mapping
                 let dr = 2.0 * r_bs / ((1.0 - xi) * (1.0 - xi)); // dr/dxi
 
-                let radial_weight =
-                    PI / (n_radial as f64 + 1.0) * (1.0 - xi * xi).sqrt() * r * r * dr;
+                // Lebedev angular weights are normalized to sum to 1, so include
+                // the full solid angle here to represent the 3D volume element.
+                let radial_weight = 4.0
+                    * PI
+                    * PI
+                    / (n_radial as f64 + 1.0)
+                    * (1.0 - xi * xi).sqrt()
+                    * r
+                    * r
+                    * dr;
 
                 // Angular grid
                 for &(theta_x, theta_y, theta_z, ang_weight) in &angular_points {
@@ -166,7 +174,7 @@ fn bragg_slater_radius(z: u8) -> f64 {
 /// 6-point Lebedev grid (octahedral symmetry).
 /// Returns (x, y, z, weight) for points on the unit sphere.
 fn lebedev_6() -> Vec<(f64, f64, f64, f64)> {
-    let w = 1.0 / 6.0; // 4π/6 normalized to sum=4π... actually sum of weights = 4π
+    let w = 1.0 / 6.0; // Normalized angular weights sum to 1; the radial weight carries 4π.
     // For integration: Σ w_i f(r_i) ≈ ∫ f dΩ / (4π), so w_i should sum to 1
     // We normalize so Σ w = 1 (weights are for ∫ f(Ω) dΩ/(4π))
     vec![
@@ -410,22 +418,88 @@ mod tests {
             );
         }
 
-        // 4. Quartic moment identity: x^2+y^2+z^2=1 pointwise on the unit
-        // sphere, so squaring and integrating gives
-        // E[x^4]+E[y^4]+E[z^4] + 2*(E[x^2y^2]+E[x^2z^2]+E[y^2z^2]) = E[1] = 1
-        // exactly -- a real constraint any degree->=4-exact rule must
-        // satisfy, derived here, not looked up.
-        let e_x4: f64 = pts.iter().map(|&(x, _, _, w)| w * x.powi(4)).sum();
-        let e_y4: f64 = pts.iter().map(|&(_, y, _, w)| w * y.powi(4)).sum();
-        let e_z4: f64 = pts.iter().map(|&(_, _, z, w)| w * z.powi(4)).sum();
-        let e_x2y2: f64 = pts.iter().map(|&(x, y, _, w)| w * x * x * y * y).sum();
-        let e_x2z2: f64 = pts.iter().map(|&(x, _, z, w)| w * x * x * z * z).sum();
-        let e_y2z2: f64 = pts.iter().map(|&(_, y, z, w)| w * y * y * z * z).sum();
-        let quartic_identity = e_x4 + e_y4 + e_z4 + 2.0 * (e_x2y2 + e_x2z2 + e_y2z2);
+        // Weight normalization and unit-sphere checks are structural invariants.
+        // They do not establish a rule's polynomial exactness; see the explicit
+        // analytic spherical-moment tests below for that stronger contract.
+    }
+
+    /// Integrate a monomial using normalized spherical weights.
+    fn weighted_spherical_moment(
+        pts: &[(f64, f64, f64, f64)],
+        powers: [i32; 3],
+    ) -> f64 {
+        pts.iter()
+            .map(|&(x, y, z, w)| {
+                w * x.powi(powers[0]) * y.powi(powers[1]) * z.powi(powers[2])
+            })
+            .sum()
+    }
+
+    fn assert_spherical_moment(
+        pts: &[(f64, f64, f64, f64)],
+        powers: [i32; 3],
+        exact: f64,
+        label: &str,
+    ) {
+        let numerical = weighted_spherical_moment(pts, powers);
         assert!(
-            (quartic_identity - 1.0).abs() < 1e-10,
-            "{label}: quartic identity = {quartic_identity}, expected 1"
+            (numerical - exact).abs() < 2e-10,
+            "{label}: moment x^{} y^{} z^{} = {numerical:.15e}, expected {exact:.15e}",
+            powers[0],
+            powers[1],
+            powers[2],
         );
+    }
+
+    #[test]
+    fn test_lebedev_rules_match_their_spherical_moment_exactness() {
+        // For the normalized uniform-sphere measure,
+        // E[x^(2a)y^(2b)z^(2c)] = ((2a-1)!!(2b-1)!!(2c-1)!!)
+        //                                   / (2(a+b+c)+1)!!.
+        // These are independent analytic targets; sphere membership plus a
+        // weight sum of one alone cannot catch a wrong Lebedev orbit weight.
+        let lebedev6 = lebedev_6();
+        for (powers, exact) in [
+            ([2, 0, 0], 1.0 / 3.0),
+            ([0, 2, 0], 1.0 / 3.0),
+            ([0, 0, 2], 1.0 / 3.0),
+        ] {
+            assert_spherical_moment(&lebedev6, powers, exact, "Lebedev-6 (degree 3)");
+        }
+
+        // Lebedev-26 is degree 7 exact.
+        let lebedev26 = lebedev_26();
+        for (powers, exact) in [
+            ([2, 0, 0], 1.0 / 3.0),
+            ([4, 0, 0], 1.0 / 5.0),
+            ([2, 2, 0], 1.0 / 15.0),
+            ([6, 0, 0], 1.0 / 7.0),
+            ([4, 2, 0], 1.0 / 35.0),
+            ([2, 2, 2], 1.0 / 105.0),
+        ] {
+            assert_spherical_moment(&lebedev26, powers, exact, "Lebedev-26 (degree 7)");
+        }
+
+        // Lebedev-50 is degree 11 exact; the higher moments exercise its
+        // 24-point (p,p,q) orbit as well as the shared lower-order orbits.
+        let lebedev50 = lebedev_50();
+        for (powers, exact) in [
+            ([2, 0, 0], 1.0 / 3.0),
+            ([4, 0, 0], 1.0 / 5.0),
+            ([2, 2, 0], 1.0 / 15.0),
+            ([6, 0, 0], 1.0 / 7.0),
+            ([4, 2, 0], 1.0 / 35.0),
+            ([2, 2, 2], 1.0 / 105.0),
+            ([8, 0, 0], 1.0 / 9.0),
+            ([6, 2, 0], 1.0 / 63.0),
+            ([4, 4, 0], 1.0 / 105.0),
+            ([10, 0, 0], 1.0 / 11.0),
+            ([8, 2, 0], 1.0 / 99.0),
+            ([6, 4, 0], 1.0 / 231.0),
+            ([4, 4, 2], 1.0 / 1155.0),
+        ] {
+            assert_spherical_moment(&lebedev50, powers, exact, "Lebedev-50 (degree 11)");
+        }
     }
 
     #[test]
@@ -456,6 +530,208 @@ mod tests {
                 let (x2, y2, z2, _) = pts[j];
                 let d2 = (x1 - x2).powi(2) + (y1 - y2).powi(2) + (z1 - z2).powi(2);
                 assert!(d2 > 1e-12, "duplicate points at indices {i} and {j}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_radial_grid_resolves_diffuse_and_tight_gaussians_by_quality() {
+        // For every alpha > 0, ∫ exp(-alpha*r²) d³r = π^(3/2)/alpha^(3/2).
+        // Sweep multiple length scales to exercise both the radial mapping and
+        // the quality presets instead of validating only one specially chosen
+        // Gaussian. Tolerances are relative and deliberately tighter for
+        // the denser presets; they do not tune SCF or chemical-energy criteria.
+        let atom = Atom::new(1, 0.0, 0.0, 0.0);
+        let cases = [
+            (GridQuality::Coarse, 5e-4),
+            (GridQuality::Medium, 5e-6),
+            (GridQuality::Fine, 1e-7),
+        ];
+        let alphas = [0.25_f64, 0.5, 1.0, 2.0, 4.0];
+
+        for (quality, relative_tolerance) in cases {
+            let grid = DftGrid::build(&[atom], quality);
+            for alpha in alphas {
+                let numerical: f64 = grid
+                    .points
+                    .iter()
+                    .map(|point| {
+                        let r2 =
+                            point.x * point.x + point.y * point.y + point.z * point.z;
+                        point.weight * (-alpha * r2).exp()
+                    })
+                    .sum();
+                let exact = PI.powf(1.5) / alpha.powf(1.5);
+                let relative_error = (numerical - exact).abs() / exact;
+                assert!(
+                    relative_error <= relative_tolerance,
+                    "{quality:?}, alpha={alpha}: integral={numerical}, exact={exact}, relative error={relative_error}, tolerance={relative_tolerance}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_single_atom_grid_integrates_three_dimensional_gaussian() {
+        // ∫ exp(-r²) d³r = π^(3/2). This also detects a missing 4π
+        // factor when the angular Lebedev weights are normalized to sum to 1.
+        let atom = Atom::new(1, 0.0, 0.0, 0.0);
+        let grid = DftGrid::build(&[atom], GridQuality::Coarse);
+        let numerical_integral: f64 = grid
+            .points
+            .iter()
+            .map(|point| {
+                let r2 = point.x * point.x + point.y * point.y + point.z * point.z;
+                point.weight * (-r2).exp()
+            })
+            .sum();
+        let exact_integral = PI.powf(1.5);
+
+        assert!(
+            (numerical_integral - exact_integral).abs() < 1e-3,
+            "3D Gaussian integral = {numerical_integral}, expected {exact_integral}"
+        );
+    }
+
+    #[test]
+    fn test_diatomic_grid_integrates_gaussians_across_becke_partition() {
+        // The integral of a sum of two unit-exponent Gaussians is independent
+        // of their centers: ∫[exp(-|r-Ra|²) + exp(-|r-Rb|²)] d³r = 2π^(3/2).
+        // Unlike the single-center test, this exercises atom-centered grids and
+        // Becke partitioning together, so a broken partition cannot hide behind
+        // a correct radial measure. Tolerances reflect the documented presets;
+        // they do not assert strict monotonic convergence for every geometry.
+        let exact_integral = 2.0 * PI.powf(1.5);
+        let cases = [
+            (GridQuality::Coarse, 7e-2),
+            (GridQuality::Medium, 1.1e-2),
+            (GridQuality::Fine, 2e-4),
+        ];
+
+        for (quality, relative_tolerance) in cases {
+            for separation in [1.0_f64, 1.4, 2.0] {
+                let atoms = [
+                    Atom::new(1, 0.0, 0.0, -separation / 2.0),
+                    Atom::new(1, 0.0, 0.0, separation / 2.0),
+                ];
+                let grid = DftGrid::build(&atoms, quality);
+                let numerical_integral: f64 = grid
+                    .points
+                    .iter()
+                    .map(|point| {
+                        atoms
+                            .iter()
+                            .map(|atom| {
+                                let dx = point.x - atom.position[0];
+                                let dy = point.y - atom.position[1];
+                                let dz = point.z - atom.position[2];
+                                (-(dx * dx + dy * dy + dz * dz)).exp()
+                            })
+                            .sum::<f64>()
+                            * point.weight
+                    })
+                    .sum();
+                let relative_error =
+                    (numerical_integral - exact_integral).abs() / exact_integral;
+
+                assert!(
+                    relative_error <= relative_tolerance,
+                    "{quality:?}, separation={separation}: integral={numerical_integral}, expected={exact_integral}, relative error={relative_error}, tolerance={relative_tolerance}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_radial_gaussian_integrals_across_atomic_radius_classes() {
+        // A radial integral's exact value is independent of the atom-centered
+        // grid scale. Exercise every distinct radius branch currently used by
+        // bragg_slater_radius, alongside diffuse and tight Gaussian profiles.
+        // This qualifies quadrature under the current scales; it does not
+        // establish that those approximate radii are chemically optimal.
+        let atomic_numbers = [1_u8, 2, 3, 6, 26];
+        let alphas = [0.25_f64, 0.5, 1.0, 2.0, 4.0];
+        let cases = [
+            (GridQuality::Coarse, 2e-3),
+            (GridQuality::Medium, 2e-6),
+            (GridQuality::Fine, 3e-8),
+        ];
+
+        for (quality, relative_tolerance) in cases {
+            for atomic_number in atomic_numbers {
+                let atom = Atom::new(atomic_number, 0.0, 0.0, 0.0);
+                let grid = DftGrid::build(&[atom], quality);
+
+                for alpha in alphas {
+                    let numerical: f64 = grid
+                        .points
+                        .iter()
+                        .map(|point| {
+                            let r2 =
+                                point.x * point.x + point.y * point.y + point.z * point.z;
+                            point.weight * (-alpha * r2).exp()
+                        })
+                        .sum();
+                    let exact = PI.powf(1.5) / alpha.powf(1.5);
+                    let relative_error = (numerical - exact).abs() / exact;
+
+                    assert!(
+                        relative_error <= relative_tolerance,
+                        "{quality:?}, Z={atomic_number}, alpha={alpha}: integral={numerical}, exact={exact}, relative error={relative_error}, tolerance={relative_tolerance}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_becke_partition_weights_are_finite_and_sum_to_one() {
+        // Partition of unity is independent of radial/angular quadrature.
+        // Exercise points near nuclei, between atoms, off-axis, and outside
+        // the molecular region for diatomic, bent triatomic, and tetrahedral
+        // geometries. The partition weights are normalized shares, not density.
+        let geometries = [
+            vec![
+                Atom::new(1, 0.0, 0.0, -0.7),
+                Atom::new(1, 0.0, 0.0, 0.7),
+            ],
+            vec![
+                Atom::new(8, 0.0, 0.0, 0.0),
+                Atom::new(1, 1.43, 0.0, 1.10),
+                Atom::new(1, -1.43, 0.0, 1.10),
+            ],
+            vec![
+                Atom::new(6, 0.0, 0.0, 0.0),
+                Atom::new(1, 1.0, 1.0, 1.0),
+                Atom::new(1, -1.0, -1.0, 1.0),
+                Atom::new(1, -1.0, 1.0, -1.0),
+            ],
+        ];
+        let probes = [
+            [0.0, 0.0, 0.0],
+            [0.1, -0.2, 0.3],
+            [1.0, 0.0, 0.0],
+            [-2.5, 0.4, 0.7],
+            [4.0, -3.0, 2.0],
+        ];
+
+        for (geometry_index, atoms) in geometries.iter().enumerate() {
+            for point in probes {
+                let weights: Vec<f64> = (0..atoms.len())
+                    .map(|atom_idx| {
+                        becke_partition_weight(atom_idx, point[0], point[1], point[2], atoms)
+                    })
+                    .collect();
+                let total: f64 = weights.iter().sum();
+
+                assert!(
+                    weights.iter().all(|w| w.is_finite() && *w >= 0.0 && *w <= 1.0),
+                    "geometry={geometry_index}, point={point:?}: invalid partition weights {weights:?}"
+                );
+                assert!(
+                    (total - 1.0).abs() < 1e-12,
+                    "geometry={geometry_index}, point={point:?}: partition sum={total}, weights={weights:?}"
+                );
             }
         }
     }
