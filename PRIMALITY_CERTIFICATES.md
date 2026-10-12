@@ -102,3 +102,28 @@ generator produced it.
 The on-wire encoding is a transport contract, not a formalization of the Rust
 implementation. A future version should be introduced under a new magic/version
 rather than changing the meaning of version 1.
+
+
+## Standalone verifier
+
+A second implementation is provided in `tools/verify_math_certificate.py`. It uses
+only the Python standard library and checks the serialized Pocklington evidence
+directly; it does not import the Rust crate, HDC code, or the factorization search
+engine. It supports both formats:
+
+```sh
+python3 tools/verify_math_certificate.py path/to/certificate.bin
+python3 -m unittest discover -s tests -p 'test_verify_math_certificate.py' -v
+```
+
+On success, the command emits a JSON object with `"verified": true`, the input
+value, and the verified format. Invalid certificates return a non-zero exit code
+and a JSON error on standard error. The independent verifier checks the same
+version-1 resource ceilings and demands byte-for-byte equality with its own
+canonical re-encoding. A hand-authored golden vector and malformed-input tests
+help lock down field layout independently of round-trip tests.
+
+The focused GitHub Actions workflow
+`.github/workflows/math-certificate-verifier.yml` runs Python bytecode
+compilation, the standard-library unit tests, and the CLI help check on
+`ubuntu-24.04`; it does not need Rust dependencies, network access, or secrets.
