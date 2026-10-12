@@ -204,9 +204,11 @@ fn quadratic_polynomial(expression: &Expr) -> Option<Polynomial> {
     }
 }
 
-/// Analytic oracle for the dimensionless harmonic oscillator: accept exactly the
-/// polynomial family a*(x²+v²)+b with non-zero a. This checks algebraic form,
-/// not physical truth and not the holdout criterion.
+/// Analytic coefficient-map oracle for the dimensionless harmonic oscillator.
+/// Accepts the quadratic family a*(x²+v²)+b above the explicit 1e-10 coefficient
+/// floor, with 1e-10 relative coefficient tolerance. Coefficients below 1e-12
+/// are normalized away. This classification is tolerance-qualified algebraic
+/// form, not physical truth and not the holdout criterion.
 fn is_oracle_equivalent_harmonic_energy(candidate: &AutonomousInvariant) -> bool {
     let Some(mut polynomial) = quadratic_polynomial(&candidate.formula) else {
         return false;
@@ -449,12 +451,13 @@ fn build_run_record(
             "system_id": SYSTEM_ID,
             "system_definition_canonical": SYSTEM_DEFINITION,
             "system_definition_blake3": blake3::hash(SYSTEM_DEFINITION.as_bytes()).to_hex().to_string(),
-            "oracle": "polynomial coefficient-map equivalence to a*(x^2+v^2)+b, a != 0"
+            "oracle": "degree-2 polynomial coefficient map: a*(x^2+v^2)+b; |a|>1e-10, relative coefficient tolerance 1e-10, coefficients below 1e-12 normalized to zero; unsupported expressions fail closed"
         },
         "condition": mode_name(mode),
         "discovery_seed": seed,
         "holdout_seed": holdout_seed,
-        "paired_seeds": seed != holdout_seed,
+        "paired_replicate_id": seed,
+        "discovery_holdout_seeds_distinct": seed != holdout_seed,
         "search_config": {
             "population_size": config.population_size,
             "generations": config.generations,
