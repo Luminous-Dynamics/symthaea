@@ -12,6 +12,8 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
+/// PX4 external-mode SetpointConfig request/reply evidence.
+pub mod external_mode_setpoint_config;
 /// Receiver-clock MAVLink heartbeat evidence and PX4 freshness qualification.
 pub mod heartbeat;
 /// Firmware-profile-bound Offboard-loss parameter configuration evidence.
