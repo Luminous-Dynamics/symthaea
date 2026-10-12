@@ -92,6 +92,14 @@ jobs:
               ).strip()
               for path in source_paths
           }
+          curves_without_observed_change = [
+              {"style": profile["style"], "control": curve["control"]}
+              for profile in report["profiles"]
+              for curve in profile["curves"]
+              if curve["observed_changes_from_baseline"][
+                  "no_observed_change_at_tested_points"
+              ]
+          ]
           receipt = {
               "schema": "muse-style-response-run-receipt-v1",
               "git_commit": os.environ["GITHUB_SHA"],
@@ -106,6 +114,7 @@ jobs:
               "runner_os": os.environ.get("RUNNER_OS"),
               "runner_arch": os.environ.get("RUNNER_ARCH"),
               "protocol": report["protocol"],
+              "curves_without_observed_change_at_tested_points": curves_without_observed_change,
               "measurement_scope": report["measurement_scope"],
               "interpretation": (
                   "Symbolic response evidence only. This receipt does not establish "
@@ -124,6 +133,17 @@ jobs:
               stream.write(f"- Styles: {report['protocol']['style_count']}\n")
               stream.write(f"- Curves: {report['protocol']['curve_count']}\n")
               stream.write(f"- Control points: {report['protocol']['point_count']}\n")
+              stream.write(
+                  "- Curves with no observed change at tested points: "
+                  f"{len(curves_without_observed_change)} / {report['protocol']['curve_count']}\\n"
+              )
+              if curves_without_observed_change:
+                  stream.write("## Curves with no observed output change\\n\\n")
+                  stream.write("These are triage signals, not automatic failures.\\n\\n")
+                  stream.write("| Style | Control |\\n|---|---|\\n")
+                  for item in curves_without_observed_change:
+                      stream.write(f"| {item['style']} | {item['control']} |\\n")
+                  stream.write("\\n")
               stream.write(f"- Report SHA-256: `{receipt['report_sha256']}`\n\n")
               stream.write("## Source blob digests\n\n")
               stream.write("| Source | Git blob SHA |\n|---|---|\n")
