@@ -186,7 +186,7 @@ def _render_factorization(data: bytes) -> list[str]:
         [
             "def source_certificate : WireCertifiedFactorization :=",
             "  { factorization :=",
-            f"      {{ value := {factorization.value}, factors := {factors} }},\n",
+            f"      {{ value := {factorization.value}, factors := {factors} }},",
             f"    primeProofs := {proof_refs} }}",
             f"def source_bytes : List Nat := {_lean_bytes(data)}",
             "",
