@@ -132,7 +132,12 @@ impl MavlinkHeartbeatEvidenceV1 {
         hasher.update(HEARTBEAT_DOMAIN_V1);
         hasher.update(&self.schema_version.to_le_bytes());
         feed_str(&mut hasher, &self.producer_profile_id);
-        hasher.update(&[self.system_id, self.component_id, self.vehicle_type, self.autopilot]);
+        hasher.update(&[
+            self.system_id,
+            self.component_id,
+            self.vehicle_type,
+            self.autopilot,
+        ]);
         hasher.update(&[self.base_mode]);
         hasher.update(&self.custom_mode.to_le_bytes());
         hasher.update(&[self.system_status, self.mavlink_version]);
@@ -198,7 +203,9 @@ impl Px4HeartbeatFreshnessProfileV1 {
     pub fn validate(&self) -> Result<(), Px4HeartbeatEvidenceError> {
         self.validate_without_digest()?;
         if self.profile_digest_hex != self.compute_digest_hex() {
-            return Err(Px4HeartbeatEvidenceError::DigestMismatch("freshness_profile"));
+            return Err(Px4HeartbeatEvidenceError::DigestMismatch(
+                "freshness_profile",
+            ));
         }
         Ok(())
     }
@@ -344,7 +351,10 @@ impl Px4HeartbeatFreshnessV1 {
         }
 
         let mut failures = Vec::new();
-        let latest = self.samples.last().ok_or(Px4HeartbeatEvidenceError::EmptySampleWindow)?;
+        let latest = self
+            .samples
+            .last()
+            .ok_or(Px4HeartbeatEvidenceError::EmptySampleWindow)?;
         let age_ns = self
             .assessed_at
             .elapsed_since(&latest.received_at)
@@ -431,7 +441,9 @@ impl Px4HeartbeatFreshnessV1 {
             if !seen.insert(sample.heartbeat_digest_hex.clone()) {
                 return Err(Px4HeartbeatEvidenceError::DuplicateSample);
             }
-            if previous_receive_ns.is_some_and(|previous| sample.received_at.nanoseconds <= previous) {
+            if previous_receive_ns
+                .is_some_and(|previous| sample.received_at.nanoseconds <= previous)
+            {
                 return Err(Px4HeartbeatEvidenceError::NonAdvancingReceiveTime);
             }
             previous_receive_ns = Some(sample.received_at.nanoseconds);
@@ -591,7 +603,12 @@ mod tests {
         TimestampV1::new(clock("companion.monotonic"), ms * 1_000_000)
     }
 
-    fn heartbeat(ms: u64, system_id: u8, component_id: u8, autopilot: u8) -> MavlinkHeartbeatEvidenceV1 {
+    fn heartbeat(
+        ms: u64,
+        system_id: u8,
+        component_id: u8,
+        autopilot: u8,
+    ) -> MavlinkHeartbeatEvidenceV1 {
         MavlinkHeartbeatEvidenceV1::new(
             "mavlink.decoder.fixture.v1",
             system_id,
@@ -628,20 +645,21 @@ mod tests {
         ]
     }
 
-    fn assessment(samples: Vec<MavlinkHeartbeatEvidenceV1>, now_ms: u64) -> Px4HeartbeatFreshnessV1 {
-        Px4HeartbeatFreshnessV1::new(
-            "mavlink.decoder.fixture.v1",
-            profile(),
-            ts(now_ms),
-            samples,
-        )
-        .unwrap()
+    fn assessment(
+        samples: Vec<MavlinkHeartbeatEvidenceV1>,
+        now_ms: u64,
+    ) -> Px4HeartbeatFreshnessV1 {
+        Px4HeartbeatFreshnessV1::new("mavlink.decoder.fixture.v1", profile(), ts(now_ms), samples)
+            .unwrap()
     }
 
     #[test]
     fn repeated_current_px4_heartbeat_is_fresh_and_satisfied() {
         let value = assessment(good_samples(), 3_500);
-        assert_eq!(value.outcome().unwrap(), Px4HeartbeatFreshnessOutcomeV1::Fresh);
+        assert_eq!(
+            value.outcome().unwrap(),
+            Px4HeartbeatFreshnessOutcomeV1::Fresh
+        );
         let fact = value.readiness_fact().unwrap();
         assert_eq!(fact.requirement, Px4ReadinessRequirementV1::HeartbeatFresh);
         assert_eq!(fact.state, Px4ReadinessFactStateV1::Satisfied);
@@ -657,12 +675,12 @@ mod tests {
                 if failures.contains(&Px4HeartbeatFreshnessFailureV1::LatestHeartbeatStale)
         ));
         let stale_fact = stale.readiness_fact().unwrap();
-        assert_eq!(stale_fact.requirement, Px4ReadinessRequirementV1::HeartbeatFresh);
-        assert_eq!(stale_fact.state, Px4ReadinessFactStateV1::Unsatisfied);
         assert_eq!(
-            stale_fact.evidence_id,
-            Some(stale.freshness_id().unwrap())
+            stale_fact.requirement,
+            Px4ReadinessRequirementV1::HeartbeatFresh
         );
+        assert_eq!(stale_fact.state, Px4ReadinessFactStateV1::Unsatisfied);
+        assert_eq!(stale_fact.evidence_id, Some(stale.freshness_id().unwrap()));
 
         let gapped = vec![
             heartbeat(1_000, 1, 1, MAV_AUTOPILOT_PX4_RAW),
@@ -680,7 +698,10 @@ mod tests {
     fn insufficient_including_zero_samples_remains_unobserved() {
         for samples in [vec![], vec![heartbeat(1_000, 1, 1, MAV_AUTOPILOT_PX4_RAW)]] {
             let value = assessment(samples, 1_100);
-            assert!(matches!(value.outcome().unwrap(), Px4HeartbeatFreshnessOutcomeV1::Incomplete { .. }));
+            assert!(matches!(
+                value.outcome().unwrap(),
+                Px4HeartbeatFreshnessOutcomeV1::Incomplete { .. }
+            ));
             let fact = value.readiness_fact().unwrap();
             assert_eq!(fact.state, Px4ReadinessFactStateV1::Unobserved);
             assert!(fact.evidence_id.is_none());
@@ -694,13 +715,15 @@ mod tests {
             vec![heartbeat(1_000, 1, 2, MAV_AUTOPILOT_PX4_RAW)],
             vec![heartbeat(1_000, 1, 1, 3)],
         ] {
-            assert!(Px4HeartbeatFreshnessV1::new(
-                "mavlink.decoder.fixture.v1",
-                profile(),
-                ts(1_100),
-                samples,
-            )
-            .is_err());
+            assert!(
+                Px4HeartbeatFreshnessV1::new(
+                    "mavlink.decoder.fixture.v1",
+                    profile(),
+                    ts(1_100),
+                    samples,
+                )
+                .is_err()
+            );
         }
     }
 
@@ -804,7 +827,10 @@ mod tests {
         let samples = good_samples();
         let forward = assessment(samples.clone(), 3_500);
         let reverse = assessment(samples.into_iter().rev().collect(), 3_500);
-        assert_eq!(forward.freshness_id().unwrap(), reverse.freshness_id().unwrap());
+        assert_eq!(
+            forward.freshness_id().unwrap(),
+            reverse.freshness_id().unwrap()
+        );
 
         let original_id = forward.freshness_id().unwrap();
         let mut changed_profile = forward.clone();
@@ -827,7 +853,10 @@ mod tests {
         let bytes = serde_json::to_vec(&value).unwrap();
         let mut restored: Px4HeartbeatFreshnessV1 = serde_json::from_slice(&bytes).unwrap();
         restored.validate().unwrap();
-        assert_eq!(restored.freshness_id().unwrap(), value.freshness_id().unwrap());
+        assert_eq!(
+            restored.freshness_id().unwrap(),
+            value.freshness_id().unwrap()
+        );
         restored.samples[0].base_mode ^= 1;
         assert!(restored.validate().is_err());
     }
