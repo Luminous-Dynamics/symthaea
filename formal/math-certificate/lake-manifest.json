@@ -6,7 +6,7 @@
       "url": "https://github.com/b-mehta/PrimeCert",
       "type": "git",
       "subDir": null,
-      "scope": null,
+      "scope": "",
       "rev": "7d3a2de13bb08f111a95203634f9ea52e50e246e",
       "name": "PrimeCert",
       "manifestFile": "lake-manifest.json",
