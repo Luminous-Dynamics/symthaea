@@ -783,6 +783,7 @@ mod tests {
                 parameters: BTreeMap::from([
                     ("alpha".to_string(), "0.05".to_string()),
                     ("resamples".to_string(), "2000".to_string()),
+                    ("rng".to_string(), "xorshift64_seed_xor_9e3779b97f4a7c15_v1".to_string()),
                 ]),
             },
             ComparisonRuleV1::RelativeDelta {
@@ -926,7 +927,7 @@ mod tests {
             "value_domain":"unit_interval",
             "direction":{"kind":"unknown"},
             "sample_unit":"independent_seed_run",
-            "uncertainty":{"kind":"empirical","method":"bca_bootstrap_v1","confidence_level":0.95,"parameters":{"alpha":"0.05","resamples":"2000"}},
+            "uncertainty":{"kind":"empirical","method":"bca_bootstrap_v1","confidence_level":0.95,"parameters":{"alpha":"0.05","resamples":"2000","rng":"xorshift64_seed_xor_9e3779b97f4a7c15_v1"}},
             "comparison":{"kind":"relative_delta","warning_fraction":0.05,"critical_fraction":0.10,"minimum_reference_magnitude":0.01}
         }"#;
         assert!(serde_json::from_str::<MetricDefinitionV1>(json).is_err());
