@@ -611,6 +611,7 @@ def self_test() -> list[str]:
             ("supported", "supported"),
         ]
         confidence_pairs = [(2, 2), (1, 4), (4, 4), (3, 4)]
+        case_ids = ("JSP-A", "JSP-A", "JSP-B", "JSP-C")
         for index, (pair, confidence_pair) in enumerate(zip(label_pairs, confidence_pairs)):
             ratings = []
             for reviewer_index, (evidence_label, confidence_label) in enumerate(zip(pair, confidence_pair)):
@@ -621,7 +622,7 @@ def self_test() -> list[str]:
                     "reviewer_id": f"reviewer-{reviewer_index}",
                     "labels": labels,
                 })
-            case_id = "JSP-A" if index < 2 else f"JSP-{chr(ord('A') + index)}"
+            case_id = case_ids[index]
             sensitivity_units.append({
                 "unit_id": f"unit-{index}",
                 "case_id": case_id,
@@ -651,6 +652,33 @@ def self_test() -> list[str]:
         require(confidence_case_sensitivity["defined_replicates"] == 3
                 and confidence_case_sensitivity["method"] == "leave_one_case_out_deletion_sensitivity_not_confidence_interval",
                 "ordinal confidence case-level sensitivity diagnostics are invalid")
+
+        # Removing the only disagreeing case must make expected disagreement zero,
+        # and the diagnostic must retain that undefined replicate instead of dropping it.
+        undefined_case_fixture = [
+            ("JSP-A", ["supported", "contradicted"]),
+            ("JSP-B", ["supported", "supported"]),
+            ("JSP-C", ["supported", "supported"]),
+        ]
+        undefined_case_full = alpha_estimate(
+            [ratings for _, ratings in undefined_case_fixture], "evidence_relation"
+        )
+        undefined_case_sensitivity = leave_one_case_out_sensitivity(
+            undefined_case_fixture, "evidence_relation", undefined_case_full
+        )
+        require(undefined_case_sensitivity["undefined_replicates"] == 1
+                and undefined_case_sensitivity["defined_replicates"] == 2
+                and undefined_case_sensitivity["status"] == "partially_undefined"
+                and next(item for item in undefined_case_sensitivity["per_case_results"]
+                         if item["case_id"] == "JSP-A")["status"] == "undefined_alpha",
+                "case-level sensitivity must explicitly count undefined replicates")
+
+        few_case_sensitivity = leave_one_case_out_sensitivity(
+            undefined_case_fixture[:2], "evidence_relation", undefined_case_full
+        )
+        require(few_case_sensitivity["status"] == "insufficient_pairable_cases"
+                and few_case_sensitivity["replicates"] == 0,
+                "case-level sensitivity must not calculate the range with fewer than three cases")
     except Exception as exc:
         failures.append(f"disagreement measurement positive control failed: {exc}")
 
