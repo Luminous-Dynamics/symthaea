@@ -170,6 +170,37 @@ class ODataInventoryTests(unittest.TestCase):
         errors = verify_inventory(doc)
         self.assertTrue(any("scope.bbox_wgs84" in err for err in errors))
 
+    def test_zero_product_results_form_a_valid_query_specific_inventory(self):
+        with patch("tools.water_leak_satellite.odata_inventory.urlopen", side_effect=[
+            FakeResponse({"value": []}), FakeResponse({"value": []})
+        ]):
+            queries = [
+                inventory_query(profile=p, bbox=self.bbox, start=date(2025, 1, 1),
+                    end_exclusive=date(2025, 1, 2), limit=100, max_pages=5, timeout=2)
+                for p in PROFILES
+            ]
+        doc = build_document(self.bbox, date(2025, 1, 1), date(2025, 1, 1), queries)
+        self.assertEqual(verify_inventory(doc), [])
+        self.assertEqual([query["item_count"] for query in doc["queries"]], [0, 0])
+        self.assertIn("does not establish", doc["overall_claim_ceiling"])
+
+    def test_noncanonical_query_date_fails_closed(self):
+        with patch("tools.water_leak_satellite.odata_inventory.urlopen", side_effect=[
+            FakeResponse({"value": []}), FakeResponse({"value": []})
+        ]):
+            queries = [
+                inventory_query(profile=p, bbox=self.bbox, start=date(2025, 1, 1),
+                    end_exclusive=date(2025, 1, 2), limit=100, max_pages=5, timeout=2)
+                for p in PROFILES
+            ]
+        doc = build_document(self.bbox, date(2025, 1, 1), date(2025, 1, 1), queries)
+        doc["queries"][0]["start_date_inclusive"] = "20250101"
+        from tools.water_leak_satellite.odata_inventory import sha256_json
+        doc.pop("inventory_manifest_sha256")
+        doc["inventory_manifest_sha256"] = sha256_json(doc)
+        errors = verify_inventory(doc)
+        self.assertTrue(any("canonical YYYY-MM-DD" in err for err in errors))
+
     def test_query_scope_tamper_is_detected_even_after_rehash(self):
         # Build an otherwise valid full document via fake responses.
         responses = [{"value": [dict(self.product, Id=f"p{i}", Name=f"n{i}")]} for i in range(2)]

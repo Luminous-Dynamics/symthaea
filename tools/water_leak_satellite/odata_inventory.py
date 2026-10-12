@@ -372,12 +372,16 @@ def verify_inventory(document: Any) -> list[str]:
         if profile is None:
             errors.append(f"{prefix}.profile_id: unsupported profile")
             continue
+        q_start_text = query.get("start_date_inclusive", "")
+        q_end_text = query.get("end_date_exclusive", "")
         try:
-            q_start = date.fromisoformat(query.get("start_date_inclusive", ""))
-            q_end = date.fromisoformat(query.get("end_date_exclusive", ""))
+            q_start = date.fromisoformat(q_start_text)
+            q_end = date.fromisoformat(q_end_text)
         except (TypeError, ValueError):
             errors.append(f"{prefix}: invalid query dates")
             continue
+        if q_start.isoformat() != q_start_text or q_end.isoformat() != q_end_text:
+            errors.append(f"{prefix}: query dates must use canonical YYYY-MM-DD")
         actual_keys.append((profile["profile_id"], q_start, q_end))
         if query.get("collection") != profile["collection"] or query.get("product_type") != profile["product_type"]:
             errors.append(f"{prefix}: collection/product type do not match the declared profile")
