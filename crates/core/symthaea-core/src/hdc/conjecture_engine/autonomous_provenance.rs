@@ -1443,6 +1443,80 @@ mod tests {
     }
 
     #[test]
+    fn random_baseline_receipt_records_sanitized_prior_policy() {
+        let mut config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        config.disable_macro_seeds = false;
+        config.prior_composition_rate = 0.6;
+        config.prior_fragment_bonus = 0.5;
+        config.orthogonality_penalty = 4.0;
+        config.known_invariants = vec![Expr::Var("x".into())];
+
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::RandomBaseline);
+        let holdout = validate_invariant_holdout(
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
+        );
+        let receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        ).expect("random baseline receipt should be constructed with sanitized policy");
+
+        assert_eq!(receipt.discovery_mode, AutonomousDiscoveryMode::RandomBaseline);
+        assert!(receipt.search_config.disable_macro_seeds);
+        assert_eq!(receipt.search_config.prior_composition_rate, 0.0);
+        assert_eq!(receipt.search_config.prior_fragment_bonus, 1.0);
+        assert_eq!(receipt.search_config.orthogonality_penalty, 1.0);
+        assert!(receipt.search_config.known_invariant_formulas.is_empty());
+        assert!(receipt.search_config.extra_seed_template_formulas.is_empty());
+        assert!(verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
+    fn random_baseline_receipt_rejects_explicit_prior_templates() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::RandomBaseline);
+        let holdout = validate_invariant_holdout(
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
+        );
+        let result = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[Expr::Var("x".into())], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        );
+        assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::UncontrolledRunContainsPriors);
+    }
+
+    #[test]
+    fn receipt_binds_actual_holdout_work_counters() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        ).expect("valid holdout work record should be receipted");
+        assert!(verify_autonomous_discovery_receipt_v1(&receipt));
+        assert_eq!(receipt.rhs_evaluations, receipt.completed_integration_steps * 4);
+        assert_eq!(receipt.state_updates, receipt.completed_integration_steps * 4);
+
+        receipt.rhs_evaluations += 1;
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
     fn composed_candidates_need_parent_receipts() {
         let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
         let formula = harmonic_energy();
