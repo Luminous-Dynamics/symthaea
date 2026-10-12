@@ -5,9 +5,9 @@
 //!
 //! This contract does not infer meaning from metric names. Every comparison-qualified
 //! metric must declare its estimand, unit/domain, direction, sample unit, uncertainty
-//! treatment, and comparison rule. Snapshot values currently do not bind CI method or
-//! confidence level, so empirical uncertainty cannot yet qualify a snapshot. Missing
-//! semantics or observation-level provenance remain missing.
+//! treatment, and comparison rule. Snapshot values currently do not bind sample unit,
+//! CI method, or confidence level, so empirical uncertainty cannot yet qualify a snapshot.
+//! Missing semantics or observation-level provenance remain missing.
 
 use crate::harness::report::MetricValue;
 use crate::harness::snapshot::{RegressionSnapshot, SNAPSHOT_SCHEMA_VERSION};
@@ -359,7 +359,7 @@ impl MetricContractV1 {
 
     /// Require exact equality between this contract's keys and every key in a
     /// snapshot. Empirical policies also remain unqualified until the snapshot binds
-    /// the observed CI method and confidence level; n >= 2 alone is not sufficient.
+    /// observed sample unit, CI method, and confidence level; n >= 2 alone is not sufficient.
     pub fn validate_snapshot_population(
         &self,
         snapshot: &RegressionSnapshot,
@@ -425,11 +425,11 @@ impl MetricContractV1 {
                             definition.benchmark, definition.metric, value.n
                         ));
                     }
-                    // MetricValue currently serializes CI bounds but not the method or
-                    // confidence level that produced them. A contract declaration is
-                    // not evidence that those bounds were actually generated as declared.
+                    // MetricValue currently serializes `n` and CI bounds but does not
+                    // bind the sample unit, CI method, or confidence level that produced
+                    // them. A declaration is not observation-level evidence.
                     errors.push(format!(
-                        "{}/{}: empirical uncertainty is unqualified because snapshot MetricValue does not bind the observed CI method or confidence level; add observation-level uncertainty provenance before claiming empirical qualification",
+                        "{}/{}: empirical uncertainty is unqualified because snapshot MetricValue does not bind the observed sample unit, CI method, or confidence level; add observation-level uncertainty provenance before claiming empirical qualification",
                         definition.benchmark, definition.metric
                     ));
                 }
@@ -516,7 +516,7 @@ mod tests {
             unit: "proportion".to_string(),
             value_domain: MetricValueDomainV1::UnitInterval,
             direction: MetricDirectionV1::HigherIsBetter,
-            sample_unit: "independent_seed_run".to_string(),
+            sample_unit: "fixture_metric_observation".to_string(),
             uncertainty,
             comparison,
         }
@@ -527,7 +527,7 @@ mod tests {
             benchmark,
             metric,
             UncertaintyPolicyV1::Empirical {
-                method: "bootstrap_percentile_95_v1".to_string(),
+                method: "metric_value_from_samples_bootstrap_bca_2000_95_v1".to_string()
                 confidence_level: 0.95,
             },
             ComparisonRuleV1::RelativeDelta {
@@ -659,7 +659,7 @@ mod tests {
         let one_sample = snapshot(&[("B", "accuracy", 0.8, 1)]);
         let errors = contract.validate_snapshot_population(&one_sample).unwrap_err();
         assert!(errors.iter().any(|message| message.contains("empirical uncertainty requires n >= 2")));
-        assert!(errors.iter().any(|message| message.contains("does not bind the observed CI method or confidence level")));
+        assert!(errors.iter().any(|message| message.contains("does not bind the observed sample unit, CI method, or confidence level")));
 
         let invalid = definition(
             "B",
