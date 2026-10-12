@@ -10,6 +10,7 @@ psychological instrument, or evidence of generalization.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import re
@@ -624,6 +625,35 @@ def build_annotation_seed(
     }
 
 
+
+def validate_annotation_seed_bytes(
+    seed_bytes: bytes,
+    *,
+    bundle_bytes: bytes,
+    results: dict[str, dict[str, Any]],
+    method_id: str,
+    source_revision: str,
+    corpus: dict[str, Any],
+    corpus_bytes: bytes,
+) -> dict[str, Any]:
+    """Fail closed unless the serialized sidecar exactly matches its bound source.
+
+    Reconstructing the expected packet from the already-validated corpus and
+    normalized bundle protects the closed schema, exact text, pointers, digests,
+    deterministic IDs, blank review state, and first-pass blinding together.
+    This verifies packet integrity only; it does not judge any claim's meaning.
+    """
+    seed = load_json_bytes(seed_bytes)
+    require(isinstance(seed, dict), "annotation seed must be a JSON object")
+    expected = build_annotation_seed(
+        bundle_bytes, results, method_id, source_revision, corpus, corpus_bytes
+    )
+    require(
+        seed == expected,
+        "annotation seed differs from deterministic reconstruction of bound sources",
+    )
+    return seed
+
 def annotation_seed_self_test() -> list[str]:
     """Test packet completeness and label-free behavior on a synthetic bundle."""
     failures: list[str] = []
@@ -682,11 +712,21 @@ def annotation_seed_self_test() -> list[str]:
         seed = build_annotation_seed(
             bundle_bytes, results, method_id, bound_revision, corpus, corpus_bytes
         )
+        seed_bytes = canonical_json(seed)
+        checked_seed = validate_annotation_seed_bytes(
+            seed_bytes,
+            bundle_bytes=bundle_bytes,
+            results=results,
+            method_id=method_id,
+            source_revision=bound_revision,
+            corpus=corpus,
+            corpus_bytes=corpus_bytes,
+        )
         replay = build_annotation_seed(
             bundle_bytes, results, method_id, bound_revision, corpus, corpus_bytes
         )
         checks = [
-            ("schema and draft protocol identity", seed["schema"] == ANNOTATION_SEED_SCHEMA
+            ("schema and draft protocol identity", checked_seed["schema"] == ANNOTATION_SEED_SCHEMA
              and seed["annotation_protocol_status"] == "DRAFT_NOT_YET_APPLIED"),
             ("every frozen case has source context", len(seed["case_contexts"]) == len(corpus["cases"])
              and {item["case_context_id"] for item in seed["case_contexts"]} == {case["id"] for case in corpus["cases"]}),
@@ -725,6 +765,65 @@ def annotation_seed_self_test() -> list[str]:
                      for unit in seed["units"])),
         ]
         failures.extend(f"{name} failed" for name, passed in checks if not passed)
+        # Hostile mutations must be rejected after strict JSON parsing. These
+        # controls test the packet consumer, not only the builder's happy path.
+        mutations: list[tuple[str, Any]] = []
+
+        mutation = copy.deepcopy(seed)
+        mutation["corpus_sha256"] = "f" * 64
+        mutations.append(("reject corpus digest mutation", mutation))
+
+        mutation = copy.deepcopy(seed)
+        mutation["annotation_guide_sha256"] = "e" * 64
+        mutations.append(("reject guide digest mutation", mutation))
+
+        mutation = copy.deepcopy(seed)
+        mutation["annotation_state"] = "ANNOTATED"
+        mutations.append(("reject forged annotation state", mutation))
+
+        mutation = copy.deepcopy(seed)
+        mutation["units"][0]["independent_reviews"] = [{"reviewer_id": "invented", "labels": {"support": "supported"}}]
+        mutations.append(("reject prefilled reviewer labels", mutation))
+
+        mutation = copy.deepcopy(seed)
+        mutation["units"][0]["unit_id"] = "0" * 64
+        mutations.append(("reject unit identity mutation", mutation))
+
+        mutation = copy.deepcopy(seed)
+        mutation["units"][0]["evidence_links"]["observed_evidence_ids"] = ["NOT-IN-CORPUS"]
+        mutations.append(("reject dangling evidence link", mutation))
+
+        mutation = copy.deepcopy(seed)
+        mutation["case_contexts"][0]["input_text"] += " altered"
+        mutations.append(("reject altered case context", mutation))
+
+        mutation = copy.deepcopy(seed)
+        interpretation_units = [unit for unit in mutation["units"] if unit["unit_kind"] == "interpretation_candidate"]
+        if interpretation_units:
+            interpretation_units[0]["detail"]["epistemic_status_as_emitted"] = "ScholarlyInterpretation"
+        else:
+            # Empty-interpretation case is still required to exercise the closed
+            # schema. Mutate a unit with an unauthorized label field instead.
+            mutation["units"][0]["forged_label"] = "supported"
+        mutations.append(("reject system label leakage or injected label", mutation))
+
+        for name, mutated in mutations:
+            try:
+                validate_annotation_seed_bytes(
+                    canonical_json(mutated),
+                    bundle_bytes=bundle_bytes,
+                    results=results,
+                    method_id=method_id,
+                    source_revision=bound_revision,
+                    corpus=corpus,
+                    corpus_bytes=corpus_bytes,
+                )
+            except AuditError:
+                pass
+            except Exception as exc:
+                failures.append(f"{name}: wrong exception type {type(exc).__name__}: {exc}")
+            else:
+                failures.append(f"{name}: hostile packet mutation was accepted")
     except Exception as exc:
         failures.append(f"annotation seed self-test raised {type(exc).__name__}: {exc}")
     return failures
@@ -1025,7 +1124,7 @@ def main() -> int:
                 print(f"- annotation seed: {failure}", file=sys.stderr)
             return 1
         print("PASS: 36 evaluator controls (31 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
-        print("PASS: 8 annotation-seed controls (identity, case context, exact text, unit separation, unannotated state, deterministic IDs, evidence binding, guide digest/blinding)")
+        print("PASS: 8 annotation-seed invariant controls plus 8 hostile packet mutations")
     if not args.results:
         return 0
     if args.output_dir is None:
@@ -1046,6 +1145,19 @@ def main() -> int:
         args.output_dir.mkdir(parents=True, exist_ok=True)
         for results_path in args.results:
             report, seed_bytes = evaluate(results_path, corpus_bytes, corpus, corpus_sha256, args.source_revision)
+            # Re-validate the serialized sidecar against the same exact inputs
+            # used to produce the normalized bundle; never silently ship drift.
+            checked_bundle = load_json_bytes(results_path.read_bytes())
+            checked_results = {row["case_id"]: row for row in checked_bundle["results"]}
+            validate_annotation_seed_bytes(
+                seed_bytes,
+                bundle_bytes=results_path.read_bytes(),
+                results=checked_results,
+                method_id=report["method_id"],
+                source_revision=args.source_revision,
+                corpus=corpus,
+                corpus_bytes=corpus_bytes,
+            )
             seed_path = args.output_dir / f"{report['method_id']}.annotation_seed.json"
             seed_path.write_bytes(seed_bytes)
             output_path = args.output_dir / f"{report['method_id']}.output_evaluation.json"
