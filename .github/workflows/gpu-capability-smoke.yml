@@ -97,6 +97,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Fail closed if the opt-in guard or Vulkan ICD selection regresses.
+          # The test intentionally skips GPU initialization outside qualification
+          # mode, so this workflow must prove that mode is explicitly enabled.
+          if [ "${SYTHAEA_GPU_EXPECT_SOFTWARE:-}" != "1" ]; then
+            echo "::error::Software-Vulkan qualification requires SYTHAEA_GPU_EXPECT_SOFTWARE=1."
+            exit 1
+          fi
+          if [ "${WGPU_BACKEND:-}" != "vulkan" ]; then
+            echo "::error::Software-Vulkan qualification requires WGPU_BACKEND=vulkan."
+            exit 1
+          fi
+          if [ -z "${VK_ICD_FILENAMES:-}" ] || [ ! -f "${VK_ICD_FILENAMES}" ]; then
+            echo "::error::VK_ICD_FILENAMES must point to an existing ICD manifest."
+            exit 1
+          fi
+          case "${VK_ICD_FILENAMES}" in
+            *lvp_icd*.json) ;;
+            *)
+              echo "::error::Expected Mesa lavapipe ICD, got ${VK_ICD_FILENAMES}."
+              exit 1
+              ;;
+          esac
           cargo test -p symthaea-core --features gpu --lib \
             hdc::gpu_compute::capability_report_tests -- --nocapture \
             2>&1 | tee gpu-capability-smoke.log
