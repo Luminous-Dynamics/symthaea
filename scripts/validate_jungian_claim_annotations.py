@@ -415,7 +415,7 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
         "scope": "units with at least two distinct declared reviewer IDs; this does not authenticate identity/independence; raw ratings remain authoritative",
         "eligible_unit_count": max((item["eligible_units"] for item in label_results.values()), default=0),
         "small_sample_warning": "Agreement estimates are descriptive; interpret cautiously with few units, imbalanced labels, or a selected non-random subset.",
-        "sensitivity_warning": "Leave-one-unit-out extrema measure sensitivity to individual reviewed cases; they are not confidence limits or population inference.",
+        "sensitivity_warning": "Leave-one-unit-out extrema measure annotation-unit influence; leave-one-case-out deletion measures case-level influence by excluding all eligible units from a case. Neither is a confidence interval, population inference, or a correction for within-case dependence.",
         "labels": label_results,
         "not_established": ["correctness", "psychological validity", "holdout generalization", "population reliability"],
     }
