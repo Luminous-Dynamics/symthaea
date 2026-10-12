@@ -1,6 +1,6 @@
 # Domain-General Delay-Tolerant Telemetry: Symthaea, Mycelix and Sol-Atlas
 
-**Status:** Research architecture plus deterministic in-memory store-and-forward policy prototype.  
+**Status:** Research architecture plus deterministic in-memory and SQLite-backed store-and-forward policy prototypes.  
 **Threat-model review:** 2026-10-12.  
 **Not claimed:** production queue durability, deployed satellite connectivity, source authentication, cryptographic signature verification, a formal safety case, real meter/sensor evaluation, or live Sol-Atlas/Mycelix integration.
 
@@ -40,7 +40,7 @@ These are proposed responsibilities and interface boundaries, not claims that th
 
 ## Shared event contract implemented by the current prototype
 
-The current tools/energy_telemetry/store_forward.py module is a deterministic in-memory policy model. Each event carries:
+The tools/energy_telemetry/store_forward.py module is a deterministic in-memory reference policy model. The tools/energy_telemetry/durable_queue.py module adds a SQLite-backed restart-recovery prototype for metadata, attempts, expiry and ACK state. Each event carries:
 
 - Random per-event ID (format checked; randomness is not established by the module).
 - Domain label: energy, water, agriculture, infrastructure or spacecraft.
@@ -83,11 +83,11 @@ The policy model does not implement a durable DP accountant, secure aggregation,
 
 The accompanying unittest suite uses synthetic timestamps, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
 
-Local verification recorded during implementation: **18 store-forward tests passed** under Python's unittest runner. This is a local result for the new prototype tests; it is not the GitHub Actions result, not a run of the full repository test suite, and not field evidence. The exact-head GitHub workflow remains the authority for CI status.
+Local verification recorded in the previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed ledger now has 11 additional deterministic tests added; those tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
 
 ## Required next steps before deployment
 
-- Replace in-memory state with an encrypted durable queue and a crash-consistent transactional receipt/ACK ledger.
+- Harden the SQLite prototype with multi-process contention, crash/reopen, database-full, read-only path, backup/restore and target-filesystem power-loss tests before deployment.
 - Specify canonical serialization and authenticate message, ACK, source identity, policy version and freshness metadata end to end.
 - Define retention ceilings and bounds for terminal receipts, replay windows and participant-level privacy accounting.
 - Add deterministic chaos simulation for link loss, reordering, duplication, clock drift, key expiry, reboot/recovery, storage-full and compromised-sensor cases.
