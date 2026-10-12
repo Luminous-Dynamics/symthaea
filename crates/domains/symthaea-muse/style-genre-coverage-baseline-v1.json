@@ -22,7 +22,8 @@
       "ExpertReviewRequired": 5
     },
     "foundation_entries": 0,
-    "routed_does_not_mean_distinct": true
+    "routed_does_not_mean_distinct": true,
+    "executable_styles_without_catalog_route": 0
   },
   "entries": [
     {
