@@ -533,6 +533,21 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
     print(
+        "Grammar dispatch modes: "
+        + json.dumps(summary["grammar_dispatch_modes"], sort_keys=True),
+        file=sys.stderr,
+    )
+    print(
+        "Dedicated-engine styles: "
+        + (", ".join(summary["styles_with_dedicated_grammar_engine"]) or "none"),
+        file=sys.stderr,
+    )
+    print(
+        "Compatibility-fallback styles: "
+        + (", ".join(summary["styles_using_compatibility_fallback"]) or "none"),
+        file=sys.stderr,
+    )
+    print(
         "Interpretation: source-declared controls only; no claim of causal "
         "effect, renderer availability, perceptual distinctness, or authenticity.",
         file=sys.stderr,
