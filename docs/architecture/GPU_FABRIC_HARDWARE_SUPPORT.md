@@ -159,4 +159,5 @@ This document extends, rather than replaces, the existing GPU Fabric work:
 - GPU Fabric semantic operations and native Vulkan/WebGPU path: issue #6968.
 - Typed execution dependency graph and synchronization model: issue #6985.
 - HDC-LTC/CfC dimension and workload changes: PR #7364.
+- Initial executable capability-reporting step: [PR #7404](https://github.com/Luminous-Dynamics/symthaea/pull/7404) adds a serializable report for the existing `symthaea-core` WGPU context, including adapter identity, adapter/device limits, and bounded buffer/dispatch checks. It preserves the existing Option constructor while exposing structured errors through a new report-returning constructor. This is an initial reporting surface, not yet the complete backend-neutral capability planner or proof of GPU execution.
 - Neuromorphic/HDC co-design and separate hardware qualification: issue #5804.
