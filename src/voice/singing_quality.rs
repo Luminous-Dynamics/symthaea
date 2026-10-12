@@ -405,12 +405,7 @@ fn estimate_f0(x: &[f32], rate: u32) -> Option<f32> {
 
 /// Estimate F0 without a score prior over an explicit frequency band.
 /// A broad band exposes errors hidden by the narrower target-conditioned search.
-fn estimate_f0_in_range(
-    x: &[f32],
-    rate: u32,
-    min_hz: f32,
-    max_hz: f32,
-) -> Option<f32> {
+fn estimate_f0_in_range(x: &[f32], rate: u32, min_hz: f32, max_hz: f32) -> Option<f32> {
     if rate == 0
         || x.len() < 4
         || !min_hz.is_finite()
