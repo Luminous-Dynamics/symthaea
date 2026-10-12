@@ -272,6 +272,79 @@ def leave_one_unit_out_sensitivity(per_unit: list[list[Any]], field: str, point_
     return base
 
 
+def leave_one_case_out_sensitivity(per_case_units: list[tuple[str, list[Any]]], field: str,
+                                   point_alpha: float | None) -> dict[str, Any]:
+    """Measure alpha sensitivity after removing every eligible unit from one case together.
+
+    This grouped deletion diagnostic captures case-level influence when a case contributes
+    multiple annotation units. It is descriptive, not a confidence interval or a correction
+    for within-case dependence.
+    """
+    case_ids = sorted({case_id for case_id, _ in per_case_units})
+    base = {
+        "method": "leave_one_case_out_deletion_sensitivity_not_confidence_interval",
+        "eligible_cases": len(case_ids),
+        "eligible_units": len(per_case_units),
+        "replicates": 0,
+        "defined_replicates": 0,
+        "undefined_replicates": 0,
+        "minimum_alpha": None,
+        "maximum_alpha": None,
+        "maximum_absolute_change_from_full_estimate": None,
+        "most_influential_case_ids": [],
+        "per_case_results": [],
+        "status": "insufficient_pairable_cases",
+    }
+    if len(case_ids) < 3:
+        return base
+
+    values: list[float] = []
+    results: list[dict[str, Any]] = []
+    undefined = 0
+    for case_id in case_ids:
+        excluded = [ratings for candidate_case, ratings in per_case_units if candidate_case == case_id]
+        candidate = [ratings for candidate_case, ratings in per_case_units if candidate_case != case_id]
+        estimate = alpha_estimate(candidate, field)
+        change = abs(estimate - point_alpha) if estimate is not None and point_alpha is not None else None
+        if estimate is None:
+            undefined += 1
+        else:
+            values.append(estimate)
+        results.append({
+            "case_id": case_id,
+            "excluded_unit_count": len(excluded),
+            "alpha": estimate,
+            "absolute_change_from_full_estimate": change,
+            "status": "defined" if estimate is not None else "undefined_alpha",
+        })
+
+    maximum_change = max(
+        (item["absolute_change_from_full_estimate"] for item in results
+         if item["absolute_change_from_full_estimate"] is not None),
+        default=None,
+    )
+    most_influential = (
+        [item["case_id"] for item in results
+         if item["absolute_change_from_full_estimate"] == maximum_change]
+        if maximum_change is not None and maximum_change > 0.0 else []
+    )
+    base.update({
+        "replicates": len(case_ids),
+        "defined_replicates": len(values),
+        "undefined_replicates": undefined,
+        "minimum_alpha": min(values) if values else None,
+        "maximum_alpha": max(values) if values else None,
+        "maximum_absolute_change_from_full_estimate": maximum_change,
+        "most_influential_case_ids": most_influential,
+        "per_case_results": results,
+        "status": (
+            "all_replicates_defined" if len(values) == len(case_ids) else
+            "partially_undefined" if values else "all_replicates_undefined"
+        ),
+    })
+    return base
+
+
 def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
     """Summarize declared-reviewer agreement, Krippendorff alpha, and item influence.
 
@@ -284,11 +357,16 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
     label_results: dict[str, Any] = {}
     for field in sorted(LABEL_KEYS):
         per_unit: list[list[Any]] = []
+        per_case_unit_ratings: list[tuple[str, list[Any]]] = []
         for unit in units:
             reviews = unit.get("independent_reviews", [])
             ratings = [review["labels"][field] for review in reviews]
             if len(ratings) >= 2:
                 per_unit.append(ratings)
+                case_id = unit.get("case_id")
+                require(isinstance(case_id, str) and case_id,
+                        "pairable annotation unit must include a non-empty case_id for case-level sensitivity")
+                per_case_unit_ratings.append((case_id, ratings))
 
         comparisons = 0
         exact_matches = 0
@@ -316,6 +394,9 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
                 else "insufficient_paired_reviews"
             ),
             "leave_one_unit_out_sensitivity": leave_one_unit_out_sensitivity(per_unit, field, point_alpha),
+            "leave_one_case_out_sensitivity": leave_one_case_out_sensitivity(
+                per_case_unit_ratings, field, point_alpha
+            ),
         }
         if field == "confidence":
             entry["mean_absolute_confidence_difference"] = (
@@ -540,7 +621,12 @@ def self_test() -> list[str]:
                     "reviewer_id": f"reviewer-{reviewer_index}",
                     "labels": labels,
                 })
-            sensitivity_units.append({"unit_id": f"unit-{index}", "independent_reviews": ratings})
+            case_id = "JSP-A" if index < 2 else f"JSP-{chr(ord('A') + index)}"
+            sensitivity_units.append({
+                "unit_id": f"unit-{index}",
+                "case_id": case_id,
+                "independent_reviews": ratings,
+            })
         sensitivity = inter_rater_agreement(sensitivity_units)
         evidence_sensitivity = sensitivity["labels"]["evidence_relation"]["leave_one_unit_out_sensitivity"]
         require(evidence_sensitivity["replicates"] == 4
@@ -551,6 +637,20 @@ def self_test() -> list[str]:
         confidence_sensitivity = sensitivity["labels"]["confidence"]["leave_one_unit_out_sensitivity"]
         require(confidence_sensitivity["method"] == "leave_one_annotation_unit_out_sensitivity_not_confidence_interval",
                 "sensitivity diagnostic must not be mislabeled as a confidence interval")
+        case_sensitivity = sensitivity["labels"]["evidence_relation"]["leave_one_case_out_sensitivity"]
+        require(case_sensitivity["method"] == "leave_one_case_out_deletion_sensitivity_not_confidence_interval"
+                and case_sensitivity["eligible_cases"] == 3
+                and case_sensitivity["replicates"] == 3
+                and case_sensitivity["defined_replicates"] == 3
+                and case_sensitivity["maximum_absolute_change_from_full_estimate"] > 0.0,
+                "leave-one-case-out sensitivity failed to expose case-level influence")
+        grouped_case = next(item for item in case_sensitivity["per_case_results"] if item["case_id"] == "JSP-A")
+        require(grouped_case["excluded_unit_count"] == 2,
+                "case-level deletion must remove every eligible unit from the selected case together")
+        confidence_case_sensitivity = sensitivity["labels"]["confidence"]["leave_one_case_out_sensitivity"]
+        require(confidence_case_sensitivity["defined_replicates"] == 3
+                and confidence_case_sensitivity["method"] == "leave_one_case_out_deletion_sensitivity_not_confidence_interval",
+                "ordinal confidence case-level sensitivity diagnostics are invalid")
     except Exception as exc:
         failures.append(f"disagreement measurement positive control failed: {exc}")
 
