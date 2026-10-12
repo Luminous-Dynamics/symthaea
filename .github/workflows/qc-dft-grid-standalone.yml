@@ -67,6 +67,7 @@ jobs:
           /tmp/dft-grid-tests --nocapture 2>&1 | tee /tmp/dft-grid-tests.log
 
       - name: Fetch and verify exact PR merge context
+        id: merge_context
         if: github.event_name == 'pull_request'
         shell: bash
         env:
@@ -101,6 +102,7 @@ jobs:
           } | tee /tmp/qc-grid-merge-context-receipt.txt
 
       - name: Compile and run quantum-chemistry crate grid tests on the exact merge context
+        id: qc_merge_test
         if: github.event_name == 'pull_request'
         shell: bash
         working-directory: /tmp/qc-merge-context
@@ -108,6 +110,38 @@ jobs:
           set -euo pipefail
           cargo metadata --locked --no-deps --format-version 1 > /tmp/qc-grid-cargo-metadata.json
           cargo test --locked -p symthaea-quantum-chemistry dft::grid::tests -- --nocapture 2>&1 | tee /tmp/qc-grid-cargo-tests.log
+
+      - name: Diagnose lockfile drift (diagnostic only; never a pass)
+        if: steps.qc_merge_test.outcome == 'failure'
+        shell: bash
+        working-directory: /tmp/qc-merge-context
+        run: |
+          set -uo pipefail
+          cp Cargo.lock /tmp/qc-grid-lock-before-diagnostic.lock
+          set +e
+          cargo metadata --format-version 1 \
+            > /tmp/qc-grid-cargo-metadata-diagnostic.json \
+            2> /tmp/qc-grid-cargo-metadata-diagnostic.stderr
+          metadata_rc=$?
+          set -e
+          {
+            printf 'diagnostic_cargo_metadata_exit=%s\n' "$metadata_rc"
+            printf 'diagnostic_scope=exploratory_only_not_qualification\n'
+            if git diff --quiet -- Cargo.lock; then
+              printf 'lockfile_changed=false\n'
+            else
+              printf 'lockfile_changed=true\n'
+              git diff --no-ext-diff -- Cargo.lock > /tmp/qc-grid-lock-delta.patch
+              printf 'lockfile_delta_lines=%s\n' "$(wc -l < /tmp/qc-grid-lock-delta.patch)"
+            fi
+          } | tee /tmp/qc-grid-lock-diagnostic.txt
+          if [[ -s /tmp/qc-grid-cargo-metadata-diagnostic.stderr ]]; then
+            echo '--- cargo metadata stderr ---' >> /tmp/qc-grid-lock-diagnostic.txt
+            cat /tmp/qc-grid-cargo-metadata-diagnostic.stderr >> /tmp/qc-grid-lock-diagnostic.txt
+          fi
+          # Never let the exploratory lockfile mutation alter the tested merge tree.
+          git checkout -- Cargo.lock
+          exit 0
 
       - name: Summarize and upload evidence
         if: always()
@@ -145,6 +179,21 @@ jobs:
               tail -n 40 /tmp/qc-grid-cargo-tests.log
               echo '```'
             fi
+            if [[ -f /tmp/qc-grid-lock-diagnostic.txt ]]; then
+              echo
+              echo "### Lockfile diagnosis (non-qualifying)"
+              echo
+              cat /tmp/qc-grid-lock-diagnostic.txt
+              echo
+              echo "This diagnostic runs without --locked only to capture a proposed lockfile delta. It is never treated as a qualification pass; the required --locked test above remains authoritative."
+              if [[ -s /tmp/qc-grid-lock-delta.patch ]]; then
+                echo
+                echo "A full lockfile delta is attached in the workflow artifact."
+                echo '```diff'
+                sed -n '1,100p' /tmp/qc-grid-lock-delta.patch
+                echo '```'
+              fi
+            fi
             echo
             echo "Scope: the standalone run isolates the production grid module. The PR merge-context run additionally tests the actual quantum-chemistry crate against the exact base/head merge parents. Neither result alone establishes SCF convergence, molecular-energy agreement, or chemical accuracy."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -160,5 +209,9 @@ jobs:
             /tmp/qc-grid-merge-context-receipt.txt
             /tmp/qc-grid-cargo-metadata.json
             /tmp/qc-grid-cargo-tests.log
+            /tmp/qc-grid-cargo-metadata-diagnostic.json
+            /tmp/qc-grid-cargo-metadata-diagnostic.stderr
+            /tmp/qc-grid-lock-diagnostic.txt
+            /tmp/qc-grid-lock-delta.patch
           if-no-files-found: warn
           retention-days: 30
