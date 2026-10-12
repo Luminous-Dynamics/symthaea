@@ -33,6 +33,7 @@ fn synthetic_snapshot(name: &str, data: &[(&str, &str, f64)]) -> RegressionSnaps
                 n: 20,
                 ci_lower: val * 0.95,
                 ci_upper: val * 1.05,
+                uncertainty_provenance: None,
             },
         );
     }
