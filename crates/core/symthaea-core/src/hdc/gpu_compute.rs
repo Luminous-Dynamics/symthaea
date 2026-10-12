@@ -285,9 +285,20 @@ mod capability_report_tests {
 
         use std::time::Duration;
 
+        let qualification_mode = if expect_software {
+            "Mesa lavapipe software"
+        } else {
+            "NVIDIA physical GPU"
+        };
+        println!("Symthaea GPU qualification mode: {qualification_mode}");
+
         let (context, report) = super::GpuContext::new_with_report()
             .await
-            .expect("required software Vulkan adapter must initialize");
+            .unwrap_or_else(|error| {
+                panic!(
+                    "required {qualification_mode} Vulkan adapter must initialize: {error}"
+                )
+            });
 
         println!(
             "Symthaea GPU smoke adapter report: {}",
