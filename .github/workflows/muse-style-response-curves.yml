@@ -1,0 +1,137 @@
+name: Muse Style Response Curves
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-music-theory/src/style.rs"
+      - "crates/domains/symthaea-music-theory/src/grammar.rs"
+      - "crates/domains/symthaea-music-theory/src/fingerprint.rs"
+      - "crates/domains/symthaea-music-theory/src/composer.rs"
+      - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
+      - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/muse-style-response-curves.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-music-theory/src/style.rs"
+      - "crates/domains/symthaea-music-theory/src/grammar.rs"
+      - "crates/domains/symthaea-music-theory/src/fingerprint.rs"
+      - "crates/domains/symthaea-music-theory/src/composer.rs"
+      - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
+      - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
+      - "crates/domains/symthaea-music-theory/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/muse-style-response-curves.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-style-response-curves-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  routed-response-curves:
+    name: Generate fixed-grid routed response curves
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install the repository Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Compile and test the response-curve protocol
+        run: cargo test -p symthaea-music-theory --example style_control_response_curves
+
+      - name: Run all routed style/control response curves
+        run: |
+          mkdir -p artifacts/muse-style-response-curves
+          MUSE_STYLE_RESPONSE_JSON_OUT=artifacts/muse-style-response-curves/response-curves.json \
+            cargo run -p symthaea-music-theory --example style_control_response_curves \
+            > /tmp/muse-style-response-curves-stdout.json
+
+      - name: Bind the report to source and artifact digests
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          output_dir = Path("artifacts/muse-style-response-curves")
+          report_path = output_dir / "response-curves.json"
+          report_bytes = report_path.read_bytes()
+          report = json.loads(report_bytes)
+          source_paths = [
+              "crates/domains/symthaea-music-theory/src/style.rs",
+              "crates/domains/symthaea-music-theory/src/grammar.rs",
+              "crates/domains/symthaea-music-theory/src/fingerprint.rs",
+              "crates/domains/symthaea-music-theory/src/composer.rs",
+              "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs",
+              "Cargo.lock",
+          ]
+          blob_digests = {
+              path: subprocess.check_output(
+                  ["git", "hash-object", path], text=True
+              ).strip()
+              for path in source_paths
+          }
+          receipt = {
+              "schema": "muse-style-response-run-receipt-v1",
+              "git_commit": os.environ["GITHUB_SHA"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "workflow_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "report_path": report_path.as_posix(),
+              "report_sha256": hashlib.sha256(report_bytes).hexdigest(),
+              "source_git_blob_sha": blob_digests,
+              "engine_package_version": report["engine_package_version"],
+              "protocol": report["protocol"],
+              "measurement_scope": report["measurement_scope"],
+              "interpretation": (
+                  "Symbolic response evidence only. This receipt does not establish "
+                  "rendering success, perceptual distinctness, quality, or authenticity."
+              ),
+          }
+          receipt_path = output_dir / "run-receipt.json"
+          receipt_path.write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          with summary.open("a", encoding="utf-8") as stream:
+              stream.write("# Muse routed style-control response curves\n\n")
+              stream.write(f"- Commit: `{receipt['git_commit']}`\n")
+              stream.write(f"- Styles: {report['protocol']['style_count']}\n")
+              stream.write(f"- Curves: {report['protocol']['curve_count']}\n")
+              stream.write(f"- Control points: {report['protocol']['point_count']}\n")
+              stream.write(f"- Report SHA-256: `{receipt['report_sha256']}`\n\n")
+              stream.write("## Source blob digests\n\n")
+              stream.write("| Source | Git blob SHA |\n|---|---|\n")
+              for path, digest in blob_digests.items():
+                  stream.write(f"| `{path}` | `{digest}` |\n")
+              stream.write(
+                  "\n> Symbolic, deterministic measurements only; no audio, "
+                  "listener, distinctness, or cultural-authenticity claim is made.\n"
+              )
+          print(f"Wrote response receipt {receipt_path}")
+
+      - name: Upload reproducible response-curve evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: muse-style-response-curves-${{ github.sha }}
+          path: artifacts/muse-style-response-curves/
+          if-no-files-found: error
+          retention-days: 30
