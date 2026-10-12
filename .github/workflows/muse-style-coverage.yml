@@ -5,6 +5,9 @@ on:
     paths:
       - "crates/domains/symthaea-muse-protocol/src/catalog.rs"
       - "crates/domains/symthaea-music-theory/src/style.rs"
+      - "crates/domains/symthaea-muse/src/theory_realize.rs"
+      - "scripts/muse_style_capability_inventory.py"
+      - "tests/python/test_muse_style_capability_inventory.py"
       - "crates/domains/symthaea-muse/style-genre-coverage-baseline-v1.json"
       - "scripts/muse_style_coverage.py"
       - "tests/python/test_muse_style_coverage.py"
@@ -43,3 +46,9 @@ jobs:
 
       - name: Test parsing, integrity guards, and drift detection
         run: python3 tests/python/test_muse_style_coverage.py -v
+
+      - name: Audit source-declared executable style controls
+        run: python3 scripts/muse_style_capability_inventory.py > /tmp/muse-style-capability-inventory.json
+
+      - name: Test runtime capability inventory parser and fail-closed guards
+        run: python3 tests/python/test_muse_style_capability_inventory.py -v
