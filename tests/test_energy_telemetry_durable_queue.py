@@ -284,11 +284,19 @@ class DurableQueueTests(unittest.TestCase):
         with self.assertRaisesRegex(TelemetryQueueError, "unsupported telemetry queue schema"):
             self.reopen()
 
-    def test_nonfinite_busy_timeout_is_rejected(self):
-        for timeout in (float("nan"), float("inf"), float("-inf"), 0, -1):
+    def test_invalid_busy_timeout_and_numeric_overflow_are_rejected(self):
+        for timeout in (float("nan"), float("inf"), float("-inf"), 0, -1, 301, 1e300):
             with self.subTest(timeout=timeout):
-                with self.assertRaisesRegex(ValueError, "finite and positive"):
+                with self.assertRaisesRegex(ValueError, "finite and in"):
                     DurableTelemetryQueue(self.database, busy_timeout_seconds=timeout)
+        for kwargs in (
+            {"max_queue_bytes": 1 << 100},
+            {"max_records": 1 << 100},
+            {"max_future_skew_seconds": 1 << 100},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(ValueError):
+                    DurableTelemetryQueue(self.database, **kwargs)
 
 
 if __name__ == "__main__":
