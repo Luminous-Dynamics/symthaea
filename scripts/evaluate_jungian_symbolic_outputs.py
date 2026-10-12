@@ -22,7 +22,7 @@ DEFAULT_CORPUS = ROOT / "docs/research/data/jungian_symbolic_probe_v1.json"
 EXPECTED_CORPUS_GIT_BLOB_SHA1 = "7503a660f0062571fe1d7094a00b80631680500a"
 CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
 OUTPUT_SCHEMA = "symthaea-jungian-normalized-results-v1"
-EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v7"
+EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v8"
 ANNOTATION_SEED_SCHEMA = "symthaea-jungian-claim-annotation-seed-v1"
 ANNOTATION_PROTOCOL_ID = "JUNG-CLAIM-ANNOTATION-DRAFT-v1"
 RESULT_KEYS = {"case_id", "observations", "interpretations", "open_questions", "abstention"}
@@ -761,7 +761,7 @@ def evaluate(
     distinct_pair_text_count = sum(row["distinct_interpretation_text"] for row in pair_rows)
     return {
         "schema": EVALUATOR_SCHEMA,
-        "evaluator_id": "static_output_contract_cues_v7",
+        "evaluator_id": "static_output_contract_cues_v8",
         "method_id": method_id,
         "corpus_id": corpus["corpus_id"],
         "corpus_version": corpus["version"],
