@@ -77,7 +77,7 @@ fn cases() -> Vec<GateCase> {
         .collect()
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct BlindClip {
     clip_id: String,
     case_id: usize,
@@ -89,21 +89,21 @@ struct BlindClip {
 
 /// Listener-facing metadata only. Keep experimental labels and source case IDs
 /// out of the shareable manifest to reduce expectancy bias during rating.
-#[derive(Serialize)]
-struct ListeningClip<'a> {
-    clip_id: &'a str,
-    lyrics: &'a str,
-    audio: &'a str,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct ListeningClip {
+    clip_id: String,
+    lyrics: String,
+    audio: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct KeyEntry {
     clip_id: String,
     backend: String,
     case_id: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct ObjectiveEntry {
     clip_id: String,
     backend: String,
@@ -123,7 +123,7 @@ struct HumanRating {
     lyric_words_total: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct PerClipHumanResult {
     clip_id: String,
     rating_count: usize,
@@ -133,6 +133,13 @@ struct PerClipHumanResult {
     artifact_free_mean: f32,
     word_comprehension: f32,
     pass: bool,
+}
+
+#[derive(Deserialize)]
+struct PrivateKeyFile {
+    format_version: u32,
+    salt: String,
+    entries: Vec<KeyEntry>,
 }
 
 /// Optional authorized human anchors. Paths remain private; imported copies
@@ -177,6 +184,7 @@ fn path_entry_exists(path: &Path) -> Result<bool> {
 fn relocate_legacy_private_artifacts(output: &Path, private_output: &Path) -> Result<()> {
     for name in [
         "private_backend_key.json",
+        "internal_manifest.json",
         "objective_report.json",
         "human_case_report.json",
         "release_status.json",
@@ -566,14 +574,18 @@ fn main() -> Result<()> {
     let listening_manifest: Vec<_> = clips
         .iter()
         .map(|clip| ListeningClip {
-            clip_id: &clip.clip_id,
-            lyrics: &clip.lyrics,
-            audio: &clip.audio,
+            clip_id: clip.clip_id.clone(),
+            lyrics: clip.lyrics.clone(),
+            audio: clip.audio.clone(),
         })
         .collect();
     std::fs::write(
         output.join("blind_manifest.json"),
         serde_json::to_vec_pretty(&listening_manifest)?,
+    )?;
+    std::fs::write(
+        private_output.join("internal_manifest.json"),
+        serde_json::to_vec_pretty(&clips)?,
     )?;
     std::fs::write(
         private_output.join("private_backend_key.json"),
