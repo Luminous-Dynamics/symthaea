@@ -1911,8 +1911,9 @@ mod tests {
             Err(PrimalityProofWireError::InputTooLarge { .. })
         ));
 
-        let mut too_many_certificates = bytes;
-        too_many_certificates[16..20].copy_from_slice(&(PRIMALITY_PROOF_MAX_CERTIFICATES + 1).to_be_bytes());
+        let mut too_many_certificates = bytes.clone();
+        too_many_certificates[16..20]
+            .copy_from_slice(&(PRIMALITY_PROOF_MAX_CERTIFICATES + 1).to_be_bytes());
         assert!(matches!(
             PrimalityProof::from_canonical_bytes(&too_many_certificates),
             Err(PrimalityProofWireError::TooManyCertificates { .. })
