@@ -32,7 +32,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 - `format_summary.py` - Summary formatting
 - `generate_benchmark_report.py` - Report generation
 - `muse_style_coverage.py` - Source-derived Muse route audit in both directions; `--report` emits per-constellation gaps and unreferenced executable styles, `--check` fails on frozen-baseline drift
-- `muse_style_capability_inventory.py` - Extracts per-style grammar family, composition spec, meter, tempo range, declared intent axes, and instrument-pool mappings from Rust source; declarations are not render/quality evidence
+- `muse_style_capability_inventory.py` - Extracts per-style grammar family/dispatch mode, composition spec, meter, tempo range, census-informed intent-axis declarations, and instrument-pool choices from Rust source; mappings are not render/quality evidence
 - `gpu_smoke.sh` - NVIDIA/CUDA environment preflight and optional Broca CUDA smoke test
 - `post_to_dashboard.py` - Dashboard posting
 - `precompute_ethics_embeddings.py` - Ethics embeddings
@@ -60,6 +60,7 @@ python scripts/analyze_nixos_config.py
 python scripts/benchmark_causal_consciousness.py
 
 # Inspect Muse style catalog and executable-routing gaps (metadata, not musical-quality evidence)
+# Inspect source-declared runtime controls and grammar engine/fallback dispatch
 python3 scripts/muse_style_coverage.py --report > /tmp/muse-style-coverage-report.json
 python3 scripts/muse_style_coverage.py --check
 python3 tests/python/test_muse_style_coverage.py -v
