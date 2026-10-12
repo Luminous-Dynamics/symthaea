@@ -1873,6 +1873,31 @@ mod tests {
     #[test]
     fn test_primality_proof_canonical_bytes_round_trip() {
         let engine = NumberTheoryEngine::new();
+
+        // Shared hand-authored golden vector also consumed by the standalone Python
+        // verifier. This prevents matching encoder/decoder bugs from redefining v1.
+        let proof_three = engine.primality_proof(3).unwrap();
+        let golden: &[u8] = &[
+            b'S', b'Y', b'M', b'P', b'P', b'R', b'F', b'1',
+            0, 0, 0, 0, 0, 0, 0, 3, // root = 3
+            0, 0, 0, 2, // two certificate nodes
+            0, 0, 0, 0, 0, 0, 0, 2, // base node: prime = 2
+            0, 0, 0, 0, // no predecessor factors
+            0, 0, 0, 0, // no witnesses
+            0, 0, 0, 0, 0, 0, 0, 3, // root node: prime = 3
+            0, 0, 0, 1, // one predecessor factor
+            0, 0, 0, 0, 0, 0, 0, 2, // factor = 2
+            0, 0, 0, 1, // exponent = 1
+            0, 0, 0, 1, // one witness
+            0, 0, 0, 0, 0, 0, 0, 2, // witness factor = 2
+            0, 0, 0, 0, 0, 0, 0, 2, // witness base = 2
+        ];
+        assert_eq!(proof_three.to_canonical_bytes().unwrap().as_slice(), golden);
+        assert_eq!(
+            PrimalityProof::from_canonical_bytes(golden).unwrap(),
+            proof_three
+        );
+
         for value in [
             2u64,
             17,
