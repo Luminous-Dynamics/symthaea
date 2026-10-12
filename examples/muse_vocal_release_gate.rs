@@ -1317,6 +1317,28 @@ mod tests {
         assert_eq!(case_report[0]["clip_id"], "clip-1");
         assert_eq!(case_report[0]["pass"], true);
 
+        // A second review preserves the first report/status rather than
+        // silently overwriting earlier evidence.
+        run_saved_ratings_review(&output, &private, &ratings_path, 5).unwrap();
+        let private_names: Vec<String> = std::fs::read_dir(&private)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(
+            private_names
+                .iter()
+                .filter(|name| name.starts_with("human_case_report.review-"))
+                .count(),
+            2
+        );
+        assert_eq!(
+            private_names
+                .iter()
+                .filter(|name| name.starts_with("release_status.review-"))
+                .count(),
+            2
+        );
+
         let mut tampered_manifest = public_manifest.clone();
         tampered_manifest[0].lyrics = "different lyrics".into();
         std::fs::write(
