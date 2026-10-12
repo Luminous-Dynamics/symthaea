@@ -6,7 +6,7 @@
 //! The legacy [`crate::embodiment::EmbodimentBridge`] API exposes several bare
 //! numerical getters whose defaults are compatibility conveniences rather than
 //! observed evidence. This module provides a parallel, opt-in contract whose
-//! defaults are explicitly [`EvidenceAvailability::Unavailable`].
+//! defaults are explicitly [`crate::embodiment_evidence::EvidenceAvailability::Unavailable`].
 //!
 //! New claim-bearing, safety, trust, and HIL consumers should depend on
 //! [`EmbodimentEvidenceProviderV1`] (or a later version), not infer evidence
