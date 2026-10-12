@@ -104,7 +104,8 @@ jobs:
           {
             echo "## GPU capability smoke"
             echo
-            echo "- Tested revision: `$(git rev-parse HEAD)`"
+            REV="$(git rev-parse HEAD)"
+            echo "- Tested revision: ${REV}"
             echo "- Required backend: Vulkan using the Mesa lavapipe ICD"
             echo "- Qualification scope: WGPU adapter report, one WGSL compute dispatch, buffer copy, mapped readback, and expected-value assertion"
             echo "- Evidence classification: software-Vulkan execution only; this job does not qualify NVIDIA, AMD, Intel, Apple, or Pixel physical-GPU execution."
