@@ -32,7 +32,8 @@ const REPLY_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-reply.v2\0";
 const REPLY_PAYLOAD_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-reply-payload.v1\0";
 const PROFILE_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-coherence-profile.v1\0";
 const ASSESSMENT_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-coherence-assessment.v1\0";
-const PX4_EXTERNAL_MODE_COMPONENT_NAME_MAX_BYTES_V1: usize = 25;
+// PX4's 25-byte char array includes the terminating NUL byte.
+const PX4_EXTERNAL_MODE_COMPONENT_NAME_MAX_BYTES_V1: usize = 24;
 
 /// Successful or failed external-component registration as observed from PX4.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1371,8 +1372,8 @@ pub enum Px4ExternalModeArmingCheckError {
     /// Empty, padded, overlong, or control-containing identifier.
     #[error("invalid {0}")]
     InvalidIdentifier(&'static str),
-    /// Registration component name exceeded PX4 v1's fixed-width 25-byte field.
-    #[error("registration component name is {found} bytes; PX4 v1 allows at most 25 bytes")]
+    /// Registration component name exceeded PX4 v1's 25-byte NUL-terminated field.
+    #[error("registration component name is {found} bytes; PX4 v1 allows at most 24 bytes plus NUL")]
     ComponentNameTooLong { found: usize },
     /// Registration reply supplied a raw ID below PX4's invalid sentinel.
     #[error("registration IDs below -1 are invalid")]
@@ -1593,7 +1594,7 @@ mod tests {
             "px4.boot.fixture.session-a",
             850_000,
             991,
-            "org.luminous.fixture.mode",
+            "org.luminous.fixture.mod",
             1,
             success,
             arming_check_id,
@@ -2903,29 +2904,42 @@ mod tests {
     }
 
     #[test]
-    fn registration_component_name_obeys_px4_fixed_width_field() {
+    fn registration_component_name_respects_px4_nul_terminated_field_width() {
         let at_limit = registration(true, 3, 42);
-        assert_eq!(at_limit.component_name.len(), 25);
+        assert_eq!(at_limit.component_name.len(), 24);
         at_limit.validate().unwrap();
 
-        let over_limit = Px4ExternalModeRegistrationBindingV1::new(
-            "px4.registration.decoder.fixture.v1",
-            "vehicle.slot-a",
-            "px4.v1.18.external-mode.fixture.v1",
-            "px4.boot.fixture.session-a",
-            850_000,
-            991,
-            "org.luminous.fixture.modeX",
-            1,
-            true,
-            3,
-            42,
-            -1,
-            false,
-            ts(900_000_000),
-        );
+        let named_registration = |name: String| {
+            Px4ExternalModeRegistrationBindingV1::new(
+                "px4.registration.decoder.fixture.v1",
+                "vehicle.slot-a",
+                "px4.v1.18.external-mode.fixture.v1",
+                "px4.boot.fixture.session-a",
+                850_000,
+                991,
+                name,
+                1,
+                true,
+                3,
+                42,
+                -1,
+                false,
+                ts(900_000_000),
+            )
+        };
+
         assert_eq!(
-            over_limit.unwrap_err(),
+            named_registration("org.luminous.fixture.mode".to_owned()).unwrap_err(),
+            Px4ExternalModeArmingCheckError::ComponentNameTooLong { found: 25 }
+        );
+
+        // Rust String::len and the PX4 companion library's std::string::length both count bytes.
+        let multibyte_at_limit = named_registration("é".repeat(12)).unwrap();
+        assert_eq!(multibyte_at_limit.component_name.len(), 24);
+        multibyte_at_limit.validate().unwrap();
+
+        assert_eq!(
+            named_registration("é".repeat(13)).unwrap_err(),
             Px4ExternalModeArmingCheckError::ComponentNameTooLong { found: 26 }
         );
     }
