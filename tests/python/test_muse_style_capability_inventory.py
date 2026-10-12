@@ -44,6 +44,7 @@ impl Style {
     pub fn supported_intent_axes(self) -> &'static [&'static str] {
         const ALL: &[&str] = &["valence", "arousal", "energy", "bars"];
         const LIMITED: &[&str] = &["arousal", "bars"];
+        const NONE_LIVE: &[&str] = &[];
         match self {
             Style::Default => ALL,
             Style::Other => LIMITED,
@@ -188,6 +189,31 @@ class RuntimeInventoryTests(unittest.TestCase):
             )
             self.assertTrue(report["intent_axis_evidence"]["required_marker_present"])
             self.assertFalse(report["intent_axis_evidence"]["census_executed_by_inventory"])
+
+    def test_zero_intent_axis_styles_are_explicit_in_summary(self) -> None:
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_root(root)
+            style_path = root / STYLE_RELATIVE
+            style_path.write_text(
+                STYLE_FIXTURE.replace(
+                    "Style::Other => LIMITED,",
+                    "Style::Other => NONE_LIVE,",
+                ),
+                encoding="utf-8",
+            )
+            report = _runtime_report(root)
+
+            self.assertEqual(
+                report["summary"]["intent_axis_count_distribution"],
+                {"0": 1, "4": 1},
+            )
+            self.assertEqual(report["summary"]["styles_with_zero_intent_axes"], ["Other"])
+            other = next(item for item in report["profiles"] if item["style"] == "Other")
+            self.assertEqual(other["supported_intent_axes"], [])
+            self.assertEqual(other["intent_axis_count"], 0)
 
     def test_catalog_rows_join_to_runtime_profiles_by_composer_route(self) -> None:
         from tempfile import TemporaryDirectory
