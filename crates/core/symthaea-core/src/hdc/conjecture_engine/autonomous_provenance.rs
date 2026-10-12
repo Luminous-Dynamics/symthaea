@@ -310,13 +310,7 @@ fn validate_invariant_holdout_inner(
         if n_samples < 20 {
             return None;
         }
-        let step = states.len() / n_samples.max(1);
-        let samples: Vec<Vec<f64>> = states
-            .iter()
-            .step_by(step.max(1))
-            .take(n_samples)
-            .cloned()
-            .collect();
+        let samples = super::autonomous::sample_trajectory_evenly(&states, n_samples);
         if samples.len() < 20
             || samples.iter().any(|state| {
                 state.len() != var_names.len() || state.iter().any(|value| !value.is_finite())
