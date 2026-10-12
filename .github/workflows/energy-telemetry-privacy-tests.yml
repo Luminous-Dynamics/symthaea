@@ -9,6 +9,7 @@ on:
       - "tests/test_energy_telemetry_*.py"
       - "docs/research/energy_telemetry_envelope.schema.json"
       - "docs/research/DOMAIN_GENERAL_DELAY_TOLERANT_TELEMETRY.md"
+      - "docs/research/SQLITE_DURABLE_TELEMETRY_LEDGER.md"
       - ".github/workflows/energy-telemetry-privacy-tests.yml"
   pull_request:
     paths:
