@@ -306,8 +306,6 @@ mod capability_report_tests {
             assert!(!report.is_cpu_device, "NVIDIA hardware lane rejected a CPU-classified adapter");
             assert_eq!(report.vendor_id, 0x10DE, "hardware lane expected NVIDIA vendor ID");
         }
-        assert!(report.supports_storage_binding(4));
-
         // Exercise Symthaea's actual BinaryHV bind implementation as the CPU
         // oracle. The first 512 words cover one complete 16,384-bit BinaryHV;
         // one extra sentinel word forces a masked partial final workgroup.
@@ -315,6 +313,15 @@ mod capability_report_tests {
         const VECTOR_WORDS: usize = BinaryHV::BYTES / std::mem::size_of::<u32>();
         const ELEMENTS: usize = VECTOR_WORDS + 1;
         const BYTES: u64 = (ELEMENTS * std::mem::size_of::<u32>()) as u64;
+        let workgroups = (ELEMENTS as u32).div_ceil(64);
+        assert!(
+            report.supports_storage_binding(BYTES),
+            "device report rejects the required {BYTES}-byte storage binding"
+        );
+        assert!(
+            report.supports_1d_dispatch(workgroups, 64),
+            "device report rejects {workgroups} workgroups of 64 invocations"
+        );
 
         let left_hv = BinaryHV::random(0x5348_4456);
         let right_hv = BinaryHV::random(0x4844_4342);
@@ -425,7 +432,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             });
             pass.set_pipeline(&pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
-            pass.dispatch_workgroups((ELEMENTS as u32).div_ceil(64), 1, 1);
+            pass.dispatch_workgroups(workgroups, 1, 1);
         }
         encoder.copy_buffer_to_buffer(&output_buffer, 0, &readback, 0, BYTES);
         context.queue.submit(Some(encoder.finish()));
