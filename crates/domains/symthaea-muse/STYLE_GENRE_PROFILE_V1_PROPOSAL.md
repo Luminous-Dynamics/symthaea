@@ -156,16 +156,20 @@ This protocol is motivated by recent evidence that nominally disentangled music 
 
 ## Implementation sequence
 
-### M0 — Coverage inventory (first coding increment)
-Emit a deterministic machine-readable report linking each of the 152 catalog entries to:
-- routed executable style (or none);
-- implemented grammar family and form path;
-- actual per-style deviations from inherited anatomy;
-- rhythm/pitch/harmony/orchestration/performance/production profiles actually used;
-- tests and deterministic captures;
-- current unsupported/fallback behavior.
+### M0a — Bidirectional source-routing inventory (implemented foundation)
+Emit a deterministic source-derived report for the 152 catalog entries and 29 executable `Style` variants. The current audit checks stable catalog IDs, source digests, status/route consistency, routes that reference enum variants, and executable variants that lack a catalog route. It lists routed/unrouted catalog IDs per constellation and pins the aggregate inventory in a frozen baseline.
 
-Inventory only verified source evidence. A catalog row, enum variant, or non-empty anatomy field is not proof of an independent implementation.
+This phase reports **routing and source integrity only**. A route, enum variant, catalog row, or non-empty anatomy field is not proof of an independent musical implementation. The audit explicitly does not claim musical distinctness, renderer availability, or cultural authenticity.
+
+### M0b — Runtime capability inventory (next coding increment)
+Extend the source-routing foundation with per-style evidence for:
+- implemented grammar family and form/section path;
+- actual per-style deviations from inherited anatomy;
+- rhythm, pitch, harmony, orchestration, performance, and production profiles actually used;
+- tests and deterministic symbolic/audio captures;
+- current unsupported layers, instrument/effect substitutions, and fallback behavior.
+
+Each capability row must cite the executable source, tests or capture receipt that support it. Unknown capability remains unknown; do not infer it from a name or constellation.
 
 ### M1 — Profile and receipt contract
 Add schema/version types, sparse values with origin, canonical resolver output, stable validation codes, profile digest and round-trip tests. Keep the existing `Style` enum and stored formats as adapters; pin Classical's current behavior.
@@ -196,4 +200,5 @@ Run deterministic structural probes and audio-capture comparisons, then owner/us
 - Recipes and resolution receipts are versioned, deterministic and provenance-bound.
 - Hybrid compatibility returns reasons and can model section transitions.
 - A style's status cannot imply cultural authenticity, rendering fidelity, or distinctness unless the corresponding evidence axis supports that claim.
-- The first coverage report counts actual implemented grammar and layers, not names or labels.
+- The routing inventory reports source-declared coverage without presenting route counts as musical capability evidence.
+- The subsequent runtime-capability inventory cites source/tests/captures for actual grammar and layer behavior, rather than inferring implementation from names or labels.
