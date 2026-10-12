@@ -262,7 +262,7 @@ impl CdpSession {
                     .context("CSS click target must match exactly one element")?
             },
             ElementSelector::BackendNodeId(id) => {
-                bail!("raw integer backend node selector {id} is unsupported; use CSS or accessibility targeting");
+                bail!("unsupported raw backend node selector: {id}");
             }
             ElementSelector::Accessible { role, name } => {
                 resolve_accessible_backend_node(&page, role, name).await?
@@ -315,7 +315,7 @@ impl CdpSession {
             .as_deref()
             .is_some_and(|value| value.contains(text));
         if !value_changed || !contains_inserted_text {
-            bail!("Input.insertText was dispatched, but the AX tree did not confirm a changed value containing the requested text");
+            bail!("AX tree did not confirm the text insertion");
         }
 
         debug!(text_len = text.len(), "Typed text with native CDP input");
@@ -442,7 +442,7 @@ fn require_unique_css_match_count(selector: &str, count: usize) -> Result<()> {
     match count {
         0 => bail!("CSS selector matched no elements: {selector}"),
         1 => Ok(()),
-        multiple => bail!("CSS selector matched {multiple} elements; refusing ambiguous target: {selector}"),
+        multiple => bail!("ambiguous CSS selector {selector}: {multiple} matches"),
     }
 }
 
