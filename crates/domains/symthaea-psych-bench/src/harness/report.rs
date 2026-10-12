@@ -315,8 +315,8 @@ impl MetricValue {
 
     /// Compute from a slice of samples.
     ///
-    /// Uses proper t-distribution critical values for the 95% CI when n < 30,
-    /// falling back to z = 1.96 for larger samples.
+    /// Uses t-distribution critical values for the 95% CI when n <= 30,
+    /// falling back to z = 1.96 for n > 30.
     pub fn from_samples(samples: &[f64]) -> Self {
         let n = samples.len();
         if n == 0 {
