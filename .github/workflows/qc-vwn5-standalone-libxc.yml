@@ -66,6 +66,45 @@ jobs:
           set -euo pipefail
           /tmp/vwn5-lda-tests --nocapture 2>&1 | tee /tmp/vwn5-lda-tests.log
 
+      - name: Fetch and verify exact PR merge context
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "refs/pull/${PR_NUMBER}/merge"
+          merge_sha="$(git rev-parse --verify 'FETCH_HEAD^{commit}')"
+          merge_head="$(git rev-parse --verify "${merge_sha}^2")"
+          merge_base="$(git rev-parse --verify "${merge_sha}^1")"
+          if [[ "$merge_head" != "$EXPECTED_HEAD_SHA" ]]; then
+            printf 'merge head mismatch: expected=%s actual=%s\n' "$EXPECTED_HEAD_SHA" "$merge_head" >&2
+            exit 1
+          fi
+          if [[ "$merge_base" != "$EXPECTED_BASE_SHA" ]]; then
+            printf 'merge base mismatch: expected=%s actual=%s\n' "$EXPECTED_BASE_SHA" "$merge_base" >&2
+            exit 1
+          fi
+          git worktree add --detach /tmp/qc-merge-context "$merge_sha"
+          test -f /tmp/qc-merge-context/crates/core/symthaea-observation-attestation/Cargo.toml
+          {
+            printf 'merge_sha=%s\n' "$merge_sha"
+            printf 'merge_parent1_base_sha=%s\n' "$merge_base"
+            printf 'merge_parent2_head_sha=%s\n' "$merge_head"
+            printf 'workspace_manifest_present=true\n'
+          } | tee /tmp/vwn5-merge-context-receipt.txt
+
+      - name: Run quantum-chemistry crate LDA tests on the exact merge context
+        if: github.event_name == 'pull_request'
+        shell: bash
+        working-directory: /tmp/qc-merge-context
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 > /tmp/vwn5-cargo-metadata.json
+          cargo test --locked -p symthaea-quantum-chemistry dft::lda::tests -- --nocapture 2>&1 | tee /tmp/vwn5-cargo-tests.log
+
       - name: Install pinned Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -134,7 +173,22 @@ jobs:
               echo "- No comparison JSON was produced; the reference step did not complete."
             fi
             echo
-            echo "This gate verifies the standalone LDA source and pointwise functional values only. It does not replace Cargo workspace tests or establish molecular-energy convergence, chemical accuracy, spin-polarized VWN, or materials-discovery qualification."
+            if [[ -f /tmp/vwn5-merge-context-receipt.txt ]]; then
+              echo
+              echo "### Exact PR merge-context receipt"
+              echo
+              cat /tmp/vwn5-merge-context-receipt.txt
+            fi
+            if [[ -f /tmp/vwn5-cargo-tests.log ]]; then
+              echo
+              echo "### Quantum-chemistry crate LDA tests"
+              echo
+              echo '```text'
+              tail -n 40 /tmp/vwn5-cargo-tests.log
+              echo '```'
+            fi
+            echo
+            echo "Scope: the standalone run executes the exact LDA module tests and direct PySCF/Libxc reference. The PR merge-context run additionally tests the actual quantum-chemistry crate and verifies exact base/head merge parents. Neither proves molecular-energy convergence, chemical accuracy, spin-polarized VWN, or materials-discovery qualification."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload numerical evidence
@@ -146,5 +200,8 @@ jobs:
             /tmp/vwn5-rustc-version.txt
             /tmp/vwn5-lda-tests.log
             /tmp/vwn5-pyscf-reference.json
+            /tmp/vwn5-merge-context-receipt.txt
+            /tmp/vwn5-cargo-metadata.json
+            /tmp/vwn5-cargo-tests.log
           if-no-files-found: warn
           retention-days: 30
