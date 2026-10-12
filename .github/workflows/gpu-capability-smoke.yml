@@ -1,0 +1,124 @@
+name: GPU Capability Smoke
+
+on:
+  push:
+    branches:
+      - main
+      - feat/gpu-adapter-capability-report
+    paths:
+      - '.github/workflows/gpu-capability-smoke.yml'
+      - 'crates/core/symthaea-core/src/hdc/gpu_compute.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/gpu-capability-smoke.yml'
+      - 'crates/core/symthaea-core/src/hdc/gpu_compute.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpu-capability-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  WGPU_BACKEND: vulkan
+  SYTHAEA_GPU_SMOKE_REQUIRED: '1'
+  XDG_RUNTIME_DIR: /tmp/symthaea-xdg-runtime
+
+jobs:
+  software-vulkan:
+    name: WGPU compute dispatch on Mesa lavapipe (software Vulkan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache Cargo dependencies and build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-gpu-capability-smoke-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('crates/core/symthaea-core/src/hdc/gpu_compute.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-gpu-capability-smoke-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-gpu-capability-smoke-
+
+      - name: Install Vulkan loader, Mesa software driver, and diagnostic tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers vulkan-tools
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          ICD="$(find /usr/share/vulkan/icd.d -maxdepth 1 -type f \( -name 'lvp_icd*.json' -o -name '*lvp*.json' \) -print | sort | head -n 1)"
+          if [ -z "$ICD" ]; then
+            echo "::error::Mesa lavapipe ICD manifest was not found; refusing to report a Vulkan smoke pass."
+            exit 1
+          fi
+          echo "VK_ICD_FILENAMES=$ICD" >> "$GITHUB_ENV"
+          {
+            echo "revision=$(git rev-parse HEAD)"
+            rustc --version
+            cargo --version
+            echo "VK_ICD_FILENAMES=$ICD"
+            echo "WGPU_BACKEND=$WGPU_BACKEND"
+            dpkg-query -W libvulkan-dev mesa-vulkan-drivers vulkan-tools
+          } | tee gpu-smoke-environment.txt
+          vulkaninfo --summary 2>&1 | tee vulkan-summary.txt
+
+      - name: Run adapter-report unit tests and real software-Vulkan dispatch/readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-core --features gpu --lib \
+            hdc::gpu_compute::capability_report_tests -- --nocapture \
+            2>&1 | tee gpu-capability-smoke.log
+
+      - name: Summarize evidence level
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## GPU capability smoke"
+            echo
+            echo "- Tested revision: `$(git rev-parse HEAD)`"
+            echo "- Required backend: Vulkan using the Mesa lavapipe ICD"
+            echo "- Qualification scope: WGPU adapter report, one WGSL compute dispatch, buffer copy, mapped readback, and expected-value assertion"
+            echo "- Evidence classification: software-Vulkan execution only; this job does not qualify NVIDIA, AMD, Intel, Apple, or Pixel physical-GPU execution."
+            echo
+            if [ -f gpu-capability-smoke.log ]; then
+              echo '### Test summary'
+              grep -E 'test result:|test .* \.\.\.' gpu-capability-smoke.log || true
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload raw smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-capability-smoke-${{ github.sha }}
+          path: |
+            gpu-smoke-environment.txt
+            vulkan-summary.txt
+            gpu-capability-smoke.log
+          if-no-files-found: warn
+          retention-days: 30
