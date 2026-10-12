@@ -41,7 +41,7 @@ Use the existing concealed IDs and human-rating workflow. Keep technical checks 
 
 ## Output and provenance contract
 
-The release harness separates two output trees: the shareable listening pack (`--output`) contains WAVs, a minimal listener manifest, and a rating template; the organizer-only sibling (`<output>.private`) contains the backend answer key, objective report, and release status. Unix permissions are set to `0700`; on other platforms the operator must configure and verify suitable ACLs. The gate rejects stale files in either directory, and listeners must never receive the private sibling. The legacy-artifact migration path moves old key/report/status files out of an existing listening pack before failing closed so the operator can archive them safely.
+The release harness separates two output trees: the shareable listening pack (`--output`) contains WAVs, a minimal listener manifest, and a rating template; the organizer-only sibling (`<output>.private`) contains the backend answer key, objective report, and release status. Unix permissions are set to `0700`; on other platforms the operator must configure and verify suitable ACLs. Both output paths must be non-symlink directories, must canonicalize to separate non-nested trees, and must be empty for a fresh run; listeners must never receive the private sibling. The legacy-artifact migration path moves old key/report/status files out of an existing listening pack before failing closed so the operator can archive them safely.
 
 Every backend invocation should produce a machine-readable run manifest containing:
 
