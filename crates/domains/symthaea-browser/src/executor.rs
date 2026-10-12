@@ -85,6 +85,9 @@ impl<'a> BrowserExecutor<'a> {
     /// Dispatch an action after evaluating capability, Phi, and URL policy.
     pub async fn execute(&self, action: BrowserAction) -> ActionReceipt {
         let started = Instant::now();
+        // Hold this guard from policy preflight through action dispatch so two
+        // executor calls cannot interleave current-URL validation and mutation.
+        let _action_guard = self.session.begin_action().await;
         let decision = self.policy.evaluate_action(&action, self.phi);
 
         if let PolicyDecision::Deny { ref reason, .. } = decision {
