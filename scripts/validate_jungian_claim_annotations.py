@@ -182,6 +182,103 @@ def validate_adjudication(adjudication: Any, *, unit_id: str, guide_sha: str, re
             f"{unit_id}: adjudication_id does not match adjudication content")
 
 
+
+def label_distance(field: str, left: Any, right: Any) -> float:
+    """Nominal disagreement for categorical labels; squared normalized distance for confidence."""
+    if field == "confidence":
+        # Confidence is an ordered 1..4 rating; use squared normalized distance.
+        return ((left - right) / 3.0) ** 2
+    return 0.0 if left == right else 1.0
+
+
+def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize raw pairwise agreement and Krippendorff alpha across available reviews.
+
+    Only units with at least two independent reviews contribute. Alpha is undefined
+    when expected disagreement is zero; it is reported as null rather than fabricated.
+    These statistics describe this annotation sample, not correctness or validity.
+    """
+    label_results: dict[str, Any] = {}
+    for field in sorted(LABEL_KEYS):
+        per_unit: list[list[Any]] = []
+        for unit in units:
+            reviews = unit.get("independent_reviews", [])
+            ratings = [review["labels"][field] for review in reviews]
+            if len(ratings) >= 2:
+                per_unit.append(ratings)
+
+        comparisons = 0
+        exact_matches = 0
+        absolute_confidence_differences = 0.0
+        for ratings in per_unit:
+            for index, left in enumerate(ratings):
+                for right in ratings[index + 1:]:
+                    comparisons += 1
+                    if left == right:
+                        exact_matches += 1
+                    if field == "confidence":
+                        absolute_confidence_differences += abs(left - right)
+
+        flat = [rating for ratings in per_unit for rating in ratings]
+        rating_count = len(flat)
+        observed_numerator = 0.0
+        for ratings in per_unit:
+            if len(ratings) < 2:
+                continue
+            ordered_disagreement = sum(
+                label_distance(field, left, right)
+                for i, left in enumerate(ratings)
+                for j, right in enumerate(ratings)
+                if i != j
+            )
+            observed_numerator += ordered_disagreement / (len(ratings) - 1)
+        observed_disagreement = observed_numerator / rating_count if rating_count else None
+
+        expected_numerator = sum(
+            label_distance(field, left, right)
+            for i, left in enumerate(flat)
+            for j, right in enumerate(flat)
+            if i != j
+        )
+        expected_disagreement = (
+            expected_numerator / (rating_count * (rating_count - 1))
+            if rating_count >= 2 else None
+        )
+        alpha = (
+            1.0 - (observed_disagreement / expected_disagreement)
+            if observed_disagreement is not None
+            and expected_disagreement is not None
+            and expected_disagreement > 0.0 else None
+        )
+        entry: dict[str, Any] = {
+            "distance": "squared_normalized_ordinal" if field == "confidence" else "nominal",
+            "eligible_units": len(per_unit),
+            "rating_count": rating_count,
+            "pairwise_comparisons": comparisons,
+            "exact_pairwise_agreement": exact_matches / comparisons if comparisons else None,
+            "observed_disagreement": observed_disagreement,
+            "expected_disagreement": expected_disagreement,
+            "krippendorff_alpha": alpha,
+            "alpha_status": "defined" if alpha is not None else (
+                "undefined_no_expected_disagreement" if rating_count >= 2 else "insufficient_paired_reviews"
+            ),
+        }
+        if field == "confidence":
+            entry["mean_absolute_confidence_difference"] = (
+                absolute_confidence_differences / comparisons if comparisons else None
+            )
+        label_results[field] = entry
+
+    return {
+        "method": "Krippendorff alpha with nominal distance for categorical labels and squared normalized ordinal distance for confidence",
+        "scope": "units with at least two independent reviews; raw reviews remain authoritative",
+        "eligible_unit_count": max((item["eligible_units"] for item in label_results.values()), default=0),
+        "small_sample_warning": "Agreement estimates are descriptive; interpret cautiously with few units, imbalanced labels, or a selected non-random subset.",
+        "labels": label_results,
+        "not_established": ["correctness", "psychological validity", "holdout generalization", "population reliability"],
+    }
+
+
 def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_bytes: bytes,
                        expected_seed_sha256: str, submission_bytes: bytes | None = None, minimum_reviewers: int = 2,
                        require_complete: bool = False, require_adjudication: bool = False) -> dict[str, Any]:
@@ -276,7 +373,8 @@ def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_b
         "annotation_state": expected_state,
         "independent_review_severity_counts": severity_counts,
         "adjudicated_severity_counts": adjudicated_severity_counts,
-        "claims_not_established": ["label correctness", "semantic accuracy", "psychological validity", "inter-rater agreement", "generalization"],
+        "inter_rater_agreement": inter_rater_agreement(submission["units"]),
+        "claims_not_established": ["label correctness", "semantic accuracy", "psychological validity", "generalization"],
     }
 
 
@@ -311,6 +409,11 @@ def self_test() -> list[str]:
     try:
         report = validate_documents(seed,submission,seed_bytes=seed_bytes,guide_bytes=guide,expected_seed_sha256=expected,require_complete=True)
         require(report["review_count"] == 2 and report["coverage_complete"],"valid reviewed packet not counted")
+        agreement = report["inter_rater_agreement"]["labels"]["evidence_relation"]
+        require(agreement["exact_pairwise_agreement"] == 1.0,
+                "identical reviewer labels should produce full raw agreement")
+        require(agreement["alpha_status"] == "undefined_no_expected_disagreement",
+                "alpha must be null when the sample has no expected disagreement")
     except Exception as exc:
         failures.append(f"valid independent-review packet failed: {exc}")
     adjudicated = copy.deepcopy(submission)
@@ -334,6 +437,23 @@ def self_test() -> list[str]:
             failures.append(f"{name}: wrong exception {type(exc).__name__}: {exc}")
             return
         failures.append(f"{name}: hostile annotation packet was accepted")
+
+    disagreement = copy.deepcopy(submission)
+    second_review = disagreement["units"][0]["independent_reviews"][1]
+    second_review["labels"]["evidence_relation"] = "contradicted"
+    second_review["review_id"] = digest_record(
+        {key:value for key,value in second_review.items() if key!="review_id"},unit_id
+    )
+    try:
+        report = validate_documents(seed,disagreement,seed_bytes=seed_bytes,guide_bytes=guide,
+                                    expected_seed_sha256=expected,require_complete=True)
+        metric = report["inter_rater_agreement"]["labels"]["evidence_relation"]
+        require(metric["exact_pairwise_agreement"] == 0.0,
+                "conflicting reviewer labels should report zero pairwise agreement")
+        require(metric["krippendorff_alpha"] == 0.0,
+                "two maximally disagreeing labels on one unit should yield alpha 0.0")
+    except Exception as exc:
+        failures.append(f"disagreement measurement positive control failed: {exc}")
 
     # The adjudicator must not be one of the two independent reviewers.
     same_person_adjudicator = copy.deepcopy(adjudicated)
