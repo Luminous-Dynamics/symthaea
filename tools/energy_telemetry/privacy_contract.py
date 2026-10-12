@@ -125,7 +125,7 @@ def validate_envelope(document: Any) -> list[str]:
 
     aggregation = document.get("aggregation")
     if _exact_keys(aggregation, AGGREGATION_KEYS, "aggregation", errors):
-        if aggregation.get("scope") not in {"distribution_area", "microgrid"}:
+        if aggregation.get("scope") not in ("distribution_area", "microgrid"):
             errors.append("aggregation.scope: unsupported scope")
         token = aggregation.get("region_token")
         if not isinstance(token, str) or not REGION_TOKEN_RE.fullmatch(token):
@@ -143,27 +143,27 @@ def validate_envelope(document: Any) -> list[str]:
         if not _is_int(energy) or not 0 <= energy <= 1_000_000_000_000_000:
             errors.append("aggregation.energy_wh_total: must be a bounded non-negative integer Wh total")
         method = aggregation.get("method")
-        if method not in {
+        if method not in (
             "trusted_edge_aggregation", "secure_aggregation", "secure_aggregation_with_dp"
-        }:
+        ):
             errors.append("aggregation.method: unsupported aggregation method")
         coverage = aggregation.get("coverage_fraction")
         if not _is_finite_number(coverage) or not 0 <= coverage <= 1:
             errors.append("aggregation.coverage_fraction: must be finite and within [0,1]")
-        if aggregation.get("measurement_quality") not in {"validated", "partial", "estimated"}:
+        if aggregation.get("measurement_quality") not in ("validated", "partial", "estimated"):
             errors.append("aggregation.measurement_quality: unsupported quality state")
     else:
         method = None
 
     recipient = document.get("recipient_class")
-    if recipient not in {"grid_operations", "approved_research", "public_reporting"}:
+    if recipient not in ("grid_operations", "approved_research", "public_reporting"):
         errors.append("recipient_class: unsupported recipient class")
 
     dp_release = document.get("dp_release")
     if dp_release is not None:
         if _exact_keys(dp_release, DP_KEYS, "dp_release", errors):
             mechanism = dp_release.get("mechanism")
-            if mechanism not in {"discrete_laplace", "gaussian"}:
+            if mechanism not in ("discrete_laplace", "gaussian"):
                 errors.append("dp_release.mechanism: unsupported mechanism")
             epsilon, delta = dp_release.get("epsilon"), dp_release.get("delta")
             if not _is_finite_number(epsilon) or not 0 < epsilon <= MAX_RELEASE_EPSILON:
@@ -177,14 +177,14 @@ def validate_envelope(document: Any) -> list[str]:
             if not isinstance(receipt, str) or not SHA256_RE.fullmatch(receipt):
                 errors.append("dp_release.budget_receipt_sha256: invalid SHA-256 receipt reference")
 
-    if recipient in {"approved_research", "public_reporting"}:
+    if recipient in ("approved_research", "public_reporting"):
         if method != "secure_aggregation_with_dp":
             errors.append("recipient_class: research/public release requires secure aggregation with DP")
         if dp_release is None:
             errors.append("dp_release: required for research/public release")
     if method == "secure_aggregation_with_dp" and dp_release is None:
         errors.append("dp_release: required when aggregation.method uses DP")
-    if method in {"trusted_edge_aggregation", "secure_aggregation"} and dp_release is not None:
+    if method in ("trusted_edge_aggregation", "secure_aggregation") and dp_release is not None:
         errors.append("dp_release: must be null when the declared method does not apply DP")
 
     return errors

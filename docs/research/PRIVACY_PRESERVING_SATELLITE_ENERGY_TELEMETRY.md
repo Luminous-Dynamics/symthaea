@@ -121,7 +121,9 @@ Files:
 - `tools/energy_telemetry/privacy_contract.py`
 - `tests/test_energy_telemetry_privacy_contract.py`
 
-The validator checks the aggregate envelope's exact keys, UTC/time-window consistency, cohort floor, bounded integer energy value, finite coverage fraction, privacy-mechanism/recipient compatibility and per-release DP parameter limits. It also rejects duplicate JSON keys and non-standard `NaN`/`Infinity` constants. It does not establish cryptographic authenticity, hardware provenance, meter calibration, the reality of claimed cohort membership or a mathematical privacy proof.
+The initial unit suite contains 31 deterministic, network-free cases covering schema shape, privacy-policy gates, edge cases and ambiguous JSON input. They are implemented cases; no hosted CI pass is implied.
+
+The validator checks the aggregate envelope's exact keys, UTC/time-window consistency, cohort floor, bounded integer energy value, finite coverage fraction, privacy-mechanism/recipient compatibility and per-release DP parameter limits. It also rejects duplicate JSON keys, non-standard `NaN`/`Infinity` constants and malformed container types without crashing. It does not establish cryptographic authenticity, hardware provenance, meter calibration, the reality of claimed cohort membership or a mathematical privacy proof.
 
 ## Research and standards base
 

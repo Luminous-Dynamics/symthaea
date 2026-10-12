@@ -197,6 +197,26 @@ class PrivacyContractTests(unittest.TestCase):
         document["aggregation"]["gps"] = [-26.2, 28.0]
         self.assertTrue(any("forbidden or unknown keys" in e for e in validate_envelope(document)))
 
+    def test_list_scope_value_fails_closed_without_type_error(self):
+        document = valid_envelope()
+        document["aggregation"]["scope"] = ["microgrid"]
+        self.assertTrue(any("scope" in e for e in validate_envelope(document)))
 
-if __class__ == "__main__":
+    def test_list_method_value_fails_closed_without_type_error(self):
+        document = valid_envelope()
+        document["aggregation"]["method"] = ["secure_aggregation"]
+        self.assertTrue(any("method" in e for e in validate_envelope(document)))
+
+    def test_list_recipient_value_fails_closed_without_type_error(self):
+        document = valid_envelope()
+        document["recipient_class"] = ["public_reporting"]
+        self.assertTrue(any("recipient_class" in e for e in validate_envelope(document)))
+
+    def test_list_dp_mechanism_fails_closed_without_type_error(self):
+        document = add_dp_release(valid_envelope())
+        document["dp_release"]["mechanism"] = ["gaussian"]
+        self.assertTrue(any("mechanism" in e for e in validate_envelope(document)))
+
+
+if __name__ == "__main__":
     unittest.main()
