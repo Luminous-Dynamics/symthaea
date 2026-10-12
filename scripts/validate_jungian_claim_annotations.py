@@ -273,9 +273,9 @@ def leave_one_unit_out_sensitivity(per_unit: list[list[Any]], field: str, point_
 
 
 def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
-    """Summarize raw pairwise agreement, Krippendorff alpha, and item influence.
+    """Summarize declared-reviewer agreement, Krippendorff alpha, and item influence.
 
-    Only units with at least two independent reviews contribute to alpha. Alpha is
+    Only units with at least two distinct declared reviewer IDs contribute to alpha. Alpha is
     undefined when expected disagreement is zero; it is reported as null rather
     than fabricated. Leave-one-unit-out ranges are sensitivity diagnostics, not
     confidence intervals. These statistics describe the submitted annotation
@@ -325,7 +325,7 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
 
     return {
         "method": "Krippendorff alpha: nominal distance for categorical labels and marginal-frequency ordinal distance for confidence",
-        "scope": "units with at least two independent reviews; raw reviews remain authoritative",
+        "scope": "units with at least two distinct declared reviewer IDs; this does not authenticate identity/independence; raw ratings remain authoritative",
         "eligible_unit_count": max((item["eligible_units"] for item in label_results.values()), default=0),
         "small_sample_warning": "Agreement estimates are descriptive; interpret cautiously with few units, imbalanced labels, or a selected non-random subset.",
         "sensitivity_warning": "Leave-one-unit-out extrema measure sensitivity to individual reviewed cases; they are not confidence limits or population inference.",
@@ -386,10 +386,13 @@ def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_b
             all_review_ids.add(review_id)
             local_review_ids.add(review_id)
             severity_counts[review["labels"]["severity"]] += 1
-        expected_unit_state = "ADJUDICATED" if unit.get("adjudication") is not None else (
-            "INDEPENDENTLY_REVIEWED" if reviews else "UNANNOTATED")
+        expected_unit_state = (
+            "ADJUDICATED" if unit.get("adjudication") is not None else
+            "UNANNOTATED" if not reviewer_ids else
+            "REVIEWED" if len(reviewer_ids) >= minimum_reviewers else "IN_REVIEW"
+        )
         require(unit.get("annotation_state") == expected_unit_state,
-                f"{unit_id}: annotation_state disagrees with review/adjudication records")
+                f"{unit_id}: annotation_state disagrees with review count/adjudication records")
         if unit.get("adjudication") is not None:
             require(len(reviewer_ids) >= minimum_reviewers,
                     f"{unit_id}: adjudication requires at least {minimum_reviewers} independent reviewers")
@@ -406,7 +409,7 @@ def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_b
     require(submission.get("annotation_state") == expected_state,
             f"top-level annotation_state must be {expected_state}")
     if require_complete:
-        require(complete, f"incomplete coverage: {sum(count >= minimum_reviewers for count in review_counts)}/{len(review_counts)} units have at least {minimum_reviewers} independent reviewers")
+        require(complete, f"incomplete coverage: {sum(count >= minimum_reviewers for count in review_counts)}/{len(review_counts)} units have at least {minimum_reviewers} distinct declared reviewer IDs")
     if require_adjudication:
         require(complete and fully_adjudicated,
                 "complete independent-review coverage and adjudication for every unit are required")
@@ -426,7 +429,7 @@ def validate_documents(seed: Any, submission: Any, *, seed_bytes: bytes, guide_b
         "coverage_complete": complete,
         "adjudication_complete": fully_adjudicated,
         "annotation_state": expected_state,
-        "independent_review_severity_counts": severity_counts,
+        "declared_reviewer_severity_counts": severity_counts,
         "adjudicated_severity_counts": adjudicated_severity_counts,
         "inter_rater_agreement": inter_rater_agreement(submission["units"]),
         "claims_not_established": ["label correctness", "semantic accuracy", "psychological validity", "generalization"],
@@ -459,7 +462,7 @@ def self_test() -> list[str]:
     submission = copy.deepcopy(seed)
     reviews = [make_review(unit_id,"reviewer-a",guide_sha,[evidence_id],"2026-10-12T11:00:00Z"),make_review(unit_id,"reviewer-b",guide_sha,[evidence_id],"2026-10-12T11:05:00Z")]
     submission["units"][0]["independent_reviews"] = reviews
-    submission["units"][0]["annotation_state"] = "INDEPENDENTLY_REVIEWED"
+    submission["units"][0]["annotation_state"] = "REVIEWED"
     submission["annotation_state"] = "REVIEWED"
     try:
         report = validate_documents(seed,submission,seed_bytes=seed_bytes,guide_bytes=guide,expected_seed_sha256=expected,require_complete=True)
@@ -595,8 +598,22 @@ def self_test() -> list[str]:
     review=bad_ref["units"][0]["independent_reviews"][0]
     review["review_id"]=digest_record({key:value for key,value in review.items() if key!="review_id"},unit_id)
     rejected("cross-case evidence reference",bad_ref)
+    partial_review=copy.deepcopy(submission)
+    partial_review["units"][0]["independent_reviews"]=[reviews[0]]
+    partial_review["units"][0]["annotation_state"]="IN_REVIEW"
+    partial_review["annotation_state"]="IN_REVIEW"
+    try:
+        report = validate_documents(seed,partial_review,seed_bytes=seed_bytes,guide_bytes=guide,
+                                    expected_seed_sha256=expected)
+        require(report["annotation_state"] == "IN_REVIEW"
+                and report["units_with_minimum_independent_reviewers"] == 0,
+                "one declared reviewer must remain IN_REVIEW, not be counted complete")
+    except Exception as exc:
+        failures.append(f"partial-review state control failed: {exc}")
+
     no_review=copy.deepcopy(submission)
     no_review["units"][0]["independent_reviews"]=[reviews[0]]
+    no_review["units"][0]["annotation_state"]="IN_REVIEW"
     no_review["annotation_state"]="IN_REVIEW"
     rejected("incomplete independent-review coverage",no_review,complete=True)
     rejected("wrong pinned seed digest",submission,seed_digest="f"*64)
