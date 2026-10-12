@@ -165,29 +165,29 @@ def validate_adjudication(adjudication: Any, *, unit_id: str, guide_sha: str, re
     require(isinstance(rationale, str) and rationale.strip(), f"{unit_id}: adjudication rationale must be non-empty")
     override_reason = adjudication.get("severity_override_reason")
     require(isinstance(override_reason, str), f"{unit_id}: severity_override_reason must be a string")
-    # This ordering is a review-escalation policy, not a claim that the
-    # categories are interchangeable psychological measurements. Any downward
-    # resolution from the strongest independent-review concern needs rationale.
-    severity_priority = {"none": 0, "other_concern": 1, "unsupported_person_level_inference": 2}
-    strongest_review_priority = max(
-        (severity_priority[review["labels"]["severity"]] for review in reviews),
-        default=0,
-    )
-    resolved_priority = severity_priority[adjudication["resolved_labels"]["severity"]]
-    if resolved_priority < strongest_review_priority:
+    # These are categorical risk labels, not an ordinal severity scale. If
+    # any reviewer flagged a concern, choosing a different resolved risk label
+    # must leave an explicit rationale rather than silently overwriting it.
+    severities = [review["labels"]["severity"] for review in reviews]
+    resolved_severity = adjudication["resolved_labels"]["severity"]
+    if any(item != "none" for item in severities) and any(item != resolved_severity for item in severities):
         require(override_reason.strip(),
-                f"{unit_id}: reducing independently reported severity requires severity_override_reason")
+                f"{unit_id}: resolving away from an independently reported risk label requires severity_override_reason")
     raw = {key: value for key, value in adjudication.items() if key != "adjudication_id"}
     require(adjudication.get("adjudication_id") == digest_record(raw, unit_id),
             f"{unit_id}: adjudication_id does not match adjudication content")
 
 
 
-def label_distance(field: str, left: Any, right: Any) -> float:
-    """Nominal disagreement for categorical labels; squared normalized distance for confidence."""
+def label_distance(field: str, left: Any, right: Any, marginal_counts: dict[Any, int]) -> float:
+    """Nominal distance for categories and Krippendorff's marginal-frequency ordinal distance for confidence."""
     if field == "confidence":
-        # Confidence is an ordered 1..4 rating; use squared normalized distance.
-        return ((left - right) / 3.0) ** 2
+        # Krippendorff's ordinal delta: squared cumulative marginal frequency
+        # between the two ordered ratings minus half the endpoint frequencies.
+        low, high = sorted((left, right))
+        cumulative = sum(marginal_counts.get(category, 0) for category in range(low, high + 1))
+        endpoints = (marginal_counts.get(low, 0) + marginal_counts.get(high, 0)) / 2.0
+        return (cumulative - endpoints) ** 2
     return 0.0 if left == right else 1.0
 
 
@@ -221,12 +221,13 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
 
         flat = [rating for ratings in per_unit for rating in ratings]
         rating_count = len(flat)
+        marginal_counts = {value: flat.count(value) for value in set(flat)}
         observed_numerator = 0.0
         for ratings in per_unit:
             if len(ratings) < 2:
                 continue
             ordered_disagreement = sum(
-                label_distance(field, left, right)
+                label_distance(field, left, right, marginal_counts)
                 for i, left in enumerate(ratings)
                 for j, right in enumerate(ratings)
                 if i != j
@@ -235,7 +236,7 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
         observed_disagreement = observed_numerator / rating_count if rating_count else None
 
         expected_numerator = sum(
-            label_distance(field, left, right)
+            label_distance(field, left, right, marginal_counts)
             for i, left in enumerate(flat)
             for j, right in enumerate(flat)
             if i != j
@@ -251,7 +252,7 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
             and expected_disagreement > 0.0 else None
         )
         entry: dict[str, Any] = {
-            "distance": "squared_normalized_ordinal" if field == "confidence" else "nominal",
+            "distance": "krippendorff_ordinal" if field == "confidence" else "nominal",
             "eligible_units": len(per_unit),
             "rating_count": rating_count,
             "pairwise_comparisons": comparisons,
@@ -270,7 +271,7 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
         label_results[field] = entry
 
     return {
-        "method": "Krippendorff alpha with nominal distance for categorical labels and squared normalized ordinal distance for confidence",
+        "method": "Krippendorff alpha: nominal distance for categorical labels and marginal-frequency ordinal distance for confidence",
         "scope": "units with at least two independent reviews; raw reviews remain authoritative",
         "eligible_unit_count": max((item["eligible_units"] for item in label_results.values()), default=0),
         "small_sample_warning": "Agreement estimates are descriptive; interpret cautiously with few units, imbalanced labels, or a selected non-random subset.",
@@ -439,8 +440,14 @@ def self_test() -> list[str]:
         failures.append(f"{name}: hostile annotation packet was accepted")
 
     disagreement = copy.deepcopy(submission)
+    first_review = disagreement["units"][0]["independent_reviews"][0]
+    first_review["labels"]["confidence"] = 1
+    first_review["review_id"] = digest_record(
+        {key:value for key,value in first_review.items() if key!="review_id"},unit_id
+    )
     second_review = disagreement["units"][0]["independent_reviews"][1]
     second_review["labels"]["evidence_relation"] = "contradicted"
+    second_review["labels"]["confidence"] = 4
     second_review["review_id"] = digest_record(
         {key:value for key,value in second_review.items() if key!="review_id"},unit_id
     )
@@ -452,6 +459,11 @@ def self_test() -> list[str]:
                 "conflicting reviewer labels should report zero pairwise agreement")
         require(metric["krippendorff_alpha"] == 0.0,
                 "two maximally disagreeing labels on one unit should yield alpha 0.0")
+        confidence_metric = report["inter_rater_agreement"]["labels"]["confidence"]
+        require(confidence_metric["distance"] == "krippendorff_ordinal"
+                and confidence_metric["krippendorff_alpha"] == 0.0
+                and confidence_metric["mean_absolute_confidence_difference"] == 3.0,
+                "ordinal confidence disagreement diagnostics are incorrect")
     except Exception as exc:
         failures.append(f"disagreement measurement positive control failed: {exc}")
 
