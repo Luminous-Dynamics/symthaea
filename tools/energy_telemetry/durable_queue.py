@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-import math
 import sqlite3
 from typing import Iterator
 
@@ -64,7 +63,6 @@ class DurableTelemetryQueue:
             raise ValueError("max_future_skew_seconds must be in [0, 31536000]")
         if (
             type(busy_timeout_seconds) not in (int, float)
-            or not math.isfinite(busy_timeout_seconds)
             or not 0 < busy_timeout_seconds <= 300
         ):
             raise ValueError("busy_timeout_seconds must be finite and in (0, 300]")
