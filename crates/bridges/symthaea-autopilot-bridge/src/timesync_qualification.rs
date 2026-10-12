@@ -159,7 +159,9 @@ impl Px4TimesyncQualificationProfileV1 {
                 hasher.update(&[1]);
                 hasher.update(&value.to_le_bytes());
             }
-            None => hasher.update(&[0]),
+            None => {
+                hasher.update(&[0]);
+            }
         }
         digest_hex(hasher.finalize().as_bytes())
     }

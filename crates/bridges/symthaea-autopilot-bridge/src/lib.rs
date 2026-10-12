@@ -12,6 +12,8 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
+/// Receiver-clock MAVLink heartbeat evidence and PX4 freshness qualification.
+pub mod heartbeat;
 /// Evidence-backed PX4 operational-readiness profiles and assessments.
 pub mod readiness;
 /// Readiness-specific content-addressed PX4 status projections.

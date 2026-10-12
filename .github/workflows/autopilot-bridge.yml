@@ -8,40 +8,50 @@ on:
       - '.github/workflows/autopilot-bridge.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
   cancel-in-progress: true
 
 jobs:
-  px4-timesync-evidence:
-    name: PX4 Timesync Evidence
-    runs-on: ubuntu-latest
+  px4-heartbeat-and-timesync-evidence:
+    name: PX4 Heartbeat and Timesync Evidence
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          components: clippy
+          ref: ${{ env.QUALIFIED_SHA }}
+          persist-credentials: false
 
-      - name: Cache cargo registry and target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/autopilot-bridge
-          key: ${{ runner.os }}-cargo-autopilot-bridge-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-autopilot-bridge-
+      - name: Assert exact tested commit
+        run: test "$(git rev-parse HEAD)" = "$QUALIFIED_SHA"
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal --component clippy
+
+      - name: Record qualification identity
+        run: |
+          set -euo pipefail
+          echo "qualification_sha=$(git rev-parse HEAD)"
+          echo "event_sha=$GITHUB_SHA"
+          echo "rustc=$(rustc +1.96.0 --version)"
+          echo "cargo=$(cargo +1.96.0 --version)"
+          echo "target=x86_64-unknown-linux-gnu"
+          if test -f Cargo.lock; then
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          else
+            echo "cargo_lock=ABSENT"
+          fi
+          echo "workflow_blob_sha=$(git hash-object .github/workflows/autopilot-bridge.yml)"
 
       - name: Unit qualification
-        env:
-          CARGO_TARGET_DIR: target/autopilot-bridge
-        run: cargo test -p symthaea-autopilot-bridge -- --test-threads=1
+        run: cargo +1.96.0 test -p symthaea-autopilot-bridge -- --test-threads=1
 
       - name: Clippy
-        env:
-          CARGO_TARGET_DIR: target/autopilot-bridge
-        run: cargo clippy -p symthaea-autopilot-bridge --all-targets -- -D warnings
+        run: cargo +1.96.0 clippy -p symthaea-autopilot-bridge --all-targets -- -D warnings
