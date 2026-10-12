@@ -27,9 +27,11 @@ A hypothesis is allowed to fail. No post-hoc changes to thresholds, systems, or 
 
 Before interpreting benchmark results, expose deterministic counters for at least:
 - candidate fitness evaluations;
-- RHS evaluations and numerical integration steps;
-- candidates rejected for invalidity, degeneracy, or low gradient informativeness;
-- total search and holdout wall time.
+- RHS evaluations and attempted/completed numerical integration steps;
+- candidate rejection reasons for invalidity, excessive complexity, degeneracy, duplicate formulas, and gradient policy;
+- completed and failed trajectories, state updates, and search/holdout wall time.
+
+Counters must include work already spent by a run that later fails. A run rejected at preflight must report zero integration work and an explicit preflight rejection; it must not be conflated with a zero-cost successful search.
 
 Verify that counters count rejected work too. If exact counters are not available, the run may be reported as an exploratory pilot, but not as an equal-computation comparison.
 
@@ -40,6 +42,22 @@ Keep integrity and scientific tests separate: a valid receipt establishes intern
 Use a small fixed suite spanning different invariant structures, for example: harmonic oscillator energy, coupled linear oscillators, pendulum energy, conservative Duffing energy, Kepler energy/angular momentum, and a Lotka–Volterra first integral. Publish the exact system definitions, parameter ranges, units, expected invariants, and known limitations before running the pilot.
 
 Use at least 10 independent search seeds per system and condition. Treat these results as exploratory only: they may expose bugs and refine the harness, but must not be mixed into the confirmatory estimates.
+
+#### Executable single-system instrumentation pilot
+
+An exploratory runner is registered as `ramanujan_protocol_v2_pilot` in `symthaea-core`. From a clean, committed repository root, the intended invocation is:
+
+```text
+cargo run --locked -p symthaea-core --example ramanujan_protocol_v2_pilot -- target/ramanujan-protocol-v2-pilot.jsonl 10 42
+```
+
+The arguments are a **new output path**, replicate count, and first discovery seed. The runner refuses to overwrite an existing output, rejects dirty/untracked source trees, and emits one hashed JSONL record for each `(seed, condition)` pair plus a final batch manifest listing all per-run digests. The initial instrumentation batch uses the dimensionless one-dimensional harmonic oscillator, 80 candidates, 8 generations, a maximum expression depth of 4, maximum complexity 18, three search trajectories, and three independent holdout trajectories per returned candidate. Conditions are cold, primed, and random-expression control; each replicate shares a discovery seed label and a distinct, deterministic holdout seed namespace.
+
+Each record binds the git revision, Rust toolchain string, protocol-file digest, Cargo.lock digest, both workspace manifest digests, system-definition digest, candidate formulas, search work counters, per-candidate holdout counters, serialized receipts, oracle classifications, and a content digest. The oracle is an analytic polynomial coefficient-map check for (a(x^2+v^2)+b) with nonzero (a); formulas outside the supported degree-2 polynomial grammar fail oracle classification rather than being guessed equivalent. Holdout acceptance and oracle-equivalence are recorded separately.
+
+This runner is an **instrumentation smoke pilot**, not the full Stage 1 system suite or Stage 2 confirmatory test. It does not yet perform the required second-step-size stability check, does not validate new system families, and must not be used to claim cold discovery superiority. It is designed to make work counts, failed receipts, and every returned candidate auditable before the larger suite is frozen.
+
+**Execution caveat:** this invocation has not been run in the present environment. A preceding CI run reported that a `cargo run --locked` lane could not update `Cargo.lock`; preserve `--locked` and resolve that lockfile drift rather than bypassing it. No pilot result should be interpreted until the lockfile state is fixed and the new example and receipt changes pass CI.
 
 ### Stage 2 — Confirmatory suite
 
@@ -53,7 +71,7 @@ Run these conditions with the same expression grammar, fitness definition, maxim
 
 1. **Cold:** no built-in invariant templates, no caller templates, and cold-mode prior settings sanitized as recorded in the receipt.
 2. **Primed:** normal built-in templates; explicitly record every enabled prior and seed template.
-3. **Random-expression baseline:** sample from the same allowed grammar under the same candidate-evaluation budget, without selection pressure. This estimates how much apparent success arises from the grammar and acceptance test alone.
+3. **Random-expression baseline:** sample fresh expressions from the same allowed grammar under the same candidate-evaluation budget, without evolutionary selection, mutation, or crossover. Apply the same in-sample scoring and final candidate shortlist to all three conditions. This estimates how much apparent success arises from the grammar and acceptance test alone.
 
 For Stage 2, add at least one external symbolic-regression baseline if its problem interface can be made equivalent. State any interface mismatch rather than silently treating a non-equivalent baseline as comparable.
 
