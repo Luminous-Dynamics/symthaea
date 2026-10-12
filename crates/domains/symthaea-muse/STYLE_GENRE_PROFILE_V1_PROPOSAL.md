@@ -185,7 +185,7 @@ The new probe varies one input at a time across 29 styles:
 
 It emits 174 style/control curves and 841 tested points, each carrying the full input, exact fingerprint, distances for every named structural layer, tempo, meter, duration, note count, pitch diversity/range, and form section count. Continuous response shapes are reported as descriptive observations, not pass/fail quality scores; tonic and seed are not treated as ordinal controls. A dedicated `cargo test -p symthaea-music-theory --example style_control_response_curves` gate checks the control grids and monotonicity labeling.
 
-**Execution has not been claimed yet.** The next step is to run the probe, preserve the JSON receipt and source revision, inspect zero/partial-axis styles first, and then compare intended target changes against non-target invariance. Audio-render and listener evidence remain separate gates.
+A dedicated [Muse Style Response Curves workflow](../../../../.github/workflows/muse-style-response-curves.yml) now runs the example tests, executes the probe, binds the JSON report to the exact commit plus Git blob and SHA-256 digests, and uploads both report and receipt as a CI artifact. The latest revision has not yet produced an execution result, so no generated measurements are claimed in this proposal. Once produced, inspect zero/partial-axis styles first and compare intended target changes against non-target invariance. Audio-render and listener evidence remain separate gates.
 
 ### M0d — Measured implementation and evidence inventory
 Extend the source map with per-style evidence for:
