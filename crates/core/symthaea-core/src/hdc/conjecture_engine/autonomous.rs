@@ -1918,6 +1918,49 @@ mod cold_discovery_provenance_tests {
     }
 
     #[test]
+    fn cold_discovery_metrics_count_scoring_attempts_and_rhs_work() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            max_depth: 3,
+            max_complexity: 16,
+            diverse_trajectory_count: 1,
+            ..RegressorConfig::default()
+        };
+        let run = discover_invariants_autonomous_cold_with_metrics(
+            harmonic_rhs,
+            &[1.0, 0.0],
+            &["x", "v"],
+            None,
+            &config,
+            1.0,
+            0.01,
+        );
+
+        assert_eq!(
+            run.metrics.candidate_fitness_evaluations,
+            (config.population_size * (config.generations + 1)) as u64
+        );
+        assert_eq!(run.metrics.trajectory_attempts, 1);
+        assert_eq!(run.metrics.trajectories_completed, 1);
+        assert_eq!(run.metrics.trajectories_failed, 0);
+        assert_eq!(
+            run.metrics.rhs_evaluations,
+            run.metrics.completed_integration_steps * 4
+        );
+        assert_eq!(
+            run.metrics.state_updates,
+            run.metrics.completed_integration_steps * 2
+        );
+        assert!(run.metrics.search_wall_time_ns > 0);
+        assert_eq!(run.metrics.returned_candidates, run.candidates.len() as u64);
+    }
+
+    #[test]
     fn cold_entry_point_fails_closed_on_dimension_mismatch() {
         fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
             vec![state[1], -state[0]]
