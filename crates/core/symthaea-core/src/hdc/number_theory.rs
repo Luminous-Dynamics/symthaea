@@ -10,7 +10,21 @@ pub struct PrimeFactorization {
     pub value: u64,
     pub factors: Vec<(u64, u32)>,
     pub encoding: BinaryHV,
+    /// Floating representation of the exact Euler totient, rounded once from `u64`.
+    /// Values above 2^53 may not be exactly representable as `f64`.
     pub phi: f64,
+}
+
+/// Compute Euler's totient exactly from a value and its distinct prime factors.
+///
+/// The caller must provide the complete, distinct prime factors of `value`.
+/// Divide-before-multiply keeps every intermediate integral and no larger than `value`.
+fn phi_from_distinct_prime_factors(value: u64, factors: &[(u64, u32)]) -> u64 {
+    let mut phi = value;
+    for &(prime, _) in factors {
+        phi = (phi / prime) * (prime - 1);
+    }
+    phi
 }
 
 /// Number theory engine for HDC-based arithmetic
@@ -214,11 +228,8 @@ impl NumberTheoryEngine {
             BinaryHV::bundle(&factor_encodings)
         };
 
-        // Calculate Euler's totient function: φ(n) = n * ∏(1 - 1/p)
-        let mut phi = n as f64;
-        for (prime, _) in &factors {
-            phi *= 1.0 - 1.0 / (*prime as f64);
-        }
+        // Compute in integer arithmetic first, then convert once for the legacy API.
+        let phi = phi_from_distinct_prime_factors(n, &factors) as f64;
 
         PrimeFactorization {
             value: n,
@@ -785,13 +796,7 @@ impl ModularRing {
         self.assert_valid_modulus();
 
         let factorization = NumberTheoryEngine::new().factorize(self.modulus);
-        let mut totient = self.modulus;
-        for (prime, _) in factorization.factors {
-            // Divide first: this stays exact and avoids an unnecessary product
-            // that could overflow even if the final totient is representable.
-            totient = (totient / prime) * (prime - 1);
-        }
-        totient
+        phi_from_distinct_prime_factors(self.modulus, &factorization.factors)
     }
 }
 
@@ -859,6 +864,23 @@ mod tests {
                 product * u128::from(prime).pow(exponent)
             });
         assert_eq!(reconstructed, u128::from(semiprime));
+    }
+
+    #[test]
+    fn test_factorization_phi_uses_exact_integer_totient_before_float_conversion() {
+        let engine = NumberTheoryEngine::new();
+        // Repeated floating products historically drifted for these exact small values:
+        // phi(30) could be 8.000000000000002 rather than 8.0.
+        for (n, expected_phi) in [
+            (30u64, 8u64),
+            (210, 48),
+            (2_310, 480),
+            (30_030, 5_760),
+            (510_510, 92_160),
+            (9_699_690, 1_658_880),
+        ] {
+            assert_eq!(engine.factorize(n).phi, expected_phi as f64, "n={n}");
+        }
     }
 
     #[test]
