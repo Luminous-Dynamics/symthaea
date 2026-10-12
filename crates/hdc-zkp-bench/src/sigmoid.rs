@@ -34,7 +34,7 @@ pub struct MaskedGateBenchResult {
 
 /// Demonstrate a low-byte-masked gate in a packed-bit recurrence.
 ///
-/// The mask source remains an unconstrained private witness word; no numerical
+/// The mask source remains an unconstrained witness word; no numerical
 /// activation is computed or proven. The historical name is retained in the
 /// file path for compatibility with the benchmark harness.
 pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> MaskedGateBenchResult {
@@ -55,7 +55,7 @@ pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> MaskedG
         final_h_wires.push(builder.add_inout());
     }
 
-    // Each timestep uses an unconstrained private witness word as a gate source.
+    // Each timestep uses an unconstrained witness word as a gate source.
     // Masking with 0xFF leaves only the lowest eight bit lanes enabled.
     // The recurrence is Boolean and does not model numerical activation dynamics.
     let mut current_h: Vec<_> = h_wires.clone();
@@ -67,7 +67,7 @@ pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> MaskedG
     for _t in 0..timesteps {
         let mut new_h = Vec::with_capacity(neurons);
         for n in 0..neurons {
-            let gate_input = builder.add_witness(); // unconstrained private witness word
+            let gate_input = builder.add_witness(); // unconstrained witness word
             gate_input_wires.push(gate_input);
 
             // Gate mask: retain the lowest eight bits of the witness word (1 AND).
@@ -178,7 +178,7 @@ pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> MaskedG
         "  Verifier time: {:.3} ms",
         verify_time.as_secs_f64() * 1000.0
     );
-    println!("  Verification: PASSED (real cryptographic proof)");
+    println!("  Verification: PASSED (integrity proof; no Binius64 ZK privacy guarantee)");
 
     println!("\n  Masked recurrence: two AND gates per word per timestep (mask + update).");
     println!("  The mask source remains private; no sigmoid or numeric CfC is encoded.");
