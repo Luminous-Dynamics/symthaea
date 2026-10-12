@@ -95,22 +95,187 @@ impl fmt::Display for RtSummary {
     }
 }
 
-/// A single metric value with optional confidence interval.
+/// Versioned provenance describing the confidence-interval estimator used to
+/// create a MetricValue. A missing sample unit is deliberately unknown, not inferred.
+pub const UNCERTAINTY_PROVENANCE_SCHEMA_VERSION: &str =
+    "symthaea-psych-uncertainty-provenance-v1";
+const METRIC_VALUE_UNCERTAINTY_DIGEST_DOMAIN: &[u8] =
+    b"symthaea:psych-bench:metric-value-uncertainty:v1\n";
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UncertaintyProvenanceV1 {
+    schema_version: String,
+    sample_unit: Option<String>,
+    method: String,
+    confidence_level: f64,
+    parameters: BTreeMap<String, String>,
+    /// Digest of the metric summary and provenance fields. This detects inconsistent
+    /// edits; it is not a signature or an execution attestation.
+    observation_digest: String,
+}
+
+impl UncertaintyProvenanceV1 {
+    fn t_table_95() -> Self {
+        Self {
+            schema_version: UNCERTAINTY_PROVENANCE_SCHEMA_VERSION.to_string(),
+            sample_unit: None,
+            method: "t_table_df_1_to_29_else_z_1_96_v1".to_string(),
+            confidence_level: 0.95,
+            parameters: BTreeMap::from([
+                ("df_table_max".to_string(), "29".to_string()),
+                ("fallback_z".to_string(), "1.96".to_string()),
+            ]),
+            observation_digest: String::new(),
+        }
+    }
+
+    fn bca_bootstrap_95(seed: u64) -> Self {
+        Self {
+            schema_version: UNCERTAINTY_PROVENANCE_SCHEMA_VERSION.to_string(),
+            sample_unit: None,
+            method: "bca_bootstrap_v1".to_string(),
+            confidence_level: 0.95,
+            parameters: BTreeMap::from([
+                ("alpha".to_string(), "0.05".to_string()),
+                ("resamples".to_string(), "2000".to_string()),
+                ("seed".to_string(), seed.to_string()),
+            ]),
+            observation_digest: String::new(),
+        }
+    }
+
+    pub fn schema_version(&self) -> &str { &self.schema_version }
+    pub fn sample_unit(&self) -> Option<&str> { self.sample_unit.as_deref() }
+    pub fn method(&self) -> &str { &self.method }
+    pub fn confidence_level(&self) -> f64 { self.confidence_level }
+    pub fn parameters(&self) -> &BTreeMap<String, String> { &self.parameters }
+
+    fn compute_observation_digest(&self, value: &MetricValue) -> Result<String, String> {
+        let bytes = serde_json::to_vec(&(
+            self.schema_version.as_str(),
+            self.sample_unit.as_deref(),
+            self.method.as_str(),
+            self.confidence_level,
+            &self.parameters,
+            value.mean,
+            value.std_dev,
+            value.n,
+            value.ci_lower,
+            value.ci_upper,
+        )).map_err(|error| format!("cannot serialize metric uncertainty payload: {error}"))?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(METRIC_VALUE_UNCERTAINTY_DIGEST_DOMAIN);
+        hasher.update(&bytes);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+
+    /// Check schema, estimator parameters, and binding to the exact stored summary.
+    /// The digest is an integrity check, not a cryptographic signature.
+    pub fn validate_for_value(&self, value: &MetricValue) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if self.schema_version != UNCERTAINTY_PROVENANCE_SCHEMA_VERSION {
+            errors.push(format!(
+                "unsupported uncertainty provenance schema {:?}; expected {:?}",
+                self.schema_version, UNCERTAINTY_PROVENANCE_SCHEMA_VERSION
+            ));
+        }
+        if let Some(sample_unit) = &self.sample_unit {
+            if sample_unit.trim().is_empty() || sample_unit.chars().any(char::is_control) {
+                errors.push("uncertainty sample_unit must be non-empty and contain no control characters".to_string());
+            }
+        }
+        if self.method.trim().is_empty() {
+            errors.push("uncertainty estimator method must not be empty".to_string());
+        }
+        if !self.confidence_level.is_finite()
+            || self.confidence_level <= 0.0
+            || self.confidence_level >= 1.0 {
+            errors.push("uncertainty confidence_level must be finite and between zero and one".to_string());
+        }
+
+        match self.method.as_str() {
+            "t_table_df_1_to_29_else_z_1_96_v1" => {
+                if self.confidence_level != 0.95
+                    || self.parameters.get("df_table_max").map(String::as_str) != Some("29")
+                    || self.parameters.get("fallback_z").map(String::as_str) != Some("1.96")
+                    || self.parameters.len() != 2 {
+                    errors.push("t-table estimator provenance parameters do not match the supported 95% implementation".to_string());
+                }
+            }
+            "bca_bootstrap_v1" => {
+                let resamples = self.parameters.get("resamples").and_then(|v| v.parse::<usize>().ok());
+                let alpha = self.parameters.get("alpha").and_then(|v| v.parse::<f64>().ok());
+                let seed = self.parameters.get("seed").and_then(|v| v.parse::<u64>().ok());
+                if resamples != Some(2000) || seed.is_none() || alpha.is_none() {
+                    errors.push("BCa bootstrap provenance requires resamples=2000, a parseable alpha, and the actual u64 seed".to_string());
+                }
+                if let Some(alpha) = alpha {
+                    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0
+                        || (1.0 - alpha - self.confidence_level).abs() > 1e-12 {
+                        errors.push("BCa bootstrap alpha does not match the declared confidence level".to_string());
+                    }
+                }
+                if self.parameters.len() != 3 {
+                    errors.push("BCa bootstrap provenance contains unsupported or missing method parameters".to_string());
+                }
+            }
+            _ => errors.push(format!("unsupported uncertainty estimator method {:?}", self.method)),
+        }
+
+        match self.compute_observation_digest(value) {
+            Ok(expected) if expected == self.observation_digest => {}
+            Ok(_) => errors.push("uncertainty observation digest does not match the metric summary and provenance".to_string()),
+            Err(error) => errors.push(error),
+        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
+    }
+}
+
+/// A single metric value with an optional confidence interval and optional estimator
+/// provenance. Missing provenance in historical/manual values stays unknown.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricValue {
     /// Mean value across trials.
     pub mean: f64,
     /// Standard deviation.
     pub std_dev: f64,
-    /// Number of trials.
+    /// Number of samples represented by this metric.
     pub n: usize,
-    /// 95% confidence interval lower bound.
+    /// Confidence interval lower bound.
     pub ci_lower: f64,
-    /// 95% confidence interval upper bound.
+    /// Confidence interval upper bound.
     pub ci_upper: f64,
+    /// Optional versioned estimator provenance. Missing in legacy snapshots.
+    #[serde(default)]
+    pub uncertainty_provenance: Option<UncertaintyProvenanceV1>,
 }
 
 impl MetricValue {
+    fn with_estimator_provenance(mut self, mut provenance: UncertaintyProvenanceV1) -> Self {
+        if let Ok(digest) = provenance.compute_observation_digest(&self) {
+            provenance.observation_digest = digest;
+        }
+        self.uncertainty_provenance = Some(provenance);
+        self
+    }
+
+    /// Declare the actual unit represented by the sample count. Callers must supply its
+    /// domain-specific meaning; this is never inferred from the benchmark name.
+    pub fn with_sample_unit(mut self, sample_unit: impl Into<String>) -> Self {
+        if let Some(mut provenance) = self.uncertainty_provenance.take() {
+            provenance.sample_unit = Some(sample_unit.into());
+            if let Ok(digest) = provenance.compute_observation_digest(&self) {
+                provenance.observation_digest = digest;
+            }
+            self.uncertainty_provenance = Some(provenance);
+        }
+        self
+    }
+
+    pub fn uncertainty_provenance(&self) -> Option<&UncertaintyProvenanceV1> {
+        self.uncertainty_provenance.as_ref()
+    }
     /// Compute from a slice of samples using BCa bootstrap confidence intervals.
     ///
     /// Uses 2000 resamples with the BCa (bias-corrected and accelerated) method
@@ -126,7 +291,8 @@ impl MetricValue {
                 n: 0,
                 ci_lower: 0.0,
                 ci_upper: 0.0,
-            };
+                uncertainty_provenance: None,
+            }.with_estimator_provenance(UncertaintyProvenanceV1::bca_bootstrap_95(seed));
         }
         let mean = samples.iter().sum::<f64>() / n as f64;
         let variance = if n > 1 {
@@ -142,7 +308,9 @@ impl MetricValue {
             n,
             ci_lower,
             ci_upper,
+            uncertainty_provenance: None,
         }
+        .with_estimator_provenance(UncertaintyProvenanceV1::bca_bootstrap_95(seed))
     }
 
     /// Compute from a slice of samples.
@@ -158,7 +326,8 @@ impl MetricValue {
                 n: 0,
                 ci_lower: 0.0,
                 ci_upper: 0.0,
-            };
+                uncertainty_provenance: None,
+            }.with_estimator_provenance(UncertaintyProvenanceV1::t_table_95());
         }
         let mean = samples.iter().sum::<f64>() / n as f64;
         let variance = if n > 1 {
@@ -175,7 +344,9 @@ impl MetricValue {
             n,
             ci_lower: mean - t * se,
             ci_upper: mean + t * se,
+            uncertainty_provenance: None,
         }
+        .with_estimator_provenance(UncertaintyProvenanceV1::t_table_95())
     }
 }
 
