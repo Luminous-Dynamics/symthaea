@@ -161,8 +161,11 @@ kernel.
 
 `formal/math-certificate/` pins Lean 4.33.0, the `PrimeCert` source revision, and
 its resolved Mathlib dependency graph. The new focused workflow builds the project,
-runs an axiom audit, generates Lean source from both fixed wire vectors, and asks
-Lean to check the generated claims. The source project also includes kernel-checked
+runs an axiom audit, generates Lean source from both cross-language golden vectors and a separate
+152-byte multi-factor fixture for 13, and asks Lean to check all three generated
+claims. The extra fixture exercises combining per-factor witnesses for
+`12 = 2^2 * 3`; it is a proof-bridge regression, not a third Rust/Python
+protocol golden vector. The source project also includes kernel-checked
 claims for primality of 3 and 2 and exact reconstruction of the factorization of 2.
 
 **Formal boundary:** this is a proof of the mathematical claims produced from a
