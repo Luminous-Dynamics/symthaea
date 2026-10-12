@@ -1017,6 +1017,17 @@ mod tests {
     }
 
     #[test]
+    fn test_euler_totient_handles_near_u64_semiprime() {
+        let p = 4_294_967_291u64;
+        let q = 4_294_967_279u64;
+        let modulus = p * q;
+        assert_eq!(
+            ModularRing::new(modulus).euler_totient(),
+            (p - 1) * (q - 1)
+        );
+    }
+
+    #[test]
     fn test_primes_up_to() {
         let engine = NumberTheoryEngine::new();
         let primes = engine.primes_up_to(20);
