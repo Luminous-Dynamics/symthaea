@@ -1102,9 +1102,13 @@ mod tests {
             test_clip.case_id = index;
             clips.push(test_clip);
         }
-        let backend_by_id: BTreeMap<&str, &str> = clips
+        let key: Vec<KeyEntry> = clips
             .iter()
-            .map(|test_clip| (test_clip.clip_id.as_str(), "synthetic-test"))
+            .map(|test_clip| KeyEntry {
+                clip_id: test_clip.clip_id.clone(),
+                backend: "synthetic-test".into(),
+                case_id: test_clip.case_id,
+            })
             .collect();
         let mut values = Vec::new();
         for listener_index in 0..5 {
@@ -1129,11 +1133,15 @@ mod tests {
         let overall_naturalness =
             values.iter().map(|row| row.naturalness).sum::<f32>() / values.len() as f32;
         assert!(overall_naturalness >= 4.0, "fixture must pass global mean");
-        let per_clip = per_clip_human_results(&values, &clips, &backend_by_id);
+        let (status, per_clip) = evaluate_human_ratings(&values, &clips, &key, true, 5).unwrap();
         assert_eq!(per_clip.len(), 10);
+        assert!(status["naturalness_mean"].as_f64().unwrap() >= 4.0);
         assert!(!per_clip[0].pass, "catastrophic case must fail per clip");
         assert!(per_clip[1..].iter().all(|result| result.pass));
         assert_eq!(per_clip.iter().filter(|result| !result.pass).count(), 1);
+        assert_eq!(status["failing_synthetic_clip_count"], 1);
+        assert_eq!(status["per_clip_pass"], false);
+        assert_eq!(status["release_pass"], false);
     }
 
     #[test]
