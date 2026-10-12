@@ -654,6 +654,9 @@ mod tests {
         std::fs::create_dir_all(&public).unwrap();
         std::fs::create_dir_all(&private).unwrap();
         assert!(ensure_private_output_is_separate(&public, &private).is_ok());
+        assert!(ensure_empty_private_output(&private).is_ok());
+        std::fs::write(private.join("stale-key.json"), b"old-key").unwrap();
+        assert!(ensure_empty_private_output(&private).is_err());
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -677,10 +680,13 @@ mod tests {
         ));
         let public = root.join("pack");
         let actual_private = root.join("actual-private");
+        let public_link = root.join("pack-link");
         let private_link = root.join("pack.private");
         std::fs::create_dir_all(&public).unwrap();
         std::fs::create_dir_all(&actual_private).unwrap();
+        symlink(&public, &public_link).unwrap();
         symlink(&actual_private, &private_link).unwrap();
+        assert!(ensure_private_output_is_separate(&public_link, &actual_private).is_err());
         assert!(ensure_private_output_is_separate(&public, &private_link).is_err());
         std::fs::remove_dir_all(root).unwrap();
     }
