@@ -181,6 +181,12 @@ fn relocate_legacy_private_artifacts(output: &Path, private_output: &Path) -> Re
 /// Require the two output trees to be physically separate and restrict access
 /// to organizer-only evidence on Unix systems.
 fn ensure_private_output_is_separate(output: &Path, private_output: &Path) -> Result<()> {
+    let public_metadata =
+        std::fs::symlink_metadata(output).context("failed to inspect listening-pack directory")?;
+    anyhow::ensure!(
+        !public_metadata.file_type().is_symlink(),
+        "listening-pack output must not be a symlink"
+    );
     let private_metadata = std::fs::symlink_metadata(private_output)
         .context("failed to inspect organizer-only output directory")?;
     anyhow::ensure!(
@@ -612,6 +618,52 @@ mod tests {
             lyric_words_understood: total,
             lyric_words_total: total,
         }
+    }
+
+    #[test]
+    fn private_output_is_separate_and_owner_only_on_unix() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "symthaea-vocal-private-output-{}-{nonce}",
+            std::process::id()
+        ));
+        let public = root.join("pack");
+        let private = root.join("pack.private");
+        std::fs::create_dir_all(&public).unwrap();
+        std::fs::create_dir_all(&private).unwrap();
+        assert!(ensure_private_output_is_separate(&public, &private).is_ok());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&private).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o700);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_output_rejects_symlinks() {
+        use std::os::unix::fs::symlink;
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "symthaea-vocal-private-symlink-{}-{nonce}",
+            std::process::id()
+        ));
+        let public = root.join("pack");
+        let actual_private = root.join("actual-private");
+        let private_link = root.join("pack.private");
+        std::fs::create_dir_all(&public).unwrap();
+        std::fs::create_dir_all(&actual_private).unwrap();
+        symlink(&actual_private, &private_link).unwrap();
+        assert!(ensure_private_output_is_separate(&public, &private_link).is_err());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
