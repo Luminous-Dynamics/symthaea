@@ -608,6 +608,24 @@ fn seed_robustness_summary(curves: &[serde_json::Value]) -> Vec<serde_json::Valu
             .iter()
             .filter(|curve| curve["control"].as_str() == Some(control))
             .collect();
+        let expected_seed_set: BTreeSet<u64> = BASE_SEED_SET.into_iter().collect();
+        let observed_seed_values: Vec<u64> = matching
+            .iter()
+            .filter_map(|curve| curve["baseline_seed"].as_u64())
+            .collect();
+        let observed_seed_set: BTreeSet<u64> = observed_seed_values.iter().copied().collect();
+        let invalid_seed_record_count = matching.len() - observed_seed_values.len();
+        let duplicate_seed_record_count = observed_seed_values.len() - observed_seed_set.len();
+        let missing_seed_ids: Vec<serde_json::Value> = expected_seed_set
+            .difference(&observed_seed_set)
+            .copied()
+            .map(serde_json::Value::from)
+            .collect();
+        let unexpected_seed_ids: Vec<serde_json::Value> = observed_seed_set
+            .difference(&expected_seed_set)
+            .copied()
+            .map(serde_json::Value::from)
+            .collect();
         let changed_count = matching
             .iter()
             .filter(|curve| {
@@ -646,11 +664,21 @@ fn seed_robustness_summary(curves: &[serde_json::Value]) -> Vec<serde_json::Valu
             .collect();
 
         let expected_seed_count = BASE_SEED_SET.len();
-        let coverage_complete = matching.len() == expected_seed_count;
+        let coverage_complete = matching.len() == expected_seed_count
+            && invalid_seed_record_count == 0
+            && duplicate_seed_record_count == 0
+            && observed_seed_set == expected_seed_set;
         summaries.push(serde_json::json!({
             "control": control,
             "seed_count": matching.len(),
+            "unique_seed_count": observed_seed_set.len(),
             "expected_seed_count": expected_seed_count,
+            "expected_seed_ids": expected_seed_set,
+            "observed_seed_ids": observed_seed_set,
+            "missing_seed_ids": missing_seed_ids,
+            "unexpected_seed_ids": unexpected_seed_ids,
+            "duplicate_seed_record_count": duplicate_seed_record_count,
+            "invalid_seed_record_count": invalid_seed_record_count,
             "coverage_complete": coverage_complete,
             "seeds_with_any_observed_change": changed_count,
             "seeds_with_no_observed_change": unchanged_seeds,
@@ -658,8 +686,9 @@ fn seed_robustness_summary(curves: &[serde_json::Value]) -> Vec<serde_json::Valu
                 coverage_complete && changed_count == expected_seed_count,
             "per_channel_seed_counts": channel_seed_counts,
             "interpretation": (
-                "Counts describe source-measured output changes at tested seed/grid points; "
-                "they are not target-correctness, quality, or authenticity scores."
+                "Coverage is complete only when there is exactly one valid record for each "
+                "expected baseline seed. Counts describe measured output changes, not "
+                "target-correctness, quality, or authenticity scores."
             ),
         }));
     }
@@ -870,6 +899,90 @@ mod tests {
             incomplete_arousal["all_seeds_changed_at_least_one_recorded_channel"].as_bool(),
             Some(false)
         );
+    }
+
+    #[test]
+    fn seed_coverage_rejects_duplicate_seed_records_even_when_count_matches() {
+        let make_curve = |seed: u64| {
+            serde_json::json!({
+                "control": "arousal",
+                "baseline_seed": seed,
+                "observed_changes_from_baseline": {
+                    "no_observed_change_at_tested_points": false,
+                },
+            })
+        };
+        let curves = vec![
+            make_curve(90_210),
+            make_curve(90_210),
+            make_curve(222_731),
+            make_curve(918_273),
+        ];
+        let summary = seed_robustness_summary(&curves)
+            .into_iter()
+            .find(|row| row["control"] == "arousal")
+            .expect("arousal summary");
+        assert_eq!(summary["seed_count"].as_u64(), Some(4));
+        assert_eq!(summary["unique_seed_count"].as_u64(), Some(3));
+        assert_eq!(summary["duplicate_seed_record_count"].as_u64(), Some(1));
+        assert_eq!(summary["missing_seed_ids"][0].as_u64(), Some(130_363));
+        assert_eq!(summary["coverage_complete"].as_bool(), Some(false));
+        assert_eq!(
+            summary["all_seeds_changed_at_least_one_recorded_channel"].as_bool(),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn seed_coverage_rejects_unexpected_seed_ids() {
+        let make_curve = |seed: u64| {
+            serde_json::json!({
+                "control": "arousal",
+                "baseline_seed": seed,
+                "observed_changes_from_baseline": {
+                    "no_observed_change_at_tested_points": false,
+                },
+            })
+        };
+        let curves = vec![
+            make_curve(90_210),
+            make_curve(123_456),
+            make_curve(222_731),
+            make_curve(918_273),
+        ];
+        let summary = seed_robustness_summary(&curves)
+            .into_iter()
+            .find(|row| row["control"] == "arousal")
+            .expect("arousal summary");
+        assert_eq!(summary["missing_seed_ids"][0].as_u64(), Some(130_363));
+        assert_eq!(summary["unexpected_seed_ids"][0].as_u64(), Some(123_456));
+        assert_eq!(summary["coverage_complete"].as_bool(), Some(false));
+    }
+
+    #[test]
+    fn seed_coverage_rejects_invalid_seed_identity() {
+        let make_curve = |seed: serde_json::Value| {
+            serde_json::json!({
+                "control": "arousal",
+                "baseline_seed": seed,
+                "observed_changes_from_baseline": {
+                    "no_observed_change_at_tested_points": false,
+                },
+            })
+        };
+        let curves = vec![
+            make_curve(serde_json::json!(90_210)),
+            make_curve(serde_json::json!("130363")),
+            make_curve(serde_json::json!(222_731)),
+            make_curve(serde_json::json!(918_273)),
+        ];
+        let summary = seed_robustness_summary(&curves)
+            .into_iter()
+            .find(|row| row["control"] == "arousal")
+            .expect("arousal summary");
+        assert_eq!(summary["invalid_seed_record_count"].as_u64(), Some(1));
+        assert_eq!(summary["missing_seed_ids"][0].as_u64(), Some(130_363));
+        assert_eq!(summary["coverage_complete"].as_bool(), Some(false));
     }
 
     #[test]
