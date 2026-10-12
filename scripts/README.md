@@ -31,7 +31,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 - `run_coding_validation.sh` - Run code-generation honesty tests and the verified HumanEval-style smoke benchmark
 - `format_summary.py` - Summary formatting
 - `generate_benchmark_report.py` - Report generation
-- `muse_style_coverage.py` - Source-derived Muse catalog/route coverage audit; `--check` fails on stale baseline drift
+- `muse_style_coverage.py` - Source-derived Muse catalog/route audit; `--report` emits per-constellation gaps, `--check` fails on frozen-baseline drift
 - `gpu_smoke.sh` - NVIDIA/CUDA environment preflight and optional Broca CUDA smoke test
 - `post_to_dashboard.py` - Dashboard posting
 - `precompute_ethics_embeddings.py` - Ethics embeddings
@@ -57,6 +57,11 @@ nix develop .#python-research
 # Run package-backed Python scripts
 python scripts/analyze_nixos_config.py
 python scripts/benchmark_causal_consciousness.py
+
+# Inspect Muse style catalog and executable-routing gaps (metadata, not musical-quality evidence)
+python3 scripts/muse_style_coverage.py --report > /tmp/muse-style-coverage-report.json
+python3 scripts/muse_style_coverage.py --check
+python3 tests/python/test_muse_style_coverage.py -v
 
 # Run Python smoke checks
 uv run --no-sync pytest tests/python -q
