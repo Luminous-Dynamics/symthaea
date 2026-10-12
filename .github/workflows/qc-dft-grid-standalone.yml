@@ -1,0 +1,217 @@
+name: QC DFT Grid Standalone Regressions
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-quantum-chemistry/src/dft/grid.rs"
+      - "scripts/qc/dft_grid_standalone.rs"
+      - ".github/workflows/qc-dft-grid-standalone.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qc-dft-grid-standalone-${{ github.event.pull_request.number || github.run_id || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dft-grid:
+    name: Compile and run production grid.rs tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head or dispatched source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact source and record tree identity
+        shell: bash
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse --verify 'HEAD^{commit}')"
+          if [[ "$actual" != "$EXPECTED_SOURCE_SHA" ]]; then
+            printf 'source HEAD mismatch: expected=%s actual=%s\n' "$EXPECTED_SOURCE_SHA" "$actual" >&2
+            exit 1
+          fi
+          {
+            echo "## Standalone DFT grid regression evidence"
+            echo
+            printf -- '- Exact source commit: `%s`\n' "$actual"
+            printf -- '- Source tree: `%s`\n' "$(git rev-parse --verify 'HEAD^{tree}')"
+            printf -- '- Production grid source: `crates/domains/symthaea-quantum-chemistry/src/dft/grid.rs`\n'
+            printf -- '- Harness supplies minimal `Atom` and `Molecule` fixtures only; the production `grid.rs` and its embedded unit tests are compiled directly.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Compile production grid source and embedded tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose | tee /tmp/dft-grid-rustc-version.txt
+          rustc --edition=2024 --test scripts/qc/dft_grid_standalone.rs -o /tmp/dft-grid-tests
+
+      - name: Execute analytic and structural grid regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/dft-grid-tests --nocapture 2>&1 | tee /tmp/dft-grid-tests.log
+
+      - name: Fetch and verify exact PR merge context
+        id: merge_context
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=2 origin "refs/pull/${PR_NUMBER}/merge"
+          merge_sha="$(git rev-parse --verify 'FETCH_HEAD^{commit}')"
+          merge_head="$(git rev-parse --verify "${merge_sha}^2")"
+          merge_base="$(git rev-parse --verify "${merge_sha}^1")"
+          if [[ "$merge_head" != "$EXPECTED_HEAD_SHA" ]]; then
+            printf 'merge head mismatch: expected=%s actual=%s\n' "$EXPECTED_HEAD_SHA" "$merge_head" >&2
+            exit 1
+          fi
+          if [[ "$merge_base" != "$EXPECTED_BASE_SHA" ]]; then
+            printf 'merge base mismatch: expected=%s actual=%s\n' "$EXPECTED_BASE_SHA" "$merge_base" >&2
+            exit 1
+          fi
+          git worktree add --detach /tmp/qc-merge-context "$merge_sha"
+          test -f /tmp/qc-merge-context/crates/core/symthaea-observation-attestation/Cargo.toml
+          {
+            printf 'merge_sha=%s\n' "$merge_sha"
+            printf 'merge_parent1_base_sha=%s\n' "$merge_base"
+            printf 'merge_parent2_head_sha=%s\n' "$merge_head"
+            printf 'lockfile_blob_sha=%s\n' "$(git rev-parse --verify "${merge_sha}:Cargo.lock")"
+            printf 'observation_manifest_blob_sha=%s\n' "$(git rev-parse --verify "${merge_sha}:crates/core/symthaea-observation-attestation/Cargo.toml")"
+            printf 'scientific_source_path=%s\n' "crates/domains/symthaea-quantum-chemistry/src/dft/grid.rs"
+            printf 'scientific_source_blob_sha=%s\n' "$(git rev-parse --verify "${merge_sha}:crates/domains/symthaea-quantum-chemistry/src/dft/grid.rs")"
+            printf 'workspace_manifest_present=true\n'
+          } | tee /tmp/qc-grid-merge-context-receipt.txt
+
+      - name: Compile and run quantum-chemistry crate grid tests on the exact merge context
+        id: qc_merge_test
+        if: github.event_name == 'pull_request'
+        shell: bash
+        working-directory: /tmp/qc-merge-context
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 > /tmp/qc-grid-cargo-metadata.json
+          cargo test --locked -p symthaea-quantum-chemistry dft::grid::tests -- --nocapture 2>&1 | tee /tmp/qc-grid-cargo-tests.log
+
+      - name: Diagnose lockfile drift (diagnostic only; never a pass)
+        if: steps.qc_merge_test.outcome == 'failure'
+        shell: bash
+        working-directory: /tmp/qc-merge-context
+        run: |
+          set -uo pipefail
+          cp Cargo.lock /tmp/qc-grid-lock-before-diagnostic.lock
+          set +e
+          cargo metadata --format-version 1 \
+            > /tmp/qc-grid-cargo-metadata-diagnostic.json \
+            2> /tmp/qc-grid-cargo-metadata-diagnostic.stderr
+          metadata_rc=$?
+          set -e
+          {
+            printf 'diagnostic_cargo_metadata_exit=%s\n' "$metadata_rc"
+            printf 'diagnostic_scope=exploratory_only_not_qualification\n'
+            if git diff --quiet -- Cargo.lock; then
+              printf 'lockfile_changed=false\n'
+            else
+              printf 'lockfile_changed=true\n'
+              git diff --no-ext-diff -- Cargo.lock > /tmp/qc-grid-lock-delta.patch
+              printf 'lockfile_delta_lines=%s\n' "$(wc -l < /tmp/qc-grid-lock-delta.patch)"
+            fi
+          } | tee /tmp/qc-grid-lock-diagnostic.txt
+          if [[ -s /tmp/qc-grid-cargo-metadata-diagnostic.stderr ]]; then
+            echo '--- cargo metadata stderr ---' >> /tmp/qc-grid-lock-diagnostic.txt
+            cat /tmp/qc-grid-cargo-metadata-diagnostic.stderr >> /tmp/qc-grid-lock-diagnostic.txt
+          fi
+          # Never let the exploratory lockfile mutation alter the tested merge tree.
+          git checkout -- Cargo.lock
+          exit 0
+
+      - name: Summarize and upload evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo
+            echo "### Rust regression output"
+            echo
+            if [[ -f /tmp/dft-grid-rustc-version.txt ]]; then
+              printf -- '- Compiler: `%s`\n' "$(head -1 /tmp/dft-grid-rustc-version.txt)"
+            else
+              echo "- Compiler version was not recorded."
+            fi
+            if [[ -f /tmp/dft-grid-tests.log ]]; then
+              echo
+              echo '```text'
+              tail -n 40 /tmp/dft-grid-tests.log
+              echo '```'
+            else
+              echo "- Test log was not produced; compilation or an earlier step may have failed."
+            fi
+            echo
+            if [[ -f /tmp/qc-grid-merge-context-receipt.txt ]]; then
+              echo
+              echo "### Exact PR merge-context receipt"
+              echo
+              cat /tmp/qc-grid-merge-context-receipt.txt
+            fi
+            if [[ -f /tmp/qc-grid-cargo-tests.log ]]; then
+              echo
+              echo "### Quantum-chemistry crate tests"
+              echo
+              echo '```text'
+              tail -n 40 /tmp/qc-grid-cargo-tests.log
+              echo '```'
+            fi
+            if [[ -f /tmp/qc-grid-lock-diagnostic.txt ]]; then
+              echo
+              echo "### Lockfile diagnosis (non-qualifying)"
+              echo
+              cat /tmp/qc-grid-lock-diagnostic.txt
+              echo
+              echo "This diagnostic runs without --locked only to capture a proposed lockfile delta. It is never treated as a qualification pass; the required --locked test above remains authoritative."
+              if [[ -s /tmp/qc-grid-lock-delta.patch ]]; then
+                echo
+                echo "A full lockfile delta is attached in the workflow artifact."
+                echo '```diff'
+                sed -n '1,100p' /tmp/qc-grid-lock-delta.patch
+                echo '```'
+              fi
+            fi
+            echo
+            echo "Scope: the standalone run isolates the production grid module. The PR merge-context run additionally tests the actual quantum-chemistry crate against the exact base/head merge parents. Neither result alone establishes SCF convergence, molecular-energy agreement, or chemical accuracy."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload source-scoped grid evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qc-dft-grid-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/dft-grid-rustc-version.txt
+            /tmp/dft-grid-tests.log
+            /tmp/qc-grid-merge-context-receipt.txt
+            /tmp/qc-grid-cargo-metadata.json
+            /tmp/qc-grid-cargo-tests.log
+            /tmp/qc-grid-cargo-metadata-diagnostic.json
+            /tmp/qc-grid-cargo-metadata-diagnostic.stderr
+            /tmp/qc-grid-lock-diagnostic.txt
+            /tmp/qc-grid-lock-delta.patch
+          if-no-files-found: warn
+          retention-days: 30
