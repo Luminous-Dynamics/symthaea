@@ -95,7 +95,7 @@ use crate::consciousness::temporal_primitives::{
 };
 use crate::hdc::binary_hv::BinaryHV;
 use std::collections::VecDeque;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 // ============================================================================
 // CONFIGURATION
@@ -104,8 +104,14 @@ use std::time::Instant;
 /// Configuration for temporal consciousness analysis
 #[derive(Clone, Debug)]
 pub struct TemporalConsciousnessConfig {
-    /// History depth for Φ trajectory analysis
+    /// Maximum number of Φ samples retained for trajectory analysis.
+    /// This is a sample-count bound, not an elapsed-time horizon.
     pub phi_history_depth: usize,
+
+    /// Exponential moving-average time constant in seconds.
+    /// The EMA is elapsed-time-aware, so its effective smoothing does not depend
+    /// on how often the cognitive loop happens to emit observations.
+    pub phi_ema_time_constant_secs: f64,
 
     /// Threshold for continuity discontinuity detection
     pub continuity_threshold: f64,
@@ -136,6 +142,7 @@ impl Default for TemporalConsciousnessConfig {
     fn default() -> Self {
         Self {
             phi_history_depth: 100,
+            phi_ema_time_constant_secs: 1.0,
             continuity_threshold: 0.15,
             past_weight: 0.3,
             present_weight: 0.4,
@@ -155,8 +162,15 @@ impl Default for TemporalConsciousnessConfig {
 /// Analysis of Φ over time
 #[derive(Debug, Clone)]
 pub struct PhiTrajectory {
-    /// Historical Φ values with timestamps
-    history: VecDeque<(Instant, f64)>,
+    /// Historical Φ values with elapsed monotonic offsets from construction.
+    /// Offsets are scoped to this trajectory and are not portable timestamps.
+    history: VecDeque<(Duration, f64)>,
+
+    /// Monotonic origin for the compatibility observe() method.
+    started_at: Instant,
+
+    /// Elapsed-time constant for the EMA (seconds).
+    ema_time_constant_secs: f64,
 
     /// Current Φ velocity (dΦ/dt)
     pub velocity: f64,
@@ -179,8 +193,24 @@ pub struct PhiTrajectory {
 
 impl PhiTrajectory {
     pub fn new(capacity: usize) -> Self {
+        Self::new_with_time_constant(capacity, 1.0)
+    }
+
+    /// Create a trajectory analyzer with an explicit elapsed-time EMA constant.
+    /// Invalid or non-positive constants fall back to one second.
+    pub fn new_with_time_constant(capacity: usize, ema_time_constant_secs: f64) -> Self {
+        let ema_time_constant_secs = if ema_time_constant_secs.is_finite()
+            && ema_time_constant_secs > 0.0
+        {
+            ema_time_constant_secs
+        } else {
+            1.0
+        };
+        let capacity = capacity.max(1);
         Self {
             history: VecDeque::with_capacity(capacity),
+            started_at: Instant::now(),
+            ema_time_constant_secs,
             velocity: 0.0,
             acceleration: 0.0,
             stability: 1.0,
@@ -190,19 +220,43 @@ impl PhiTrajectory {
         }
     }
 
-    /// Record a new Φ observation
+    /// Record a Φ observation using the trajectory's local monotonic clock.
+    ///
+    /// Use `observe_at` in deterministic experiments or when observations arrive
+    /// from an externally measured clock. The compatibility method intentionally
+    /// keeps the original simple call surface.
     pub fn observe(&mut self, phi: f64) {
-        let now = Instant::now();
+        let _ = self.observe_at(phi, self.started_at.elapsed());
+    }
 
-        // Update EMA (α = 0.1)
-        self.ema = 0.1 * phi + 0.9 * self.ema;
+    /// Record Φ at an elapsed offset from the trajectory's monotonic origin.
+    ///
+    /// Returns false and leaves state unchanged for non-finite Φ values or
+    /// duplicate/backwards timestamps. The first valid observation initializes
+    /// the EMA; later observations use alpha = 1 - exp(-dt / tau), making the
+    /// smoothing time-constant invariant to subdividing a constant-value interval.
+    pub fn observe_at(&mut self, phi: f64, elapsed: Duration) -> bool {
+        if !phi.is_finite() {
+            return false;
+        }
+        if let Some((previous_time, _)) = self.history.back() {
+            if elapsed <= *previous_time {
+                return false;
+            }
+            let dt = elapsed.saturating_sub(*previous_time).as_secs_f64();
+            let decay = (-dt / self.ema_time_constant_secs).exp();
+            self.ema = (1.0 - decay) * phi + decay * self.ema;
+        } else {
+            self.ema = phi;
+        }
 
-        self.history.push_back((now, phi));
+        self.history.push_back((elapsed, phi));
         if self.history.len() > self.capacity {
             self.history.pop_front();
         }
 
         self.compute_dynamics();
+        true
     }
 
     fn compute_dynamics(&mut self) {
@@ -215,7 +269,7 @@ impl PhiTrajectory {
         let (t1, phi1) = self.history[len - 2];
         let (t2, phi2) = self.history[len - 1];
 
-        let dt = t2.duration_since(t1).as_secs_f64();
+        let dt = t2.saturating_sub(t1).as_secs_f64();
         if dt > 0.0 {
             let new_velocity = (phi2 - phi1) / dt;
 
@@ -227,6 +281,9 @@ impl PhiTrajectory {
 
         // Compute stability (inverse variance)
         if self.history.len() >= 3 {
+            // Deliberately sample-weighted variance. It describes the retained
+            // sample set, not a time-weighted variance; compare it across runs only
+            // when sampling cadence and retained time coverage are comparable.
             let phis: Vec<f64> = self.history.iter().map(|(_, p)| *p).collect();
             let mean = phis.iter().sum::<f64>() / phis.len() as f64;
             let variance = phis.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / phis.len() as f64;
@@ -764,7 +821,10 @@ impl TemporalConsciousnessAnalyzer {
         };
 
         Self {
-            phi_trajectory: PhiTrajectory::new(config.phi_history_depth),
+            phi_trajectory: PhiTrajectory::new_with_time_constant(
+                config.phi_history_depth,
+                config.phi_ema_time_constant_secs,
+            ),
             continuity: ConsciousnessContinuity::new(20, config.continuity_threshold),
             identity_coherence: TemporalIdentityCoherence::new(config.clone()),
             husserlian: HusserlianAnalysis::new(10, 5),
@@ -1047,6 +1107,45 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn phi_ema_is_invariant_to_sampling_subdivision_for_constant_segments() {
+        let mut coarse = PhiTrajectory::new_with_time_constant(16, 1.0);
+        let mut fine = PhiTrajectory::new_with_time_constant(16, 1.0);
+
+        assert!(coarse.observe_at(0.2, Duration::ZERO));
+        assert!(coarse.observe_at(0.8, Duration::from_secs(1)));
+
+        assert!(fine.observe_at(0.2, Duration::ZERO));
+        assert!(fine.observe_at(0.2, Duration::from_millis(250)));
+        assert!(fine.observe_at(0.2, Duration::from_millis(500)));
+        assert!(fine.observe_at(0.2, Duration::from_millis(750)));
+        assert!(fine.observe_at(0.8, Duration::from_secs(1)));
+
+        assert!(
+            (coarse.ema - fine.ema).abs() < 1e-12,
+            "EMA should depend on elapsed time, not the number of identical samples"
+        );
+    }
+
+    #[test]
+    fn phi_trajectory_rejects_duplicate_backwards_and_nonfinite_observations() {
+        let mut trajectory = PhiTrajectory::new(8);
+        assert!(trajectory.observe_at(0.4, Duration::from_secs(1)));
+        assert!(!trajectory.observe_at(0.6, Duration::from_secs(1)));
+        assert!(!trajectory.observe_at(0.6, Duration::from_millis(500)));
+        assert!(!trajectory.observe_at(f64::NAN, Duration::from_secs(2)));
+        assert_eq!(trajectory.history().len(), 1);
+        assert_eq!(trajectory.ema, 0.4);
+    }
+
+    #[test]
+    fn phi_velocity_uses_elapsed_seconds() {
+        let mut trajectory = PhiTrajectory::new(8);
+        assert!(trajectory.observe_at(0.2, Duration::ZERO));
+        assert!(trajectory.observe_at(0.4, Duration::from_secs(2)));
+        assert!((trajectory.velocity - 0.1).abs() < 1e-12);
+    }
 
     #[test]
     fn test_phi_trajectory() {
