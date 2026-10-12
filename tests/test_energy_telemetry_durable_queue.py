@@ -150,6 +150,16 @@ class DurableQueueTests(unittest.TestCase):
         self.assertEqual(self.queue.integrity_check(), "ok")
         self.assertEqual(self.reopen().integrity_check(), "ok")
 
+    def test_ephemeral_database_path_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "persistent filesystem path"):
+            DurableTelemetryQueue(":memory:")
+
+    def test_nonfinite_busy_timeout_is_rejected(self):
+        for timeout in (float("nan"), float("inf"), float("-inf"), 0, -1):
+            with self.subTest(timeout=timeout):
+                with self.assertRaisesRegex(ValueError, "finite and positive"):
+                    DurableTelemetryQueue(self.database, busy_timeout_seconds=timeout)
+
 
 if __name__ == "__main__":
     unittest.main()
