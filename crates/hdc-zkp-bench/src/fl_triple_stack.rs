@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Legacy-path demonstration of a bitwise-majority proof over opaque words.
 //!
-//! The circuit proves only that a public packed-word output is strict per-bit
-//! majority of private packed-word inputs. It does NOT prove one-time-pad
+//! The circuit constrains only that a public packed-word output is strict per-bit
+//! majority of witness input words. Binius64 gives no ZK input-privacy guarantee.
+//! It does NOT prove one-time-pad
 //! encryption, participant identity, numeric gradient aggregation, or an
 //! end-to-end federated-learning protocol.
 
@@ -33,7 +34,7 @@ pub struct BitwiseMajorityBenchResult {
     pub proof_size_bytes: usize,
 }
 
-/// Prove strict bitwise majority over N private inputs of dim_words 64-bit words.
+/// Prove strict bitwise majority over N witness inputs; input confidentiality is not guaranteed.
 pub fn bench_bitwise_majority(
     participants: usize,
     dim_words: usize,
@@ -121,7 +122,7 @@ pub fn bench_bitwise_majority(
         "  Verifier time: {:.3} ms",
         verify_time.as_secs_f64() * 1000.0
     );
-    println!("  Verification: PASSED (strict bitwise-majority relation)");
+    println!("  Verification: PASSED (integrity relation; no Binius64 ZK privacy guarantee)");
 
     BitwiseMajorityBenchResult {
         participants,
