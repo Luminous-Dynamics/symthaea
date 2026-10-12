@@ -48,7 +48,7 @@ class DurableTelemetryQueue:
         if (
             not isinstance(database_path, str)
             or not database_path.strip()
-            or "\\x00" in database_path
+            or "\x00" in database_path
             or database_path == ":memory:"
         ):
             raise ValueError("database_path must be a persistent filesystem path, not :memory:")
