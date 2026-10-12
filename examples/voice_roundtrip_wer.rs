@@ -684,18 +684,37 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut rows = Vec::new();
+    let mut synthesis_failures = Vec::new();
     let mut total_wer = 0.0f64;
     for (i, sentence) in sentences.iter().enumerate() {
         let synth_start = Instant::now();
-        let samples = match &mut synth {
-            Synth::Repl(voice) => voice.synthesize(sentence)?,
-            Synth::Kokoro(engine) => engine.synthesize(sentence, None).unwrap_or_default(),
+        let synthesis_result: Result<Vec<f32>, String> = match &mut synth {
+            Synth::Repl(voice) => voice
+                .synthesize(sentence)
+                .map_err(|error| format!("synthesis error: {error:#}")),
+            Synth::Kokoro(engine) => engine
+                .synthesize(sentence, None)
+                .ok_or_else(|| "synthesis unavailable: G2P/model returned None".to_string()),
         };
         let synth_ms = synth_start.elapsed().as_millis();
-        if samples.is_empty() {
-            println!("  [{i:2}] SYNTHESIS EMPTY: {sentence:?}");
-            continue;
-        }
+        let samples = match synthesis_result {
+            Ok(samples) if !samples.is_empty() => samples,
+            Ok(_) => {
+                let reason = "synthesis returned empty audio".to_string();
+                println!("  [{i:2}] SYNTHESIS FAILED: {sentence:?} ({reason})");
+                synthesis_failures.push(serde_json::json!({
+                    "index": i, "sentence": sentence, "reason": reason, "synth_ms": synth_ms
+                }));
+                continue;
+            }
+            Err(reason) => {
+                println!("  [{i:2}] SYNTHESIS FAILED: {sentence:?} ({reason})");
+                synthesis_failures.push(serde_json::json!({
+                    "index": i, "sentence": sentence, "reason": reason, "synth_ms": synth_ms
+                }));
+                continue;
+            }
+        };
         let audio_secs = samples.len() as f32 / voice_sr as f32;
         let resampled = linear_resample(&samples, voice_sr, WHISPER_SAMPLE_RATE);
 
@@ -734,12 +753,22 @@ fn main() -> anyhow::Result<()> {
         }));
     }
 
-    let mean_wer = total_wer / rows.len().max(1) as f64;
+    let rendered_count = rows.len();
+    let requested_count = sentences.len();
+    let failure_count = synthesis_failures.len();
+    let complete = rendered_count == requested_count && failure_count == 0;
+    let mean_wer = if rendered_count > 0 {
+        Some(total_wer / rendered_count as f64)
+    } else {
+        None
+    };
+    let mean_wer_display = mean_wer
+        .map(|wer| format!("{:.1}%", wer * 100.0))
+        .unwrap_or_else(|| "unavailable".to_string());
     println!(
-        "\n  Mean round-trip WER: {:.1}% over {} sentences",
-        mean_wer * 100.0,
-        rows.len()
+        "\n  Mean round-trip WER: {mean_wer_display} over {rendered_count}/{requested_count} requested sentences"
     );
+    println!("  Synthesis failures: {failure_count}; corpus complete: {complete}");
     println!(
         "  (normalized scoring; measures mouth intelligibility — Whisper's own WER on real speech is ~4.8%)"
     );
@@ -754,11 +783,22 @@ fn main() -> anyhow::Result<()> {
             "vocal_tract_feature": cfg!(feature = "vocal-tract"),
             "asr": "whisper-large-v3-local (JSONL worker)",
             "scoring": "symthaea-communication normalize_for_scoring + word_error_rate",
+            "requested_sentence_count": requested_count,
+            "rendered_sentence_count": rendered_count,
+            "synthesis_failure_count": failure_count,
+            "synthesis_failures": synthesis_failures,
+            "complete": complete,
             "mean_wer": mean_wer,
             "sentences": rows,
         });
         std::fs::write(&path, serde_json::to_string_pretty(&report)?)?;
         println!("  Report written to {path}");
+    }
+
+    if !complete {
+        anyhow::bail!(
+            "round-trip evaluation incomplete: rendered {rendered_count} of {requested_count} requested sentences with {failure_count} synthesis failure(s); do not interpret mean WER as a full-corpus score"
+        );
     }
 
     Ok(())
