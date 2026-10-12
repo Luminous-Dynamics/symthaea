@@ -167,6 +167,16 @@ claims. The extra fixture exercises combining per-factor witnesses for
 `12 = 2^2 * 3`; it is a proof-bridge regression, not a third Rust/Python
 protocol golden vector. The source project also includes kernel-checked
 claims for primality of 3 and 2 and exact reconstruction of the factorization of 2.
+The Lean source now also defines
+`pocklington_certify_independent_witnesses`: a generic theorem that derives
+`Nat.Prime N` from the Pocklington size/divisibility conditions and a separate
+verified witness for each prime divisor. A concrete theorem for 13 exercises
+the two distinct factor obligations for (12 = 2^2 \cdot 3) without using the
+Python common-root conversion. This theorem is currently an auxiliary formal
+result; the generator still emits proofs through `PrimeCert`'s common-root
+tactic path. Wiring generated records into the new theorem and formally decoding
+the bytes remain separate qualification steps.
+
 
 Each generated Lean module embeds the exact input bytes and the parsed
 wire structure. Lean proves that its separate canonical encoder reproduces those
