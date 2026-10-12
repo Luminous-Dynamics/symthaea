@@ -257,7 +257,7 @@ fn observe(
         layer_distances,
         tempo_bpm: score.tempo_bpm,
         meter_beats: score.meter,
-        total_duration_beats: score.total_duration().beats(),
+        total_duration_beats: score.total_beats.beats(),
         score_note_count: score.notes.len(),
         distinct_midi_pitches: midi_pitches.len(),
         pitch_span_semitones,
