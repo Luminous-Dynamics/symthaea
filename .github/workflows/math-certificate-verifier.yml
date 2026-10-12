@@ -2,8 +2,10 @@ name: Math Certificate Verifier
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "tools/verify_math_certificate.py"
+      - "tools/math_certificate_golden_vectors.py"
       - "tests/test_verify_math_certificate.py"
       - "PRIMALITY_CERTIFICATES.md"
       - "crates/core/symthaea-core/src/hdc/number_theory.rs"
@@ -24,6 +26,7 @@ permissions:
 
 jobs:
   verify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
