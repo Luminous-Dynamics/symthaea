@@ -790,6 +790,42 @@ mod tests {
     }
 
     #[test]
+    fn constructor_emits_the_interval_method_actually_used() {
+        let student_t = MetricValue::from_samples(&[0.2, 0.4, 0.6]);
+        let provenance = student_t.uncertainty_provenance().unwrap();
+        assert_eq!(provenance.method(), "t_table_df_1_to_29_else_z_1_96_v1");
+        assert_eq!(provenance.confidence_level(), 0.95);
+        assert!(provenance.sample_unit().is_none());
+        assert!(provenance.validate_for_value(&student_t).is_ok());
+
+        let bootstrap = MetricValue::from_samples_bootstrap(&[0.2, 0.4, 0.6], 17)
+            .with_sample_unit("independent_seed_run");
+        let serialized = serde_json::to_string(&bootstrap).unwrap();
+        let loaded: MetricValue = serde_json::from_str(&serialized).unwrap();
+        let provenance = loaded.uncertainty_provenance().unwrap();
+        assert_eq!(provenance.method(), "bca_bootstrap_v1");
+        assert_eq!(provenance.sample_unit(), Some("independent_seed_run"));
+        assert_eq!(provenance.parameters().get("seed").map(String::as_str), Some("17"));
+        assert!(provenance.validate_for_value(&loaded).is_ok());
+    }
+
+    #[test]
+    fn unsupported_provenance_schema_is_rejected() {
+        let metric = MetricValue::from_samples_bootstrap(&[0.2, 0.4, 0.6], 17)
+            .with_sample_unit("independent_seed_run");
+        let mut json = serde_json::to_value(&metric).unwrap();
+        json["uncertainty_provenance"]["schema_version"] =
+            serde_json::Value::String("symthaea-psych-uncertainty-provenance-v999".to_string());
+        let tampered: MetricValue = serde_json::from_value(json).unwrap();
+        let errors = tampered
+            .uncertainty_provenance()
+            .unwrap()
+            .validate_for_value(&tampered)
+            .unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("unsupported uncertainty provenance schema")));
+    }
+
+    #[test]
     fn legacy_metric_value_deserializes_without_invented_provenance() {
         let json = r#"{"mean":0.8,"std_dev":0.1,"n":10,"ci_lower":0.6,"ci_upper":1.0}"#;
         let value: MetricValue = serde_json::from_str(json).unwrap();
