@@ -76,7 +76,7 @@ def radial_scale_policy_record() -> dict[str, Any]:
 def source_identity(path: Path) -> dict[str, str]:
     """Record both a Git-compatible blob ID and SHA-256 of the exact callback source file."""
     payload = path.read_bytes()
-    git_payload = b"blob " + str(len(payload)).encode("ascii") + b"\\0" + payload
+    git_payload = b"blob " + str(len(payload)).encode("ascii") + b"\0" + payload
     return {
         "path": path.name,
         "git_blob_sha1": hashlib.sha1(git_payload).hexdigest(),
