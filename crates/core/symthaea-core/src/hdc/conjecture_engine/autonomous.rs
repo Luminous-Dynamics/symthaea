@@ -916,6 +916,7 @@ fn discover_invariants_autonomous_with_mode_and_metrics(
             extra_seed_templates,
         )
     {
+        metrics.preflight_rejections = 1;
         return finish_discovery_run(Vec::new(), metrics, started_at);
     }
 
@@ -1935,10 +1936,13 @@ mod cold_discovery_provenance_tests {
             generations: 2,
             ..RegressorConfig::default()
         };
-        let result = discover_invariants_autonomous_cold(
+        let run = discover_invariants_autonomous_cold_with_metrics(
             harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.0,
         );
-        assert!(result.is_empty());
+        assert!(run.candidates.is_empty());
+        assert_eq!(run.metrics.preflight_rejections, 1);
+        assert_eq!(run.metrics.candidate_fitness_evaluations, 0);
+        assert_eq!(run.metrics.rhs_evaluations, 0);
     }
 
     #[test]
