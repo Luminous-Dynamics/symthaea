@@ -13,7 +13,15 @@ use anyhow::{Context, Result, bail};
 use chromiumoxide::Page;
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::accessibility::GetFullAxTreeParams;
+use chromiumoxide::cdp::browser_protocol::dom::{
+    BackendNodeId, GetContentQuadsParams, ScrollIntoViewIfNeededParams,
+};
+use chromiumoxide::cdp::browser_protocol::input::InsertTextParams;
+use chromiumoxide::cdp::browser_protocol::page::{
+    GetNavigationHistoryParams, NavigateToHistoryEntryParams,
+};
 use chromiumoxide::handler::viewport::Viewport;
+use chromiumoxide::layout::Point;
 use futures::StreamExt;
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -145,6 +153,7 @@ impl CdpSession {
             .context("Failed to get accessibility tree")?;
 
         let mut elements = Vec::new();
+        let mut focused_element = None;
         for node in &response.result.nodes {
             let role = node
                 .role
@@ -173,6 +182,18 @@ impl CdpSession {
                 .as_ref()
                 .map(|id| *id.inner())
                 .unwrap_or(0);
+            let focused = node.properties.as_ref().is_some_and(|properties| {
+                properties.iter().any(|property| {
+                    let property_name = serde_json::to_value(&property.name).ok();
+                    property_name.as_ref().and_then(serde_json::Value::as_str)
+                        == Some("focused")
+                        && property.value.value.as_ref()
+                            .and_then(serde_json::Value::as_bool) == Some(true)
+                })
+            });
+            if focused {
+                focused_element.get_or_insert(elements.len());
+            }
 
             elements.push(AccessibleElement {
                 backend_node_id,
@@ -180,14 +201,13 @@ impl CdpSession {
                 name,
                 value,
                 description,
-                focused: false,
+                focused,
                 // AX `ignored` means omitted from the accessibility projection;
                 // it is not the HTML/ARIA disabled state.
                 disabled: false,
             });
         }
 
-        let focused_element = detect_focused_element(&page, &elements).await;
         let mut observation = PageObservation {
             url,
             title,
@@ -198,134 +218,106 @@ impl CdpSession {
         Ok(observation)
     }
 
-    /// Click an element identified by a supported selector.
+    /// Click a CSS or accessibility target using native DOM and Input CDP commands.
+    ///
+    /// This avoids Chromiumoxide's convenience click path, which runs a JavaScript
+    /// scroll helper before dispatching input.
     pub(crate) async fn click(&self, selector: &ElementSelector) -> Result<()> {
         let page = self.page.lock().await;
-        match selector {
-            ElementSelector::Css(css) => {
-                page.find_element(css)
-                    .await
-                    .context("Element not found")?
-                    .click()
-                    .await
-                    .context("Click failed")?;
-            }
+        let backend_node_id = match selector {
+            ElementSelector::Css(css) => page
+                .find_element(css)
+                .await
+                .context("Element not found")?
+                .backend_node_id
+                .clone(),
             ElementSelector::BackendNodeId(id) => {
-                bail!(
-                    "backend node targeting is not implemented safely for node {id}; use a CSS or accessible selector"
-                );
+                bail!("raw integer backend node selector {id} is unsupported; use CSS or accessibility targeting");
             }
             ElementSelector::Accessible { role, name } => {
-                let role = serde_json::to_string(role).context("Serialize accessible role")?;
-                let name = serde_json::to_string(name).context("Serialize accessible name")?;
-                let result = page
-                    .evaluate(format!(
-                        r#"(() => {{
-                            const wantedRole = {role};
-                            const wantedName = {name};
-                            const inferredRole = (el) => {{
-                                const explicit = el.getAttribute('role');
-                                if (explicit) return explicit;
-                                const tag = el.tagName.toLowerCase();
-                                if (tag === 'button') return 'button';
-                                if (tag === 'a' && el.hasAttribute('href')) return 'link';
-                                if (tag === 'textarea') return 'textbox';
-                                if (tag === 'select') return 'combobox';
-                                if (tag === 'input') {{
-                                    const type = (el.getAttribute('type') || 'text').toLowerCase();
-                                    if (type === 'checkbox') return 'checkbox';
-                                    if (type === 'radio') return 'radio';
-                                    return 'textbox';
-                                }}
-                                return '';
-                            }};
-                            const accessibleName = (el) =>
-                                (el.getAttribute('aria-label') ||
-                                 el.getAttribute('title') ||
-                                 el.getAttribute('placeholder') ||
-                                 el.textContent || '').trim();
-                            const matches = Array.from(document.querySelectorAll('*')).filter(
-                                el => inferredRole(el) === wantedRole && accessibleName(el) === wantedName
-                            );
-                            if (matches.length === 0) return 'not_found';
-                            if (matches.length > 1) return 'ambiguous';
-                            matches[0].click();
-                            return 'clicked';
-                        }})()"#
-                    ))
-                    .await
-                    .context("Click via accessible selector failed")?
-                    .into_value::<String>()
-                    .unwrap_or_default();
-                match result.as_str() {
-                    "clicked" => {}
-                    "ambiguous" => bail!("accessible selector matched multiple elements"),
-                    _ => bail!("accessible selector did not match an element"),
-                }
+                resolve_accessible_backend_node(&page, role, name).await?
             }
-        }
-        debug!(?selector, "Clicked");
+        };
+        click_backend_node(&page, &backend_node_id)
+            .await
+            .context("Native CDP click failed")?;
+        debug!(?selector, "Clicked with native CDP input");
         Ok(())
     }
 
-    /// Type text into an element after focusing it.
+    /// Type text using native CDP input and verify the resulting AX value.
+    ///
+    /// A successful CDP command is not enough: the accessibility tree must
+    /// confirm the inserted text, so rejected or reverted framework inputs fail closed.
     pub(crate) async fn type_text(&self, selector: &ElementSelector, text: &str) -> Result<()> {
-        match selector {
-            ElementSelector::Css(css) => {
-                let page = self.page.lock().await;
-                let element = page.find_element(css).await.context("Element not found")?;
-                element.click().await.context("Focus failed")?;
-                set_active_value(&page, text).await.context("Type failed")?;
-            }
-            _ => {
-                self.click(selector).await?;
-                let page = self.page.lock().await;
-                set_active_value(&page, text)
-                    .await
-                    .context("Type after focus failed")?;
-            }
+        if text.is_empty() {
+            return Ok(());
         }
-        debug!(text_len = text.len(), "Typed text");
+
+        let page = self.page.lock().await;
+        let backend_node_id = match selector {
+            ElementSelector::Css(css) => page
+                .find_element(css)
+                .await
+                .context("Element not found")?
+                .backend_node_id
+                .clone(),
+            ElementSelector::BackendNodeId(id) => {
+                bail!("raw integer backend node selector {id} is unsupported; use CSS or accessibility targeting");
+            }
+            ElementSelector::Accessible { role, name } => {
+                resolve_accessible_backend_node(&page, role, name).await?
+            }
+        };
+
+        validate_text_entry_target(&page, &backend_node_id)
+            .await
+            .context("Text target is not a supported editable control")?;
+        click_backend_node(&page, &backend_node_id)
+            .await
+            .context("Focus text target with native CDP input")?;
+        page.execute(InsertTextParams::new(text.to_owned()))
+            .await
+            .context("Input.insertText failed")?;
+        if !accessibility_value_contains(&page, &backend_node_id, text).await? {
+            bail!("Input.insertText was dispatched, but the AX tree did not confirm the requested text");
+        }
+
+        debug!(text_len = text.len(), "Typed text with native CDP input");
         Ok(())
     }
 
-    /// Scroll a CSS-selected element into the viewport.
+    /// Scroll a CSS-selected element into the viewport using the DOM CDP domain.
     pub(crate) async fn scroll_to(&self, selector: &ElementSelector) -> Result<()> {
         let ElementSelector::Css(css) = selector else {
             bail!("scroll currently requires a CSS selector");
         };
         let page = self.page.lock().await;
-        let css = serde_json::to_string(css).context("Serialize CSS selector")?;
-        let result = page
-            .evaluate(format!(
-                "(() => {{ const el = document.querySelector({css}); if (!el) return 'not_found'; el.scrollIntoView({{block:'center', inline:'nearest'}}); return 'scrolled'; }})()"
-            ))
+        let element = page
+            .find_element(css)
             .await
-            .context("Scroll failed")?
-            .into_value::<String>()
-            .unwrap_or_default();
-        if result != "scrolled" {
-            bail!("scroll target not found");
-        }
+            .context("Scroll target not found")?;
+        scroll_backend_node_into_view(&page, &element.backend_node_id)
+            .await
+            .context("Native CDP scroll failed")?;
         Ok(())
     }
 
     pub(crate) async fn go_back(&self) -> Result<()> {
         let page = self.page.lock().await;
-        page.evaluate("history.back(); true")
-            .await
-            .context("History back failed")?;
-        Ok(())
+        navigate_history(&page, -1).await.context("History back failed")
     }
 
     pub(crate) async fn go_forward(&self) -> Result<()> {
         let page = self.page.lock().await;
-        page.evaluate("history.forward(); true")
-            .await
-            .context("History forward failed")?;
-        Ok(())
+        navigate_history(&page, 1).await.context("History forward failed")
     }
 
+    /// Extract page text for the explicit ExtractText action.
+    ///
+    /// This is the remaining fixed-expression JavaScript helper. Migration to a
+    /// DOMSnapshot/text-node implementation remains open; the CSS selector is
+    /// JSON-serialized before it is included in the expression.
     pub(crate) async fn extract_text(&self, selector: Option<&str>) -> Result<String> {
         let page = self.page.lock().await;
         let selector = serde_json::to_string(&selector).context("Serialize text selector")?;
@@ -369,135 +361,192 @@ impl CdpSession {
         Ok(bytes)
     }
 
-    /// Get page state via JS when the AX tree is unavailable.
+    /// Compatibility shim. The JavaScript observation fallback has been removed.
+    ///
+    /// Prefer the native accessibility-tree API. This shim is kept for source
+    /// compatibility and no longer evaluates page JavaScript.
+    #[deprecated(note = "JavaScript observation fallback removed; use get_accessibility_tree")]
     pub async fn get_page_state_js(&self) -> Result<PageObservation> {
-        let page = self.page.lock().await;
-        let url = page.url().await.unwrap_or(None).unwrap_or_default();
-        let title = page
-            .get_title()
-            .await
-            .unwrap_or(None)
-            .unwrap_or_else(|| "Untitled".into());
-
-        let json = page
-            .evaluate(
-                r#"JSON.stringify({
-                    headings: Array.from(document.querySelectorAll('h1,h2')).slice(0,10).map(e=>e.textContent?.trim()||''),
-                    buttons: Array.from(document.querySelectorAll('button')).slice(0,20).map(e=>e.textContent?.trim()||''),
-                    inputs: Array.from(document.querySelectorAll('input')).slice(0,10).map(e=>e.placeholder||''),
-                    links: Array.from(document.querySelectorAll('a')).slice(0,10).map(e=>e.textContent?.trim()||''),
-                    texts: Array.from(document.querySelectorAll('p')).slice(0,5).map(e=>e.textContent?.trim().substring(0,80)||'')
-                })"#,
-            )
-            .await
-            .context("JS eval failed")?;
-
-        let data: serde_json::Value =
-            serde_json::from_str(&json.into_value::<String>().unwrap_or_default())
-                .unwrap_or_default();
-
-        let mut elements = Vec::new();
-        let extract = |key: &str, role: &str| -> Vec<AccessibleElement> {
-            data.get(key)
-                .and_then(|value| value.as_array())
-                .map(|items| {
-                    items
-                        .iter()
-                        .filter_map(|value| {
-                            let name = value.as_str().unwrap_or("").to_string();
-                            if name.is_empty() {
-                                return None;
-                            }
-                            Some(AccessibleElement {
-                                backend_node_id: -1,
-                                role: role.to_string(),
-                                name,
-                                value: None,
-                                description: None,
-                                focused: false,
-                                disabled: false,
-                            })
-                        })
-                        .collect()
-                })
-                .unwrap_or_default()
-        };
-
-        elements.extend(extract("headings", "heading"));
-        elements.extend(extract("buttons", "button"));
-        elements.extend(extract("inputs", "textbox"));
-        elements.extend(extract("links", "link"));
-        elements.extend(extract("texts", "text"));
-
-        let mut observation = PageObservation {
-            url,
-            title,
-            elements,
-            focused_element: None,
-        };
-        observation.sanitize(self.max_elements);
-        Ok(observation)
+        self.get_accessibility_tree().await
     }
 
-    /// Try AX tree first, then fall back to bounded JS extraction.
+    /// Observe through the native accessibility tree only.
+    ///
+    /// An unavailable tree is returned as an error; there is no silent JavaScript
+    /// fallback that could hide a degraded observation path.
     pub async fn observe(&self) -> Result<PageObservation> {
-        match self.get_accessibility_tree().await {
-            Ok(observation) => Ok(observation),
-            Err(_) => self.get_page_state_js().await,
-        }
+        self.get_accessibility_tree()
+            .await
+            .context("Accessibility observation unavailable; JavaScript fallback is disabled")
     }
 
-    /// Low-level arbitrary JavaScript evaluation for internal diagnostics only.
-    pub(crate) async fn eval_js(&self, expression: &str) -> Result<String> {
-        let page = self.page.lock().await;
-        let result = page
-            .evaluate(expression)
-            .await
-            .context("JS evaluation failed")?;
-        Ok(result.into_value::<String>().unwrap_or_default())
+async fn navigate_history(page: &Page, offset: i64) -> Result<()> {
+    let history = page
+        .execute(GetNavigationHistoryParams::builder().build())
+        .await
+        .context("Read navigation history")?
+        .result;
+    let target_index = history
+        .current_index
+        .checked_add(offset)
+        .context("Navigation history index overflow")?;
+    if target_index < 0 {
+        bail!("no earlier navigation history entry");
     }
+    let target_index = usize::try_from(target_index).context("Invalid navigation history index")?;
+    let entry = history
+        .entries
+        .get(target_index)
+        .context("no navigation history entry in that direction")?;
+    page.execute(
+        NavigateToHistoryEntryParams::builder()
+            .entry_id(entry.id)
+            .build()
+            .unwrap(),
+    )
+    .await
+    .context("Navigate to history entry")?;
+    Ok(())
 }
 
-async fn set_active_value(page: &Page, text: &str) -> Result<()> {
-    let text = serde_json::to_string(text).context("Serialize input text")?;
-    let result = page
-        .evaluate(format!(
-            "(() => {{ const el = document.activeElement; const value = {text}; if (!el || !('value' in el)) return 'not_editable'; el.value = value; el.dispatchEvent(new Event('input', {{bubbles:true}})); el.dispatchEvent(new Event('change', {{bubbles:true}})); return 'typed'; }})()"
-        ))
+async fn resolve_accessible_backend_node(
+    page: &Page,
+    wanted_role: &str,
+    wanted_name: &str,
+) -> Result<BackendNodeId> {
+    let tree = page
+        .execute(GetFullAxTreeParams::builder().build())
         .await
-        .context("Set active value failed")?
-        .into_value::<String>()
-        .unwrap_or_default();
-    if result != "typed" {
-        bail!("focused element is not editable");
+        .context("Read accessibility tree for target resolution")?;
+    let matches: Vec<_> = tree
+        .result
+        .nodes
+        .iter()
+        .filter(|node| {
+            let role = node.role.as_ref().and_then(|value| ax_value_to_string(&value.value));
+            let name = node.name.as_ref().and_then(|value| ax_value_to_string(&value.value));
+            role.as_deref() == Some(wanted_role) && name.as_deref() == Some(wanted_name)
+        })
+        .collect();
+
+    if matches.is_empty() {
+        bail!("accessible selector did not match an element");
+    }
+    if matches.len() > 1 {
+        bail!("accessible selector matched multiple elements");
+    }
+    matches[0]
+        .backend_dom_node_id
+        .as_ref()
+        .cloned()
+        .context("accessible selector has no associated DOM backend node")
+}
+
+async fn validate_text_entry_target(page: &Page, backend_node_id: &BackendNodeId) -> Result<()> {
+    let tree = page
+        .execute(GetFullAxTreeParams::builder().build())
+        .await
+        .context("Read accessibility tree before text entry")?;
+    let node = tree
+        .result
+        .nodes
+        .iter()
+        .find(|node| {
+            node.backend_dom_node_id
+                .as_ref()
+                .is_some_and(|id| *id.inner() == *backend_node_id.inner())
+        })
+        .context("text target is not present in the accessibility tree")?;
+    let role = node.role.as_ref().and_then(|value| ax_value_to_string(&value.value));
+    if !matches!(role.as_deref(), Some("textbox" | "searchbox" | "spinbutton")) {
+        bail!("text target has unsupported accessibility role: {:?}", role);
+    }
+
+    let disabled = node.properties.as_ref().is_some_and(|properties| {
+        properties.iter().any(|property| {
+            let property_name = serde_json::to_value(&property.name).ok();
+            property_name.as_ref().and_then(serde_json::Value::as_str) == Some("disabled")
+                && property.value.value.as_ref()
+                    .and_then(serde_json::Value::as_bool) == Some(true)
+        })
+    });
+    if disabled {
+        bail!("text target is disabled");
     }
     Ok(())
 }
 
-async fn detect_focused_element(page: &Page, elements: &[AccessibleElement]) -> Option<usize> {
-    let result = page
-        .evaluate(
-            r#"(() => {
-                const el = document.activeElement;
-                if (!el || el === document.body) return '';
-                const role = el.getAttribute('role') ||
-                    (el.tagName.toLowerCase() === 'button' ? 'button' :
-                    (el.tagName.toLowerCase() === 'a' ? 'link' :
-                    (['input','textarea'].includes(el.tagName.toLowerCase()) ? 'textbox' : '')));
-                const name = (el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.textContent || '').trim();
-                return JSON.stringify({role, name});
-            })()"#,
+async fn accessibility_value_contains(
+    page: &Page,
+    backend_node_id: &BackendNodeId,
+    expected: &str,
+) -> Result<bool> {
+    let tree = page
+        .execute(GetFullAxTreeParams::builder().build())
+        .await
+        .context("Read accessibility tree after text entry")?;
+    let node = tree.result.nodes.iter().find(|node| {
+        node.backend_dom_node_id
+            .as_ref()
+            .is_some_and(|id| *id.inner() == *backend_node_id.inner())
+    });
+    let Some(node) = node else {
+        return Ok(false);
+    };
+    let value = node.value.as_ref().and_then(|value| ax_value_to_string(&value.value));
+    Ok(value.is_some_and(|value| value.contains(expected)))
+}
+
+async fn scroll_backend_node_into_view(
+    page: &Page,
+    backend_node_id: &BackendNodeId,
+) -> Result<()> {
+    page.execute(
+        ScrollIntoViewIfNeededParams::builder()
+            .backend_node_id(backend_node_id.clone())
+            .build(),
+    )
+    .await
+    .context("DOM.scrollIntoViewIfNeeded")?;
+    Ok(())
+}
+
+async fn click_backend_node(page: &Page, backend_node_id: &BackendNodeId) -> Result<()> {
+    scroll_backend_node_into_view(page, backend_node_id).await?;
+    let quads = page
+        .execute(
+            GetContentQuadsParams::builder()
+                .backend_node_id(backend_node_id.clone())
+                .build(),
         )
         .await
-        .ok()?
-        .into_value::<String>()
-        .ok()?;
-    let focused: serde_json::Value = serde_json::from_str(&result).ok()?;
-    let role = focused.get("role")?.as_str()?;
-    let name = focused.get("name")?.as_str()?;
-    elements
+        .context("DOM.getContentQuads")?
+        .result;
+    let point = quads
+        .quads
         .iter()
-        .position(|element| element.role == role && element.name == name)
+        .find_map(|quad| quad_center(quad.inner()))
+        .context("Click target has no visible content quad")?;
+    page.click(point).await.context("Input dispatch click")?;
+    Ok(())
+}
+
+fn quad_center(coordinates: &[f64]) -> Option<Point> {
+    if coordinates.len() != 8 || coordinates.iter().any(|coordinate| !coordinate.is_finite()) {
+        return None;
+    }
+    let mut twice_area = 0.0;
+    for index in 0..4 {
+        let next = (index + 1) % 4;
+        twice_area += coordinates[index * 2] * coordinates[next * 2 + 1]
+            - coordinates[next * 2] * coordinates[index * 2 + 1];
+    }
+    if twice_area.abs() < 2.0 {
+        return None;
+    }
+    let x = (coordinates[0] + coordinates[2] + coordinates[4] + coordinates[6]) / 4.0;
+    let y = (coordinates[1] + coordinates[3] + coordinates[5] + coordinates[7]) / 4.0;
+    Some(Point::new(x, y))
 }
 
 /// Extract a string from a `serde_json::Value` (the AxValue payload).
@@ -526,3 +575,49 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod native_cdp_tests {
+    use super::*;
+
+    #[test]
+    fn quad_center_returns_center_of_visible_quad() {
+        let point = quad_center(&[0.0, 0.0, 10.0, 0.0, 10.0, 20.0, 0.0, 20.0])
+            .expect("valid quad should have a center");
+        assert!((point.x - 5.0).abs() < f64::EPSILON);
+        assert!((point.y - 10.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn quad_center_rejects_degenerate_and_malformed_quads() {
+        assert!(quad_center(&[0.0, 0.0, 1.0, 1.0]).is_none());
+        assert!(quad_center(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).is_none());
+        assert!(quad_center(&[0.0, 0.0, f64::NAN, 0.0, 10.0, 10.0, 0.0, 10.0]).is_none());
+    }
+
+    #[test]
+    fn core_action_paths_do_not_call_page_evaluate() {
+        let source = include_str!("cdp.rs");
+        let sections = [
+            ("pub async fn get_accessibility_tree", "    /// Click an element"),
+            ("pub(crate) async fn click", "    /// Type text"),
+            ("pub(crate) async fn type_text", "    /// Scroll a CSS-selected"),
+            ("pub(crate) async fn scroll_to", "    pub(crate) async fn extract_text"),
+            ("pub(crate) async fn go_back", "    pub(crate) async fn go_forward"),
+            ("pub(crate) async fn go_forward", "    /// Extract page text"),
+            ("pub async fn observe", "/// Extract a string from"),
+        ];
+        for (start, end) in sections {
+            let start_at = source.find(start).expect("source section start exists");
+            let end_at = source[start_at..]
+                .find(end)
+                .map(|offset| start_at + offset)
+                .expect("source section end exists");
+            assert!(
+                !source[start_at..end_at].contains(".evaluate("),
+                "JavaScript evaluation remains in action path starting at {start}"
+            );
+        }
+    }
+}
+
