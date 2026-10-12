@@ -51,10 +51,17 @@ impl DftGrid {
         };
 
         let mut points = Vec::new();
+        // Reuse the same effective radii for radial scaling and the heteronuclear
+        // Becke partition adjustment. The radius table itself remains a separate
+        // qualification item (see issue #7397).
+        let atomic_radii: Vec<f64> = atoms
+            .iter()
+            .map(|atom| bragg_slater_radius(atom.atomic_number))
+            .collect();
 
         for (atom_idx, atom) in atoms.iter().enumerate() {
             // Bragg-Slater radius for this atom (used for radial scaling)
-            let r_bs = bragg_slater_radius(atom.atomic_number);
+            let r_bs = atomic_radii[atom_idx];
 
             // Radial grid: Gauss-Chebyshev mapping
             for i in 1..=n_radial {
@@ -80,7 +87,7 @@ impl DftGrid {
                     let z = atom.position[2] + r * theta_z;
 
                     // Becke partitioning weight
-                    let becke_w = becke_partition_weight(atom_idx, x, y, z, atoms);
+                    let becke_w = becke_partition_weight(atom_idx, x, y, z, atoms, &atomic_radii);
 
                     let total_weight = radial_weight * ang_weight * becke_w;
 
@@ -107,8 +114,16 @@ impl DftGrid {
 
 /// Becke partition weight for atom `atom_idx` at point (x, y, z).
 ///
-/// Uses the Becke fuzzy-cell scheme with Stratmann step function.
-fn becke_partition_weight(atom_idx: usize, x: f64, y: f64, z: f64, atoms: &[Atom]) -> f64 {
+/// Uses the Becke fuzzy-cell scheme with Stratmann step function and the
+/// Treutler atomic-radii adjustment for heteronuclear pairs.
+fn becke_partition_weight(
+    atom_idx: usize,
+    x: f64,
+    y: f64,
+    z: f64,
+    atoms: &[Atom],
+    atomic_radii: &[f64],
+) -> f64 {
     let n_atoms = atoms.len();
     if n_atoms == 1 {
         return 1.0;
@@ -132,8 +147,12 @@ fn becke_partition_weight(atom_idx: usize, x: f64, y: f64, z: f64, atoms: &[Atom
             }
 
             let mu = (r_a - r_b) / r_ab;
+            // Correct the pair coordinate for unlike atomic sizes before applying
+            // the Becke step function (PySCF's Treutler adjustment convention).
+            let adjusted_mu =
+                treutler_adjust_becke_mu(mu, atomic_radii[a], atomic_radii[b]);
             // Becke's step function (3 iterations)
-            let s = step_function(mu);
+            let s = step_function(adjusted_mu);
             p[a] *= s;
         }
     }
@@ -143,6 +162,25 @@ fn becke_partition_weight(atom_idx: usize, x: f64, y: f64, z: f64, atoms: &[Atom
         return 0.0;
     }
     p[atom_idx] / total
+}
+
+/// Apply the Treutler atomic-radii correction used by PySCF's default
+/// molecular-grid partition:
+///
+/// `mu' = mu + a_AB * (1 - mu²)`
+///
+/// where `a_AB = clamp(¼(√(R_B/R_A) - √(R_A/R_B)), -0.5, 0.5)`.
+/// Equal radii give `a_AB = 0`; reversing the pair negates both `mu` and
+/// `a_AB`, preserving pairwise symmetry. Radius values are in any consistent
+/// positive units because only their ratio is used.
+///
+/// This makes partitioning responsive to the current effective radius map; it
+/// does not qualify that map's chemical provenance or accuracy (issue #7397).
+fn treutler_adjust_becke_mu(mu: f64, radius_a: f64, radius_b: f64) -> f64 {
+    let sqrt_a = radius_a.sqrt();
+    let sqrt_b = radius_b.sqrt();
+    let a_ab = (0.25 * (sqrt_b / sqrt_a - sqrt_a / sqrt_b)).clamp(-0.5, 0.5);
+    mu + a_ab * (1.0 - mu * mu)
 }
 
 /// Becke's smoothed step function: s(μ) = ½(1 - f(f(f(μ))))
@@ -350,7 +388,8 @@ mod tests {
     #[test]
     fn test_becke_partition_single_atom() {
         let atoms = vec![Atom::new(1, 0.0, 0.0, 0.0)];
-        let w = becke_partition_weight(0, 1.0, 0.0, 0.0, &atoms);
+        let radii = [bragg_slater_radius(1)];
+        let w = becke_partition_weight(0, 1.0, 0.0, 0.0, &atoms, &radii);
         assert!((w - 1.0).abs() < 1e-10, "Single atom partition = 1.0");
     }
 
@@ -358,8 +397,9 @@ mod tests {
     fn test_becke_partition_midpoint() {
         // At the midpoint of H2, both atoms should have weight ~0.5
         let atoms = vec![Atom::new(1, 0.0, 0.0, 0.0), Atom::new(1, 0.0, 0.0, 2.0)];
-        let w0 = becke_partition_weight(0, 0.0, 0.0, 1.0, &atoms);
-        let w1 = becke_partition_weight(1, 0.0, 0.0, 1.0, &atoms);
+        let radii = [bragg_slater_radius(1), bragg_slater_radius(1)];
+        let w0 = becke_partition_weight(0, 0.0, 0.0, 1.0, &atoms, &radii);
+        let w1 = becke_partition_weight(1, 0.0, 0.0, 1.0, &atoms, &radii);
         assert!(
             (w0 - 0.5).abs() < 0.1 && (w1 - 0.5).abs() < 0.1,
             "Midpoint: w0={:.3}, w1={:.3}",
@@ -684,6 +724,79 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn test_treutler_adjustment_leaves_homonuclear_coordinates_unchanged() {
+        let radius = bragg_slater_radius(1);
+        for mu in [-1.0_f64, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0] {
+            let adjusted = treutler_adjust_becke_mu(mu, radius, radius);
+            assert!(
+                (adjusted - mu).abs() < 1e-15,
+                "equal radii must not alter mu={mu}: adjusted={adjusted}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_treutler_adjustment_matches_frozen_hydrogen_oxygen_reference() {
+        // Frozen independently from PySCF's Treutler radius-adjustment equation
+        // using Symthaea's current H/O radii (0.661 / 1.323 Bohr). This tests
+        // the transform, not the provenance/quality of those radius values.
+        let radius_h = bragg_slater_radius(1);
+        let radius_o = bragg_slater_radius(8);
+        let references = [
+            (-0.75_f64, -0.672_572_470_269_286),
+            (-0.50_f64, -0.367_267_091_890_204_7),
+            (-0.25_f64, -0.084_083_864_862_755_79),
+            (0.00_f64,  0.176_977_210_813_060_48),
+            (0.25_f64,  0.415_916_135_137_244_24),
+            (0.50_f64,  0.632_732_908_109_795_3),
+            (0.75_f64,  0.827_427_529_730_714),
+        ];
+        for (mu, expected) in references {
+            let observed = treutler_adjust_becke_mu(mu, radius_h, radius_o);
+            assert!(
+                (observed - expected).abs() < 2e-15,
+                "H/O adjusted mu({mu})={observed:.17}, expected={expected:.17}"
+            );
+            let reverse = treutler_adjust_becke_mu(-mu, radius_o, radius_h);
+            assert!(
+                (observed + reverse).abs() < 2e-15,
+                "pair symmetry failed at mu={mu}: forward={observed}, reverse={reverse}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_treutler_adjustment_clamps_radius_asymmetry() {
+        let forward = treutler_adjust_becke_mu(0.0, 1e-6, 1e6);
+        let reverse = treutler_adjust_becke_mu(0.0, 1e6, 1e-6);
+        assert!((forward - 0.5).abs() < 1e-15, "forward coefficient should clamp at +0.5");
+        assert!((reverse + 0.5).abs() < 1e-15, "reverse coefficient should clamp at -0.5");
+    }
+
+    #[test]
+    fn test_heteronuclear_becke_midpoint_matches_treutler_reference_share() {
+        // At the midpoint mu=0, the smaller H radius receives a smaller share
+        // than O under the radius-adjusted partition. Shares still normalize.
+        let atoms = vec![
+            Atom::new(1, 0.0, 0.0, 0.0),
+            Atom::new(8, 0.0, 0.0, 2.0),
+        ];
+        let radii = [bragg_slater_radius(1), bragg_slater_radius(8)];
+        let w_h = becke_partition_weight(0, 0.0, 0.0, 1.0, &atoms, &radii);
+        let w_o = becke_partition_weight(1, 0.0, 0.0, 1.0, &atoms, &radii);
+        assert!(
+            (w_h - 0.225_531_115_748_345).abs() < 2e-14,
+            "H midpoint share={w_h:.17}, expected 0.225531115748345"
+        );
+        assert!(
+            (w_o - 0.774_468_884_251_655).abs() < 2e-14,
+            "O midpoint share={w_o:.17}, expected 0.774468884251655"
+        );
+        assert!((w_h + w_o - 1.0).abs() < 1e-14);
+    }
+
     #[test]
     fn test_becke_partition_weights_are_finite_and_sum_to_one() {
         // Partition of unity is independent of radial/angular quadrature.
@@ -716,10 +829,21 @@ mod tests {
         ];
 
         for (geometry_index, atoms) in geometries.iter().enumerate() {
+            let atomic_radii: Vec<f64> = atoms
+                .iter()
+                .map(|atom| bragg_slater_radius(atom.atomic_number))
+                .collect();
             for point in probes {
                 let weights: Vec<f64> = (0..atoms.len())
                     .map(|atom_idx| {
-                        becke_partition_weight(atom_idx, point[0], point[1], point[2], atoms)
+                        becke_partition_weight(
+                            atom_idx,
+                            point[0],
+                            point[1],
+                            point[2],
+                            atoms,
+                            &atomic_radii,
+                        )
                     })
                     .collect();
                 let total: f64 = weights.iter().sum();
