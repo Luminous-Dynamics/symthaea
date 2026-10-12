@@ -132,6 +132,15 @@ Keep this evaluation separate from sustained-note singing:
 5. **Timing and turn-taking:** if used interactively, measure time-to-first-audio, real-time factor, chunk gaps, end-of-turn delay, stop/cancel latency, and interruption handling at p50/p95. A fluent offline WAV is not necessarily a usable conversational voice system.
 6. **Listening comfort and identity:** check loudness stability, sibilance, breath noise, pitch/timbre consistency, and fatigue across long passages. Speech and singing should share identity constraints where desired, but singing-specific vibrato and sustained vowels must not be forced into ordinary speech.
 
+### Spoken-passage comprehension fixture (implemented, audio integration pending)
+
+The dependency-free `scripts/voice_comprehension_gate.py` and its original case bank provide a first structured comprehension layer beyond WER. The 16 synthetic passages cover negation, quantities and amounts, dates/times, names, units, sequencing, conditions, and safety instructions (32 four-choice questions).
+
+- `prepare --output <pack>` writes listener-facing multiple-choice questions to the public directory, while the exact source text, SHA-256 digests, category labels, and answer key are written to a sibling private directory with restrictive Unix permissions. Public questions intentionally omit source text, answer keys, and category labels.
+- `score --output <pack> --responses <outside-file>` requires one answer for every question and fails closed on missing/duplicate rows, unknown IDs, invalid choices, or coverage drift. It reports total and per-category accuracy plus the fraction of cases with all answers correct.
+- It deliberately sets no release threshold: the fixture has no validated listener baseline or population norms. Reports say so explicitly. This is a deterministic scoring and artifact-integrity layer, not proof of speech intelligibility.
+- Audio generation is **not yet integrated** into this helper. Before using scores as evidence, render every private manifest utterance using the exact candidate backend, name each WAV by `clip_id`, pin the runtime/model and record WAV digests. Run comprehension questions after playback, without displaying the source text. Keep the answer key private through scoring.
+
 ### Automated-first validation sequence
 
 - Build a deterministic 60–100 prompt spoken suite spanning short answers, long explanations, questions, contrastive stress, numbers/dates, names/acronyms, negation/minimal pairs, low-energy delivery, and multi-clause sentences.

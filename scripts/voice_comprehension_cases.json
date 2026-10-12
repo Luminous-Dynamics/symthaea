@@ -1,0 +1,855 @@
+{
+  "schema_version": 1,
+  "language": "en",
+  "description": "Synthetic, original spoken-passage comprehension cases for Symthaea. These cases are a local test fixture, not validated listener norms.",
+  "cases": [
+    {
+      "case_id": "VC-001",
+      "category": "negation",
+      "text": "Do not restart the server until the backup is verified.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What must happen before the server is restarted?",
+          "options": [
+            [
+              "A",
+              "The backup must be verified."
+            ],
+            [
+              "B",
+              "The server must be restarted twice."
+            ],
+            [
+              "C",
+              "The network must be disabled."
+            ],
+            [
+              "D",
+              "Nothing; restart immediately."
+            ]
+          ],
+          "answer": "A"
+        },
+        {
+          "question_id": "q2",
+          "question": "Which action does the instruction prohibit for now?",
+          "options": [
+            [
+              "A",
+              "Checking the backup."
+            ],
+            [
+              "B",
+              "Restarting before verification."
+            ],
+            [
+              "C",
+              "Keeping the server online."
+            ],
+            [
+              "D",
+              "Reading the status report."
+            ]
+          ],
+          "answer": "B"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-002",
+      "category": "negation",
+      "text": "The meeting is not canceled; it moved from Monday, 12 October, to Wednesday, 14 October.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What is the meeting's status?",
+          "options": [
+            [
+              "A",
+              "It is canceled."
+            ],
+            [
+              "B",
+              "It happened on Monday."
+            ],
+            [
+              "C",
+              "It is still planned, but rescheduled."
+            ],
+            [
+              "D",
+              "It has no date."
+            ]
+          ],
+          "answer": "C"
+        },
+        {
+          "question_id": "q2",
+          "question": "What is the new meeting date?",
+          "options": [
+            [
+              "A",
+              "Monday, 12 October."
+            ],
+            [
+              "B",
+              "Tuesday, 13 October."
+            ],
+            [
+              "C",
+              "Thursday, 15 October."
+            ],
+            [
+              "D",
+              "Wednesday, 14 October."
+            ]
+          ],
+          "answer": "D"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-003",
+      "category": "quantities",
+      "text": "Send exactly 3 copies to Mira and 1 copy to Jo.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "How many copies should Mira receive?",
+          "options": [
+            [
+              "A",
+              "One."
+            ],
+            [
+              "B",
+              "Three."
+            ],
+            [
+              "C",
+              "Four."
+            ],
+            [
+              "D",
+              "None."
+            ]
+          ],
+          "answer": "B"
+        },
+        {
+          "question_id": "q2",
+          "question": "How many copies are sent in total?",
+          "options": [
+            [
+              "A",
+              "Three."
+            ],
+            [
+              "B",
+              "One."
+            ],
+            [
+              "C",
+              "Five."
+            ],
+            [
+              "D",
+              "Four."
+            ]
+          ],
+          "answer": "D"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-004",
+      "category": "amounts",
+      "text": "The repair costs $48, excluding a $12 delivery fee.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What is the repair cost before delivery?",
+          "options": [
+            [
+              "A",
+              "$48."
+            ],
+            [
+              "B",
+              "$12."
+            ],
+            [
+              "C",
+              "$60."
+            ],
+            [
+              "D",
+              "$36."
+            ]
+          ],
+          "answer": "A"
+        },
+        {
+          "question_id": "q2",
+          "question": "What is the total after adding delivery?",
+          "options": [
+            [
+              "A",
+              "$48."
+            ],
+            [
+              "B",
+              "$12."
+            ],
+            [
+              "C",
+              "$60."
+            ],
+            [
+              "D",
+              "$72."
+            ]
+          ],
+          "answer": "C"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-005",
+      "category": "dates",
+      "text": "Submit the form by 17 October, not 7 October.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "Which date is the actual deadline?",
+          "options": [
+            [
+              "A",
+              "7 October."
+            ],
+            [
+              "B",
+              "17 October."
+            ],
+            [
+              "C",
+              "27 October."
+            ],
+            [
+              "D",
+              "October 1."
+            ]
+          ],
+          "answer": "B"
+        },
+        {
+          "question_id": "q2",
+          "question": "Which date is explicitly rejected?",
+          "options": [
+            [
+              "A",
+              "17 October."
+            ],
+            [
+              "B",
+              "27 October."
+            ],
+            [
+              "C",
+              "7 October."
+            ],
+            [
+              "D",
+              "7 November."
+            ]
+          ],
+          "answer": "C"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-006",
+      "category": "time",
+      "text": "The call starts at 14:30 Johannesburg time and lasts 45 minutes.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What time does the call start?",
+          "options": [
+            [
+              "A",
+              "14:30 Johannesburg time."
+            ],
+            [
+              "B",
+              "14:45 UTC."
+            ],
+            [
+              "C",
+              "15:30 Johannesburg time."
+            ],
+            [
+              "D",
+              "13:45 Johannesburg time."
+            ]
+          ],
+          "answer": "A"
+        },
+        {
+          "question_id": "q2",
+          "question": "When should the call finish?",
+          "options": [
+            [
+              "A",
+              "14:45."
+            ],
+            [
+              "B",
+              "15:00."
+            ],
+            [
+              "C",
+              "15:15."
+            ],
+            [
+              "D",
+              "15:30."
+            ]
+          ],
+          "answer": "C"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-007",
+      "category": "names",
+      "text": "Mara Ndlovu will approve the draft; Nala Dlamini will send the invoice.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "Who approves the draft?",
+          "options": [
+            [
+              "A",
+              "Nala Dlamini."
+            ],
+            [
+              "B",
+              "Mara Ndlovu."
+            ],
+            [
+              "C",
+              "Both people."
+            ],
+            [
+              "D",
+              "Neither person."
+            ]
+          ],
+          "answer": "B"
+        },
+        {
+          "question_id": "q2",
+          "question": "Who sends the invoice?",
+          "options": [
+            [
+              "A",
+              "Mara Ndlovu."
+            ],
+            [
+              "B",
+              "The recipient."
+            ],
+            [
+              "C",
+              "Nala Dlamini."
+            ],
+            [
+              "D",
+              "No one."
+            ]
+          ],
+          "answer": "C"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-008",
+      "category": "names",
+      "text": "Email the report to Luis Chen, not Louis Chan.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What is the intended recipient's name?",
+          "options": [
+            [
+              "A",
+              "Luis Chen."
+            ],
+            [
+              "B",
+              "Louis Chan."
+            ],
+            [
+              "C",
+              "Lewis Chen."
+            ],
+            [
+              "D",
+              "Luis Chan."
+            ]
+          ],
+          "answer": "A"
+        },
+        {
+          "question_id": "q2",
+          "question": "Which name should not be used?",
+          "options": [
+            [
+              "A",
+              "Luis Chen."
+            ],
+            [
+              "B",
+              "Luis Chan."
+            ],
+            [
+              "C",
+              "Louis Chan."
+            ],
+            [
+              "D",
+              "Louis Chen."
+            ]
+          ],
+          "answer": "C"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-009",
+      "category": "units",
+      "text": "Keep the sensor between 18 and 22 degrees Celsius; 25 degrees is too warm.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What is the permitted temperature range?",
+          "options": [
+            [
+              "A",
+              "18 to 22 degrees Celsius."
+            ],
+            [
+              "B",
+              "22 to 25 degrees Celsius."
+            ],
+            [
+              "C",
+              "Exactly 25 degrees Celsius."
+            ],
+            [
+              "D",
+              "Below 18 degrees Celsius only."
+            ]
+          ],
+          "answer": "A"
+        },
+        {
+          "question_id": "q2",
+          "question": "How is 25 degrees Celsius described?",
+          "options": [
+            [
+              "A",
+              "Ideal."
+            ],
+            [
+              "B",
+              "Too warm."
+            ],
+            [
+              "C",
+              "Too cold."
+            ],
+            [
+              "D",
+              "Not mentioned."
+            ]
+          ],
+          "answer": "B"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-010",
+      "category": "units",
+      "text": "The container holds 2 liters, and the sample uses 250 milliliters.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "How much liquid does the sample use?",
+          "options": [
+            [
+              "A",
+              "2 milliliters."
+            ],
+            [
+              "B",
+              "25 milliliters."
+            ],
+            [
+              "C",
+              "250 milliliters."
+            ],
+            [
+              "D",
+              "2,500 milliliters."
+            ]
+          ],
+          "answer": "C"
+        },
+        {
+          "question_id": "q2",
+          "question": "How many 250-milliliter samples equal the full container?",
+          "options": [
+            [
+              "A",
+              "Two."
+            ],
+            [
+              "B",
+              "Four."
+            ],
+            [
+              "C",
+              "Six."
+            ],
+            [
+              "D",
+              "Eight."
+            ]
+          ],
+          "answer": "D"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-011",
+      "category": "sequence",
+      "text": "First disconnect power, then remove the cover, and only after that replace the fuse.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What must happen first?",
+          "options": [
+            [
+              "A",
+              "Replace the fuse."
+            ],
+            [
+              "B",
+              "Disconnect power."
+            ],
+            [
+              "C",
+              "Remove the cover."
+            ],
+            [
+              "D",
+              "Reconnect power."
+            ]
+          ],
+          "answer": "B"
+        },
+        {
+          "question_id": "q2",
+          "question": "When may the fuse be replaced?",
+          "options": [
+            [
+              "A",
+              "Before disconnecting power."
+            ],
+            [
+              "B",
+              "While removing the cover."
+            ],
+            [
+              "C",
+              "Only after power is disconnected and the cover is removed."
+            ],
+            [
+              "D",
+              "At any time."
+            ]
+          ],
+          "answer": "C"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-012",
+      "category": "sequence",
+      "text": "Back up the database before deploying version 2.4; verify health checks before enabling traffic.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What must happen before version 2.4 is deployed?",
+          "options": [
+            [
+              "A",
+              "Back up the database."
+            ],
+            [
+              "B",
+              "Enable public traffic."
+            ],
+            [
+              "C",
+              "Disable health checks."
+            ],
+            [
+              "D",
+              "Delete the database."
+            ]
+          ],
+          "answer": "A"
+        },
+        {
+          "question_id": "q2",
+          "question": "What must happen before traffic is enabled?",
+          "options": [
+            [
+              "A",
+              "Deploy version 2.5."
+            ],
+            [
+              "B",
+              "Delete the backup."
+            ],
+            [
+              "C",
+              "Restart every client."
+            ],
+            [
+              "D",
+              "Verify health checks."
+            ]
+          ],
+          "answer": "D"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-013",
+      "category": "conditions",
+      "text": "If the red indicator flashes, stop the machine; if it is steady green, continue monitoring.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What should happen when the red indicator flashes?",
+          "options": [
+            [
+              "A",
+              "Continue at full speed."
+            ],
+            [
+              "B",
+              "Stop the machine."
+            ],
+            [
+              "C",
+              "Ignore the indicator."
+            ],
+            [
+              "D",
+              "Remove the label."
+            ]
+          ],
+          "answer": "B"
+        },
+        {
+          "question_id": "q2",
+          "question": "What does a steady green indicator mean?",
+          "options": [
+            [
+              "A",
+              "Shut down immediately."
+            ],
+            [
+              "B",
+              "Replace the machine."
+            ],
+            [
+              "C",
+              "Continue monitoring."
+            ],
+            [
+              "D",
+              "Stop monitoring."
+            ]
+          ],
+          "answer": "C"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-014",
+      "category": "conditions",
+      "text": "Only staff with a valid badge may enter the lab, and visitors must be escorted.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What does a staff member need to enter the lab?",
+          "options": [
+            [
+              "A",
+              "A valid badge."
+            ],
+            [
+              "B",
+              "A visitor pass with no escort."
+            ],
+            [
+              "C",
+              "No credentials."
+            ],
+            [
+              "D",
+              "Permission from another visitor."
+            ]
+          ],
+          "answer": "A"
+        },
+        {
+          "question_id": "q2",
+          "question": "What is required for visitors?",
+          "options": [
+            [
+              "A",
+              "They may enter alone."
+            ],
+            [
+              "B",
+              "They must disable the badge reader."
+            ],
+            [
+              "C",
+              "They must wait until next week."
+            ],
+            [
+              "D",
+              "They must be escorted."
+            ]
+          ],
+          "answer": "D"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-015",
+      "category": "safety",
+      "text": "If pressure exceeds 80 kPa, open valve A; never open valve B while the pump is running.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What should happen if pressure exceeds 80 kPa?",
+          "options": [
+            [
+              "A",
+              "Open valve B."
+            ],
+            [
+              "B",
+              "Stop checking pressure."
+            ],
+            [
+              "C",
+              "Open valve A."
+            ],
+            [
+              "D",
+              "Remove the pump."
+            ]
+          ],
+          "answer": "C"
+        },
+        {
+          "question_id": "q2",
+          "question": "When is opening valve B prohibited?",
+          "options": [
+            [
+              "A",
+              "Whenever the pump is running."
+            ],
+            [
+              "B",
+              "Only when the pump is off."
+            ],
+            [
+              "C",
+              "Only below 80 kPa."
+            ],
+            [
+              "D",
+              "Never; it is always required."
+            ]
+          ],
+          "answer": "A"
+        }
+      ]
+    },
+    {
+      "case_id": "VC-016",
+      "category": "safety",
+      "text": "Take 5 mg once daily; do not take a second dose if you miss one.",
+      "questions": [
+        {
+          "question_id": "q1",
+          "question": "What dose frequency is stated?",
+          "options": [
+            [
+              "A",
+              "5 mg twice daily."
+            ],
+            [
+              "B",
+              "5 mg once daily."
+            ],
+            [
+              "C",
+              "10 mg once daily."
+            ],
+            [
+              "D",
+              "No dose is specified."
+            ]
+          ],
+          "answer": "B"
+        },
+        {
+          "question_id": "q2",
+          "question": "What does the instruction say after a missed dose?",
+          "options": [
+            [
+              "A",
+              "Take two doses together."
+            ],
+            [
+              "B",
+              "Double the next dose."
+            ],
+            [
+              "C",
+              "Take an extra dose immediately."
+            ],
+            [
+              "D",
+              "Do not take a second dose to make up for it."
+            ]
+          ],
+          "answer": "D"
+        }
+      ]
+    }
+  ]
+}

@@ -237,6 +237,8 @@ jobs:
 
       - name: Test DiffSinger phoneme and language contract
         run: python3 scripts/test_diffsinger_phonemes.py
+      - name: Test spoken-passage comprehension pack
+        run: python3 scripts/test_voice_comprehension_gate.py
 
       - name: Test (default features)
         run: cargo test -p symthaea-muse --lib
