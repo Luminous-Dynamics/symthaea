@@ -28,6 +28,16 @@ Existing models establish that large-scale coverage is technically possible, but
 5. **Learning loop.** Accept consented, licensed text/audio pairs or corrections; freeze a training/evaluation split by speaker and source; train or adapt the relevant model; run regression tests on already supported languages; attach model and corpus digests; promote only the specific task/language that met its declared criterion. Avoid evaluating with training clips.
 6. **Coverage without false equivalence.** Publish per-language tiers such as `unverified`, `experimental`, `automated-checks-passed`, and `community-reviewed`. Never collapse “the model emits audio” into “the language is supported well.”
 
+### Immediate multilingual baseline: model licence and data limits
+
+A snapshot checked on **2026-10-12** narrows the initial adapter plan:
+
+- Meta's [MMS TTS model card](https://huggingface.co/facebook/mms-tts) lists 1,107 language models and a **CC-BY-NC 4.0** licence. Treat it as a research comparator only unless legal review establishes that the exact intended use is compatible or a separate commercial permission applies. Do not silently treat broad language coverage as a commercially reusable dependency, and do not infer quality from the language count.
+- [Common Voice Scripted Speech 27.0 — Zulu](https://mozilladatacollective.com/datasets/cmu610aue00jtnq07hnb00xio) is listed under CC0-1.0 but currently has 223 clips (0.34 hours) from 9 speakers, only 29 validated clips, and 3 clips in its listed test split. The dataset page explicitly forbids attempting to identify speakers and re-hosting or re-sharing the dataset.
+- [Common Voice Scripted Speech 27.0 — Xhosa](https://mozilladatacollective.com/datasets/cmu60x5rv00ilo1070jbpgna2) is listed under CC0-1.0 but has 35 clips (0.06 hours) from 5 speakers, only 13 validated clips, and 4 clips in its listed test split. Its page states the same no-speaker-identification and no-rehosting restrictions.
+
+These Common Voice snapshots can exercise ingestion, decoding, tokenizer/G2P wiring, and a few reproducible smoke cases. Their tiny validated/test partitions are **not sufficient evidence of robust ASR, dialect coverage, voice quality, or synthesis capability**. Do not train or promote a model based on these clip counts alone. The next responsible step is to pin permitted artefacts and metadata, build a language-aware pipeline smoke test, then gather additional consented/licensed audio and a held-out-speaker evaluation set with language-community input. The registry intentionally keeps Afrikaans, isiZulu, and isiXhosa unverified; the existence of these datasets does not alter that status.
+
 ## Can she produce click consonants?
 
 **Not through the current custom singing path, and not reliably in the current DiffSinger bridge.** The five core click place symbols in the IPA are `ʘ` (bilabial), `ǀ` (dental), `ǃ` (post-alveolar), `ǂ` (palatoalveolar), and `ǁ` (alveolar lateral). These are non-pulmonic, velaric-ingressive articulations with a different pressure/closure/release mechanism from ordinary English stop consonants. See the [International Phonetic Association chart](https://www.internationalphoneticassociation.org/IPAcharts/IPA_charts_EI/IPA_charts_EI.html) and [University of Newcastle IPA consonants guide](https://teaching.ncl.ac.uk/ipa/consonants-non-pulmonic.html).
