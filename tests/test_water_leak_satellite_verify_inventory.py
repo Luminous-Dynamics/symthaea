@@ -24,7 +24,13 @@ def fixture():
     item["summary_sha256"] = digest(item)
     collection = {
         "collection": "sentinel-1-grd",
-        "query": {"collections": ["sentinel-1-grd"]},
+        "query": {
+            "collections": ["sentinel-1-grd"],
+            "bbox": [27.7, -26.5, 28.4, -25.8],
+            "datetime": "2025-01-01T00:00:00Z/2025-01-01T23:59:59Z",
+            "limit": 100,
+            "fields": {"exclude": ["assets"]},
+        },
         "page_count": 1,
         "page_records": [{
             "page": 1,
@@ -45,7 +51,11 @@ def fixture():
         "schema_version": 1,
         "generated_at_utc": "2026-10-12T10:00:00Z",
         "catalog_endpoint": "https://stac.dataspace.copernicus.eu/v1/search",
-        "scope": {"bbox_wgs84": [27.7, -26.5, 28.4, -25.8]},
+        "scope": {
+            "bbox_wgs84": [27.7, -26.5, 28.4, -25.8],
+            "start_date_inclusive": "2025-01-01",
+            "end_date_inclusive": "2025-01-01",
+        },
         "collections": [collection],
         "overall_claim_ceiling": "no leak claim",
     }
@@ -86,6 +96,40 @@ class InventoryVerifierTests(unittest.TestCase):
         errors = verify_inventory(document)
         self.assertTrue(any("page_count" in error for error in errors))
         self.assertTrue(any("response_sha256" in error for error in errors))
+
+    def test_href_outside_item_summary_is_rejected_after_manifest_rehash(self):
+        document = fixture()
+        document["pagination_extension"] = {
+            "links": [{"href": "https://example.invalid/next?token=secret"}]
+        }
+        document.pop("inventory_manifest_sha256")
+        document["inventory_manifest_sha256"] = digest(document)
+        errors = verify_inventory(document)
+        self.assertTrue(any("inventory: contains an href field" in error for error in errors))
+
+    def test_page_feature_total_must_reconcile_with_items_and_duplicates(self):
+        document = fixture()
+        document["collections"][0]["page_records"][0]["feature_count"] = 9
+        document.pop("inventory_manifest_sha256")
+        document["inventory_manifest_sha256"] = digest(document)
+        errors = verify_inventory(document)
+        self.assertTrue(any("page feature total" in error for error in errors))
+
+    def test_catalogue_query_must_match_declared_aoi_even_after_manifest_rehash(self):
+        document = fixture()
+        document["collections"][0]["query"]["bbox"] = [27.0, -27.0, 29.0, -25.0]
+        document.pop("inventory_manifest_sha256")
+        document["inventory_manifest_sha256"] = digest(document)
+        errors = verify_inventory(document)
+        self.assertTrue(any("query.bbox" in error for error in errors))
+
+    def test_catalogue_query_must_match_declared_dates_even_after_manifest_rehash(self):
+        document = fixture()
+        document["collections"][0]["query"]["datetime"] = "2024-01-01T00:00:00Z/2024-01-01T23:59:59Z"
+        document.pop("inventory_manifest_sha256")
+        document["inventory_manifest_sha256"] = digest(document)
+        errors = verify_inventory(document)
+        self.assertTrue(any("query.datetime" in error for error in errors))
 
 
 if __name__ == "__main__":

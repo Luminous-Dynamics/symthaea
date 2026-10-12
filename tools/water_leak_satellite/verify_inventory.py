@@ -9,8 +9,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +31,15 @@ def is_sha256(value: Any) -> bool:
     return isinstance(value, str) and SHA256_RE.fullmatch(value) is not None
 
 
+def _valid_iso_date(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        return date.fromisoformat(value).isoformat() == value
+    except ValueError:
+        return False
+
+
 def _contains_href_key(value: Any) -> bool:
     if isinstance(value, dict):
         return any(str(key).lower() == "href" or _contains_href_key(nested) for key, nested in value.items())
@@ -39,6 +50,10 @@ def _contains_href_key(value: Any) -> bool:
 
 def verify_inventory(document: Any) -> list[str]:
     errors: list[str] = []
+    # Enforce the no-href rule across the entire saved artifact, including
+    # top-level extension fields and pagination metadata—not only item summaries.
+    if _contains_href_key(document):
+        errors.append("inventory: contains an href field; signed/download URLs must not be stored")
     if not isinstance(document, dict):
         return ["inventory: root must be an object"]
 
@@ -54,8 +69,26 @@ def verify_inventory(document: Any) -> list[str]:
     schema_version = document.get("schema_version")
     if type(schema_version) is not int or schema_version != 1:
         errors.append("schema_version: expected integer 1")
-    if not isinstance(document.get("scope"), dict):
+    scope = document.get("scope")
+    if not isinstance(scope, dict):
         errors.append("scope: must be an object")
+    else:
+        bbox = scope.get("bbox_wgs84")
+        if (
+            not isinstance(bbox, list)
+            or len(bbox) != 4
+            or any(type(value) not in (int, float) or not math.isfinite(value) for value in bbox)
+        ):
+            errors.append("scope.bbox_wgs84: must contain four finite numeric bounds")
+        elif not (-180 <= bbox[0] < bbox[2] <= 180 and -90 <= bbox[1] < bbox[3] <= 90):
+            errors.append("scope.bbox_wgs84: bounds must be ordered WGS84 west,south,east,north")
+
+        start_date = scope.get("start_date_inclusive")
+        end_date = scope.get("end_date_inclusive")
+        if not _valid_iso_date(start_date) or not _valid_iso_date(end_date):
+            errors.append("scope: start/end dates must be canonical YYYY-MM-DD dates")
+        elif end_date < start_date:
+            errors.append("scope: end_date_inclusive precedes start_date_inclusive")
 
     collections = document.get("collections")
     if not isinstance(collections, list):
@@ -71,6 +104,26 @@ def verify_inventory(document: Any) -> list[str]:
         name = collection.get("collection")
         if not isinstance(name, str) or not name:
             errors.append(f"{prefix}.collection: missing collection identifier")
+
+        query = collection.get("query")
+        if not isinstance(query, dict):
+            errors.append(f"{prefix}.query: must preserve the catalogue query")
+        else:
+            if not isinstance(name, str) or query.get("collections") != [name]:
+                errors.append(f"{prefix}.query.collections: must match the inventoried collection")
+            if not isinstance(scope, dict) or query.get("bbox") != scope.get("bbox_wgs84"):
+                errors.append(f"{prefix}.query.bbox: does not match declared inventory scope")
+            if isinstance(scope, dict):
+                start_date = scope.get("start_date_inclusive")
+                end_date = scope.get("end_date_inclusive")
+                if _valid_iso_date(start_date) and _valid_iso_date(end_date) and end_date >= start_date:
+                    expected_interval = f"{start_date}T00:00:00Z/{end_date}T23:59:59Z"
+                    if query.get("datetime") != expected_interval:
+                        errors.append(f"{prefix}.query.datetime: does not match declared scope dates")
+            limit = query.get("limit")
+            if type(limit) is not int or not 1 <= limit <= 100:
+                errors.append(f"{prefix}.query.limit: must be an integer from 1 to 100")
+
         pages = collection.get("page_records")
         if not isinstance(pages, list):
             errors.append(f"{prefix}.page_records: must be a list")
@@ -78,11 +131,24 @@ def verify_inventory(document: Any) -> list[str]:
         if type(collection.get("page_count")) is not int or collection.get("page_count") != len(pages):
             errors.append(f"{prefix}.page_count: does not match page_records length")
 
+        page_feature_total = 0
+        page_feature_counts_valid = True
         for page_index, page in enumerate(pages):
             pfx = f"{prefix}.page_records[{page_index}]"
             if not isinstance(page, dict):
                 errors.append(f"{pfx}: must be an object")
+                page_feature_counts_valid = False
                 continue
+            if type(page.get("page")) is not int or page.get("page") != page_index + 1:
+                errors.append(f"{pfx}.page: page numbers must be consecutive starting at 1")
+            if page.get("request_method") not in ("GET", "POST"):
+                errors.append(f"{pfx}.request_method: must be GET or POST")
+            feature_count = page.get("feature_count")
+            if type(feature_count) is not int or feature_count < 0:
+                errors.append(f"{pfx}.feature_count: must be a non-negative integer")
+                page_feature_counts_valid = False
+            else:
+                page_feature_total += feature_count
             for digest_name in ("response_sha256", "request_url_sha256"):
                 if not is_sha256(page.get(digest_name)):
                     errors.append(f"{pfx}.{digest_name}: missing or invalid SHA-256")
@@ -102,6 +168,11 @@ def verify_inventory(document: Any) -> list[str]:
         duplicate_count = collection.get("duplicate_items_dropped")
         if type(duplicate_count) is not int or duplicate_count < 0:
             errors.append(f"{prefix}.duplicate_items_dropped: must be a non-negative integer")
+        elif page_feature_counts_valid and type(collection.get("item_count")) is int:
+            if page_feature_total != collection["item_count"] + duplicate_count:
+                errors.append(
+                    f"{prefix}: page feature total must equal unique item_count plus duplicate_items_dropped"
+                )
 
         for item_index, item in enumerate(items):
             pfx = f"{prefix}.items[{item_index}]"
@@ -112,6 +183,8 @@ def verify_inventory(document: Any) -> list[str]:
             if not isinstance(item_collection, str) or not item_collection or not isinstance(item_id, str) or not item_id:
                 errors.append(f"{pfx}: missing item collection or ID")
             else:
+                if isinstance(name, str) and item_collection != name:
+                    errors.append(f"{pfx}.collection: item collection does not match parent collection")
                 pair = (item_collection, item_id)
                 if pair in seen_items:
                     errors.append(f"{pfx}: duplicate collection/ID pair")
@@ -127,8 +200,6 @@ def verify_inventory(document: Any) -> list[str]:
                 unsigned_item.pop("summary_sha256", None)
                 if sha256_json(unsigned_item) != summary_digest:
                     errors.append(f"{pfx}.summary_sha256: digest does not match summary")
-            if _contains_href_key(item):
-                errors.append(f"{pfx}: contains an href field; signed/download URLs must not be stored")
             self_uri = item.get("self_uri_redacted")
             if self_uri is not None and (not isinstance(self_uri, str) or "?" in self_uri or "#" in self_uri):
                 errors.append(f"{pfx}.self_uri_redacted: must be a query-free URI")
