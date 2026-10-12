@@ -837,6 +837,25 @@ mod tests {
     }
 
     #[test]
+    fn test_factorize_near_u64_limit_semiprime() {
+        let engine = NumberTheoryEngine::new();
+        let p = 4_294_967_291u64;
+        let q = 4_294_967_279u64;
+        assert!(engine.miller_rabin(p));
+        assert!(engine.miller_rabin(q));
+
+        let semiprime = p * q;
+        assert!(semiprime > u64::MAX - 1_000_000_000);
+        let factorization = engine.factorize(semiprime);
+        assert_eq!(factorization.factors, vec![(q, 1), (p, 1)]);
+
+        let reconstructed = factorization.factors.iter().fold(1u128, |product, &(prime, exponent)| {
+            product * u128::from(prime).pow(exponent)
+        });
+        assert_eq!(reconstructed, u128::from(semiprime));
+    }
+
+    #[test]
     fn test_factorize_large_prime_powers_and_mixed_composite() {
         let engine = NumberTheoryEngine::new();
         for (n, expected) in [
