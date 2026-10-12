@@ -135,7 +135,8 @@ def _validate_speaker_review(review: Any, where: str) -> None:
           f"{where}.speaker_review.reviewer_count must be a positive integer")
     for key in ("method", "scope"):
         _need(_nonempty(review[key]), f"{where}.speaker_review.{key} must be non-empty")
-    _need(isinstance(review["date"], str), f"{where}.speaker_review.date must be ISO YYYY-MM-DD")
+    _need(isinstance(review["date"], str) and re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}", review["date"]) is not None,
+          f"{where}.speaker_review.date must be ISO YYYY-MM-DD")
     try:
         date.fromisoformat(review["date"])
     except ValueError as exc:
@@ -179,7 +180,7 @@ def validate_registry(registry: Any) -> dict[str, int]:
             refs = record["source_refs"]
             _need(isinstance(refs, list) and all(_nonempty(ref) for ref in refs), f"{cw}.source_refs must be a string array")
             for ref in refs:
-                _need(not ref.startswith("/") and ".." not in Path(ref).parts and "\\\\" not in ref,
+                _need(not ref.startswith("/") and ".." not in Path(ref).parts and "\\" not in ref,
                       f"{cw}.source_refs must be safe repository-relative paths")
             _validate_model(record["model"], cw)
             _validate_dataset(record["dataset"], cw)
