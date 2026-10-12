@@ -9,7 +9,7 @@
 //! CI method, or confidence level, so empirical uncertainty cannot yet qualify a snapshot.
 //! Missing semantics or observation-level provenance remain missing.
 
-use crate::harness::report::MetricValue;
+use crate::harness::report::{MetricValue, UncertaintyProvenanceV1};
 use crate::harness::snapshot::{RegressionSnapshot, SNAPSHOT_SCHEMA_VERSION};
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -45,6 +45,8 @@ pub enum UncertaintyPolicyV1 {
     Empirical {
         method: String,
         confidence_level: f64,
+        /// Required algorithm parameters, which must match recorded observation metadata.
+        parameters: BTreeMap<String, String>,
     },
     Deterministic {
         verification_method: String,
@@ -146,10 +148,8 @@ impl MetricDefinitionV1 {
             UncertaintyPolicyV1::Empirical {
                 method,
                 confidence_level,
+                parameters,
             } => {
-                if method.trim().is_empty() {
-                    errors.push("empirical uncertainty method must not be empty".to_string());
-                }
                 if !confidence_level.is_finite()
                     || *confidence_level <= 0.0
                     || *confidence_level >= 1.0
@@ -158,6 +158,42 @@ impl MetricDefinitionV1 {
                         "empirical confidence_level must be finite and strictly between zero and one"
                             .to_string(),
                     );
+                }
+                if parameters.is_empty()
+                    || parameters.iter().any(|(key, value)| {
+                        key.trim().is_empty() || value.trim().is_empty()
+                    })
+                {
+                    errors.push("empirical uncertainty requires non-empty, explicit method parameters".to_string());
+                }
+                match method.as_str() {
+                    "bca_bootstrap_v1" => {
+                        let alpha = parameters.get("alpha").and_then(|v| v.parse::<f64>().ok());
+                        if parameters.get("resamples").map(String::as_str) != Some("2000")
+                            || alpha.is_none()
+                        {
+                            errors.push("BCa bootstrap policy requires resamples=2000 and alpha".to_string());
+                        }
+                        if let Some(alpha) = alpha {
+                            if !alpha.is_finite()
+                                || alpha <= 0.0
+                                || alpha >= 1.0
+                                || (1.0 - alpha - confidence_level).abs() > 1e-12
+                            {
+                                errors.push("BCa bootstrap alpha must match the declared confidence level".to_string());
+                            }
+                        }
+                    }
+                    "t_table_df_1_to_29_else_z_1_96_v1" => {
+                        if *confidence_level != 0.95
+                            || parameters.get("df_table_max").map(String::as_str) != Some("29")
+                            || parameters.get("fallback_z").map(String::as_str) != Some("1.96")
+                            || parameters.len() != 2
+                        {
+                            errors.push("t-table policy parameters do not match the supported 95% implementation".to_string());
+                        }
+                    }
+                    _ => errors.push(format!("unsupported empirical uncertainty method {:?}", method)),
                 }
             }
             UncertaintyPolicyV1::Deterministic {
@@ -418,20 +454,65 @@ impl MetricContractV1 {
                 .get(&definition.benchmark)
                 .and_then(|metrics| metrics.get(&definition.metric))
             {
-                if matches!(&definition.uncertainty, UncertaintyPolicyV1::Empirical { .. }) {
-                    if value.n < 2 {
+                match &definition.uncertainty {
+                    UncertaintyPolicyV1::Empirical {
+                        method,
+                        confidence_level,
+                        parameters,
+                    } => {
+                        if value.n < 2 {
+                            errors.push(format!(
+                                "{}/{}: empirical uncertainty requires n >= 2; found n={}",
+                                definition.benchmark, definition.metric, value.n
+                            ));
+                        }
+                        match value.uncertainty_provenance() {
+                            None => errors.push(format!(
+                                "{}/{}: empirical uncertainty is unqualified because the snapshot has no estimator provenance",
+                                definition.benchmark, definition.metric
+                            )),
+                            Some(observed) => {
+                                if let Err(provenance_errors) = observed.validate_for_value(value) {
+                                    errors.extend(provenance_errors.into_iter().map(|error| {
+                                        format!("{}/{}: {error}", definition.benchmark, definition.metric)
+                                    }));
+                                }
+                                if observed.method() != method {
+                                    errors.push(format!(
+                                        "{}/{}: observed estimator method {:?} does not match contract method {:?}",
+                                        definition.benchmark, definition.metric, observed.method(), method
+                                    ));
+                                }
+                                if (observed.confidence_level() - confidence_level).abs() > 1e-12 {
+                                    errors.push(format!(
+                                        "{}/{}: observed confidence level {} does not match contract level {}",
+                                        definition.benchmark, definition.metric, observed.confidence_level(), confidence_level
+                                    ));
+                                }
+                                if observed.sample_unit() != Some(definition.sample_unit.as_str()) {
+                                    errors.push(format!(
+                                        "{}/{}: observed sample unit {:?} does not match declared sample unit {:?}",
+                                        definition.benchmark, definition.metric, observed.sample_unit(), definition.sample_unit
+                                    ));
+                                }
+                                for (key, expected) in parameters {
+                                    if observed.parameters().get(key) != Some(expected) {
+                                        errors.push(format!(
+                                            "{}/{}: observed estimator parameter {:?}={:?} does not match contract value {:?}",
+                                            definition.benchmark, definition.metric, key, observed.parameters().get(key), expected
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    UncertaintyPolicyV1::Deterministic { .. } => {
                         errors.push(format!(
-                            "{}/{}: empirical uncertainty requires n >= 2; found n={}",
-                            definition.benchmark, definition.metric, value.n
+                            "{}/{}: deterministic qualification is unsupported until a separately verifiable deterministic-observation provenance type is implemented",
+                            definition.benchmark, definition.metric
                         ));
                     }
-                    // MetricValue currently serializes `n` and CI bounds but does not
-                    // bind the sample unit, CI method, or confidence level that produced
-                    // them. A declaration is not observation-level evidence.
-                    errors.push(format!(
-                        "{}/{}: empirical uncertainty is unqualified because snapshot MetricValue does not bind the observed sample unit, CI method, or confidence level; add observation-level uncertainty provenance before claiming empirical qualification",
-                        definition.benchmark, definition.metric
-                    ));
+                    UncertaintyPolicyV1::NotEstimated { .. } => {}
                 }
                 validate_value_domain(definition, value, &mut errors);
             }
@@ -557,23 +638,12 @@ mod tests {
             benchmark,
             metric,
             UncertaintyPolicyV1::Empirical {
-                method: "metric_value_from_samples_bootstrap_bca_2000_95_v1".to_string()
+                method: "bca_bootstrap_v1".to_string(),
                 confidence_level: 0.95,
-            },
-            ComparisonRuleV1::RelativeDelta {
-                warning_fraction: 0.05,
-                critical_fraction: 0.10,
-                minimum_reference_magnitude: 0.01,
-            },
-        )
-    }
-
-    fn deterministic_definition(benchmark: &str, metric: &str) -> MetricDefinitionV1 {
-        definition(
-            benchmark,
-            metric,
-            UncertaintyPolicyV1::Deterministic {
-                verification_method: "deterministic_fixture_repeatability_v1".to_string(),
+                parameters: BTreeMap::from([
+                    ("alpha".to_string(), "0.05".to_string()),
+                    ("resamples".to_string(), "2000".to_string()),
+                ]),
             },
             ComparisonRuleV1::RelativeDelta {
                 warning_fraction: 0.05,
@@ -586,15 +656,11 @@ mod tests {
     fn snapshot(values: &[(&str, &str, f64, usize)]) -> RegressionSnapshot {
         let mut metrics: BTreeMap<String, BTreeMap<String, MetricValue>> = BTreeMap::new();
         for (benchmark, metric, mean, n) in values {
+            let samples = vec![*mean; *n];
             metrics.entry((*benchmark).to_string()).or_default().insert(
                 (*metric).to_string(),
-                MetricValue {
-                    mean: *mean,
-                    std_dev: 0.01,
-                    n: *n,
-                    ci_lower: (*mean - 0.02).max(0.0),
-                    ci_upper: (*mean + 0.02).min(1.0),
-                },
+                MetricValue::from_samples_bootstrap(&samples, 42)
+                    .with_sample_unit("fixture_metric_observation"),
             );
         }
         RegressionSnapshot {
@@ -640,8 +706,8 @@ mod tests {
     #[test]
     fn exact_snapshot_population_is_required() {
         let contract = MetricContractV1::new(vec![
-            deterministic_definition("B", "accuracy"),
-            deterministic_definition("A", "latency"),
+            empirical_definition("B", "accuracy"),
+            empirical_definition("A", "latency"),
         ])
         .unwrap();
         let exact = snapshot(&[
@@ -658,7 +724,7 @@ mod tests {
 
     #[test]
     fn snapshot_metric_without_definition_is_rejected() {
-        let contract = MetricContractV1::new(vec![deterministic_definition("B", "accuracy")]).unwrap();
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
         let expanded = snapshot(&[
             ("B", "accuracy", 0.8, 10),
             ("B", "latency", 0.4, 10),
@@ -699,8 +765,12 @@ mod tests {
             "B",
             "accuracy",
             UncertaintyPolicyV1::Empirical {
-                method: "bootstrap".to_string(),
+                method: "bca_bootstrap_v1".to_string(),
                 confidence_level: 1.0,
+                parameters: BTreeMap::from([
+                    ("alpha".to_string(), "0.05".to_string()),
+                    ("resamples".to_string(), "2000".to_string()),
+                ]),
             },
             ComparisonRuleV1::RelativeDelta {
                 warning_fraction: 0.05,
@@ -714,11 +784,28 @@ mod tests {
     #[test]
     fn empirical_snapshot_cannot_qualify_without_observation_level_ci_provenance() {
         let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
-        let complete_sample = snapshot(&[("B", "accuracy", 0.8, 10)]);
-        let errors = contract.validate_snapshot_population(&complete_sample).unwrap_err();
-        assert!(errors.iter().any(|message| {
-            message.contains("does not bind the observed CI method or confidence level")
-        }));
+        let mut missing_provenance = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        missing_provenance.metrics.get_mut("B").unwrap().get_mut("accuracy").unwrap().uncertainty_provenance = None;
+        let errors = contract.validate_snapshot_population(&missing_provenance).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("has no estimator provenance")));
+    }
+
+    #[test]
+    fn empirical_provenance_must_match_method_parameters_and_sample_unit() {
+        let contract = MetricContractV1::new(vec![empirical_definition("B", "accuracy")]).unwrap();
+        let mut wrong_unit = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        let value = wrong_unit.metrics.get_mut("B").unwrap().get_mut("accuracy").unwrap();
+        *value = value.clone().with_sample_unit("different_sample_unit");
+        let errors = contract.validate_snapshot_population(&wrong_unit).unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("does not match declared sample unit")));
+    }
+
+    #[test]
+    fn uncertainty_digest_detects_summary_tampering() {
+        let mut tampered = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        tampered.metrics.get_mut("B").unwrap().get_mut("accuracy").unwrap().ci_upper += 0.01;
+        let errors = tampered.validate().unwrap_err();
+        assert!(errors.iter().any(|message| message.contains("observation digest does not match")));
     }
 
     #[test]
@@ -753,7 +840,7 @@ mod tests {
             "value_domain":"unit_interval",
             "direction":{"kind":"unknown"},
             "sample_unit":"independent_seed_run",
-            "uncertainty":{"kind":"empirical","method":"bootstrap","confidence_level":0.95},
+            "uncertainty":{"kind":"empirical","method":"bca_bootstrap_v1","confidence_level":0.95,"parameters":{"alpha":"0.05","resamples":"2000"}},
             "comparison":{"kind":"relative_delta","warning_fraction":0.05,"critical_fraction":0.10,"minimum_reference_magnitude":0.01}
         }"#;
         assert!(serde_json::from_str::<MetricDefinitionV1>(json).is_err());
