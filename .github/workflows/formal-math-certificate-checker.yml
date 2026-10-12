@@ -1,0 +1,82 @@
+name: Formal Math Certificate Checker
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/verify_math_certificate.py"
+      - "tools/math_certificate_golden_vectors.py"
+      - "tools/generate_lean_math_certificate.py"
+      - "tests/test_verify_math_certificate.py"
+      - "tests/test_generate_lean_math_certificate.py"
+      - "PRIMALITY_CERTIFICATES.md"
+      - "formal/math-certificate/**"
+      - ".github/workflows/formal-math-certificate-checker.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/verify_math_certificate.py"
+      - "tools/math_certificate_golden_vectors.py"
+      - "tools/generate_lean_math_certificate.py"
+      - "tests/test_verify_math_certificate.py"
+      - "tests/test_generate_lean_math_certificate.py"
+      - "PRIMALITY_CERTIFICATES.md"
+      - "formal/math-certificate/**"
+      - ".github/workflows/formal-math-certificate-checker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  formal-math-certificates:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact event revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Compile Python certificate tools and tests
+        run: >-
+          python3 -m py_compile
+          tools/verify_math_certificate.py
+          tools/math_certificate_golden_vectors.py
+          tools/generate_lean_math_certificate.py
+          tests/test_verify_math_certificate.py
+          tests/test_generate_lean_math_certificate.py
+
+      - name: Run independent byte-verifier regressions
+        run: python3 -m unittest discover -s tests -p 'test_verify_math_certificate.py' -v
+
+      - name: Run Lean-bridge and witness-combination regressions
+        run: python3 -m unittest discover -s tests -p 'test_generate_lean_math_certificate.py' -v
+
+      - name: Generate Lean claims from the exact wire golden vectors
+        run: |
+          python3 tools/generate_lean_math_certificate.py \
+            --golden-vector primality-3 \
+            --output "$RUNNER_TEMP/SymthaeaPrimeThree.lean"
+          python3 tools/generate_lean_math_certificate.py \
+            --golden-vector factorization-2 \
+            --output "$RUNNER_TEMP/SymthaeaFactorizationTwo.lean"
+
+      - name: Build the pinned Lean proof project
+        uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6
+        with:
+          lake-package-directory: formal/math-certificate
+          auto-config: "false"
+          build: "true"
+          test: "false"
+          axiom-audit: "true"
+          axiom-audit-root: "SymthaeaMathCertificates"
+          axiom-audit-allow: "propext,Classical.choice,Quot.sound"
+
+      - name: Kernel-check generated claims from both wire formats
+        working-directory: formal/math-certificate
+        run: |
+          lake env lean "$RUNNER_TEMP/SymthaeaPrimeThree.lean"
+          lake env lean "$RUNNER_TEMP/SymthaeaFactorizationTwo.lean"
