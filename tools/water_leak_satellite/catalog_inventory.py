@@ -175,6 +175,7 @@ def summarize_item_feature(
         "geometry": feature.get("geometry"),
         "properties": {key: properties[key] for key in SAFE_PROPERTY_KEYS if key in properties},
         # Hrefs intentionally omitted: remote catalogues may supply signed/query-bearing URLs.
+        "asset_metadata_included": bool(raw_assets),
         "assets": asset_summaries,
     }
 
@@ -218,6 +219,9 @@ def inventory_collection(
         "bbox": bbox,
         "datetime": interval,
         "limit": limit,
+        # The first pass inventories scene metadata only. Exclude bulky image-asset
+        # hrefs so this phase is smaller and cannot persist signed download URLs.
+        "fields": {"exclude": ["assets"]},
     }
     current_url = endpoint
     method = "POST"

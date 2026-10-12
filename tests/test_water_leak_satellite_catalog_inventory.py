@@ -73,6 +73,8 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(len(report["page_records"][0]["response_sha256"]), 64)
         self.assertTrue(report["catalog_discovery_only"])
         self.assertEqual(mock_open.call_count, 1)
+        request_body = json.loads(mock_open.call_args.args[0].data)
+        self.assertEqual(request_body["fields"]["exclude"], ["assets"])
 
     def test_next_page_get_link_is_followed_and_duplicates_are_dropped(self):
         first = {
