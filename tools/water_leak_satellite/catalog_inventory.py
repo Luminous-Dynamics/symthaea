@@ -166,7 +166,7 @@ def summarize_item_feature(
             key: asset[key] for key in SAFE_ASSET_KEYS if key in asset
         }
 
-    return {
+    summary = {
         "collection": collection,
         "id": item_id,
         "self_uri_redacted": self_uri,
@@ -178,6 +178,8 @@ def summarize_item_feature(
         "asset_metadata_returned_in_response": bool(raw_assets),
         "assets": asset_summaries,
     }
+    summary["summary_sha256"] = sha256_bytes(canonical_json_bytes(summary))
+    return summary
 
 
 def request_json(url: str, method: str, payload: dict[str, Any] | None, timeout: float) -> tuple[bytes, dict[str, Any]]:
@@ -358,6 +360,8 @@ def main(argv: list[str] | None = None) -> int:
                 max_pages=args.max_pages,
                 timeout=args.timeout,
             ))
+        # Bind the complete published inventory, including compact summary hashes.
+        document["inventory_manifest_sha256"] = sha256_bytes(canonical_json_bytes(document))
         output = json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
         atomic_write_text(args.out, output)
     except (CatalogError, OSError) as exc:
@@ -366,6 +370,7 @@ def main(argv: list[str] | None = None) -> int:
 
     counts = ", ".join(f"{entry['collection']}={entry['item_count']}" for entry in document["collections"])
     print(f"wrote {args.out} ({counts}); metadata inventory only, not leak evidence")
+    print(f"inventory_manifest_sha256={document['inventory_manifest_sha256']}")
     return 0
 
 

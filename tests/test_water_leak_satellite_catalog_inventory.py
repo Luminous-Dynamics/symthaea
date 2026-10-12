@@ -245,6 +245,8 @@ class InventoryTests(unittest.TestCase):
             self.assertEqual(code, 0)
             document = json.loads(out.read_text(encoding="utf-8"))
             self.assertEqual(document["collections"][0]["item_count"], 1)
+            self.assertEqual(len(document["inventory_manifest_sha256"]), 64)
+            self.assertEqual(len(document["collections"][0]["items"][0]["summary_sha256"]), 64)
             self.assertIn("overall_claim_ceiling", document)
 
 
