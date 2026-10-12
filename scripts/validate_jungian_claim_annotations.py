@@ -358,27 +358,47 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
     for field in sorted(LABEL_KEYS):
         per_unit: list[list[Any]] = []
         per_case_unit_ratings: list[tuple[str, list[Any]]] = []
+        pairable_reviewer_ids: set[str] = set()
+        units_with_fewer_than_two_declared_reviewer_ids = 0
         for unit in units:
             reviews = unit.get("independent_reviews", [])
             ratings = [review["labels"][field] for review in reviews]
             if len(ratings) >= 2:
                 per_unit.append(ratings)
+                pairable_reviewer_ids.update(review["reviewer_id"] for review in reviews)
                 case_id = unit.get("case_id")
                 require(isinstance(case_id, str) and case_id,
                         "pairable annotation unit must include a non-empty case_id for case-level sensitivity")
                 per_case_unit_ratings.append((case_id, ratings))
+            else:
+                units_with_fewer_than_two_declared_reviewer_ids += 1
 
         comparisons = 0
         exact_matches = 0
         absolute_confidence_differences = 0.0
+        unit_pairwise_agreement: list[float] = []
+        unanimous_pairable_units = 0
+        pairable_units_by_reviewer_count: dict[str, int] = {}
         for ratings in per_unit:
+            unit_comparisons = 0
+            unit_exact_matches = 0
+            reviewer_count_key = str(len(ratings))
+            pairable_units_by_reviewer_count[reviewer_count_key] = (
+                pairable_units_by_reviewer_count.get(reviewer_count_key, 0) + 1
+            )
             for index, left in enumerate(ratings):
                 for right in ratings[index + 1:]:
                     comparisons += 1
+                    unit_comparisons += 1
                     if left == right:
                         exact_matches += 1
+                        unit_exact_matches += 1
                     if field == "confidence":
                         absolute_confidence_differences += abs(left - right)
+            if unit_comparisons:
+                unit_pairwise_agreement.append(unit_exact_matches / unit_comparisons)
+                if unit_exact_matches == unit_comparisons:
+                    unanimous_pairable_units += 1
 
         point_alpha = alpha_estimate(per_unit, field)
         pairable_values = [value for ratings in per_unit for value in ratings]
@@ -393,6 +413,26 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
             "rating_count": sum(len(ratings) for ratings in per_unit),
             "pairwise_comparisons": comparisons,
             "exact_pairwise_agreement": exact_matches / comparisons if comparisons else None,
+            "unit_weighted_exact_pairwise_agreement": (
+                sum(unit_pairwise_agreement) / len(unit_pairwise_agreement)
+                if unit_pairwise_agreement else None
+            ),
+            "unanimous_pairable_unit_count": unanimous_pairable_units,
+            "unanimous_pairable_unit_fraction": (
+                unanimous_pairable_units / len(per_unit) if per_unit else None
+            ),
+            "pairable_units_by_declared_reviewer_count": dict(
+                sorted(pairable_units_by_reviewer_count.items(), key=lambda item: int(item[0]))
+            ),
+            "pairable_distinct_declared_reviewer_id_count": len(pairable_reviewer_ids),
+            "units_with_fewer_than_two_declared_reviewer_ids": (
+                units_with_fewer_than_two_declared_reviewer_ids
+            ),
+            "pairwise_agreement_weighting_note": (
+                "exact_pairwise_agreement pools all within-unit reviewer pairs, so units with more reviewers contribute more pairs; "
+                "unit_weighted_exact_pairwise_agreement gives each pairable unit equal weight; "
+                "unanimous_pairable_unit_fraction reports the fraction of pairable units on which all declared reviewers agree."
+            ),
             "krippendorff_alpha": point_alpha,
             "alpha_status": "defined" if point_alpha is not None else (
                 "undefined_no_expected_disagreement"
@@ -670,6 +710,39 @@ def self_test() -> list[str]:
                 and confidence_case_sensitivity["method"] == "leave_one_case_out_deletion_sensitivity_not_confidence_interval",
                 "ordinal confidence case-level sensitivity diagnostics are invalid")
 
+        # Variable reviewer counts make pooled raw agreement and equal-unit-weight
+        # agreement answer different descriptive questions. Preserve both explicitly.
+        weighted_fixture: list[dict[str, Any]] = []
+        for case_id, labels_for_unit in [
+            ("JSP-WA", ["supported", "supported", "supported"]),
+            ("JSP-WB", ["supported", "contradicted"]),
+            ("JSP-WC", ["supported", "supported"]),
+        ]:
+            weighted_reviews = []
+            for reviewer_index, evidence_label in enumerate(labels_for_unit):
+                labels = synthetic_labels()
+                labels["evidence_relation"] = evidence_label
+                weighted_reviews.append({
+                    "reviewer_id": f"weighted-reviewer-{reviewer_index}",
+                    "labels": labels,
+                })
+            weighted_fixture.append({
+                "unit_id": f"weighted-{case_id}",
+                "case_id": case_id,
+                "independent_reviews": weighted_reviews,
+            })
+        weighted_metric = inter_rater_agreement(weighted_fixture)["labels"]["evidence_relation"]
+        require(weighted_metric["pairwise_comparisons"] == 5
+                and abs(weighted_metric["exact_pairwise_agreement"] - 0.8) < 1e-12,
+                "pooled pairwise agreement must weight all declared reviewer pairs")
+        require(abs(weighted_metric["unit_weighted_exact_pairwise_agreement"] - (2 / 3)) < 1e-12
+                and abs(weighted_metric["unanimous_pairable_unit_fraction"] - (2 / 3)) < 1e-12,
+                "equal-unit-weight agreement and unanimous-unit fraction must not inherit pair-count weighting")
+        require(weighted_metric["pairable_units_by_declared_reviewer_count"] == {"2": 2, "3": 1}
+                and weighted_metric["pairable_distinct_declared_reviewer_id_count"] == 3
+                and weighted_metric["units_with_fewer_than_two_declared_reviewer_ids"] == 0,
+                "reviewer-count distribution and pairable coverage metadata are incorrect")
+
         # Removing the only disagreeing case must make expected disagreement zero,
         # and the diagnostic must retain that undefined replicate instead of dropping it.
         undefined_case_fixture = [
@@ -753,6 +826,11 @@ def self_test() -> list[str]:
         require(report["annotation_state"] == "IN_REVIEW"
                 and report["units_with_minimum_independent_reviewers"] == 0,
                 "one declared reviewer must remain IN_REVIEW, not be counted complete")
+        partial_agreement = report["inter_rater_agreement"]["labels"]["evidence_relation"]
+        require(partial_agreement["eligible_units"] == 0
+                and partial_agreement["units_with_fewer_than_two_declared_reviewer_ids"] == 1
+                and partial_agreement["unit_weighted_exact_pairwise_agreement"] is None,
+                "unpairable partial-review units must be visible and excluded from agreement")
     except Exception as exc:
         failures.append(f"partial-review state control failed: {exc}")
 
