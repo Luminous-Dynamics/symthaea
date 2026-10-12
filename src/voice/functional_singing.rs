@@ -719,6 +719,19 @@ mod tests {
     }
 
     #[test]
+    fn click_consonants_are_rejected_until_the_renderer_models_click_gestures() {
+        // IPA click places: bilabial, dental, post-alveolar, palatoalveolar,
+        // and alveolar lateral. These need velaric ingressive gestures and
+        // burst models; mapping them to pulmonic ARPAbet phones would be false.
+        for click in ["ʘ", "ǀ", "ǃ", "ǂ", "ǁ"] {
+            assert!(
+                ipa_to_arpa(click).is_none(),
+                "click {click:?} must fail closed until a click-specific gesture exists"
+            );
+        }
+    }
+
+    #[test]
     fn mapper_covers_current_g2p_dictionary_and_letter_fallback() {
         let corpus = "abcdefghijklmnopqrstuvwxyz i the a is am feel hello world yes peace consciousness awareness expanding harmony rising something this calm still silence light dark feels right not but and my can see hear know think now here";
         let phonemes = symthaea_vocal_tract::speech::g2p::text_to_phonemes(corpus);

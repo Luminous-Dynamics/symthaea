@@ -76,6 +76,14 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "finite and positive"):
                     duration_per_mapped_phone(duration, 2)
 
+    def test_click_consonants_are_rejected_until_a_click_specific_phone_inventory_exists(self):
+        # Clicks are non-pulmonic articulations. They must not be approximated
+        # by ordinary ARPAbet consonants without an explicit acoustic model.
+        for click in ("ʘ", "ǀ", "ǃ", "ǂ", "ǁ"):
+            with self.subTest(click=click):
+                with self.assertRaisesRegex(ValueError, "unsupported IPA phoneme"):
+                    ipa_to_arpabet(click)
+
     def test_unknown_ipa_is_rejected_not_replaced_with_schwa(self):
         with self.assertRaisesRegex(ValueError, "unsupported IPA phoneme.*ʎ"):
             ipa_to_arpabet("ʎ")
