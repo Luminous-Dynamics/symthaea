@@ -1006,6 +1006,21 @@ fn stable_musicxml_metadata<T: Copy + PartialEq>(
 
     for &(position, value) in &events[1..] {
         if value != first_value {
+            // Two different tempo declarations at the same score position are
+            // a conflict, not merely a later tempo change. Preserve that
+            // distinction in diagnostics while still failing closed.
+            let conflicting_tempo_at_same_position = name == "tempo"
+                && events.iter().any(|(other_position, other_value)| {
+                    *other_value != value
+                        && other_position.checked_cmp(position)
+                            == Some(std::cmp::Ordering::Equal)
+                });
+            if conflicting_tempo_at_same_position {
+                return Err(
+                    "MusicXML conflicting tempo indicators at the same score position cannot be represented by a single-tempo Score"
+                        .into(),
+                );
+            }
             return Err(format!(
                 "MusicXML {name} changes cannot be represented by a {schema_field} Score"
             ));
@@ -2231,7 +2246,7 @@ mod tests {
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(
-            error.contains("tempo/dynamics-only sound directives are supported"),
+            error.contains("<midi-instrument> routing/program metadata is not represented by Score"),
             "{error}"
         );
     }
@@ -2278,7 +2293,7 @@ mod tests {
             );
             let error = parse_musicxml(xml.as_bytes()).unwrap_err();
             assert!(
-                error.contains("end-dynamics, attack, release, or pizzicato"),
+                error.contains("current Score model cannot represent"),
                 "{attribute}: {error}"
             );
         }
@@ -2382,7 +2397,7 @@ mod tests {
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(
-            error.contains("must contain a supported <pitch> or an explicit <rest>"),
+            error.contains("must contain exactly one of <pitch>, <unpitched>, or <rest>"),
             "{error}"
         );
     }
@@ -2750,7 +2765,7 @@ mod tests {
     fn musicxml_grace_note_is_rejected_instead_of_given_a_default_duration() {
         let xml = br#"<score-partwise><part id="P1"><measure number="1">
             <attributes><divisions>1</divisions></attributes>
-            <note><grace slash="yes"/><pitch><step>B</step><octave>4</octave></pitch>
+            <note><grace slash="yes"/><pitch><step>B</step><octave>4</octave></pitch></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(
@@ -3071,7 +3086,7 @@ mod tests {
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(
-            error.contains("non-zero tempo direction offsets are not supported"),
+            error.contains("non-zero sound or direction tempo offsets are not supported"),
             "{error}"
         );
     }
