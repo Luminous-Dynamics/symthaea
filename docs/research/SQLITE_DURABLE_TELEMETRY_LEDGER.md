@@ -21,7 +21,7 @@ The ledger stores envelope metadata and a payload digest, not actual sensor payl
 - payload digest and estimated wire size;
 - state (pending/delivered/expired), attempt count, accepted time and terminal time.
 
-The schema enforces basic state constraints, UTC timestamps are normalized to a fixed-width ISO representation, and status transitions occur inside explicit write transactions using BEGIN IMMEDIATE. The database is tagged with a SQLite application_id; an existing database with a foreign application ID or unrelated unowned tables is rejected before switching its journal mode or creating telemetry tables. Queue byte/record/time-skew policy is persisted and mismatched instances fail closed. A delivery ACK requires that the event was selected for delivery, has not expired, and has the expected digest. An exact repeated ACK for an already delivered event is idempotent. Terminal rows remain as replay tombstones.
+The schema enforces basic state constraints, UTC timestamps are normalized to a fixed-width ISO representation, and status transitions occur inside explicit write transactions using BEGIN IMMEDIATE. The database is tagged with a SQLite application_id; an existing database with a foreign application ID or unrelated unowned tables is rejected before switching its journal mode or creating telemetry tables. After ownership is verified, the prototype restricts the main database and existing WAL/SHM sidecars to POSIX mode 0600 where supported; the parent directory must still be private to prevent exposure before sidecar chmod and to protect backups. Queue byte/record/time-skew policy is persisted and mismatched instances fail closed. A delivery ACK requires that the event was selected for delivery, has not expired, and has the expected digest. An exact repeated ACK for an already delivered event is idempotent. Terminal rows remain as replay tombstones.
 
 ## Durability posture
 
@@ -47,7 +47,7 @@ This is a reasoned local persistence configuration, not proof against all hardwa
 
 ## Test plan added
 
-The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files and synthetic event metadata. Twenty-two deterministic tests are added; they cover:
+The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files and synthetic event metadata. Twenty-three deterministic tests are added; they cover:
 - enqueue and pending-byte recovery after creating a fresh process-like queue instance;
 - re-transmission after restart and persisted attempt counts;
 - ACK and duplicate ACK behavior across queue instances;
