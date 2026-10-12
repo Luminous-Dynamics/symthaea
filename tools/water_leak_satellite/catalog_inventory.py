@@ -175,7 +175,7 @@ def summarize_item_feature(
         "geometry": feature.get("geometry"),
         "properties": {key: properties[key] for key in SAFE_PROPERTY_KEYS if key in properties},
         # Hrefs intentionally omitted: remote catalogues may supply signed/query-bearing URLs.
-        "asset_metadata_included": bool(raw_assets),
+        "asset_metadata_returned_in_response": bool(raw_assets),
         "assets": asset_summaries,
     }
 
