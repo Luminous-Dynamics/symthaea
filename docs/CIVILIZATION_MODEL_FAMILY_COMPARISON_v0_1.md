@@ -63,14 +63,16 @@ Do not make the simulator, evidence repository, user interface and policy author
 
 Align producer/consumer schemas with the public Sol-Atlas Humanity Atlas work rather than creating a second incompatible envelope.
 
-### Existing simulator audit — 2026-10-11
+### Existing simulator audit — 2026-10-12
 
-The repository already contains a multi-world civilization simulator; the first implementation task must not accidentally create a competing simulator. A source audit of `mycelix-multiworld-sim/src/bin/governance_comparison.rs` found that its five-row comparison iterated all declared `GovernanceModel` variants, but `Sortition`, `Meritocratic` and `ElderCouncil` all mapped to the same `trust_weighted_governance = false` setting as the equal-weight arm. The executable also classified a single-seed delta using fixed percentage thresholds. Labels therefore implied three additional interventions that were not actually executed, and a single seed was being used to print hypothesis-support language.
+The repository already contains a multi-world civilization simulator; the implementation task must not create a competing simulator. A source audit found two layers of experimental-validity problems in `mycelix-multiworld-sim/src/bin/governance_comparison.rs` and its execution path:
 
-The fix is proposed in [Luminous-Dynamics PR #3765](https://github.com/Luminous-Dynamics/luminous-dynamics/pull/3765): separate the full declared model catalog from `comparison_ready()`, report unwired variants as `NOT RUN`, call the output a single-seed smoke comparison, and remove the threshold-based support verdict. It is still a draft: source was fetched back and checked, but Rust tests and the simulation have not been run in this environment.
+1. The five-row comparator mapped `Sortition`, `Meritocratic` and `ElderCouncil` to the same `trust_weighted_governance = false` configuration as the equal-weight row. Those rows were not distinct interventions.
+2. Even the remaining true/false comparison is **not a governance-policy comparison**. In the current `lib.rs` execution path, the flag changes a resource-waste assumption; in `consciousness.rs`, it changes the consciousness-growth amplifier. The governance tick receives `phase2_enabled`, not a selected `GovernanceModel`, and still computes profile/tier-based eligibility. Thus no governance policy arm is verified as wired end-to-end, and the flag's effects are confounded with non-governance model changes.
 
-This finding changes the implementation order. Reuse the current simulator and correct its experiment harness first; wire additional policy families end-to-end only in a subsequent change. Do not cite the existing five-row output as a five-way governance comparison.
+The corrective [PR #3765](https://github.com/Luminous-Dynamics/luminous-dynamics/pull/3765) now keeps `GovernanceModel::comparison_ready()` empty and makes the comparator exit with every declared model marked `NOT RUN` until the actual tick loop consumes a policy selector. The new gate and fail-closed behavior are source-checked, but not compiled or executed here; the PR is still draft, and the commit has no available CI run in this session. Follow-up implementation requirements are tracked in [issue #3766](https://github.com/Luminous-Dynamics/luminous-dynamics/issues/3766).
 
+This changes the implementation order: first add a typed, versioned selector to the actual governance transition and tests proving that each selected arm changes only its declared mechanism; then run a frozen multi-seed comparison. Do not cite any prior one-seed or five-row result as evidence that distinct governance policies were compared, or as evidence that consciousness metrics should determine political authority.
 
 ## 4. First pilot: essential-energy access
 
