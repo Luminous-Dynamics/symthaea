@@ -9,12 +9,11 @@ use symthaea_core::embodiment_evidence::{ClockDomainId, TimestampV1};
 use crate::readiness::{Px4ReadinessFactV1, Px4ReadinessRequirementV1};
 
 use super::{
-    PX4_READINESS_STATUS_SCHEMA_V1, Px4StatusEvidenceError, digest_hex, feed_str,
-    readiness_fact, status_timestamp, validate_identifier, validate_schema,
+    PX4_READINESS_STATUS_SCHEMA_V1, Px4StatusEvidenceError, digest_hex, feed_str, readiness_fact,
+    status_timestamp, validate_identifier, validate_schema,
 };
 
-const COMMITMENT_DOMAIN_V1: &[u8] =
-    b"symthaea.autopilot.px4.vehicle-status-readiness.v1\0";
+const COMMITMENT_DOMAIN_V1: &[u8] = b"symthaea.autopilot.px4.vehicle-status-readiness.v1\0";
 
 /// Content-addressed readiness-specific projection of one PX4 `VehicleStatus`.
 ///
@@ -120,9 +119,7 @@ impl Px4VehicleStatusReadinessEvidenceV1 {
     }
 
     /// Evidence-backed `FailsafeInactive` fact from `!VehicleStatus.failsafe`.
-    pub fn failsafe_inactive_fact(
-        &self,
-    ) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
+    pub fn failsafe_inactive_fact(&self) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
         readiness_fact(
             Px4ReadinessRequirementV1::FailsafeInactive,
             !self.failsafe,
@@ -188,9 +185,15 @@ mod tests {
         let status_id = value.status_id().unwrap();
         let accepts = value.accepts_offboard_setpoints_fact().unwrap();
         let failsafe = value.failsafe_inactive_fact().unwrap();
-        assert_eq!(accepts.requirement, Px4ReadinessRequirementV1::AcceptsOffboardSetpoints);
+        assert_eq!(
+            accepts.requirement,
+            Px4ReadinessRequirementV1::AcceptsOffboardSetpoints
+        );
         assert_eq!(accepts.state, Px4ReadinessFactStateV1::Unsatisfied);
-        assert_eq!(failsafe.requirement, Px4ReadinessRequirementV1::FailsafeInactive);
+        assert_eq!(
+            failsafe.requirement,
+            Px4ReadinessRequirementV1::FailsafeInactive
+        );
         assert_eq!(failsafe.state, Px4ReadinessFactStateV1::Unsatisfied);
         assert_eq!(accepts.evidence_id.as_deref(), Some(status_id.as_str()));
         assert_eq!(failsafe.evidence_id.as_deref(), Some(status_id.as_str()));
