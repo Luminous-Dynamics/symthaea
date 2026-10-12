@@ -20,7 +20,7 @@ use binius_spartan_frontend::{
 };
 use binius_spartan_prover::Prover;
 use binius_spartan_verifier::{config::StdChallenger, Verifier};
-use binius_transcript::ProverTranscript;
+use binius_transcript::{ProverTranscript, VerifierTranscript};
 use rand::{rngs::StdRng, SeedableRng};
 
 /// Add private witness bits and constrain their public XOR result.
@@ -96,13 +96,29 @@ fn iron_spartan_proves_private_boolean_xor_and_rejects_non_bits() {
         .prove(&witness, &mut rng, &mut prover_transcript)
         .expect("Iron Spartan proof generation failed");
 
-    let mut verifier_transcript = prover_transcript.into_verifier();
+    let proof = prover_transcript.finalize();
+
+    // Verify the original public statement from the serialized proof bytes.
+    let mut verifier_transcript =
+        VerifierTranscript::new(StdChallenger::default(), proof.clone());
     verifier
         .verify(public, &mut verifier_transcript)
         .expect("Iron Spartan rejected a valid public XOR statement");
     verifier_transcript
         .finalize()
         .expect("Iron Spartan transcript finalization failed");
+
+    // A proof for output 1 must not verify if the public output is changed to 0.
+    // The verifier absorbs public inputs into Fiat-Shamir, so this mutation
+    // must invalidate the proof rather than silently rebind it to a new claim.
+    let tampered_public = [output_value + B128::ONE];
+    assert_eq!(tampered_public[0], B128::ZERO);
+    let mut tampered_transcript =
+        VerifierTranscript::new(StdChallenger::default(), proof);
+    assert!(
+        verifier.verify(&tampered_public, &mut tampered_transcript).is_err(),
+        "Iron Spartan must reject a proof when its public XOR output is altered"
+    );
 
     // An arbitrary field element must not pass as a Boolean witness bit.
     let bad_a = B128::new(2);

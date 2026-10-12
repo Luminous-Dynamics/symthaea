@@ -67,3 +67,10 @@
 
 
 - Follow-up source scan removed a second stale comment that referenced a non-existent standalone path for a separately measured Winterfell circuit. Both module-level and function-level descriptions now consistently state that this crate contains no Winterfell XOR prover.
+
+
+## Iron Spartan statement-binding regression (2026-10-12)
+
+- Extended the minimal Iron Spartan smoke test to serialize the proof and verify it through a fresh verifier transcript.
+- Added a negative case that changes the public XOR output from one to zero and requires verification to fail. This tests proof binding to the public statement rather than only checking that a valid proof verifies.
+- The regression is authored but remains unconfirmed until the current CI head runs the Rust test successfully.
