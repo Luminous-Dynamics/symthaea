@@ -252,27 +252,14 @@ fn validate_invariant_holdout_inner(
             AutonomousHoldoutFailure::TrajectoryLimitExceeded,
         );
     }
-    let initial_derivative = rhs(initial_state, 0.0);
-    if initial_derivative.len() != initial_state.len()
-        || initial_derivative.iter().any(|value| !value.is_finite())
-    {
-        return failed_holdout(
-            discovery_seed,
-            holdout_seed,
-            holdout_trajectories,
-            threshold,
-            0,
-            f64::MAX,
-            0.0,
-            AutonomousHoldoutFailure::InvalidInput,
-        );
-    }
-
-    let sample_orbit = |initial: &[f64]| -> Option<Vec<Vec<f64>>> {
-        let states = checked_rk4_trajectory(rhs, initial, t_max, dt)?;
+    let sample_orbit = |initial: &[f64]| -> (Option<Vec<Vec<f64>>>, super::dynamics::Rk4TrajectoryWorkV1) {
+        let (states, work) = checked_rk4_trajectory(rhs, initial, t_max, dt);
+        let Some(states) = states else {
+            return (None, work);
+        };
         let n_samples = 200.min(states.len());
         if n_samples < 20 {
-            return None;
+            return (None, work);
         }
         let samples = super::autonomous::sample_trajectory_evenly(&states, n_samples);
         if samples.len() < 20
@@ -280,14 +267,19 @@ fn validate_invariant_holdout_inner(
                 state.len() != var_names.len() || state.iter().any(|value| !value.is_finite())
             })
         {
-            return None;
+            return (None, work);
         }
-        Some(samples)
+        (Some(samples), work)
     };
 
     let mut prng = holdout_seed;
     let mut variances = Vec::with_capacity(holdout_trajectories);
     let mut gradient_fractions = Vec::with_capacity(holdout_trajectories);
+    let mut attempted_integration_steps = 0u64;
+    let mut completed_integration_steps = 0u64;
+    let mut rhs_evaluations = 0u64;
+    let mut state_updates = 0u64;
+    let mut invalid_rhs_at_start = false;
     for _ in 0..holdout_trajectories {
         let mut initial = initial_state.to_vec();
         for value in &mut initial {
@@ -296,7 +288,19 @@ fn validate_invariant_holdout_inner(
             let scale = value.abs().max(0.05);
             *value += u * 0.25 * scale;
         }
-        let Some(orbit) = sample_orbit(&initial) else {
+        let (orbit_result, work) = sample_orbit(&initial);
+        attempted_integration_steps = attempted_integration_steps.saturating_add(work.attempted_steps);
+        completed_integration_steps = completed_integration_steps.saturating_add(work.completed_steps);
+        rhs_evaluations = rhs_evaluations.saturating_add(work.rhs_evaluations);
+        state_updates = state_updates.saturating_add(work.state_updates);
+        if orbit_result.is_none()
+            && work.attempted_steps == 1
+            && work.completed_steps == 0
+            && work.rhs_evaluations == 1
+        {
+            invalid_rhs_at_start = true;
+        }
+        let Some(orbit) = orbit_result else {
             continue;
         };
         let informativeness = gradient_informativeness_fraction(candidate, &orbit, var_names);
@@ -323,7 +327,12 @@ fn validate_invariant_holdout_inner(
         min_gradient_informativeness_fraction
     };
     if checked != holdout_trajectories {
-        return failed_holdout(
+        let failure = if checked == 0 && invalid_rhs_at_start {
+            AutonomousHoldoutFailure::InvalidInput
+        } else {
+            AutonomousHoldoutFailure::IncompleteCoverage
+        };
+        let mut result = failed_holdout(
             discovery_seed,
             holdout_seed,
             holdout_trajectories,
@@ -331,8 +340,13 @@ fn validate_invariant_holdout_inner(
             checked,
             if checked == 0 { f64::MAX } else { max_variance },
             min_gradient_informativeness_fraction,
-            AutonomousHoldoutFailure::IncompleteCoverage,
+            failure,
         );
+        result.attempted_integration_steps = attempted_integration_steps;
+        result.completed_integration_steps = completed_integration_steps;
+        result.rhs_evaluations = rhs_evaluations;
+        result.state_updates = state_updates;
+        return result;
     }
 
     variances.sort_by(f64::total_cmp);
@@ -359,6 +373,10 @@ fn validate_invariant_holdout_inner(
         system_definition_blake3: String::new(),
         requested_trajectories: holdout_trajectories,
         trajectories_checked: checked,
+        attempted_integration_steps,
+        completed_integration_steps,
+        rhs_evaluations,
+        state_updates,
         max_lie_derivative_variance: max_variance,
         median_lie_derivative_variance: median,
         min_gradient_informativeness_fraction,
