@@ -68,7 +68,7 @@ The queue's now_utc argument is injected by the caller for reproducibility. It d
 - Minimize at the source; aggregate before any uplink where the use case permits.
 - Keep household/participant membership lists and local source keys outside the wire envelope.
 - Do not publish participant lists, exact coordinates, raw fine-grained series or stable per-person identifiers into a shared ledger or satellite envelope.
-- Do not publish hashes of low-entropy private values as if they anonymize them. Here the payload digest exists to bind retry/ACK identity and should be computed over a canonical authorized envelope; privacy-sensitive data must not be inferable from the material being hashed.
+- Do not publish hashes of low-entropy private values as if they anonymize them. In this prototype the payload digest is only an idempotency binding; a production envelope should authenticate canonical metadata and payload together (for example with a signed canonical-envelope digest). No digest scheme is anonymization, and privacy-sensitive values must not be inferable from published material.
 - Keep differential-privacy accounting separate from delivery idempotency. At-least-once transmission must not spend a privacy budget twice for the same exact release, while a semantically new release must be accounted for even if it has similar values.
 
 The policy model does not implement a durable DP accountant, secure aggregation, encryption, key rotation, signatures or storage encryption. Those are mandatory production design tasks, not implied by these tests.
