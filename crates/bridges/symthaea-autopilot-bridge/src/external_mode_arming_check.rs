@@ -32,6 +32,7 @@ const REPLY_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-reply.v2\0";
 const REPLY_PAYLOAD_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-reply-payload.v1\0";
 const PROFILE_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-coherence-profile.v1\0";
 const ASSESSMENT_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-coherence-assessment.v1\0";
+const PX4_EXTERNAL_MODE_COMPONENT_NAME_MAX_BYTES_V1: usize = 25;
 
 /// Successful or failed external-component registration as observed from PX4.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -140,6 +141,11 @@ impl Px4ExternalModeRegistrationBindingV1 {
         validate_identifier(&self.firmware_profile_id, "firmware_profile_id")?;
         validate_identifier(&self.source_boot_session_id, "source_boot_session_id")?;
         validate_identifier(&self.component_name, "component_name")?;
+        if self.component_name.len() > PX4_EXTERNAL_MODE_COMPONENT_NAME_MAX_BYTES_V1 {
+            return Err(Px4ExternalModeArmingCheckError::ComponentNameTooLong {
+                found: self.component_name.len(),
+            });
+        }
         self.received_at
             .validate()
             .map_err(Px4ExternalModeArmingCheckError::Timestamp)?;
@@ -1346,6 +1352,9 @@ pub enum Px4ExternalModeArmingCheckError {
     /// Empty, padded, overlong, or control-containing identifier.
     #[error("invalid {0}")]
     InvalidIdentifier(&'static str),
+    /// Registration component name exceeded PX4 v1's fixed-width 25-byte field.
+    #[error("registration component name is {found} bytes; PX4 v1 allows at most 25 bytes")]
+    ComponentNameTooLong { found: usize },
     /// Registration reply supplied a raw ID below PX4's invalid sentinel.
     #[error("registration IDs below -1 are invalid")]
     InvalidRegistrationSentinel,
@@ -2702,6 +2711,34 @@ mod tests {
         assert_eq!(
             outside_mask.unwrap_err(),
             Px4ExternalModeArmingCheckError::RegistrationIdOutsideMask
+        );
+    }
+
+    #[test]
+    fn registration_component_name_obeys_px4_fixed_width_field() {
+        let at_limit = registration(true, 3, 42);
+        assert_eq!(at_limit.component_name.len(), 25);
+        at_limit.validate().unwrap();
+
+        let over_limit = Px4ExternalModeRegistrationBindingV1::new(
+            "px4.registration.decoder.fixture.v1",
+            "vehicle.slot-a",
+            "px4.v1.18.external-mode.fixture.v1",
+            "px4.boot.fixture.session-a",
+            850_000,
+            991,
+            "org.luminous.fixture.modeX",
+            1,
+            true,
+            3,
+            42,
+            -1,
+            false,
+            ts(900_000_000),
+        );
+        assert_eq!(
+            over_limit.unwrap_err(),
+            Px4ExternalModeArmingCheckError::ComponentNameTooLong { found: 26 }
         );
     }
 
