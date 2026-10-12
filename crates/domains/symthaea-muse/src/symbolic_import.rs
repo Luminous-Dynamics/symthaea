@@ -1163,7 +1163,7 @@ const MOTIF_NEAR_MATCH_MAX_NORMALIZED_ONSET_GAP_ERROR: f64 = 0.15;
 /// tolerance definition explicit. The five-slot array is sufficient for the
 /// importer's fixed 3–6-note motif window.
 fn normalized_onset_gap_shape(notes: &[(usize, &ScoreNote)]) -> Option<[f64; 5]> {
-    if !(2..=6).contains(&notes.len()) {
+    if !(3..=6).contains(&notes.len()) {
         return None;
     }
     let gap_count = notes.len() - 1;
@@ -1720,6 +1720,16 @@ mod tests {
         assert_eq!(first[0].onset_denominator, 1);
         assert_eq!(first[0].duration_numerator, 5);
         assert_eq!(first[0].duration_denominator, 24);
+    }
+
+    #[test]
+    fn near_matches_are_unavailable_for_two_note_provisional_contours() {
+        let track = monophonic_midi_track(&[60_u8, 62], &[]);
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        let analysis = analyze(&score);
+        assert_eq!(analysis.motifs.len(), 1);
+        assert_eq!(analysis.motifs[0].midi_pitches, vec![60, 62]);
+        assert!(analysis.motifs[0].rhythm_near_matches.is_none());
     }
 
     #[test]
