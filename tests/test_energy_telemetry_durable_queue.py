@@ -49,7 +49,8 @@ class DurableQueueTests(unittest.TestCase):
         self.temp.cleanup()
 
     def reopen(self, **kwargs):
-        return DurableTelemetryQueue(self.database, max_queue_bytes=1000, **kwargs)
+        kwargs.setdefault("max_queue_bytes", 1000)
+        return DurableTelemetryQueue(self.database, **kwargs)
 
     def test_event_survives_restart_and_pending_bytes_are_rebuilt(self):
         e = event()
