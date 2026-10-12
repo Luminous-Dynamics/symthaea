@@ -53,7 +53,7 @@ The queue's now_utc argument is injected by the caller for reproducibility. It d
 
 ## Delivery rules and safety invariants
 
-1. **At-least-once until acknowledged.** Selection does not remove an event. The same event can be resent after lost acknowledgements. Receivers must be idempotent. ACKs must refer to an event that was selected and match its digest; production ACKs still need authenticated transport.
+1. **At-least-once until acknowledged.** Selection does not remove an event. The same event can be resent after lost acknowledgements. Receivers must be idempotent. ACKs must refer to an event that was selected, arrive before expiry and match its digest; an expired event needs an explicit expiry receipt rather than a delivery ACK. Production ACKs still need authenticated transport.
 2. **Duplicate is not new evidence.** Exact event replay is idempotent. Reusing an ID for different metadata or payload is an identity conflict and fails closed.
 3. **Expiry is explicit.** Expiration returns event IDs so the caller can write audit receipts. Queue expiration in this prototype is volatile; a production system must durably record decisions before deleting stored bytes.
 4. **Priority is deterministic.** Candidate batches sort by priority, then observation time, then event ID; events that do not fit the byte budget remain pending. Queue capacity errors do not silently evict earlier events.
