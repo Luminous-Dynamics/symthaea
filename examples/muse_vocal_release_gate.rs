@@ -533,6 +533,56 @@ fn ensure_directory_contains_exact_files(
     Ok(())
 }
 
+fn is_review_history_filename(name: &str) -> bool {
+    ["human_case_report", "release_status"].iter().any(|base| {
+        name.strip_prefix(&format!("{base}.review-"))
+            .and_then(|suffix| suffix.strip_suffix(".json"))
+            .is_some_and(|suffix| {
+                !suffix.is_empty()
+                    && suffix.bytes().any(|byte| byte.is_ascii_digit())
+                    && suffix
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || byte == b'-')
+            })
+    })
+}
+
+fn archive_current_review_artifacts(private_output: &Path) -> Result<()> {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .context("system clock is before the Unix epoch")?
+        .as_nanos()
+        .to_string();
+    for name in ["human_case_report.json", "release_status.json"] {
+        let source = private_output.join(name);
+        if !path_entry_exists(&source)? {
+            continue;
+        }
+        require_regular_non_symlink_file(&source)?;
+        let stem = name
+            .strip_suffix(".json")
+            .context("expected a JSON review artifact filename")?;
+        let mut suffix = 0usize;
+        loop {
+            let destination =
+                private_output.join(format!("{stem}.review-{timestamp}-{suffix}.json"));
+            if !path_entry_exists(&destination)? {
+                std::fs::rename(&source, &destination).with_context(|| {
+                    format!(
+                        "failed to archive prior review artifact {}",
+                        source.display()
+                    )
+                })?;
+                break;
+            }
+            suffix = suffix
+                .checked_add(1)
+                .context("review archive suffix overflow")?;
+        }
+    }
+    Ok(())
+}
+
 fn run_saved_ratings_review(
     output: &Path,
     private_output: &Path,
@@ -583,7 +633,7 @@ fn run_saved_ratings_review(
         &expected_public_files,
         "shareable listening pack",
     )?;
-    let expected_private_files: std::collections::BTreeSet<String> = [
+    let mut expected_private_files: std::collections::BTreeSet<String> = [
         "internal_manifest.json",
         "private_backend_key.json",
         "objective_report.json",
@@ -593,6 +643,15 @@ fn run_saved_ratings_review(
     .into_iter()
     .map(str::to_string)
     .collect();
+    for entry in std::fs::read_dir(private_output)? {
+        let name = entry?
+            .file_name()
+            .into_string()
+            .map_err(|_| anyhow::anyhow!("organizer-only directory contains a non-UTF8 filename"))?;
+        if is_review_history_filename(&name) {
+            expected_private_files.insert(name);
+        }
+    }
     ensure_directory_contains_exact_files(
         private_output,
         &expected_private_files,
@@ -704,6 +763,9 @@ fn run_saved_ratings_review(
         objective_pass,
         minimum_listeners,
     )?;
+    // Preserve the prior result before replacing the current summary; repeated
+    // reviews must not silently erase evidence from an earlier rating set.
+    archive_current_review_artifacts(private_output)?;
     write_private_artifact(
         &private_output.join("human_case_report.json"),
         &serde_json::to_vec_pretty(&per_clip_results)?,
