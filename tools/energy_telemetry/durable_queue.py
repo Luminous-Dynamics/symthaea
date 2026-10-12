@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+import os
 import sqlite3
 from typing import Iterator
 
@@ -72,7 +73,26 @@ class DurableTelemetryQueue:
         self.max_records = max_records
         self.max_future_skew = timedelta(seconds=max_future_skew_seconds)
         self.busy_timeout_seconds = float(busy_timeout_seconds)
+        self._ownership_verified = False
         self._initialize()
+        self._ownership_verified = True
+        self._secure_file_modes()
+
+    def _secure_file_modes(self) -> None:
+        """Restrict database and existing WAL sidecars to the current user."""
+        for candidate in (
+            self.database_path,
+            self.database_path + "-wal",
+            self.database_path + "-shm",
+        ):
+            try:
+                os.chmod(candidate, 0o600)
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise TelemetryQueueError(
+                    "unable to enforce private SQLite file permissions"
+                ) from exc
 
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
@@ -89,7 +109,11 @@ class DurableTelemetryQueue:
             connection.execute("PRAGMA synchronous = FULL")
             yield connection
         finally:
-            connection.close()
+            try:
+                if self._ownership_verified:
+                    self._secure_file_modes()
+            finally:
+                connection.close()
 
     def _initialize(self) -> None:
         with self._connection() as db:
