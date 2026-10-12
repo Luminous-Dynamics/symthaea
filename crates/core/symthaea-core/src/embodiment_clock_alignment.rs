@@ -153,10 +153,7 @@ fn validate_identifier(
     field: &'static str,
 ) -> Result<(), ClockAlignmentValidationError> {
     let trimmed = value.trim();
-    if trimmed.is_empty()
-        || trimmed.len() != value.len()
-        || value.chars().any(char::is_control)
-    {
+    if trimmed.is_empty() || trimmed.len() != value.len() || value.chars().any(char::is_control) {
         return Err(ClockAlignmentValidationError::InvalidIdentifier(field));
     }
     Ok(())
@@ -197,10 +194,16 @@ impl std::fmt::Display for ClockAlignmentValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UnsupportedSchemaVersion { found } => {
-                write!(f, "unsupported clock-alignment sample schema version {found}")
+                write!(
+                    f,
+                    "unsupported clock-alignment sample schema version {found}"
+                )
             }
             Self::Timestamp(error) => write!(f, "invalid clock-alignment timestamp: {error}"),
-            Self::SameClockDomain => write!(f, "clock-alignment sample requires two distinct clock domains"),
+            Self::SameClockDomain => write!(
+                f,
+                "clock-alignment sample requires two distinct clock domains"
+            ),
             Self::InvalidIdentifier(field) => write!(f, "invalid {field} identifier"),
             Self::DigestMismatch => write!(f, "clock-alignment sample content commitment mismatch"),
         }
@@ -229,10 +232,12 @@ mod tests {
         .unwrap();
 
         assert_eq!(sample.max_alignment_error_ns, 0);
-        assert!(sample
-            .alignment_id()
-            .unwrap()
-            .starts_with("symthaea.embodiment.clock-alignment-sample.v1:"));
+        assert!(
+            sample
+                .alignment_id()
+                .unwrap()
+                .starts_with("symthaea.embodiment.clock-alignment-sample.v1:")
+        );
     }
 
     #[test]
@@ -251,13 +256,7 @@ mod tests {
     #[test]
     fn malformed_method_or_evidence_id_is_rejected() {
         assert_eq!(
-            ClockAlignmentSampleV1::new(
-                ts("host", 1),
-                ts("device", 2),
-                "  ",
-                1,
-                "evidence:1",
-            ),
+            ClockAlignmentSampleV1::new(ts("host", 1), ts("device", 2), "  ", 1, "evidence:1",),
             Err(ClockAlignmentValidationError::InvalidIdentifier(
                 "method_profile_id"
             ))
@@ -270,7 +269,9 @@ mod tests {
                 1,
                 "bad\nvalue",
             ),
-            Err(ClockAlignmentValidationError::InvalidIdentifier("evidence_id"))
+            Err(ClockAlignmentValidationError::InvalidIdentifier(
+                "evidence_id"
+            ))
         );
     }
 
@@ -309,7 +310,10 @@ mod tests {
         .unwrap();
 
         sample.target_at.nanoseconds = 901;
-        assert_eq!(sample.validate(), Err(ClockAlignmentValidationError::DigestMismatch));
+        assert_eq!(
+            sample.validate(),
+            Err(ClockAlignmentValidationError::DigestMismatch)
+        );
         assert_eq!(
             sample.alignment_id(),
             Err(ClockAlignmentValidationError::DigestMismatch)
