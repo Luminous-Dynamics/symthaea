@@ -17,6 +17,7 @@ from tools.generate_lean_math_certificate import main, render_certificate
 from tools.math_certificate_golden_vectors import (
     SYMFCER1_FACTOR_2,
     SYMPPRF1_PRIME_3,
+    SYMPPRF1_PRIME_13_MULTI_FACTOR,
 )
 
 
@@ -56,17 +57,12 @@ class LeanCertificateBridgeTests(unittest.TestCase):
         self.assertIn("norm_num", factor_two)
 
     def test_combines_distinct_factor_witnesses_and_rechecks_them(self) -> None:
-        # 2 is a primitive root modulo 13. The q=2 and q=3 witnesses are both 2;
-        # isolated q-primary components multiply to the valid common root 11.
-        proof = verifier.PrimalityProof(
-            13,
-            (
-                verifier.PrimeNode(2, (), ()),
-                verifier.PrimeNode(3, ((2, 1),), ((2, 2),)),
-                verifier.PrimeNode(13, ((2, 2), (3, 1)), ((2, 2), (3, 2))),
-            ),
-        )
-        encoded = verifier.encode_primality_proof(proof)
+        # The fixed bridge fixture certifies 13 using q=2 and q=3 witnesses.
+        # Isolating their q-primary components yields the common root 11.
+        encoded = SYMPPRF1_PRIME_13_MULTI_FACTOR
+        self.assertEqual(len(encoded), 152)
+        proof = verifier.decode_primality_proof(encoded)
+        self.assertEqual(verifier.encode_primality_proof(proof), encoded)
         lean_source = render_certificate(encoded)
         self.assertIn("pock (13, 11, 2 ^ 2 * 3)", lean_source)
 
@@ -104,6 +100,23 @@ class LeanCertificateBridgeTests(unittest.TestCase):
             self.assertEqual(status, 0, stdout.getvalue())
             self.assertIn("written", stdout.getvalue())
             self.assertIn("prime_cert [small {2}, pock (3, 2, 2)]", output.read_text())
+
+    def test_cli_writes_multifactor_fixture_for_kernel_checking(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "GeneratedPrimeThirteen.lean"
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                status = main(
+                    [
+                        "--golden-vector",
+                        "prime-13-multifactor",
+                        "--output",
+                        str(output),
+                    ]
+                )
+            self.assertEqual(status, 0, stdout.getvalue())
+            self.assertIn("written", stdout.getvalue())
+            self.assertIn("pock (13, 11, 2 ^ 2 * 3)", output.read_text())
 
 
 if __name__ == "__main__":
