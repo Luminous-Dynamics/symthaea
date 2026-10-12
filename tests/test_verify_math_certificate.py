@@ -351,7 +351,7 @@ class ExhaustiveSmallDomainTests(unittest.TestCase):
         # The expected primality classification comes from a separate, deliberately
         # simple trial-division oracle—not from either certificate implementation.
         cache = {2: proof_two()}
-        for value in range(2, 501):
+        for value in range(2, 2001):
             with self.subTest(value=value):
                 claim = _small_domain_claim(value, cache)
                 if _reference_is_prime(value):
@@ -361,6 +361,15 @@ class ExhaustiveSmallDomainTests(unittest.TestCase):
                 else:
                     with self.assertRaises(verifier.CertificateError):
                         verifier.verify_primality_proof(claim)
+
+    def test_rejects_carmichael_number_after_fermat_condition_passes(self) -> None:
+        # 561 is composite but Carmichael: base 2 satisfies Fermat's congruence,
+        # so the checker must enforce Pocklington's per-factor GCD condition too.
+        self.assertEqual(pow(2, 560, 561), 1)
+        claim = _small_domain_claim(561, {2: proof_two()})
+        with self.assertRaisesRegex(verifier.CertificateError, "Pocklington GCD condition failed"):
+            verifier.verify_primality_proof(claim)
+
 
 if __name__ == "__main__":
     unittest.main()
