@@ -379,6 +379,7 @@ impl CdpSession {
             .await
             .context("Accessibility observation unavailable; JavaScript fallback is disabled")
     }
+}
 
 async fn navigate_history(page: &Page, offset: i64) -> Result<()> {
     let history = page
