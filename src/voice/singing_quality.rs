@@ -14,10 +14,13 @@ pub struct VocalQualityMetrics {
     pub p95_pitch_error_cents: f32,
     /// Broad-range autocorrelation diagnostic that does not use the target pitch
     /// as a search prior. This is a cross-check, not a calibrated release gate.
-    pub score_blind_voiced_frame_fraction: f32,
-    pub score_blind_voiced_unvoiced_error_rate: f32,
-    pub score_blind_median_pitch_error_cents: f32,
-    pub score_blind_p95_pitch_error_cents: f32,
+    /// These metrics are None when their denominator/sample set is empty.
+    pub score_blind_voiced_frame_fraction: Option<f32>,
+    pub score_blind_voiced_unvoiced_error_rate: Option<f32>,
+    pub score_blind_median_pitch_error_cents: Option<f32>,
+    pub score_blind_p95_pitch_error_cents: Option<f32>,
+    /// Number of eligible voiced frames contributing to score-blind pitch errors.
+    pub score_blind_pitch_error_frame_count: usize,
     pub stable_pitch_p95_cents: f32,
     pub transition_pitch_p95_cents: f32,
     pub median_onset_error_ms: f32,
@@ -183,12 +186,16 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let median_pitch_error_cents = percentile(&errors, 0.5);
     let p95_pitch_error_cents = percentile(&errors, 0.95);
     score_blind_errors.sort_by(f32::total_cmp);
-    let score_blind_voiced_frame_fraction = score_blind_detected_voiced_frames as f32
-        / score_blind_expected_voiced_frames.max(1) as f32;
+    let score_blind_pitch_error_frame_count = score_blind_errors.len();
+    let score_blind_voiced_frame_fraction = (score_blind_expected_voiced_frames > 0).then(|| {
+        score_blind_detected_voiced_frames as f32 / score_blind_expected_voiced_frames as f32
+    });
     let score_blind_voiced_unvoiced_error_rate =
-        score_blind_vuv_errors as f32 / all_frames.max(1) as f32;
-    let score_blind_median_pitch_error_cents = percentile(&score_blind_errors, 0.5);
-    let score_blind_p95_pitch_error_cents = percentile(&score_blind_errors, 0.95);
+        (all_frames > 0).then(|| score_blind_vuv_errors as f32 / all_frames as f32);
+    let score_blind_median_pitch_error_cents =
+        (!score_blind_errors.is_empty()).then(|| percentile(&score_blind_errors, 0.5));
+    let score_blind_p95_pitch_error_cents =
+        (!score_blind_errors.is_empty()).then(|| percentile(&score_blind_errors, 0.95));
     stable_errors.sort_by(f32::total_cmp);
     transition_errors.sort_by(f32::total_cmp);
     let stable_pitch_p95_cents = percentile(&stable_errors, 0.95);
@@ -259,6 +266,7 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         score_blind_voiced_unvoiced_error_rate,
         score_blind_median_pitch_error_cents,
         score_blind_p95_pitch_error_cents,
+        score_blind_pitch_error_frame_count,
         stable_pitch_p95_cents,
         transition_pitch_p95_cents,
         median_onset_error_ms,
@@ -492,6 +500,30 @@ mod tests {
     }
 
     #[test]
+    fn score_blind_metrics_are_undefined_without_eligible_frames() {
+        let note = symthaea_muse::Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let stem = VocalStem {
+            // Less than one 50 ms analysis frame at 24 kHz.
+            samples: vec![0.0; 400],
+            sample_rate: 24_000,
+            backend: "short-fixture".into(),
+        };
+
+        let metrics = analyze_vocal_stem(&performance, &stem);
+        assert_eq!(metrics.score_blind_pitch_error_frame_count, 0);
+        assert_eq!(metrics.score_blind_voiced_frame_fraction, None);
+        assert_eq!(metrics.score_blind_voiced_unvoiced_error_rate, None);
+        assert_eq!(metrics.score_blind_median_pitch_error_cents, None);
+        assert_eq!(metrics.score_blind_p95_pitch_error_cents, None);
+    }
+
+    #[test]
     fn perfect_sine_tracks_note() {
         let note = symthaea_muse::Note {
             frequency: 220.0,
@@ -547,9 +579,12 @@ mod tests {
             metrics
         );
         assert!(
-            metrics.score_blind_median_pitch_error_cents > 1_000.0,
+            metrics
+                .score_blind_median_pitch_error_cents
+                .is_some_and(|error| error > 1_000.0),
             "score-blind diagnostic should expose the large pitch mismatch: {:?}",
             metrics
         );
+        assert!(metrics.score_blind_pitch_error_frame_count > 0);
     }
 }
