@@ -23,7 +23,6 @@ use chromiumoxide::cdp::browser_protocol::page::{
 use chromiumoxide::handler::viewport::Viewport;
 use chromiumoxide::layout::Point;
 use futures::StreamExt;
-use html5ever::tree_builder::TreeSink;
 use scraper::{Html, Selector};
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -424,7 +423,14 @@ fn extract_html_text(html: &str) -> Result<String> {
 
     // Reverse document order so descendants are detached before an ancestor.
     for id in excluded_nodes.into_iter().rev() {
-        document.remove_from_parent(&id);
+        // `HtmlTreeSink` implements the html5ever tree-sink adapter, but
+        // the parsed tree itself is an ego_tree::Tree<Node>. Mutate that tree
+        // directly so excluded nodes are detached before their ancestors.
+        document
+            .tree
+            .get_mut(id)
+            .context("Excluded HTML node disappeared during extraction")?
+            .detach();
     }
 
     let text = document
