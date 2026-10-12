@@ -3,6 +3,8 @@
 **Status:** Research / implementation RFC. The contract is proposed; the four integrations below are audit findings and migration targets, not claims of completed cross-repository qualification.  
 **Scope:** Symthaea, Mycelix, Sol Atlas, Symtropy, and adapters between them.
 
+**Companion:** [Ancient Wisdom to Engineering Invariants v0.1](./ANCIENT_WISDOM_TO_ENGINEERING_INVARIANTS_V0_1.md) translates selected philosophical lenses into proposed, testable engineering properties. It is a research RFC, not a claim of implementation or proof of ethical correctness.
+
 ## Executive decision
 
 **Do not model time as one universal scalar.** Establish a shared temporal *type system* and conversion rules instead. An event may have a physical timestamp, a causal position, a simulation tick, a valid-time interval, and a cognitive observation cycle. Those values answer different questions.
