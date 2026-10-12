@@ -7,8 +7,8 @@
 Symthaea Benchmark Regression Checker
 Reference: BENCHMARKING_STRATEGY.md Section 36
 
-Analyzes Criterion point-estimate changes and reports effect sizes.
-The checker fails closed when the caller requires a missing baseline to be present.
+Analyzes Criterion baseline comparisons and reports bootstrap confidence intervals.
+The checker fails closed when required comparison evidence is incomplete.
 """
 
 import argparse
@@ -380,8 +380,15 @@ def main():
 
     args = parser.parse_args()
 
-    if args.threshold < 0 or args.critical_threshold < args.threshold:
-        parser.error("Thresholds must be non-negative and critical-threshold must be >= threshold")
+    if (
+        not isfinite(args.threshold)
+        or not isfinite(args.critical_threshold)
+        or args.threshold < 0
+        or args.critical_threshold < args.threshold
+    ):
+        parser.error(
+            "Thresholds must be finite and non-negative, and critical-threshold must be >= threshold"
+        )
 
     if args.require_baseline:
         current_results = load_criterion_results(args.results)
