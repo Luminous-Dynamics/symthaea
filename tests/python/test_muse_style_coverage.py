@@ -125,6 +125,38 @@ class CoverageReportTests(unittest.TestCase):
                 (root / CATALOG_RELATIVE).read_bytes()
             ))
 
+    def test_report_identifies_executable_styles_without_catalog_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_root(root)
+            style_path = root / STYLE_RELATIVE
+            source = STYLE_FIXTURE.replace(
+                "    Other,\n}",
+                "    Other,\n    NotCataloged,\n}",
+            ).replace(
+                "        Style::Other,\n",
+                "        Style::Other,\n        Style::NotCataloged,\n",
+            )
+            style_path.write_text(source, encoding="utf-8")
+
+            report = build_current_report(root)
+            self.assertEqual(
+                report["summary"]["executable_styles_without_catalog_route"],
+                1,
+            )
+            self.assertEqual(
+                report["coverage_analysis"]["unreferenced_executable_styles"],
+                ["NotCataloged"],
+            )
+
+            output = StringIO()
+            with redirect_stdout(output):
+                print_summary(report)
+            self.assertIn(
+                "Executable Style variants without catalog route: NotCataloged",
+                output.getvalue(),
+            )
+
     def test_report_exposes_zero_partial_and_full_constellation_routing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
