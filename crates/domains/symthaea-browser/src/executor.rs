@@ -141,7 +141,7 @@ impl<'a> BrowserExecutor<'a> {
                             let landing_decision = self.policy.evaluate_url(&landed_url);
                             if !landing_decision.is_allowed() {
                                 return ActionReceipt {
-                                    action,
+                                    action: action.clone(),
                                     policy_decision: landing_decision,
                                     outcome: ActionOutcome::Failed(
                                         "blocked post-navigation URL; request may have occurred"
