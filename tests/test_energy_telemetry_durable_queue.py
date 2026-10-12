@@ -256,7 +256,7 @@ class DurableQueueTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "persistent filesystem path"):
             DurableTelemetryQueue(":memory:")
         with self.assertRaisesRegex(ValueError, "persistent filesystem path"):
-            DurableTelemetryQueue("bad\\x00path")
+            DurableTelemetryQueue("bad\x00path")
 
     def test_policy_configuration_mismatch_fails_closed(self):
         with self.assertRaisesRegex(TelemetryQueueError, "configuration mismatch"):
