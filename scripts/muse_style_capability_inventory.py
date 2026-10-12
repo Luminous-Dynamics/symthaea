@@ -170,23 +170,128 @@ def _top_level_arrow(arm: str) -> tuple[str, str] | None:
 
 
 def _match_arms(source: str, pattern: str) -> list[tuple[str, str]]:
+    """Parse Rust match arms, including block arms without trailing commas."""
     match = re.search(pattern, source)
     if match is None:
         raise CoverageError(f"Could not find match expression {pattern!r}")
     opening = source.find("{", match.end() - 1)
     body = source[opening + 1 : _matching_brace(source, opening)]
     arms: list[tuple[str, str]] = []
-    for item in _split_top_level(body):
-        if not item:
-            continue
-        split = _top_level_arrow(item)
-        if split is None:
-            raise CoverageError(f"Unrecognized Rust match arm: {item[:100]!r}")
-        arms.append(split)
+    index = 0
+
+    def skip_space_and_comments(offset: int) -> int:
+        while offset < len(body):
+            if body[offset].isspace():
+                offset += 1
+            elif body.startswith("//", offset):
+                offset = _skip_line_comment(body, offset)
+            elif body.startswith("/*", offset):
+                from muse_style_coverage import _skip_block_comment
+
+                offset = _skip_block_comment(body, offset)
+            else:
+                break
+        return offset
+
+    def find_top_level_arrow(offset: int) -> int:
+        stack: list[str] = []
+        pairs = {")": "(", "]": "[", "}": "{"}
+        cursor = offset
+        while cursor < len(body):
+            if body.startswith("//", cursor):
+                cursor = _skip_line_comment(body, cursor)
+                continue
+            if body.startswith("/*", cursor):
+                from muse_style_coverage import _skip_block_comment
+
+                cursor = _skip_block_comment(body, cursor)
+                continue
+            if body[cursor] == '"':
+                from muse_style_coverage import _skip_string
+
+                cursor = _skip_string(body, cursor)
+                continue
+            if body.startswith("=>", cursor) and not stack:
+                return cursor
+            character = body[cursor]
+            if character in "([{":
+                stack.append(character)
+            elif character in ")]}":
+                if not stack or stack[-1] != pairs[character]:
+                    raise CoverageError("Unbalanced delimiter in Rust match pattern")
+                stack.pop()
+            cursor += 1
+        raise CoverageError("Rust match arm is missing a top-level =>")
+
+    while True:
+        index = skip_space_and_comments(index)
+        if index >= len(body):
+            break
+        arm_start = index
+        arrow = find_top_level_arrow(arm_start)
+        arm_pattern = body[arm_start:arrow].strip()
+        expression_start = arrow + 2
+        expression_probe = skip_space_and_comments(expression_start)
+        expression_is_block = (
+            expression_probe < len(body) and body[expression_probe] == "{"
+        )
+        cursor = expression_start
+        stack: list[str] = []
+        pairs = {")": "(", "]": "[", "}": "{"}
+        expression_end: int | None = None
+        next_arm = len(body)
+
+        while cursor < len(body):
+            if body.startswith("//", cursor):
+                cursor = _skip_line_comment(body, cursor)
+                continue
+            if body.startswith("/*", cursor):
+                from muse_style_coverage import _skip_block_comment
+
+                cursor = _skip_block_comment(body, cursor)
+                continue
+            if body[cursor] == '"':
+                from muse_style_coverage import _skip_string
+
+                cursor = _skip_string(body, cursor)
+                continue
+
+            character = body[cursor]
+            if character in "([{":
+                stack.append(character)
+            elif character in ")]}":
+                if not stack or stack[-1] != pairs[character]:
+                    raise CoverageError("Unbalanced delimiter in Rust match expression")
+                stack.pop()
+                if (
+                    expression_is_block
+                    and character == "}"
+                    and not stack
+                ):
+                    expression_end = cursor + 1
+                    next_arm = expression_end
+                    break
+            elif character == "," and not stack:
+                expression_end = cursor
+                next_arm = cursor + 1
+                break
+            cursor += 1
+
+        if expression_end is None:
+            raise CoverageError(
+                f"Could not determine end of Rust match arm {arm_pattern!r}"
+            )
+        arm_expression = body[expression_start:expression_end].strip()
+        if not arm_pattern or not arm_expression:
+            raise CoverageError("Rust match arm has an empty pattern or expression")
+        arms.append((arm_pattern, arm_expression))
+        index = next_arm
+        if index < len(body) and body[index] == ",":
+            index += 1
+
     if not arms:
         raise CoverageError(f"Match expression {pattern!r} has no arms")
     return arms
-
 
 def _variant_names(pattern: str) -> list[str]:
     return re.findall(r"\bStyle::([A-Z][A-Za-z0-9_]*)\b", pattern)
