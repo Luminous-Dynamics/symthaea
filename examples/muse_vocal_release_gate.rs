@@ -1356,6 +1356,38 @@ mod tests {
             2
         );
 
+        let mut manifest_with_backend_field =
+            serde_json::to_value(&public_manifest).unwrap();
+        manifest_with_backend_field[0]["backend"] = serde_json::json!("synthetic-test");
+        std::fs::write(
+            output.join("blind_manifest.json"),
+            serde_json::to_vec_pretty(&manifest_with_backend_field).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            run_saved_ratings_review(&output, &private, &ratings_path, 5).is_err(),
+            "review must reject extra listener-manifest fields such as backend labels"
+        );
+
+        // The private answer key must agree with the internal manifest, not
+        // merely agree with an objective report that could share the same drift.
+        std::fs::write(
+            output.join("blind_manifest.json"),
+            serde_json::to_vec_pretty(&public_manifest).unwrap(),
+        )
+        .unwrap();
+        let key_path = private.join("private_backend_key.json");
+        let mut changed_key: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&key_path).unwrap()).unwrap();
+        changed_key["entries"][0]["case_id"] = serde_json::json!(8);
+        std::fs::write(&key_path, serde_json::to_vec_pretty(&changed_key).unwrap()).unwrap();
+        assert!(
+            run_saved_ratings_review(&output, &private, &ratings_path, 5).is_err(),
+            "review must reject answer-key case drift against the private manifest"
+        );
+        changed_key["entries"][0]["case_id"] = serde_json::json!(7);
+        std::fs::write(&key_path, serde_json::to_vec_pretty(&changed_key).unwrap()).unwrap();
+
         let mut tampered_manifest = public_manifest.clone();
         tampered_manifest[0].lyrics = "different lyrics".into();
         std::fs::write(
