@@ -643,4 +643,28 @@ mod tests {
         assert_eq!(monotonicity(&[(0.0, 1.0), (1.0, 1.0)]), "flat");
         assert_eq!(monotonicity(&[(0.0, 1.0), (1.0, 2.0), (2.0, 1.0)]), "non_monotonic");
     }
+
+    #[test]
+    fn routed_curve_reports_dynamic_channels_and_observed_change_flags() {
+        let curve = curve_json(Style::Classical, "arousal");
+        assert_eq!(curve["point_count"].as_u64(), Some(5));
+        assert_eq!(
+            curve["observed_changes_from_baseline"]
+                ["no_observed_change_at_tested_points"]
+                .as_bool(),
+            Some(false),
+        );
+        let points = curve["points"].as_array().expect("response points");
+        assert!(points.iter().all(|point| {
+            point["descriptors"].get("mean_velocity").is_some()
+                && point["descriptors"].get("velocity_standard_deviation").is_some()
+                && point["descriptors"].get("mean_section_intensity").is_some()
+                && point["descriptors"].get("score_key_tonic_pc").is_some()
+                && point["layer_distances"].as_array().is_some()
+        }));
+        assert!(points.iter().any(|point| {
+            point["input"]["arousal"].as_f64() == Some(0.5)
+                && point["overall_structural_distance_from_baseline"].as_f64() == Some(0.0)
+        }));
+    }
 }
