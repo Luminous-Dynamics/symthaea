@@ -154,6 +154,12 @@ impl CdpSession {
         let mut elements = Vec::new();
         let mut focused_element = None;
         for node in &response.result.nodes {
+            // Ignored AX nodes are not actionable user-facing controls. Do not
+            // leak hidden/presentational nodes into the observation projection.
+            if node.ignored {
+                continue;
+            }
+
             let role = node
                 .role
                 .as_ref()
@@ -486,6 +492,9 @@ async fn resolve_accessible_backend_node(
         .nodes
         .iter()
         .filter(|node| {
+            if node.ignored {
+                return false;
+            }
             let role = node.role.as_ref().and_then(|value| ax_value_to_string(&value.value));
             let name = node.name.as_ref().and_then(|value| ax_value_to_string(&value.value));
             role.as_deref() == Some(wanted_role) && name.as_deref() == Some(wanted_name)
