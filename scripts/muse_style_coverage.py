@@ -303,6 +303,53 @@ def parse_style_contract(source: str) -> tuple[list[str], list[str], int]:
     return enum_variants, all_names, declared_count
 
 
+def build_coverage_analysis(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize executable routing coverage without implying musical quality."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for entry in entries:
+        grouped.setdefault(entry["constellation"], []).append(entry)
+
+    by_constellation: list[dict[str, Any]] = []
+    for constellation in sorted(grouped):
+        rows = grouped[constellation]
+        routed = [entry for entry in rows if entry["composer_style"] is not None]
+        unrouted = [entry for entry in rows if entry["composer_style"] is None]
+        by_constellation.append(
+            {
+                "constellation": constellation,
+                "catalog_entries": len(rows),
+                "composer_routed_entries": len(routed),
+                "unrouted_entries": len(unrouted),
+                "routed_catalog_ids": [entry["id"] for entry in routed],
+                "unrouted_catalog_ids": [entry["id"] for entry in unrouted],
+                "composer_routes": [entry["composer_style"] for entry in routed],
+            }
+        )
+
+    return {
+        "interpretation": (
+            "Routing completeness only; not evidence of musical distinctness, "
+            "rendering quality, or cultural authenticity."
+        ),
+        "by_constellation": by_constellation,
+        "zero_route_constellations": [
+            item["constellation"]
+            for item in by_constellation
+            if item["composer_routed_entries"] == 0
+        ],
+        "partial_route_constellations": [
+            item["constellation"]
+            for item in by_constellation
+            if 0 < item["composer_routed_entries"] < item["catalog_entries"]
+        ],
+        "fully_routed_constellations": [
+            item["constellation"]
+            for item in by_constellation
+            if item["composer_routed_entries"] == item["catalog_entries"]
+        ],
+    }
+
+
 def build_current_report(root: Path) -> dict[str, Any]:
     catalog_path = root / CATALOG_RELATIVE
     style_path = root / STYLE_RELATIVE
@@ -380,6 +427,7 @@ def build_current_report(root: Path) -> dict[str, Any]:
             "foundation_entries": status_counts.get("Foundation", 0),
             "routed_does_not_mean_distinct": True,
         },
+        "coverage_analysis": build_coverage_analysis(entries),
         "entries": entries,
     }
 
