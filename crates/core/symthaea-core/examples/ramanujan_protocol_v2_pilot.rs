@@ -89,6 +89,32 @@ fn file_blake3(path: &str) -> Result<String, Box<dyn Error>> {
     Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 
+fn canonical_pilot_conditions() -> [AutonomousDiscoveryMode; 3] {
+    [
+        AutonomousDiscoveryMode::Cold,
+        AutonomousDiscoveryMode::Primed,
+        AutonomousDiscoveryMode::RandomBaseline,
+    ]
+}
+
+fn run_order_for_replicate(replicate: usize) -> [AutonomousDiscoveryMode; 3] {
+    let canonical = canonical_pilot_conditions();
+    let orders = [
+        canonical,
+        [
+            AutonomousDiscoveryMode::Primed,
+            AutonomousDiscoveryMode::RandomBaseline,
+            AutonomousDiscoveryMode::Cold,
+        ],
+        [
+            AutonomousDiscoveryMode::RandomBaseline,
+            AutonomousDiscoveryMode::Cold,
+            AutonomousDiscoveryMode::Primed,
+        ],
+    ];
+    orders[replicate % orders.len()]
+}
+
 fn mode_name(mode: AutonomousDiscoveryMode) -> &'static str {
     match mode {
         AutonomousDiscoveryMode::Cold => "cold",
@@ -654,32 +680,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map_err(|error| format!("cannot create evidence file {}: {error}", output_path.display()))?;
     let mut output = BufWriter::new(file);
 
-    let canonical_conditions = [
-        AutonomousDiscoveryMode::Cold,
-        AutonomousDiscoveryMode::Primed,
-        AutonomousDiscoveryMode::RandomBaseline,
-    ];
-    // Counterbalance condition position with a deterministic 3-order Latin
-    // square to reduce systematic warm-cache and machine-load bias.
-    let orders = [
-        canonical_conditions,
-        [
-            AutonomousDiscoveryMode::Primed,
-            AutonomousDiscoveryMode::RandomBaseline,
-            AutonomousDiscoveryMode::Cold,
-        ],
-        [
-            AutonomousDiscoveryMode::RandomBaseline,
-            AutonomousDiscoveryMode::Cold,
-            AutonomousDiscoveryMode::Primed,
-        ],
-    ];
+    let canonical_conditions = canonical_pilot_conditions();
     let mut run_record_digests = Vec::with_capacity(replicates * canonical_conditions.len());
     let mut replicate_orders = Vec::with_capacity(replicates);
     for replicate in 0..replicates {
         let seed = first_seed.wrapping_add(replicate as u64);
         let holdout_seed = seed.wrapping_add(HOLDOUT_SEED_OFFSET);
-        let run_order = orders[replicate % orders.len()];
+        let run_order = run_order_for_replicate(replicate);
         replicate_orders.push(json!({
             "replicate_id": seed,
             "ordered_conditions": run_order.map(mode_name)
@@ -769,6 +776,40 @@ mod tests {
             symbolically_proven: false,
             discovery_mode: AutonomousDiscoveryMode::Cold,
         }
+    }
+
+    #[test]
+    fn run_order_is_a_counterbalanced_three_order_latin_square() {
+        let orders = [
+            run_order_for_replicate(0),
+            run_order_for_replicate(1),
+            run_order_for_replicate(2),
+        ];
+        assert_eq!(orders[0], [
+            AutonomousDiscoveryMode::Cold,
+            AutonomousDiscoveryMode::Primed,
+            AutonomousDiscoveryMode::RandomBaseline,
+        ]);
+        assert_eq!(orders[1], [
+            AutonomousDiscoveryMode::Primed,
+            AutonomousDiscoveryMode::RandomBaseline,
+            AutonomousDiscoveryMode::Cold,
+        ]);
+        assert_eq!(orders[2], [
+            AutonomousDiscoveryMode::RandomBaseline,
+            AutonomousDiscoveryMode::Cold,
+            AutonomousDiscoveryMode::Primed,
+        ]);
+        for mode in canonical_pilot_conditions() {
+            for position in 0..3 {
+                assert_eq!(
+                    orders.iter().filter(|order| order[position] == mode).count(),
+                    1,
+                    "each condition must occupy each position once over three replicates"
+                );
+            }
+        }
+        assert_eq!(run_order_for_replicate(3), orders[0]);
     }
 
     #[test]
