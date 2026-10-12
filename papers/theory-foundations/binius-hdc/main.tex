@@ -16,7 +16,7 @@
 
 \begin{document}
 
-\title{Binary-Field STARKs for Hyperdimensional Computing:\\
+\title{Binary-Field Proofs for Hyperdimensional Computing:\\
 XOR Relations and Proof-Circuit Semantics}
 
 \author{
@@ -28,12 +28,12 @@ Luminous Dynamics\\
 \maketitle
 
 \begin{abstract}
-Hyperdimensional Computing (HDC) uses high-dimensional binary vectors and operations such as XOR binding, majority bundling, and permutation. In a binary-field proof system, XOR is addition and therefore does not require nonlinear AND/MUL gates. This paper reports a Binius64 circuit for a 16,384-bit XOR relation and a public harness that generates and verifies the resulting proof. The circuit's reported constraint total also includes equality-wiring overhead.
+Hyperdimensional Computing (HDC) uses high-dimensional binary vectors and operations such as XOR binding, majority bundling, and permutation. In characteristic-two arithmetic, XOR is addition and therefore does not require nonlinear AND/MUL gates. This paper reports a Binius64 constraint-integrity circuit for a 16,384-bit XOR relation and a public harness that generates and verifies the resulting proof. The reported constraint total also includes equality-wiring overhead.
 
-The public artifact does not implement a Winterfell XOR prover in its benchmark harness: its Winterfell comparison is an analytic estimate. Accordingly, the same-scale cross-backend speedup and constraint-reduction ratios previously reported are retracted pending a reproducible, measured baseline. This revision corrects the Hamming-distance and multi-input-majority circuits to match their stated functions. Historical measurements for those circuits are superseded, and fresh post-correction measurements remain pending. The temporal demo proves a packed-bit recurrence with witness-supplied gates, not numerical fixed-point CfC dynamics. Health-attestation and federated-learning end-to-end claims are outside what this public artifact currently reproduces.
+The public artifact does not implement a Winterfell XOR prover in its benchmark harness: its Winterfell comparison is an analytic estimate. Accordingly, the same-scale cross-backend speedup and constraint-reduction ratios previously reported are retracted pending a reproducible, measured baseline. More importantly, the vendored `vendor/binius64/ARCHITECTURE.md` explicitly marks the standard Binius64 prover/verifier as **not zero-knowledge** and lists Iron Spartan as a separate zero-knowledge system. This harness depends on `binius-prover` and `binius-verifier`, not Iron Spartan, so witness-input privacy is not claimed. This is a proof-of-computation-integrity demonstration, not a privacy-preserving HDC implementation. Hamming-distance and multi-input-majority circuits are corrected; historical measurements are superseded pending test execution and fresh benchmarks. The temporal demo proves a packed-bit recurrence with witness-supplied gates, not numerical fixed-point CfC dynamics. Health-attestation and federated-learning end-to-end claims remain unsupported by this public artifact.
 \end{abstract}
 
-\noindent\textbf{Keywords:} zero-knowledge proofs, hyperdimensional computing, binary fields, STARKs, Binius, privacy-preserving machine learning, CfC networks
+\noindent\textbf{Keywords:} computational integrity, hyperdimensional computing, binary fields, Binius64, proof circuits, CfC networks
 \vspace{1em}
 
 % ============================================================================
@@ -42,7 +42,7 @@ The public artifact does not implement a Winterfell XOR prover in its benchmark 
 
 Hyperdimensional Computing (HDC)~\cite{kanerva2009hyperdimensional} encodes information as high-dimensional binary vectors (typically $D = 10{,}000$--$16{,}384$ bits) and performs reasoning through three algebraically simple operations: XOR binding ($\oplus$), majority-vote bundling, and cyclic permutation ($\rho$). These operations are computationally trivial---nanoseconds on commodity hardware---yet they enable robust classification, associative memory, and temporal sequence processing~\cite{rahimi2016robust}.
 
-A growing need exists for \emph{privacy-preserving HDC}: proving that an HDC computation was performed correctly without revealing the underlying vectors. Applications include federated learning with verifiable gradient integrity~\cite{bonawitz2017practical}, anonymous voting with provable eligibility~\cite{groth2016size}, and selective credential disclosure~\cite{camenisch2001efficient}. Zero-knowledge proof (ZKP) systems provide this guarantee, but existing systems impose enormous overhead on bitwise operations.
+A useful goal is HDC computation with verifiable integrity. Privacy-preserving HDC is a stricter goal: it requires a zero-knowledge system or another separately justified confidentiality mechanism, not merely a circuit whose inputs are created as witness wires. The standard Binius64 prover/verifier backend used in this artifact is explicitly documented as non-zero-knowledge in the vendored architecture notes. Thus the experiments here address relation correctness and constraint cost only; privacy-preserving federated learning, anonymous eligibility, and selective credential disclosure are motivating research areas, not capabilities demonstrated by this harness.
 
 \textbf{The Problem.} In a straightforward prime-field STARK arithmetization (e.g., using a system such as Winterfell~\cite{winterfell}), a designer may decompose $N$-bit values, constrain per-bit XOR ($c_i = a_i + b_i - 2a_ib_i$), and recompose the output, giving an illustrative $O(3N)$-constraint construction. For 16,384-bit HDC vectors this simple construction has about 49,152 bit-level constraints before considering alternative encodings or optimizer effects. This is an analytical construction sketch, not a measured Winterfell result; the public artifact leaves a semantically matched baseline open.
 
@@ -300,7 +300,7 @@ The public reproduction command is \texttt{bash papers/theory-foundations/binius
 % ============================================================================
 \section{Conclusion}
 
-Binary-field addition maps naturally to XOR, and the public Binius64 harness demonstrates generation and verification of a proof for a packed-word XOR relation. That algebraic result is the supported contribution of this artifact. The previously reported same-scale Winterfell speedup and constraint-reduction ratios are withdrawn because the public harness estimates, rather than measures, the Winterfell comparator. Hamming-distance and multi-input majority circuits have been corrected, and prior counts for those circuits are superseded pending reruns. The packed-bit recurrence demo is not a numerical CfC proof; health-attestation and federated-learning end-to-end results are not established by the public reproduction path. The next milestone is a semantically matched evaluation with independent reference outputs and measured baselines.
+Binary-field addition maps naturally to XOR, and the public Binius64 harness demonstrates generation and verification of a proof for a packed-word XOR relation. That algebraic result is the supported contribution of this artifact. The previously reported same-scale Winterfell speedup and constraint-reduction ratios are withdrawn because the public harness estimates, rather than measures, the Winterfell comparator. Hamming-distance and multi-input majority circuits have been corrected, and prior counts for those circuits are superseded pending reruns. The packed-bit recurrence demo is not a numerical CfC proof; health-attestation and federated-learning end-to-end results are not established by the public reproduction path. The next milestones are a semantically matched evaluation with independent reference outputs and measured baselines, plus migration to a documented zero-knowledge backend before claiming witness confidentiality.
 
 % ============================================================================
 \section*{Acknowledgments}
