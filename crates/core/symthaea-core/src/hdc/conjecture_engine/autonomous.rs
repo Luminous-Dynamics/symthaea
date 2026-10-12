@@ -463,6 +463,8 @@ pub enum AutonomousDiscoveryMode {
     Primed,
     /// Built-in templates and prior-dependent configuration are disabled.
     Cold,
+    /// Grammar-sampled candidate without evolutionary selection pressure.
+    RandomBaseline,
     /// Candidate created by composing other candidates.
     Composed,
 }
@@ -472,6 +474,7 @@ impl AutonomousDiscoveryMode {
         match self {
             Self::Primed => "primed",
             Self::Cold => "cold",
+            Self::RandomBaseline => "random_baseline",
             Self::Composed => "composed",
         }
     }
@@ -734,12 +737,29 @@ pub fn discover_invariants_autonomous_cold_with_metrics(
     )
 }
 
+/// Random-expression control: draws independently from the same grammar and
+/// scores the same candidate budget, but never selects parents or evolves formulas.
+pub fn discover_invariants_autonomous_random_baseline_with_metrics(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>,
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+) -> AutonomousDiscoveryRunV1 {
+    discover_invariants_autonomous_with_mode_and_metrics(
+        rhs, initial_state, var_names, dynamics, config, t_max, dt,
+        &[], AutonomousDiscoveryMode::RandomBaseline,
+    )
+}
+
 fn effective_discovery_config(
     config: &RegressorConfig,
     mode: AutonomousDiscoveryMode,
 ) -> RegressorConfig {
     let mut effective = config.clone();
-    if mode == AutonomousDiscoveryMode::Cold {
+    if matches!(mode, AutonomousDiscoveryMode::Cold | AutonomousDiscoveryMode::RandomBaseline) {
         effective.disable_macro_seeds = true;
         effective.prior_composition_rate = 0.0;
         effective.prior_fragment_bonus = 1.0;
@@ -915,7 +935,9 @@ fn discover_invariants_autonomous_with_mode_and_metrics(
 
     let mut seed_templates = match mode {
         AutonomousDiscoveryMode::Primed => build_invariant_templates(var_names),
-        AutonomousDiscoveryMode::Cold | AutonomousDiscoveryMode::Composed => Vec::new(),
+        AutonomousDiscoveryMode::Cold
+        | AutonomousDiscoveryMode::RandomBaseline
+        | AutonomousDiscoveryMode::Composed => Vec::new(),
     };
     let mut seen_seed_templates: std::collections::HashSet<String> =
         seed_templates.iter().map(macro_usage_key).collect();
@@ -1081,6 +1103,20 @@ fn discover_invariants_autonomous_with_mode_and_metrics(
                 worst
             })
             .collect();
+
+        if mode == AutonomousDiscoveryMode::RandomBaseline {
+            // Equal number of generated/scored candidates, but no survivor
+            // selection, mutation, crossover, prior injection, or fitness-guided
+            // parent choice. The final common ranking only allocates the fixed
+            // returned-candidate/holdout budget.
+            population = (0..pop_size)
+                .map(|_| {
+                    rng = lcg_step(rng);
+                    random_expr_multivar(&mut rng, max_depth.min(3), var_names, exclude_trig)
+                })
+                .collect();
+            continue;
+        }
 
         let mut new_pop = Vec::with_capacity(pop_size);
         let mut ranked: Vec<(usize, f64)> =
