@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "case_id": "nominal_correlated_reply",
+      "kind": "assessment",
+      "expected": "requirements_match",
+      "request_id": 8,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1200000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.cycle-1",
+      "reply_window_id": "arming-check.fixture.cycle-1",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1350000000,
+      "assessment_at_ns": 1400000000,
+      "config_assessed_at_ns": 1200000000,
+      "duplicate_second_received_at_ns": null
+    },
+    {
+      "case_id": "wrapped_request_id_old_source_reply",
+      "kind": "assessment",
+      "expected": "source_timestamp_regression",
+      "request_id": 0,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1500000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.cycle-after-wrap",
+      "reply_window_id": "arming-check.fixture.cycle-after-wrap",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1350000000,
+      "assessment_at_ns": 1400000000,
+      "config_assessed_at_ns": 1200000000,
+      "duplicate_second_received_at_ns": null,
+      "previous_request_id": 255,
+      "previous_request_source_timestamp_us": 1250000
+    },
+    {
+      "case_id": "reply_from_previous_capture_window",
+      "kind": "assessment",
+      "expected": "capture_window_mismatch",
+      "request_id": 8,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1200000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.cycle-current",
+      "reply_window_id": "arming-check.fixture.cycle-previous",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1350000000,
+      "assessment_at_ns": 1400000000,
+      "config_assessed_at_ns": 1200000000,
+      "duplicate_second_received_at_ns": null
+    },
+    {
+      "case_id": "correlated_reply_observed_after_deadline",
+      "kind": "assessment",
+      "expected": "reply_observed_too_late",
+      "request_id": 8,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1200000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.cycle-late",
+      "reply_window_id": "arming-check.fixture.cycle-late",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1600000000,
+      "assessment_at_ns": 1650000000,
+      "config_assessed_at_ns": 1550000000,
+      "duplicate_second_received_at_ns": null
+    },
+    {
+      "case_id": "reply_is_stale_at_assessment",
+      "kind": "assessment",
+      "expected": "stale_reply",
+      "request_id": 8,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1200000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.cycle-stale",
+      "reply_window_id": "arming-check.fixture.cycle-stale",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1350000000,
+      "assessment_at_ns": 1900000000,
+      "config_assessed_at_ns": 1700000000,
+      "duplicate_second_received_at_ns": null
+    },
+    {
+      "case_id": "same_payload_captured_twice",
+      "kind": "duplicate_observation",
+      "expected": "same_source_different_observation",
+      "request_id": 8,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1200000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.cycle-duplicate",
+      "reply_window_id": "arming-check.fixture.cycle-duplicate",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1350000000,
+      "assessment_at_ns": 1400000000,
+      "config_assessed_at_ns": 1200000000,
+      "duplicate_second_received_at_ns": 1360000000
+    },
+    {
+      "case_id": "reply_at_exact_response_deadline",
+      "kind": "assessment",
+      "expected": "requirements_match",
+      "request_id": 31,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1200000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.deadline-equality",
+      "reply_window_id": "arming-check.fixture.deadline-equality",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1500000000,
+      "assessment_at_ns": 1550000000,
+      "config_assessed_at_ns": 1300000000,
+      "duplicate_second_received_at_ns": null
+    },
+    {
+      "case_id": "equal_source_timestamp_is_not_regression",
+      "kind": "assessment",
+      "expected": "requirements_match",
+      "request_id": 32,
+      "registration_id": 3,
+      "request_source_timestamp_us": 1250000,
+      "reply_source_timestamp_us": 1250000,
+      "request_window_id": "arming-check.fixture.source-time-equality",
+      "reply_window_id": "arming-check.fixture.source-time-equality",
+      "request_received_at_ns": 1300000000,
+      "reply_received_at_ns": 1350000000,
+      "assessment_at_ns": 1400000000,
+      "config_assessed_at_ns": 1200000000,
+      "duplicate_second_received_at_ns": null
+    }
+  ],
+  "provenance": {
+    "fixture_kind": "synthetic_scenario_parameters",
+    "raw_wire_capture": false,
+    "note": "Scenarios are synthesized by the Rust test harness from named parameter sets. This corpus contains no captured PX4 frame bytes and does not qualify a live decoder or vehicle.",
+    "source_contracts": [
+      {
+        "message": "ArmingCheckRequest v1",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/e0488b19e573e4e016a8066ad00164099a22e46c/msg/versioned/ArmingCheckRequest.msg",
+        "source_blob_sha": "79a30af500ecf3661169f62a50edfe0f02fbcd8f"
+      },
+      {
+        "message": "ArmingCheckReply v1",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/e0488b19e573e4e016a8066ad00164099a22e46c/msg/versioned/ArmingCheckReply.msg",
+        "source_blob_sha": "604539e49066546e518c7ebaec8b6f1a7cc97285"
+      },
+      {
+        "message": "Event v1",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/e0488b19e573e4e016a8066ad00164099a22e46c/msg/versioned/Event.msg",
+        "source_blob_sha": "ed8d841ebd80449927989af3b24038149825a1f4"
+      },
+      {
+        "message": "RegisterExtComponentReply v1",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/e0488b19e573e4e016a8066ad00164099a22e46c/msg/versioned/RegisterExtComponentReply.msg",
+        "source_blob_sha": "17ff6765c9a1980f1cec163a0ff38aea07491a12"
+      },
+      {
+        "message": "SetpointConfigReply v1",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/9dd448d7af27ee90f4aa2a1e2b4e9e49f87a446f/msg/versioned/SetpointConfigReply.msg",
+        "source_blob_sha": "d5c8cb562461a2826f782d3ec8ee5a5c65674471"
+      }
+    ]
+  }
+}
