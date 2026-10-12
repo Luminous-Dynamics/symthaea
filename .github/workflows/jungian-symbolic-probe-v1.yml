@@ -167,6 +167,27 @@ jobs:
               )
           lines.extend([
               "",
+              "## Annotation-ready packets (not annotated)",
+              "",
+              "| Baseline | Review units | Packet SHA-256 | State |",
+              "|---|---:|---|---|",
+          ])
+          for item in data["methods"]:
+              if item["state"] != "executed":
+                  continue
+              seed_path = audit_dir / f"{item['method_id']}.annotation_seed.json"
+              seed = json.load(open(seed_path, encoding="utf-8"))
+              lines.append(
+                  f"| {item['method_id']} | {seed['unit_count']} | "
+                  f"{hashlib.sha256(seed_path.read_bytes()).hexdigest()} | UNANNOTATED |"
+              )
+          lines.extend([
+              "",
+              "> Seed packets preserve emitted text, evidence links, and the frozen synthetic case context. No human labels are prefilled; an empty review list means unreviewed, not correct.",
+              "",
+          ])
+          lines.extend([
+              "",
               "> The independent audit inspects emitted statements, abstention/questions, exact evidence links, and case-specific cues. Its text patterns are incomplete and can misread negation; the raw normalized bundles and per-case findings are in the artifact. Audit failures are reported rather than blocking capture because the lexical foil is intentionally unsafe. No score here is semantic, psychological, clinical, human-rated, or holdout accuracy.",
               "",
           ])
