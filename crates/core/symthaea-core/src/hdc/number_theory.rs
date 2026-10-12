@@ -44,7 +44,127 @@ impl NumberTheoryEngine {
         }
     }
 
-    /// Trial division factorization with HDC encoding
+    /// Bounded deterministic-seed Pollard-Brent attempt to find a nontrivial factor.
+    ///
+    /// Returns `None` if the fixed work budget is exhausted; callers retain a
+    /// trial-division fallback so the factorization API remains complete.
+    fn pollard_brent_factor(&self, n: u64) -> Option<u64> {
+        if n.is_multiple_of(2) {
+            return Some(2);
+        }
+        if n.is_multiple_of(3) {
+            return Some(3);
+        }
+        if n < 5 {
+            return None;
+        }
+
+        const ATTEMPTS: u64 = 16;
+        const ITERATION_BUDGET: u64 = 250_000;
+        const BLOCK_SIZE: u64 = 128;
+        let ring = ModularRing::new(n);
+
+        for attempt in 0..ATTEMPTS {
+            // Fixed seeds make behavior reproducible across runs and CI machines.
+            let mut y = 2 + attempt % (n - 3);
+            let c = 1 + 2 * attempt;
+            let mut g = 1u64;
+            let mut r = 1u64;
+            let mut q = 1u64;
+            let mut x = 0u64;
+            let mut ys = 0u64;
+            let mut iterations = 0u64;
+
+            while g == 1 && iterations < ITERATION_BUDGET {
+                x = y;
+
+                // Keep each doubling phase inside the per-attempt work budget.
+                if r > ITERATION_BUDGET - iterations {
+                    break;
+                }
+                for _ in 0..r {
+                    y = ring.add(ring.multiply(y, y), c);
+                }
+                iterations += r;
+
+                let mut k = 0u64;
+                while k < r && g == 1 {
+                    ys = y;
+                    let limit = BLOCK_SIZE.min(r - k).min(ITERATION_BUDGET - iterations);
+                    if limit == 0 {
+                        break;
+                    }
+                    for _ in 0..limit {
+                        y = ring.add(ring.multiply(y, y), c);
+                        q = ring.multiply(q, x.abs_diff(y));
+                    }
+                    iterations += limit;
+                    g = self.gcd(q, n);
+                    k += limit;
+                }
+
+                if g != 1 || iterations >= ITERATION_BUDGET || r > ITERATION_BUDGET / 2 {
+                    break;
+                }
+                r *= 2;
+            }
+
+            // A batch can make q divisible by n. Recover by checking each step
+            // from the beginning of the final batch, still under the same budget.
+            if g == n {
+                while iterations < ITERATION_BUDGET {
+                    ys = ring.add(ring.multiply(ys, ys), c);
+                    iterations += 1;
+                    g = self.gcd(x.abs_diff(ys), n);
+                    if g > 1 {
+                        break;
+                    }
+                }
+            }
+
+            if g > 1 && g < n {
+                return Some(g);
+            }
+        }
+
+        None
+    }
+
+    /// Recursively collect prime factors. Miller-Rabin handles prime leaves;
+    /// Pollard-Brent handles hard composites, with exact trial division as fallback.
+    fn collect_prime_factors(&self, n: u64, out: &mut Vec<u64>) {
+        if n <= 1 {
+            return;
+        }
+        if self.miller_rabin(n) {
+            out.push(n);
+            return;
+        }
+
+        if let Some(factor) = self.pollard_brent_factor(n) {
+            self.collect_prime_factors(factor, out);
+            self.collect_prime_factors(n / factor, out);
+            return;
+        }
+
+        // Completeness fallback: this may be slower for an unusually difficult
+        // input, but it preserves exactness if the bounded rho attempts fail.
+        let mut remaining = n;
+        let mut divisor = 2u64;
+        while divisor <= remaining / divisor {
+            while remaining.is_multiple_of(divisor) {
+                out.push(divisor);
+                remaining /= divisor;
+            }
+            divisor += if divisor == 2 { 1 } else { 2 };
+        }
+        if remaining > 1 {
+            out.push(remaining);
+        }
+    }
+
+    /// Prime factorization using deterministic primality testing and Pollard-Brent,
+    /// returning an HDC encoding of the factorization.
     pub fn factorize(&self, n: u64) -> PrimeFactorization {
         if n == 0 {
             return PrimeFactorization {
@@ -64,33 +184,19 @@ impl NumberTheoryEngine {
             };
         }
 
-        let mut factors = Vec::new();
-        let mut remaining = n;
+        let mut prime_factors = Vec::new();
+        self.collect_prime_factors(n, &mut prime_factors);
+        prime_factors.sort_unstable();
 
-        // Fast path: primality is deterministic over the full u64 domain, so
-        // large primes do not fall into an infeasible trial-division loop.
-        if self.miller_rabin(n) {
-            factors.push((n, 1));
-        } else {
-            let mut divisor = 2;
-
-            // Compare by division rather than divisor * divisor: the product
-            // can overflow u64 near the square-root boundary.
-            while divisor <= remaining / divisor {
-                let mut count = 0;
-                while remaining.is_multiple_of(divisor) {
-                    count += 1;
-                    remaining /= divisor;
+        let mut factors: Vec<(u64, u32)> = Vec::new();
+        for prime in prime_factors {
+            if let Some((last_prime, exponent)) = factors.last_mut() {
+                if *last_prime == prime {
+                    *exponent += 1;
+                    continue;
                 }
-                if count > 0 {
-                    factors.push((divisor, count));
-                }
-                divisor += if divisor == 2 { 1 } else { 2 };
             }
-
-            if remaining > 1 {
-                factors.push((remaining, 1));
-            }
+            factors.push((prime, 1));
         }
 
         // Encode as bundle of MULTIPLICATION.bind(prime_enc).bind(exp_enc)
@@ -712,6 +818,35 @@ mod tests {
         let engine = NumberTheoryEngine::new();
         let f = engine.factorize(17);
         assert_eq!(f.factors, vec![(17, 1)]);
+    }
+
+    #[test]
+    fn test_factorize_large_semiprime_uses_pollard_brent() {
+        let engine = NumberTheoryEngine::new();
+        let p = 1_000_000_007u64;
+        let q = 1_000_000_009u64;
+        let semiprime = p * q;
+        let factorization = engine.factorize(semiprime);
+        assert_eq!(factorization.value, semiprime);
+        assert_eq!(factorization.factors, vec![(p, 1), (q, 1)]);
+
+        let reconstructed = factorization.factors.iter().fold(1u128, |product, &(prime, exponent)| {
+            product * u128::from(prime).pow(exponent)
+        });
+        assert_eq!(reconstructed, u128::from(semiprime));
+    }
+
+    #[test]
+    fn test_factorize_large_prime_powers_and_mixed_composite() {
+        let engine = NumberTheoryEngine::new();
+        for (n, expected) in [
+            (2u64.pow(40), vec![(2, 40)]),
+            (3u64.pow(20), vec![(3, 20)]),
+            (3_215_031_751u64, vec![(151, 1), (751, 1), (28_351, 1)]),
+        ] {
+            let result = engine.factorize(n);
+            assert_eq!(result.factors, expected, "n={n}");
+        }
     }
 
     #[test]
