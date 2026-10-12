@@ -57,5 +57,70 @@ jobs:
       - name: Audit source-declared executable style controls
         run: python3 scripts/muse_style_capability_inventory.py > /tmp/muse-style-capability-inventory.json
 
+      - name: Publish style capability source map to the job summary
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/muse-style-capability-inventory.json").read_text())
+          summary = report["summary"]
+          source = report["source"]
+          print("## Muse runtime capability source map")
+          print()
+          print(
+              f"Catalog rows: {summary['catalog_entries']}; "
+              f"rows with runtime profiles: {summary['catalog_entries_with_runtime_profile']}; "
+              f"catalog-only rows: {summary['catalog_entries_without_runtime_profile']}."
+          )
+          print()
+          print(
+              "Grammar dispatch modes: "
+              + ", ".join(
+                  f"{name} = {count}"
+                  for name, count in summary["grammar_dispatch_modes"].items()
+              )
+          )
+          print()
+          print(
+              "Intent-axis declaration counts: "
+              + ", ".join(
+                  f"{count} axes = {styles} styles"
+                  for count, styles in summary["intent_axis_count_distribution"].items()
+              )
+          )
+          print(
+              "Styles declaring no intent axes: "
+              + (", ".join(summary["styles_with_zero_intent_axes"]) or "none")
+          )
+          print()
+          print("| Source | Path | Git blob SHA |")
+          print("|---|---|---|")
+          for label, path_key, hash_key in [
+              ("Catalog", "catalog_path", "catalog_blob_sha"),
+              ("Style declarations", "style_path", "style_blob_sha"),
+              ("Grammar dispatch", "grammar_dispatch_path", "grammar_dispatch_blob_sha"),
+              ("Instrument realization", "realization_path", "realization_blob_sha"),
+              ("Intent-axis census source", "intent_axis_evidence_path", "intent_axis_evidence_blob_sha"),
+          ]:
+              print(f"| {label} | {source[path_key]} | {source[hash_key]} |")
+          print()
+          print("| Style | Grammar family | Dispatch mode | Intent axes | Instrument pool choices |")
+          print("|---|---|---|---:|---:|")
+          for item in report["profiles"]:
+              print(
+                  f"| {item['style']} | {item['grammar_family']} | "
+                  f"{item['grammar_dispatch']['mode']} | "
+                  f"{item['intent_axis_count']} | "
+                  f"{item['instrument_pool']['ensemble_choices']} |"
+              )
+          print()
+          print(
+              "Note: this inventories source-declared capability only. It does not run "
+              "the causal census or validate audio rendering, perceptual distinctness, "
+              "or cultural authenticity."
+          )
+          PY
+
       - name: Test runtime capability inventory parser and fail-closed guards
         run: python3 tests/python/test_muse_style_capability_inventory.py -v
