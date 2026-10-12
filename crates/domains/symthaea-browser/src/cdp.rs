@@ -30,6 +30,7 @@ use tracing::debug;
 use crate::actions::ElementSelector;
 use crate::config::BrowserAgentConfig;
 use crate::observation::{AccessibleElement, PageObservation};
+use crate::safety::PolicyDecision;
 
 /// Refuse to parse unusually large page fragments after CDP has returned them.
 const MAX_TEXT_EXTRACTION_HTML_BYTES: usize = 2 * 1024 * 1024;
@@ -318,14 +319,29 @@ impl CdpSession {
         Ok(())
     }
 
-    pub(crate) async fn go_back(&self) -> Result<()> {
+    /// Navigate back only after checking the history entry URL under policy.
+    ///
+    /// The target URL is checked while the page mutex is held and immediately
+    /// before the exact history entry ID is dispatched.
+    pub(crate) async fn go_back_with_url_policy<F>(&self, check_url: F) -> Result<PolicyDecision>
+    where
+        F: Fn(&str) -> PolicyDecision,
+    {
         let page = self.page.lock().await;
-        navigate_history(&page, -1).await.context("History back failed")
+        navigate_history(&page, -1, check_url)
+            .await
+            .context("History back failed")
     }
 
-    pub(crate) async fn go_forward(&self) -> Result<()> {
+    /// Navigate forward only after checking the history entry URL under policy.
+    pub(crate) async fn go_forward_with_url_policy<F>(&self, check_url: F) -> Result<PolicyDecision>
+    where
+        F: Fn(&str) -> PolicyDecision,
+    {
         let page = self.page.lock().await;
-        navigate_history(&page, 1).await.context("History forward failed")
+        navigate_history(&page, 1, check_url)
+            .await
+            .context("History forward failed")
     }
 
     /// Extract current DOM text through typed CDP and Rust HTML parsing.
@@ -467,7 +483,14 @@ fn extract_html_text(html: &str) -> Result<String> {
     Ok(text.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 
-async fn navigate_history(page: &Page, offset: i64) -> Result<()> {
+async fn navigate_history<F>(
+    page: &Page,
+    offset: i64,
+    check_url: F,
+) -> Result<PolicyDecision>
+where
+    F: Fn(&str) -> PolicyDecision,
+{
     let history = page
         .execute(GetNavigationHistoryParams::builder().build())
         .await
@@ -485,15 +508,21 @@ async fn navigate_history(page: &Page, offset: i64) -> Result<()> {
         .entries
         .get(target_index)
         .context("no navigation history entry in that direction")?;
+    let decision = check_url(&entry.url);
+    if !decision.is_allowed() {
+        return Ok(decision);
+    }
+
+    let entry_id = entry.id;
     page.execute(
         NavigateToHistoryEntryParams::builder()
-            .entry_id(entry.id)
+            .entry_id(entry_id)
             .build()
-            .unwrap(),
+            .context("Build history navigation request")?,
     )
     .await
     .context("Navigate to history entry")?;
-    Ok(())
+    Ok(decision)
 }
 
 async fn resolve_accessible_backend_node(
