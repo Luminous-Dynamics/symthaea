@@ -81,7 +81,7 @@ Current source: `src/consciousness/temporal/temporal_consciousness.rs` and `src/
 6. Retention depth/protention depth are currently counts; do not label their sum “time” without mapping those counts to an elapsed horizon or explicitly naming it a horizon-in-steps.
 7. Distinguish prediction target time from prediction depth/index. Future-self identity alignment should compare the stated predicted horizon and provenance, not silently treat a present-state proxy as an actual future state.
 
-**Acceptance test:** feeding the same piecewise-constant trajectory at different sample cadences should produce equivalent elapsed-time EWMA and slope within declared tolerance; duplicate or backwards timestamps must be rejected or explicitly classified as unusable, not divided through. Replay with a fixed observation clock must be deterministic.
+**Acceptance test:** when each observation represents the interval ending at its timestamp, feeding equivalent piecewise-constant input at different sample cadences should produce equivalent elapsed-time EWMA values at a common endpoint within declared tolerance. The current velocity field is a two-point finite difference, so transient slopes are **not** claimed cadence-invariant; compare them only with matched endpoints/sampling semantics or introduce a separately specified windowed estimator. Duplicate or backwards timestamps must be rejected or explicitly classified as unusable, not divided through. Replay with a fixed observation clock must be deterministic.
 
 ### Mycelix — distributed causal time, authoring time, expiry
 
