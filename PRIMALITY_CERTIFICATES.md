@@ -87,7 +87,8 @@ its own strict decoder and proof verifier.
 
 Limits: at most 4,096 factor entries, at most 4,096 nested proofs, and 1 MiB for
 the complete outer encoding. Each nested proof must also respect its own
-`SYMPPRF1` limits.
+`SYMPPRF1` limits. The Rust in-memory factorization verifiers enforce the same
+factor/proof count ceilings before reconstruction or nested proof verification.
 
 ## Verification and limitations
 
