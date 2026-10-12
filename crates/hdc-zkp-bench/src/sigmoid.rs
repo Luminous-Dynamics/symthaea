@@ -37,7 +37,7 @@ pub struct MaskedGateBenchResult {
 /// The mask source remains an unconstrained private witness word; no numerical
 /// activation is computed or proven. The historical name is retained in the
 /// file path for compatibility with the benchmark harness.
-pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> SigmoidBenchResult {
+pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> MaskedGateBenchResult {
     println!(
         "\n=== BINIUS: Packed-bit Recurrence with Low-Byte Mask ({} words × {} timesteps) ===\n",
         neurons, timesteps
@@ -183,7 +183,7 @@ pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> Sigmoid
     println!("\n  Masked recurrence: two AND gates per word per timestep (mask + update).");
     println!("  The mask source remains private; no sigmoid or numeric CfC is encoded.");
 
-    SigmoidBenchResult {
+    MaskedGateBenchResult {
         neurons,
         and_constraints: stat.n_and_constraints,
         prove_time_ms: prove_time.as_secs_f64() * 1000.0,
