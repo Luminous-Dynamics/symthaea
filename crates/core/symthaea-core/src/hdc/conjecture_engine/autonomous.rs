@@ -185,7 +185,7 @@ pub fn discover_conservation_laws(
     let ndim = initial_state.len();
     assert_eq!(var_names.len(), ndim);
 
-    let (_times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
+    let (_times, states) = rk4_trajectory(rhs, initial_state, t_max, dt);
     let sampled_states = sample_trajectory_evenly(&states, 100);
     let candidates = build_invariant_candidates(var_names);
 
@@ -233,7 +233,7 @@ pub fn discover_conservation_laws_with_custom(
     let ndim = initial_state.len();
     assert_eq!(var_names.len(), ndim);
 
-    let (_times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
+    let (_times, states) = rk4_trajectory(rhs, initial_state, t_max, dt);
     let sampled_states = sample_trajectory_evenly(&states, 200);
 
     let mut results = Vec::new();
@@ -501,7 +501,7 @@ pub fn compose_top_k_invariants(
     if k < 2 {
         return None;
     }
-    let (_t, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
+    let (_t, states) = rk4_trajectory(rhs, initial_state, t_max, dt);
     let n_samples = 200.min(states.len());
     if n_samples < 20 {
         return None;
@@ -740,7 +740,7 @@ fn discover_invariants_autonomous_with_mode(
     }
 
     let sample_one = |ic: &[f64]| -> Vec<Vec<f64>> {
-        let (_t, states) = rk45_trajectory(rhs, ic, t_max, dt);
+        let (_t, states) = rk4_trajectory(rhs, ic, t_max, dt);
         sample_trajectory_evenly(&states, 200)
     };
     let sampled = sample_one(initial_state);
@@ -1591,7 +1591,7 @@ fn find_lyapunov_candidate(
     t_max: f64,
     dt: f64,
 ) -> Option<String> {
-    let (_times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
+    let (_times, states) = rk4_trajectory(rhs, initial_state, t_max, dt);
     if states.len() < 100 {
         return None;
     }
