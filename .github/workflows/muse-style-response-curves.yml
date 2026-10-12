@@ -168,6 +168,48 @@ jobs:
                           f"| {item['style']} | {item['control']} | {item['baseline_seed']} |\n"
                       )
                   stream.write("\n")
+              stream.write("## Tonic target fidelity and candidate invariance by style\n\n")
+              stream.write(
+                  "| Style | Requested tonic matched | Candidate invariant-layer deviations |\n"
+              )
+              stream.write("|---|---:|---|\n")
+              stream.write(
+                  "Tonic target fidelity is an explicit requested-versus-realized pitch-class match. "
+                  "Invariant-layer deviations are diagnostic only; other controls remain not_predeclared.\n\n"
+              )
+              for profile in report["profiles"]:
+                  tonic_curves = [
+                      curve for curve in profile["curves"] if curve["control"] == "tonic"
+                  ]
+                  target_rows = [
+                      curve["control_target_evaluation"]["target_fidelity"]
+                      for curve in tonic_curves
+                  ]
+                  tested = sum(row.get("tested_point_count", 0) for row in target_rows)
+                  matched = sum(row.get("matching_point_count", 0) for row in target_rows)
+                  target_text = (
+                      f"{matched}/{tested} requested tonics matched"
+                      if tested else "not predeclared"
+                  )
+                  invariance_rows = [
+                      curve["control_target_evaluation"]["non_target_invariance"]
+                      for curve in tonic_curves
+                  ]
+                  nonbaseline = sum(row.get("nonbaseline_point_count", 0) for row in invariance_rows)
+                  violating_points = sum(
+                      row.get("points_with_candidate_invariance_violations", 0)
+                      for row in invariance_rows
+                  )
+                  layer_deltas = sum(len(row.get("violations", [])) for row in invariance_rows)
+                  invariance_text = (
+                      f"{violating_points}/{nonbaseline} non-baseline points; "
+                      f"{layer_deltas} layer deltas"
+                  ) if nonbaseline else "not predeclared"
+                  stream.write(
+                      f"| {profile['style']} | {target_text} | {invariance_text} |\n"
+                  )
+              stream.write("\n")
+
               stream.write("## Seed robustness by style/control\n\n")
               stream.write(
                   "| Style | Control | Seeds with any observed change | "
