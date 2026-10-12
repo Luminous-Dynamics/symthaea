@@ -22,6 +22,7 @@ from tools import verify_math_certificate as verifier
 from tools.math_certificate_golden_vectors import (
     SYMFCER1_FACTOR_2,
     SYMPPRF1_PRIME_3,
+    SYMPPRF1_PRIME_13_MULTI_FACTOR,
 )
 
 
@@ -168,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     source.add_argument(
         "--golden-vector",
-        choices=("primality-3", "factorization-2"),
+        choices=("primality-3", "factorization-2", "prime-13-multifactor"),
         help="emit Lean for a fixed cross-language golden vector",
     )
     parser.add_argument("--output", required=True, type=Path, help="Lean source output path")
@@ -179,6 +180,8 @@ def main(argv: list[str] | None = None) -> int:
             data = SYMPPRF1_PRIME_3
         elif args.golden_vector == "factorization-2":
             data = SYMFCER1_FACTOR_2
+        elif args.golden_vector == "prime-13-multifactor":
+            data = SYMPPRF1_PRIME_13_MULTI_FACTOR
         else:
             data = _read_limited(args.certificate)
 
