@@ -13,9 +13,7 @@ use std::collections::HashSet;
 use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::embodiment_evidence::{
-    ClockDomainId, EvidenceValidationError, TimestampV1,
-};
+use symthaea_core::embodiment_evidence::{ClockDomainId, EvidenceValidationError, TimestampV1};
 use thiserror::Error;
 
 pub const PX4_OFFBOARD_LOSS_CONFIGURATION_SCHEMA_V1: u16 = 1;
@@ -300,7 +298,9 @@ impl Px4OffboardLossParameterObservationV1 {
     pub fn validate(&self) -> Result<(), Px4OffboardLossConfigurationError> {
         self.validate_without_digest()?;
         if self.observation_digest_hex != self.compute_digest_hex() {
-            return Err(Px4OffboardLossConfigurationError::DigestMismatch("observation"));
+            return Err(Px4OffboardLossConfigurationError::DigestMismatch(
+                "observation",
+            ));
         }
         Ok(())
     }
@@ -453,10 +453,10 @@ impl Px4OffboardLossConfigurationProfileV1 {
             &self.parameter_encoding_evidence_id,
             "parameter_encoding_evidence_id",
         )?;
-        let bytewise = self.parameter_encoding_capabilities_raw
-            & PARAM_ENCODE_BYTEWISE_CAPABILITY != 0;
-        let c_style = self.parameter_encoding_capabilities_raw
-            & PARAM_ENCODE_C_CAST_CAPABILITY != 0;
+        let bytewise =
+            self.parameter_encoding_capabilities_raw & PARAM_ENCODE_BYTEWISE_CAPABILITY != 0;
+        let c_style =
+            self.parameter_encoding_capabilities_raw & PARAM_ENCODE_C_CAST_CAPABILITY != 0;
         let mode_matches_capabilities = match self.parameter_encoding {
             Px4MavlinkParameterEncodingV1::Bytewise => bytewise && !c_style,
             Px4MavlinkParameterEncodingV1::CStyleCast => c_style && !bytewise,
@@ -467,15 +467,26 @@ impl Px4OffboardLossConfigurationProfileV1 {
         self.receiver_clock_domain
             .validate()
             .map_err(Px4OffboardLossConfigurationError::Timestamp)?;
-        if !self.required_parameters.contains(&Px4OffboardLossParameterNameV1::ComOfLossT) {
+        if !self
+            .required_parameters
+            .contains(&Px4OffboardLossParameterNameV1::ComOfLossT)
+        {
             return Err(Px4OffboardLossConfigurationError::TimeoutParameterNotRequired);
         }
-        if !self.required_parameters.contains(&Px4OffboardLossParameterNameV1::ComOblAct)
-            && !self.required_parameters.contains(&Px4OffboardLossParameterNameV1::ComOblRcAct)
+        if !self
+            .required_parameters
+            .contains(&Px4OffboardLossParameterNameV1::ComOblAct)
+            && !self
+                .required_parameters
+                .contains(&Px4OffboardLossParameterNameV1::ComOblRcAct)
         {
             return Err(Px4OffboardLossConfigurationError::ActionParameterNotRequired);
         }
-        if self.required_parameters.windows(2).any(|pair| pair[0] == pair[1]) {
+        if self
+            .required_parameters
+            .windows(2)
+            .any(|pair| pair[0] == pair[1])
+        {
             return Err(Px4OffboardLossConfigurationError::DuplicateRequiredParameter);
         }
         if self.max_capture_skew_ns == 0 {
@@ -599,7 +610,9 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
     pub fn validate(&self) -> Result<(), Px4OffboardLossConfigurationError> {
         self.validate_without_digest()?;
         if self.assessment_digest_hex != self.compute_digest_hex() {
-            return Err(Px4OffboardLossConfigurationError::DigestMismatch("assessment"));
+            return Err(Px4OffboardLossConfigurationError::DigestMismatch(
+                "assessment",
+            ));
         }
         Ok(())
     }
@@ -621,7 +634,11 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
         let mut required = Vec::with_capacity(self.profile.required_parameters.len());
         let mut missing = Vec::new();
         for name in &self.profile.required_parameters {
-            match self.observations.iter().find(|item| item.parameter_name() == *name) {
+            match self
+                .observations
+                .iter()
+                .find(|item| item.parameter_name() == *name)
+            {
                 Some(item) => required.push(item.clone()),
                 None => missing.push(*name),
             }
@@ -654,17 +671,21 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
         }
         let capture_skew_ns = last_receive_ns - first_receive_ns;
         if capture_skew_ns > self.profile.max_capture_skew_ns {
-            return Ok(Px4OffboardLossConfigurationOutcomeV1::CaptureWindowTooWide {
-                capture_skew_ns,
-                max_capture_skew_ns: self.profile.max_capture_skew_ns,
-            });
+            return Ok(
+                Px4OffboardLossConfigurationOutcomeV1::CaptureWindowTooWide {
+                    capture_skew_ns,
+                    max_capture_skew_ns: self.profile.max_capture_skew_ns,
+                },
+            );
         }
-        Ok(Px4OffboardLossConfigurationOutcomeV1::CompleteSnapshotObserved {
-            required_observations: required,
-            latest_parameter_age_ns: latest_age_ns,
-            oldest_parameter_age_ns: oldest_age_ns,
-            capture_skew_ns,
-        })
+        Ok(
+            Px4OffboardLossConfigurationOutcomeV1::CompleteSnapshotObserved {
+                required_observations: required,
+                latest_parameter_age_ns: latest_age_ns,
+                oldest_parameter_age_ns: oldest_age_ns,
+                capture_skew_ns,
+            },
+        )
     }
 
     fn validate_without_digest(&self) -> Result<(), Px4OffboardLossConfigurationError> {
@@ -714,12 +735,14 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
             if !sequences.insert(item.capture_sequence) {
                 return Err(Px4OffboardLossConfigurationError::DuplicateCaptureSequence);
             }
-            self.assessed_at.elapsed_since(&item.received_at).map_err(|error| match error {
-                EvidenceValidationError::NonMonotonicTimestamp => {
-                    Px4OffboardLossConfigurationError::AssessmentBeforeObservation
-                }
-                other => Px4OffboardLossConfigurationError::Timestamp(other),
-            })?;
+            self.assessed_at
+                .elapsed_since(&item.received_at)
+                .map_err(|error| match error {
+                    EvidenceValidationError::NonMonotonicTimestamp => {
+                        Px4OffboardLossConfigurationError::AssessmentBeforeObservation
+                    }
+                    other => Px4OffboardLossConfigurationError::Timestamp(other),
+                })?;
         }
         Ok(())
     }
@@ -742,9 +765,11 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
 
 fn validate_schema(schema_version: u16) -> Result<(), Px4OffboardLossConfigurationError> {
     if schema_version != PX4_OFFBOARD_LOSS_CONFIGURATION_SCHEMA_V1 {
-        return Err(Px4OffboardLossConfigurationError::UnsupportedSchemaVersion {
-            found: schema_version,
-        });
+        return Err(
+            Px4OffboardLossConfigurationError::UnsupportedSchemaVersion {
+                found: schema_version,
+            },
+        );
     }
     Ok(())
 }
@@ -896,9 +921,7 @@ mod tests {
         )
     }
 
-    fn wire_for(
-        value: Px4OffboardLossParameterValueV1,
-    ) -> Px4MavlinkParameterValueV1 {
+    fn wire_for(value: Px4OffboardLossParameterValueV1) -> Px4MavlinkParameterValueV1 {
         let param_value_bits = match value {
             Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(bits) => bits,
             Px4OffboardLossParameterValueV1::LegacyActionI32(raw)
@@ -957,7 +980,11 @@ mod tests {
     }
 
     fn action(sequence: u64, raw: i32, at: u64) -> Px4OffboardLossParameterObservationV1 {
-        observation(sequence, Px4OffboardLossParameterValueV1::RcActionI32(raw), at)
+        observation(
+            sequence,
+            Px4OffboardLossParameterValueV1::RcActionI32(raw),
+            at,
+        )
     }
 
     fn profile(max_skew_ns: u64) -> Px4OffboardLossConfigurationProfileV1 {
@@ -995,7 +1022,6 @@ mod tests {
         )
         .unwrap()
     }
-
 
     #[test]
     fn profile_rejects_encoding_mode_not_supported_by_declared_capabilities() {
@@ -1042,7 +1068,8 @@ mod tests {
                 vec![Px4OffboardLossParameterNameV1::ComOfLossT],
                 200,
                 2_000_000_000,
-            ).unwrap_err(),
+            )
+            .unwrap_err(),
             Px4OffboardLossConfigurationError::ActionParameterNotRequired
         );
     }
@@ -1062,9 +1089,12 @@ mod tests {
             } if required_observations.iter().any(|entry|
                 entry.value == Px4OffboardLossParameterValueV1::RcActionI32(6))
         ));
-        assert!(value.assessment_id().unwrap().starts_with(
-            "symthaea.autopilot.px4.offboard-loss-configuration-assessment.v1:"
-        ));
+        assert!(
+            value
+                .assessment_id()
+                .unwrap()
+                .starts_with("symthaea.autopilot.px4.offboard-loss-configuration-assessment.v1:")
+        );
     }
 
     #[test]
@@ -1100,7 +1130,8 @@ mod tests {
             "parameter-capture.fixture.attempt-1",
             ts(1_300),
             vec![timeout(11, 1_000), action(12, 6, 1_201)],
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             value.outcome().unwrap(),
             Px4OffboardLossConfigurationOutcomeV1::CaptureWindowTooWide {
@@ -1127,8 +1158,16 @@ mod tests {
     #[test]
     fn packet_sender_ids_are_bound_to_the_configuration_profile() {
         for (system_id, component_id, expected_error) in [
-            (2, 1, Px4OffboardLossConfigurationError::SourceSystemMismatch),
-            (1, 2, Px4OffboardLossConfigurationError::SourceComponentMismatch),
+            (
+                2,
+                1,
+                Px4OffboardLossConfigurationError::SourceSystemMismatch,
+            ),
+            (
+                1,
+                2,
+                Px4OffboardLossConfigurationError::SourceComponentMismatch,
+            ),
         ] {
             let value = Px4OffboardLossParameterValueV1::RcActionI32(6);
             let mut wire = wire_for(value);
@@ -1209,7 +1248,8 @@ mod tests {
                 )),
                 Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(f32::NAN.to_bits()),
                 ts(1_000),
-            ).unwrap_err(),
+            )
+            .unwrap_err(),
             Px4OffboardLossConfigurationError::InvalidTimeoutValue
         );
         assert_eq!(
@@ -1230,14 +1270,16 @@ mod tests {
             wire_for(Px4OffboardLossParameterValueV1::RcActionI32(6)),
             Px4OffboardLossParameterValueV1::RcActionI32(6),
             ts(1_100_000_000),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             Px4OffboardLossConfigurationAssessmentV1::new(
                 profile(200_000_000),
                 "parameter-capture.fixture.attempt-1",
                 ts(1_200_000_000),
                 vec![timeout(11, 1_000_000_000), wrong_session],
-            ).unwrap_err(),
+            )
+            .unwrap_err(),
             Px4OffboardLossConfigurationError::BootSessionMismatch
         );
     }
@@ -1272,7 +1314,10 @@ mod tests {
             vec![action(12, 6, 1_100_000_000), timeout(11, 1_000_000_000)],
             1_200_000_000,
         );
-        assert_eq!(first.assessment_id().unwrap(), second.assessment_id().unwrap());
+        assert_eq!(
+            first.assessment_id().unwrap(),
+            second.assessment_id().unwrap()
+        );
     }
 
     #[test]
