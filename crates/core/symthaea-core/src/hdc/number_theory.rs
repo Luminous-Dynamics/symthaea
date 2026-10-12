@@ -237,8 +237,6 @@ impl PrimalityProof {
     /// Fixed-width integers avoid alternate textual spellings. The whole proof is
     /// verified before encoding and capped at 1 MiB with bounded table/entry counts.
     pub fn to_canonical_bytes(&self) -> Result<Vec<u8>, PrimalityProofWireError> {
-        self.verify().map_err(PrimalityProofWireError::InvalidProof)?;
-
         let certificate_count = u32::try_from(self.certificates.len())
             .map_err(|_| PrimalityProofWireError::LengthOverflow)?;
         if certificate_count > PRIMALITY_PROOF_MAX_CERTIFICATES {
@@ -271,6 +269,7 @@ impl PrimalityProof {
         if encoded_len > PRIMALITY_PROOF_MAX_WIRE_BYTES {
             return Err(PrimalityProofWireError::InputTooLarge { length: encoded_len });
         }
+        self.verify().map_err(PrimalityProofWireError::InvalidProof)?;
 
         let mut bytes = Vec::with_capacity(encoded_len);
         bytes.extend_from_slice(PRIMALITY_PROOF_WIRE_MAGIC);
@@ -578,8 +577,6 @@ impl CertifiedFactorizationCertificate {
     /// Encode a verified factorization plus all per-factor Pocklington proofs.
     /// Nested primality proofs use their own versioned canonical encoding.
     pub fn to_canonical_bytes(&self) -> Result<Vec<u8>, CertifiedFactorizationWireError> {
-        self.verify().map_err(CertifiedFactorizationWireError::InvalidCertificate)?;
-
         let factor_count = u32::try_from(self.factorization.factors.len())
             .map_err(|_| CertifiedFactorizationWireError::LengthOverflow)?;
         let proof_count = u32::try_from(self.prime_proofs.len())
@@ -590,6 +587,7 @@ impl CertifiedFactorizationCertificate {
         if proof_count > CERTIFIED_FACTORIZATION_MAX_PROOFS {
             return Err(CertifiedFactorizationWireError::TooManyProofs { count: proof_count });
         }
+        self.verify().map_err(CertifiedFactorizationWireError::InvalidCertificate)?;
 
         let mut nested = Vec::with_capacity(self.prime_proofs.len());
         let mut encoded_len = 8usize + 8 + 4 + 4;
