@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -149,6 +150,106 @@ class DurableQueueTests(unittest.TestCase):
         self.queue.acknowledge(event_id=e.event_id, payload_sha256=e.payload_sha256, now_utc=self.now)
         self.assertEqual(self.queue.integrity_check(), "ok")
         self.assertEqual(self.reopen().integrity_check(), "ok")
+
+    def test_concurrent_duplicate_enqueues_commit_exactly_one_event(self):
+        workers = 12
+        barrier = threading.Barrier(workers)
+        results = []
+        errors = []
+        lock = threading.Lock()
+        e = event()
+
+        def submit():
+            try:
+                local_queue = self.reopen()
+                barrier.wait(timeout=5)
+                result = local_queue.enqueue(e, now_utc=self.now)
+                with lock:
+                    results.append(result)
+            except Exception as exc:
+                with lock:
+                    errors.append(exc)
+
+        threads = [threading.Thread(target=submit) for _ in range(workers)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+        self.assertTrue(all(not thread.is_alive() for thread in threads), "thread did not terminate")
+        self.assertEqual(errors, [])
+        self.assertEqual(results.count("queued"), 1)
+        self.assertEqual(results.count("duplicate_pending"), workers - 1)
+        self.assertEqual(self.queue.record_count, 1)
+        self.assertEqual(self.queue.pending_bytes, e.wire_size_bytes)
+
+    def test_concurrent_unique_enqueues_respect_byte_limit_atomically(self):
+        workers = 8
+        barrier = threading.Barrier(workers)
+        results = []
+        errors = []
+        lock = threading.Lock()
+        limited = DurableTelemetryQueue(self.database, max_queue_bytes=250, max_records=100)
+
+        def submit(i):
+            try:
+                local_queue = self.reopen(max_queue_bytes=250, max_records=100)
+                barrier.wait(timeout=5)
+                result = local_queue.enqueue(event(chr(97 + i), size=100), now_utc=self.now)
+                with lock:
+                    results.append(result)
+            except QueueCapacityError:
+                with lock:
+                    results.append("capacity_rejected")
+            except Exception as exc:
+                with lock:
+                    errors.append(exc)
+
+        threads = [threading.Thread(target=submit, args=(i,)) for i in range(workers)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+        self.assertTrue(all(not thread.is_alive() for thread in threads), "thread did not terminate")
+        self.assertEqual(errors, [])
+        self.assertEqual(results.count("queued"), 2)
+        self.assertEqual(results.count("capacity_rejected"), workers - 2)
+        self.assertEqual(limited.pending_bytes, 200)
+        self.assertEqual(limited.pending_count, 2)
+
+    def test_concurrent_exact_acknowledgements_are_idempotent(self):
+        e = event()
+        self.queue.enqueue(e, now_utc=self.now)
+        self.queue.select_batch(now_utc=self.now, max_bytes=100)
+        workers = 8
+        barrier = threading.Barrier(workers)
+        results = []
+        errors = []
+        lock = threading.Lock()
+
+        def ack():
+            try:
+                local_queue = self.reopen()
+                barrier.wait(timeout=5)
+                result = local_queue.acknowledge(
+                    event_id=e.event_id, payload_sha256=e.payload_sha256, now_utc=self.now
+                )
+                with lock:
+                    results.append(result)
+            except Exception as exc:
+                with lock:
+                    errors.append(exc)
+
+        threads = [threading.Thread(target=ack) for _ in range(workers)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+        self.assertTrue(all(not thread.is_alive() for thread in threads), "thread did not terminate")
+        self.assertEqual(errors, [])
+        self.assertEqual(results.count("acknowledged"), 1)
+        self.assertEqual(results.count("idempotent_ack"), workers - 1)
+        self.assertEqual(self.queue.pending_count, 0)
+        self.assertEqual(self.queue.record_count, 1)
 
     def test_ephemeral_database_path_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "persistent filesystem path"):
