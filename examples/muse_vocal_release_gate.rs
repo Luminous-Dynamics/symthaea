@@ -132,6 +132,43 @@ fn arg(args: &[String], flag: &str) -> Option<String> {
         .cloned()
 }
 
+/// Keep organizer-only mappings and score reports outside the shareable
+/// listening-pack directory. Share `--output`; keep this sibling private.
+fn private_output_dir(output: &Path) -> Result<PathBuf> {
+    let name = output
+        .file_name()
+        .context("--output must identify a listening-pack directory name")?;
+    Ok(output.with_file_name(format!("{}.private", name.to_string_lossy())))
+}
+
+/// Migrate legacy organizer-only artifacts out of older listening packs.
+/// Refuse a collision rather than overwrite or leave a key in the public pack.
+fn relocate_legacy_private_artifacts(output: &Path, private_output: &Path) -> Result<()> {
+    for name in [
+        "private_backend_key.json",
+        "objective_report.json",
+        "release_status.json",
+    ] {
+        let legacy_path = output.join(name);
+        if !legacy_path.is_file() {
+            continue;
+        }
+        let private_path = private_output.join(name);
+        anyhow::ensure!(
+            !private_path.exists(),
+            "refusing to overwrite organizer-only artifact while isolating {}",
+            legacy_path.display()
+        );
+        std::fs::rename(&legacy_path, &private_path).with_context(|| {
+            format!(
+                "failed to move legacy private artifact {} outside the listening pack",
+                legacy_path.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
 fn save(path: &Path, stem: &VocalStem) -> Result<()> {
     let path = path.to_str().context("non-UTF8 output path")?;
     symthaea::voice::save_wav(&stem.samples, stem.sample_rate, path)
@@ -269,6 +306,7 @@ fn main() -> Result<()> {
     let output = PathBuf::from(
         arg(&args, "--output").unwrap_or_else(|| "audio_output/muse_vocal_gate".into()),
     );
+    let private_output = private_output_dir(&output)?;
     let voice = arg(&args, "--voice").unwrap_or_else(|| "af_bella".into());
     let worker = arg(&args, "--diffsinger-worker").map(PathBuf::from);
     let ratings = arg(&args, "--ratings").map(PathBuf::from);
@@ -280,6 +318,8 @@ fn main() -> Result<()> {
         .context("invalid --minimum-listeners")?;
     anyhow::ensure!(minimum_listeners > 0, "--minimum-listeners must be positive");
     std::fs::create_dir_all(&output)?;
+    std::fs::create_dir_all(&private_output)?;
+    relocate_legacy_private_artifacts(&output, &private_output)?;
     let salt = blind_salt(&args, &output)?;
 
     let mut kokoro = KokoroSingingEngine::load(&voice)?;
@@ -365,13 +405,13 @@ fn main() -> Result<()> {
         serde_json::to_vec_pretty(&clips)?,
     )?;
     std::fs::write(
-        output.join("private_backend_key.json"),
+        private_output.join("private_backend_key.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
             "format_version": 2, "salt": salt, "entries": key
         }))?,
     )?;
     std::fs::write(
-        output.join("objective_report.json"),
+        private_output.join("objective_report.json"),
         serde_json::to_vec_pretty(&objective)?,
     )?;
 
@@ -452,9 +492,13 @@ fn main() -> Result<()> {
         });
     }
     std::fs::write(
-        output.join("release_status.json"),
+        private_output.join("release_status.json"),
         serde_json::to_vec_pretty(&status)?,
     )?;
+    eprintln!(
+        "organizer-only artifacts (backend key, objective report, release status): {}",
+        private_output.display()
+    );
     println!("{}", serde_json::to_string_pretty(&status)?);
     Ok(())
 }
@@ -485,6 +529,17 @@ mod tests {
             lyric_words_understood: total,
             lyric_words_total: total,
         }
+    }
+
+    #[test]
+    fn private_artifacts_are_written_to_a_sibling_of_the_listening_pack() {
+        let output = Path::new("audio_output/muse_vocal_gate");
+        let private = private_output_dir(output).unwrap();
+        assert_eq!(
+            private,
+            PathBuf::from("audio_output/muse_vocal_gate.private")
+        );
+        assert!(!private.starts_with(output));
     }
 
     #[test]
