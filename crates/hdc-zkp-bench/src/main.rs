@@ -103,8 +103,14 @@ fn bench_binius_hdc_xor() -> BenchResult {
     let mut witness = circuit.new_witness_filler();
     let mut expected_xor = vec![0u64; hv_dim_words];
     // Fixed fixtures make the same synthetic relation reproducible between runs.
-    let a_values = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_HDC_XOR_A, hv_dim_words);
-    let b_values = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_HDC_XOR_B, hv_dim_words);
+    let a_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_HDC_XOR_A,
+        hv_dim_words,
+    );
+    let b_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_HDC_XOR_B,
+        hv_dim_words,
+    );
 
     for i in 0..hv_dim_words {
         let a_val = a_values[i];

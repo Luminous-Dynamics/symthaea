@@ -107,9 +107,12 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     let mut witness = circuit.new_witness_filler();
 
     // Generate deterministic synthetic initial values, independent by role.
-    let h0_vals =
-        crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_CFC_INITIAL_STATE, neurons);
-    let x_inf_vals = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_CFC_INPUT, neurons);
+    let h0_vals = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_CFC_INITIAL_STATE,
+        neurons,
+    );
+    let x_inf_vals =
+        crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_CFC_INPUT, neurons);
 
     for n in 0..neurons {
         witness[h_wires[n]] = Word(h0_vals[n]);

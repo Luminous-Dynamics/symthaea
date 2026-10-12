@@ -103,9 +103,12 @@ pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> MaskedG
 
     // Fill witness with deterministic synthetic fixtures.
     let mut witness = circuit.new_witness_filler();
-    let h0_vals =
-        crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_MASK_INITIAL_STATE, neurons);
-    let x_inf_vals = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_MASK_INPUT, neurons);
+    let h0_vals = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_MASK_INITIAL_STATE,
+        neurons,
+    );
+    let x_inf_vals =
+        crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_MASK_INPUT, neurons);
 
     for n in 0..neurons {
         witness[h_wires[n]] = Word(h0_vals[n]);

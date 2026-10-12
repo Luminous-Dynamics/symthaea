@@ -75,8 +75,14 @@ pub fn bench_opaque_xor_relation(dim_words: usize) -> OpaqueXorBenchResult {
     let mut witness = circuit.new_witness_filler();
 
     // Use opaque deterministic fixture words. This example intentionally does not model OTP.
-    let a_values = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_TRIPLE_XOR_A, dim_words);
-    let b_values = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_TRIPLE_XOR_B, dim_words);
+    let a_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_TRIPLE_XOR_A,
+        dim_words,
+    );
+    let b_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_TRIPLE_XOR_B,
+        dim_words,
+    );
     for i in 0..dim_words {
         let a = a_values[i];
         let b = b_values[i];
