@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+import os
 import sqlite3
 import tempfile
 import threading
 import unittest
 from pathlib import Path
+import stat
 
 from tools.energy_telemetry.durable_queue import DurableTelemetryQueue
 from tools.energy_telemetry.store_forward import (
@@ -293,6 +295,14 @@ class DurableQueueTests(unittest.TestCase):
         self.assertEqual(self.reopen().integrity_check(), "ok")
         with sqlite3.connect(self.database) as db:
             self.assertEqual(db.execute("PRAGMA application_id").fetchone()[0], 0x53594D54)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX file mode assertion")
+    def test_database_and_existing_wal_sidecars_are_private(self):
+        self.queue.enqueue(event(), now_utc=self.now)
+        for candidate in (self.database, self.database + "-wal", self.database + "-shm"):
+            if Path(candidate).exists():
+                mode = stat.S_IMODE(os.stat(candidate).st_mode)
+                self.assertEqual(mode & 0o077, 0, f"{candidate} exposes group/other permissions")
 
     def test_foreign_application_id_is_rejected(self):
         with sqlite3.connect(self.database) as db:
