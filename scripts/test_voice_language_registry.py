@@ -60,7 +60,7 @@ class VoiceLanguageRegistryTests(unittest.TestCase):
     def test_source_refs_reject_windows_paths_and_parent_components(self):
         registry = copy.deepcopy(REGISTRY)
         record = registry["languages"][0]["capabilities"]["g2p"]
-        record["source_refs"] = [r"C:\\private\\source.py"]
+        record["source_refs"] = [r"C:\private\source.py"]
         with self.assertRaisesRegex(ValueError, "safe repository-relative paths"):
             validate_registry(registry)
 
