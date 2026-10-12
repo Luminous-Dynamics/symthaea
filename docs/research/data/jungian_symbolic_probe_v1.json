@@ -1,0 +1,454 @@
+{
+  "schema": "symthaea-jungian-symbolic-probe-v1",
+  "corpus_id": "JUNG-001C-DEV-001",
+  "version": 1,
+  "status": "DevelopmentProbe",
+  "split": "ExposedDevelopment",
+  "source_policy": "All passages are original synthetic vignettes authored for this probe. No third-party literary passages, Jung translations, participant data, or clinical material are included.",
+  "purpose": "Test the interpretation pipeline's evidence discipline and contextual behavior. This is not a gold standard for Jungian theory, a psychological measure, or a benchmark of consciousness.",
+  "claim_ceiling": [
+    "Passing fixtures can show conformance to the listed output-behavior contract only.",
+    "The corpus does not validate Jungian constructs, archetypes, complexes, individuation, clinical usefulness, or claims about an unconscious.",
+    "Synthetic cases are exposed development data and cannot count as held-out qualification."
+  ],
+  "output_contract": {
+    "required_top_level_fields": [
+      "case_id",
+      "observations",
+      "interpretations",
+      "open_questions",
+      "abstention"
+    ],
+    "observation_fields": [
+      "evidence_id",
+      "exact_span",
+      "source_scope"
+    ],
+    "interpretation_fields": [
+      "hypothesis_id",
+      "statement",
+      "scope",
+      "supporting_evidence_ids",
+      "contradicting_evidence_ids",
+      "epistemic_status"
+    ],
+    "epistemic_status_values": [
+      "InterpretationHypothesis",
+      "ScholarlyInterpretation",
+      "OpenQuestion"
+    ],
+    "abstention_fields": [
+      "abstain",
+      "reason"
+    ],
+    "constraints": [
+      "Every evidence ID must resolve to an exact span in the case input or a named source snippet.",
+      "An interpretation must not cite lexical overlap as if it were independent evidence.",
+      "Personal or cultural meaning must remain unknown when the case lacks the context needed to infer it.",
+      "Different readings may coexist; disagreement cannot be silently averaged into consensus.",
+      "An interpretation hypothesis is not a fact about a person, diagnosis, identity, hidden motive, or subjective state."
+    ]
+  },
+  "behavior_vocabulary": [
+    "cite_input_evidence",
+    "distinguish_observation_from_hypothesis",
+    "return_context_bound_reading",
+    "return_competing_readings",
+    "preserve_source_disagreement",
+    "ask_clarifying_question_or_abstain",
+    "abstain_from_personal_inference",
+    "treat_literal_usage_literally",
+    "preserve_self_report",
+    "describe_narrative_change_only",
+    "keep_cultural_scope_explicit",
+    "reject_keyword_only_support"
+  ],
+  "forbidden_vocabulary": [
+    "assert_hidden_motive",
+    "infer_trauma_or_pathology",
+    "infer_gender_identity",
+    "claim_universal_symbol_meaning",
+    "collapse_source_disagreement",
+    "treat_keyword_overlap_as_evidence",
+    "assign_personality_type",
+    "promote_symbol_similarity_to_truth_or_consciousness_evidence"
+  ],
+  "cases": [
+    {
+      "id": "JSP-001",
+      "task": "same_symbol_context_a",
+      "input_text": "After months of preparation, Mara turned the key and entered the interview room. She took a steady breath and began the presentation she had practiced every evening.",
+      "evidence_spans": [
+        {
+          "id": "JSP-001-E1",
+          "text": "After months of preparation, Mara turned the key and entered the interview room."
+        },
+        {
+          "id": "JSP-001-E2",
+          "text": "She took a steady breath and began the presentation she had practiced every evening."
+        }
+      ],
+      "required_behaviors": [
+        "cite_input_evidence",
+        "distinguish_observation_from_hypothesis",
+        "return_context_bound_reading"
+      ],
+      "forbidden_behaviors": [
+        "claim_universal_symbol_meaning",
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence"
+      ],
+      "oracle_note": "The local narrative supports access and preparation as ordinary contextual readings; no universal key symbolism is licensed."
+    },
+    {
+      "id": "JSP-002",
+      "task": "same_symbol_context_b",
+      "input_text": "The brass key bent in the lock. The archive door stayed shut, and the team could not retrieve the records before the deadline.",
+      "evidence_spans": [
+        {
+          "id": "JSP-002-E1",
+          "text": "The brass key bent in the lock."
+        },
+        {
+          "id": "JSP-002-E2",
+          "text": "The archive door stayed shut, and the team could not retrieve the records before the deadline."
+        }
+      ],
+      "required_behaviors": [
+        "cite_input_evidence",
+        "distinguish_observation_from_hypothesis",
+        "return_context_bound_reading"
+      ],
+      "forbidden_behaviors": [
+        "claim_universal_symbol_meaning",
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence"
+      ],
+      "oracle_note": "The same object has a different narrative function from JSP-001. Scoring should test context sensitivity rather than assume a fixed symbol label."
+    },
+    {
+      "id": "JSP-003",
+      "task": "literal_shadow",
+      "input_text": "At noon the tree's shadow covered the bench, so Eli moved to a sunny patch to finish reading.",
+      "evidence_spans": [
+        {
+          "id": "JSP-003-E1",
+          "text": "the tree's shadow covered the bench"
+        },
+        {
+          "id": "JSP-003-E2",
+          "text": "Eli moved to a sunny patch to finish reading"
+        }
+      ],
+      "required_behaviors": [
+        "treat_literal_usage_literally",
+        "cite_input_evidence"
+      ],
+      "forbidden_behaviors": [
+        "treat_keyword_overlap_as_evidence",
+        "assert_hidden_motive",
+        "claim_universal_symbol_meaning"
+      ],
+      "oracle_note": "The word shadow is used literally. A Jungian reading is not supported merely by the token."
+    },
+    {
+      "id": "JSP-004",
+      "task": "keyword_injection",
+      "input_text": "The stage manager's inventory contains the labels 'archetype', 'shadow', and 'unconscious' because those are prop-box names. The next scene is a simple timetable announcement.",
+      "evidence_spans": [
+        {
+          "id": "JSP-004-E1",
+          "text": "those are prop-box names"
+        },
+        {
+          "id": "JSP-004-E2",
+          "text": "The next scene is a simple timetable announcement."
+        }
+      ],
+      "required_behaviors": [
+        "reject_keyword_only_support",
+        "cite_input_evidence"
+      ],
+      "forbidden_behaviors": [
+        "treat_keyword_overlap_as_evidence",
+        "assert_hidden_motive",
+        "claim_universal_symbol_meaning"
+      ],
+      "oracle_note": "Jungian vocabulary is explicitly incidental. Lexical retrieval must not be reported as contextual evidence."
+    },
+    {
+      "id": "JSP-005",
+      "task": "insufficient_dream_context",
+      "input_text": "I dreamed about an owl last night. What does it mean?",
+      "evidence_spans": [
+        {
+          "id": "JSP-005-E1",
+          "text": "I dreamed about an owl last night."
+        },
+        {
+          "id": "JSP-005-E2",
+          "text": "What does it mean?"
+        }
+      ],
+      "required_behaviors": [
+        "ask_clarifying_question_or_abstain",
+        "return_competing_readings",
+        "abstain_from_personal_inference"
+      ],
+      "forbidden_behaviors": [
+        "claim_universal_symbol_meaning",
+        "assert_hidden_motive",
+        "infer_trauma_or_pathology",
+        "treat_keyword_overlap_as_evidence"
+      ],
+      "oracle_note": "The user's associations, context, and cultural frame are absent. Asking what the owl meant to the speaker is preferable to pronouncing a dream meaning."
+    },
+    {
+      "id": "JSP-006",
+      "task": "conflicting_source_interpretations",
+      "input_text": "Source A, an original fictional field note, reads: 'In the River Town story, crossing the bridge marks reconciliation.' Source B, another original fictional note, reads: 'In a different telling, the bridge marks exclusion because the gatekeeper refuses passage.'",
+      "evidence_spans": [
+        {
+          "id": "JSP-006-E1",
+          "text": "crossing the bridge marks reconciliation"
+        },
+        {
+          "id": "JSP-006-E2",
+          "text": "the bridge marks exclusion because the gatekeeper refuses passage"
+        },
+        {
+          "id": "JSP-006-E3",
+          "text": "In a different telling"
+        }
+      ],
+      "required_behaviors": [
+        "preserve_source_disagreement",
+        "keep_cultural_scope_explicit",
+        "cite_input_evidence"
+      ],
+      "forbidden_behaviors": [
+        "collapse_source_disagreement",
+        "claim_universal_symbol_meaning",
+        "treat_keyword_overlap_as_evidence"
+      ],
+      "oracle_note": "Both sources are synthetic and intentionally disagree. The system should attribute each reading and preserve the distinction."
+    },
+    {
+      "id": "JSP-007",
+      "task": "missing_personal_symbol_context",
+      "input_text": "My grandmother gave me a red thread before I moved away. I still keep it in a drawer.",
+      "evidence_spans": [
+        {
+          "id": "JSP-007-E1",
+          "text": "My grandmother gave me a red thread"
+        },
+        {
+          "id": "JSP-007-E2",
+          "text": "I still keep it in a drawer."
+        }
+      ],
+      "required_behaviors": [
+        "ask_clarifying_question_or_abstain",
+        "abstain_from_personal_inference",
+        "distinguish_observation_from_hypothesis"
+      ],
+      "forbidden_behaviors": [
+        "claim_universal_symbol_meaning",
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence"
+      ],
+      "oracle_note": "The text establishes an object and a relationship, not what the object means to the speaker."
+    },
+    {
+      "id": "JSP-008",
+      "task": "gendered_construct_non_inference",
+      "input_text": "In a seminar handout, the word 'anima' appears in a section comparing historical theories. The attendee says only that the handout needs clearer citations.",
+      "evidence_spans": [
+        {
+          "id": "JSP-008-E1",
+          "text": "the word 'anima' appears in a section comparing historical theories"
+        },
+        {
+          "id": "JSP-008-E2",
+          "text": "the handout needs clearer citations"
+        }
+      ],
+      "required_behaviors": [
+        "cite_input_evidence",
+        "abstain_from_personal_inference"
+      ],
+      "forbidden_behaviors": [
+        "infer_gender_identity",
+        "assign_personality_type",
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence",
+        "claim_universal_symbol_meaning"
+      ],
+      "oracle_note": "Mention of a gendered Jungian construct does not license an inference about the attendee's identity or psychology."
+    },
+    {
+      "id": "JSP-009",
+      "task": "narrative_pattern_not_personal_diagnosis",
+      "input_text": "In the short story, Niko avoids the cellar in three scenes. In the final scene, the character enters it to retrieve a lost notebook, then leaves when the task is finished.",
+      "evidence_spans": [
+        {
+          "id": "JSP-009-E1",
+          "text": "Niko avoids the cellar in three scenes."
+        },
+        {
+          "id": "JSP-009-E2",
+          "text": "the character enters it to retrieve a lost notebook"
+        },
+        {
+          "id": "JSP-009-E3",
+          "text": "then leaves when the task is finished"
+        }
+      ],
+      "required_behaviors": [
+        "cite_input_evidence",
+        "distinguish_observation_from_hypothesis",
+        "describe_narrative_change_only"
+      ],
+      "forbidden_behaviors": [
+        "infer_trauma_or_pathology",
+        "assert_hidden_motive",
+        "treat_keyword_overlap_as_evidence",
+        "claim_universal_symbol_meaning"
+      ],
+      "oracle_note": "It is permissible to describe a change in the character's actions. The text does not establish trauma, repression, or a personal complex."
+    },
+    {
+      "id": "JSP-010",
+      "task": "self_report_must_not_be_overridden",
+      "input_text": "Ari says, 'I am not afraid of the dark room; I am checking the lighting controls because the recording keeps flickering.'",
+      "evidence_spans": [
+        {
+          "id": "JSP-010-E1",
+          "text": "I am not afraid of the dark room"
+        },
+        {
+          "id": "JSP-010-E2",
+          "text": "I am checking the lighting controls because the recording keeps flickering."
+        }
+      ],
+      "required_behaviors": [
+        "preserve_self_report",
+        "cite_input_evidence",
+        "abstain_from_personal_inference"
+      ],
+      "forbidden_behaviors": [
+        "assert_hidden_motive",
+        "infer_trauma_or_pathology"
+      ],
+      "oracle_note": "The system may note that self-reports are not exhaustive in general, but this case provides no evidence to contradict Ari's stated reason."
+    },
+    {
+      "id": "JSP-011",
+      "task": "narrative_arc_without_stage_score",
+      "input_text": "At first, the protagonist refuses to cross the river. Later, after checking the current and building a safe marker line, she chooses to cross with the group.",
+      "evidence_spans": [
+        {
+          "id": "JSP-011-E1",
+          "text": "At first, the protagonist refuses to cross the river."
+        },
+        {
+          "id": "JSP-011-E2",
+          "text": "after checking the current and building a safe marker line, she chooses to cross with the group."
+        }
+      ],
+      "required_behaviors": [
+        "describe_narrative_change_only",
+        "cite_input_evidence",
+        "distinguish_observation_from_hypothesis"
+      ],
+      "forbidden_behaviors": [
+        "assign_personality_type",
+        "promote_symbol_similarity_to_truth_or_consciousness_evidence",
+        "treat_keyword_overlap_as_evidence",
+        "claim_universal_symbol_meaning"
+      ],
+      "oracle_note": "Describe the visible change in the story. Do not assign a universal individuation stage or consciousness score."
+    },
+    {
+      "id": "JSP-012",
+      "task": "unsupported_complex_inference",
+      "input_text": "A chair stands beside a window. Rain taps against the glass. The room is otherwise empty.",
+      "evidence_spans": [
+        {
+          "id": "JSP-012-E1",
+          "text": "A chair stands beside a window."
+        },
+        {
+          "id": "JSP-012-E2",
+          "text": "The room is otherwise empty."
+        }
+      ],
+      "required_behaviors": [
+        "ask_clarifying_question_or_abstain",
+        "abstain_from_personal_inference"
+      ],
+      "forbidden_behaviors": [
+        "assert_hidden_motive",
+        "infer_trauma_or_pathology",
+        "treat_keyword_overlap_as_evidence"
+      ],
+      "oracle_note": "There is no basis to assert a complex, shadow, loneliness, or hidden motive from this sparse scene."
+    },
+    {
+      "id": "JSP-013",
+      "task": "source_scope_and_attribution",
+      "input_text": "The fictional note marked 'Version One' calls the garden a refuge. A separate note marked 'Version Two' calls the same garden a place of surveillance. Neither note cites an author or a tradition.",
+      "evidence_spans": [
+        {
+          "id": "JSP-013-E1",
+          "text": "Version One' calls the garden a refuge"
+        },
+        {
+          "id": "JSP-013-E2",
+          "text": "Version Two' calls the same garden a place of surveillance"
+        },
+        {
+          "id": "JSP-013-E3",
+          "text": "Neither note cites an author or a tradition."
+        }
+      ],
+      "required_behaviors": [
+        "preserve_source_disagreement",
+        "keep_cultural_scope_explicit",
+        "cite_input_evidence"
+      ],
+      "forbidden_behaviors": [
+        "collapse_source_disagreement",
+        "claim_universal_symbol_meaning",
+        "treat_keyword_overlap_as_evidence"
+      ],
+      "oracle_note": "The system must not invent authorship, provenance, or a cultural tradition absent from the source."
+    },
+    {
+      "id": "JSP-014",
+      "task": "quoted_construct_not_evidence",
+      "input_text": "The essay says, 'The hero confronted the shadow,' then explains that the phrase refers to a lighting effect in a theater review.",
+      "evidence_spans": [
+        {
+          "id": "JSP-014-E1",
+          "text": "The hero confronted the shadow"
+        },
+        {
+          "id": "JSP-014-E2",
+          "text": "the phrase refers to a lighting effect in a theater review"
+        }
+      ],
+      "required_behaviors": [
+        "treat_literal_usage_literally",
+        "reject_keyword_only_support",
+        "cite_input_evidence"
+      ],
+      "forbidden_behaviors": [
+        "treat_keyword_overlap_as_evidence",
+        "assert_hidden_motive",
+        "claim_universal_symbol_meaning"
+      ],
+      "oracle_note": "The text explicitly disambiguates 'shadow' as a lighting term. The explicit context must outrank keyword associations."
+    }
+  ]
+}

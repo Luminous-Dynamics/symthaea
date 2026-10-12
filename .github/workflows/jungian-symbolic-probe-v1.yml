@@ -1,0 +1,264 @@
+name: JUNG-001C deterministic baseline capture
+
+on:
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md'
+      - 'docs/research/data/jungian_symbolic_probe_v1.json'
+      - 'scripts/validate_jungian_symbolic_probe.py'
+      - 'scripts/run_jungian_symbolic_baselines.py'
+      - 'scripts/evaluate_jungian_symbolic_outputs.py'
+      - 'scripts/validate_jungian_claim_annotations.py'
+      - 'src/bin/jungian_glyph_projection_probe.rs'
+      - '.github/workflows/jungian-symbolic-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer head supersedes an older capture on this PR; keep only current work active.
+concurrency:
+  group: jungian-probe-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact source lineage and complete diff scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=b9af191f380d635f0459b24284c1d1fd6a5516aa
+          git merge-base --is-ancestor "$BASE" HEAD
+          actual="$(git diff --name-only "$BASE" HEAD | sort)"
+          expected="$(printf '%s\n' '.github/workflows/jungian-symbolic-probe-v1.yml' 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md' 'docs/research/data/jungian_symbolic_probe_v1.json' 'scripts/run_jungian_symbolic_baselines.py' 'scripts/evaluate_jungian_symbolic_outputs.py' 'scripts/validate_jungian_claim_annotations.py' 'scripts/validate_jungian_symbolic_probe.py' 'src/bin/jungian_glyph_projection_probe.rs' 'Cargo.toml' | sort)"
+          test "$actual" = "$expected"
+
+      - name: Capture exact runtime and source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "head=$(git rev-parse HEAD)"
+          echo "python_path=$(command -v python3)"
+          python3 --version
+          rustc --version --verbose
+          cargo --version
+          rustup show active-toolchain
+          python3 - <<'PY'
+          import hashlib, pathlib, platform, sys
+          p = pathlib.Path("docs/research/data/jungian_symbolic_probe_v1.json")
+          r = pathlib.Path("scripts/run_jungian_symbolic_baselines.py")
+          print("python_implementation=" + platform.python_implementation())
+          print("python_version_full=" + sys.version.replace("\n", " "))
+          print("corpus_sha256=" + hashlib.sha256(p.read_bytes()).hexdigest())
+          print("runner_sha256=" + hashlib.sha256(r.read_bytes()).hexdigest())
+          PY
+
+      - name: Validate frozen corpus, output evaluator, and hostile mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_jungian_symbolic_probe.py --self-test
+          python3 scripts/evaluate_jungian_symbolic_outputs.py --self-test
+          python3 scripts/validate_jungian_claim_annotations.py --self-test
+
+      - name: Run deterministic lexical and context-rule baselines
+        id: baselines
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/jungian-baseline-capture"
+          mkdir -p "$OUT"
+          SOURCE_REVISION="$(git rev-parse HEAD)"
+          export SYMTHAEA_RUSTC_VERSION="$(rustc --version --verbose | tr '\n' ';')"
+          export SYMTHAEA_CARGO_VERSION="$(cargo --version)"
+          cargo run --locked --quiet --no-default-features --bin jungian_glyph_projection_probe --features glyph_codex -- \
+            --corpus docs/research/data/jungian_symbolic_probe_v1.json \
+            --output "$OUT/glyph_projection.json" \
+            --source-revision "$SOURCE_REVISION" \
+            --glyph-source-blob "$(git rev-parse HEAD:src/hdc/glyph_basis.rs)" \
+            --registry-source-blob "$(git rev-parse HEAD:src/hdc/glyph_registry_data.rs)" \
+            --encoder-source-blob "$(git rev-parse HEAD:src/hdc/moral_text_encoder.rs)"
+          cargo run --locked --quiet --no-default-features --bin jungian_glyph_projection_probe --features glyph_codex -- \
+            --corpus docs/research/data/jungian_symbolic_probe_v1.json \
+            --output "$OUT/glyph_projection.repeat.json" \
+            --source-revision "$SOURCE_REVISION" \
+            --glyph-source-blob "$(git rev-parse HEAD:src/hdc/glyph_basis.rs)" \
+            --registry-source-blob "$(git rev-parse HEAD:src/hdc/glyph_registry_data.rs)" \
+            --encoder-source-blob "$(git rev-parse HEAD:src/hdc/moral_text_encoder.rs)"
+          cmp --silent "$OUT/glyph_projection.json" "$OUT/glyph_projection.repeat.json"
+          rm "$OUT/glyph_projection.repeat.json"
+          python3 scripts/run_jungian_symbolic_baselines.py \
+            --output-dir "$OUT" \
+            --source-revision "$SOURCE_REVISION" \
+            --glyph-projection "$OUT/glyph_projection.json"
+          python3 scripts/validate_jungian_symbolic_probe.py --results "$OUT/keyword_dictionary_foil_v0.normalized.json"
+          python3 scripts/validate_jungian_symbolic_probe.py --results "$OUT/context_guardrails_rules_v0.normalized.json"
+          python3 scripts/evaluate_jungian_symbolic_outputs.py \
+            --corpus docs/research/data/jungian_symbolic_probe_v1.json \
+            --source-revision "$SOURCE_REVISION" \
+            --results "$OUT/keyword_dictionary_foil_v0.normalized.json" \
+            --results "$OUT/context_guardrails_rules_v0.normalized.json" \
+            --output-dir "$OUT"
+          sha256sum "$OUT"/*.json
+          echo "output_dir=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Add rubric summary to the workflow run
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/jungian-baseline-capture/baseline_comparison.json" "$GITHUB_STEP_SUMMARY" <<'PY'
+          import hashlib, json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          lines = [
+              "# JUNG-001C baseline capture",
+              "",
+              f"- Corpus: `{data['corpus_id']} v{data['corpus_version']}`",
+              f"- Split: `{data['corpus_split']}` (exposed development only)",
+              f"- Corpus SHA-256: `{data['corpus_sha256']}`",
+              f"- Corpus Git blob SHA-1: `{data['corpus_git_blob_sha1']}`",
+              f"- Runner SHA-256: `{data['runner_sha256']}`",
+              f"- Python: `{data['runtime_profile']['python_implementation']} {data['runtime_profile']['python_version']}`",
+              f"- Platform: `{data['runtime_profile']['platform']}` / `{data['runtime_profile']['architecture']}`",
+              f"- Rustc: `{data['runtime_profile']['rustc_version']}`",
+              f"- Cargo: `{data['runtime_profile']['cargo_version']}`",
+              f"- rust-toolchain.toml SHA-256: `{data['runtime_profile']['rust_toolchain_manifest_sha256']}`",
+              f"- Source revision: `{data['source_revision']}`",
+              "",
+              "| Baseline | Declared coverage (not observed behavior) | Declared matches | Declared forbidden claims | Cases declaring complete coverage | State |",
+              "|---|---:|---:|---:|---:|---|",
+          ]
+          for item in data["methods"]:
+              if item["state"] == "projection_only_not_rubric_scored":
+                  lines.append(f"| {item['method_id']} | — | — | — | — | projection-only; not rubric-scored |")
+                  continue
+              if item["state"] != "executed":
+                  lines.append(f"| {item['method_id']} | — | — | — | — | NOT RUN |")
+                  continue
+              s = item["summary"]
+              lines.append(
+                  f"| {item['method_id']} | {s['declared_required_code_claim_coverage']:.3f} | "
+                  f"{s['declared_required_code_matches']}/{s['declared_required_code_total']} | "
+                  f"{s['declared_forbidden_code_claims']} | "
+                  f"{s['cases_declaring_all_required_codes_without_forbidden_claims']}/14 | executed |"
+              )
+          # This score is derived from the result bundle text, not from the
+          # baseline's own hand-returned behavior-code declarations.
+          audit_dir = __import__("pathlib").Path(sys.argv[1]).parent
+          lines.extend([
+              "",
+              "## Independent output-side audit (static cues; not semantic accuracy)",
+              "",
+              "| Baseline | Text/evidence checks | Cases satisfying every static cue | Pairs with distinct text (not correctness) |",
+              "|---|---:|---:|---:|",
+          ])
+          for item in data["methods"]:
+              if item["state"] != "executed":
+                  continue
+              audit_path = audit_dir / f"{item['method_id']}.output_evaluation.json"
+              audit = json.load(open(audit_path, encoding="utf-8"))
+              lines.append(
+                  f"| {item['method_id']} | {audit['checks_passed']}/{audit['checks_total']} | "
+                  f"{audit['case_sets_all_static_cues_satisfied']}/{audit['case_count']} | "
+                  f"{audit['distinct_pair_text_count']}/{audit['context_pair_count']} |"
+              )
+          lines.extend([
+              "",
+              "## Annotation-ready packets (not annotated)",
+              "",
+              "| Baseline | Review units | Packet SHA-256 | Guide SHA-256 | State |",
+              "|---|---:|---|---|---|",
+          ])
+          for item in data["methods"]:
+              if item["state"] != "executed":
+                  continue
+              seed_path = audit_dir / f"{item['method_id']}.annotation_seed.json"
+              seed = json.load(open(seed_path, encoding="utf-8"))
+              lines.append(
+                  f"| {item['method_id']} | {seed['unit_count']} | "
+                  f"{hashlib.sha256(seed_path.read_bytes()).hexdigest()} | "
+                  f"{seed['annotation_guide_sha256']} | UNANNOTATED |"
+              )
+          lines.extend([
+              "",
+              "> Seed packets preserve emitted text, evidence links, and the frozen synthetic case context. The serialized sidecar must equal canonical reconstruction from its bound sources; nine hostile mutations must be rejected. No human labels are prefilled; an empty review list means unreviewed, not correct.",
+              "",
+          ])
+          lines.extend([
+              "",
+              "> The independent audit inspects emitted statements, abstention/questions, exact evidence links, and case-specific cues. Its text patterns are incomplete and can misread negation; the raw normalized bundles and per-case findings are in the artifact. Audit failures are reported rather than blocking capture because the lexical foil is intentionally unsafe. No score here is semantic, psychological, clinical, human-rated, or holdout accuracy.",
+              "",
+          ])
+          if data.get("context_pair_diagnostics"):
+              lines.extend([
+                  "",
+                  "## HDC context-pair geometry (exploratory; no pass thresholds)",
+                  "",
+                  "| Pair | Whole-text HDC cosine | 11D projection cosine | 11D L2 distance | Top-1 glyph equal | Top-5 glyph Jaccard |",
+                  "|---|---:|---:|---:|---|---:|",
+              ])
+              for row in data["context_pair_diagnostics"]:
+                  projected = row["modality_projection_cosine"]
+                  projected_text = "n/a" if projected is None else f"{projected:.4f}"
+                  lines.append(
+                      f"| {row['left_case_id']} / {row['right_case_id']} | "
+                      f"{row['whole_text_hdc_cosine']:.4f} | {projected_text} | "
+                      f"{row['modality_projection_l2_distance']:.4f} | "
+                      f"{row['top1_glyph_equal']} | {row['top5_glyph_jaccard']:.3f} |"
+                  )
+          lines.extend([
+              "",
+              "> The left table measures behavior codes manually declared by the hand-authored baseline implementations; it does not infer behavior from their prose or act as independent output evaluation. HDC pair metrics are representation geometry only. Nothing here measures psychological truth, independent human evaluation, holdout performance, or clinical usefulness.",
+              "",
+          ])
+          with open(sys.argv[2], "a", encoding="utf-8") as f:
+              f.write("\n".join(lines))
+          PY
+
+      - name: Verify committed source remains unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Upload reproducibility packet
+        id: reproducibility
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: jungian-probe-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.baselines.outputs.output_dir }}/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Record immutable artifact identity
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.reproducibility.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.reproducibility.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.reproducibility.outputs.artifact-url }}
+        run: |
+          set -euo pipefail
+          test -n "$ARTIFACT_ID"
+          test -n "$ARTIFACT_DIGEST"
+          echo "artifact_id=$ARTIFACT_ID"
+          echo "artifact_sha256=$ARTIFACT_DIGEST"
+          {
+            echo ""
+            echo "## Immutable artifact receipt"
+            echo ""
+            echo "- Artifact ID: `$ARTIFACT_ID`"
+            echo "- Artifact SHA-256: `$ARTIFACT_DIGEST`"
+            echo "- Artifact URL: $ARTIFACT_URL"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
