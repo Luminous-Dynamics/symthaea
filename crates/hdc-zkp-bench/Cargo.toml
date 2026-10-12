@@ -34,7 +34,7 @@ serde_json = "1.0"
 
 
 [dev-dependencies]
-# Minimal privacy-capable comparison: Iron Spartan is separate from the non-ZK Binius64 backend.
+# Minimal standalone Iron Spartan proof smoke test only; not a witness-privacy audit.
 binius-field = { path = "../../vendor/binius64/crates/field" }
 binius-spartan-frontend = { path = "../../vendor/binius64/crates/spartan-frontend" }
 binius-spartan-prover = { path = "../../vendor/binius64/crates/spartan-prover" }

@@ -7,6 +7,10 @@
 //! This test is only a tiny integration proof showing how a private Boolean
 //! relation can be expressed and proved with Iron Spartan. It is not a migration
 //! of the large packed-word HDC circuits and not an independent crypto audit.
+//! It checks statement acceptance/binding and Boolean-witness rejection only; it
+//! does not test whether proofs statistically hide private witness values. The
+//! fixed-seed StdRng below is test-only and must never be reused for production
+//! proof randomness.
 //!
 //! The Iron Spartan verifier currently declares SECURITY_BITS = 96; production
 //! use requires an explicit security-parameter review before making stronger
