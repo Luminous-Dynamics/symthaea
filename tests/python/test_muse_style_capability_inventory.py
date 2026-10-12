@@ -167,7 +167,7 @@ class RuntimeInventoryTests(unittest.TestCase):
                 profiles["Other"]["instrument_pool"]["instrument_names"],
                 ["Bass", "Harp", "Pad", "Sitar"],
             )
-            self.assertIn("do not prove", report["interpretation"])
+            self.assertIn("does not execute the causal census", report["interpretation"])
 
             self.assertEqual(
                 report["source"]["intent_axis_evidence_path"],
