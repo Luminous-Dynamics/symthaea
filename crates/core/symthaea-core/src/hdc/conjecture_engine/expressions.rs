@@ -523,8 +523,8 @@ fn expr_is_total_over_reals(expr: &Expr) -> bool {
             Expr::Const(value) if value.is_finite() && *value > 0.0
         ),
         Expr::Func(_, arg) => expr_is_total_over_reals(arg),
-        // The current Sum evaluator casts a floating binding to usize and has
-        // no checked range contract, so do not erase it through algebraic rules.
+        // Keep sums out of totality-based erasure: although bounds are checked,
+        // floating-point term evaluation and accumulation can still overflow.
         Expr::Sum(_, _) => false,
     }
 }
