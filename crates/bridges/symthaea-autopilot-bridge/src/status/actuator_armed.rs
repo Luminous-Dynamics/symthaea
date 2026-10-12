@@ -9,12 +9,11 @@ use symthaea_core::embodiment_evidence::{ClockDomainId, TimestampV1};
 use crate::readiness::{Px4ReadinessFactV1, Px4ReadinessRequirementV1};
 
 use super::{
-    PX4_READINESS_STATUS_SCHEMA_V1, Px4StatusEvidenceError, digest_hex, feed_str,
-    readiness_fact, status_timestamp, validate_identifier, validate_schema,
+    PX4_READINESS_STATUS_SCHEMA_V1, Px4StatusEvidenceError, digest_hex, feed_str, readiness_fact,
+    status_timestamp, validate_identifier, validate_schema,
 };
 
-const COMMITMENT_DOMAIN_V1: &[u8] =
-    b"symthaea.autopilot.px4.actuator-armed-readiness.v1\0";
+const COMMITMENT_DOMAIN_V1: &[u8] = b"symthaea.autopilot.px4.actuator-armed-readiness.v1\0";
 
 /// Content-addressed readiness projection of one PX4 `ActuatorArmed` message.
 ///
@@ -115,9 +114,7 @@ impl Px4ActuatorArmedReadinessEvidenceV1 {
     }
 
     /// Evidence-backed `LockdownInactive = !lockdown` fact.
-    pub fn lockdown_inactive_fact(
-        &self,
-    ) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
+    pub fn lockdown_inactive_fact(&self) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
         self.fact(Px4ReadinessRequirementV1::LockdownInactive, !self.lockdown)
     }
 
@@ -127,9 +124,7 @@ impl Px4ActuatorArmedReadinessEvidenceV1 {
     }
 
     /// Evidence-backed `TerminationInactive = !termination` fact.
-    pub fn termination_inactive_fact(
-        &self,
-    ) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
+    pub fn termination_inactive_fact(&self) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
         self.fact(
             Px4ReadinessRequirementV1::TerminationInactive,
             !self.termination,
