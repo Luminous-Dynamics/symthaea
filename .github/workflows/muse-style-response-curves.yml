@@ -167,6 +167,24 @@ jobs:
                           f"| {item['style']} | {item['control']} | {item['baseline_seed']} |\n"
                       )
                   stream.write("\n")
+              stream.write("## Seed robustness by style/control\n\n")
+              stream.write(
+                  "| Style | Control | Seeds with any observed change | Seed count | "
+                  "Baseline seeds with no observed change |\n"
+              )
+              stream.write("|---|---|---:|---:|---|\n")
+              for profile in report["profiles"]:
+                  for summary_row in profile["seed_robustness_summary"]:
+                      unchanged = ", ".join(
+                          str(seed)
+                          for seed in summary_row["seeds_with_no_observed_change"]
+                      ) or "none"
+                      stream.write(
+                          f"| {profile['style']} | {summary_row['control']} | "
+                          f"{summary_row['seeds_with_any_observed_change']} | "
+                          f"{summary_row['seed_count']} | {unchanged} |\n"
+                      )
+              stream.write("\n")
               stream.write(f"- Report SHA-256: `{receipt['report_sha256']}`\n\n")
               stream.write("## Source blob digests\n\n")
               stream.write("| Source | Git blob SHA |\n|---|---|\n")
