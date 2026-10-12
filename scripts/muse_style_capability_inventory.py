@@ -407,6 +407,21 @@ def _parse_grammar_dispatch(
                 ),
                 None,
             )
+            unknown_realizers = sorted(
+                set(
+                    re.findall(
+                        r"\\bcrate::[A-Za-z0-9_:]+::realize_[A-Za-z0-9_]+\\b",
+                        expression,
+                    )
+                )
+                - set(dedicated_engines)
+            )
+            if unknown_realizers:
+                raise CoverageError(
+                    f"Grammar family {family} calls an unrecognized dedicated realizer: "
+                    + ", ".join(unknown_realizers)
+                    + ". Extend the audited engine marker table explicitly."
+                )
             if engine is not None:
                 dispatch[family] = {
                     "mode": "dedicated_engine",
