@@ -158,7 +158,10 @@ pub fn AddMusicPage() -> impl IntoView {
                             <span><small>"Territory"</small><strong>"Unclassified"</strong></span>
                         </div>
                         <p>"Muse preserved the work as source-native. Section and motif findings remain reconstructed suggestions until you confirm them."</p>
-                        {analysis.motifs.first().cloned().map(|motif| {
+                        {analysis.motifs.iter().cloned().map(|motif| {
+                            let source_part = motif.source_part_id
+                                .map(|part_id| format!("Source part {part_id}"))
+                                .unwrap_or_else(|| "Source part unavailable (legacy record)".to_string());
                             let heading = match motif.independent_occurrence_count {
                                 Some(count) if count > 1 => "Possible recurring contour",
                                 Some(_) => "Provisional opening contour",
@@ -194,6 +197,7 @@ pub fn AddMusicPage() -> impl IntoView {
                             view! {
                                 <div class="import-motif-result">
                                     <strong>{heading}</strong>
+                                    <span>{source_part}</span>
                                     <span>{format!("{} notes · {} exact pitch-contour window{}",
                                         motif.midi_pitches.len(), motif.occurrence_count,
                                         if motif.occurrence_count == 1 { "" } else { "s" })}</span>
@@ -204,7 +208,7 @@ pub fn AddMusicPage() -> impl IntoView {
                                     <span class="muted small">"Symbolic pitch-contour evidence only; rhythm is not a match gate, and confidence is not calibrated."</span>
                                 </div>
                             }
-                        })}
+                        }).collect_view()}
                         <div class="import-actions">
                             <button type="button" on:click=move |_| muse.play_review_audio(
                                 api::imported_audio_url(api::DEFAULT_BACKEND, &audio_id), playback_title.clone())>
