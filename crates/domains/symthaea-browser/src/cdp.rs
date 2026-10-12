@@ -584,11 +584,18 @@ async fn validate_click_target_enabled(page: &Page, backend_node_id: &BackendNod
         .execute(GetFullAxTreeParams::builder().build())
         .await
         .context("Read accessibility tree before click")?;
-    let disabled = tree.result.nodes.iter().find(|node| {
-        node.backend_dom_node_id
-            .as_ref()
-            .is_some_and(|id| *id.inner() == *backend_node_id.inner())
-    }).map(|node| {
+    let disabled = tree
+        .result
+        .nodes
+        .iter()
+        .find(|node| {
+            !node.ignored
+                && node
+                    .backend_dom_node_id
+                    .as_ref()
+                    .is_some_and(|id| *id.inner() == *backend_node_id.inner())
+        })
+        .map(|node| {
         node.properties.as_ref().is_some_and(|properties| {
             properties.iter().any(|property| {
                 let property_name = serde_json::to_value(&property.name).ok();
@@ -621,11 +628,13 @@ async fn validate_text_entry_target(page: &Page, backend_node_id: &BackendNodeId
         .nodes
         .iter()
         .find(|node| {
-            node.backend_dom_node_id
-                .as_ref()
-                .is_some_and(|id| *id.inner() == *backend_node_id.inner())
+            !node.ignored
+                && node
+                    .backend_dom_node_id
+                    .as_ref()
+                    .is_some_and(|id| *id.inner() == *backend_node_id.inner())
         })
-        .context("text target is not present in the accessibility tree")?;
+        .context("text target is not exposed in the accessibility tree")?;
     let role = node.role.as_ref().and_then(|value| ax_value_to_string(&value.value));
     if !matches!(role.as_deref(), Some("textbox" | "searchbox" | "spinbutton")) {
         bail!("text target has unsupported accessibility role: {:?}", role);
@@ -641,6 +650,17 @@ async fn validate_text_entry_target(page: &Page, backend_node_id: &BackendNodeId
     });
     if disabled {
         bail!("text target is disabled");
+    }
+    let read_only = node.properties.as_ref().is_some_and(|properties| {
+        properties.iter().any(|property| {
+            let property_name = serde_json::to_value(&property.name).ok();
+            property_name.as_ref().and_then(serde_json::Value::as_str) == Some("readonly")
+                && property.value.value.as_ref()
+                    .and_then(serde_json::Value::as_bool) == Some(true)
+        })
+    });
+    if read_only {
+        bail!("text target is read-only");
     }
     Ok(())
 }
