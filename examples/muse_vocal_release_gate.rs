@@ -407,6 +407,14 @@ fn evaluate_human_ratings(
         backend_by_id.len() == key.len(),
         "private answer key contains duplicate clip IDs"
     );
+    let clip_ids: std::collections::BTreeSet<_> =
+        clips.iter().map(|clip| clip.clip_id.as_str()).collect();
+    let key_ids: std::collections::BTreeSet<_> =
+        backend_by_id.keys().copied().collect();
+    anyhow::ensure!(
+        clip_ids.len() == clips.len() && clip_ids == key_ids,
+        "private answer key and rating manifest do not have exactly matching clip IDs"
+    );
     let listeners: std::collections::BTreeSet<_> =
         values.iter().map(|rating| rating.listener_id.clone()).collect();
     let mut by_clip_listener = BTreeMap::new();
@@ -1444,6 +1452,10 @@ mod tests {
         let overall_naturalness =
             values.iter().map(|row| row.naturalness).sum::<f32>() / values.len() as f32;
         assert!(overall_naturalness >= 4.0, "fixture must pass global mean");
+        assert!(
+            evaluate_human_ratings(&values, &clips, &key[..9], true, 5).is_err(),
+            "a partial answer key must not reinterpret missing clips as synthetic"
+        );
         let (status, per_clip) = evaluate_human_ratings(&values, &clips, &key, true, 5).unwrap();
         assert_eq!(per_clip.len(), 10);
         assert!(status["naturalness_mean"].as_f64().unwrap() >= 4.0);
