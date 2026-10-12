@@ -1790,7 +1790,7 @@ mod tests {
         ];
         let mut extra_rest_before_note = vec![0_u8; pitches.len()];
         // Adds 100 ticks to the second candidate's first internal onset gap:
-        // normalized gaps become [1/2, 1/4, 1/4], exceeding a 0.15 share error.
+        // normalized gaps become [1/2, 1/4, 1/4]; max share error is 1/6 (~0.167), above 0.15.
         extra_rest_before_note[9] = 100;
         let track = monophonic_midi_track(&pitches, &extra_rest_before_note);
         let score = parse_midi(&midi_file(&track)).unwrap();
