@@ -329,6 +329,34 @@ mod bounded_rk4_trajectory_tests {
     }
 
     #[test]
+    fn successful_work_counters_match_completed_rk4_steps() {
+        let (times, states, work) = rk4_trajectory_with_work(constant_rhs, &[0.0, 1.0], 1.0, 0.1);
+        assert!(work.completed);
+        assert_eq!(work.attempted_steps, work.completed_steps);
+        assert_eq!(work.completed_steps as usize, states.len() - 1);
+        assert_eq!(times.len(), states.len());
+        assert_eq!(work.rhs_evaluations, work.completed_steps * 4);
+        assert_eq!(work.state_updates, work.completed_steps * 2);
+    }
+
+    #[test]
+    fn failed_work_counters_preserve_rhs_calls_without_partial_trajectory() {
+        let (times, states, work) = rk4_trajectory_with_work(
+            |_state, time| if time == 0.0 { vec![1.0] } else { vec![f64::NAN] },
+            &[0.0],
+            1.0,
+            0.1,
+        );
+        assert!(times.is_empty());
+        assert!(states.is_empty());
+        assert!(!work.completed);
+        assert_eq!(work.attempted_steps, 1);
+        assert_eq!(work.completed_steps, 0);
+        assert_eq!(work.rhs_evaluations, 2);
+        assert_eq!(work.state_updates, 0);
+    }
+
+    #[test]
     fn excessive_step_budget_is_rejected_before_allocation() {
         let (times, states) = rk4_trajectory(constant_rhs, &[0.0], 1.0e9, 1.0e-6);
         assert!(times.is_empty());
