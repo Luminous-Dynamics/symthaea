@@ -182,10 +182,10 @@ class RuntimeInventoryTests(unittest.TestCase):
             grammar_path = root / GRAMMAR_RELATIVE
             grammar_path.write_text(
                 GRAMMAR_FIXTURE.replace(
-                    "        family => {\\n"
-                    "            let (score, form) = crate::composer::compose_with_spec_and_form_and_grammar(intent, spec, Some(profile));\\n"
-                    "            build_compatibility(family, score, form)\\n"
-                    "        }\\n",
+                    "        family => {\n"
+                    "            let (score, form) = crate::composer::compose_with_spec_and_form_and_grammar(intent, spec, Some(profile));\n"
+                    "            build_compatibility(family, score, form)\n"
+                    "        }\n",
                     "",
                 ),
                 encoding="utf-8",
