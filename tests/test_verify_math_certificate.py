@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools import verify_math_certificate as verifier
+from tools.math_certificate_golden_vectors import SYMFCER1_FACTOR_2, SYMPPRF1_PRIME_3
 
 
 def proof_two() -> verifier.PrimalityProof:
@@ -63,15 +64,7 @@ def certificate_thirty() -> verifier.CertifiedFactorization:
 class PrimalityProofTests(unittest.TestCase):
     def test_primality_proof_golden_vector_is_stable(self) -> None:
         # Hand-authored SYMPPRF1 encoding of p=3 with the base node p=2.
-        golden = bytes.fromhex(
-            "53594d5050524631"
-            "0000000000000003"
-            "00000002"
-            "0000000000000002" "00000000" "00000000"
-            "0000000000000003" "00000001"
-            "0000000000000002" "00000001"
-            "00000001" "0000000000000002" "0000000000000002"
-        )
+        golden = SYMPPRF1_PRIME_3
         self.assertEqual(verifier.encode_primality_proof(proof_three()), golden)
         self.assertEqual(verifier.decode_primality_proof(golden), proof_three())
 
@@ -164,21 +157,7 @@ class CertifiedFactorizationTests(unittest.TestCase):
             verifier.Factorization(2, ((2, 1),)),
             (proof_two(),),
         )
-        golden = bytes.fromhex(
-            "53594d4643455231"
-            "0000000000000002"
-            "00000001"
-            "0000000000000002"
-            "00000001"
-            "00000001"
-            "00000024"
-            "53594d5050524631"
-            "0000000000000002"
-            "00000001"
-            "0000000000000002"
-            "00000000"
-            "00000000"
-        )
+        golden = SYMFCER1_FACTOR_2
         self.assertEqual(len(golden), 76)
         self.assertEqual(verifier.encode_certified_factorization(certificate), golden)
         self.assertEqual(verifier.decode_certified_factorization(golden), certificate)
