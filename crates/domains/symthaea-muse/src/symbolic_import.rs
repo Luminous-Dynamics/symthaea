@@ -1202,8 +1202,7 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
     let signature_for = |start: usize, note_len: usize| -> u64 {
         let mut signature = (note_len as u64) << 56;
         for (offset, pair) in notes[start..start + note_len].windows(2).enumerate() {
-            let interval = i16::from(pair[1].1.pitch.midi())
-                - i16::from(pair[0].1.pitch.midi());
+            let interval = i16::from(pair[1].1.pitch.midi()) - i16::from(pair[0].1.pitch.midi());
             signature |= ((interval + 127) as u64) << (offset * 8);
         }
         signature
@@ -1255,8 +1254,7 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
             Some((best_signature, best)) => {
                 stats.note_len > best.note_len
                     || (stats.note_len == best.note_len
-                        && (stats.independent_occurrence_count
-                            > best.independent_occurrence_count
+                        && (stats.independent_occurrence_count > best.independent_occurrence_count
                             || (stats.independent_occurrence_count
                                 == best.independent_occurrence_count
                                 && (stats.first_start < best.first_start
@@ -1335,11 +1333,8 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         }
 
         let mut references = Vec::with_capacity(motif_len);
-        for (offset, (score_note_index, note)) in notes
-            .iter()
-            .skip(window_start)
-            .take(motif_len)
-            .enumerate()
+        for (offset, (score_note_index, note)) in
+            notes.iter().skip(window_start).take(motif_len).enumerate()
         {
             references.push(ImportedNoteReference {
                 score_note_index: *score_note_index,
@@ -1423,7 +1418,8 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
         );
     } else {
         unresolved_interpretations.push(
-            "Confirm source-part motif identities; no audio or listener-recognition claim is made".into(),
+            "Confirm source-part motif identities; no audio or listener-recognition claim is made"
+                .into(),
         );
     }
     if skipped_part_count > 0 {
@@ -1675,17 +1671,18 @@ mod tests {
         let track = [
             0, 0x90, 60, 100, // first note starts at tick zero
             0, 0x90, 64, 100, // second note overlaps it in the same part
-            100, 0x80, 60, 0,
-            0, 0x80, 64, 0,
-            0, 0xFF, 0x2F, 0,
+            100, 0x80, 60, 0, 0, 0x80, 64, 0, 0, 0xFF, 0x2F, 0,
         ];
         let score = parse_midi(&midi_file(&track)).unwrap();
         let analysis = analyze(&score);
         assert_eq!(analysis.voice_count, 1);
         assert!(analysis.motifs.is_empty());
-        assert!(analysis.unresolved_interpretations.iter().any(|item| {
-            item.contains("overlapping/polyphonic events")
-        }));
+        assert!(
+            analysis
+                .unresolved_interpretations
+                .iter()
+                .any(|item| { item.contains("overlapping/polyphonic events") })
+        );
     }
 
     #[test]
@@ -2340,7 +2337,12 @@ mod tests {
     fn parses_minimal_musicxml_without_forcing_a_territory() {
         let score = parse_musicxml(minimal_musicxml()).unwrap();
         assert_eq!(score.notes.len(), 2);
-        assert!(score.notes.iter().all(|note| note.role == VoiceRole::Unspecified));
+        assert!(
+            score
+                .notes
+                .iter()
+                .all(|note| note.role == VoiceRole::Unspecified)
+        );
         let analysis = analyze(&score);
         assert!(analysis.source_native);
         assert!(analysis.inferred_territory.is_none());
