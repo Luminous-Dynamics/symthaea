@@ -296,7 +296,7 @@ pub fn check_virial_theorem(
 
 #[cfg(test)]
 mod bounded_rk4_trajectory_tests {
-    use super::rk4_trajectory;
+    use super::{rk4_trajectory, rk4_trajectory_with_work};
 
     fn constant_rhs(state: &[f64], _time: f64) -> Vec<f64> {
         vec![1.0; state.len()]
