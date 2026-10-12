@@ -8,11 +8,13 @@
 
 use std::time::Instant;
 
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::actions::BrowserAction;
 use crate::cdp::CdpSession;
 use crate::safety::{BrowserSafetyPolicy, PolicyDecision, PolicyDenial};
+use crate::observation::PageObservation;
 
 /// Result class for a dispatched browser action.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,6 +82,31 @@ impl<'a> BrowserExecutor<'a> {
             policy,
             phi,
         }
+    }
+
+    /// Observe the current page through the executor's capability, Phi and URL checks.
+    ///
+    /// Perception loops should use this method rather than reading directly from
+    /// the low-level CDP session. It serializes against other actions and refuses
+    /// to expose page content when the current URL is denied by policy.
+    pub async fn observe(&self) -> Result<PageObservation> {
+        let _action_guard = self.session.begin_action().await;
+        let policy_action = BrowserAction::ExtractText { selector: None };
+        if let PolicyDecision::Deny { reason, .. } =
+            self.policy.evaluate_action(&policy_action, self.phi)
+        {
+            bail!("browser observation denied by action policy: {reason:?}");
+        }
+
+        let current_url = self.session.current_url().await?;
+        if let PolicyDecision::Deny { reason, .. } = self.policy.evaluate_url(&current_url) {
+            bail!("browser observation denied by current URL policy: {reason:?}");
+        }
+
+        self.session
+            .observe()
+            .await
+            .context("Policy-checked accessibility observation failed")
     }
 
     /// Dispatch an action after evaluating capability, Phi, and URL policy.
