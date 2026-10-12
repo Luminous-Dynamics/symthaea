@@ -75,7 +75,7 @@ jobs:
           EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          git fetch --no-tags origin "refs/pull/${PR_NUMBER}/merge"
+          git fetch --no-tags --depth=2 origin "refs/pull/${PR_NUMBER}/merge"
           merge_sha="$(git rev-parse --verify 'FETCH_HEAD^{commit}')"
           merge_head="$(git rev-parse --verify "${merge_sha}^2")"
           merge_base="$(git rev-parse --verify "${merge_sha}^1")"
