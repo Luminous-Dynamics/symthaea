@@ -142,6 +142,19 @@ struct PrivateKeyFile {
     entries: Vec<KeyEntry>,
 }
 
+#[derive(Deserialize)]
+struct SavedObjectiveEntry {
+    clip_id: String,
+    backend: String,
+    case_id: usize,
+    metrics: SavedObjectiveMetrics,
+}
+
+#[derive(Deserialize)]
+struct SavedObjectiveMetrics {
+    objective_pass: bool,
+}
+
 /// Optional authorized human anchors. Paths remain private; imported copies
 /// receive the same salted concealment as synthetic clips.
 #[derive(Deserialize)]
@@ -375,6 +388,263 @@ fn per_clip_human_results(
             }
         })
         .collect()
+}
+
+fn evaluate_human_ratings(
+    values: &[HumanRating],
+    clips: &[BlindClip],
+    key: &[KeyEntry],
+    objective_pass: bool,
+    minimum_listeners: usize,
+) -> Result<(serde_json::Value, Vec<PerClipHumanResult>)> {
+    anyhow::ensure!(minimum_listeners > 0, "minimum listener count must be positive");
+    let backend_by_id: BTreeMap<_, _> = key
+        .iter()
+        .map(|entry| (entry.clip_id.as_str(), entry.backend.as_str()))
+        .collect();
+    anyhow::ensure!(
+        backend_by_id.len() == key.len(),
+        "private answer key contains duplicate clip IDs"
+    );
+    let listeners: std::collections::BTreeSet<_> =
+        values.iter().map(|rating| rating.listener_id.clone()).collect();
+    let mut by_clip_listener = BTreeMap::new();
+    for rating in values {
+        validate_human_rating(rating, clips)?;
+        if by_clip_listener
+            .insert((rating.clip_id.clone(), rating.listener_id.clone()), ())
+            .is_some()
+        {
+            anyhow::bail!("duplicate listener/clip rating");
+        }
+    }
+    let complete = listeners.len() >= minimum_listeners
+        && clips.iter().all(|clip| {
+            listeners.iter().all(|listener| {
+                by_clip_listener.contains_key(&(clip.clip_id.clone(), listener.clone()))
+            })
+        });
+    let model_values: Vec<_> = values
+        .iter()
+        .filter(|rating| backend_by_id.get(rating.clip_id.as_str()) != Some(&"human-reference"))
+        .collect();
+    let reference_values: Vec<_> = values
+        .iter()
+        .filter(|rating| backend_by_id.get(rating.clip_id.as_str()) == Some(&"human-reference"))
+        .collect();
+    let mean = |field: fn(&HumanRating) -> f32| {
+        model_values.iter().map(|rating| field(rating)).sum::<f32>()
+            / model_values.len().max(1) as f32
+    };
+    let naturalness = mean(|rating| rating.naturalness);
+    let emotional_fit = mean(|rating| rating.emotional_fit);
+    let identity_consistency = mean(|rating| rating.identity_consistency);
+    let artifact_free = mean(|rating| rating.artifact_free);
+    let understood: usize = model_values
+        .iter()
+        .map(|rating| rating.lyric_words_understood)
+        .sum();
+    let total: usize = model_values
+        .iter()
+        .map(|rating| rating.lyric_words_total)
+        .sum();
+    let comprehension = understood as f32 / total.max(1) as f32;
+    let per_clip_results = per_clip_human_results(values, clips, &backend_by_id);
+    let failing_synthetic_clip_count =
+        per_clip_results.iter().filter(|result| !result.pass).count();
+    let per_clip_pass = !per_clip_results.is_empty() && failing_synthetic_clip_count == 0;
+    let status = serde_json::json!({
+        "objective_pass": objective_pass,
+        "human_complete": complete,
+        "per_clip_pass": per_clip_pass,
+        "failing_synthetic_clip_count": failing_synthetic_clip_count,
+        "synthetic_clip_count": per_clip_results.len(),
+        "listener_count": listeners.len(),
+        "naturalness_mean": naturalness,
+        "human_reference_rating_count": reference_values.len(),
+        "emotional_fit_mean": emotional_fit,
+        "identity_consistency_mean": identity_consistency,
+        "artifact_free_mean": artifact_free,
+        "word_comprehension": comprehension,
+        "release_pass": objective_pass && complete && per_clip_pass
+            && naturalness >= 4.0 && emotional_fit >= 4.0
+            && identity_consistency >= 4.0 && artifact_free >= 4.0
+            && comprehension >= 0.95
+    });
+    Ok((status, per_clip_results))
+}
+
+fn require_regular_non_symlink_file(path: &Path) -> Result<()> {
+    let metadata = std::fs::symlink_metadata(path)
+        .with_context(|| format!("failed to inspect required file {}", path.display()))?;
+    anyhow::ensure!(
+        metadata.is_file() && !metadata.file_type().is_symlink(),
+        "required artifact must be a regular non-symlink file: {}",
+        path.display()
+    );
+    Ok(())
+}
+
+fn write_private_artifact(path: &Path, contents: &[u8]) -> Result<()> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) => anyhow::ensure!(
+            metadata.is_file() && !metadata.file_type().is_symlink(),
+            "refusing to overwrite a non-regular or symlinked private artifact {}",
+            path.display()
+        ),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    std::fs::write(path, contents)
+        .with_context(|| format!("failed to write private artifact {}", path.display()))
+}
+
+fn run_saved_ratings_review(
+    output: &Path,
+    private_output: &Path,
+    ratings_path: &Path,
+    minimum_listeners: usize,
+) -> Result<()> {
+    ensure_private_output_is_separate(output, private_output)?;
+    anyhow::ensure!(output.is_dir(), "listening pack does not exist: {}", output.display());
+    anyhow::ensure!(
+        private_output.is_dir(),
+        "organizer-only run state does not exist: {}",
+        private_output.display()
+    );
+
+    let public_manifest_path = output.join("blind_manifest.json");
+    let internal_manifest_path = private_output.join("internal_manifest.json");
+    let key_path = private_output.join("private_backend_key.json");
+    let objective_path = private_output.join("objective_report.json");
+    for path in [
+        public_manifest_path.as_path(),
+        internal_manifest_path.as_path(),
+        key_path.as_path(),
+        objective_path.as_path(),
+        ratings_path,
+    ] {
+        require_regular_non_symlink_file(path)?;
+    }
+
+    let public_manifest: Vec<ListeningClip> =
+        serde_json::from_slice(&std::fs::read(&public_manifest_path)?)?;
+    let clips: Vec<BlindClip> =
+        serde_json::from_slice(&std::fs::read(&internal_manifest_path)?)?;
+    let private_key: PrivateKeyFile = serde_json::from_slice(&std::fs::read(&key_path)?)?;
+    let objective: Vec<SavedObjectiveEntry> =
+        serde_json::from_slice(&std::fs::read(&objective_path)?)?;
+    anyhow::ensure!(private_key.format_version == 2, "unsupported private-key format");
+    anyhow::ensure!(
+        private_key.salt.len() == 64
+            && private_key.salt.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "saved run has invalid blinding salt"
+    );
+    anyhow::ensure!(
+        !clips.is_empty() && !public_manifest.is_empty() && !objective.is_empty(),
+        "saved run lacks clip or objective evidence"
+    );
+
+    let mut clip_by_id = BTreeMap::new();
+    for clip in &clips {
+        anyhow::ensure!(
+            !clip.clip_id.trim().is_empty() && clip_by_id.insert(clip.clip_id.as_str(), clip).is_none(),
+            "private manifest contains a blank or duplicate clip ID"
+        );
+        anyhow::ensure!(
+            !clip.audio.is_empty() && !clip.audio.contains('/') && !clip.audio.contains('\\'),
+            "unsafe audio path in private manifest"
+        );
+        let audio_path = output.join(&clip.audio);
+        require_regular_non_symlink_file(&audio_path)?;
+    }
+    anyhow::ensure!(
+        public_manifest.len() == clips.len(),
+        "public and private manifests have different clip counts"
+    );
+    let mut public_by_id = BTreeMap::new();
+    for clip in &public_manifest {
+        anyhow::ensure!(
+            !clip.clip_id.trim().is_empty()
+                && public_by_id.insert(clip.clip_id.as_str(), clip).is_none(),
+            "public manifest contains a blank or duplicate clip ID"
+        );
+    }
+    anyhow::ensure!(
+        public_by_id.len() == clip_by_id.len(),
+        "public/private manifest clip identities differ"
+    );
+    for (clip_id, internal) in &clip_by_id {
+        let public = public_by_id
+            .get(clip_id)
+            .context("private clip is missing from the public listening manifest")?;
+        anyhow::ensure!(
+            public.lyrics == internal.lyrics && public.audio == internal.audio,
+            "public/private manifest content mismatch for clip {clip_id}"
+        );
+    }
+
+    let mut key_by_id = BTreeMap::new();
+    for entry in &private_key.entries {
+        anyhow::ensure!(
+            !entry.clip_id.trim().is_empty()
+                && key_by_id.insert(entry.clip_id.as_str(), entry).is_none(),
+            "private answer key contains a blank or duplicate clip ID"
+        );
+    }
+    anyhow::ensure!(
+        key_by_id.len() == clip_by_id.len()
+            && clip_by_id.keys().all(|clip_id| key_by_id.contains_key(clip_id)),
+        "private answer key and manifest identities differ"
+    );
+
+    let mut objective_by_id = BTreeMap::new();
+    for entry in &objective {
+        let key_entry = key_by_id
+            .get(entry.clip_id.as_str())
+            .context("objective report references unknown clip ID")?;
+        anyhow::ensure!(
+            entry.backend == key_entry.backend && entry.case_id == key_entry.case_id,
+            "objective report disagrees with private answer key for {}",
+            entry.clip_id
+        );
+        anyhow::ensure!(
+            objective_by_id.insert(entry.clip_id.as_str(), entry).is_none(),
+            "objective report contains duplicate clip IDs"
+        );
+    }
+    let expected_synthetic_ids: std::collections::BTreeSet<_> = private_key
+        .entries
+        .iter()
+        .filter(|entry| entry.backend != "human-reference")
+        .map(|entry| entry.clip_id.as_str())
+        .collect();
+    let actual_objective_ids: std::collections::BTreeSet<_> =
+        objective_by_id.keys().copied().collect();
+    anyhow::ensure!(
+        expected_synthetic_ids == actual_objective_ids,
+        "objective report does not cover exactly the synthetic clip IDs"
+    );
+    let objective_pass = !objective.is_empty() && objective.iter().all(|entry| entry.metrics.objective_pass);
+    let values: Vec<HumanRating> = serde_json::from_slice(&std::fs::read(ratings_path)?)?;
+    let (status, per_clip_results) = evaluate_human_ratings(
+        &values,
+        &clips,
+        &private_key.entries,
+        objective_pass,
+        minimum_listeners,
+    )?;
+    write_private_artifact(
+        &private_output.join("human_case_report.json"),
+        &serde_json::to_vec_pretty(&per_clip_results)?,
+    )?;
+    write_private_artifact(
+        &private_output.join("release_status.json"),
+        &serde_json::to_vec_pretty(&status)?,
+    )?;
+    eprintln!("organizer-only artifacts (answer key, objective report, per-clip report, release status): {}", private_output.display());
+    println!("{}", serde_json::to_string_pretty(&status)?);
+    Ok(())
 }
 
 fn blind_salt(args: &[String], output: &Path) -> Result<String> {
