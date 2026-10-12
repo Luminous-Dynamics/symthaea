@@ -146,3 +146,30 @@ The focused GitHub Actions workflow
 `.github/workflows/math-certificate-verifier.yml` runs Python bytecode
 compilation, the standard-library unit tests, and the CLI help check on
 `ubuntu-24.04`; it does not need Rust dependencies, network access, or secrets.
+
+
+## Lean kernel qualification lane
+
+`tools/generate_lean_math_certificate.py` provides a downstream proof bridge for either
+wire format. It first decodes and verifies the exact input bytes with the independent
+Python verifier. For a Pocklington node, it combines the per-prime-factor witnesses
+into a common candidate root by isolating the prime-power components, then checks the
+resulting modular-power and GCD conditions before emitting Lean source. This does
+not trust the root-combination algorithm: the emitted claim is checked using the
+pinned `PrimeCert` Pocklington tactic, and the resulting theorem is checked by Lean's
+kernel.
+
+`formal/math-certificate/` pins Lean 4.33.0, the `PrimeCert` source revision, and
+its resolved Mathlib dependency graph. The new focused workflow builds the project,
+runs an axiom audit, generates Lean source from both fixed wire vectors, and asks
+Lean to check the generated claims. The source project also includes kernel-checked
+claims for primality of 3 and 2 and exact reconstruction of the factorization of 2.
+
+**Formal boundary:** this is a proof of the mathematical claims produced from a
+decoded certificate, not yet a formal proof that the Rust or Python byte parser,
+canonical encoder, or translation program implements this protocol specification.
+The Python validation and Lean proof are independently checked stages, but the
+parser-to-Lean translation is not itself proved correct. In particular, this lane
+does not make the Rust verifier formally verified; it creates a practical path to
+kernel-check prime and factorization claims and gives us a precise next target for
+formalizing decoding and translation.
