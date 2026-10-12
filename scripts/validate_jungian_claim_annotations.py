@@ -381,8 +381,14 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
                         absolute_confidence_differences += abs(left - right)
 
         point_alpha = alpha_estimate(per_unit, field)
+        pairable_values = [value for ratings in per_unit for value in ratings]
+        allowed_values = [1, 2, 3, 4] if field == "confidence" else sorted(ENUMS[field])
+        pairable_rating_counts = {
+            str(value): pairable_values.count(value) for value in allowed_values
+        }
         entry: dict[str, Any] = {
             "distance": "krippendorff_ordinal" if field == "confidence" else "nominal",
+            "pairable_rating_counts": pairable_rating_counts,
             "eligible_units": len(per_unit),
             "rating_count": sum(len(ratings) for ratings in per_unit),
             "pairwise_comparisons": comparisons,
@@ -629,6 +635,17 @@ def self_test() -> list[str]:
                 "independent_reviews": ratings,
             })
         sensitivity = inter_rater_agreement(sensitivity_units)
+        evidence_metric = sensitivity["labels"]["evidence_relation"]
+        require(evidence_metric["pairable_rating_counts"] == {
+            "contradicted": 3,
+            "no_relevant_evidence": 0,
+            "not_assessable": 0,
+            "partially_supported": 0,
+            "supported": 5,
+        }, "pairable reviewer label frequencies must report imbalance and zero-count categories")
+        require(sensitivity["labels"]["confidence"]["pairable_rating_counts"] == {
+            "1": 1, "2": 2, "3": 1, "4": 4,
+        }, "ordinal confidence frequencies must count all allowed values")
         evidence_sensitivity = sensitivity["labels"]["evidence_relation"]["leave_one_unit_out_sensitivity"]
         require(evidence_sensitivity["replicates"] == 4
                 and evidence_sensitivity["defined_replicates"] == 4
