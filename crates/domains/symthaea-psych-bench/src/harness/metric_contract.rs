@@ -107,8 +107,8 @@ impl MetricDefinitionV1 {
             errors.push("definition_version must be greater than zero".to_string());
         }
 
-        if let MetricDirectionV1::TargetRange { lower, upper } = self.direction {
-            if !lower.is_finite() || !upper.is_finite() || lower > upper {
+        if let MetricDirectionV1::TargetRange { lower, upper } = &self.direction {
+            if !lower.is_finite() || !upper.is_finite() || *lower > *upper {
                 errors.push(
                     "target-range bounds must be finite and lower must not exceed upper"
                         .to_string(),
@@ -147,7 +147,7 @@ impl MetricDefinitionV1 {
                 if reason.trim().is_empty() {
                     errors.push("not-estimated uncertainty requires a reason".to_string());
                 }
-                if !matches!(self.comparison, ComparisonRuleV1::NoClassification { .. }) {
+                if !matches!(&self.comparison, ComparisonRuleV1::NoClassification { .. }) {
                     errors.push(
                         "metrics without an uncertainty estimate must use NoClassification"
                             .to_string(),
@@ -201,8 +201,8 @@ impl MetricDefinitionV1 {
             }
         }
 
-        if matches!(self.direction, MetricDirectionV1::DiagnosticOnly)
-            && !matches!(self.comparison, ComparisonRuleV1::NoClassification { .. })
+        if matches!(&self.direction, MetricDirectionV1::DiagnosticOnly)
+            && !matches!(&self.comparison, ComparisonRuleV1::NoClassification { .. })
         {
             errors.push("DiagnosticOnly metrics must use NoClassification".to_string());
         }
@@ -383,7 +383,7 @@ impl MetricContractV1 {
                 .get(&definition.benchmark)
                 .and_then(|metrics| metrics.get(&definition.metric))
             {
-                if matches!(definition.uncertainty, UncertaintyPolicyV1::Empirical { .. })
+                if matches!(&definition.uncertainty, UncertaintyPolicyV1::Empirical { .. })
                     && value.n < 2
                 {
                     errors.push(format!(
