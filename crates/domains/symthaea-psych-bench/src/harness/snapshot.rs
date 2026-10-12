@@ -176,6 +176,12 @@ impl RegressionSnapshot {
 
         for (bench, bench_metrics) in &self.metrics {
             for (metric_name, val) in bench_metrics {
+                if val.n == 0 {
+                    errors.push(format!(
+                        "{}/{}: sample count is zero; no observations were summarized",
+                        bench, metric_name
+                    ));
+                }
                 if !val.mean.is_finite() {
                     errors.push(format!(
                         "{}/{}: mean is not finite ({:?})",
@@ -186,6 +192,32 @@ impl RegressionSnapshot {
                     errors.push(format!(
                         "{}/{}: std_dev is not finite ({:?})",
                         bench, metric_name, val.std_dev
+                    ));
+                } else if val.std_dev < 0.0 {
+                    errors.push(format!(
+                        "{}/{}: std_dev is negative ({:?})",
+                        bench, metric_name, val.std_dev
+                    ));
+                }
+                if !val.ci_lower.is_finite() {
+                    errors.push(format!(
+                        "{}/{}: ci_lower is not finite ({:?})",
+                        bench, metric_name, val.ci_lower
+                    ));
+                }
+                if !val.ci_upper.is_finite() {
+                    errors.push(format!(
+                        "{}/{}: ci_upper is not finite ({:?})",
+                        bench, metric_name, val.ci_upper
+                    ));
+                }
+                if val.ci_lower.is_finite()
+                    && val.ci_upper.is_finite()
+                    && val.ci_lower > val.ci_upper
+                {
+                    errors.push(format!(
+                        "{}/{}: confidence interval is reversed ({:?} > {:?})",
+                        bench, metric_name, val.ci_lower, val.ci_upper
                     ));
                 }
             }
@@ -224,7 +256,104 @@ impl RegressionReport {
     /// fractions (e.g., 0.05 for 5%, 0.10 for 10%). A regression is flagged only
     /// when the current mean falls below the baseline confidence interval *and*
     /// the percentage drop exceeds the threshold.
+    /// Compare snapshots for a qualified regression result.
+    ///
+    /// This compatibility API fails closed: invalid snapshots or thresholds
+    /// yield a synthetic Critical result. Prefer [`Self::try_compare`] when
+    /// the caller needs actionable validation errors.
     pub fn compare(
+        baseline: &RegressionSnapshot,
+        current: &RegressionSnapshot,
+        warning_pct: f64,
+        critical_pct: f64,
+    ) -> Self {
+        match Self::try_compare(baseline, current, warning_pct, critical_pct) {
+            Ok(report) => report,
+            Err(errors) => Self::invalid_input_report(&baseline.name, &current.name, &errors),
+        }
+    }
+
+    /// Checked snapshot comparison for qualified/empirical benchmark runs.
+    ///
+    /// Rejects invalid snapshots and thresholds before any regression is
+    /// classified. A caller must not interpret structural parsing alone as
+    /// evidence that the comparison is qualified.
+    pub fn try_compare(
+        baseline: &RegressionSnapshot,
+        current: &RegressionSnapshot,
+        warning_pct: f64,
+        critical_pct: f64,
+    ) -> Result<Self, Vec<String>> {
+        let mut errors = Vec::new();
+        if let Err(validation_errors) = baseline.validate() {
+            errors.extend(
+                validation_errors
+                    .into_iter()
+                    .map(|error| format!("baseline: {error}")),
+            );
+        }
+        if let Err(validation_errors) = current.validate() {
+            errors.extend(
+                validation_errors
+                    .into_iter()
+                    .map(|error| format!("current: {error}")),
+            );
+        }
+        if !warning_pct.is_finite() || warning_pct < 0.0 {
+            errors.push("warning_pct must be finite and non-negative".to_string());
+        }
+        if !critical_pct.is_finite() || critical_pct < 0.0 {
+            errors.push("critical_pct must be finite and non-negative".to_string());
+        }
+        if warning_pct.is_finite()
+            && critical_pct.is_finite()
+            && warning_pct >= 0.0
+            && critical_pct >= 0.0
+            && critical_pct < warning_pct
+        {
+            errors.push("critical_pct must be greater than or equal to warning_pct".to_string());
+        }
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        Ok(Self::compare_validated(
+            baseline,
+            current,
+            warning_pct,
+            critical_pct,
+        ))
+    }
+
+    fn invalid_input_report(
+        baseline_name: &str,
+        current_name: &str,
+        errors: &[String],
+    ) -> Self {
+        let result = RegressionResult {
+            benchmark: "QUALIFICATION".to_string(),
+            metric: format!("INVALID_INPUT: {}", errors.join("; ")),
+            baseline_mean: f64::NAN,
+            baseline_ci_lower: f64::NAN,
+            baseline_ci_upper: f64::NAN,
+            current_mean: f64::NAN,
+            delta_pct: f64::NAN,
+            severity: RegressionSeverity::Critical,
+        };
+        Self {
+            baseline_name: baseline_name.to_string(),
+            current_name: current_name.to_string(),
+            results: vec![result],
+            summary: RegressionSummary {
+                total_metrics: 1,
+                passed: 0,
+                warnings: 0,
+                critical: 1,
+            },
+        }
+    }
+
+    fn compare_validated(
         baseline: &RegressionSnapshot,
         current: &RegressionSnapshot,
         warning_pct: f64,
@@ -624,6 +753,60 @@ mod tests {
         );
         let errs = s.validate().unwrap_err();
         assert!(errs.iter().any(|e| e.contains("mean is not finite")));
+    }
+
+    #[test]
+    fn test_validate_rejects_zero_samples_and_invalid_confidence_interval() {
+        let mut snapshot = make_test_snapshot("invalid", 0.85);
+        snapshot.metrics.get_mut("TestBench").unwrap().insert(
+            "zero-samples".to_string(),
+            MetricValue {
+                mean: 0.0,
+                std_dev: 0.0,
+                n: 0,
+                ci_lower: 0.0,
+                ci_upper: 0.0,
+            },
+        );
+        snapshot.metrics.get_mut("TestBench").unwrap().insert(
+            "reversed-ci".to_string(),
+            MetricValue {
+                mean: 0.5,
+                std_dev: 0.1,
+                n: 10,
+                ci_lower: 0.8,
+                ci_upper: 0.2,
+            },
+        );
+        let errors = snapshot.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("sample count is zero")));
+        assert!(errors.iter().any(|error| error.contains("confidence interval is reversed")));
+    }
+
+    #[test]
+    fn test_compare_invalid_snapshot_cannot_appear_all_pass() {
+        let baseline = make_test_snapshot("baseline", 0.90);
+        let mut current = make_test_snapshot("current", 0.91);
+        current.metrics.get_mut("TestBench").unwrap().get_mut("accuracy").unwrap().mean =
+            f64::NAN;
+
+        assert!(RegressionReport::try_compare(&baseline, &current, 0.05, 0.10).is_err());
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        assert!(report.has_critical());
+        assert_eq!(report.summary.passed, 0);
+        assert_eq!(report.summary.critical, 1);
+        assert!(report.format_summary().contains("INVALID_INPUT"));
+    }
+
+    #[test]
+    fn test_compare_rejects_invalid_thresholds() {
+        let baseline = make_test_snapshot("baseline", 0.90);
+        let current = make_test_snapshot("current", 0.91);
+        assert!(RegressionReport::try_compare(&baseline, &current, f64::NAN, 0.10).is_err());
+        assert!(RegressionReport::try_compare(&baseline, &current, 0.10, 0.05).is_err());
+        let report = RegressionReport::compare(&baseline, &current, f64::NAN, 0.10);
+        assert!(report.has_critical());
+        assert_eq!(report.summary.passed, 0);
     }
 
     #[test]
