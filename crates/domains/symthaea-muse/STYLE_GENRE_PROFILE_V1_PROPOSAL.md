@@ -174,15 +174,27 @@ This phase reports **routing and source integrity only**. A route, enum variant,
 The independent source pass currently resolves 12 styles to the named period pipeline, 6 to dedicated grammar engines, and 11 to the compatibility fallback. These are dispatch categories, not quality grades: a dedicated call site does not prove an engine has the intended causal effect, a sound bank exists, or the rendered audio is distinctive. The report explicitly retains that distinction.
 
 The report now also joins all 152 catalog rows to their runtime profile by composer route: 29 rows expose the parsed source profile, while 123 catalog-only rows carry an explicit null runtime profile. The intent-axis source metadata points to the existing `diversity_census.rs` one-factor-at-a-time census using a blob digest and function-marker check. It does **not** execute that census or claim to independently reproduce its measurements. A further source-derived count makes control gaps visible: 13 styles declare all four intent axes, 10 declare three, 4 declare two, and 2 declare none (`Passacaglia` and `RenaissancePolyphony`). The latter reflects the existing `supported_intent_axes()` declaration and its cited census contract; it is a priority for measured M0c follow-up, not proof that every possible input can never affect those styles.
-### M0c — Measured implementation and evidence inventory (next coding increment)
-Extend the source map with per-style evidence for:
-- actual form and section-transition paths;
-- actual per-style deviations from inherited anatomy;
-- rhythm, pitch, harmony, orchestration, performance, and production behavior actually used;
-- tests and deterministic symbolic/audio captures;
-- unsupported layers, instrument/effect substitutions, and fallback behavior.
+### M0c — Routed symbolic control-response curves (probe implemented; execution pending)
+`crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs` measures the real public styled-composition dispatch path via `compose_with_grammar_plan(style.grammar_profile(), ...)`. This matters because the existing `diversity_census.rs` sensitivity matrix calls `compose_with_spec_and_form`, which does not exercise the same grammar-dispatch path for styles routed to dedicated engines.
 
-Each capability claim must cite the executable source and the relevant test/capture receipt. Unknown capability remains unknown; do not infer it from a name or constellation. Source-declared controls and observed causal effects must be represented separately.
+The new probe varies one input at a time across 29 styles:
+- tonic: C, Eb, E, G, Bb;
+- valence, arousal, energy: five ordered levels each;
+- requested bars: 8, 12, 16, 20, 24;
+- seed: the fixed base seed and the next three seeds.
+
+It emits 174 style/control curves and 841 tested points, each carrying the full input, exact fingerprint, distances for every named structural layer, tempo, meter, duration, note count, pitch diversity/range, and form section count. Continuous response shapes are reported as descriptive observations, not pass/fail quality scores; tonic and seed are not treated as ordinal controls. A dedicated `cargo test -p symthaea-music-theory --example style_control_response_curves` gate checks the control grids and monotonicity labeling.
+
+**Execution has not been claimed yet.** The next step is to run the probe, preserve the JSON receipt and source revision, inspect zero/partial-axis styles first, and then compare intended target changes against non-target invariance. Audio-render and listener evidence remain separate gates.
+
+### M0d — Measured implementation and evidence inventory
+Extend the source map with per-style evidence for:
+- actual form and section-transition paths and deviations from inherited anatomy;
+- measured rhythm, pitch, harmony, orchestration, performance, and production behavior;
+- deterministic symbolic/audio captures and their source/engine/input digests;
+- unsupported layers, sample/effect substitutions, and fallback behavior.
+
+Each capability claim must cite the executable source and relevant test/capture receipt. Unknown capability remains unknown; do not infer it from a name or constellation. Source-declared controls and observed effects must remain separate.
 
 ### M1 — Profile and receipt contract
 Add schema/version types, sparse values with origin, canonical resolver output, stable validation codes, profile digest and round-trip tests. Keep the existing `Style` enum and stored formats as adapters; pin Classical's current behavior.
