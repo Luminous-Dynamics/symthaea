@@ -111,6 +111,21 @@ For every consequential recommendation, record (where applicable):
 
 **Misuse to prevent:** Do not use “outside our control” to excuse failures within the system's authority or to dismiss suffering as irrelevant.
 
+### 2.7 *Ren* and *li* — classical Confucian traditions
+
+**Interpretive lens:** Confucian discussions of *ren* (often involving humaneness or care for others) and *li* (rites, ritual propriety, and conventionally expressed forms of respect) connect ethical development with practices learned and performed in relationships. Their meanings and the relation between ritual form, moral attitude, culture, and autonomy remain subjects of scholarly interpretation; this is not one uniform rule system.
+
+**Engineering hypothesis:** Recurring social obligations—care routines, meetings, civic duties, and community observances—need more than a fixed duration or an unexamined cron expression. Represent the relevant calendar, participants, context, consent, exceptions, and authority separately so a schedule can support care and continuity without turning custom or hierarchy into automatic permission.
+
+**Candidate invariant — AWI-08, Situated recurring commitments**
+- A recurring commitment identifies its recurrence rule, calendar/timezone or temporal reference system, policy version, and applicable occurrence window. Calendar recurrence is not silently approximated by adding a fixed number of seconds.
+- Where relevant, the record identifies participants or accountable roles, notice requirements, consent/opt-out state, and authorized exception or cancellation paths. A relationship or role label is context, not sufficient authorization by itself.
+- Each occurrence has an explicit outcome such as **pending**, **completed**, **missed**, **waived**, **cancelled**, or **rescheduled**. Rescheduling must not erase the original occurrence or silently transform a missed obligation into a completed one.
+- Changes to roles, policies, calendars, or participant preferences are versioned and affect future occurrences according to explicit transition rules; they do not rewrite historical receipts.
+- Custom and recurrence may be revised through a defined, accountable process. The system must not assume one community's practice is universal or that prior participation implies permanent consent.
+
+**Misuse to prevent:** Do not infer consent from family, community, employment, or civic roles; do not automatically enforce a customary practice because it is traditional; do not treat routine scheduling as moral legitimacy. Safety, rights, explicit authority, and the wishes of affected people remain separate checks.
+
 ## 3. Cross-cutting epistemic and cultural safeguards
 
 **Candidate invariant — AWI-07, Interpretive humility**
@@ -121,7 +136,7 @@ For every consequential recommendation, record (where applicable):
 - Concepts can be rejected, revised, or culturally contextualized without changing the factual event history.
 - Prefer community-authored scholarship and contextual sources when interpreting living traditions; seek appropriate review before turning a community-specific concept into a public product or normative policy.
 
-These safeguards apply across all seven candidate invariants.
+These safeguards apply across all eight candidate invariants.
 
 ## 4. Candidate conformance tests
 
@@ -139,6 +154,9 @@ These are test specifications, not claims that the tests exist or pass today. Im
 | AWI-T08 | External service fails after an agent requests an action | Request, acknowledgement, and observed effect remain separate | Requested/queued action is reported as completed |
 | AWI-T09 | A concept appears in a technical requirement but is only supported by an analogy or contested translation | Document marks it as an interpretation, cites contextual scholarship, and avoids claims of scientific proof | A cultural metaphor is stated as empirical evidence or universal doctrine |
 | AWI-T10 | Re-run the same decision from a frozen fixture set and versions | Stable deterministic portions reproduce; nondeterministic/model-dependent portions are declared and bounded | Results are claimed deterministic without recording relevant versions, seeds, or external inputs |
+| AWI-T11 | A monthly recurring event crosses a daylight-saving transition, leap day, or variable-length month | Next occurrence follows the declared calendar rule, timezone, and policy version; it is not computed by adding a universal fixed-second duration | The event drifts or changes local civil time because a month/day was treated as a fixed duration |
+| AWI-T12 | A participant revokes consent or an accountable role changes before the next scheduled occurrence | Future execution is re-evaluated against current consent and authority; the change and its effective time are recorded without rewriting prior occurrences | Past participation or an old role is treated as permanent authorization |
+| AWI-T13 | A scheduled care/civic occurrence is missed, waived, cancelled, or explicitly rescheduled | The distinct outcome and any remedy remain auditable; a new schedule links to, rather than erases, the prior occurrence | A missed occurrence disappears, is silently marked complete, or triggers unbounded catch-up actions |
 
 All test receipts must identify exact repository commit, evaluator/toolchain version, input fixture digest, and conclusion. **Authored ≠ executed; queued ≠ passed; passed ≠ proof of universal ethical correctness.**
 
@@ -147,11 +165,11 @@ All test receipts must identify exact repository commit, evaluator/toolchain ver
 | System / layer | First relevant invariants | Candidate next step |
 |---|---|---|
 | **Symthaea** | AWI-01, 02, 03, 06, 07 | Represent evidence freshness and dependency status explicitly; keep proposer, evaluator, and authority distinct; add safe abstention and decision-receipt fixtures before claiming broader agency properties |
-| **Mycelix** | AWI-01, 04, 05, 07 | Model source/causal provenance, disputes, consent/authority, burden distribution, and remedy without conflating source-chain order with civil timestamps |
-| **Symtropy** | AWI-01, 04, 06 | Separate proposed, acknowledged, and observed effects; preserve immutable chronology of failures and repairs; make replay independent of current wall time |
+| **Mycelix** | AWI-01, 04, 05, 07, 08 | Model source/causal provenance, disputes, consent/authority, burden distribution, remedy, and versioned participant commitments without conflating source-chain order with civil timestamps |
+| **Symtropy** | AWI-01, 04, 06, 08 | Separate proposed, acknowledged, and observed effects; preserve immutable chronology of failures and repairs; make replay independent of current wall time; keep missed, waived, cancelled, and rescheduled occurrences distinct |
 | **Sol Atlas** | AWI-01, 03, 06, 07 | Label scenario assumptions and modeled versus observed results; distinguish what a simulation demonstrates from what remains a forecast |
 | **Nixward / infrastructure control** | AWI-02, 03, 06 | Enforce capabilities and hard policy first; favor reversible changes when suitable; explicit no-op, abort, and indeterminate outcomes |
-| **Civic / economic evaluation** | AWI-04, 05, 07 | Show distributional effects, dissent, appeal, uncertainty, and remedy; prevent an aggregate score from hiding exclusion or harm |
+| **Civic / economic evaluation** | AWI-04, 05, 07, 08 | Show distributional effects, dissent, appeal, uncertainty, remedy, and the local rules behind recurring obligations; prevent an aggregate score from hiding exclusion or harm |
 
 This mapping is a set of audit targets, not a finding that every system currently satisfies or violates the listed properties. Each code-level change requires inspection of the actual call sites, a narrow test, and exact-head qualification.
 
@@ -183,7 +201,7 @@ This mapping is a set of audit targets, not a finding that every system currentl
 5. **Ubuntu / hunhu / botho:** “Hunhu/Ubuntu in the Traditional Thought of Southern Africa,” *Internet Encyclopedia of Philosophy*. This survey discusses historical and scholarly disagreements as well as community-oriented ethical concepts. [IEP](https://iep.utm.edu/hunhu-ubuntu-southern-african-thought/)
 6. **Ubuntu and autonomy:** Michael Onyebuchi Eze, “I am because you are,” *UNESCO Courier*. Particularly useful for the caution that relational personhood need not erase individual autonomy or difference. [UNESCO](https://www.unesco.org/en/articles/i-am-because-you-are-0)
 7. **Stoicism:** “Stoicism,” *Internet Encyclopedia of Philosophy*. Introduces Stoicism as a historically diverse Hellenistic philosophical tradition rather than a single modern self-help slogan. [IEP](https://iep.utm.edu/stoicism/)
-8. **Confucian ethics — reserved for a later reviewed extension:** “Chinese Ethics,” *Stanford Encyclopedia of Philosophy*. Explores *ren* and *li* and warns that distinctions between relational ethics and individual autonomy require care. [SEP](https://plato.stanford.edu/entries/ethics-chinese/)
+8. **Confucian ethics:** “Chinese Ethics,” *Stanford Encyclopedia of Philosophy*. Discusses *ren* and *li*, the contested relation between ritual practice and moral attitude, the role of custom in social life, and the need to describe relational ethics and autonomy carefully. [SEP](https://plato.stanford.edu/entries/ethics-chinese/)
 
 ## Qualification boundary
 
