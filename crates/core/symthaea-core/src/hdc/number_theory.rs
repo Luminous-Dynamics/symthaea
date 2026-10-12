@@ -1794,6 +1794,43 @@ mod tests {
     }
 
     #[test]
+    fn test_certified_factorization_canonical_bytes_golden_vector_is_stable() {
+        let certificate = CertifiedFactorizationCertificate {
+            factorization: FactorizationCertificate {
+                value: 2,
+                factors: vec![(2, 1)],
+            },
+            prime_proofs: vec![PrimalityProof {
+                value: 2,
+                certificates: vec![PrimalityCertificate {
+                    prime: 2,
+                    predecessor_factors: vec![],
+                    witnesses: vec![],
+                }],
+            }],
+        };
+        let golden: [u8; 76] = [
+            83, 89, 77, 70, 67, 69, 82, 49, // SYMFCER1
+            0, 0, 0, 0, 0, 0, 0, 2, // value = 2
+            0, 0, 0, 1, // factor count
+            0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 1, // (2, 1)
+            0, 0, 0, 1, // proof count
+            0, 0, 0, 36, // nested proof length
+            83, 89, 77, 80, 80, 82, 70, 49, // SYMPPRF1
+            0, 0, 0, 0, 0, 0, 0, 2, // proof value = 2
+            0, 0, 0, 1, // certificate count
+            0, 0, 0, 0, 0, 0, 0, 2, // candidate = 2
+            0, 0, 0, 0, // no predecessor factors
+            0, 0, 0, 0, // no witnesses
+        ];
+        assert_eq!(certificate.to_canonical_bytes().unwrap(), golden);
+        assert_eq!(
+            CertifiedFactorizationCertificate::from_canonical_bytes(&golden).unwrap(),
+            certificate
+        );
+    }
+
+    #[test]
     fn test_certified_factorization_canonical_bytes_round_trip() {
         let engine = NumberTheoryEngine::new();
         for value in [
