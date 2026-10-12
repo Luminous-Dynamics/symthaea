@@ -161,12 +161,12 @@ jobs:
               if curves_without_observed_change:
                   stream.write("## Curves with no observed output change\n\n")
                   stream.write("These are triage signals, not automatic failures.\n\n")
-                  stream.write("| Style | Control | Baseline seed |\\n|---|---|---:|\\n")
+                  stream.write("| Style | Control | Baseline seed |\n|---|---|---:|\n")
                   for item in curves_without_observed_change:
                       stream.write(
-                          f"| {item['style']} | {item['control']} | {item['baseline_seed']} |\\n"
+                          f"| {item['style']} | {item['control']} | {item['baseline_seed']} |\n"
                       )
-                  stream.write("\\n")
+                  stream.write("\n")
               stream.write(f"- Report SHA-256: `{receipt['report_sha256']}`\n\n")
               stream.write("## Source blob digests\n\n")
               stream.write("| Source | Git blob SHA |\n|---|---|\n")
