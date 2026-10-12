@@ -82,3 +82,8 @@
 - The vendored Symthaea snapshot lacks those wrapper modules, while retaining older non-ZK standard APIs plus separate Spartan crates. Accordingly, the current public benchmark's non-ZK limitation is real, but must be scoped to the vendored API snapshot rather than generalized to the entire Binius64 project.
 - Preferred next experiment: pin a known upstream revision (or perform a reviewed backport) and prove the existing packed-word XOR statement with the word-oriented ZK wrapper. Compare security parameters, transcript/public-input binding, proof verification, build reproducibility, and performance against the existing non-ZK path. Avoid reimplementing all HDC circuits over the older GF(2^128) frontend unless the wrapper route proves infeasible.
 - Research finding only: this integration/migration is not part of this PR and no current upstream security claim substitutes for testing and reviewing the exact code vendored in Symthaea.
+
+
+## Standalone package metadata cleanup (2026-10-12)
+
+- Removed the remaining `Cargo.toml` comment claiming a measured Winterfell XOR circuit lives at a monorepo-only path. The standalone package now consistently states that it only prints an analytical estimate for Winterfell and does not provide a measured same-scale comparison.

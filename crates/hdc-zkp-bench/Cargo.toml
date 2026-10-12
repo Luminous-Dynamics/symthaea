@@ -24,8 +24,8 @@ binius-hash = { path = "../../vendor/binius64/crates/hash" }
 
 # NOTE: No Winterfell dependency. The "Winterfell" numbers this benchmark
 # prints are an ANALYTIC ESTIMATE (constraint-count model) — no AIR is
-# implemented and no Winterfell prover runs. A real, measured Winterfell
-# 16,384-bit XOR circuit lives in crates/mycelix-zkp-core (monorepo root).
+# implemented and no Winterfell prover runs in this standalone artifact.
+# No measured same-scale Winterfell result is available from this crate.
 
 # Common
 rand = "0.9"
