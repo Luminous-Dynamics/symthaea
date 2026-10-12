@@ -32,6 +32,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 - `format_summary.py` - Summary formatting
 - `generate_benchmark_report.py` - Report generation
 - `muse_style_coverage.py` - Source-derived Muse route audit in both directions; `--report` emits per-constellation gaps and unreferenced executable styles, `--check` fails on frozen-baseline drift
+- `muse_style_capability_inventory.py` - Extracts per-style grammar family, composition spec, meter, tempo range, declared intent axes, and instrument-pool mappings from Rust source; declarations are not render/quality evidence
 - `gpu_smoke.sh` - NVIDIA/CUDA environment preflight and optional Broca CUDA smoke test
 - `post_to_dashboard.py` - Dashboard posting
 - `precompute_ethics_embeddings.py` - Ethics embeddings
@@ -62,10 +63,12 @@ python scripts/benchmark_causal_consciousness.py
 python3 scripts/muse_style_coverage.py --report > /tmp/muse-style-coverage-report.json
 python3 scripts/muse_style_coverage.py --check
 python3 tests/python/test_muse_style_coverage.py -v
+python3 scripts/muse_style_capability_inventory.py > /tmp/muse-style-capability-inventory.json
+python3 tests/python/test_muse_style_capability_inventory.py -v
 
 # Run Python smoke checks
 uv run --no-sync pytest tests/python -q
-uv run --no-sync ruff check python/symthaea_research scripts/analyze_nixos_config.py scripts/muse_style_coverage.py tests/python
+uv run --no-sync ruff check python/symthaea_research scripts/analyze_nixos_config.py scripts/muse_style_coverage.py scripts/muse_style_capability_inventory.py tests/python
 
 # Run lane checks
 ./scripts/ci_check_lanes.sh core
