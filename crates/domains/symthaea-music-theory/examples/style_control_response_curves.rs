@@ -101,6 +101,13 @@ struct Observation {
     score_note_count: usize,
     distinct_midi_pitches: usize,
     pitch_span_semitones: i32,
+    score_key_tonic_pc: i32,
+    mean_velocity: f64,
+    velocity_standard_deviation: f64,
+    mean_note_duration_beats: f64,
+    mean_section_intensity: f64,
+    section_intensity_standard_deviation: f64,
+    emphasis_counts: [usize; 4],
     form_section_count: Option<usize>,
 }
 
@@ -180,6 +187,65 @@ fn observe(
         .first()
         .zip(midi_pitches.last())
         .map_or(0, |(low, high)| high - low);
+    let note_count = score.notes.len();
+    let mean_velocity = if note_count == 0 {
+        0.0
+    } else {
+        score.notes.iter().map(|note| note.velocity as f64).sum::<f64>()
+            / note_count as f64
+    };
+    let velocity_standard_deviation = if note_count == 0 {
+        0.0
+    } else {
+        (score
+            .notes
+            .iter()
+            .map(|note| (note.velocity as f64 - mean_velocity).powi(2))
+            .sum::<f64>()
+            / note_count as f64)
+            .sqrt()
+    };
+    let mean_note_duration_beats = if note_count == 0 {
+        0.0
+    } else {
+        score
+            .notes
+            .iter()
+            .map(|note| note.duration.beats())
+            .sum::<f64>()
+            / note_count as f64
+    };
+    let mean_section_intensity = if note_count == 0 {
+        0.0
+    } else {
+        score
+            .notes
+            .iter()
+            .map(|note| note.section_intensity as f64)
+            .sum::<f64>()
+            / note_count as f64
+    };
+    let section_intensity_standard_deviation = if note_count == 0 {
+        0.0
+    } else {
+        (score
+            .notes
+            .iter()
+            .map(|note| (note.section_intensity as f64 - mean_section_intensity).powi(2))
+            .sum::<f64>()
+            / note_count as f64)
+            .sqrt()
+    };
+    let mut emphasis_counts = [0_usize; 4];
+    for note in &score.notes {
+        let index = match note.emphasis {
+            symthaea_music_theory::score::Emphasis::Normal => 0,
+            symthaea_music_theory::score::Emphasis::Climax => 1,
+            symthaea_music_theory::score::Emphasis::Cadential => 2,
+            symthaea_music_theory::score::Emphasis::PhraseStart => 3,
+        };
+        emphasis_counts[index] += 1;
+    }
 
     Observation {
         value_label: control_point.value_label.clone(),
@@ -195,6 +261,13 @@ fn observe(
         score_note_count: score.notes.len(),
         distinct_midi_pitches: midi_pitches.len(),
         pitch_span_semitones,
+        score_key_tonic_pc: score.key.tonic.value() as i32,
+        mean_velocity,
+        velocity_standard_deviation,
+        mean_note_duration_beats,
+        mean_section_intensity,
+        section_intensity_standard_deviation,
+        emphasis_counts,
         form_section_count: realization.form.as_ref().map(|form| form.sections.len()),
     }
 }
@@ -245,6 +318,19 @@ fn observation_json(observation: &Observation, base_hash: u64) -> serde_json::Va
             "score_note_count": observation.score_note_count,
             "distinct_midi_pitches": observation.distinct_midi_pitches,
             "pitch_span_semitones": observation.pitch_span_semitones,
+            "score_key_tonic_pc": observation.score_key_tonic_pc,
+            "mean_velocity": observation.mean_velocity,
+            "velocity_standard_deviation": observation.velocity_standard_deviation,
+            "mean_note_duration_beats": observation.mean_note_duration_beats,
+            "mean_section_intensity": observation.mean_section_intensity,
+            "section_intensity_standard_deviation": observation.section_intensity_standard_deviation,
+            "emphasis_counts": {
+                "normal": observation.emphasis_counts[0],
+                "climax": observation.emphasis_counts[1],
+                "cadential": observation.emphasis_counts[2],
+                "phrase_start": observation.emphasis_counts[3],
+            },
+            "form_available": observation.form_section_count.is_some(),
             "form_section_count": observation.form_section_count,
         },
     })
@@ -302,11 +388,18 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         .iter()
         .filter_map(|point| point.numeric_value.map(|value| (value, point.score_note_count as f64)))
         .collect();
-
-    let mut observations_sorted = observations
+    let velocity_points: Vec<(f64, f64)> = observations
         .iter()
-        .filter(|point| point.numeric_value.is_some())
-        .collect::<Vec<_>>();
+        .filter_map(|point| point.numeric_value.map(|value| (value, point.mean_velocity)))
+        .collect();
+    let duration_mean_points: Vec<(f64, f64)> = observations
+        .iter()
+        .filter_map(|point| point.numeric_value.map(|value| (value, point.mean_note_duration_beats)))
+        .collect();
+    let intensity_points: Vec<(f64, f64)> = observations
+        .iter()
+        .filter_map(|point| point.numeric_value.map(|value| (value, point.mean_section_intensity)))
+        .collect();
 
     serde_json::json!({
         "control": control,
@@ -320,8 +413,11 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
             "tempo_bpm_vs_control": monotonicity(&tempo_points),
             "total_duration_beats_vs_control": monotonicity(&duration_points),
             "score_note_count_vs_control": monotonicity(&note_count_points),
+            "mean_velocity_vs_control": monotonicity(&velocity_points),
+            "mean_note_duration_beats_vs_control": monotonicity(&duration_mean_points),
+            "mean_section_intensity_vs_control": monotonicity(&intensity_points),
             "structural_distance_note": "Per-point distance from baseline is recorded below. It is a displacement magnitude, not a directional target metric, so no monotonicity class is assigned to it.",
-            "note": "Shape labels describe observed points only; they are not correctness or quality scores. Tonic and seed are not treated as ordinal axes."
+            "note": "Shape labels describe observed points only; they are not correctness or quality scores. Tonic and seed are not treated as ordinal axes. Dynamics and key are reported separately because the exact fingerprint omits velocity/emphasis and pitch-class structural features are transposition-invariant."
         },
         "points": observations
             .iter()
