@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/gpu-capability-smoke.yml'
       - 'crates/core/symthaea-core/src/hdc/gpu_compute.rs'
+      - 'crates/core/symthaea-core/src/hdc/binary_hv.rs'
       - 'crates/core/symthaea-core/Cargo.toml'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -16,6 +17,7 @@ on:
     paths:
       - '.github/workflows/gpu-capability-smoke.yml'
       - 'crates/core/symthaea-core/src/hdc/gpu_compute.rs'
+      - 'crates/core/symthaea-core/src/hdc/binary_hv.rs'
       - 'crates/core/symthaea-core/Cargo.toml'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -59,7 +61,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-gpu-capability-smoke-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('crates/core/symthaea-core/src/hdc/gpu_compute.rs') }}
+          key: ${{ runner.os }}-gpu-capability-smoke-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('crates/core/symthaea-core/src/hdc/gpu_compute.rs') }}-${{ hashFiles('crates/core/symthaea-core/src/hdc/binary_hv.rs') }}
           restore-keys: |
             ${{ runner.os }}-gpu-capability-smoke-${{ hashFiles('**/Cargo.lock') }}-
             ${{ runner.os }}-gpu-capability-smoke-
