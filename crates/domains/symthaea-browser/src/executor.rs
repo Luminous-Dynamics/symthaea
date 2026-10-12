@@ -133,7 +133,27 @@ impl<'a> BrowserExecutor<'a> {
 
         let execution = match &action {
             BrowserAction::Navigate { url } => {
-                self.session.navigate(url).await.map(|_| ActionOutput::None)
+                match self.session.navigate(url).await {
+                    Err(error) => Err(error),
+                    Ok(()) => match self.session.current_url().await {
+                        Err(error) => Err(error),
+                        Ok(landed_url) => {
+                            let landing_decision = self.policy.evaluate_url(&landed_url);
+                            if let PolicyDecision::Deny { .. } = landing_decision {
+                                return ActionReceipt {
+                                    action,
+                                    policy_decision: landing_decision,
+                                    outcome: ActionOutcome::Failed(
+                                        "navigation landed on a URL denied by policy; the request may already have occurred".to_string(),
+                                    ),
+                                    output: ActionOutput::None,
+                                    elapsed_ms: started.elapsed().as_millis(),
+                                };
+                            }
+                            Ok(ActionOutput::None)
+                        }
+                    },
+                }
             }
             BrowserAction::Click { selector } => self
                 .session
