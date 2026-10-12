@@ -1355,6 +1355,60 @@ mod tests {
     }
 
     #[test]
+    fn arousal_tempo_target_matches_the_declared_spec_curve() {
+        for style in [Style::Classical, Style::AfroCuban, Style::Minimalism] {
+            let curve = curve_json(style, "arousal", BASE_SEED);
+            let target = &curve["control_target_evaluation"]["target_fidelity"];
+            assert_eq!(
+                target["status"].as_str(),
+                Some("measured"),
+                "{style:?}"
+            );
+            assert_eq!(target["tested_point_count"].as_u64(), Some(5));
+            assert_eq!(
+                target["matching_point_count"].as_u64(),
+                Some(5),
+                "{style:?}: {:?}",
+                target["points"]
+            );
+            assert_eq!(target["mismatching_point_count"].as_u64(), Some(0));
+        }
+    }
+
+    #[test]
+    fn valence_target_is_not_scored_when_style_owns_the_mode() {
+        let style = Style::HindustaniInspired;
+        let curve = curve_json(style, "valence", BASE_SEED);
+        let target = &curve["control_target_evaluation"]["target_fidelity"];
+        assert_ne!(target["status"].as_str(), Some("measured"));
+        assert!(matches!(
+            target["status"].as_str(),
+            Some("preset_mode_override" | "engine_owned_default")
+        ));
+    }
+
+    #[test]
+    fn energy_phrase_model_target_tracks_the_composers_threshold_rule() {
+        let curve = curve_json(Style::Classical, "energy", BASE_SEED);
+        let target = &curve["control_target_evaluation"]["target_fidelity"];
+        assert_eq!(target["status"].as_str(), Some("measured"));
+        assert_eq!(target["tested_point_count"].as_u64(), Some(5));
+        assert_eq!(
+            target["matching_point_count"].as_u64(),
+            Some(5),
+            "{:?}",
+            target["points"]
+        );
+        assert_eq!(target["mismatching_point_count"].as_u64(), Some(0));
+        let points = target["points"].as_array().unwrap();
+        let sentence_count = points
+            .iter()
+            .filter(|point| point["expected_phrase_model"].as_str() == Some("sentence"))
+            .count();
+        assert_eq!(sentence_count, 1);
+    }
+
+    #[test]
     fn routed_curve_reports_dynamic_channels_and_observed_change_flags() {
         let curve = curve_json(Style::Classical, "arousal", BASE_SEED);
         assert_eq!(curve["point_count"].as_u64(), Some(5));
