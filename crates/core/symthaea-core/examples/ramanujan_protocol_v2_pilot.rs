@@ -471,6 +471,8 @@ fn build_run_record(
             "method": "fixed-step RK4",
             "t_max": T_MAX,
             "dt": DT,
+            "stability_dt": DT / 2.0,
+            "step_size_stability_relative_tolerance": STEP_SIZE_STABILITY_RELATIVE_TOLERANCE,
             "requested_holdout_trajectories_per_candidate": HOLDOUT_TRAJECTORIES,
             "holdout_variance_threshold": HOLDOUT_THRESHOLD
         },
