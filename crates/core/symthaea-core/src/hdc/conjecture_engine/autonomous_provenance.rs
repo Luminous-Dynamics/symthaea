@@ -1042,6 +1042,8 @@ fn holdout_record_is_consistent(
         || holdout.integration_rhs_evaluations > holdout.attempted_integration_steps.saturating_mul(4)
         || holdout.rhs_evaluations
             != holdout.integration_rhs_evaluations.saturating_add(holdout.scoring_rhs_evaluations)
+        || holdout.scoring_rhs_evaluations
+            > (holdout.requested_trajectories as u64).saturating_mul(200)
     {
         return false;
     }
