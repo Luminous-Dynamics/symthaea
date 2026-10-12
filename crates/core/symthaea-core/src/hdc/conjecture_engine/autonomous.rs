@@ -509,6 +509,11 @@ pub struct AutonomousDiscoveryWorkMetricsV1 {
     pub trajectories_failed: u64,
     pub attempted_integration_steps: u64,
     pub completed_integration_steps: u64,
+    /// RHS calls performed by the integrator alone.
+    pub integration_rhs_evaluations: u64,
+    /// RHS calls performed by candidate fitness/score calculations.
+    pub scoring_rhs_evaluations: u64,
+    /// Total RHS calls across integration and scoring.
     pub rhs_evaluations: u64,
     pub state_updates: u64,
     pub returned_candidates: u64,
@@ -534,6 +539,9 @@ fn add_trajectory_work(
     metrics.completed_integration_steps = metrics
         .completed_integration_steps
         .saturating_add(work.completed_steps);
+    metrics.integration_rhs_evaluations = metrics
+        .integration_rhs_evaluations
+        .saturating_add(work.rhs_evaluations);
     metrics.rhs_evaluations = metrics.rhs_evaluations.saturating_add(work.rhs_evaluations);
     metrics.state_updates = metrics.state_updates.saturating_add(work.state_updates);
     if work.completed {
@@ -1064,11 +1072,14 @@ fn discover_invariants_autonomous_with_mode_and_metrics(
 
                 let mut worst = 0.0_f64;
                 for orbit in &sampled_orbits {
-                    let v = if config.use_lie_fitness {
-                        lie_derivative_variance(expr, rhs, orbit, var_names)
+                    let (v, rhs_calls) = if config.use_lie_fitness {
+                        lie_derivative_variance_with_work(expr, rhs, orbit, var_names)
                     } else {
-                        compute_trajectory_variance(expr, orbit, var_names)
+                        (compute_trajectory_variance(expr, orbit, var_names), 0)
                     };
+                    metrics.scoring_rhs_evaluations =
+                        metrics.scoring_rhs_evaluations.saturating_add(rhs_calls);
+                    metrics.rhs_evaluations = metrics.rhs_evaluations.saturating_add(rhs_calls);
                     if !v.is_finite() {
                         metrics.rejected_invalid = metrics.rejected_invalid.saturating_add(1);
                         return f64::MAX;
@@ -1251,17 +1262,21 @@ fn discover_invariants_autonomous_with_mode_and_metrics(
                 }
             }
 
-            let var = sampled_orbits
-                .iter()
-                .map(|orbit| {
-                    if config.use_lie_fitness {
-                        lie_derivative_variance(expr, rhs, orbit, var_names)
-                    } else {
-                        compute_trajectory_variance(expr, orbit, var_names)
-                    }
-                })
-                .filter(|v| v.is_finite())
-                .fold(0.0_f64, f64::max);
+            let mut worst_variance = 0.0_f64;
+            for orbit in &sampled_orbits {
+                let (variance, rhs_calls) = if config.use_lie_fitness {
+                    lie_derivative_variance_with_work(expr, rhs, orbit, var_names)
+                } else {
+                    (compute_trajectory_variance(expr, orbit, var_names), 0)
+                };
+                metrics.scoring_rhs_evaluations =
+                    metrics.scoring_rhs_evaluations.saturating_add(rhs_calls);
+                metrics.rhs_evaluations = metrics.rhs_evaluations.saturating_add(rhs_calls);
+                if variance.is_finite() && variance > worst_variance {
+                    worst_variance = variance;
+                }
+            }
+            let var = worst_variance;
             let mean = {
                 let vals: Vec<f64> = sampled
                     .iter()
@@ -2026,6 +2041,7 @@ mod cold_discovery_provenance_tests {
             max_depth: 3,
             max_complexity: 16,
             diverse_trajectory_count: 1,
+            use_lie_fitness: true,
             ..RegressorConfig::default()
         };
         let run = discover_invariants_autonomous_cold_with_metrics(
@@ -2046,8 +2062,13 @@ mod cold_discovery_provenance_tests {
         assert_eq!(run.metrics.trajectories_completed, 1);
         assert_eq!(run.metrics.trajectories_failed, 0);
         assert_eq!(
-            run.metrics.rhs_evaluations,
+            run.metrics.integration_rhs_evaluations,
             run.metrics.completed_integration_steps * 4
+        );
+        assert!(run.metrics.scoring_rhs_evaluations > 0);
+        assert_eq!(
+            run.metrics.rhs_evaluations,
+            run.metrics.integration_rhs_evaluations + run.metrics.scoring_rhs_evaluations
         );
         assert_eq!(
             run.metrics.state_updates,
