@@ -79,6 +79,24 @@ pub enum PrimalityProofError {
     WitnessSearchExhausted { prime: u64, factor: u64 },
 }
 
+/// Versioned, bounded canonical encoding errors for recursive primality proofs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PrimalityProofWireError {
+    InvalidMagicOrVersion,
+    TruncatedInput,
+    TrailingBytes { count: usize },
+    InputTooLarge { length: usize },
+    TooManyCertificates { count: u32 },
+    TooManyEntries { count: u64 },
+    LengthOverflow,
+    InvalidProof(PrimalityProofError),
+}
+
+const PRIMALITY_PROOF_WIRE_MAGIC: &[u8; 8] = b"SYMPPRF1";
+const PRIMALITY_PROOF_MAX_WIRE_BYTES: usize = 1_048_576;
+const PRIMALITY_PROOF_MAX_CERTIFICATES: u32 = 4_096;
+const PRIMALITY_PROOF_MAX_ENTRIES: u64 = 65_536;
+
 impl PrimalityProof {
     /// Verify this proof using only integer arithmetic and recursive Pocklington
     /// conditions. The checker does not call Miller-Rabin or Pollard-Brent.
@@ -209,6 +227,173 @@ impl PrimalityProof {
             return Err(PrimalityProofError::UnreachableCertificate { prime: certificate.prime });
         }
         Ok(())
+    }
+}
+
+impl PrimalityProof {
+    /// Encode a verified proof as canonical, versioned big-endian bytes.
+    ///
+    /// Fixed-width integers avoid alternate textual spellings. The whole proof is
+    /// verified before encoding and capped at 1 MiB with bounded table/entry counts.
+    pub fn to_canonical_bytes(&self) -> Result<Vec<u8>, PrimalityProofWireError> {
+        self.verify().map_err(PrimalityProofWireError::InvalidProof)?;
+
+        let certificate_count = u32::try_from(self.certificates.len())
+            .map_err(|_| PrimalityProofWireError::LengthOverflow)?;
+        if certificate_count > PRIMALITY_PROOF_MAX_CERTIFICATES {
+            return Err(PrimalityProofWireError::TooManyCertificates {
+                count: certificate_count,
+            });
+        }
+
+        let mut total_entries = 0u64;
+        let mut encoded_len = 8usize + 8 + 4;
+        for certificate in &self.certificates {
+            let factors = u64::try_from(certificate.predecessor_factors.len())
+                .map_err(|_| PrimalityProofWireError::LengthOverflow)?;
+            let witnesses = u64::try_from(certificate.witnesses.len())
+                .map_err(|_| PrimalityProofWireError::LengthOverflow)?;
+            total_entries = total_entries
+                .checked_add(factors)
+                .and_then(|count| count.checked_add(witnesses))
+                .ok_or(PrimalityProofWireError::LengthOverflow)?;
+            encoded_len = encoded_len
+                .checked_add(8 + 4 + 4)
+                .and_then(|len| len.checked_add(certificate.predecessor_factors.len().checked_mul(12)?))
+                .and_then(|len| len.checked_add(certificate.witnesses.len().checked_mul(16)?))
+                .ok_or(PrimalityProofWireError::LengthOverflow)?;
+        }
+
+        if total_entries > PRIMALITY_PROOF_MAX_ENTRIES {
+            return Err(PrimalityProofWireError::TooManyEntries { count: total_entries });
+        }
+        if encoded_len > PRIMALITY_PROOF_MAX_WIRE_BYTES {
+            return Err(PrimalityProofWireError::InputTooLarge { length: encoded_len });
+        }
+
+        let mut bytes = Vec::with_capacity(encoded_len);
+        bytes.extend_from_slice(PRIMALITY_PROOF_WIRE_MAGIC);
+        bytes.extend_from_slice(&self.value.to_be_bytes());
+        bytes.extend_from_slice(&certificate_count.to_be_bytes());
+        for certificate in &self.certificates {
+            bytes.extend_from_slice(&certificate.prime.to_be_bytes());
+            let factor_count = u32::try_from(certificate.predecessor_factors.len())
+                .map_err(|_| PrimalityProofWireError::LengthOverflow)?;
+            bytes.extend_from_slice(&factor_count.to_be_bytes());
+            for &(factor, exponent) in &certificate.predecessor_factors {
+                bytes.extend_from_slice(&factor.to_be_bytes());
+                bytes.extend_from_slice(&exponent.to_be_bytes());
+            }
+            let witness_count = u32::try_from(certificate.witnesses.len())
+                .map_err(|_| PrimalityProofWireError::LengthOverflow)?;
+            bytes.extend_from_slice(&witness_count.to_be_bytes());
+            for &(factor, base) in &certificate.witnesses {
+                bytes.extend_from_slice(&factor.to_be_bytes());
+                bytes.extend_from_slice(&base.to_be_bytes());
+            }
+        }
+
+        debug_assert_eq!(bytes.len(), encoded_len);
+        Ok(bytes)
+    }
+
+    /// Decode canonical proof bytes with size limits, strict framing, and verification.
+    ///
+    /// No allocation is driven by an unchecked count: every table and cumulative entry
+    /// count is bounded before capacity is reserved. Trailing data and invalid proofs
+    /// are rejected instead of normalized.
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, PrimalityProofWireError> {
+        if bytes.len() > PRIMALITY_PROOF_MAX_WIRE_BYTES {
+            return Err(PrimalityProofWireError::InputTooLarge { length: bytes.len() });
+        }
+
+        let mut reader = PrimalityProofByteReader { bytes, offset: 0 };
+        if reader.read(8)? != PRIMALITY_PROOF_WIRE_MAGIC {
+            return Err(PrimalityProofWireError::InvalidMagicOrVersion);
+        }
+        let value = reader.read_u64()?;
+        let certificate_count = reader.read_u32()?;
+        if certificate_count > PRIMALITY_PROOF_MAX_CERTIFICATES {
+            return Err(PrimalityProofWireError::TooManyCertificates {
+                count: certificate_count,
+            });
+        }
+
+        let mut total_entries = 0u64;
+        let mut certificates = Vec::with_capacity(certificate_count as usize);
+        for _ in 0..certificate_count {
+            let prime = reader.read_u64()?;
+            let factor_count = reader.read_u32()?;
+            total_entries = total_entries
+                .checked_add(u64::from(factor_count))
+                .ok_or(PrimalityProofWireError::LengthOverflow)?;
+            if total_entries > PRIMALITY_PROOF_MAX_ENTRIES {
+                return Err(PrimalityProofWireError::TooManyEntries { count: total_entries });
+            }
+
+            let mut predecessor_factors = Vec::with_capacity(factor_count as usize);
+            for _ in 0..factor_count {
+                predecessor_factors.push((reader.read_u64()?, reader.read_u32()?));
+            }
+
+            let witness_count = reader.read_u32()?;
+            total_entries = total_entries
+                .checked_add(u64::from(witness_count))
+                .ok_or(PrimalityProofWireError::LengthOverflow)?;
+            if total_entries > PRIMALITY_PROOF_MAX_ENTRIES {
+                return Err(PrimalityProofWireError::TooManyEntries { count: total_entries });
+            }
+
+            let mut witnesses = Vec::with_capacity(witness_count as usize);
+            for _ in 0..witness_count {
+                witnesses.push((reader.read_u64()?, reader.read_u64()?));
+            }
+
+            certificates.push(PrimalityCertificate {
+                prime,
+                predecessor_factors,
+                witnesses,
+            });
+        }
+
+        if reader.offset != bytes.len() {
+            return Err(PrimalityProofWireError::TrailingBytes {
+                count: bytes.len() - reader.offset,
+            });
+        }
+
+        let proof = Self { value, certificates };
+        proof.verify().map_err(PrimalityProofWireError::InvalidProof)?;
+        Ok(proof)
+    }
+}
+
+struct PrimalityProofByteReader<'a> {
+    bytes: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> PrimalityProofByteReader<'a> {
+    fn read(&mut self, length: usize) -> Result<&'a [u8], PrimalityProofWireError> {
+        let end = self.offset.checked_add(length).ok_or(PrimalityProofWireError::LengthOverflow)?;
+        if end > self.bytes.len() {
+            return Err(PrimalityProofWireError::TruncatedInput);
+        }
+        let slice = &self.bytes[self.offset..end];
+        self.offset = end;
+        Ok(slice)
+    }
+
+    fn read_u32(&mut self) -> Result<u32, PrimalityProofWireError> {
+        let bytes = self.read(4)?;
+        Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+    }
+
+    fn read_u64(&mut self) -> Result<u64, PrimalityProofWireError> {
+        let bytes = self.read(8)?;
+        Ok(u64::from_be_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        ]))
     }
 }
 
@@ -1416,6 +1601,87 @@ mod tests {
             certificate.verify(),
             Err(CertifiedFactorizationError::InvalidFactorization(
                 FactorizationVerificationError::ZeroExponent { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn test_primality_proof_canonical_bytes_round_trip() {
+        let engine = NumberTheoryEngine::new();
+        for value in [
+            2u64,
+            17,
+            97,
+            1_000_003,
+            1_000_000_007,
+            18_446_744_073_709_551_557,
+        ] {
+            let proof = engine.primality_proof(value).unwrap();
+            let bytes = proof.to_canonical_bytes().unwrap();
+            assert_eq!(&bytes[..8], b"SYMPPRF1");
+            let decoded = PrimalityProof::from_canonical_bytes(&bytes).unwrap();
+            assert_eq!(decoded, proof);
+            assert_eq!(decoded.to_canonical_bytes().unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn test_primality_proof_decoder_rejects_malformed_wire_inputs() {
+        let engine = NumberTheoryEngine::new();
+        let proof = engine.primality_proof(17).unwrap();
+        let bytes = proof.to_canonical_bytes().unwrap();
+
+        let mut bad_magic = bytes.clone();
+        bad_magic[0] ^= 1;
+        assert_eq!(
+            PrimalityProof::from_canonical_bytes(&bad_magic),
+            Err(PrimalityProofWireError::InvalidMagicOrVersion)
+        );
+        assert_eq!(
+            PrimalityProof::from_canonical_bytes(&bytes[..bytes.len() - 1]),
+            Err(PrimalityProofWireError::TruncatedInput)
+        );
+
+        let mut trailing = bytes.clone();
+        trailing.push(0);
+        assert_eq!(
+            PrimalityProof::from_canonical_bytes(&trailing),
+            Err(PrimalityProofWireError::TrailingBytes { count: 1 })
+        );
+
+        assert!(matches!(
+            PrimalityProof::from_canonical_bytes(&vec![0u8; PRIMALITY_PROOF_MAX_WIRE_BYTES + 1]),
+            Err(PrimalityProofWireError::InputTooLarge { .. })
+        ));
+
+        let mut too_many_certificates = bytes;
+        too_many_certificates[16..20].copy_from_slice(&(PRIMALITY_PROOF_MAX_CERTIFICATES + 1).to_be_bytes());
+        assert!(matches!(
+            PrimalityProof::from_canonical_bytes(&too_many_certificates),
+            Err(PrimalityProofWireError::TooManyCertificates { .. })
+        ));
+    }
+
+    #[test]
+    fn test_primality_proof_wire_rejects_tampered_witness() {
+        let engine = NumberTheoryEngine::new();
+        let proof = engine.primality_proof(17).unwrap();
+        let mut bytes = proof.to_canonical_bytes().unwrap();
+        let last = bytes.len() - 1;
+        bytes[last] = 1; // base 1 is invalid; reject rather than normalize
+        assert!(matches!(
+            PrimalityProof::from_canonical_bytes(&bytes),
+            Err(PrimalityProofWireError::InvalidProof(
+                PrimalityProofError::InvalidWitnessBase { .. }
+            ))
+        ));
+
+        let mut malformed = proof;
+        malformed.certificates.reverse();
+        assert!(matches!(
+            malformed.to_canonical_bytes(),
+            Err(PrimalityProofWireError::InvalidProof(
+                PrimalityProofError::CertificateTableNotStrictlyIncreasing { .. }
             ))
         ));
     }
