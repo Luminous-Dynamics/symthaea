@@ -61,6 +61,11 @@ pub struct AutonomousHoldoutValidation {
     pub system_definition_blake3: String,
     pub requested_trajectories: usize,
     pub trajectories_checked: usize,
+    /// Work spent integrating holdout orbits, including failed attempts.
+    pub attempted_integration_steps: u64,
+    pub completed_integration_steps: u64,
+    pub rhs_evaluations: u64,
+    pub state_updates: u64,
     pub max_lie_derivative_variance: f64,
     pub median_lie_derivative_variance: f64,
     /// Minimum gradient-informativeness fraction across successfully scored orbits.
@@ -103,6 +108,10 @@ fn failed_holdout(
         system_definition_blake3: String::new(),
         requested_trajectories,
         trajectories_checked,
+        attempted_integration_steps: 0,
+        completed_integration_steps: 0,
+        rhs_evaluations: 0,
+        state_updates: 0,
         max_lie_derivative_variance: max_variance,
         median_lie_derivative_variance: f64::MAX,
         min_gradient_informativeness_fraction,
@@ -122,10 +131,18 @@ fn checked_rk4_trajectory(
     initial: &[f64],
     t_end: f64,
     dt: f64,
-) -> Option<Vec<Vec<f64>>> {
+) -> (Option<Vec<Vec<f64>>>, super::dynamics::Rk4TrajectoryWorkV1) {
+    use super::dynamics::Rk4TrajectoryWorkV1;
+
+    let empty_work = Rk4TrajectoryWorkV1::default();
     let dimension = initial.len();
-    if dimension == 0 || !t_end.is_finite() || t_end <= 0.0 || !dt.is_finite() || dt <= 0.0 {
-        return None;
+    if dimension == 0
+        || !t_end.is_finite()
+        || t_end <= 0.0
+        || !dt.is_finite()
+        || dt <= 0.0
+    {
+        return (None, empty_work);
     }
     let estimated_steps = (t_end / dt).ceil();
     let estimated_state_updates = estimated_steps * dimension as f64;
@@ -134,68 +151,15 @@ fn checked_rk4_trajectory(
         || dimension > MAX_AUTONOMOUS_STATE_DIMENSION
         || estimated_state_updates > MAX_AUTONOMOUS_STATE_UPDATES_PER_TRAJECTORY
     {
-        return None;
-    }
-    let max_steps = estimated_steps as usize;
-    let mut state = initial.to_vec();
-    let mut states = Vec::with_capacity(max_steps.saturating_add(1));
-    states.push(state.clone());
-    let mut reached_end = false;
-
-    let derivative = |values: &[f64], time: f64| -> Option<Vec<f64>> {
-        if values.len() != dimension || values.iter().any(|value| !value.is_finite()) {
-            return None;
-        }
-        let output = rhs(values, time);
-        if output.len() != dimension || output.iter().any(|value| !value.is_finite()) {
-            return None;
-        }
-        Some(output)
-    };
-
-    // Compute each time from its integer step index rather than repeated addition.
-    // Repeated addition can leave the final time a few ulps below t_end
-    // (for example 400 additions of 0.01), incorrectly rejecting a complete orbit.
-    for step in 0..max_steps {
-        let t = (step as f64 * dt).min(t_end);
-        if t >= t_end {
-            reached_end = true;
-            break;
-        }
-        let next_t = if step + 1 == max_steps {
-            t_end
-        } else {
-            ((step + 1) as f64 * dt).min(t_end)
-        };
-        let h = next_t - t;
-        if !h.is_finite() || h <= 0.0 || t + h <= t {
-            return None;
-        }
-        let k1 = derivative(&state, t)?;
-        let y2: Vec<f64> = (0..dimension).map(|i| state[i] + h * 0.5 * k1[i]).collect();
-        let k2 = derivative(&y2, t + 0.5 * h)?;
-        let y3: Vec<f64> = (0..dimension).map(|i| state[i] + h * 0.5 * k2[i]).collect();
-        let k3 = derivative(&y3, t + 0.5 * h)?;
-        let y4: Vec<f64> = (0..dimension).map(|i| state[i] + h * k3[i]).collect();
-        let k4 = derivative(&y4, t + h)?;
-
-        for i in 0..dimension {
-            state[i] += h / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
-        }
-        if state.iter().any(|value| !value.is_finite()) {
-            return None;
-        }
-        states.push(state.clone());
-        if next_t == t_end {
-            reached_end = true;
-            break;
-        }
+        return (None, empty_work);
     }
 
-    if !reached_end {
-        return None;
+    let (_times, states, work) =
+        super::dynamics::rk4_trajectory_with_work(rhs, initial, t_end, dt);
+    if !work.completed {
+        return (None, work);
     }
-    Some(states)
+    (Some(states), work)
 }
 
 /// Assess a candidate on independently seeded, perturbed initial conditions.
@@ -720,6 +684,11 @@ pub struct AutonomousDiscoveryReceiptV1 {
     pub dt: f64,
     pub requested_trajectories: usize,
     pub trajectories_checked: usize,
+    /// Exact holdout integration work, including failed trajectories.
+    pub attempted_integration_steps: u64,
+    pub completed_integration_steps: u64,
+    pub rhs_evaluations: u64,
+    pub state_updates: u64,
     pub max_lie_derivative_variance: f64,
     pub median_lie_derivative_variance: f64,
     /// Minimum gradient-informativeness fraction across successfully scored orbits.
