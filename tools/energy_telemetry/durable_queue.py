@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+import math
 import sqlite3
 from typing import Iterator
 
@@ -44,16 +45,24 @@ class DurableTelemetryQueue:
         max_future_skew_seconds: int = 300,
         busy_timeout_seconds: float = 5.0,
     ) -> None:
-        if not isinstance(database_path, str) or not database_path.strip():
-            raise ValueError("database_path must be a non-empty filesystem path")
+        if (
+            not isinstance(database_path, str)
+            or not database_path.strip()
+            or database_path == ":memory:"
+        ):
+            raise ValueError("database_path must be a persistent filesystem path, not :memory:")
         if type(max_queue_bytes) is not int or max_queue_bytes < 1:
             raise ValueError("max_queue_bytes must be a positive integer")
         if type(max_records) is not int or max_records < 1:
             raise ValueError("max_records must be a positive integer")
         if type(max_future_skew_seconds) is not int or max_future_skew_seconds < 0:
             raise ValueError("max_future_skew_seconds must be a non-negative integer")
-        if type(busy_timeout_seconds) not in (int, float) or busy_timeout_seconds <= 0:
-            raise ValueError("busy_timeout_seconds must be positive")
+        if (
+            type(busy_timeout_seconds) not in (int, float)
+            or not math.isfinite(busy_timeout_seconds)
+            or busy_timeout_seconds <= 0
+        ):
+            raise ValueError("busy_timeout_seconds must be finite and positive")
         self.database_path = database_path
         self.max_queue_bytes = max_queue_bytes
         self.max_records = max_records
