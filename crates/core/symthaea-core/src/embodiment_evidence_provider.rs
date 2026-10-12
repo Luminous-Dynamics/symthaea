@@ -6,7 +6,7 @@
 //! The legacy [`crate::embodiment::EmbodimentBridge`] API exposes several bare
 //! numerical getters whose defaults are compatibility conveniences rather than
 //! observed evidence. This module provides a parallel, opt-in contract whose
-//! defaults are explicitly [`EvidenceAvailability::Unavailable`].
+//! defaults are explicitly [`crate::embodiment_evidence::EvidenceAvailability::Unavailable`].
 //!
 //! New claim-bearing, safety, trust, and HIL consumers should depend on
 //! [`EmbodimentEvidenceProviderV1`] (or a later version), not infer evidence
@@ -14,7 +14,7 @@
 
 use crate::embodiment::EmbodimentBridge;
 use crate::embodiment_evidence::{
-    EmbodimentEvidenceKind, EvidenceAvailability, EvidenceMetadataV1, EvidenceSourceClass,
+    EmbodimentEvidenceKind, EvidenceMetadataV1, EvidenceSourceClass,
     EvidenceValidationError, NormalizedScalarEvidenceV1, NormalizedVectorEvidenceV1,
 };
 
@@ -164,6 +164,7 @@ impl EmbodimentEvidenceProviderV1 for LegacyCompatibilityEvidenceAdapter<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::embodiment_evidence::EvidenceAvailability;
     use crate::embodiment::{
         AgentIdentity, EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel,
         GROUNDING_SENSORIMOTOR,
