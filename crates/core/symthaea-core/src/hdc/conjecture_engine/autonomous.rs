@@ -239,10 +239,8 @@ pub fn discover_conservation_laws_with_custom(
     let mut results = Vec::new();
     let auto_candidates = build_invariant_candidates(var_names);
     for (name, eval_fn, sym_expr) in &auto_candidates {
-        let values: Vec<f64> = states
+        let values: Vec<f64> = sampled_states
             .iter()
-            .step_by(step.max(1))
-            .take(n_samples)
             .map(|s| eval_fn(s))
             .filter(|v| v.is_finite())
             .collect();
@@ -265,10 +263,8 @@ pub fn discover_conservation_laws_with_custom(
         });
     }
     for (name, eval_fn) in &custom_candidates {
-        let values: Vec<f64> = states
+        let values: Vec<f64> = sampled_states
             .iter()
-            .step_by(step.max(1))
-            .take(n_samples)
             .map(|s| eval_fn(s))
             .filter(|v| v.is_finite())
             .collect();
