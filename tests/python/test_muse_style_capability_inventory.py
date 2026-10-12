@@ -259,6 +259,23 @@ class RuntimeInventoryTests(unittest.TestCase):
                 {"dedicated_engine": 1, "period_sentence_pipeline": 1},
             )
 
+    def test_fails_closed_on_unrecognized_dedicated_grammar_engine(self) -> None:
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_root(root)
+            grammar_path = root / GRAMMAR_RELATIVE
+            grammar_path.write_text(
+                GRAMMAR_FIXTURE.replace(
+                    "crate::groove_cycle::realize_groove_cycle",
+                    "crate::new_engine::realize_new_engine",
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(CoverageError, "unrecognized dedicated realizer"):
+                _runtime_report(root)
+
     def test_classifies_families_using_the_dispatch_fallback(self) -> None:
         from tempfile import TemporaryDirectory
 
