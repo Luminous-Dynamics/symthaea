@@ -207,6 +207,39 @@ pub struct ImportedBeatRational {
     pub denominator: i64,
 }
 
+/// A bounded source-note snapshot accepted by the rhythm-aware near-match layer.
+/// Scores are symbolic comparison measurements, not calibrated perceptual probabilities.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedMotifNearMatchOccurrence {
+    pub notes: Vec<ImportedNoteReference>,
+    /// Largest absolute difference from the representative signed interval, in semitones.
+    pub observed_max_pitch_interval_deviation_semitones: u8,
+    /// Largest absolute error between normalized onset-gap shares (range 0..=1).
+    pub observed_max_normalized_onset_gap_error: f64,
+    /// Mean absolute error between normalized onset-gap shares (range 0..=1).
+    pub observed_mean_normalized_onset_gap_error: f64,
+}
+
+/// Results from the separate, conservative pitch-and-rhythm near-match scan.
+/// Candidate windows preserve interval direction, allow at most the declared
+/// interval-magnitude deviation, and constrain every normalized onset-gap share.
+/// These rules are explicit heuristics, not a claim of motif identity.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedMotifNearMatchSummary {
+    /// All accepted candidate windows, including overlapping windows.
+    pub occurrence_count: usize,
+    /// Earliest-first greedy count of accepted non-overlapping windows.
+    pub independent_occurrence_count: usize,
+    /// Inclusive bound on each candidate interval's absolute deviation.
+    pub max_allowed_pitch_interval_deviation_semitones: u8,
+    /// Inclusive bound on each normalized onset-gap share's absolute error.
+    pub max_allowed_normalized_onset_gap_error: f64,
+    /// Whether every accepted candidate has a stored note snapshot.
+    pub occurrence_evidence_complete: bool,
+    /// Bounded source-note evidence, in deterministic onset order.
+    pub occurrences: Vec<ImportedMotifNearMatchOccurrence>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedMotifSummary {
     /// Total exact pitch-interval-contour windows, including overlapping windows
@@ -238,6 +271,9 @@ pub struct ImportedMotifSummary {
     /// predates this distinction; this is not a musical-importance judgment.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub independent_occurrence_count: Option<usize>,
+    /// Separate rhythm-aware symbolic near matches; absent in legacy records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rhythm_near_matches: Option<ImportedMotifNearMatchSummary>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -2787,10 +2823,12 @@ mod tests {
         assert!(decoded.onset_deltas.is_empty());
         assert!(decoded.matched_occurrences.is_empty());
         assert_eq!(decoded.occurrence_evidence_complete, None);
+        assert!(decoded.rhythm_near_matches.is_none());
 
         let round_trip = serde_json::to_string(&decoded).unwrap();
         assert!(!round_trip.contains("source_part_id"));
         assert!(!round_trip.contains("matched_occurrences"));
+        assert!(!round_trip.contains("rhythm_near_matches"));
     }
 
     #[test]
@@ -2806,6 +2844,14 @@ mod tests {
             matched_occurrences: Vec::new(),
             occurrence_evidence_complete: Some(true),
             independent_occurrence_count: Some(2),
+            rhythm_near_matches: Some(ImportedMotifNearMatchSummary {
+                occurrence_count: 0,
+                independent_occurrence_count: 0,
+                max_allowed_pitch_interval_deviation_semitones: 1,
+                max_allowed_normalized_onset_gap_error: 0.15,
+                occurrence_evidence_complete: true,
+                occurrences: Vec::new(),
+            }),
         };
         let serialized = serde_json::to_string(&summary).unwrap();
         let last_legacy_field = serialized
@@ -2814,6 +2860,10 @@ mod tests {
         let appended_field = serialized
             .find("\"independent_occurrence_count\"")
             .expect("independent count is serialized when present");
+        let appended_near_matches = serialized
+            .find("\"rhythm_near_matches\"")
+            .expect("rhythm-aware near matches are appended after legacy fields");
         assert!(last_legacy_field < appended_field);
+        assert!(appended_field < appended_near_matches);
     }
 }

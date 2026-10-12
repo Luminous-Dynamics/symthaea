@@ -9,8 +9,9 @@
 use midly::{MetaMessage, MidiMessage, Smf, TrackEventKind};
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use symthaea_muse_protocol::{
-    ImportedBeatRational, ImportedMotifOccurrence, ImportedMotifSummary, ImportedNoteReference,
-    ImportedSectionSummary, ImportedWorkAnalysis, SymbolicImportFormat,
+    ImportedBeatRational, ImportedMotifNearMatchOccurrence, ImportedMotifNearMatchSummary,
+    ImportedMotifOccurrence, ImportedMotifSummary, ImportedNoteReference, ImportedSectionSummary,
+    ImportedWorkAnalysis, SymbolicImportFormat,
 };
 use symthaea_music_theory::{
     Duration, Emphasis, Key, Pitch, PitchClass, Score, ScoreNote, VoiceRole, score::PartId,
@@ -1153,6 +1154,151 @@ fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Result<Option<u8>, String> {
 }
 
 const MAX_MOTIF_OCCURRENCE_EVIDENCE: usize = 128;
+const MAX_MOTIF_NEAR_MATCH_OCCURRENCE_EVIDENCE: usize = 128;
+const MOTIF_NEAR_MATCH_MAX_INTERVAL_DEVIATION_SEMITONES: i16 = 1;
+const MOTIF_NEAR_MATCH_MAX_NORMALIZED_ONSET_GAP_ERROR: f64 = 0.15;
+const MOTIF_NEAR_MATCH_EXACT_GAP_EPSILON: f64 = 1e-9;
+
+/// Normalize exact inter-onset gaps to shares of the motif's total onset span.
+/// This makes the shape invariant to uniform tempo scaling while keeping the
+/// tolerance definition explicit. The five-slot array is sufficient for the
+/// importer's fixed 3–6-note motif window.
+fn normalized_onset_gap_shape(notes: &[(usize, &ScoreNote)]) -> Option<[f64; 5]> {
+    if !(2..=6).contains(&notes.len()) {
+        return None;
+    }
+    let gap_count = notes.len() - 1;
+    let mut gaps = [0.0_f64; 5];
+    let mut total = 0.0_f64;
+    for (index, pair) in notes.windows(2).enumerate() {
+        let delta = pair[1].1.onset.checked_sub(pair[0].1.onset)?;
+        if delta.num() <= 0 || delta.den() <= 0 {
+            return None;
+        }
+        let beats = delta.beats();
+        if !beats.is_finite() || beats <= 0.0 {
+            return None;
+        }
+        gaps[index] = beats;
+        total += beats;
+    }
+    if !total.is_finite() || total <= 0.0 {
+        return None;
+    }
+    for gap in &mut gaps[..gap_count] {
+        *gap /= total;
+    }
+    Some(gaps)
+}
+
+/// Compare equal-length part-local windows against a representative contour.
+/// A near match must preserve every interval's direction, stay within one
+/// semitone of each signed interval, and keep every normalized onset-gap share
+/// within 0.15 of the representative. Exact interval + rhythm-shape matches
+/// remain solely in the exact evidence layer. Counts include overlapping
+/// windows; independent counts use deterministic earliest-first non-overlap.
+fn rhythm_near_match_summary(
+    notes: &[(usize, &ScoreNote)],
+    target_pitch_intervals: &[i16],
+    target_gap_shape: [f64; 5],
+) -> ImportedMotifNearMatchSummary {
+    let note_len = target_pitch_intervals.len() + 1;
+    let mut summary = ImportedMotifNearMatchSummary {
+        occurrence_count: 0,
+        independent_occurrence_count: 0,
+        max_allowed_pitch_interval_deviation_semitones:
+            MOTIF_NEAR_MATCH_MAX_INTERVAL_DEVIATION_SEMITONES as u8,
+        max_allowed_normalized_onset_gap_error: MOTIF_NEAR_MATCH_MAX_NORMALIZED_ONSET_GAP_ERROR,
+        occurrence_evidence_complete: true,
+        occurrences: Vec::new(),
+    };
+    if !(3..=6).contains(&note_len) || notes.len() < note_len {
+        return summary;
+    }
+
+    let mut next_non_overlapping_start = 0_usize;
+    for window_start in 0..=(notes.len() - note_len) {
+        let candidate = &notes[window_start..window_start + note_len];
+        let mut interval_pattern_is_compatible = true;
+        let mut interval_pattern_is_exact = true;
+        let mut max_interval_deviation = 0_u8;
+
+        for (pair, &target_interval) in candidate.windows(2).zip(target_pitch_intervals) {
+            let candidate_interval =
+                i16::from(pair[1].1.pitch.midi()) - i16::from(pair[0].1.pitch.midi());
+            if candidate_interval.signum() != target_interval.signum() {
+                interval_pattern_is_compatible = false;
+                break;
+            }
+            let deviation = (candidate_interval - target_interval).abs();
+            if deviation > MOTIF_NEAR_MATCH_MAX_INTERVAL_DEVIATION_SEMITONES {
+                interval_pattern_is_compatible = false;
+                break;
+            }
+            if deviation != 0 {
+                interval_pattern_is_exact = false;
+            }
+            max_interval_deviation = max_interval_deviation.max(deviation as u8);
+        }
+        if !interval_pattern_is_compatible {
+            continue;
+        }
+
+        let Some(candidate_gap_shape) = normalized_onset_gap_shape(candidate) else {
+            continue;
+        };
+        let gap_count = note_len - 1;
+        let mut max_gap_error = 0.0_f64;
+        let mut total_gap_error = 0.0_f64;
+        for index in 0..gap_count {
+            let error = (candidate_gap_shape[index] - target_gap_shape[index]).abs();
+            max_gap_error = max_gap_error.max(error);
+            total_gap_error += error;
+        }
+        if max_gap_error > MOTIF_NEAR_MATCH_MAX_NORMALIZED_ONSET_GAP_ERROR {
+            continue;
+        }
+        // The candidate already belongs to the exact contour layer if its
+        // signed intervals and normalized rhythm shape are both unchanged.
+        if interval_pattern_is_exact && max_gap_error <= MOTIF_NEAR_MATCH_EXACT_GAP_EPSILON {
+            continue;
+        }
+
+        summary.occurrence_count += 1;
+        if window_start >= next_non_overlapping_start {
+            summary.independent_occurrence_count += 1;
+            next_non_overlapping_start = window_start + note_len;
+        }
+        if summary.occurrences.len() >= MAX_MOTIF_NEAR_MATCH_OCCURRENCE_EVIDENCE {
+            continue;
+        }
+
+        let references = candidate
+            .iter()
+            .enumerate()
+            .map(|(offset, (score_note_index, note))| ImportedNoteReference {
+                score_note_index: *score_note_index,
+                part_note_index: window_start + offset,
+                midi_pitch: note.pitch.midi(),
+                onset_numerator: note.onset.num(),
+                onset_denominator: note.onset.den(),
+                duration_numerator: note.duration.num(),
+                duration_denominator: note.duration.den(),
+            })
+            .collect();
+
+        summary.occurrences.push(ImportedMotifNearMatchOccurrence {
+            notes: references,
+            observed_max_pitch_interval_deviation_semitones: max_interval_deviation,
+            observed_max_normalized_onset_gap_error: max_gap_error,
+            observed_mean_normalized_onset_gap_error: total_gap_error / gap_count as f64,
+        });
+    }
+    summary.occurrence_evidence_complete =
+        summary.occurrence_count <= MAX_MOTIF_NEAR_MATCH_OCCURRENCE_EVIDENCE;
+    summary
+}
+
 
 fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotifSummary> {
     // Keep original Score indices and explicit within-part ordering together.
@@ -1298,11 +1444,8 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         return None;
     }
 
-    let representative_notes: Vec<_> = notes
-        .iter()
-        .skip(selected_stats.first_start)
-        .take(motif_len)
-        .collect();
+    let representative_notes =
+        &notes[selected_stats.first_start..selected_stats.first_start + motif_len];
     let mut onset_deltas = Vec::with_capacity(motif_len.saturating_sub(1));
     for pair in representative_notes.windows(2) {
         let delta = pair[1].1.onset.checked_sub(pair[0].1.onset)?;
@@ -1314,6 +1457,10 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
             denominator: delta.den(),
         });
     }
+
+    let rhythm_near_matches = normalized_onset_gap_shape(representative_notes).map(|shape| {
+        rhythm_near_match_summary(&notes, &pitch_interval_pattern, shape)
+    });
 
     let mut occurrence_count = 0_usize;
     let mut independent_occurrence_count = 0_usize;
@@ -1374,6 +1521,7 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         onset_deltas,
         matched_occurrences,
         occurrence_evidence_complete: Some(occurrence_count <= MAX_MOTIF_OCCURRENCE_EVIDENCE),
+        rhythm_near_matches,
     })
 }
 
@@ -1473,6 +1621,17 @@ mod tests {
         midi_file_with_tracks(&[track])
     }
 
+    fn monophonic_midi_track(pitches: &[u8], extra_rest_before_note: &[u8]) -> Vec<u8> {
+        let mut track = Vec::new();
+        for (index, pitch) in pitches.iter().copied().enumerate() {
+            let rest = extra_rest_before_note.get(index).copied().unwrap_or_default();
+            track.extend_from_slice(&[rest, 0x90, pitch, 100, 100, 0x80, pitch, 0]);
+        }
+        track.extend_from_slice(&[0, 0xFF, 0x2F, 0]);
+        track
+    }
+
+
     fn midi_file_with_tracks(tracks: &[&[u8]]) -> Vec<u8> {
         let format = if tracks.len() > 1 { 1_u16 } else { 0_u16 };
         midi_file_with_format(format, tracks)
@@ -1563,6 +1722,67 @@ mod tests {
         assert_eq!(first[0].onset_denominator, 1);
         assert_eq!(first[0].duration_numerator, 5);
         assert_eq!(first[0].duration_denominator, 24);
+    }
+
+
+    #[test]
+    fn rhythm_aware_near_matches_expose_pitch_tolerance_and_reject_direction_changes() {
+        let pitches = [
+            60_u8, 62, 64, 65, 60, 62, 64, 65, // exact contour repeated twice
+            70, 72, 75, 76, // +2,+3,+1: one interval differs by one semitone
+            70, 72, 75, 74, // +2,+3,-1: direction changes and must be rejected
+        ];
+        let track = monophonic_midi_track(&pitches, &[]);
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        let analysis = analyze(&score);
+        assert_eq!(analysis.motifs.len(), 1);
+        let motif = &analysis.motifs[0];
+        assert_eq!(motif.pitch_interval_pattern, vec![2, 2, 1]);
+
+        let near = motif.rhythm_near_matches.as_ref().expect("valid timing yields a near-match scan");
+        assert_eq!(near.max_allowed_pitch_interval_deviation_semitones, 1);
+        assert!((near.max_allowed_normalized_onset_gap_error - 0.15).abs() < 1e-12);
+        assert_eq!(near.occurrence_count, 1);
+        assert_eq!(near.independent_occurrence_count, 1);
+        assert!(near.occurrence_evidence_complete);
+        assert_eq!(
+            near.occurrences[0]
+                .notes
+                .iter()
+                .map(|note| note.score_note_index)
+                .collect::<Vec<_>>(),
+            vec![8, 9, 10, 11]
+        );
+        assert_eq!(
+            near.occurrences[0].observed_max_pitch_interval_deviation_semitones,
+            1
+        );
+        assert!(near.occurrences[0].observed_max_normalized_onset_gap_error < 1e-12);
+    }
+
+    #[test]
+    fn rhythm_aware_near_matches_reject_gap_shape_outside_explicit_tolerance() {
+        let pitches = [
+            60_u8, 62, 64, 65, 60, 62, 64, 65, // exact contour repeated twice
+            70, 72, 75, 76, // pitch-near, but 70->72 is rhythmically stretched
+        ];
+        let mut extra_rest_before_note = vec![0_u8; pitches.len()];
+        // Adds 100 ticks to the second candidate's first internal onset gap:
+        // normalized gaps become [1/2, 1/4, 1/4], exceeding a 0.15 share error.
+        extra_rest_before_note[9] = 100;
+        let track = monophonic_midi_track(&pitches, &extra_rest_before_note);
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        let analysis = analyze(&score);
+        assert_eq!(analysis.motifs.len(), 1);
+        let near = analysis.motifs[0]
+            .rhythm_near_matches
+            .as_ref()
+            .expect("valid timing yields a near-match scan");
+        assert_eq!(near.max_allowed_normalized_onset_gap_error, 0.15);
+        assert_eq!(near.occurrence_count, 0);
+        assert_eq!(near.independent_occurrence_count, 0);
+        assert!(near.occurrence_evidence_complete);
+        assert!(near.occurrences.is_empty());
     }
 
     #[test]

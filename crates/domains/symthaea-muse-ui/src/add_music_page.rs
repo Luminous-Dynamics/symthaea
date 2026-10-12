@@ -194,6 +194,41 @@ pub fn AddMusicPage() -> impl IntoView {
                                     motif.matched_occurrences.len(), motif.occurrence_count),
                                 None => "Stored-evidence completeness unavailable (legacy record)".to_string(),
                             };
+                            let rhythm_near_match_text = match motif.rhythm_near_matches.as_ref() {
+                                Some(summary) if summary.occurrence_count == 0 => format!(
+                                    "Rhythm-aware near matches: no windows met the explicit rule (interval direction preserved; interval magnitude deviation ≤{} semitone; normalized onset-gap-share error ≤{:.2}).",
+                                    summary.max_allowed_pitch_interval_deviation_semitones,
+                                    summary.max_allowed_normalized_onset_gap_error,
+                                ),
+                                Some(summary) => {
+                                    let evidence_status = if summary.occurrence_evidence_complete {
+                                        "complete"
+                                    } else {
+                                        "truncated"
+                                    };
+                                    let first_example = summary.occurrences.first().map(|occurrence| {
+                                        let indices = occurrence.notes.iter()
+                                            .map(|note| note.score_note_index.to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", ");
+                                        format!(
+                                            "; first candidate score-note indices [{indices}], observed max interval deviation {} semitone(s), max normalized gap error {:.3}",
+                                            occurrence.observed_max_pitch_interval_deviation_semitones,
+                                            occurrence.observed_max_normalized_onset_gap_error,
+                                        )
+                                    }).unwrap_or_default();
+                                    format!(
+                                        "Rhythm-aware near matches: {} windows, {} non-overlapping; tolerance ≤{} semitone(s) per interval magnitude and ≤{:.2} normalized onset-gap-share error; stored {} of {} evidence ({evidence_status}){first_example}",
+                                        summary.occurrence_count,
+                                        summary.independent_occurrence_count,
+                                        summary.max_allowed_pitch_interval_deviation_semitones,
+                                        summary.max_allowed_normalized_onset_gap_error,
+                                        summary.occurrences.len(),
+                                        summary.occurrence_count,
+                                    )
+                                }
+                                None => "Rhythm-aware near-match evidence unavailable (legacy record or insufficient timing evidence).".to_string(),
+                            };
                             view! {
                                 <div class="import-motif-result">
                                     <strong>{heading}</strong>
@@ -205,7 +240,8 @@ pub fn AddMusicPage() -> impl IntoView {
                                     <span class="muted small">{format!("Pitch intervals (semitones): {pitch_contour}")}</span>
                                     <span class="muted small">{format!("Representative onset gaps (beats, exact fractions): {onset_gaps}")}</span>
                                     <span class="muted small">{evidence_text}</span>
-                                    <span class="muted small">"Symbolic pitch-contour evidence only; rhythm is not a match gate, and confidence is not calibrated."</span>
+                                    <span class="muted small">{rhythm_near_match_text}</span>
+                                    <span class="muted small">"Exact contour matches do not require rhythm agreement; near matches use explicit timing tolerances. Neither establishes musical identity or listener recognition, and legacy confidence is not calibrated."</span>
                                 </div>
                             }
                         }).collect_view()}
