@@ -43,6 +43,8 @@ const HOLDOUT_TRAJECTORIES: usize = 3;
 const HOLDOUT_THRESHOLD: f64 = 1e-2;
 /// Exploratory instrumentation threshold, to be frozen before confirmatory runs.
 const STEP_SIZE_STABILITY_RELATIVE_TOLERANCE: f64 = 0.10;
+/// Absolute floor for near-zero Lie-variance comparisons at different step sizes.
+const STEP_SIZE_STABILITY_ABSOLUTE_TOLERANCE: f64 = 1e-12;
 const MAX_REPLICATES: usize = 100;
 
 type Monomial = (u8, u8);
@@ -93,6 +95,48 @@ fn mode_name(mode: AutonomousDiscoveryMode) -> &'static str {
         AutonomousDiscoveryMode::Primed => "primed",
         AutonomousDiscoveryMode::RandomBaseline => "random_baseline",
         AutonomousDiscoveryMode::Composed => "composed",
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StepSizeStabilityAssessmentV1 {
+    passed: bool,
+    absolute_variance_difference: f64,
+    relative_variance_difference: f64,
+}
+
+fn assess_step_size_stability(
+    coarse_passed: bool,
+    fine_passed: bool,
+    coarse_variance: f64,
+    fine_variance: f64,
+) -> StepSizeStabilityAssessmentV1 {
+    if !coarse_variance.is_finite()
+        || !fine_variance.is_finite()
+        || coarse_variance < 0.0
+        || fine_variance < 0.0
+        || coarse_variance >= f64::MAX
+        || fine_variance >= f64::MAX
+    {
+        return StepSizeStabilityAssessmentV1 {
+            passed: false,
+            absolute_variance_difference: f64::MAX,
+            relative_variance_difference: f64::MAX,
+        };
+    }
+
+    let absolute_variance_difference = (coarse_variance - fine_variance).abs();
+    let scale = coarse_variance.abs().max(fine_variance.abs());
+    let relative_variance_difference =
+        absolute_variance_difference / scale.max(STEP_SIZE_STABILITY_ABSOLUTE_TOLERANCE);
+    let within_mixed_tolerance = absolute_variance_difference
+        <= STEP_SIZE_STABILITY_ABSOLUTE_TOLERANCE
+            + STEP_SIZE_STABILITY_RELATIVE_TOLERANCE * scale;
+
+    StepSizeStabilityAssessmentV1 {
+        passed: coarse_passed && fine_passed && within_mixed_tolerance,
+        absolute_variance_difference,
+        relative_variance_difference,
     }
 }
 
@@ -347,17 +391,15 @@ fn build_run_record(
             .saturating_add(holdout.state_updates)
             .saturating_add(stability_holdout.state_updates);
 
-        let coarse_variance = holdout.max_lie_derivative_variance;
-        let fine_variance = stability_holdout.max_lie_derivative_variance;
-        let variance_scale = coarse_variance.abs().max(fine_variance.abs()).max(1e-12);
-        let relative_step_size_difference = if coarse_variance.is_finite() && fine_variance.is_finite() {
-            (coarse_variance - fine_variance).abs() / variance_scale
-        } else {
-            f64::MAX
-        };
-        let step_size_stable = holdout.passed
-            && stability_holdout.passed
-            && relative_step_size_difference <= STEP_SIZE_STABILITY_RELATIVE_TOLERANCE;
+        let stability = assess_step_size_stability(
+            holdout.passed,
+            stability_holdout.passed,
+            holdout.max_lie_derivative_variance,
+            stability_holdout.max_lie_derivative_variance,
+        );
+        let absolute_step_size_difference = stability.absolute_variance_difference;
+        let relative_step_size_difference = stability.relative_variance_difference;
+        let step_size_stable = stability.passed;
 
         if holdout.passed {
             holdout_passing_candidates += 1;
@@ -444,7 +486,9 @@ fn build_run_record(
             "holdout": holdout,
             "step_size_stability": {
                 "second_dt": DT / 2.0,
+                "absolute_variance_difference": absolute_step_size_difference,
                 "relative_variance_difference": relative_step_size_difference,
+                "absolute_tolerance": STEP_SIZE_STABILITY_ABSOLUTE_TOLERANCE,
                 "relative_tolerance": STEP_SIZE_STABILITY_RELATIVE_TOLERANCE,
                 "passed": step_size_stable,
                 "assessment": stability_holdout
@@ -722,6 +766,29 @@ mod tests {
         );
         assert_eq!(classify_harmonic_energy_oracle(&candidate(anisotropic)), Some(false));
         assert_eq!(classify_harmonic_energy_oracle(&candidate(cross_term)), Some(false));
+    }
+
+    #[test]
+    fn step_size_stability_uses_explicit_absolute_tolerance_near_zero() {
+        let near_zero = assess_step_size_stability(true, true, 2e-15, 8e-15);
+        assert!(near_zero.passed);
+        assert!((near_zero.absolute_variance_difference - 6e-15).abs() < 1e-20);
+    }
+
+    #[test]
+    fn step_size_stability_enforces_relative_tolerance_away_from_zero() {
+        let stable = assess_step_size_stability(true, true, 5e-3, 5.3e-3);
+        assert!(stable.passed);
+
+        let unstable = assess_step_size_stability(true, true, 5e-3, 6e-3);
+        assert!(!unstable.passed);
+    }
+
+    #[test]
+    fn step_size_stability_never_passes_if_either_holdout_fails() {
+        assert!(!assess_step_size_stability(false, true, 0.0, 0.0).passed);
+        assert!(!assess_step_size_stability(true, false, 1e-14, 1e-14).passed);
+        assert!(!assess_step_size_stability(true, true, f64::MAX, f64::MAX).passed);
     }
 
     #[test]
