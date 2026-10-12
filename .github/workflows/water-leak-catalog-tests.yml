@@ -42,7 +42,7 @@ jobs:
         run: python3 --version
 
       - name: Compile inventory utility and tests
-        run: python3 -m py_compile tools/water_leak_satellite/catalog_inventory.py tests/test_water_leak_satellite_*.py
+        run: python3 -m py_compile tools/water_leak_satellite/strict_json.py tools/water_leak_satellite/catalog_inventory.py tools/water_leak_satellite/verify_inventory.py tools/water_leak_satellite/ground_truth.py tests/test_water_leak_satellite_*.py
 
       - name: Run deterministic offline tests
         run: python3 -m unittest discover -s tests -p 'test_water_leak_satellite_*.py' -v

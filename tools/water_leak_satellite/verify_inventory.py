@@ -16,6 +16,11 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+try:
+    from .strict_json import loads as strict_json_loads
+except ImportError:  # Support direct execution as a script from the repository root.
+    from strict_json import loads as strict_json_loads
+
 SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 
 
@@ -235,9 +240,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("inventory", type=Path, help="saved catalogue inventory JSON")
     args = parser.parse_args(argv)
     try:
-        document = json.loads(args.inventory.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
-        print(f"FAIL: cannot read valid UTF-8 JSON inventory: {exc}", file=sys.stderr)
+        document = strict_json_loads(args.inventory.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError, RecursionError) as exc:
+        print(f"FAIL: cannot read valid strict UTF-8 JSON inventory: {exc}", file=sys.stderr)
         return 2
     errors = verify_inventory(document)
     if errors:

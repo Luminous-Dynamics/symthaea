@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import unittest
 from tools.water_leak_satellite.verify_inventory import canonical_json_bytes, verify_inventory
+from tools.water_leak_satellite.strict_json import loads as strict_json_loads
 
 
 def digest(value):
@@ -66,6 +67,19 @@ def fixture():
 class InventoryVerifierTests(unittest.TestCase):
     def test_valid_inventory_passes_integrity_check(self):
         self.assertEqual(verify_inventory(fixture()), [])
+
+    def test_strict_json_rejects_duplicate_top_level_keys(self):
+        with self.assertRaisesRegex(ValueError, "duplicate JSON object key"):
+            strict_json_loads('{"schema_version": 1, "schema_version": 2}')
+
+    def test_strict_json_rejects_duplicate_nested_keys(self):
+        with self.assertRaisesRegex(ValueError, "duplicate JSON object key"):
+            strict_json_loads('{"properties": {"datetime": "a", "datetime": "b"}}')
+
+    def test_strict_json_rejects_non_finite_numeric_constants(self):
+        for token in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(token=token), self.assertRaisesRegex(ValueError, "non-standard JSON numeric constant"):
+                strict_json_loads('{"measurement": ' + token + '}')
 
     def test_changed_summary_is_detected(self):
         document = fixture()

@@ -21,6 +21,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
+try:
+    from .strict_json import loads as strict_json_loads
+except ImportError:  # Support direct execution as a script from the repository root.
+    from strict_json import loads as strict_json_loads
+
 DEFAULT_ENDPOINT = "https://stac.dataspace.copernicus.eu/v1/search"
 ALLOWED_HOST = "stac.dataspace.copernicus.eu"
 USER_AGENT = "LuminousDynamics-WaterLeak-CatalogInventory/0.1"
@@ -200,9 +205,9 @@ def request_json(url: str, method: str, payload: dict[str, Any] | None, timeout:
     except (URLError, TimeoutError, OSError) as exc:
         raise CatalogError(f"catalog request failed ({type(exc).__name__}): {exc}") from exc
     try:
-        parsed = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise CatalogError("catalog returned a non-JSON or invalid UTF-8 response") from exc
+        parsed = strict_json_loads(raw)
+    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
+        raise CatalogError("catalog returned malformed, ambiguous, or non-standard JSON") from exc
     if not isinstance(parsed, dict) or not isinstance(parsed.get("features"), list):
         raise CatalogError("catalog response did not contain a STAC FeatureCollection with a features array")
     return raw, parsed
