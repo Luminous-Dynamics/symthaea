@@ -439,10 +439,14 @@ fn curve_json(style: Style, control: &str, base_seed: u64) -> serde_json::Value 
         })
         .collect();
 
+    let baseline_input = InputConfig {
+        seed: base_seed,
+        ..InputConfig::BASE
+    };
     let baseline_observation = observations
         .iter()
-        .find(|point| point.input == InputConfig::BASE)
-        .expect("every control grid includes the unchanged baseline");
+        .find(|point| point.input == baseline_input)
+        .expect("every control grid includes the unchanged seeded baseline");
     let exact_events_changed = unique_fingerprints.len() > 1;
     let structural_distance_changed = max_structural_distance > MONOTONIC_EPSILON;
     let structural_layers_changed = !layers_changed.is_empty();
