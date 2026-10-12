@@ -33,6 +33,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 - `generate_benchmark_report.py` - Report generation
 - `muse_style_coverage.py` - Source-derived Muse route audit in both directions; `--report` emits per-constellation gaps and unreferenced executable styles, `--check` fails on frozen-baseline drift
 - `muse_style_capability_inventory.py` - Extracts per-style grammar family/dispatch mode, composition spec, meter, tempo range, census-informed intent-axis declarations, and instrument-pool choices from Rust source; pins the census-source digest without executing the census or claiming render/quality evidence
+- `examples/style_control_response_curves.rs` - Records per-point exact and 11-layer structural differences for fixed-grid tonic/valence/arousal/energy/bars/seed changes through `compose_with_grammar_plan`; symbolic evidence only
   - The dedicated workflow publishes a per-style capability table and source blob digests in its job summary; the JSON report joins catalog entries to their runtime profiles and marks catalog-only rows explicitly.
 - `gpu_smoke.sh` - NVIDIA/CUDA environment preflight and optional Broca CUDA smoke test
 - `post_to_dashboard.py` - Dashboard posting
@@ -62,6 +63,9 @@ python scripts/benchmark_causal_consciousness.py
 
 # Inspect Muse style catalog and executable-routing gaps (metadata, not musical-quality evidence)
 # Inspect source-declared runtime controls and grammar engine/fallback dispatch
+# Measure fixed-seed, one-control-at-a-time curves on the real grammar dispatch path
+cargo test -p symthaea-music-theory --example style_control_response_curves
+MUSE_STYLE_RESPONSE_JSON_OUT=/tmp/muse-style-response.json cargo run --release -p symthaea-music-theory --example style_control_response_curves
 python3 scripts/muse_style_coverage.py --report > /tmp/muse-style-coverage-report.json
 python3 scripts/muse_style_coverage.py --check
 python3 tests/python/test_muse_style_coverage.py -v
