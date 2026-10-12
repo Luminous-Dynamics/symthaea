@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Translate verified Symthaea certificates into Lean kernel-checkable claims.
 
-This tool is a proof bridge, not a formal proof of the Rust/Python decoders. It
-first validates the canonical bytes with the independent Python verifier, then
-constructs a Lean PrimeCert proof of each claimed prime and an exact Lean
-arithmetic equality for the outer factorization.
+This tool is a bounded proof bridge, not a formal proof of the Rust/Python
+decoders. It verifies the exact bytes, emits the decoded wire structure and
+bytes together, and asks Lean to prove that its independent canonical encoder
+reproduces those bytes before proving the prime/factorization claims.
 """
 from __future__ import annotations
 
@@ -25,6 +25,10 @@ from tools.math_certificate_golden_vectors import (
     SYMPPRF1_PRIME_13_MULTI_FACTOR,
 )
 
+# The protocol verifier accepts up to 1 MiB. The formal bridge uses a lower
+# bound because it emits every byte as a Lean numeral and checks it by reduction.
+MAX_FORMAL_CERTIFICATE_BYTES = 65_536
+
 
 def _combined_pocklington_witness(node: verifier.PrimeNode) -> int:
     """Combine per-factor witnesses into one root accepted by PrimeCert.
@@ -32,7 +36,7 @@ def _combined_pocklington_witness(node: verifier.PrimeNode) -> int:
     For m = p - 1, raising a q-witness to m/q^e isolates its q-primary
     component. Those components have pairwise-coprime orders; their product is
     checked against every Pocklington congruence before any Lean is emitted.
-    The Lean tactic then reconstructs the proof term and the kernel checks it.
+    The generated PrimeCert proof and Lean kernel check remain authoritative.
     """
     p = node.prime
     if p <= 2:
@@ -81,64 +85,165 @@ def _factor_expression(factors: tuple[tuple[int, int], ...]) -> str:
     )
 
 
-def _lean_prime_theorem(
+def _lean_pairs(pairs: tuple[tuple[int, int], ...]) -> str:
+    return "[" + ", ".join(f"({left}, {right})" for left, right in pairs) + "]"
+
+
+def _lean_bytes(data: bytes) -> str:
+    return "[" + ", ".join(str(byte) for byte in data) + "]"
+
+
+def _wire_proof_definition(
     proof: verifier.PrimalityProof,
-    theorem_name: str,
+    identifier: str,
 ) -> str:
-    """Emit a theorem whose proof term is built by Lean's PrimeCert tactic."""
+    nodes = []
+    for node in proof.certificates:
+        nodes.append(
+            "    { prime := "
+            f"{node.prime}, predecessorFactors := "
+            f"{_lean_pairs(node.predecessor_factors)}, witnesses := "
+            f"{_lean_pairs(node.witnesses)} }}"
+        )
+    node_list = "[\n" + ",\n".join(nodes) + "\n  ]"
+    return (
+        f"def {identifier} : WirePrimalityProof :=\n"
+        f"  {{ value := {proof.value}\n"
+        f"    certificates := {node_list} }}"
+    )
+
+
+def _lean_prime_tactic(proof: verifier.PrimalityProof) -> str:
     if proof.value == 2:
-        tactic = "by\n  norm_num"
-    else:
-        if not proof.certificates or proof.certificates[0].prime != 2:
-            raise verifier.CertificateError(
-                f"proof for {proof.value} does not begin with the certified base 2"
-            )
-        steps = ["small {2}"]
-        for node in proof.certificates:
-            if node.prime == 2:
-                continue
-            witness = _combined_pocklington_witness(node)
-            factors = _factor_expression(node.predecessor_factors)
-            steps.append(f"pock ({node.prime}, {witness}, {factors})")
-        if proof.certificates[-1].prime != proof.value:
-            raise verifier.CertificateError(
-                f"proof table for {proof.value} does not end at its root"
-            )
-        tactic = "by\n  prime_cert [" + ", ".join(steps) + "]"
-    return f"theorem {theorem_name} : Nat.Prime {proof.value} := {tactic}"
+        return "norm_num"
+    if not proof.certificates or proof.certificates[0].prime != 2:
+        raise verifier.CertificateError(
+            f"proof for {proof.value} does not begin with the certified base 2"
+        )
+    if proof.certificates[-1].prime != proof.value:
+        raise verifier.CertificateError(
+            f"proof table for {proof.value} does not end at its root"
+        )
+
+    steps = ["small {2}"]
+    for node in proof.certificates:
+        if node.prime == 2:
+            continue
+        witness = _combined_pocklington_witness(node)
+        factors = _factor_expression(node.predecessor_factors)
+        steps.append(f"pock ({node.prime}, {witness}, {factors})")
+    return "prime_cert [" + ", ".join(steps) + "]"
+
+
+def _check_formal_size(data: bytes) -> None:
+    if len(data) > MAX_FORMAL_CERTIFICATE_BYTES:
+        raise verifier.CertificateError(
+            "formal proof bridge limit is 65536 bytes; the protocol verifier "
+            "supports larger inputs"
+        )
+
+
+def _render_primality_proof(data: bytes) -> list[str]:
+    proof = verifier.decode_primality_proof(data)
+    lines = [
+        _wire_proof_definition(proof, "source_primality_proof"),
+        f"def source_bytes : List Nat := {_lean_bytes(data)}",
+        "",
+        "theorem source_proof_fields_fit :",
+        "    wirePrimalityProofFieldsFit source_primality_proof = true := by",
+        "  decide",
+        "",
+        "theorem source_bytes_match_canonical_encoding :",
+        "    encodeWirePrimalityProof source_primality_proof = source_bytes := by",
+        "  decide",
+        "",
+        "theorem source_root_matches_claim :",
+        f"    source_primality_proof.value = {proof.value} := by",
+        "  decide",
+        "",
+        f"theorem root_{proof.value}_is_prime :",
+        "    Nat.Prime source_primality_proof.value := by",
+        "  rw [source_root_matches_claim]",
+        f"  {_lean_prime_tactic(proof)}",
+    ]
+    return lines
+
+
+def _render_factorization(data: bytes) -> list[str]:
+    bundle = verifier.decode_certified_factorization(data)
+    factorization = bundle.factorization
+    proof_names = [
+        f"source_factor_proof_{index}"
+        for index in range(len(bundle.prime_proofs))
+    ]
+    lines: list[str] = []
+    for name, proof in zip(proof_names, bundle.prime_proofs):
+        lines.extend([_wire_proof_definition(proof, name), ""])
+
+    factors = _lean_pairs(factorization.factors)
+    proof_refs = "[" + ", ".join(proof_names) + "]"
+    lines.extend(
+        [
+            "def source_certificate : WireCertifiedFactorization :=",
+            "  { factorization :=",
+            f"      {{ value := {factorization.value}, factors := {factors} }}",
+            f"    primeProofs := {proof_refs} }}",
+            f"def source_bytes : List Nat := {_lean_bytes(data)}",
+            "",
+            "theorem source_certificate_fields_fit :",
+            "    wireCertifiedFactorizationFieldsFit source_certificate = true := by",
+            "  decide",
+            "",
+            "theorem source_bytes_match_canonical_encoding :",
+            "    encodeWireCertifiedFactorization source_certificate = source_bytes := by",
+            "  decide",
+            "",
+        ]
+    )
+
+    for index, ((prime, _exponent), proof, name) in enumerate(
+        zip(factorization.factors, bundle.prime_proofs, proof_names)
+    ):
+        root_match = f"source_factor_proof_{index}_root_matches_factor"
+        lines.extend(
+            [
+                f"theorem {root_match} : {name}.value = {prime} := by",
+                "  decide",
+                "",
+                f"theorem factor_{index}_{prime}_is_prime : Nat.Prime {name}.value := by",
+                f"  rw [{root_match}]",
+                f"  {_lean_prime_tactic(proof)}",
+                "",
+            ]
+        )
+
+    product = _factor_expression(factorization.factors)
+    lines.extend(
+        [
+            "theorem factorization_reconstructs :",
+            f"    source_certificate.factorization.value = ({product}) := by",
+            "  norm_num [source_certificate]",
+        ]
+    )
+    return lines
 
 
 def render_certificate(data: bytes) -> str:
-    """Validate canonical bytes and return a self-contained Lean source file."""
-    if len(data) > verifier.MAX_WIRE_BYTES:
-        raise verifier.CertificateError("certificate exceeds 1 MiB")
-
+    """Validate bytes and generate a Lean proof tied to their canonical encoding."""
+    _check_formal_size(data)
     lines = [
-        "import PrimeCert",
+        "import SymthaeaMathCertificates",
+        "",
+        "open SymthaeaMathCertificates",
         "",
         "namespace SymthaeaGenerated",
         "",
     ]
 
     if data.startswith(verifier.PRIMALITY_MAGIC):
-        proof = verifier.decode_primality_proof(data)
-        lines.append(_lean_prime_theorem(proof, f"root_{proof.value}_is_prime"))
+        lines.extend(_render_primality_proof(data))
     elif data.startswith(verifier.FACTORIZATION_MAGIC):
-        bundle = verifier.decode_certified_factorization(data)
-        factorization = bundle.factorization
-        for index, ((prime, _exponent), proof) in enumerate(
-            zip(factorization.factors, bundle.prime_proofs)
-        ):
-            lines.append(
-                _lean_prime_theorem(proof, f"factor_{index}_{prime}_is_prime")
-            )
-            lines.append("")
-
-        product = _factor_expression(factorization.factors)
-        lines.append(
-            "theorem factorization_reconstructs : "
-            f"{factorization.value} = ({product}) := by\n  norm_num"
-        )
+        lines.extend(_render_factorization(data))
     else:
         raise verifier.CertificateError("unrecognized certificate format")
 
@@ -148,29 +253,28 @@ def render_certificate(data: bytes) -> str:
 
 def _read_limited(path: Path) -> bytes:
     with path.open("rb") as handle:
-        data = handle.read(verifier.MAX_WIRE_BYTES + 1)
-    if len(data) > verifier.MAX_WIRE_BYTES:
-        raise verifier.CertificateError("certificate file exceeds 1 MiB")
+        data = handle.read(MAX_FORMAL_CERTIFICATE_BYTES + 1)
+    _check_formal_size(data)
     return data
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Validate a SYMPPRF1/SYMFCER1 certificate and emit Lean PrimeCert "
-            "claims for kernel checking."
+            "Validate a SYMPPRF1/SYMFCER1 certificate and emit Lean source that "
+            "checks canonical re-encoding and the mathematical claims."
         )
     )
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument(
         "--certificate",
         type=Path,
-        help="path to a binary SYMPPRF1 or SYMFCER1 certificate",
+        help="path to a binary SYMPPRF1 or SYMFCER1 certificate (up to 65536 bytes)",
     )
     source.add_argument(
         "--golden-vector",
         choices=("primality-3", "factorization-2", "prime-13-multifactor"),
-        help="emit Lean for a fixed cross-language golden vector",
+        help="emit Lean for a fixed test fixture",
     )
     parser.add_argument("--output", required=True, type=Path, help="Lean source output path")
     args = parser.parse_args(argv)
@@ -185,6 +289,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             data = _read_limited(args.certificate)
 
+        _check_formal_size(data)
         lean_source = render_certificate(data)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(lean_source, encoding="utf-8")
