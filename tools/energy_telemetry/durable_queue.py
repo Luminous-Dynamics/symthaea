@@ -79,7 +79,9 @@ class DurableTelemetryQueue:
         )
         try:
             connection.execute(f"PRAGMA busy_timeout = {int(self.busy_timeout_seconds * 1000)}")
-            connection.execute("PRAGMA journal_mode = WAL")
+            # journal_mode is persistent database state and is established once
+            # during initialization. Reissuing the mode-changing pragma for
+            # every operation needlessly contends with other writers.
             connection.execute("PRAGMA synchronous = FULL")
             yield connection
         finally:
@@ -90,6 +92,13 @@ class DurableTelemetryQueue:
             version = db.execute("PRAGMA user_version").fetchone()[0]
             if version not in (0, _SCHEMA_VERSION):
                 raise TelemetryQueueError(f"unsupported telemetry queue schema version: {version}")
+            journal_mode = db.execute("PRAGMA journal_mode").fetchone()[0].lower()
+            if journal_mode != "wal":
+                journal_mode = db.execute("PRAGMA journal_mode = WAL").fetchone()[0].lower()
+            if journal_mode != "wal":
+                raise TelemetryQueueError(
+                    "SQLite WAL mode is required but unavailable on this database/filesystem"
+                )
             db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS telemetry_events (
