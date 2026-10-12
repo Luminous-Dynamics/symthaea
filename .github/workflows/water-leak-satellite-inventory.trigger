@@ -2,3 +2,4 @@ One-shot, metadata-only Copernicus catalogue reconnaissance trigger for Johannes
 Re-triggered after inventory-verifier hardening; inspect the artifact with the current branch's verifier before interpreting counts.
 Finalized strict-JSON evidence-boundary checks and updated offline suite; re-run metadata-only inventory on this exact head.
 Refresh live metadata-only STAC and independent OData inventories after OData verifier edge-case hardening; evaluate both as catalogue discovery only.
+Refreshed after fixing OData shell line continuations; require exact-head independent STAC and OData metadata-only runs.

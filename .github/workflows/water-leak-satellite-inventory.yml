@@ -142,13 +142,13 @@ jobs:
 
       - name: Cross-check Sentinel-1 and Sentinel-2 products through OData
         run: |
-          python3 tools/water_leak_satellite/odata_inventory.py \\
-            --bbox "$BBOX" \\
-            --start "$START_DATE" \\
-            --end "$END_DATE" \\
-            --limit 100 \\
-            --max-pages 100 \\
-            --timeout 45 \\
+          python3 tools/water_leak_satellite/odata_inventory.py \
+            --bbox "$BBOX" \
+            --start "$START_DATE" \
+            --end "$END_DATE" \
+            --limit 100 \
+            --max-pages 100 \
+            --timeout 45 \
             --out artifacts/water-leak/satellite-odata-inventory.json
 
       - name: Verify saved OData inventory independently
