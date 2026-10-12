@@ -168,11 +168,20 @@ claims. The extra fixture exercises combining per-factor witnesses for
 protocol golden vector. The source project also includes kernel-checked
 claims for primality of 3 and 2 and exact reconstruction of the factorization of 2.
 
-**Formal boundary:** this is a proof of the mathematical claims produced from a
-decoded certificate, not yet a formal proof that the Rust or Python byte parser,
-canonical encoder, or translation program implements this protocol specification.
-The Python validation and Lean proof are independently checked stages, but the
-parser-to-Lean translation is not itself proved correct. In particular, this lane
-does not make the Rust verifier formally verified; it creates a practical path to
-kernel-check prime and factorization claims and gives us a precise next target for
-formalizing decoding and translation.
+Each generated Lean module embeds the exact input bytes and the parsed
+wire structure. Lean proves that its separate canonical encoder reproduces those
+bytes exactly, checks field widths, resource ceilings and factor/proof alignment,
+and only then presents the primality and reconstruction theorems. This binds each
+generated mathematical claim to its byte-level input more strongly than emitting
+a bare `Nat.Prime p` theorem.
+
+**Formal boundary:** the generic Rust/Python decoders and the generator program
+are not themselves formally verified for all inputs, and the Lean reference
+encoder has not yet been proved equivalent to the prose specification as a
+general theorem. The current workflow supplies a kernel-checked per-artifact
+encoding equality plus kernel-checked mathematics; a fully formal decoder and
+a theorem connecting the entire byte-language specification to sound verification
+remain future work. This still does not make the Rust verifier formally verified.
+The formal-generation utility deliberately caps one input at 65,536 bytes to
+keep the generated numeral lists and reduction proofs bounded; the protocol
+verifier itself retains its larger 1 MiB input ceiling.
