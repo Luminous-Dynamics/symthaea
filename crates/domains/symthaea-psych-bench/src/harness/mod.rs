@@ -42,8 +42,8 @@ pub use report::{
 };
 pub use sat_curves::{SatBattery, SatCurve, SatFit, SatPoint, run_sat_curve};
 pub use snapshot::{
-    RegressionReport, RegressionResult, RegressionSeverity, RegressionSnapshot, RegressionSummary,
-    SnapshotComparisonError, SNAPSHOT_SCHEMA_VERSION,
+    ComparisonQualificationGap, RegressionReport, RegressionResult, RegressionSeverity,
+    RegressionSnapshot, RegressionSummary, SnapshotComparisonError, SNAPSHOT_SCHEMA_VERSION,
 };
 pub use staircase::{StaircaseConfig, StaircaseResult, StaircaseRule, run_staircase};
 pub use trial_analysis::{
