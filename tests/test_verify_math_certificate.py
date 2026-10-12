@@ -158,6 +158,30 @@ class PrimalityProofTests(unittest.TestCase):
 
 
 class CertifiedFactorizationTests(unittest.TestCase):
+    def test_certified_factorization_wire_golden_vector_is_stable(self) -> None:
+        certificate = verifier.CertifiedFactorization(
+            verifier.Factorization(2, ((2, 1),)),
+            (proof_two(),),
+        )
+        golden = bytes.fromhex(
+            "53594d4643455231"
+            "0000000000000002"
+            "00000001"
+            "0000000000000002"
+            "00000001"
+            "00000001"
+            "00000024"
+            "53594d5050524631"
+            "0000000000000002"
+            "00000001"
+            "0000000000000002"
+            "00000000"
+            "00000000"
+        )
+        self.assertEqual(len(golden), 76)
+        self.assertEqual(verifier.encode_certified_factorization(certificate), golden)
+        self.assertEqual(verifier.decode_certified_factorization(golden), certificate)
+
     def test_valid_bundle_round_trip_and_exact_reconstruction(self) -> None:
         certificate = certificate_thirty()
         encoded = verifier.encode_certified_factorization(certificate)
