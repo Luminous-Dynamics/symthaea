@@ -156,13 +156,13 @@ pub fn observe_perm_det_ratio(max_n: usize) -> ObservedSequence {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Inline RK4 trajectory generation for small invariant-mining probes.
-fn rk45_trajectory(
+fn rk4_trajectory(
     f: impl Fn(&[f64], f64) -> Vec<f64>,
     y0: &[f64],
     t_end: f64,
     dt: f64,
 ) -> (Vec<f64>, Vec<Vec<f64>>) {
-    super::dynamics::rk45_trajectory(f, y0, t_end, dt)
+    super::dynamics::rk4_trajectory(f, y0, t_end, dt)
 }
 fn lorenz_rhs(s: &[f64], _t: f64) -> Vec<f64> {
     let (x, y, z) = (s[0], s[1], s[2]);
@@ -172,7 +172,7 @@ fn lorenz_rhs(s: &[f64], _t: f64) -> Vec<f64> {
 
 /// Observe time-averaged Lorenz statistics for conjecture discovery.
 pub fn observe_lorenz_time_averages(n_samples: usize) -> ObservedSequence {
-    let (_, states) = rk45_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 50.0, 0.01);
+    let (_, states) = rk4_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 50.0, 0.01);
     let attractor_states = if states.len() > 1000 {
         &states[1000..]
     } else {
@@ -201,7 +201,7 @@ pub fn observe_lorenz_time_averages(n_samples: usize) -> ObservedSequence {
 
 /// Observe Lorenz attractor candidate invariants for later GP search.
 pub fn observe_lorenz_invariant_candidates(n_points: usize) -> Vec<ObservedSequence> {
-    let (times, states) = rk45_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 50.0, 0.01);
+    let (times, states) = rk4_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 50.0, 0.01);
     let skip = if states.len() > 1000 { 1000 } else { 0 };
     let attractor = &states[skip..];
     let attractor_t = &times[skip..];
@@ -350,7 +350,7 @@ fn harmonic_rhs(s: &[f64], _t: f64) -> Vec<f64> {
 
 /// Observe harmonic oscillator invariant candidates.
 pub fn observe_harmonic_invariants(n_points: usize) -> Vec<ObservedSequence> {
-    let (times, states) = rk45_trajectory(harmonic_rhs, &[1.0, 0.0], 20.0, 0.01);
+    let (times, states) = rk4_trajectory(harmonic_rhs, &[1.0, 0.0], 20.0, 0.01);
     let step = states.len() / n_points.max(1);
     let mut seqs = Vec::new();
 
