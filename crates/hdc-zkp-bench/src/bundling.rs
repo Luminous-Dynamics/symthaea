@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Binius benchmark: HDC majority-vote bundling.
 //!
+//! This proves constraint integrity only; the vendored Binius64 backend does not
+//! guarantee zero-knowledge input privacy.
+//!
 //! Bundling N vectors: for each bit position, output 1 if majority of
 //! N input bits are 1. Requires counting + threshold comparison.
 //!
@@ -57,7 +60,7 @@ pub fn bench_bundling(num_vectors: usize, dim_words: usize) -> BundlingBenchResu
 
     let builder = CircuitBuilder::new();
 
-    // Input vectors (private witnesses)
+    // Input vectors (witness wires; no input-confidentiality guarantee)
     let inputs: Vec<Vec<_>> = (0..num_vectors)
         .map(|_| {
             (0..dim_words)
@@ -151,7 +154,7 @@ pub fn bench_bundling(num_vectors: usize, dim_words: usize) -> BundlingBenchResu
         "  Verifier time: {:.3} ms",
         verify_time.as_secs_f64() * 1000.0
     );
-    println!("  Verification: PASSED (real cryptographic proof)");
+    println!("  Verification: PASSED (integrity proof; no Binius64 ZK privacy guarantee)");
 
     BundlingBenchResult {
         num_vectors: num_vectors,
