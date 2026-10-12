@@ -19,7 +19,8 @@
 //! SYMTHAEA_WHISPER_MODEL_PATH=/srv/luminous-dynamics/models/communication/whisper-large-v3 \
 //! cargo run --example voice_roundtrip_wer --features voice-tts [--release] -- \
 //!     [--worker communication/worker/run_whisper_nixos.sh] \
-//!     [--report /path/to/report.json] [--save-wavs /tmp/dir]
+//!     [--case-manifest /path/to/pack.private/render_manifest.json] \
+//!     [--report /path/to/report.json] [--save-wavs /tmp/fresh-dir]
 //! ```
 //!
 //! Interpretation note: Whisper large-v3 scores ~4.8% WER (normalized) on real
@@ -28,9 +29,12 @@
 //! intelligibility-optimized. The point is the number and its trend, not
 //! flattery.
 
+use std::collections::HashSet;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
+
+use sha2::{Digest, Sha256};
 
 use symthaea::voice::repl_voice::{ReplVoiceConfig, ReplVoiceOutput};
 use symthaea::voice::transcribe_samples;
@@ -56,6 +60,131 @@ const SENTENCES: &[&str] = &[
     "please open the pod bay doors",
     "speech synthesis quality measurement",
 ];
+
+#[derive(Debug, Clone)]
+struct Utterance {
+    clip_id: String,
+    text: String,
+    source_text_sha256: String,
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn sha256_file(path: &Path) -> anyhow::Result<String> {
+    let bytes = std::fs::read(path)?;
+    Ok(sha256_hex(&bytes))
+}
+
+fn safe_clip_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+}
+
+fn load_case_manifest(path: &Path) -> anyhow::Result<Vec<Utterance>> {
+    let bytes = std::fs::read(path)?;
+    let root: serde_json::Value = serde_json::from_slice(&bytes)?;
+    parse_case_manifest(&root)
+}
+
+fn parse_case_manifest(root: &serde_json::Value) -> anyhow::Result<Vec<Utterance>> {
+    anyhow::ensure!(
+        root.get("format_version").and_then(|value| value.as_u64()) == Some(1),
+        "case manifest must declare format_version=1"
+    );
+    let cases = root
+        .get("cases")
+        .and_then(|value| value.as_array())
+        .ok_or_else(|| anyhow::anyhow!("case manifest requires a cases array"))?;
+    anyhow::ensure!(!cases.is_empty(), "case manifest must not be empty");
+
+    let mut seen_ids = HashSet::new();
+    let mut utterances = Vec::with_capacity(cases.len());
+    for (index, case) in cases.iter().enumerate() {
+        let clip_id = case
+            .get("clip_id")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow::anyhow!("manifest case {index} has no string clip_id"))?;
+        anyhow::ensure!(
+            safe_clip_id(clip_id),
+            "manifest case {index} has unsafe clip_id {clip_id:?}"
+        );
+        anyhow::ensure!(
+            seen_ids.insert(clip_id.to_string()),
+            "duplicate clip_id {clip_id:?} in case manifest"
+        );
+
+        let language = case
+            .get("language")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow::anyhow!("manifest case {clip_id} has no language"))?;
+        anyhow::ensure!(
+            language == "en",
+            "voice_roundtrip_wer currently supports language='en' only; got {language:?} in {clip_id}"
+        );
+        let text = case
+            .get("text")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow::anyhow!("manifest case {clip_id} has no source text"))?;
+        anyhow::ensure!(!text.trim().is_empty(), "manifest case {clip_id} has empty source text");
+        let expected_digest = case
+            .get("text_sha256")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow::anyhow!("manifest case {clip_id} has no text_sha256"))?;
+        let actual_digest = sha256_hex(text.as_bytes());
+        anyhow::ensure!(
+            expected_digest == actual_digest,
+            "source text SHA-256 mismatch for {clip_id}: manifest {expected_digest}, actual {actual_digest}"
+        );
+        let question_ids = case
+            .get("question_ids")
+            .and_then(|value| value.as_array())
+            .ok_or_else(|| anyhow::anyhow!("manifest case {clip_id} has no question_ids array"))?;
+        anyhow::ensure!(!question_ids.is_empty(), "manifest case {clip_id} has no comprehension questions");
+        let mut seen_question_ids = HashSet::new();
+        for question in question_ids {
+            let question_id = question
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("manifest case {clip_id} has a non-string question ID"))?;
+            anyhow::ensure!(
+                !question_id.trim().is_empty() && seen_question_ids.insert(question_id.to_string()),
+                "manifest case {clip_id} has an empty or duplicate question ID"
+            );
+        }
+        utterances.push(Utterance {
+            clip_id: clip_id.to_string(),
+            text: text.to_string(),
+            source_text_sha256: actual_digest,
+        });
+    }
+    Ok(utterances)
+}
+
+fn default_utterances(mode: &str) -> Vec<Utterance> {
+    const LOW_PRIOR: &[&str] = &[
+        "the purple architect measured seven quiet plums",
+        "my walrus prefers grapefruit opera on Tuesdays",
+        "eleven cautious spoons orbit the marble lighthouse",
+    ];
+    let sentences: Vec<&str> = if mode == "kokoro" {
+        SENTENCES.iter().chain(LOW_PRIOR.iter()).copied().collect()
+    } else {
+        SENTENCES.to_vec()
+    };
+    sentences
+        .into_iter()
+        .enumerate()
+        .map(|(index, text)| Utterance {
+            clip_id: format!("roundtrip_{index:02}"),
+            text: text.to_string(),
+            source_text_sha256: sha256_hex(text.as_bytes()),
+        })
+        .collect()
+}
 
 fn linear_resample(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
     if from_rate == to_rate || input.is_empty() {
@@ -466,6 +595,7 @@ fn main() -> anyhow::Result<()> {
         arg_value(&args, "--worker")
             .unwrap_or_else(|| "communication/worker/run_whisper_nixos.sh".to_string()),
     );
+    let case_manifest = arg_value(&args, "--case-manifest").map(PathBuf::from);
     let report_path = arg_value(&args, "--report").map(PathBuf::from);
     let save_wavs = arg_value(&args, "--save-wavs").map(PathBuf::from);
     if let Some(ref dir) = save_wavs {
@@ -698,21 +828,18 @@ fn main() -> anyhow::Result<()> {
     // model can reconstruct from degraded audio. These are grammatical but
     // improbable — a correct transcription here means the AUDIO carries the
     // phonetics, not the listener's prior.
-    const LOW_PRIOR: &[&str] = &[
-        "the purple architect measured seven quiet plums",
-        "my walrus prefers grapefruit opera on Tuesdays",
-        "eleven cautious spoons orbit the marble lighthouse",
-    ];
-    let sentences: Vec<&str> = if mode == "kokoro" {
-        SENTENCES.iter().chain(LOW_PRIOR.iter()).copied().collect()
+    let utterances = if let Some(ref manifest_path) = case_manifest {
+        load_case_manifest(manifest_path)?
     } else {
-        SENTENCES.to_vec()
+        default_utterances(&mode)
     };
 
     let mut rows = Vec::new();
     let mut synthesis_failures = Vec::new();
     let mut total_wer = 0.0f64;
-    for (i, sentence) in sentences.iter().enumerate() {
+    for (i, utterance) in utterances.iter().enumerate() {
+        let clip_id = utterance.clip_id.as_str();
+        let sentence = utterance.text.as_str();
         let synth_start = Instant::now();
         let synthesis_result: Result<Vec<f32>, String> = match &mut synth {
             Synth::Repl(voice) => voice
@@ -727,16 +854,16 @@ fn main() -> anyhow::Result<()> {
             Ok(samples) if !samples.is_empty() => samples,
             Ok(_) => {
                 let reason = "synthesis returned empty audio".to_string();
-                println!("  [{i:2}] SYNTHESIS FAILED: {sentence:?} ({reason})");
+                println!("  [{i:2}] SYNTHESIS FAILED {clip_id}: {sentence:?} ({reason})");
                 synthesis_failures.push(serde_json::json!({
-                    "index": i, "sentence": sentence, "reason": reason, "synth_ms": synth_ms
+                    "index": i, "clip_id": clip_id, "sentence": sentence, "reason": reason, "synth_ms": synth_ms
                 }));
                 continue;
             }
             Err(reason) => {
-                println!("  [{i:2}] SYNTHESIS FAILED: {sentence:?} ({reason})");
+                println!("  [{i:2}] SYNTHESIS FAILED {clip_id}: {sentence:?} ({reason})");
                 synthesis_failures.push(serde_json::json!({
-                    "index": i, "sentence": sentence, "reason": reason, "synth_ms": synth_ms
+                    "index": i, "clip_id": clip_id, "sentence": sentence, "reason": reason, "synth_ms": synth_ms
                 }));
                 continue;
             }
@@ -744,12 +871,11 @@ fn main() -> anyhow::Result<()> {
         let audio_secs = samples.len() as f32 / voice_sr as f32;
         let resampled = linear_resample(&samples, voice_sr, WHISPER_SAMPLE_RATE);
 
+        let mut audio_sha256: Option<String> = None;
         if let Some(ref dir) = save_wavs {
-            save_wav(
-                &dir.join(format!("roundtrip_{i:02}.wav")),
-                &samples,
-                voice_sr,
-            )?;
+            let wav_path = dir.join(format!("{clip_id}.wav"));
+            save_wav(&wav_path, &samples, voice_sr)?;
+            audio_sha256 = Some(sha256_file(&wav_path)?);
         }
 
         let asr_start = Instant::now();
@@ -770,6 +896,9 @@ fn main() -> anyhow::Result<()> {
         println!("        heard: {:?}", preserved.original.trim());
 
         rows.push(serde_json::json!({
+            "clip_id": clip_id,
+            "source_text_sha256": utterance.source_text_sha256,
+            "audio_sha256": audio_sha256,
             "sentence": sentence,
             "heard": preserved.original.trim(),
             "wer": wer,
@@ -780,7 +909,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     let rendered_count = rows.len();
-    let requested_count = sentences.len();
+    let requested_count = utterances.len();
     let failure_count = synthesis_failures.len();
     let complete = rendered_count == requested_count && failure_count == 0;
     let mean_wer = if rendered_count > 0 {
@@ -804,6 +933,8 @@ fn main() -> anyhow::Result<()> {
             "eval": "voice_roundtrip_wer",
             "voice": if mode == "kokoro" { "KokoroEngine (neural, onnx-community)" } else { "ReplVoiceOutput (formant/vocal-tract)" },
             "mode": mode,
+            "case_manifest": case_manifest.as_ref().map(|path| path.display().to_string()),
+            "audio_saved": save_wavs.is_some(),
             "rate": rate,
             "f0": f0,
             "vocal_tract_feature": cfg!(feature = "vocal-tract"),
@@ -838,4 +969,73 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod case_manifest_tests {
+    use super::*;
+
+    fn valid_manifest() -> serde_json::Value {
+        let text = "Do not restart the server until the backup is verified.";
+        serde_json::json!({
+            "format_version": 1,
+            "cases": [{
+                "clip_id": "VC-001",
+                "language": "en",
+                "category": "negation",
+                "text": text,
+                "text_sha256": sha256_hex(text.as_bytes()),
+                "question_ids": ["q1", "q2"]
+            }]
+        })
+    }
+
+    #[test]
+    fn case_manifest_preserves_stable_id_and_verified_source_digest() {
+        let utterances = parse_case_manifest(&valid_manifest()).unwrap();
+        assert_eq!(utterances.len(), 1);
+        assert_eq!(utterances[0].clip_id, "VC-001");
+        assert_eq!(
+            utterances[0].source_text_sha256,
+            sha256_hex(utterances[0].text.as_bytes())
+        );
+    }
+
+    #[test]
+    fn case_manifest_rejects_source_text_digest_drift() {
+        let mut manifest = valid_manifest();
+        manifest["cases"][0]["text"] = serde_json::json!("Silently changed spoken text.");
+        let error = parse_case_manifest(&manifest).unwrap_err().to_string();
+        assert!(error.contains("source text SHA-256 mismatch"), "{error}");
+    }
+
+    #[test]
+    fn case_manifest_rejects_path_like_clip_ids() {
+        let mut manifest = valid_manifest();
+        manifest["cases"][0]["clip_id"] = serde_json::json!("../outside");
+        let error = parse_case_manifest(&manifest).unwrap_err().to_string();
+        assert!(error.contains("unsafe clip_id"), "{error}");
+    }
+
+    #[test]
+    fn case_manifest_rejects_duplicate_clip_ids_and_non_english_languages() {
+        let mut duplicate = valid_manifest();
+        let existing_case = duplicate["cases"][0].clone();
+        duplicate["cases"].as_array_mut().unwrap().push(existing_case);
+        let duplicate_error = parse_case_manifest(&duplicate).unwrap_err().to_string();
+        assert!(duplicate_error.contains("duplicate clip_id"), "{duplicate_error}");
+
+        let mut wrong_language = valid_manifest();
+        wrong_language["cases"][0]["language"] = serde_json::json!("fr");
+        let language_error = parse_case_manifest(&wrong_language).unwrap_err().to_string();
+        assert!(language_error.contains("supports language='en' only"), "{language_error}");
+    }
+
+    #[test]
+    fn sha256_hex_uses_standard_sha256_encoding() {
+        assert_eq!(
+            sha256_hex(b"hello"),
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
+    }
 }
