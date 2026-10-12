@@ -74,11 +74,31 @@ class VoiceLanguageRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires a verification receipt"):
             validate_registry(registry)
 
-    def test_reviewed_status_requires_held_out_evaluation_and_review(self):
+    def test_speaker_reviewed_status_requires_verification_receipt(self):
         registry = copy.deepcopy(REGISTRY)
         registry["languages"][0]["capabilities"]["g2p"]["status"] = "speaker_reviewed"
         registry["languages"][0]["capabilities"]["g2p"]["verification"] = None
         with self.assertRaisesRegex(ValueError, "requires a verification receipt"):
+            validate_registry(registry)
+
+    def test_speaker_reviewed_status_requires_passing_evaluation_and_review(self):
+        registry = copy.deepcopy(REGISTRY)
+        row = registry["languages"][0]["capabilities"]["g2p"]
+        row["status"] = "speaker_reviewed"
+        row["verification"] = {
+            "commit_sha": "a" * 40,
+            "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/123",
+            "checks": ["unit-tests"],
+        }
+        with self.assertRaisesRegex(ValueError, "requires a passing held-out evaluation"):
+            validate_registry(registry)
+
+        row["evaluation"] = {
+            "metric": "phone accuracy", "value": 0.99, "threshold": 0.95,
+            "comparator": "gte", "sample_count": 10, "held_out": True,
+            "split_description": "held-out speakers", "outcome": "pass",
+        }
+        with self.assertRaisesRegex(ValueError, "requires speaker review evidence"):
             validate_registry(registry)
 
     def test_evaluation_outcome_cannot_contradict_threshold(self):
@@ -112,6 +132,40 @@ class VoiceLanguageRegistryTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "requires pinned model and dataset"):
             validate_registry(registry)
+
+    def test_complete_production_qualification_fixture_is_structurally_accepted(self):
+        # Synthetic metadata only: this checks the validator contract, not a
+        # real model, licensed corpus, successful CI run, or language quality.
+        registry = copy.deepcopy(REGISTRY)
+        row = registry["languages"][0]["capabilities"]["g2p"]
+        row.update({
+            "status": "production_qualified",
+            "model": {
+                "name": "synthetic-test-model", "revision": "test-only",
+                "sha256": "a" * 64, "license": "test-fixture-license",
+            },
+            "dataset": {
+                "name": "synthetic-test-corpus", "revision": "test-only",
+                "sha256": "b" * 64, "license": "test-fixture-license",
+                "held_out_split": "test-only held-out speaker split",
+            },
+            "verification": {
+                "commit_sha": "c" * 40,
+                "run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/123",
+                "checks": ["synthetic-validator-fixture"],
+            },
+            "evaluation": {
+                "metric": "phone accuracy", "value": 0.99, "threshold": 0.95,
+                "comparator": "gte", "sample_count": 100, "held_out": True,
+                "split_description": "synthetic test fixture only", "outcome": "pass",
+            },
+            "speaker_review": {
+                "reviewer_count": 2, "method": "fixture-only",
+                "scope": "synthetic test case", "date": "2026-10-12",
+            },
+        })
+        summary = validate_registry(registry)
+        self.assertEqual(summary["status_production_qualified"], 1)
 
     def test_nonstandard_json_constants_fail_closed(self):
         with tempfile.TemporaryDirectory() as tempdir:
