@@ -977,6 +977,37 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
 /// A failure must be recorded explicitly and agree with the census and metric
 /// fields. In particular, a failed score above threshold cannot have no failure
 /// code, and an incomplete census cannot be represented as threshold-only failure.
+fn actual_rk4_step_count(t_end: f64, dt: f64) -> Option<u64> {
+    if !t_end.is_finite() || t_end <= 0.0 || !dt.is_finite() || dt <= 0.0 {
+        return None;
+    }
+    let estimated = (t_end / dt).ceil();
+    if !estimated.is_finite() || estimated < 1.0 || estimated > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY {
+        return None;
+    }
+    let max_steps = estimated as usize;
+    let mut completed = 0u64;
+    for step in 0..max_steps {
+        let t = (step as f64 * dt).min(t_end);
+        if t >= t_end {
+            break;
+        }
+        let next_t = if step + 1 == max_steps {
+            t_end
+        } else {
+            ((step + 1) as f64 * dt).min(t_end)
+        };
+        if !next_t.is_finite() || next_t <= t {
+            return None;
+        }
+        completed = completed.saturating_add(1);
+        if next_t == t_end {
+            break;
+        }
+    }
+    (completed > 0).then_some(completed)
+}
+
 fn holdout_record_is_consistent(
     holdout: &AutonomousHoldoutValidation,
     t_max: f64,
@@ -1015,10 +1046,14 @@ fn holdout_record_is_consistent(
         return false;
     }
     let estimated_steps = (t_max / dt).ceil();
+    let actual_steps = match actual_rk4_step_count(t_max, dt) {
+        Some(steps) => steps,
+        None => return false,
+    };
     let state_updates_per_trajectory = estimated_steps * state_dimension as f64;
     let total_steps = estimated_steps * holdout.requested_trajectories as f64;
-    let maximum_actual_steps = total_steps;
-    if holdout.attempted_integration_steps as f64 > maximum_actual_steps {
+    let maximum_actual_steps = actual_steps.saturating_mul(holdout.requested_trajectories as u64);
+    if holdout.attempted_integration_steps > maximum_actual_steps {
         return false;
     }
     let total_state_updates = state_updates_per_trajectory
@@ -1036,7 +1071,7 @@ fn holdout_record_is_consistent(
             && holdout.failure.is_none()
             && holdout.requested_trajectories > 0
             && holdout.trajectories_checked == holdout.requested_trajectories
-            && holdout.attempted_integration_steps as f64 == maximum_actual_steps
+            && holdout.attempted_integration_steps == maximum_actual_steps
             && holdout.completed_integration_steps == holdout.attempted_integration_steps
             && holdout.integration_rhs_evaluations
                 == holdout.completed_integration_steps.saturating_mul(4)
