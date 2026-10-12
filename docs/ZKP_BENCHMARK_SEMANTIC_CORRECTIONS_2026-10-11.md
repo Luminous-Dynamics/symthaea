@@ -33,3 +33,17 @@
 - **Static review:** the duplicated bundling call is fixed; the standalone HDC test/reproduction job is now wired into CI.
 - **Automated execution:** pending. No passing Rust build, circuit test, reproduction, or workflow-syntax result has been observed yet for the latest head.
 - **Still not claimed:** numeric CfC proof, sigmoid correctness, OTP encryption, numeric federated-gradient aggregation, measured Winterfell baseline, or fresh benchmark metrics.
+
+
+## Binius64 privacy boundary (2026-10-12)
+
+- The vendored `vendor/binius64/ARCHITECTURE.md` explicitly lists the standard `binius-prover` / `binius-verifier` backend as **not zero-knowledge** and lists Iron Spartan as the separate ZK backend. The HDC benchmark depends on the standard Binius64 crates, not Iron Spartan.
+- Therefore the current HDC circuits demonstrate constraint satisfaction / computational integrity only. They do **not** guarantee that witness inputs remain confidential. Calling a wire a witness or omitting it from `public_words` is not, by itself, a zero-knowledge guarantee.
+- Replaced the misleading triple-stack runtime demo with an opaque-word XOR integrity proof. It no longer simulates host-side OTP values and then reports encryption or perfect secrecy as verified.
+- Re-scoped README and paper language to remove any implication that the bundled Binius64 HDC circuit is privacy-preserving. A ZK-capable backend and privacy/security review are prerequisites for those claims.
+
+## CI follow-up
+
+- Registered the new HDC test job in the top-level draft-safety census.
+- Fixed the workflow-safety checker so manual-only runner roots are not incorrectly required to include `ready_for_review`; its existing self-test covers this branch.
+- The latest automated HDC build, test, reproduction, and workflow checks still need a completed run. No green result is claimed yet.
