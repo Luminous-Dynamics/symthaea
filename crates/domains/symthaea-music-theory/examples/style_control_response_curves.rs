@@ -343,6 +343,118 @@ fn observation_json(observation: &Observation, base_hash: u64) -> serde_json::Va
     })
 }
 
+const TONIC_CANDIDATE_INVARIANT_LAYERS: &[&str] = &[
+    "form",
+    "rhythm",
+    "contour",
+    "tempo_meter",
+    "pitch_class",
+    "interval",
+    "chord_quality",
+    "cadence",
+    "motif",
+];
+
+/// Reports a justified target metric separately from displacement. Only tonic
+/// has a direct, source-grounded target contract here; other controls remain
+/// explicitly unscored until their per-style semantics are specified.
+fn control_target_evaluation(
+    control: &str,
+    observations: &[Observation],
+) -> serde_json::Value {
+    if control != "tonic" {
+        return serde_json::json!({
+            "control": control,
+            "target_fidelity": {
+                "status": "not_predeclared",
+                "reason": "No control-target metric is currently justified for this axis.",
+            },
+            "non_target_invariance": {
+                "status": "not_predeclared",
+                "reason": "No non-target invariant set is currently declared for this axis.",
+            },
+        });
+    }
+
+    let target_points: Vec<serde_json::Value> = observations
+        .iter()
+        .map(|observation| {
+            let requested_tonic_pc = observation.input.tonic.rem_euclid(12);
+            let realized_tonic_pc = observation.score_key_tonic_pc.rem_euclid(12);
+            serde_json::json!({
+                "control_value": observation.value_label,
+                "requested_tonic_pc": requested_tonic_pc,
+                "realized_tonic_pc": realized_tonic_pc,
+                "matches_target": requested_tonic_pc == realized_tonic_pc,
+            })
+        })
+        .collect();
+    let matching_points = target_points
+        .iter()
+        .filter(|point| point["matches_target"].as_bool() == Some(true))
+        .count();
+    let target_point_count = target_points.len();
+
+    // These layers are candidate invariants under global transposition. The
+    // absolute-key harmony and register-sensitive orchestration layers are
+    // intentionally excluded. Violations are diagnostic, not an automatic
+    // failure: individual styles may expose constraints needing investigation.
+    let nonbaseline_points: Vec<&Observation> = observations
+        .iter()
+        .filter(|observation| observation.input.tonic.rem_euclid(12) != BASE_TONIC.rem_euclid(12))
+        .collect();
+    let mut invariant_violations = Vec::new();
+    let mut points_without_violations = 0;
+    for observation in &nonbaseline_points {
+        let mut point_violation_count = 0;
+        for (&(layer, _, _), &distance) in
+            LAYERS.iter().zip(observation.layer_distances.iter())
+        {
+            if TONIC_CANDIDATE_INVARIANT_LAYERS.contains(&layer)
+                && distance > LAYER_CHANGE_THRESHOLD
+            {
+                point_violation_count += 1;
+                invariant_violations.push(serde_json::json!({
+                    "control_value": observation.value_label,
+                    "layer": layer,
+                    "distance_from_baseline": distance,
+                }));
+            }
+        }
+        if point_violation_count == 0 {
+            points_without_violations += 1;
+        }
+    }
+
+    serde_json::json!({
+        "control": control,
+        "target_fidelity": {
+            "status": "measured",
+            "target_metric": "realized_key_tonic_pc_matches_requested_pitch_class",
+            "tested_point_count": target_point_count,
+            "matching_point_count": matching_points,
+            "mismatching_point_count": target_point_count - matching_points,
+            "adherence_fraction": matching_points as f64
+                / target_point_count.max(1) as f64,
+            "points": target_points,
+        },
+        "non_target_invariance": {
+            "status": "diagnostic",
+            "candidate_invariant_layers": TONIC_CANDIDATE_INVARIANT_LAYERS,
+            "layer_change_threshold": LAYER_CHANGE_THRESHOLD,
+            "nonbaseline_point_count": nonbaseline_points.len(),
+            "points_without_candidate_invariance_violations": points_without_violations,
+            "points_with_candidate_invariance_violations":
+                nonbaseline_points.len() - points_without_violations,
+            "violations": invariant_violations,
+            "interpretation": concat!(
+                "Candidate transposition invariants are reported separately from key-target ",
+                "fidelity. Violations are diagnostic and are not quality or authenticity scores."
+            ),
+        },
+    })
+}
+
 fn curve_json(style: Style, control: &str, base_seed: u64) -> serde_json::Value {
     let base = ControlPoint {
         value_label: "baseline".into(),
@@ -532,6 +644,7 @@ fn curve_json(style: Style, control: &str, base_seed: u64) -> serde_json::Value 
             / observations.len().max(1) as f64,
         "max_structural_distance": max_structural_distance,
         "layers_changed_at_least_once": layers_changed,
+        "control_target_evaluation": control_target_evaluation(control, &observations),
         "observed_changes_from_baseline": {
             "exact_note_event_fingerprint": exact_events_changed,
             "overall_structural_distance": structural_distance_changed,
@@ -733,6 +846,7 @@ fn main() {
                 }).sum::<u64>()
             }).sum::<u64>(),
             "layer_change_threshold": LAYER_CHANGE_THRESHOLD,
+            "control_evaluation_schema": "muse-control-evaluation-v1",
             "fingerprint_layers": LAYERS.iter().map(|(name, start, len)| {
                 serde_json::json!({"name": name, "start": start, "length": len})
             }).collect::<Vec<_>>(),
@@ -998,6 +1112,58 @@ mod tests {
         assert_eq!(points_per_seed, 29);
         assert_eq!(Style::ALL.len() * BASE_SEED_SET.len() * 6, 696);
         assert_eq!(Style::ALL.len() * BASE_SEED_SET.len() * points_per_seed, 3_364);
+    }
+
+    #[test]
+    fn tonic_curve_reports_target_fidelity_separately_from_invariance() {
+        let curve = curve_json(Style::Classical, "tonic", BASE_SEED);
+        let evaluation = &curve["control_target_evaluation"];
+        let target = &evaluation["target_fidelity"];
+        let invariance = &evaluation["non_target_invariance"];
+        assert_eq!(target["status"].as_str(), Some("measured"));
+        assert_eq!(target["tested_point_count"].as_u64(), Some(5));
+        assert_eq!(target["points"].as_array().unwrap().len(), 5);
+        let independently_counted = target["points"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|point| {
+                point["requested_tonic_pc"].as_i64()
+                    == point["realized_tonic_pc"].as_i64()
+            })
+            .count();
+        assert_eq!(
+            target["matching_point_count"].as_u64(),
+            Some(independently_counted as u64)
+        );
+        assert_eq!(
+            target["mismatching_point_count"].as_u64(),
+            Some((5 - independently_counted) as u64)
+        );
+        assert_eq!(invariance["status"].as_str(), Some("diagnostic"));
+        assert_eq!(invariance["nonbaseline_point_count"].as_u64(), Some(4));
+        assert!(invariance["candidate_invariant_layers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|layer| layer.as_str() == Some("rhythm")));
+        assert!(invariance["interpretation"]
+            .as_str()
+            .unwrap()
+            .contains("reported separately"));
+    }
+
+    #[test]
+    fn unscored_controls_are_explicitly_not_predeclared() {
+        let curve = curve_json(Style::Classical, "arousal", BASE_SEED);
+        assert_eq!(
+            curve["control_target_evaluation"]["target_fidelity"]["status"].as_str(),
+            Some("not_predeclared")
+        );
+        assert_eq!(
+            curve["control_target_evaluation"]["non_target_invariance"]["status"].as_str(),
+            Some("not_predeclared")
+        );
     }
 
     #[test]
