@@ -168,6 +168,29 @@ pub fn AddMusicPage() -> impl IntoView {
                                 .map(|count| format!("{} non-overlapping occurrence{}",
                                     count, if count == 1 { "" } else { "s" }))
                                 .unwrap_or_else(|| "Independent occurrence count unavailable (legacy record)".to_string());
+                            let pitch_contour = if motif.pitch_interval_pattern.is_empty() {
+                                "Unavailable (legacy record)".to_string()
+                            } else {
+                                motif.pitch_interval_pattern.iter()
+                                    .map(|interval| format!("{interval:+}"))
+                                    .collect::<Vec<_>>()
+                                    .join(" → ")
+                            };
+                            let onset_gaps = if motif.onset_deltas.is_empty() {
+                                "Unavailable (legacy record)".to_string()
+                            } else {
+                                motif.onset_deltas.iter()
+                                    .map(|delta| format!("{}/{}", delta.numerator, delta.denominator))
+                                    .collect::<Vec<_>>()
+                                    .join(" → ")
+                            };
+                            let evidence_text = match motif.occurrence_evidence_complete {
+                                Some(true) => format!("Stored note snapshots: {} of {} exact windows",
+                                    motif.matched_occurrences.len(), motif.occurrence_count),
+                                Some(false) => format!("Stored note snapshots: {} of {} exact windows; evidence truncated",
+                                    motif.matched_occurrences.len(), motif.occurrence_count),
+                                None => "Stored-evidence completeness unavailable (legacy record)".to_string(),
+                            };
                             view! {
                                 <div class="import-motif-result">
                                     <strong>{heading}</strong>
@@ -175,6 +198,9 @@ pub fn AddMusicPage() -> impl IntoView {
                                         motif.midi_pitches.len(), motif.occurrence_count,
                                         if motif.occurrence_count == 1 { "" } else { "s" })}</span>
                                     <span class="muted small">{independent_text}</span>
+                                    <span class="muted small">{format!("Pitch intervals (semitones): {pitch_contour}")}</span>
+                                    <span class="muted small">{format!("Representative onset gaps (beats, exact fractions): {onset_gaps}")}</span>
+                                    <span class="muted small">{evidence_text}</span>
                                     <span class="muted small">"Symbolic pitch-contour evidence only; rhythm is not a match gate, and confidence is not calibrated."</span>
                                 </div>
                             }
