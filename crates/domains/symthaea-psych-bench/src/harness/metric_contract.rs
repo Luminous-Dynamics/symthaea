@@ -854,6 +854,32 @@ mod tests {
     }
 
     #[test]
+    fn empirical_contract_rejects_confidence_and_parameter_mismatch() {
+        let mut definition = empirical_definition("B", "accuracy");
+        if let UncertaintyPolicyV1::Empirical {
+            confidence_level,
+            parameters,
+            ..
+        } = &mut definition.uncertainty
+        {
+            *confidence_level = 0.90;
+            parameters.insert("alpha".to_string(), "0.10".to_string());
+        }
+        let contract = MetricContractV1::new(vec![definition]).unwrap();
+        let observed = snapshot(&[("B", "accuracy", 0.8, 10)]);
+        let errors = contract.validate_snapshot_population(&observed).unwrap_err();
+        assert!(errors.iter().any(|message| {
+            message.contains("observed confidence level")
+                && message.contains("does not match contract level")
+        }));
+        assert!(errors.iter().any(|message| {
+            message.contains("observed estimator parameter")
+                && message.contains("alpha")
+                && message.contains("does not match contract value")
+        }));
+    }
+
+    #[test]
     fn uncertainty_digest_detects_summary_tampering() {
         let mut tampered = snapshot(&[("B", "accuracy", 0.8, 10)]);
         tampered.metrics.get_mut("B").unwrap().get_mut("accuracy").unwrap().ci_upper += 0.01;
