@@ -581,6 +581,87 @@ fn curve_json(style: Style, control: &str, base_seed: u64) -> serde_json::Value 
     })
 }
 
+const OBSERVED_CHANGE_CHANNELS: &[&str] = &[
+    "exact_note_event_fingerprint",
+    "overall_structural_distance",
+    "structural_layers",
+    "tempo_bpm",
+    "meter_beats",
+    "total_duration_beats",
+    "score_note_count",
+    "distinct_midi_pitches",
+    "pitch_span_semitones",
+    "absolute_key_tonic",
+    "mean_velocity",
+    "velocity_spread",
+    "mean_note_duration_beats",
+    "mean_section_intensity",
+    "section_intensity_spread",
+    "emphasis_counts",
+    "form_availability_or_section_count",
+];
+
+fn seed_robustness_summary(curves: &[serde_json::Value]) -> Vec<serde_json::Value> {
+    let mut summaries = Vec::new();
+    for control in ["tonic", "valence", "arousal", "energy", "bars", "seed"] {
+        let matching: Vec<&serde_json::Value> = curves
+            .iter()
+            .filter(|curve| curve["control"].as_str() == Some(control))
+            .collect();
+        let changed_count = matching
+            .iter()
+            .filter(|curve| {
+                curve["observed_changes_from_baseline"]
+                    ["no_observed_change_at_tested_points"]
+                    .as_bool()
+                    == Some(false)
+            })
+            .count();
+        let unchanged_seeds: Vec<serde_json::Value> = matching
+            .iter()
+            .filter(|curve| {
+                curve["observed_changes_from_baseline"]
+                    ["no_observed_change_at_tested_points"]
+                    .as_bool()
+                    == Some(true)
+            })
+            .map(|curve| curve["baseline_seed"].clone())
+            .collect();
+        let channel_seed_counts: Vec<serde_json::Value> = OBSERVED_CHANGE_CHANNELS
+            .iter()
+            .map(|&channel| {
+                let changed_seed_count = matching
+                    .iter()
+                    .filter(|curve| {
+                        curve["observed_changes_from_baseline"][channel].as_bool()
+                            == Some(true)
+                    })
+                    .count();
+                serde_json::json!({
+                    "channel": channel,
+                    "seeds_with_observed_change": changed_seed_count,
+                    "seed_count": matching.len(),
+                })
+            })
+            .collect();
+
+        summaries.push(serde_json::json!({
+            "control": control,
+            "seed_count": matching.len(),
+            "seeds_with_any_observed_change": changed_count,
+            "seeds_with_no_observed_change": unchanged_seeds,
+            "all_seeds_changed_at_least_one_recorded_channel":
+                !matching.is_empty() && changed_count == matching.len(),
+            "per_channel_seed_counts": channel_seed_counts,
+            "interpretation": (
+                "Counts describe source-measured output changes at tested seed/grid points; "
+                "they are not target-correctness, quality, or authenticity scores."
+            ),
+        }));
+    }
+    summaries
+}
+
 fn main() {
     let profiles: Vec<serde_json::Value> = Style::ALL
         .iter()
@@ -593,10 +674,12 @@ fn main() {
                 }
             }
 
+            let seed_robustness_summary = seed_robustness_summary(&curves);
             serde_json::json!({
                 "style": format!("{style:?}"),
                 "grammar_family": format!("{:?}", style.grammar_family()),
                 "dispatch_path": "compose_with_grammar_plan (same path used by compose_styled)",
+                "seed_robustness_summary": seed_robustness_summary,
                 "curves": curves,
             })
         })
@@ -716,6 +799,58 @@ mod tests {
         assert_eq!(monotonicity(&[(0.0, 2.0), (1.0, 1.0)]), "nonincreasing");
         assert_eq!(monotonicity(&[(0.0, 1.0), (1.0, 1.0)]), "flat");
         assert_eq!(monotonicity(&[(0.0, 1.0), (1.0, 2.0), (2.0, 1.0)]), "non_monotonic");
+    }
+
+    #[test]
+    fn seed_summary_counts_any_and_per_channel_changes_without_scoring_quality() {
+        let make_curve = |seed: u64, no_change: bool, velocity_changed: bool| {
+            serde_json::json!({
+                "control": "arousal",
+                "baseline_seed": seed,
+                "observed_changes_from_baseline": {
+                    "no_observed_change_at_tested_points": no_change,
+                    "mean_velocity": velocity_changed,
+                    "exact_note_event_fingerprint": !no_change,
+                    "overall_structural_distance": !no_change,
+                    "structural_layers": !no_change,
+                    "tempo_bpm": !no_change,
+                    "meter_beats": false,
+                    "total_duration_beats": !no_change,
+                    "score_note_count": !no_change,
+                    "distinct_midi_pitches": !no_change,
+                    "pitch_span_semitones": !no_change,
+                    "absolute_key_tonic": false,
+                    "velocity_spread": velocity_changed,
+                    "mean_note_duration_beats": false,
+                    "mean_section_intensity": false,
+                    "section_intensity_spread": false,
+                    "emphasis_counts": false,
+                    "form_availability_or_section_count": false,
+                },
+            })
+        };
+        let curves = vec![
+            make_curve(90_210, false, true),
+            make_curve(130_363, true, false),
+            make_curve(222_731, false, false),
+            make_curve(918_273, false, true),
+        ];
+        let summaries = seed_robustness_summary(&curves);
+        let arousal = summaries
+            .iter()
+            .find(|summary| summary["control"] == "arousal")
+            .expect("arousal summary");
+        assert_eq!(arousal["seed_count"].as_u64(), Some(4));
+        assert_eq!(arousal["seeds_with_any_observed_change"].as_u64(), Some(3));
+        assert_eq!(arousal["seeds_with_no_observed_change"][0].as_u64(), Some(130_363));
+        let velocity = arousal["per_channel_seed_counts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|channel| channel["channel"] == "mean_velocity")
+            .unwrap();
+        assert_eq!(velocity["seeds_with_observed_change"].as_u64(), Some(2));
+        assert!(arousal["interpretation"].as_str().unwrap().contains("not target-correctness"));
     }
 
     #[test]
