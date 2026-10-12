@@ -161,15 +161,25 @@ Emit a deterministic source-derived report for the 152 catalog entries and 29 ex
 
 This phase reports **routing and source integrity only**. A route, enum variant, catalog row, or non-empty anatomy field is not proof of an independent musical implementation. The audit explicitly does not claim musical distinctness, renderer availability, or cultural authenticity.
 
-### M0b — Runtime capability inventory (next coding increment)
-Extend the source-routing foundation with per-style evidence for:
-- implemented grammar family and form/section path;
-- actual per-style deviations from inherited anatomy;
-- rhythm, pitch, harmony, orchestration, performance, and production profiles actually used;
-- tests and deterministic symbolic/audio captures;
-- current unsupported layers, instrument/effect substitutions, and fallback behavior.
+### M0b — Source-declared runtime capability map (first pass implemented)
+`scripts/muse_style_capability_inventory.py` now reads the actual `Style` declarations, grammar dispatcher, and Muse's style-to-instrument-pool mapping. For all 29 executable styles it inventories:
+- grammar family plus whether dispatch reaches a dedicated engine, the named period pipeline, or the compatibility fallback;
+- whether a `CompositionSpec` preset is declared;
+- meter, tempo range, and the intent axes declared by the existing census-informed source contract;
+- source-declared instrument names and the count of three-instrument pool choices;
+- source blob digests for the files that define these mappings.
 
-Each capability row must cite the executable source, tests or capture receipt that support it. Unknown capability remains unknown; do not infer it from a name or constellation.
+The independent source pass currently resolves 12 styles to the named period pipeline, 6 to dedicated grammar engines, and 11 to the compatibility fallback. These are dispatch categories, not quality grades: a dedicated call site does not prove an engine has the intended causal effect, a sound bank exists, or the rendered audio is distinctive. The report explicitly retains that distinction.
+
+### M0c — Measured implementation and evidence inventory (next coding increment)
+Extend the source map with per-style evidence for:
+- actual form and section-transition paths;
+- actual per-style deviations from inherited anatomy;
+- rhythm, pitch, harmony, orchestration, performance, and production behavior actually used;
+- tests and deterministic symbolic/audio captures;
+- unsupported layers, instrument/effect substitutions, and fallback behavior.
+
+Each capability claim must cite the executable source and the relevant test/capture receipt. Unknown capability remains unknown; do not infer it from a name or constellation. Source-declared controls and observed causal effects must be represented separately.
 
 ### M1 — Profile and receipt contract
 Add schema/version types, sparse values with origin, canonical resolver output, stable validation codes, profile digest and round-trip tests. Keep the existing `Style` enum and stored formats as adapters; pin Classical's current behavior.
