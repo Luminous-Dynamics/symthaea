@@ -67,16 +67,22 @@ fn command_text(program: &str, args: &[&str]) -> Result<String, Box<dyn Error>> 
 }
 
 fn source_revision() -> Result<String, Box<dyn Error>> {
-    let revision = match env::var("SYMTHAEA_SOURCE_REVISION") {
-        Ok(value) => value.trim().to_ascii_lowercase(),
-        Err(_) => command_text("git", &["rev-parse", "HEAD"])?.to_ascii_lowercase(),
-    };
+    let revision = command_text("git", &["rev-parse", "HEAD"])?.to_ascii_lowercase();
     if !matches!(revision.len(), 40 | 64)
         || !revision.bytes().all(|byte| byte.is_ascii_hexdigit())
     {
-        return Err("SYMTHAEA_SOURCE_REVISION / git HEAD must be a full 40- or 64-character hex revision".into());
+        return Err("git HEAD must be a full 40- or 64-character hex revision".into());
+    }
+    let dirty = command_text("git", &["status", "--porcelain", "--untracked-files=all"])?;
+    if !dirty.is_empty() {
+        return Err("refusing evidence generation from a dirty or untracked working tree".into());
     }
     Ok(revision)
+}
+
+fn file_blake3(path: &str) -> Result<String, Box<dyn Error>> {
+    let bytes = fs::read(path)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 
 fn mode_name(mode: AutonomousDiscoveryMode) -> &'static str {
@@ -244,6 +250,10 @@ fn build_run_record(
     config: &RegressorConfig,
     source_revision: &str,
     rustc_version: &str,
+    protocol_blake3: &str,
+    cargo_lock_blake3: &str,
+    workspace_manifest_blake3: &str,
+    core_manifest_blake3: &str,
 ) -> Result<Value, Box<dyn Error>> {
     if config.seed != seed || seed == holdout_seed {
         return Err("paired-seed invariant failed before run".into());
@@ -338,6 +348,10 @@ fn build_run_record(
         "protocol_id": PILOT_PROTOCOL_ID,
         "source_revision": source_revision,
         "toolchain": rustc_version,
+        "preregistration_blake3": protocol_blake3,
+        "cargo_lock_blake3": cargo_lock_blake3,
+        "workspace_manifest_blake3": workspace_manifest_blake3,
+        "core_manifest_blake3": core_manifest_blake3,
         "host_os": env::consts::OS,
         "host_arch": env::consts::ARCH,
         "system": {
@@ -394,7 +408,7 @@ fn build_run_record(
     }))
 }
 
-fn append_hashed_record(output: &mut BufWriter<std::fs::File>, mut record: Value) -> Result<(), Box<dyn Error>> {
+fn append_hashed_record(output: &mut BufWriter<std::fs::File>, mut record: Value) -> Result<String, Box<dyn Error>> {
     if !record.is_object() {
         return Err("pilot run record unexpectedly not a JSON object".into());
     }
@@ -406,11 +420,11 @@ fn append_hashed_record(output: &mut BufWriter<std::fs::File>, mut record: Value
     record
         .as_object_mut()
         .expect("record object shape checked")
-        .insert("record_blake3".into(), Value::String(digest));
+        .insert("record_blake3".into(), Value::String(digest.clone()));
     serde_json::to_writer(&mut *output, &record)?;
     output.write_all(b"\n")?;
     output.flush()?;
-    Ok(())
+    Ok(digest)
 }
 
 fn parse_positive_usize(value: Option<&String>, default: usize, label: &str) -> Result<usize, Box<dyn Error>> {
@@ -440,6 +454,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let first_seed = args.get(2).map(|value| value.parse::<u64>()).transpose()?.unwrap_or(42);
     let revision = source_revision()?;
     let rustc_version = command_text("rustc", &["--version"])?;
+    let protocol_blake3 = file_blake3("docs/planning/ramanujan-protocol-v2-evaluation-protocol.md")?;
+    let cargo_lock_blake3 = file_blake3("Cargo.lock")?;
+    let workspace_manifest_blake3 = file_blake3("Cargo.toml")?;
+    let core_manifest_blake3 = file_blake3("crates/core/symthaea-core/Cargo.toml")?;
 
     if let Some(parent) = output_path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         fs::create_dir_all(parent)?;
@@ -459,6 +477,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         AutonomousDiscoveryMode::Primed,
         AutonomousDiscoveryMode::RandomBaseline,
     ];
+    let mut run_record_digests = Vec::with_capacity(replicates * conditions.len());
     for replicate in 0..replicates {
         let seed = first_seed.wrapping_add(replicate as u64);
         let holdout_seed = seed.wrapping_add(HOLDOUT_SEED_OFFSET);
@@ -480,13 +499,35 @@ fn main() -> Result<(), Box<dyn Error>> {
                 &config,
                 &revision,
                 &rustc_version,
+                &protocol_blake3,
+                &cargo_lock_blake3,
+                &workspace_manifest_blake3,
+                &core_manifest_blake3,
             )?;
-            append_hashed_record(&mut output, record)?;
+            run_record_digests.push(append_hashed_record(&mut output, record)?);
         }
     }
 
+    let batch_manifest = json!({
+        "record_schema_version": PILOT_SCHEMA_VERSION,
+        "record_type": "ramanujan_protocol_v2_batch_manifest",
+        "protocol_id": PILOT_PROTOCOL_ID,
+        "source_revision": revision,
+        "preregistration_blake3": protocol_blake3,
+        "cargo_lock_blake3": cargo_lock_blake3,
+        "workspace_manifest_blake3": workspace_manifest_blake3,
+        "core_manifest_blake3": core_manifest_blake3,
+        "replicates": replicates,
+        "first_discovery_seed": first_seed,
+        "holdout_seed_offset": HOLDOUT_SEED_OFFSET,
+        "conditions": conditions.map(mode_name),
+        "run_record_count": run_record_digests.len(),
+        "run_record_blake3s": run_record_digests
+    });
+    let batch_digest = append_hashed_record(&mut output, batch_manifest)?;
+
     eprintln!(
-        "wrote {} immutable JSONL run records to {}",
+        "wrote {} immutable JSONL run records plus batch manifest ({batch_digest}) to {}",
         replicates * conditions.len(),
         output_path.display()
     );
