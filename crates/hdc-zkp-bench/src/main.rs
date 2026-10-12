@@ -393,14 +393,14 @@ fn main() {
     println!("MASKED-GATE TEMPORAL RECURRENCE BENCHMARK");
     println!("{}", "=".repeat(60));
 
-    let sig_result = sigmoid::bench_cfc_with_sigmoid(64, 100);
+    let mask_result = sigmoid::bench_masked_gate_recurrence(64, 100);
 
-    println!("\n  64N×100T masked-gate demo (not an in-circuit sigmoid):");
+    println!("\n  64-word × 100-step low-byte-mask demo:");
     println!(
-        "    {} AND constraints (vs ~7,360 without sigmoid)",
-        sig_result.and_constraints
+        "    {} AND constraints (mask + recurrence gates)",
+        mask_result.and_constraints
     );
-    println!("    The 8-bit mask is not a numerical sigmoid approximation.");
+    println!("    No sigmoid, range check, or numeric CfC arithmetic is encoded.");
 
     // Triple Stack: HDC + FHE + ZKP
     println!("\n\n{}", "=".repeat(60));
