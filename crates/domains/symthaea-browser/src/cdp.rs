@@ -841,6 +841,18 @@ mod native_cdp_tests {
             .split("#[cfg(test)]")
             .next()
             .expect("production source prefix exists");
+        for raw_public_api in [
+            "pub async fn get_accessibility_tree(",
+            "pub async fn get_page_state_js(",
+            "pub async fn observe(",
+            "pub async fn screenshot(",
+        ] {
+            assert!(
+                !cdp_production.contains(raw_public_api),
+                "low-level page observation API leaked as public: {raw_public_api}"
+            );
+        }
+
         let sources = [
             ("cdp.rs", cdp_production),
             ("actions.rs", include_str!("actions.rs")),
