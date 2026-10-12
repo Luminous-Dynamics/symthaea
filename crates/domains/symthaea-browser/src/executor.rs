@@ -117,10 +117,11 @@ impl<'a> BrowserExecutor<'a> {
             };
             let current_url_decision = self.policy.evaluate_url(&current_url);
             if let PolicyDecision::Deny { ref reason, .. } = current_url_decision {
+                let reason = reason.clone();
                 return ActionReceipt {
                     action,
                     policy_decision: current_url_decision,
-                    outcome: ActionOutcome::Denied(reason.clone()),
+                    outcome: ActionOutcome::Denied(reason),
                     output: ActionOutput::None,
                     elapsed_ms: started.elapsed().as_millis(),
                 };
