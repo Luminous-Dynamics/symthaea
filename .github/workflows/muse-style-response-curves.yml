@@ -171,7 +171,8 @@ jobs:
               stream.write("## Tonic target fidelity and candidate invariance by style\n\n")
               stream.write(
                   "Tonic target fidelity is an explicit requested-versus-realized pitch-class match. "
-                  "Invariant-layer deviations are diagnostic only; other controls remain not_predeclared.\n\n"
+                  "Invariant-layer deviations are diagnostic only; valence, arousal, and energy "
+                  "target checks are summarized separately below.\n\n"
               )
               stream.write("| Style | Requested tonic matched | Candidate invariant-layer deviations |\n")
               stream.write("|---|---:|---|\n")
@@ -205,6 +206,43 @@ jobs:
                   ) if nonbaseline else "not predeclared"
                   stream.write(
                       f"| {profile['style']} | {target_text} | {invariance_text} |\n"
+                  )
+              stream.write("\n")
+
+              stream.write("## Valence, arousal, and phrase-model targets by style\n\n")
+              stream.write(
+                  "| Style | Valence target | Arousal tempo target | Energy phrase-model target |\n"
+              )
+              stream.write("|---|---|---|---|\n")
+              for profile in report["profiles"]:
+                  by_control = {}
+                  for curve in profile["curves"]:
+                      by_control.setdefault(curve["control"], []).append(
+                          curve["control_target_evaluation"]["target_fidelity"]
+                      )
+
+                  def target_summary(rows):
+                      statuses = {row.get("status", "missing") for row in rows}
+                      if statuses != {"measured"}:
+                          return ", ".join(sorted(statuses)) or "missing"
+                      matched = sum(row.get("matching_point_count", 0) for row in rows)
+                      tested = sum(row.get("tested_point_count", 0) for row in rows)
+                      return f"{matched}/{tested} points matched"
+
+                  valence_text = target_summary(by_control.get("valence", []))
+                  energy_text = target_summary(by_control.get("energy", []))
+                  arousal_rows = by_control.get("arousal", [])
+                  arousal_text = target_summary(arousal_rows)
+                  if arousal_rows and all(row.get("status") == "measured" for row in arousal_rows):
+                      max_error = max(
+                          row.get("max_absolute_error_bpm", float("inf"))
+                          for row in arousal_rows
+                      )
+                      arousal_text += f"; max error {max_error:.4f} BPM"
+                  stream.write(
+                      "| {} | {} | {} | {} |\n".format(
+                          profile["style"], valence_text, arousal_text, energy_text
+                      )
                   )
               stream.write("\n")
 
