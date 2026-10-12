@@ -59,7 +59,7 @@ class TelemetryEvent:
     def validate(self) -> None:
         if not isinstance(self.event_id, str) or not EVENT_ID_RE.fullmatch(self.event_id):
             raise TelemetryQueueError("event_id must be a 32-character lowercase hexadecimal ID")
-        if self.domain not in DOMAINS:
+        if not isinstance(self.domain, str) or self.domain not in DOMAINS:
             raise TelemetryQueueError("unsupported telemetry domain")
         if type(self.source_sequence) is not int or self.source_sequence < 0:
             raise TelemetryQueueError("source_sequence must be a non-negative integer")
@@ -74,7 +74,7 @@ class TelemetryEvent:
             raise TelemetryQueueError("max_action_age_seconds must be in [1, 31536000]")
         if type(self.priority) is not int or not 0 <= self.priority <= 3:
             raise TelemetryQueueError("priority must be an integer in [0, 3]")
-        if self.quality not in QUALITIES:
+        if not isinstance(self.quality, str) or self.quality not in QUALITIES:
             raise TelemetryQueueError("unsupported measurement quality")
         if not isinstance(self.payload_sha256, str) or not SHA256_RE.fullmatch(self.payload_sha256):
             raise TelemetryQueueError("payload_sha256 must be a lowercase SHA-256 digest")
