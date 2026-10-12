@@ -77,6 +77,15 @@ The corrective [PR #3765](https://github.com/Luminous-Dynamics/luminous-dynamics
 
 This changes the implementation order: first add a typed, versioned selector to the actual governance transition and tests proving that each selected arm changes only its declared mechanism; then run a frozen multi-seed comparison. Do not cite any prior one-seed or five-row result as evidence that distinct governance policies were compared, or as evidence that consciousness metrics should determine political authority.
 
+### Post-hoc scoring binaries audit — 2026-10-12
+
+A second audit found a distinct but related interpretability problem in `scoring_model_comparison` and `multi_seed_scoring`. Each runner simulates one baseline trajectory per seed and only afterwards applies the built-in 4D, 8D and 3D scoring functions to the same final population. The selected scoring model does not alter that trajectory through the governance tick. Consequently, a run-level CVS is repeated across model rows by construction; identical CVS values are not evidence that three scoring policies produce identical outcomes, and per-model score/tier/vote-weight statistics are post-hoc profile measurements, not dynamic governance effects.
+
+The correction now labels these binaries as post-hoc profile analyses, emits an explicit note that CVS is shared/repeated, and changes `FINDINGS.md` to preserve the historical numbers while withdrawing causal statements about governance quality, constitutional infrastructure, or which model performs better. These artifacts can still be useful to compare how candidate profiles classify a fixed population. To infer behavioral or civilizational effects, a selector must feed the candidate profile into the actual decision path and the downstream simulator must respond to that intervention.
+
+Related implementation is tracked in [PR #3765](https://github.com/Luminous-Dynamics/luminous-dynamics/pull/3765). The source edits were fetched back and inspected, but have not been compiled or executed in this environment.
+
+
 ## 4. First pilot: essential-energy access
 
 ### Research question
