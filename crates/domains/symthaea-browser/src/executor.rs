@@ -114,7 +114,7 @@ impl<'a> BrowserExecutor<'a> {
                             .cloned()
                             .unwrap_or(PolicyDenial::InvalidUrl);
                         return ActionReceipt {
-                            action,
+                            action: action.clone(),
                             policy_decision: target_decision,
                             outcome: ActionOutcome::Denied(reason),
                             output: ActionOutput::None,
@@ -137,7 +137,7 @@ impl<'a> BrowserExecutor<'a> {
                             .cloned()
                             .unwrap_or(PolicyDenial::InvalidUrl);
                         return ActionReceipt {
-                            action,
+                            action: action.clone(),
                             policy_decision: target_decision,
                             outcome: ActionOutcome::Denied(reason),
                             output: ActionOutput::None,
