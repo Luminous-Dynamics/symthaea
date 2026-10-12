@@ -40,12 +40,19 @@ const MAX_TEXT_EXTRACTION_CHARS: usize = 32 * 1024;
 /// CDP session wrapping a `chromiumoxide::Browser` and its active page.
 pub struct CdpSession {
     _browser: Browser,
+    /// Serializes complete executor actions across URL preflight and CDP dispatch.
+    action_gate: Mutex<()>,
     page: Mutex<Page>,
     max_elements: usize,
     navigation_timeout: Duration,
 }
 
 impl CdpSession {
+    /// Acquire the per-session action gate for the full policy/dispatch transaction.
+    pub(crate) async fn begin_action(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.action_gate.lock().await
+    }
+
     /// Launch a new Chrome instance using the provided configuration.
     ///
     /// To attach to an already-running browser, use
@@ -86,6 +93,7 @@ impl CdpSession {
 
         Ok(Self {
             _browser: browser,
+            action_gate: Mutex::new(()),
             page: Mutex::new(page),
             max_elements: config.max_elements,
             navigation_timeout: Duration::from_millis(config.navigation_timeout_ms),
@@ -121,6 +129,7 @@ impl CdpSession {
 
         Ok(Self {
             _browser: browser,
+            action_gate: Mutex::new(()),
             page: Mutex::new(page),
             max_elements: config.max_elements,
             navigation_timeout: Duration::from_millis(config.navigation_timeout_ms),
