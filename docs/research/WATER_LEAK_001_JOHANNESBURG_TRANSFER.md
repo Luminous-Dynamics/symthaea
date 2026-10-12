@@ -242,7 +242,9 @@ The California Energy Commission published the final report *Demonstrating Innov
 
 Source: https://www.energy.ca.gov/publications/2021/demonstrating-innovative-water-leakage-reduction-strategies-correlating
 
-A vendor-published summary of the same project reports a higher hit rate for satellite points than acoustic points among the subset crews investigated; however, only a fraction of the satellite points of interest were field-investigated, so verification selection and denominators must be examined in the official report before adopting its quoted hit rates or cost comparisons. Vendor-reported results are not a substitute for a local, independently reported trial.
+The official report's Table 33 gives the underlying denominators: satellite imagery (Utilis/SILD) supplied 504 points of interest (POIs), of which 146 were investigated (29%); crews found 117 leaks, or 80% of the investigated POIs. Continuous acoustic monitoring (Echologics/CCAM) supplied 77 POIs, of which 49 were investigated (64%); crews found 20 leaks, or 41% of investigated POIs. The satellite results covered 45 miles of pipe investigated, at 2.6 leaks per mile, and averaged 5.6 labor-hours per leak found; acoustic monitoring covered 5 miles, at 3.8 leaks per mile, and averaged 4.9 labor-hours per leak found. The sources, site, study methods, investigation-selection process and population differ, and most satellite POIs were not investigated. These figures are therefore **yield among investigated POIs in one California project**, not overall recall, not a randomized head-to-head comparison, and not evidence that satellite data will save 93% of inspection effort in Johannesburg. Any comparison must disclose the uninvestigated POIs, selection process, uncertainty, per-mile yield, labor burden and how leak/no-leak ground truth was established.
+
+Source: official report PDF, printed page 108 / Table 33: https://www.energy.ca.gov/sites/default/files/2021-06/CEC-500-2021-036.pdf
 
 ### Revised source-selection decision
 
