@@ -139,6 +139,21 @@ Compare styles with a **dimension vector**, not a global musical-quality number.
 
 Do not use single-label genre-classifier accuracy as the universal genre-quality measure. Genre labels are not an objective partition and the validity of common genre-recognition evaluation practices has been challenged.
 
+### Controlled evaluation protocol
+
+Treat the following as separate evidence gates; do not collapse them into a single score:
+
+1. **Inventory integrity:** catalog-to-runtime and runtime-to-catalog routing, stable IDs, statuses, and source digests. A route existing is inventory evidence only.
+2. **Control sensitivity:** change one requested recipe dimension while holding seed, form scaffold, and all other inputs fixed. Measure whether the corresponding musical descriptors move in the intended direction.
+3. **Non-target invariance:** for a change to groove, for example, check that unrelated constraints such as requested pitch language or section order remain within explicitly declared tolerances. Record unintended cross-layer effects instead of silently averaging them away.
+4. **Seed robustness:** repeat the matched contrast over a fixed, published seed set. Report per-seed values and robust summaries; do not select only the most flattering generation.
+5. **Execution and rendering:** separately record whether the requested layer is implemented, whether the needed instrument/sample/effect exists, which substitutions occurred, and whether an audio artifact was successfully produced.
+6. **Musical distinctness and review:** compare symbolic grammar descriptors, captured audio evidence, and owner/user listening notes as separate modalities. Establish tolerances from calibration data before making a pass/fail claim; do not invent universal thresholds. Provenance and cultural review remain a separate gate.
+
+Every contrast should carry a resolution receipt binding the recipe/profile digests, engine revision, fixed seed, input scaffold, explicit overrides, capability fallbacks, and artifact digests. This makes a failed or successful comparison reproducible and prevents a good sample from concealing unsupported requested behavior.
+
+This protocol is motivated by recent evidence that nominally disentangled music representations do not always encode their intended semantics (Ibáñez-Martínez et al., ICASSP 2026, https://arxiv.org/abs/2602.10058), alongside the broader 2026 survey conclusion that no single objective metric captures music-generation quality and that controllability and evaluation remain open problems (Duan, Yu & Briot, https://link.springer.com/article/10.1007/s10462-026-11582-x). The lesson for Muse is to measure intended control, non-target invariance, realization, and perceptual evidence separately—not to treat an embedding distance or a genre classifier as proof of success.
+
 ## Implementation sequence
 
 ### M0 — Coverage inventory (first coding increment)
