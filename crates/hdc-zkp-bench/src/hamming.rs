@@ -31,9 +31,10 @@ pub struct HammingBenchResult {
     pub proof_size_bytes: usize,
 }
 
-/// Benchmark a zero-knowledge proof of Hamming distance.
+/// Benchmark an integrity proof of Hamming distance; witness privacy is not guaranteed.
 ///
-/// Private inputs are two vectors of dim_words 64-bit words. The public output
+/// Witness inputs are two vectors of dim_words 64-bit words. The Binius64 backend does not
+/// provide zero-knowledge input privacy. The public output
 /// is the exact number of differing bits. No normalized similarity score is
 /// claimed by this circuit.
 pub fn bench_hamming(dim_words: usize) -> HammingBenchResult {
@@ -136,7 +137,7 @@ pub fn bench_hamming(dim_words: usize) -> HammingBenchResult {
         "  Verifier time: {:.3} ms",
         verify_time.as_secs_f64() * 1000.0
     );
-    println!("  Verification: PASSED (real cryptographic proof of the circuit)");
+    println!("  Verification: PASSED (integrity proof; no Binius64 ZK privacy guarantee)");
 
     HammingBenchResult {
         dim_words,
