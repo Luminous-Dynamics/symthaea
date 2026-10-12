@@ -358,8 +358,8 @@ impl MetricContractV1 {
     }
 
     /// Require exact equality between this contract's keys and every key in a
-    /// snapshot. Empirical uncertainty requires at least two sample units; an
-    /// n=1 metric must be explicitly deterministic or descriptive-only.
+    /// snapshot. Empirical policies also remain unqualified until the snapshot binds
+    /// the observed CI method and confidence level; n >= 2 alone is not sufficient.
     pub fn validate_snapshot_population(
         &self,
         snapshot: &RegressionSnapshot,
