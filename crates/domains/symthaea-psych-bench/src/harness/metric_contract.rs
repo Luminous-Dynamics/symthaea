@@ -9,7 +9,7 @@
 //! CI method, or confidence level, so empirical uncertainty cannot yet qualify a snapshot.
 //! Missing semantics or observation-level provenance remain missing.
 
-use crate::harness::report::{MetricValue, UncertaintyProvenanceV1};
+use crate::harness::report::MetricValue;
 use crate::harness::snapshot::{RegressionSnapshot, SNAPSHOT_SCHEMA_VERSION};
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -394,8 +394,8 @@ impl MetricContractV1 {
     }
 
     /// Require exact equality between this contract's keys and every key in a
-    /// snapshot. Empirical policies also remain unqualified until the snapshot binds
-    /// observed sample unit, CI method, and confidence level; n >= 2 alone is not sufficient.
+    /// snapshot. Empirical values qualify only when versioned observation provenance
+    /// matches the declared sample unit, estimator, confidence level, and parameters.
     pub fn validate_snapshot_population(
         &self,
         snapshot: &RegressionSnapshot,
@@ -759,7 +759,6 @@ mod tests {
         let one_sample = snapshot(&[("B", "accuracy", 0.8, 1)]);
         let errors = contract.validate_snapshot_population(&one_sample).unwrap_err();
         assert!(errors.iter().any(|message| message.contains("empirical uncertainty requires n >= 2")));
-        assert!(errors.iter().any(|message| message.contains("does not bind the observed sample unit, CI method, or confidence level")));
 
         let invalid = definition(
             "B",
@@ -788,6 +787,13 @@ mod tests {
         missing_provenance.metrics.get_mut("B").unwrap().get_mut("accuracy").unwrap().uncertainty_provenance = None;
         let errors = contract.validate_snapshot_population(&missing_provenance).unwrap_err();
         assert!(errors.iter().any(|message| message.contains("has no estimator provenance")));
+    }
+
+    #[test]
+    fn legacy_metric_value_deserializes_without_invented_provenance() {
+        let json = r#"{"mean":0.8,"std_dev":0.1,"n":10,"ci_lower":0.6,"ci_upper":1.0}"#;
+        let value: MetricValue = serde_json::from_str(json).unwrap();
+        assert!(value.uncertainty_provenance().is_none());
     }
 
     #[test]
