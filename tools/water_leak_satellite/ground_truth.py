@@ -165,7 +165,10 @@ def validate_record(record: Any, index: int = 0) -> list[str]:
                 post_change = verification["post_repair_change_observed"]
 
     if outcome == "confirmed_leak":
-        if verified_method not in POSITIVE_METHODS:
+        # Type-check before set membership: malformed JSON may provide a list/dict,
+        # which is unhashable and must be rejected as data, not crash validation.
+        method_is_positive = isinstance(verified_method, str) and verified_method in POSITIVE_METHODS
+        if not method_is_positive:
             errors.append(f"{prefix}: confirmed_leak requires a physical/repair confirmation method, not a proxy")
         if not independent:
             errors.append(f"{prefix}: confirmed_leak requires independent verification")
