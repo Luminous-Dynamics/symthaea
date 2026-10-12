@@ -94,9 +94,13 @@ def assert_matched_grid_settings(
     if grids.becke_scheme is not gen_grid.original_becke:
         raise RuntimeError("PySCF Becke partition is not original_becke")
     if grids.radii_adjust is not None:
-        raise RuntimeError("PySCF atomic-radii adjustment must remain disabled for this matched-grid lane")
+        raise RuntimeError(
+            "PySCF atomic-radii adjustment must remain disabled for this matched-grid lane"
+        )
     if grids.prune is not None:
-        raise RuntimeError("PySCF grid pruning must remain disabled for this matched-grid lane")
+        raise RuntimeError(
+            "PySCF grid pruning must remain disabled for this matched-grid lane"
+        )
     configured_atom_grid = grids.atom_grid
     if not isinstance(configured_atom_grid, (tuple, list)) or tuple(configured_atom_grid) != (
         radial_count, angular_count
@@ -130,6 +134,7 @@ def symthaea_becke_radial(
     dr_dxi = 2.0 * radius / ((1.0 - xi) ** 2)
     radial_weights = (math.pi / (n + 1.0)) * np.sqrt(1.0 - xi * xi) * dr_dxi
     return radial, radial_weights
+
 
 def require_finite(name: str, value: float) -> float:
     converted = float(value)
@@ -259,7 +264,9 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
         "actual_grid_array_points_including_padding": actual_grid_points,
         "alignment_unit": alignment,
         "padding_points": padding_points,
-        "zero_weight_points_including_padding": int(np.count_nonzero(mean_field.grids.weights == 0.0)),
+        "zero_weight_points_including_padding": int(
+            np.count_nonzero(mean_field.grids.weights == 0.0)
+        ),
     })
     expected_total_energy = require_finite(f"{molecule_name} PySCF total energy", total_energy)
     integrated_electron_count = require_finite(
@@ -290,7 +297,9 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
         "expected_unpadded_grid_points": expected_unpadded_grid_points,
         "padding_grid_points": padding_points,
         "radial_scale_by_atomic_number_bohr": {
-            str(int(atom["atomic_number"])): symthaea_radial_scale_bohr(int(atom["atomic_number"]))
+            str(int(atom["atomic_number"])): symthaea_radial_scale_bohr(
+                int(atom["atomic_number"])
+            )
             for atom in geometry["atoms"]
         },
         "grid_runtime_contract": runtime_grid_contract,
