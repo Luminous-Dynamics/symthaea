@@ -659,7 +659,13 @@ mod tests {
         );
         let points = curve["points"].as_array().expect("response points");
         assert!(points.iter().all(|point| {
-            point["descriptors"].get("mean_velocity").is_some()
+            let exact = point["exact_fingerprint_hex"].as_str().unwrap_or_default();
+            let baseline = point["baseline_exact_fingerprint_hex"].as_str().unwrap_or_default();
+            exact.len() == 16
+                && baseline.len() == 16
+                && exact.bytes().all(|byte| byte.is_ascii_hexdigit())
+                && baseline.bytes().all(|byte| byte.is_ascii_hexdigit())
+                && point["descriptors"].get("mean_velocity").is_some()
                 && point["descriptors"].get("velocity_standard_deviation").is_some()
                 && point["descriptors"].get("mean_section_intensity").is_some()
                 && point["descriptors"].get("score_key_tonic_pc").is_some()
