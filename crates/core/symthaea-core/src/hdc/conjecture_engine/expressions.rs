@@ -64,7 +64,9 @@ impl fmt::Display for ExprEvalError {
         match self {
             Self::MissingVariable(name) => write!(f, "missing variable binding: {name}"),
             Self::DuplicateVariableBinding(name) => write!(f, "duplicate variable binding: {name}"),
-            Self::NonFiniteVariableBinding(name) => write!(f, "non-finite variable binding: {name}"),
+            Self::NonFiniteVariableBinding(name) => {
+                write!(f, "non-finite variable binding: {name}")
+            },
             Self::DivisionByZero => write!(f, "division by zero"),
             Self::IndeterminatePower => write!(f, "zero raised to zero is indeterminate"),
             Self::DomainError(reason) => write!(f, "expression domain error: {reason}"),
@@ -137,7 +139,9 @@ impl Expr {
                 let x = argument.eval_in_environment(vars)?;
                 match function {
                     UnaryFn::Sqrt if x < 0.0 => {
-                        return Err(ExprEvalError::DomainError("sqrt requires a nonnegative argument"));
+                        return Err(ExprEvalError::DomainError(
+                            "sqrt requires a nonnegative argument",
+                        ));
                     }
                     UnaryFn::Sqrt => x.sqrt(),
                     UnaryFn::Log if x <= 0.0 => {
