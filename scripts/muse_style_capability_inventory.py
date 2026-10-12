@@ -201,12 +201,14 @@ def _parse_mapping(
     mapped: dict[str, str] = {}
     default: str | None = None
     for pattern, expression in arms:
-        names = _variant_names(pattern)
+        clean_pattern = _strip_comments(pattern).strip()
+        clean_expression = _strip_comments(expression).strip()
+        names = _variant_names(clean_pattern)
         if not names:
-            if allow_default and re.fullmatch(r"_", pattern.strip()):
+            if allow_default and re.fullmatch(r"_", clean_pattern):
                 if default is not None:
                     raise CoverageError(f"{context} has multiple wildcard arms")
-                default = expression.strip()
+                default = clean_expression
                 continue
             raise CoverageError(f"{context} has unsupported arm pattern: {pattern!r}")
         unknown = sorted(set(names) - known)
@@ -215,7 +217,7 @@ def _parse_mapping(
         for name in names:
             if name in mapped:
                 raise CoverageError(f"{context} maps {name} more than once")
-            mapped[name] = expression.strip()
+            mapped[name] = clean_expression
     if not allow_default and set(mapped) != known:
         raise CoverageError(
             f"{context} does not cover Style::ALL; missing={sorted(known - set(mapped))}"
