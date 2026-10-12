@@ -43,7 +43,8 @@ pub use reliability_analysis::{
 };
 pub use report::{
     BaselineComparison, BenchmarkReport, BenchmarkResult, CompositeScore, ForestPlotRow,
-    LearningCurveRow, MetricValue, RtSummary, key_metric_for_benchmark, provenance_table,
+    LearningCurveRow, MetricValue, RtSummary, UncertaintyProvenanceV1,
+    UNCERTAINTY_PROVENANCE_SCHEMA_VERSION, key_metric_for_benchmark, provenance_table,
 };
 pub use sat_curves::{SatBattery, SatCurve, SatFit, SatPoint, run_sat_curve};
 pub use snapshot::{
