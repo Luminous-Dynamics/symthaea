@@ -62,7 +62,12 @@ A 2025 open-access review of ethical issues around AI-mediated interspecies comm
 
 ## First milestones
 
-- **M1 — Honest capability manifest:** publish current per-language and per-species tasks and unknowns; CI protects the English/click boundary.
+- **M1 — Honest capability manifest:** implemented as `scripts/voice_language_registry.json`, validated by `scripts/validate_voice_language_registry.py`, with evidence-gate regressions in `scripts/test_voice_language_registry.py` and execution wired into the CI `muse` job. The initial manifest has four human-language tags and 32 task records; only three English code paths are marked `implementation_present`. All other task records remain `unverified`, including Afrikaans, isiZulu and isiXhosa. No language is marked production-qualified.
+- The registry uses BCP 47-shaped language tags based on [RFC 5646](https://www.rfc-editor.org/rfc/rfc5646); the local validator checks tag syntax and case-insensitive uniqueness, not the full IANA subtag registry or canonicalization rules.
+- Model and dataset evidence is deliberately explicit. A dataset being publicly downloadable does not imply every speech recording has the same licence or provenance; for example, [Mozilla Common Voice terms](https://commonvoice.mozilla.org/dav/terms) describe CC0 contributions and contributor assurances. Pin the exact dataset version/digest and record its licence rather than relying on its project name.
+- The validator checks evidence shape only. It does not contact GitHub to verify that a run passed, nor does it measure actual language quality. Promotion to a higher status still requires independent review of the linked artifacts and exact commit.
+
+- **M2 — Human-language adapter baseline:** compare an appropriate multilingual ASR/translation/TTS stack on a small set of high-value languages, starting with English, isiZulu, isiXhosa, Afrikaans and additional languages chosen with speakers. Keep translation, recognition and generation scores separate.
 - **M2 — Human-language adapter baseline:** compare an appropriate multilingual ASR/translation/TTS stack on a small set of high-value languages, starting with English, isiZulu, isiXhosa, Afrikaans and additional languages chosen with speakers. Keep translation, recognition and generation scores separate.
 - **M3 — Click prototype:** construct a click-specific transient event in isolation and test generated audio against recorded exemplars before placing it inside connected speech.
 - **M4 — Animal sound baseline:** choose one species/task with a usable ethical dataset, pin a model and dataset, and evaluate on held-out recordings. No “translation” label until independently validated.
