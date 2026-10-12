@@ -683,6 +683,50 @@ mod tests {
     }
 
     #[test]
+    fn test_heteronuclear_grid_integrates_gaussians_across_adjusted_becke_partition() {
+        // The integral of a sum of Gaussians centered on different elements is
+        // still 2π^(3/2). Unlike H2, this exercises the heteronuclear radius
+        // adjustment as well as the radial measure and atomic partitioning.
+        let atoms = [
+            Atom::new(1, 0.0, 0.0, 0.0),
+            Atom::new(8, 0.0, 0.0, 2.0),
+        ];
+        let exact_integral = 2.0 * PI.powf(1.5);
+        let cases = [
+            (GridQuality::Coarse, 7e-2),
+            (GridQuality::Medium, 1.1e-2),
+            (GridQuality::Fine, 2e-4),
+        ];
+
+        for (quality, relative_tolerance) in cases {
+            let grid = DftGrid::build(&atoms, quality);
+            let numerical_integral: f64 = grid
+                .points
+                .iter()
+                .map(|point| {
+                    let value = atoms
+                        .iter()
+                        .map(|atom| {
+                            let dx = point.x - atom.position[0];
+                            let dy = point.y - atom.position[1];
+                            let dz = point.z - atom.position[2];
+                            (-(dx * dx + dy * dy + dz * dz)).exp()
+                        })
+                        .sum::<f64>();
+                    value * point.weight
+                })
+                .sum();
+            let relative_error =
+                (numerical_integral - exact_integral).abs() / exact_integral;
+
+            assert!(
+                relative_error <= relative_tolerance,
+                "heteronuclear {quality:?}: integral={numerical_integral}, exact={exact_integral}, relative error={relative_error}, tolerance={relative_tolerance}"
+            );
+        }
+    }
+
+    #[test]
     fn test_radial_gaussian_integrals_across_atomic_radius_classes() {
         // A radial integral's exact value is independent of the atom-centered
         // grid scale. Exercise every distinct radius branch currently used by
