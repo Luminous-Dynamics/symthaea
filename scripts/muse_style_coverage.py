@@ -303,8 +303,10 @@ def parse_style_contract(source: str) -> tuple[list[str], list[str], int]:
     return enum_variants, all_names, declared_count
 
 
-def build_coverage_analysis(entries: list[dict[str, Any]]) -> dict[str, Any]:
-    """Summarize executable routing coverage without implying musical quality."""
+def build_coverage_analysis(
+    entries: list[dict[str, Any]], executable_styles: list[str]
+) -> dict[str, Any]:
+    """Summarize both catalog-to-runtime and runtime-to-catalog coverage."""
     grouped: dict[str, list[dict[str, Any]]] = {}
     for entry in entries:
         grouped.setdefault(entry["constellation"], []).append(entry)
@@ -326,11 +328,19 @@ def build_coverage_analysis(entries: list[dict[str, Any]]) -> dict[str, Any]:
             }
         )
 
+    routed_styles = {
+        entry["composer_style"]
+        for entry in entries
+        if entry["composer_style"] is not None
+    }
+    unreferenced_executable_styles = sorted(set(executable_styles) - routed_styles)
+
     return {
         "interpretation": (
             "Routing completeness only; not evidence of musical distinctness, "
             "rendering quality, or cultural authenticity."
         ),
+        "unreferenced_executable_styles": unreferenced_executable_styles,
         "by_constellation": by_constellation,
         "zero_route_constellations": [
             item["constellation"]
@@ -423,11 +433,14 @@ def build_current_report(root: Path) -> dict[str, Any]:
             "unrouted_catalog_entries": sum(
                 entry["composer_style"] is None for entry in entries
             ),
+            "executable_styles_without_catalog_route": len(
+                set(all_names) - route_names
+            ),
             "status_counts": status_counts,
             "foundation_entries": status_counts.get("Foundation", 0),
             "routed_does_not_mean_distinct": True,
         },
-        "coverage_analysis": build_coverage_analysis(entries),
+        "coverage_analysis": build_coverage_analysis(entries, all_names),
         "entries": entries,
     }
 
@@ -552,6 +565,10 @@ def print_summary(report: dict[str, Any]) -> None:
         print(
             "Partial-route constellations: "
             + (", ".join(analysis["partial_route_constellations"]) or "none")
+        )
+        print(
+            "Executable Style variants without catalog route: "
+            + (", ".join(analysis["unreferenced_executable_styles"]) or "none")
         )
 
     print(
