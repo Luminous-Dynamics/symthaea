@@ -153,7 +153,7 @@ theorem prime_thirteen_from_independent_witnesses : Nat.Prime 13 := by
     have hqDvd : q ∣ 12 := (Nat.mem_primeFactors.mp hq).2.1
     have hqBound : q ≤ 12 := Nat.le_of_dvd (by norm_num) hqDvd
     have hqCases : q = 2 ∨ q = 3 := by
-      interval_cases q <;> norm_num at hqPrime ⊢
+      interval_cases q <;> norm_num at hqPrime hqDvd ⊢
     rcases hqCases with rfl | rfl
     · exact ⟨2, by norm_num [Nat.ModEq], by norm_num⟩
     · exact ⟨2, by norm_num [Nat.ModEq], by norm_num⟩
