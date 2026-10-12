@@ -209,21 +209,22 @@ fn quadratic_polynomial(expression: &Expr) -> Option<Polynomial> {
 /// floor, with 1e-10 relative coefficient tolerance. Coefficients below 1e-12
 /// are normalized away. This classification is tolerance-qualified algebraic
 /// form, not physical truth and not the holdout criterion.
-fn is_oracle_equivalent_harmonic_energy(candidate: &AutonomousInvariant) -> bool {
-    let Some(mut polynomial) = quadratic_polynomial(&candidate.formula) else {
-        return false;
-    };
+/// Three-way oracle result: None means the expression falls outside the
+/// oracle's supported degree-2 polynomial grammar and must not be counted as a
+/// false discovery.
+fn classify_harmonic_energy_oracle(candidate: &AutonomousInvariant) -> Option<bool> {
+    let mut polynomial = quadratic_polynomial(&candidate.formula)?;
     normalize(&mut polynomial);
     let x_squared = *polynomial.get(&(2, 0)).unwrap_or(&0.0);
     let v_squared = *polynomial.get(&(0, 2)).unwrap_or(&0.0);
     let coefficient_scale = x_squared.abs().max(v_squared.abs()).max(1.0);
     let tolerance = 1e-10 * coefficient_scale;
     if x_squared.abs() <= 1e-10 || (x_squared - v_squared).abs() > tolerance {
-        return false;
+        return Some(false);
     }
-    polynomial.iter().all(|(monomial, coefficient)| {
+    Some(polynomial.iter().all(|(monomial, coefficient)| {
         matches!(monomial, (0, 0) | (2, 0) | (0, 2)) || coefficient.abs() <= tolerance
-    })
+    }))
 }
 
 fn condition_run(
@@ -276,17 +277,30 @@ fn build_run_record(
     let mut holdout_passing_candidates = 0usize;
     let mut stable_holdout_candidates = 0usize;
     let mut holdout_stability_passes = 0usize;
+    let mut oracle_supported_candidates = 0usize;
+    let mut oracle_unsupported_candidates = 0usize;
     let mut oracle_equivalent_candidates = 0usize;
     let mut oracle_and_holdout_candidates = 0usize;
     let mut oracle_and_stable_holdout_candidates = 0usize;
     let mut holdout_false_discoveries = 0usize;
     let mut stable_holdout_false_discoveries = 0usize;
+    let mut oracle_unsupported_holdout_candidates = 0usize;
+    let mut oracle_unsupported_stable_holdout_candidates = 0usize;
     let mut receipt_errors = 0usize;
 
     for candidate in &discovery.candidates {
-        let oracle_equivalent = is_oracle_equivalent_harmonic_energy(candidate);
-        if oracle_equivalent {
-            oracle_equivalent_candidates += 1;
+        let oracle_equivalence = classify_harmonic_energy_oracle(candidate);
+        match oracle_equivalence {
+            Some(true) => {
+                oracle_supported_candidates += 1;
+                oracle_equivalent_candidates += 1;
+            }
+            Some(false) => {
+                oracle_supported_candidates += 1;
+            }
+            None => {
+                oracle_unsupported_candidates += 1;
+            }
         }
         let holdout = validate_invariant_holdout(
             &system,
@@ -347,19 +361,19 @@ fn build_run_record(
 
         if holdout.passed {
             holdout_passing_candidates += 1;
-            if oracle_equivalent {
-                oracle_and_holdout_candidates += 1;
-            } else {
-                holdout_false_discoveries += 1;
+            match oracle_equivalence {
+                Some(true) => oracle_and_holdout_candidates += 1,
+                Some(false) => holdout_false_discoveries += 1,
+                None => oracle_unsupported_holdout_candidates += 1,
             }
         }
         if step_size_stable {
             holdout_stability_passes += 1;
             stable_holdout_candidates += 1;
-            if oracle_equivalent {
-                oracle_and_stable_holdout_candidates += 1;
-            } else {
-                stable_holdout_false_discoveries += 1;
+            match oracle_equivalence {
+                Some(true) => oracle_and_stable_holdout_candidates += 1,
+                Some(false) => stable_holdout_false_discoveries += 1,
+                None => oracle_unsupported_stable_holdout_candidates += 1,
             }
         }
 
@@ -421,7 +435,12 @@ fn build_run_record(
             "complexity": candidate.complexity,
             "symbolically_proven": candidate.symbolically_proven,
             "discovery_mode": mode_name(candidate.discovery_mode),
-            "oracle_equivalent_harmonic_energy": oracle_equivalent,
+            "oracle_equivalence": match oracle_equivalence {
+                Some(true) => "equivalent_within_supported_grammar",
+                Some(false) => "not_equivalent_within_supported_grammar",
+                None => "unsupported_expression",
+            },
+            "oracle_equivalent_harmonic_energy": oracle_equivalence,
             "holdout": holdout,
             "step_size_stability": {
                 "second_dt": DT / 2.0,
@@ -493,11 +512,15 @@ fn build_run_record(
             "holdout_passing_candidates": holdout_passing_candidates,
             "stable_holdout_candidates": stable_holdout_candidates,
             "holdout_stability_passes": holdout_stability_passes,
+            "oracle_supported_candidates": oracle_supported_candidates,
+            "oracle_unsupported_candidates": oracle_unsupported_candidates,
             "oracle_equivalent_candidates": oracle_equivalent_candidates,
             "oracle_and_holdout_candidates": oracle_and_holdout_candidates,
             "oracle_and_stable_holdout_candidates": oracle_and_stable_holdout_candidates,
-            "holdout_false_discoveries": holdout_false_discoveries,
-            "stable_holdout_false_discoveries": stable_holdout_false_discoveries,
+            "holdout_false_discoveries_within_supported_oracle": holdout_false_discoveries,
+            "stable_holdout_false_discoveries_within_supported_oracle": stable_holdout_false_discoveries,
+            "oracle_unsupported_holdout_candidates": oracle_unsupported_holdout_candidates,
+            "oracle_unsupported_stable_holdout_candidates": oracle_unsupported_stable_holdout_candidates,
             "run_recovery_success": oracle_and_stable_holdout_candidates > 0,
             "receipt_errors": receipt_errors
         },
@@ -678,7 +701,7 @@ mod tests {
                 Box::new(energy),
             )),
         );
-        assert!(is_oracle_equivalent_harmonic_energy(&candidate(scaled_and_offset)));
+        assert_eq!(classify_harmonic_energy_oracle(&candidate(scaled_and_offset)), Some(true));
     }
 
     #[test]
@@ -697,8 +720,8 @@ mod tests {
             Box::new(Expr::Var("x".into())),
             Box::new(Expr::Var("v".into())),
         );
-        assert!(!is_oracle_equivalent_harmonic_energy(&candidate(anisotropic)));
-        assert!(!is_oracle_equivalent_harmonic_energy(&candidate(cross_term)));
+        assert_eq!(classify_harmonic_energy_oracle(&candidate(anisotropic)), Some(false));
+        assert_eq!(classify_harmonic_energy_oracle(&candidate(cross_term)), Some(false));
     }
 
     #[test]
@@ -711,6 +734,6 @@ mod tests {
                 Box::new(Expr::Var("v".into())),
             )),
         );
-        assert!(!is_oracle_equivalent_harmonic_energy(&candidate(expression)));
+        assert_eq!(classify_harmonic_energy_oracle(&candidate(expression)), None);
     }
 }
