@@ -1163,6 +1163,10 @@ mod tests {
         )
         .expect("valid test identity")
     }
+    fn constant_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+        vec![0.0; state.len()]
+    }
+
     fn constant_system() -> AutonomousHoldoutSystemV1 {
         AutonomousHoldoutSystemV1::new(
             "constant-flow-v1",
