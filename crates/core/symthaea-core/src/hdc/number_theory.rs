@@ -239,6 +239,97 @@ impl PrimeFactorization {
     }
 }
 
+/// A factorization certificate whose distinct prime factors each carry a
+/// recursively checkable Pocklington proof.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CertifiedFactorizationCertificate {
+    pub factorization: FactorizationCertificate,
+    /// Proofs align one-to-one with factorization factors in strictly increasing order.
+    pub prime_proofs: Vec<PrimalityProof>,
+}
+
+/// Typed failure while checking or constructing a proof-carrying factorization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CertifiedFactorizationError {
+    InvalidFactorization(FactorizationVerificationError),
+    PrimeProofCountMismatch { factors: usize, proofs: usize },
+    PrimeProofRootMismatch { factor: u64, proof_root: u64 },
+    InvalidPrimeProof { factor: u64, reason: PrimalityProofError },
+    PrimeProofGenerationFailed { factor: u64, reason: PrimalityProofError },
+}
+
+/// Check the canonical factor list and exact product without making any primality
+/// assumption. The certified variant follows this with a Pocklington proof per factor.
+fn verify_factorization_structure(
+    value: u64,
+    factors: &[(u64, u32)],
+) -> Result<(), FactorizationVerificationError> {
+    if value == 0 {
+        return Err(FactorizationVerificationError::ZeroInput);
+    }
+    let mut previous = 1u64;
+    let mut reconstructed = 1u64;
+    for &(factor, exponent) in factors {
+        if factor <= previous {
+            return Err(FactorizationVerificationError::FactorsNotStrictlyIncreasing {
+                previous,
+                current: factor,
+            });
+        }
+        if exponent == 0 {
+            return Err(FactorizationVerificationError::ZeroExponent { factor });
+        }
+        previous = factor;
+        for _ in 0..exponent {
+            reconstructed = reconstructed.checked_mul(factor).ok_or(
+                FactorizationVerificationError::ProductOverflow { factor },
+            )?;
+        }
+    }
+    if reconstructed != value {
+        return Err(FactorizationVerificationError::ProductMismatch {
+            expected: value,
+            actual: reconstructed,
+        });
+    }
+    Ok(())
+}
+
+impl CertifiedFactorizationCertificate {
+    /// Verify exact factor reconstruction and every factor's recursive primality proof.
+    ///
+    /// Unlike FactorizationCertificate::verify, this path does not use the deterministic
+    /// Miller-Rabin helper: primality is established only by the explicit Pocklington
+    /// certificate bundles.
+    pub fn verify(&self) -> Result<(), CertifiedFactorizationError> {
+        verify_factorization_structure(
+            self.factorization.value,
+            &self.factorization.factors,
+        )
+        .map_err(CertifiedFactorizationError::InvalidFactorization)?;
+
+        if self.prime_proofs.len() != self.factorization.factors.len() {
+            return Err(CertifiedFactorizationError::PrimeProofCountMismatch {
+                factors: self.factorization.factors.len(),
+                proofs: self.prime_proofs.len(),
+            });
+        }
+
+        for (&(factor, _), proof) in self.factorization.factors.iter().zip(&self.prime_proofs) {
+            if proof.value != factor {
+                return Err(CertifiedFactorizationError::PrimeProofRootMismatch {
+                    factor,
+                    proof_root: proof.value,
+                });
+            }
+            proof.verify().map_err(|reason| {
+                CertifiedFactorizationError::InvalidPrimeProof { factor, reason }
+            })?;
+        }
+        Ok(())
+    }
+}
+
 impl FactorizationCertificate {
     /// Verify canonical form, every prime factor, and exact reconstruction.
     ///
@@ -247,39 +338,12 @@ impl FactorizationCertificate {
     /// selected witness schedule. This is a reproducible machine-integer verifier;
     /// it is not a recursively checkable formal proof object.
     pub fn verify(&self) -> Result<(), FactorizationVerificationError> {
-        if self.value == 0 {
-            return Err(FactorizationVerificationError::ZeroInput);
-        }
+        verify_factorization_structure(self.value, &self.factors)?;
 
-        let mut previous = 1u64;
-        let mut reconstructed = 1u64;
-        for &(prime, exponent) in &self.factors {
-            if prime <= previous {
-                return Err(FactorizationVerificationError::FactorsNotStrictlyIncreasing {
-                    previous,
-                    current: prime,
-                });
-            }
-            if exponent == 0 {
-                return Err(FactorizationVerificationError::ZeroExponent { factor: prime });
-            }
+        for &(prime, _) in &self.factors {
             if !certificate_is_prime_u64(prime) {
                 return Err(FactorizationVerificationError::CompositeFactor { factor: prime });
             }
-
-            previous = prime;
-            for _ in 0..exponent {
-                reconstructed = reconstructed.checked_mul(prime).ok_or(
-                    FactorizationVerificationError::ProductOverflow { factor: prime },
-                )?;
-            }
-        }
-
-        if reconstructed != self.value {
-            return Err(FactorizationVerificationError::ProductMismatch {
-                expected: self.value,
-                actual: reconstructed,
-            });
         }
         Ok(())
     }
@@ -566,6 +630,35 @@ impl NumberTheoryEngine {
             encoding,
             phi,
         }
+    }
+
+    /// Create a proof-carrying factorization certificate for a u64 input.
+    ///
+    /// The result can be checked without trusting the factorization search routine or
+    /// its Miller-Rabin primality schedule. Zero is rejected; one has an empty
+    /// factorization and needs no prime proofs.
+    pub fn certified_factorization(
+        &self,
+        value: u64,
+    ) -> Result<CertifiedFactorizationCertificate, CertifiedFactorizationError> {
+        let factorization = self.factorize(value).certificate();
+        verify_factorization_structure(factorization.value, &factorization.factors)
+            .map_err(CertifiedFactorizationError::InvalidFactorization)?;
+
+        let mut prime_proofs = Vec::with_capacity(factorization.factors.len());
+        for &(factor, _) in &factorization.factors {
+            let proof = self.primality_proof(factor).map_err(|reason| {
+                CertifiedFactorizationError::PrimeProofGenerationFailed { factor, reason }
+            })?;
+            prime_proofs.push(proof);
+        }
+
+        let certificate = CertifiedFactorizationCertificate {
+            factorization,
+            prime_proofs,
+        };
+        certificate.verify()?;
+        Ok(certificate)
     }
 
     /// Build a recursive Pocklington primality proof for a prime in the u64 domain.
@@ -1271,6 +1364,50 @@ mod tests {
                 product * u128::from(prime).pow(exponent)
             });
         assert_eq!(reconstructed, u128::from(semiprime));
+    }
+
+    #[test]
+    fn test_certified_factorization_proves_each_prime_factor() {
+        let engine = NumberTheoryEngine::new();
+        for value in [
+            1u64,
+            2,
+            30,
+            3_215_031_751,
+            1_000_000_007u64 * 1_000_000_009,
+            18_446_744_073_709_551_557,
+        ] {
+            let certificate = engine.certified_factorization(value).unwrap();
+            assert_eq!(certificate.factorization.value, value);
+            assert_eq!(certificate.verify(), Ok(()), "value={value}");
+        }
+    }
+
+    #[test]
+    fn test_certified_factorization_rejects_missing_or_tampered_prime_proof() {
+        let engine = NumberTheoryEngine::new();
+        let mut certificate = engine.certified_factorization(30).unwrap();
+        certificate.prime_proofs.pop();
+        assert!(matches!(
+            certificate.verify(),
+            Err(CertifiedFactorizationError::PrimeProofCountMismatch { .. })
+        ));
+
+        let mut certificate = engine.certified_factorization(30).unwrap();
+        certificate.prime_proofs[0].value = 19;
+        assert!(matches!(
+            certificate.verify(),
+            Err(CertifiedFactorizationError::PrimeProofRootMismatch { .. })
+        ));
+
+        let mut certificate = engine.certified_factorization(30).unwrap();
+        certificate.factorization.factors[0].1 = 0;
+        assert!(matches!(
+            certificate.verify(),
+            Err(CertifiedFactorizationError::InvalidFactorization(
+                FactorizationVerificationError::ZeroExponent { .. }
+            ))
+        ));
     }
 
     #[test]
