@@ -13,9 +13,7 @@ use std::collections::HashSet;
 use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::embodiment_evidence::{
-    ClockDomainId, EvidenceValidationError, TimestampV1,
-};
+use symthaea_core::embodiment_evidence::{ClockDomainId, EvidenceValidationError, TimestampV1};
 use thiserror::Error;
 
 /// Schema version for PX4 mode/failsafe observations and assessments.
@@ -112,7 +110,9 @@ impl Px4ModeFailsafeObservationV1 {
     pub fn validate(&self) -> Result<(), Px4ModeFailsafeObservationError> {
         self.validate_without_digest()?;
         if self.observation_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ModeFailsafeObservationError::DigestMismatch("observation"));
+            return Err(Px4ModeFailsafeObservationError::DigestMismatch(
+                "observation",
+            ));
         }
         Ok(())
     }
@@ -372,7 +372,9 @@ impl Px4ModeFailsafeObservationAssessmentV1 {
     pub fn validate(&self) -> Result<(), Px4ModeFailsafeObservationError> {
         self.validate_without_digest()?;
         if self.assessment_digest_hex != self.compute_digest_hex() {
-            return Err(Px4ModeFailsafeObservationError::DigestMismatch("assessment"));
+            return Err(Px4ModeFailsafeObservationError::DigestMismatch(
+                "assessment",
+            ));
         }
         Ok(())
     }
@@ -481,9 +483,7 @@ impl Px4ModeFailsafeObservationAssessmentV1 {
             {
                 return Err(Px4ModeFailsafeObservationError::NonAdvancingReceiveTime);
             }
-            if previous_source_us
-                .is_some_and(|previous| sample.source_timestamp_us <= previous)
-            {
+            if previous_source_us.is_some_and(|previous| sample.source_timestamp_us <= previous) {
                 return Err(Px4ModeFailsafeObservationError::NonAdvancingSourceTime);
             }
             if let Some(previous) = previous_sequence {
@@ -605,7 +605,8 @@ pub enum Px4ModeFailsafeObservationError {
     DuplicateSequence,
     /// Capture sequence skipped at least one record.
     #[error("capture sequence gap after {previous}: next captured sequence is {found}")]
-    CaptureSequenceGap { /// Last captured sequence.
+    CaptureSequenceGap {
+        /// Last captured sequence.
         previous: u64,
         /// Next captured sequence.
         found: u64,
@@ -747,9 +748,12 @@ mod tests {
                     && !state.nav_state_transition_observed
                     && !state.failsafe_transition_observed
         ));
-        assert!(value.assessment_id().unwrap().starts_with(
-            "symthaea.autopilot.px4.mode-failsafe-assessment.v1:"
-        ));
+        assert!(
+            value
+                .assessment_id()
+                .unwrap()
+                .starts_with("symthaea.autopilot.px4.mode-failsafe-assessment.v1:")
+        );
     }
 
     #[test]
@@ -1012,7 +1016,10 @@ mod tests {
         let mut restored: Px4ModeFailsafeObservationAssessmentV1 =
             serde_json::from_slice(&bytes).unwrap();
         restored.validate().unwrap();
-        assert_eq!(restored.assessment_id().unwrap(), value.assessment_id().unwrap());
+        assert_eq!(
+            restored.assessment_id().unwrap(),
+            value.assessment_id().unwrap()
+        );
 
         restored.samples[0].failsafe_active = true;
         assert!(restored.validate().is_err());
