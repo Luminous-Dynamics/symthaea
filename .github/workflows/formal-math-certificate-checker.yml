@@ -63,6 +63,9 @@ jobs:
           python3 tools/generate_lean_math_certificate.py \
             --golden-vector factorization-2 \
             --output "$RUNNER_TEMP/SymthaeaFactorizationTwo.lean"
+          python3 tools/generate_lean_math_certificate.py \
+            --golden-vector prime-13-multifactor \
+            --output "$RUNNER_TEMP/SymthaeaPrimeThirteen.lean"
 
       - name: Build the pinned Lean proof project
         uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6
@@ -80,3 +83,4 @@ jobs:
         run: |
           lake env lean "$RUNNER_TEMP/SymthaeaPrimeThree.lean"
           lake env lean "$RUNNER_TEMP/SymthaeaFactorizationTwo.lean"
+          lake env lean "$RUNNER_TEMP/SymthaeaPrimeThirteen.lean"
