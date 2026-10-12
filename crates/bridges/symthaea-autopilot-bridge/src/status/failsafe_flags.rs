@@ -9,12 +9,11 @@ use symthaea_core::embodiment_evidence::{ClockDomainId, TimestampV1};
 use crate::readiness::{Px4ReadinessFactV1, Px4ReadinessRequirementV1};
 
 use super::{
-    PX4_READINESS_STATUS_SCHEMA_V1, Px4StatusEvidenceError, digest_hex, feed_str,
-    readiness_fact, status_timestamp, validate_identifier, validate_schema,
+    PX4_READINESS_STATUS_SCHEMA_V1, Px4StatusEvidenceError, digest_hex, feed_str, readiness_fact,
+    status_timestamp, validate_identifier, validate_schema,
 };
 
-const COMMITMENT_DOMAIN_V1: &[u8] =
-    b"symthaea.autopilot.px4.failsafe-flags-readiness.v1\0";
+const COMMITMENT_DOMAIN_V1: &[u8] = b"symthaea.autopilot.px4.failsafe-flags-readiness.v1\0";
 
 /// Content-addressed readiness projection of one PX4 `FailsafeFlags` message.
 ///
@@ -142,9 +141,7 @@ impl Px4FailsafeFlagsReadinessEvidenceV1 {
     }
 
     /// `LocalAltitudeValid = !local_altitude_invalid`.
-    pub fn local_altitude_valid_fact(
-        &self,
-    ) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
+    pub fn local_altitude_valid_fact(&self) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
         self.validity_fact(
             Px4ReadinessRequirementV1::LocalAltitudeValid,
             !self.local_altitude_invalid,
@@ -152,9 +149,7 @@ impl Px4FailsafeFlagsReadinessEvidenceV1 {
     }
 
     /// `LocalPositionValid = !local_position_invalid` using the strict PX4 flag.
-    pub fn local_position_valid_fact(
-        &self,
-    ) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
+    pub fn local_position_valid_fact(&self) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
         self.validity_fact(
             Px4ReadinessRequirementV1::LocalPositionValid,
             !self.local_position_invalid,
@@ -162,9 +157,7 @@ impl Px4FailsafeFlagsReadinessEvidenceV1 {
     }
 
     /// `LocalVelocityValid = !local_velocity_invalid`.
-    pub fn local_velocity_valid_fact(
-        &self,
-    ) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
+    pub fn local_velocity_valid_fact(&self) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
         self.validity_fact(
             Px4ReadinessRequirementV1::LocalVelocityValid,
             !self.local_velocity_invalid,
@@ -172,9 +165,7 @@ impl Px4FailsafeFlagsReadinessEvidenceV1 {
     }
 
     /// `GlobalPositionValid = !global_position_invalid` using the strict PX4 flag.
-    pub fn global_position_valid_fact(
-        &self,
-    ) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
+    pub fn global_position_valid_fact(&self) -> Result<Px4ReadinessFactV1, Px4StatusEvidenceError> {
         self.validity_fact(
             Px4ReadinessRequirementV1::GlobalPositionValid,
             !self.global_position_invalid,
