@@ -110,56 +110,59 @@ pub struct MetricValue {
     pub ci_upper: f64,
 }
 
-impl MetricValue {
-    /// Compute from a slice of samples using BCa bootstrap confidence intervals.
-    ///
-    /// Uses 2000 resamples with the BCa (bias-corrected and accelerated) method
-    /// for more accurate CIs on skewed or small-sample distributions.
-    ///
-    /// Reference: Efron & Tibshirani (1993), "An Introduction to the Bootstrap".
-    pub fn from_samples_bootstrap(samples: &[f64], seed: u64) -> Self {
-        let n = samples.len();
-        if n == 0 {
-            return Self {
-                mean: 0.0,
-                std_dev: 0.0,
-                n: 0,
-                ci_lower: 0.0,
-                ci_upper: 0.0,
-            };
+/// Why a sample population could not be converted into a metric summary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricValueInputError {
+    /// No observations were supplied; this is not a measured zero.
+    EmptySamples,
+    /// The observation at this zero-based index is NaN or infinite.
+    NonFiniteSample { index: usize },
+    /// Finite observations overflowed or produced invalid summary statistics.
+    NonFiniteAggregate,
+}
+
+impl fmt::Display for MetricValueInputError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptySamples => write!(f, "cannot summarize an empty sample population"),
+            Self::NonFiniteSample { index } => {
+                write!(f, "sample at index {index} is not finite")
+            }
+            Self::NonFiniteAggregate => {
+                write!(f, "sample summary produced a non-finite or invalid statistic")
+            }
         }
-        let mean = samples.iter().sum::<f64>() / n as f64;
-        let variance = if n > 1 {
-            samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64
-        } else {
-            0.0
-        };
-        let std_dev = variance.sqrt();
-        let (ci_lower, ci_upper) = super::analysis::bootstrap_ci_bca(samples, 2000, 0.05, seed);
+    }
+}
+
+impl std::error::Error for MetricValueInputError {}
+
+impl MetricValue {
+    fn validate_samples(samples: &[f64]) -> Result<(), MetricValueInputError> {
+        if samples.is_empty() {
+            return Err(MetricValueInputError::EmptySamples);
+        }
+        if let Some(index) = samples.iter().position(|sample| !sample.is_finite()) {
+            return Err(MetricValueInputError::NonFiniteSample { index });
+        }
+        Ok(())
+    }
+
+    fn invalid_summary(n: usize) -> Self {
+        // Compatibility constructors cannot return Result. NaN is deliberately
+        // used as a poison value so validation/serialization cannot mistake the
+        // failure for a genuine all-zero observation.
         Self {
-            mean,
-            std_dev,
+            mean: f64::NAN,
+            std_dev: f64::NAN,
             n,
-            ci_lower,
-            ci_upper,
+            ci_lower: f64::NAN,
+            ci_upper: f64::NAN,
         }
     }
 
-    /// Compute from a slice of samples.
-    ///
-    /// Uses proper t-distribution critical values for the 95% CI when n < 30,
-    /// falling back to z = 1.96 for larger samples.
-    pub fn from_samples(samples: &[f64]) -> Self {
+    fn from_valid_samples(samples: &[f64]) -> Result<Self, MetricValueInputError> {
         let n = samples.len();
-        if n == 0 {
-            return Self {
-                mean: 0.0,
-                std_dev: 0.0,
-                n: 0,
-                ci_lower: 0.0,
-                ci_upper: 0.0,
-            };
-        }
         let mean = samples.iter().sum::<f64>() / n as f64;
         let variance = if n > 1 {
             samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64
@@ -169,13 +172,85 @@ impl MetricValue {
         let std_dev = variance.sqrt();
         let se = std_dev / (n as f64).sqrt();
         let t = t_critical_95(n);
-        Self {
+        let ci_lower = mean - t * se;
+        let ci_upper = mean + t * se;
+
+        if !mean.is_finite()
+            || !std_dev.is_finite()
+            || !ci_lower.is_finite()
+            || !ci_upper.is_finite()
+            || std_dev < 0.0
+            || ci_lower > ci_upper
+        {
+            return Err(MetricValueInputError::NonFiniteAggregate);
+        }
+
+        Ok(Self {
             mean,
             std_dev,
             n,
-            ci_lower: mean - t * se,
-            ci_upper: mean + t * se,
+            ci_lower,
+            ci_upper,
+        })
+    }
+
+    /// Checked constructor for qualified/empirical benchmark ingestion.
+    ///
+    /// Rejects an empty population, every non-finite observation, and
+    /// overflow/invalid derived statistics before returning a summary.
+    pub fn try_from_samples(samples: &[f64]) -> Result<Self, MetricValueInputError> {
+        Self::validate_samples(samples)?;
+        Self::from_valid_samples(samples)
+    }
+
+    /// Checked constructor using BCa bootstrap confidence intervals.
+    ///
+    /// Uses 2000 resamples with the BCa (bias-corrected and accelerated) method
+    /// for confidence intervals on skewed or small-sample distributions.
+    /// The sample population is validated before aggregation, and a non-finite
+    /// bootstrap interval is returned as a typed error.
+    ///
+    /// Reference: Efron & Tibshirani (1993), "An Introduction to the Bootstrap".
+    pub fn try_from_samples_bootstrap(
+        samples: &[f64],
+        seed: u64,
+    ) -> Result<Self, MetricValueInputError> {
+        Self::validate_samples(samples)?;
+        let summary = Self::from_valid_samples(samples)?;
+        let (ci_lower, ci_upper) =
+            super::analysis::bootstrap_ci_bca(samples, 2000, 0.05, seed);
+        if !ci_lower.is_finite() || !ci_upper.is_finite() || ci_lower > ci_upper {
+            return Err(MetricValueInputError::NonFiniteAggregate);
         }
+
+        Ok(Self {
+            ci_lower,
+            ci_upper,
+            ..summary
+        })
+    }
+
+    /// Compatibility constructor from a slice of samples.
+    ///
+    /// New empirical/qualified benchmark callers should use
+    /// [`MetricValue::try_from_samples`] and propagate the typed error.
+    /// This compatibility wrapper fails closed: invalid input produces a
+    /// non-finite sentinel that snapshot qualification rejects, rather than a
+    /// numeric-looking zero summary.
+    pub fn from_samples(samples: &[f64]) -> Self {
+        Self::try_from_samples(samples).unwrap_or_else(|_| Self::invalid_summary(samples.len()))
+    }
+
+    /// Compatibility constructor using BCa bootstrap confidence intervals
+    /// estimated from 2000 resamples (Efron & Tibshirani, 1993).
+    ///
+    /// New empirical/qualified callers should use
+    /// [`MetricValue::try_from_samples_bootstrap`] and propagate the typed
+    /// error. Invalid input produces a non-finite sentinel that downstream
+    /// qualification rejects.
+    pub fn from_samples_bootstrap(samples: &[f64], seed: u64) -> Self {
+        Self::try_from_samples_bootstrap(samples, seed)
+            .unwrap_or_else(|_| Self::invalid_summary(samples.len()))
     }
 }
 
@@ -2814,10 +2889,57 @@ mod tests {
     }
 
     #[test]
-    fn test_metric_empty() {
+    fn test_metric_empty_fails_closed() {
+        assert_eq!(
+            MetricValue::try_from_samples(&[]).unwrap_err(),
+            MetricValueInputError::EmptySamples
+        );
         let m = MetricValue::from_samples(&[]);
+        let bootstrap = MetricValue::from_samples_bootstrap(&[], 42);
         assert_eq!(m.n, 0);
-        assert_eq!(m.mean, 0.0);
+        assert!(!m.mean.is_finite());
+        assert!(!m.std_dev.is_finite());
+        assert!(!m.ci_lower.is_finite());
+        assert!(!m.ci_upper.is_finite());
+        assert!(!bootstrap.mean.is_finite());
+        assert!(!bootstrap.ci_lower.is_finite());
+    }
+
+    #[test]
+    fn test_checked_metric_rejects_each_non_finite_sample() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                MetricValue::try_from_samples(&[0.25, bad, 0.75]).unwrap_err(),
+                MetricValueInputError::NonFiniteSample { index: 1 }
+            );
+            assert_eq!(
+                MetricValue::try_from_samples_bootstrap(&[0.25, bad, 0.75], 42).unwrap_err(),
+                MetricValueInputError::NonFiniteSample { index: 1 }
+            );
+        }
+
+        // An invalid observation cannot be hidden among otherwise valid data.
+        assert_eq!(
+            MetricValue::try_from_samples(&[0.25, 0.5, f64::INFINITY]).unwrap_err(),
+            MetricValueInputError::NonFiniteSample { index: 2 }
+        );
+    }
+
+    #[test]
+    fn test_checked_metric_rejects_overflowed_summary() {
+        assert_eq!(
+            MetricValue::try_from_samples(&[f64::MAX, f64::MAX]).unwrap_err(),
+            MetricValueInputError::NonFiniteAggregate
+        );
+    }
+
+    #[test]
+    fn test_checked_metric_accepts_single_finite_sample() {
+        let metric = MetricValue::try_from_samples(&[42.0]).unwrap();
+        assert_eq!(metric.n, 1);
+        assert_eq!(metric.mean, 42.0);
+        assert_eq!(metric.std_dev, 0.0);
+        assert!(metric.ci_lower.is_finite() && metric.ci_upper.is_finite());
     }
 
     #[test]
