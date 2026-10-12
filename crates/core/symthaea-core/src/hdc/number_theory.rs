@@ -38,6 +38,180 @@ pub struct FactorizationCertificate {
     pub factors: Vec<(u64, u32)>,
 }
 
+/// One node in a recursive Pocklington primality proof.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrimalityCertificate {
+    /// The prime claimed by this node.
+    pub prime: u64,
+    /// Complete prime factorization of prime - 1 as (factor, exponent) pairs.
+    pub predecessor_factors: Vec<(u64, u32)>,
+    /// One (prime factor of prime - 1, witness base) pair per distinct factor.
+    pub witnesses: Vec<(u64, u64)>,
+}
+
+/// A compact proof bundle. Certificate nodes are sorted by prime value so all
+/// dependencies are expected to appear before the node that uses them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrimalityProof {
+    pub value: u64,
+    pub certificates: Vec<PrimalityCertificate>,
+}
+
+/// Typed errors from building or verifying a recursive primality proof.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PrimalityProofError {
+    InvalidRoot { value: u64 },
+    CertificateTableNotStrictlyIncreasing { previous: u64, current: u64 },
+    MissingPrimeCertificate { prime: u64 },
+    CompositeCandidate { prime: u64 },
+    MalformedPrimeTwoCertificate,
+    PredecessorFactorsNotStrictlyIncreasing { prime: u64, previous: u64, current: u64 },
+    ZeroPredecessorExponent { prime: u64, factor: u64 },
+    PredecessorFactorNotYetProved { prime: u64, factor: u64 },
+    PredecessorProductOverflow { prime: u64, factor: u64 },
+    PredecessorProductMismatch { prime: u64, expected: u64, actual: u64 },
+    WitnessesDoNotMatchPredecessorFactors { prime: u64 },
+    InvalidWitnessBase { prime: u64, factor: u64, base: u64 },
+    InvalidPocklingtonWitness { prime: u64, factor: u64, base: u64 },
+    UnreachableCertificate { prime: u64 },
+    GenerationFactorizationInvalid { value: u64 },
+    WitnessSearchExhausted { prime: u64, factor: u64 },
+}
+
+impl PrimalityProof {
+    /// Verify this proof using only integer arithmetic and recursive Pocklington
+    /// conditions. The checker does not call Miller-Rabin or Pollard-Brent.
+    ///
+    /// Each non-base node includes a full factorization of p - 1, recursive proof
+    /// nodes for every distinct factor, and a witness for each such factor. The
+    /// verifier checks product identities and Pocklington congruences directly.
+    pub fn verify(&self) -> Result<(), PrimalityProofError> {
+        if self.value < 2 {
+            return Err(PrimalityProofError::InvalidRoot { value: self.value });
+        }
+
+        let mut nodes = std::collections::BTreeMap::new();
+        let mut verified = std::collections::BTreeSet::new();
+        let mut previous_node = 0u64;
+
+        for certificate in &self.certificates {
+            if certificate.prime <= previous_node {
+                return Err(PrimalityProofError::CertificateTableNotStrictlyIncreasing {
+                    previous: previous_node,
+                    current: certificate.prime,
+                });
+            }
+            previous_node = certificate.prime;
+            nodes.insert(certificate.prime, certificate);
+        }
+
+        if !nodes.contains_key(&self.value) {
+            return Err(PrimalityProofError::MissingPrimeCertificate { prime: self.value });
+        }
+
+        for certificate in &self.certificates {
+            let prime = certificate.prime;
+            if prime == 2 {
+                if !certificate.predecessor_factors.is_empty() || !certificate.witnesses.is_empty() {
+                    return Err(PrimalityProofError::MalformedPrimeTwoCertificate);
+                }
+                verified.insert(prime);
+                continue;
+            }
+            if prime < 3 || prime.is_multiple_of(2) {
+                return Err(PrimalityProofError::CompositeCandidate { prime });
+            }
+
+            let mut product = 1u64;
+            let mut previous_factor = 1u64;
+            for &(factor, exponent) in &certificate.predecessor_factors {
+                if factor <= previous_factor {
+                    return Err(PrimalityProofError::PredecessorFactorsNotStrictlyIncreasing {
+                        prime,
+                        previous: previous_factor,
+                        current: factor,
+                    });
+                }
+                if exponent == 0 {
+                    return Err(PrimalityProofError::ZeroPredecessorExponent { prime, factor });
+                }
+                if !verified.contains(&factor) {
+                    return Err(PrimalityProofError::PredecessorFactorNotYetProved { prime, factor });
+                }
+                previous_factor = factor;
+                for _ in 0..exponent {
+                    product = product.checked_mul(factor).ok_or(
+                        PrimalityProofError::PredecessorProductOverflow { prime, factor },
+                    )?;
+                }
+            }
+
+            let expected = prime - 1;
+            if product != expected {
+                return Err(PrimalityProofError::PredecessorProductMismatch {
+                    prime,
+                    expected,
+                    actual: product,
+                });
+            }
+            if certificate.witnesses.len() != certificate.predecessor_factors.len() {
+                return Err(PrimalityProofError::WitnessesDoNotMatchPredecessorFactors { prime });
+            }
+
+            for (&(factor, _), &(witness_factor, base)) in certificate
+                .predecessor_factors
+                .iter()
+                .zip(certificate.witnesses.iter())
+            {
+                if factor != witness_factor {
+                    return Err(PrimalityProofError::WitnessesDoNotMatchPredecessorFactors { prime });
+                }
+                if base <= 1 || base >= prime {
+                    return Err(PrimalityProofError::InvalidWitnessBase { prime, factor, base });
+                }
+
+                let full_power = certificate_pow_mod(base, prime - 1, prime);
+                let partial_power = certificate_pow_mod(base, (prime - 1) / factor, prime);
+                if full_power != 1
+                    || certificate_gcd(partial_power.abs_diff(1), prime) != 1
+                {
+                    return Err(PrimalityProofError::InvalidPocklingtonWitness { prime, factor, base });
+                }
+            }
+
+            verified.insert(prime);
+        }
+
+        // Reject unrelated proof nodes so the bundle is canonical and contains
+        // only the dependency closure needed to establish the requested root.
+        let mut reachable = std::collections::BTreeSet::new();
+        let mut pending = vec![self.value];
+        while let Some(prime) = pending.pop() {
+            if !reachable.insert(prime) {
+                continue;
+            }
+            let certificate = nodes
+                .get(&prime)
+                .ok_or(PrimalityProofError::MissingPrimeCertificate { prime })?;
+            pending.extend(certificate.predecessor_factors.iter().map(|&(factor, _)| factor));
+        }
+        if let Some(certificate) = self.certificates.iter().find(|c| !reachable.contains(&c.prime)) {
+            return Err(PrimalityProofError::UnreachableCertificate { prime: certificate.prime });
+        }
+        Ok(())
+    }
+}
+
+/// GCD helper used by the primality-proof checker, separate from the search engine.
+fn certificate_gcd(mut a: u64, mut b: u64) -> u64 {
+    while b != 0 {
+        let remainder = a % b;
+        a = b;
+        b = remainder;
+    }
+    a
+}
+
 /// Why a factorization certificate could not be verified.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FactorizationVerificationError {
@@ -392,6 +566,84 @@ impl NumberTheoryEngine {
             encoding,
             phi,
         }
+    }
+
+    /// Build a recursive Pocklington primality proof for a prime in the u64 domain.
+    ///
+    /// Generation factors each predecessor (p - 1), then searches bounded witness
+    /// bases. Failure to find a witness within the search cap returns a typed error;
+    /// it never emits an unchecked or incomplete proof.
+    pub fn primality_proof(&self, value: u64) -> Result<PrimalityProof, PrimalityProofError> {
+        if value < 2 {
+            return Err(PrimalityProofError::InvalidRoot { value });
+        }
+        let mut certificates = std::collections::BTreeMap::new();
+        self.collect_primality_proof_nodes(value, &mut certificates)?;
+        let proof = PrimalityProof {
+            value,
+            certificates: certificates.into_values().collect(),
+        };
+        proof.verify()?;
+        Ok(proof)
+    }
+
+    fn collect_primality_proof_nodes(
+        &self,
+        value: u64,
+        certificates: &mut std::collections::BTreeMap<u64, PrimalityCertificate>,
+    ) -> Result<(), PrimalityProofError> {
+        if certificates.contains_key(&value) {
+            return Ok(());
+        }
+        if value == 2 {
+            certificates.insert(value, PrimalityCertificate {
+                prime: value,
+                predecessor_factors: Vec::new(),
+                witnesses: Vec::new(),
+            });
+            return Ok(());
+        }
+        if value < 3 || value.is_multiple_of(2) || !self.is_prime(value) {
+            return Err(PrimalityProofError::CompositeCandidate { prime: value });
+        }
+
+        let predecessor = self.factorize(value - 1);
+        if predecessor.certificate().verify().is_err() {
+            return Err(PrimalityProofError::GenerationFactorizationInvalid { value });
+        }
+
+        for &(factor, _) in &predecessor.factors {
+            self.collect_primality_proof_nodes(factor, certificates)?;
+        }
+
+        let mut witnesses = Vec::with_capacity(predecessor.factors.len());
+        const MAX_WITNESS_BASE: u64 = 4096;
+        for &(factor, _) in &predecessor.factors {
+            let max_base = (value - 1).min(MAX_WITNESS_BASE);
+            let mut found = None;
+            for base in 2..=max_base {
+                if certificate_pow_mod(base, value - 1, value) != 1 {
+                    continue;
+                }
+                let partial = certificate_pow_mod(base, (value - 1) / factor, value);
+                if certificate_gcd(partial.abs_diff(1), value) == 1 {
+                    found = Some(base);
+                    break;
+                }
+            }
+            let base = found.ok_or(PrimalityProofError::WitnessSearchExhausted {
+                prime: value,
+                factor,
+            })?;
+            witnesses.push((factor, base));
+        }
+
+        certificates.insert(value, PrimalityCertificate {
+            prime: value,
+            predecessor_factors: predecessor.factors,
+            witnesses,
+        });
+        Ok(())
     }
 
     /// Widened extended Euclidean algorithm over the full i64 input domain.
@@ -1019,6 +1271,55 @@ mod tests {
                 product * u128::from(prime).pow(exponent)
             });
         assert_eq!(reconstructed, u128::from(semiprime));
+    }
+
+    #[test]
+    fn test_pocklington_primality_proofs_verify_small_and_large_primes() {
+        let engine = NumberTheoryEngine::new();
+        for prime in [
+            2u64,
+            3,
+            5,
+            17,
+            97,
+            1_000_003,
+            1_000_000_007,
+            18_446_744_073_709_551_557,
+        ] {
+            let proof = engine.primality_proof(prime).expect("prime should have a proof");
+            assert_eq!(proof.value, prime);
+            assert_eq!(proof.verify(), Ok(()), "prime={prime}");
+        }
+    }
+
+    #[test]
+    fn test_pocklington_primality_proof_rejects_composites_and_invalid_roots() {
+        let engine = NumberTheoryEngine::new();
+        for value in [0u64, 1, 4, 15, 341_550_071_728_321, u64::MAX] {
+            assert!(
+                engine.primality_proof(value).is_err(),
+                "value={value} must not receive a prime proof"
+            );
+        }
+    }
+
+    #[test]
+    fn test_pocklington_primality_proof_rejects_tampered_witness_and_table() {
+        let engine = NumberTheoryEngine::new();
+        let mut proof = engine.primality_proof(17).unwrap();
+        let root = proof.certificates.iter_mut().find(|c| c.prime == 17).unwrap();
+        root.witnesses[0].1 = 1;
+        assert!(matches!(
+            proof.verify(),
+            Err(PrimalityProofError::InvalidWitnessBase { prime: 17, .. })
+        ));
+
+        let mut proof = engine.primality_proof(17).unwrap();
+        proof.certificates.reverse();
+        assert!(matches!(
+            proof.verify(),
+            Err(PrimalityProofError::CertificateTableNotStrictlyIncreasing { .. })
+        ));
     }
 
     #[test]
