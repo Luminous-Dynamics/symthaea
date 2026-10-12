@@ -21,6 +21,7 @@ from muse_style_coverage import CoverageError, STYLE_RELATIVE, git_blob_sha, par
 
 ROOT = Path(__file__).resolve().parents[1]
 REALIZATION_RELATIVE = Path("crates/domains/symthaea-muse/src/theory_realize.rs")
+GRAMMAR_RELATIVE = Path("crates/domains/symthaea-music-theory/src/grammar.rs")
 FAMILY_METHOD = "pub fn grammar_family"
 AXES_METHOD = "pub fn supported_intent_axes"
 METER_METHOD = "pub fn meter"
@@ -249,19 +250,97 @@ def _extract_style_spec_variants(style_source: str, variants: list[str]) -> set[
     return set(mapped)
 
 
+def _parse_grammar_dispatch(
+    grammar_source: str, used_families: set[str]
+) -> dict[str, dict[str, str]]:
+    """Distinguish named family dispatch from the compatibility fallback."""
+    method = _block_after(grammar_source, "pub fn compose_with_grammar_plan")
+    arms = _match_arms(method, r"match\s+profile\.family\s*\{")
+    dispatch: dict[str, dict[str, str]] = {}
+    fallback_seen = False
+    fallback_marker = "crate::composer::compose_with_spec_and_form_and_grammar"
+    dedicated_engines = {
+        "crate::fugue::realize_fugue": "fugue",
+        "crate::groove_cycle::realize_groove_cycle": "groove_cycle",
+        "crate::process_grammar::realize_additive_process": "process_grammar",
+        "crate::modal_arc::realize_modal_arc": "modal_arc",
+        "crate::call_response::realize_call_response": "call_response",
+        "crate::jazz_chorus::realize_jazz_chorus": "jazz_chorus",
+    }
+
+    for raw_pattern, raw_expression in arms:
+        pattern = _strip_comments(raw_pattern).strip()
+        expression = _strip_comments(raw_expression)
+        families = re.findall(r"\bGrammarFamily::([A-Z][A-Za-z0-9_]*)\b", pattern)
+        if not families:
+            if re.fullmatch(r"[a-z][A-Za-z0-9_]*", pattern):
+                if fallback_seen:
+                    raise CoverageError("Grammar dispatcher has multiple fallback arms")
+                fallback_seen = True
+                if fallback_marker not in expression:
+                    raise CoverageError(
+                        "Grammar compatibility fallback no longer calls the shared pipeline"
+                    )
+                continue
+            raise CoverageError(f"Unrecognized grammar dispatcher arm: {pattern!r}")
+
+        for family in families:
+            if family in dispatch:
+                raise CoverageError(f"Grammar family {family} has duplicate dispatch arms")
+            engine = next(
+                (
+                    (name, marker)
+                    for marker, name in dedicated_engines.items()
+                    if marker in expression
+                ),
+                None,
+            )
+            if engine is not None:
+                dispatch[family] = {
+                    "mode": "dedicated_engine",
+                    "entrypoint": engine[0] + ":" + engine[1],
+                }
+            elif family == "PeriodSentence" and fallback_marker in expression:
+                dispatch[family] = {
+                    "mode": "period_sentence_pipeline",
+                    "entrypoint": fallback_marker,
+                }
+            else:
+                dispatch[family] = {
+                    "mode": "named_shared_pipeline",
+                    "entrypoint": fallback_marker
+                    if fallback_marker in expression
+                    else "explicit_family_arm",
+                }
+
+    if not fallback_seen:
+        raise CoverageError("Grammar dispatcher has no compatibility fallback arm")
+    missing = sorted(used_families - set(dispatch))
+    if missing:
+        raise CoverageError(
+            "Grammar families have no explicit dispatch or compatibility fallback: "
+            + ", ".join(missing)
+        )
+    return dispatch
+
+
 def _runtime_report(root: Path) -> dict[str, Any]:
     style_path = root / STYLE_RELATIVE
     realization_path = root / REALIZATION_RELATIVE
-    if not style_path.is_file() or not realization_path.is_file():
+    grammar_path = root / GRAMMAR_RELATIVE
+    required = [style_path, realization_path, grammar_path]
+    if any(not path.is_file() for path in required):
         raise CoverageError(
-            "Run from a checkout containing both "
-            f"{STYLE_RELATIVE} and {REALIZATION_RELATIVE}"
+            "Run from a checkout containing "
+            + ", ".join(str(path.relative_to(root)) for path in required)
         )
     style_bytes = style_path.read_bytes()
     realization_bytes = realization_path.read_bytes()
+    grammar_bytes = grammar_path.read_bytes()
     try:
         style_source = style_bytes.decode("utf-8")
         realization_source = realization_bytes.decode("utf-8")
+        grammar_source = grammar_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise CoverageError(f"Rust runtime source is not UTF-8: {exc}") from exc
 
@@ -316,6 +395,7 @@ def _runtime_report(root: Path) -> dict[str, Any]:
         tempos[style] = [low, high]
 
     spec_styles = _extract_style_spec_variants(style_source, variants)
+    family_dispatch = _parse_grammar_dispatch(grammar_source, set(grammar_families.values()))
     realization_arms = _method_match_arms(
         realization_source, REALIZATION_METHOD, REALIZATION_METHOD
     )
@@ -345,6 +425,7 @@ def _runtime_report(root: Path) -> dict[str, Any]:
         profile = {
             "style": style,
             "grammar_family": family,
+            "grammar_dispatch": family_dispatch[family],
             "composition_spec_declared": style in spec_styles,
             "meter_beats": meters[style],
             "tempo_range_bpm": tempos[style],
@@ -373,6 +454,8 @@ def _runtime_report(root: Path) -> dict[str, Any]:
             "style_blob_sha": git_blob_sha(style_bytes),
             "realization_path": REALIZATION_RELATIVE.as_posix(),
             "realization_blob_sha": git_blob_sha(realization_bytes),
+            "grammar_dispatch_path": GRAMMAR_RELATIVE.as_posix(),
+            "grammar_dispatch_blob_sha": git_blob_sha(grammar_bytes),
             "style_all_variant_count": declared_count,
         },
         "summary": {
@@ -381,6 +464,32 @@ def _runtime_report(root: Path) -> dict[str, Any]:
             "styles_with_composition_spec": len(spec_styles),
             "styles_with_intent_axis_declarations": len(axes_by_style),
             "styles_with_instrument_pool": len(ensembles),
+            "styles_with_dedicated_grammar_engine": sorted(
+                style
+                for style in variants
+                if family_dispatch[grammar_families[style].split("::")[-1]]["mode"]
+                == "dedicated_engine"
+            ),
+            "styles_using_compatibility_fallback": sorted(
+                style
+                for style in variants
+                if family_dispatch[grammar_families[style].split("::")[-1]]["mode"]
+                == "compatibility_fallback"
+            ),
+            "grammar_dispatch_modes": dict(
+                sorted(
+                    {
+                        mode: sum(
+                            family_dispatch[grammar_families[style].split("::")[-1]]["mode"] == mode
+                            for style in variants
+                        )
+                        for mode in {
+                            family_dispatch[grammar_families[style].split("::")[-1]]["mode"]
+                            for style in variants
+                        }
+                    }.items()
+                )
+            ),
             "grammar_family_counts": dict(sorted(family_counts.items())),
             "intent_axis_style_counts": dict(sorted(axis_counts.items())),
             "styles_with_fewer_than_four_intent_axes": sorted(
