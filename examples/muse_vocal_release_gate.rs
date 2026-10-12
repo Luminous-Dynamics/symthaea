@@ -216,6 +216,22 @@ fn ensure_empty_listening_pack(output: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Never overwrite old private evidence, which may belong to another blind key.
+fn ensure_empty_private_output(private_output: &Path) -> Result<()> {
+    let mut entries = std::fs::read_dir(private_output).with_context(|| {
+        format!(
+            "failed to inspect organizer-only output {}",
+            private_output.display()
+        )
+    })?;
+    anyhow::ensure!(
+        entries.next().transpose()?.is_none(),
+        "organizer-only output {} is not empty; archive prior evidence and choose a fresh --output path",
+        private_output.display()
+    );
+    Ok(())
+}
+
 fn save(path: &Path, stem: &VocalStem) -> Result<()> {
     let path = path.to_str().context("non-UTF8 output path")?;
     symthaea::voice::save_wav(&stem.samples, stem.sample_rate, path)
@@ -368,6 +384,7 @@ fn main() -> Result<()> {
     std::fs::create_dir_all(&private_output)?;
     ensure_private_output_is_separate(&output, &private_output)?;
     relocate_legacy_private_artifacts(&output, &private_output)?;
+    ensure_empty_private_output(&private_output)?;
     ensure_empty_listening_pack(&output)?;
     let salt = blind_salt(&args, &output)?;
 
