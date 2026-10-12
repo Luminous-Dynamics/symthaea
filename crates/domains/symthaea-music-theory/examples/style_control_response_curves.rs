@@ -306,9 +306,9 @@ fn observation_json(observation: &Observation, base_hash: u64) -> serde_json::Va
         "control_value": observation.value_label,
         "numeric_control_value": observation.numeric_value,
         "input": observation.input.json(),
-        "exact_fingerprint": observation.exact_hash,
+        "exact_fingerprint_hex": format!("{:016x}", observation.exact_hash),
         "exact_fingerprint_changed": observation.exact_hash_changed,
-        "baseline_exact_fingerprint": base_hash,
+        "baseline_exact_fingerprint_hex": format!("{:016x}", base_hash),
         "overall_structural_distance_from_baseline": observation.overall_structural_distance,
         "layer_distances": layer_distances,
         "descriptors": {
