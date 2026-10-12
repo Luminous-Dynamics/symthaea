@@ -650,6 +650,70 @@ fn effective_discovery_config(
     effective
 }
 
+const MAX_AUTONOMOUS_SEARCH_POPULATION: usize = 10_000;
+const MAX_AUTONOMOUS_SEARCH_GENERATIONS: usize = 10_000;
+const MAX_AUTONOMOUS_SEARCH_FITNESS_EVALUATIONS: usize = 1_000_000;
+const MAX_AUTONOMOUS_SEARCH_TRAJECTORIES: usize = 4_096;
+const MAX_AUTONOMOUS_SEARCH_TOTAL_STEPS: f64 = 5_000_000.0;
+const MAX_AUTONOMOUS_SEARCH_TOTAL_STATE_UPDATES: f64 = 50_000_000.0;
+const MAX_AUTONOMOUS_SEARCH_COMPLEXITY: usize = 2_048;
+const MAX_AUTONOMOUS_SEARCH_DEPTH: usize = 1_024;
+
+fn autonomous_discovery_request_is_bounded(
+    initial_state: &[f64],
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+) -> bool {
+    let dimension = initial_state.len();
+    if dimension == 0
+        || dimension > 4_096
+        || !t_max.is_finite()
+        || t_max <= 0.0
+        || !dt.is_finite()
+        || dt <= 0.0
+        || !(t_max / dt).is_finite()
+        || config.population_size == 0
+        || config.population_size > MAX_AUTONOMOUS_SEARCH_POPULATION
+        || config.generations == 0
+        || config.generations > MAX_AUTONOMOUS_SEARCH_GENERATIONS
+        || config.max_complexity > MAX_AUTONOMOUS_SEARCH_COMPLEXITY
+        || config.max_depth > MAX_AUTONOMOUS_SEARCH_DEPTH
+        || config.tournament_size == 0
+        || config.diverse_trajectory_count > MAX_AUTONOMOUS_SEARCH_TRAJECTORIES
+        || !config.lambda.is_finite()
+        || config.lambda < 0.0
+        || !config.mutation_rate.is_finite()
+        || !(0.0..=1.0).contains(&config.mutation_rate)
+        || !config.prior_composition_rate.is_finite()
+        || !(0.0..=1.0).contains(&config.prior_composition_rate)
+        || !config.prior_fragment_bonus.is_finite()
+        || config.prior_fragment_bonus < 0.0
+        || !config.orthogonality_penalty.is_finite()
+        || config.orthogonality_penalty < 0.0
+        || !config.orthogonality_threshold.is_finite()
+        || !(0.0..=1.0).contains(&config.orthogonality_threshold)
+    {
+        return false;
+    }
+
+    let steps_per_trajectory = (t_max / dt).ceil();
+    let trajectory_count = config.diverse_trajectory_count.max(1);
+    let total_steps = steps_per_trajectory * trajectory_count as f64;
+    let total_state_updates = total_steps * dimension as f64;
+    let fitness_evaluations = config
+        .population_size
+        .checked_mul(config.generations)
+        .unwrap_or(usize::MAX);
+
+    steps_per_trajectory <= 100_000.0
+        && steps_per_trajectory * dimension as f64 <= 10_000_000.0
+        && total_steps <= MAX_AUTONOMOUS_SEARCH_TOTAL_STEPS
+        && total_state_updates <= MAX_AUTONOMOUS_SEARCH_TOTAL_STATE_UPDATES
+        && fitness_evaluations <= MAX_AUTONOMOUS_SEARCH_FITNESS_EVALUATIONS
+        && config.known_invariants.len() <= MAX_AUTONOMOUS_SEARCH_POPULATION
+}
+
 fn discover_invariants_autonomous_with_mode(
     rhs: fn(&[f64], f64) -> Vec<f64>,
     initial_state: &[f64],
@@ -667,8 +731,10 @@ fn discover_invariants_autonomous_with_mode(
     let effective_config = effective_discovery_config(config, mode);
     let config = &effective_config;
     let ndim = initial_state.len();
-    if var_names.len() != ndim || var_names.is_empty()
+    if var_names.len() != ndim
+        || var_names.is_empty()
         || initial_state.iter().any(|value| !value.is_finite())
+        || !autonomous_discovery_request_is_bounded(initial_state, config, t_max, dt)
     {
         return Vec::new();
     }
@@ -1580,6 +1646,39 @@ mod cold_discovery_provenance_tests {
         assert!(cold.disable_macro_seeds);
         assert_eq!(config.known_invariants.len(), 1);
         assert_eq!(config.orthogonality_penalty, 4.0);
+    }
+
+    #[test]
+    fn cold_entry_point_fails_closed_on_zero_step_size() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            ..RegressorConfig::default()
+        };
+        let result = discover_invariants_autonomous_cold(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.0,
+        );
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn cold_entry_point_fails_closed_on_excessive_trajectory_budget() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            diverse_trajectory_count: usize::MAX,
+            ..RegressorConfig::default()
+        };
+        let result = discover_invariants_autonomous_cold(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.01,
+        );
+        assert!(result.is_empty());
     }
 
     #[test]
