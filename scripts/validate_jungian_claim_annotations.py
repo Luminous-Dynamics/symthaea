@@ -191,12 +191,95 @@ def label_distance(field: str, left: Any, right: Any, marginal_counts: dict[Any,
     return 0.0 if left == right else 1.0
 
 
-def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
-    """Summarize raw pairwise agreement and Krippendorff alpha across available reviews.
+def alpha_estimate(per_unit: list[list[Any]], field: str) -> float | None:
+    """Compute Krippendorff alpha for already-pairable per-unit ratings.
 
-    Only units with at least two independent reviews contribute. Alpha is undefined
-    when expected disagreement is zero; it is reported as null rather than fabricated.
-    These statistics describe this annotation sample, not correctness or validity.
+    Units with fewer than two ratings are excluded before this helper is called.
+    A zero expected disagreement makes alpha undefined; it is never coerced to 1.
+    """
+    flat = [rating for ratings in per_unit for rating in ratings]
+    rating_count = len(flat)
+    if rating_count < 2 or not per_unit:
+        return None
+    marginal_counts = {value: flat.count(value) for value in set(flat)}
+    observed_numerator = 0.0
+    for ratings in per_unit:
+        if len(ratings) < 2:
+            continue
+        ordered_disagreement = sum(
+            label_distance(field, left, right, marginal_counts)
+            for i, left in enumerate(ratings)
+            for j, right in enumerate(ratings)
+            if i != j
+        )
+        observed_numerator += ordered_disagreement / (len(ratings) - 1)
+    observed_disagreement = observed_numerator / rating_count
+    expected_numerator = sum(
+        label_distance(field, left, right, marginal_counts)
+        for i, left in enumerate(flat)
+        for j, right in enumerate(flat)
+        if i != j
+    )
+    expected_disagreement = expected_numerator / (rating_count * (rating_count - 1))
+    if expected_disagreement == 0.0:
+        return None
+    return 1.0 - observed_disagreement / expected_disagreement
+
+
+def leave_one_unit_out_sensitivity(per_unit: list[list[Any]], field: str, point_alpha: float | None) -> dict[str, Any]:
+    """Measure point-estimate sensitivity to removing each pairable annotation unit.
+
+    This is a deterministic influence diagnostic, not a confidence interval.
+    """
+    unit_count = len(per_unit)
+    base = {
+        "method": "leave_one_annotation_unit_out_sensitivity_not_confidence_interval",
+        "eligible_units": unit_count,
+        "replicates": 0,
+        "defined_replicates": 0,
+        "undefined_replicates": 0,
+        "minimum_alpha": None,
+        "maximum_alpha": None,
+        "maximum_absolute_change_from_full_estimate": None,
+        "status": "insufficient_pairable_units",
+    }
+    if unit_count < 3:
+        return base
+    values: list[float] = []
+    undefined = 0
+    for index in range(unit_count):
+        candidate = per_unit[:index] + per_unit[index + 1:]
+        estimate = alpha_estimate(candidate, field)
+        if estimate is None:
+            undefined += 1
+        else:
+            values.append(estimate)
+    base.update({
+        "replicates": unit_count,
+        "defined_replicates": len(values),
+        "undefined_replicates": undefined,
+        "minimum_alpha": min(values) if values else None,
+        "maximum_alpha": max(values) if values else None,
+        "maximum_absolute_change_from_full_estimate": (
+            max(abs(value - point_alpha) for value in values)
+            if values and point_alpha is not None else None
+        ),
+        "status": (
+            "all_replicates_defined" if len(values) == unit_count else
+            "partially_undefined" if values else "all_replicates_undefined"
+        ),
+    })
+    return base
+
+
+def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize raw pairwise agreement, Krippendorff alpha, and item influence.
+
+    Only units with at least two independent reviews contribute to alpha. Alpha is
+    undefined when expected disagreement is zero; it is reported as null rather
+    than fabricated. Leave-one-unit-out ranges are sensitivity diagnostics, not
+    confidence intervals. These statistics describe the submitted annotation
+    sample, not correctness or validity.
     """
     label_results: dict[str, Any] = {}
     for field in sorted(LABEL_KEYS):
@@ -219,50 +302,20 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
                     if field == "confidence":
                         absolute_confidence_differences += abs(left - right)
 
-        flat = [rating for ratings in per_unit for rating in ratings]
-        rating_count = len(flat)
-        marginal_counts = {value: flat.count(value) for value in set(flat)}
-        observed_numerator = 0.0
-        for ratings in per_unit:
-            if len(ratings) < 2:
-                continue
-            ordered_disagreement = sum(
-                label_distance(field, left, right, marginal_counts)
-                for i, left in enumerate(ratings)
-                for j, right in enumerate(ratings)
-                if i != j
-            )
-            observed_numerator += ordered_disagreement / (len(ratings) - 1)
-        observed_disagreement = observed_numerator / rating_count if rating_count else None
-
-        expected_numerator = sum(
-            label_distance(field, left, right, marginal_counts)
-            for i, left in enumerate(flat)
-            for j, right in enumerate(flat)
-            if i != j
-        )
-        expected_disagreement = (
-            expected_numerator / (rating_count * (rating_count - 1))
-            if rating_count >= 2 else None
-        )
-        alpha = (
-            1.0 - (observed_disagreement / expected_disagreement)
-            if observed_disagreement is not None
-            and expected_disagreement is not None
-            and expected_disagreement > 0.0 else None
-        )
+        point_alpha = alpha_estimate(per_unit, field)
         entry: dict[str, Any] = {
             "distance": "krippendorff_ordinal" if field == "confidence" else "nominal",
             "eligible_units": len(per_unit),
-            "rating_count": rating_count,
+            "rating_count": sum(len(ratings) for ratings in per_unit),
             "pairwise_comparisons": comparisons,
             "exact_pairwise_agreement": exact_matches / comparisons if comparisons else None,
-            "observed_disagreement": observed_disagreement,
-            "expected_disagreement": expected_disagreement,
-            "krippendorff_alpha": alpha,
-            "alpha_status": "defined" if alpha is not None else (
-                "undefined_no_expected_disagreement" if rating_count >= 2 else "insufficient_paired_reviews"
+            "krippendorff_alpha": point_alpha,
+            "alpha_status": "defined" if point_alpha is not None else (
+                "undefined_no_expected_disagreement"
+                if sum(len(ratings) for ratings in per_unit) >= 2
+                else "insufficient_paired_reviews"
             ),
+            "leave_one_unit_out_sensitivity": leave_one_unit_out_sensitivity(per_unit, field, point_alpha),
         }
         if field == "confidence":
             entry["mean_absolute_confidence_difference"] = (
@@ -275,6 +328,7 @@ def inter_rater_agreement(units: list[dict[str, Any]]) -> dict[str, Any]:
         "scope": "units with at least two independent reviews; raw reviews remain authoritative",
         "eligible_unit_count": max((item["eligible_units"] for item in label_results.values()), default=0),
         "small_sample_warning": "Agreement estimates are descriptive; interpret cautiously with few units, imbalanced labels, or a selected non-random subset.",
+        "sensitivity_warning": "Leave-one-unit-out extrema measure sensitivity to individual reviewed cases; they are not confidence limits or population inference.",
         "labels": label_results,
         "not_established": ["correctness", "psychological validity", "holdout generalization", "population reliability"],
     }
@@ -464,6 +518,36 @@ def self_test() -> list[str]:
                 and confidence_metric["krippendorff_alpha"] == 0.0
                 and confidence_metric["mean_absolute_confidence_difference"] == 3.0,
                 "ordinal confidence disagreement diagnostics are incorrect")
+
+        sensitivity_units: list[dict[str, Any]] = []
+        label_pairs = [
+            ("supported", "supported"),
+            ("supported", "contradicted"),
+            ("contradicted", "contradicted"),
+            ("supported", "supported"),
+        ]
+        confidence_pairs = [(2, 2), (1, 4), (4, 4), (3, 4)]
+        for index, (pair, confidence_pair) in enumerate(zip(label_pairs, confidence_pairs)):
+            ratings = []
+            for reviewer_index, (evidence_label, confidence_label) in enumerate(zip(pair, confidence_pair)):
+                labels = synthetic_labels()
+                labels["evidence_relation"] = evidence_label
+                labels["confidence"] = confidence_label
+                ratings.append({
+                    "reviewer_id": f"reviewer-{reviewer_index}",
+                    "labels": labels,
+                })
+            sensitivity_units.append({"unit_id": f"unit-{index}", "independent_reviews": ratings})
+        sensitivity = inter_rater_agreement(sensitivity_units)
+        evidence_sensitivity = sensitivity["labels"]["evidence_relation"]["leave_one_unit_out_sensitivity"]
+        require(evidence_sensitivity["replicates"] == 4
+                and evidence_sensitivity["defined_replicates"] == 4
+                and evidence_sensitivity["minimum_alpha"] is not None
+                and evidence_sensitivity["maximum_absolute_change_from_full_estimate"] > 0.0,
+                "leave-one-unit-out sensitivity failed to expose single-unit influence")
+        confidence_sensitivity = sensitivity["labels"]["confidence"]["leave_one_unit_out_sensitivity"]
+        require(confidence_sensitivity["method"] == "leave_one_annotation_unit_out_sensitivity_not_confidence_interval",
+                "sensitivity diagnostic must not be mislabeled as a confidence interval")
     except Exception as exc:
         failures.append(f"disagreement measurement positive control failed: {exc}")
 
