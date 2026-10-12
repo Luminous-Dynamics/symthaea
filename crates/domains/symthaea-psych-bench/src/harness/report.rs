@@ -2886,8 +2886,8 @@ mod tests {
     #[test]
     fn test_metric_empty_fails_closed() {
         assert_eq!(
-            MetricValue::try_from_samples(&[]),
-            Err(MetricValueInputError::EmptySamples)
+            MetricValue::try_from_samples(&[]).unwrap_err(),
+            MetricValueInputError::EmptySamples
         );
         let m = MetricValue::from_samples(&[]);
         assert_eq!(m.n, 0);
@@ -2901,27 +2901,27 @@ mod tests {
     fn test_checked_metric_rejects_each_non_finite_sample() {
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert_eq!(
-                MetricValue::try_from_samples(&[0.25, bad, 0.75]),
-                Err(MetricValueInputError::NonFiniteSample { index: 1 })
+                MetricValue::try_from_samples(&[0.25, bad, 0.75]).unwrap_err(),
+                MetricValueInputError::NonFiniteSample { index: 1 }
             );
             assert_eq!(
-                MetricValue::try_from_samples_bootstrap(&[0.25, bad, 0.75], 42),
-                Err(MetricValueInputError::NonFiniteSample { index: 1 })
+                MetricValue::try_from_samples_bootstrap(&[0.25, bad, 0.75], 42).unwrap_err(),
+                MetricValueInputError::NonFiniteSample { index: 1 }
             );
         }
 
         // An invalid observation cannot be hidden among otherwise valid data.
         assert_eq!(
-            MetricValue::try_from_samples(&[0.25, 0.5, f64::INFINITY]),
-            Err(MetricValueInputError::NonFiniteSample { index: 2 })
+            MetricValue::try_from_samples(&[0.25, 0.5, f64::INFINITY]).unwrap_err(),
+            MetricValueInputError::NonFiniteSample { index: 2 }
         );
     }
 
     #[test]
     fn test_checked_metric_rejects_overflowed_summary() {
         assert_eq!(
-            MetricValue::try_from_samples(&[f64::MAX, f64::MAX]),
-            Err(MetricValueInputError::NonFiniteAggregate)
+            MetricValue::try_from_samples(&[f64::MAX, f64::MAX]).unwrap_err(),
+            MetricValueInputError::NonFiniteAggregate
         );
     }
 
