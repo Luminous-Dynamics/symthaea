@@ -241,6 +241,7 @@ impl VocalPerformance {
         if self.pitch_curve.is_empty() {
             bail!("a vocal performance requires a pitch curve");
         }
+        let mut previous_pitch_time = None;
         for (i, point) in self.pitch_curve.iter().enumerate() {
             if !point.time_s.is_finite()
                 || point.time_s < 0.0
@@ -249,6 +250,10 @@ impl VocalPerformance {
             {
                 bail!("invalid pitch-curve point {i}");
             }
+            if previous_pitch_time.is_some_and(|previous| point.time_s < previous) {
+                bail!("pitch curve times must be chronological");
+            }
+            previous_pitch_time = Some(point.time_s);
         }
 
         let mut previous_start = 0.0f32;
@@ -443,6 +448,19 @@ mod tests {
 
         performance.syllables[0].melisma_notes[0].start_time = 0.5;
         performance.syllables[0].melisma_notes[0].velocity = f32::NAN;
+        assert!(performance.validate().is_err());
+    }
+
+    #[test]
+    fn validation_rejects_non_chronological_pitch_curve() {
+        let melody = [Note {
+            frequency: 261.63,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        }];
+        let mut performance = VocalPerformance::from_melody("light", &melody, "en").unwrap();
+        performance.pitch_curve.swap(0, 1);
         assert!(performance.validate().is_err());
     }
 
