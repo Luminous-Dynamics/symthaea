@@ -260,6 +260,121 @@ mod capability_report_tests {
             serde_json::from_str(&json).expect("deserialize capability report");
         assert_eq!(decoded, report);
     }
+
+    /// Run in CI only when the software-Vulkan lane explicitly opts in.
+    ///
+    /// This dispatches a real WGSL compute shader through WGPU/Vulkan, copies
+    /// the result to a mappable buffer, and checks the readback. On GitHub's
+    /// ordinary hosted runner, the workflow forces Mesa lavapipe; a pass here
+    /// proves software-Vulkan dispatch/readback, never physical-GPU execution.
+    #[tokio::test]
+    async fn software_vulkan_compute_dispatch_and_readback_when_requested() {
+        if std::env::var_os("SYTHAEA_GPU_SMOKE_REQUIRED").is_none() {
+            return;
+        }
+
+        use std::time::Duration;
+
+        let (context, report) = super::GpuContext::new_with_report()
+            .await
+            .expect("required software Vulkan adapter must initialize");
+
+        println!(
+            "Symthaea GPU smoke adapter report: {}",
+            serde_json::to_string(&report).expect("serialize runtime adapter report")
+        );
+
+        assert!(
+            report.backend.contains("Vulkan"),
+            "expected Vulkan backend, got {}",
+            report.backend
+        );
+        assert!(report.is_cpu_device, "software-Vulkan lane expected a CPU-classified adapter");
+        assert!(!report.is_noop_backend, "NOOP backend cannot qualify compute execution");
+        assert!(report.supports_storage_binding(4));
+
+        const SHADER: &str = r#"
+@group(0) @binding(0) var<storage, read_write> result: array<u32>;
+
+@compute @workgroup_size(1)
+fn main() {
+    result[0] = 0x00C0FFEEu;
+}
+"#;
+
+        let shader = context.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Symthaea GPU smoke shader"),
+            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+        });
+        let pipeline = context.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Symthaea GPU smoke pipeline"),
+            layout: None,
+            module: &shader,
+            entry_point: Some("main"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+        let storage = context.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Symthaea GPU smoke storage"),
+            size: 4,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let readback = context.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Symthaea GPU smoke readback"),
+            size: 4,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let bind_group_layout = pipeline.get_bind_group_layout(0);
+        let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Symthaea GPU smoke bindings"),
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: storage.as_entire_binding(),
+            }],
+        });
+
+        let mut encoder = context
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Symthaea GPU smoke commands"),
+            });
+        {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Symthaea GPU smoke pass"),
+                timestamp_writes: None,
+            });
+            pass.set_pipeline(&pipeline);
+            pass.set_bind_group(0, &bind_group, &[]);
+            pass.dispatch_workgroups(1, 1, 1);
+        }
+        encoder.copy_buffer_to_buffer(&storage, 0, &readback, 0, 4);
+        context.queue.submit(Some(encoder.finish()));
+
+        let (sender, receiver) = std::sync::mpsc::channel();
+        readback.slice(..).map_async(wgpu::MapMode::Read, move |result| {
+            let _ = sender.send(result);
+        });
+        context
+            .device
+            .poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: Some(Duration::from_secs(30)),
+            })
+            .expect("Vulkan compute/readback submission should complete");
+        receiver
+            .recv_timeout(Duration::from_secs(30))
+            .expect("Vulkan readback callback should complete")
+            .expect("Vulkan readback buffer should map");
+
+        let bytes = readback.slice(..).get_mapped_range();
+        let actual = u32::from_le_bytes(bytes[0..4].try_into().expect("four-byte output"));
+        assert_eq!(actual, 0x00C0_FFEE, "GPU dispatch output mismatch");
+        drop(bytes);
+        readback.unmap();
+    }
 }
 
 /// Sparse Matrix-Vector multiplication (SpMV) kernel in CSR format.
