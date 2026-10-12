@@ -715,3 +715,33 @@ fn lcg_step(state: u64) -> u64 {
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1442695040888963407)
 }
+
+
+#[cfg(test)]
+mod lie_derivative_work_tests {
+    use super::{Expr, lie_derivative_variance_with_work};
+
+    fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+        vec![state[1], -state[0]]
+    }
+
+    #[test]
+    fn lie_score_counts_one_rhs_call_per_scored_state() {
+        let candidate = Expr::Var("x".to_string());
+        let trajectory = vec![vec![1.0, 0.0], vec![0.9, 0.1], vec![0.8, 0.2]];
+        let (score, rhs_calls) =
+            lie_derivative_variance_with_work(&candidate, harmonic_rhs, &trajectory, &["x", "v"]);
+        assert!(score.is_finite());
+        assert_eq!(rhs_calls, trajectory.len() as u64);
+    }
+
+    #[test]
+    fn rejected_non_finite_gradient_preserves_zero_rhs_calls() {
+        let candidate = Expr::Var("x".to_string());
+        let trajectory = vec![vec![f64::NAN, 0.0], vec![1.0, 0.0]];
+        let (score, rhs_calls) =
+            lie_derivative_variance_with_work(&candidate, harmonic_rhs, &trajectory, &["x", "v"]);
+        assert_eq!(score, f64::MAX);
+        assert_eq!(rhs_calls, 0);
+    }
+}
