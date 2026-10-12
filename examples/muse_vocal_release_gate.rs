@@ -169,6 +169,53 @@ fn relocate_legacy_private_artifacts(output: &Path, private_output: &Path) -> Re
     Ok(())
 }
 
+/// Require the two output trees to be physically separate and restrict access
+/// to organizer-only evidence on Unix systems.
+fn ensure_private_output_is_separate(output: &Path, private_output: &Path) -> Result<()> {
+    let private_metadata = std::fs::symlink_metadata(private_output)
+        .context("failed to inspect organizer-only output directory")?;
+    anyhow::ensure!(
+        !private_metadata.file_type().is_symlink(),
+        "organizer-only output must not be a symlink"
+    );
+    let public_path = output.canonicalize()?;
+    let private_path = private_output.canonicalize()?;
+    anyhow::ensure!(
+        public_path != private_path
+            && !public_path.starts_with(&private_path)
+            && !private_path.starts_with(&public_path),
+        "--output and organizer-only output must resolve to separate, non-nested directories"
+    );
+    restrict_private_output_permissions(private_output)?;
+    Ok(())
+}
+
+#[cfg(unix)]
+fn restrict_private_output_permissions(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn restrict_private_output_permissions(_path: &Path) -> Result<()> {
+    // The private directory remains a sibling and is never included in the
+    // shareable pack. Platform-specific ACL configuration is left to the host.
+    Ok(())
+}
+
+/// Never mix stale WAVs or manifests into a fresh blinded run.
+fn ensure_empty_listening_pack(output: &Path) -> Result<()> {
+    let mut entries = std::fs::read_dir(output)
+        .with_context(|| format!("failed to inspect listening pack {}", output.display()))?;
+    anyhow::ensure!(
+        entries.next().transpose()?.is_none(),
+        "listening-pack directory {} is not empty; archive the previous run and choose a fresh --output path",
+        output.display()
+    );
+    Ok(())
+}
+
 fn save(path: &Path, stem: &VocalStem) -> Result<()> {
     let path = path.to_str().context("non-UTF8 output path")?;
     symthaea::voice::save_wav(&stem.samples, stem.sample_rate, path)
@@ -319,7 +366,9 @@ fn main() -> Result<()> {
     anyhow::ensure!(minimum_listeners > 0, "--minimum-listeners must be positive");
     std::fs::create_dir_all(&output)?;
     std::fs::create_dir_all(&private_output)?;
+    ensure_private_output_is_separate(&output, &private_output)?;
     relocate_legacy_private_artifacts(&output, &private_output)?;
+    ensure_empty_listening_pack(&output)?;
     let salt = blind_salt(&args, &output)?;
 
     let mut kokoro = KokoroSingingEngine::load(&voice)?;
@@ -529,6 +578,23 @@ mod tests {
             lyric_words_understood: total,
             lyric_words_total: total,
         }
+    }
+
+    #[test]
+    fn existing_listening_pack_is_rejected_to_prevent_stale_clip_mixing() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output = std::env::temp_dir().join(format!(
+            "symthaea-vocal-listening-pack-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&output).unwrap();
+        assert!(ensure_empty_listening_pack(&output).is_ok());
+        std::fs::write(output.join("stale.wav"), b"not-a-valid-wav").unwrap();
+        assert!(ensure_empty_listening_pack(&output).is_err());
+        std::fs::remove_dir_all(&output).unwrap();
     }
 
     #[test]
