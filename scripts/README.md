@@ -31,7 +31,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 - `run_coding_validation.sh` - Run code-generation honesty tests and the verified HumanEval-style smoke benchmark
 - `format_summary.py` - Summary formatting
 - `generate_benchmark_report.py` - Report generation
-- `muse_style_coverage.py` - Source-derived Muse catalog/route audit; `--report` emits per-constellation gaps, `--check` fails on frozen-baseline drift
+- `muse_style_coverage.py` - Source-derived Muse route audit in both directions; `--report` emits per-constellation gaps and unreferenced executable styles, `--check` fails on frozen-baseline drift
 - `gpu_smoke.sh` - NVIDIA/CUDA environment preflight and optional Broca CUDA smoke test
 - `post_to_dashboard.py` - Dashboard posting
 - `precompute_ethics_embeddings.py` - Ethics embeddings
