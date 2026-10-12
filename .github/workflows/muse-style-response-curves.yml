@@ -7,6 +7,7 @@ on:
       - "crates/domains/symthaea-music-theory/src/grammar.rs"
       - "crates/domains/symthaea-music-theory/src/fingerprint.rs"
       - "crates/domains/symthaea-music-theory/src/composer.rs"
+      - "crates/domains/symthaea-music-theory/src/score.rs"
       - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
       - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
       - "crates/domains/symthaea-music-theory/Cargo.toml"
@@ -19,6 +20,7 @@ on:
       - "crates/domains/symthaea-music-theory/src/grammar.rs"
       - "crates/domains/symthaea-music-theory/src/fingerprint.rs"
       - "crates/domains/symthaea-music-theory/src/composer.rs"
+      - "crates/domains/symthaea-music-theory/src/score.rs"
       - "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs"
       - "crates/domains/symthaea-music-theory/examples/diversity_census.rs"
       - "crates/domains/symthaea-music-theory/Cargo.toml"
@@ -79,6 +81,8 @@ jobs:
               "crates/domains/symthaea-music-theory/src/grammar.rs",
               "crates/domains/symthaea-music-theory/src/fingerprint.rs",
               "crates/domains/symthaea-music-theory/src/composer.rs",
+              "crates/domains/symthaea-music-theory/src/score.rs",
+              "crates/domains/symthaea-music-theory/examples/diversity_census.rs",
               "crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs",
               "Cargo.lock",
           ]
@@ -97,6 +101,10 @@ jobs:
               "report_sha256": hashlib.sha256(report_bytes).hexdigest(),
               "source_git_blob_sha": blob_digests,
               "engine_package_version": report["engine_package_version"],
+              "rustc_version": subprocess.check_output(["rustc", "-Vv"], text=True),
+              "cargo_version": subprocess.check_output(["cargo", "-V"], text=True).strip(),
+              "runner_os": os.environ.get("RUNNER_OS"),
+              "runner_arch": os.environ.get("RUNNER_ARCH"),
               "protocol": report["protocol"],
               "measurement_scope": report["measurement_scope"],
               "interpretation": (
