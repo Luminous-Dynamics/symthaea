@@ -400,6 +400,97 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         .iter()
         .filter_map(|point| point.numeric_value.map(|value| (value, point.mean_section_intensity)))
         .collect();
+    let velocity_spread_points: Vec<(f64, f64)> = observations
+        .iter()
+        .filter_map(|point| {
+            point
+                .numeric_value
+                .map(|value| (value, point.velocity_standard_deviation))
+        })
+        .collect();
+    let intensity_spread_points: Vec<(f64, f64)> = observations
+        .iter()
+        .filter_map(|point| {
+            point.numeric_value.map(|value| {
+                (value, point.section_intensity_standard_deviation)
+            })
+        })
+        .collect();
+
+    let baseline_observation = observations
+        .iter()
+        .find(|point| point.input == InputConfig::BASE)
+        .expect("every control grid includes the unchanged baseline");
+    let exact_events_changed = unique_fingerprints.len() > 1;
+    let structural_layers_changed = !layers_changed.is_empty();
+    let tempo_changed = observations
+        .iter()
+        .any(|point| (point.tempo_bpm - baseline_observation.tempo_bpm).abs() > MONOTONIC_EPSILON);
+    let meter_changed = observations
+        .iter()
+        .any(|point| point.meter_beats != baseline_observation.meter_beats);
+    let duration_changed = observations.iter().any(|point| {
+        (point.total_duration_beats - baseline_observation.total_duration_beats).abs()
+            > MONOTONIC_EPSILON
+    });
+    let note_count_changed = observations
+        .iter()
+        .any(|point| point.score_note_count != baseline_observation.score_note_count);
+    let pitch_diversity_changed = observations
+        .iter()
+        .any(|point| point.distinct_midi_pitches != baseline_observation.distinct_midi_pitches);
+    let pitch_span_changed = observations
+        .iter()
+        .any(|point| point.pitch_span_semitones != baseline_observation.pitch_span_semitones);
+    let tonic_changed = observations
+        .iter()
+        .any(|point| point.score_key_tonic_pc != baseline_observation.score_key_tonic_pc);
+    let mean_velocity_changed = observations.iter().any(|point| {
+        (point.mean_velocity - baseline_observation.mean_velocity).abs() > MONOTONIC_EPSILON
+    });
+    let velocity_spread_changed = observations.iter().any(|point| {
+        (point.velocity_standard_deviation - baseline_observation.velocity_standard_deviation)
+            .abs()
+            > MONOTONIC_EPSILON
+    });
+    let note_duration_changed = observations.iter().any(|point| {
+        (point.mean_note_duration_beats - baseline_observation.mean_note_duration_beats).abs()
+            > MONOTONIC_EPSILON
+    });
+    let section_intensity_changed = observations.iter().any(|point| {
+        (point.mean_section_intensity - baseline_observation.mean_section_intensity).abs()
+            > MONOTONIC_EPSILON
+    });
+    let intensity_spread_changed = observations.iter().any(|point| {
+        (point.section_intensity_standard_deviation
+            - baseline_observation.section_intensity_standard_deviation)
+            .abs()
+            > MONOTONIC_EPSILON
+    });
+    let emphasis_changed = observations
+        .iter()
+        .any(|point| point.emphasis_counts != baseline_observation.emphasis_counts);
+    let form_availability_changed = observations.iter().any(|point| {
+        point.form_section_count != baseline_observation.form_section_count
+    });
+    let no_observed_change_at_tested_points = !(
+        exact_events_changed
+            || structural_layers_changed
+            || tempo_changed
+            || meter_changed
+            || duration_changed
+            || note_count_changed
+            || pitch_diversity_changed
+            || pitch_span_changed
+            || tonic_changed
+            || mean_velocity_changed
+            || velocity_spread_changed
+            || note_duration_changed
+            || section_intensity_changed
+            || intensity_spread_changed
+            || emphasis_changed
+            || form_availability_changed
+    );
 
     serde_json::json!({
         "control": control,
@@ -409,6 +500,25 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
         "distinct_exact_output_fraction": unique_fingerprints.len() as f64 / observations.len().max(1) as f64,
         "max_structural_distance": max_structural_distance,
         "layers_changed_at_least_once": layers_changed,
+        "observed_changes_from_baseline": {
+            "exact_note_event_fingerprint": exact_events_changed,
+            "structural_layers": structural_layers_changed,
+            "tempo_bpm": tempo_changed,
+            "meter_beats": meter_changed,
+            "total_duration_beats": duration_changed,
+            "score_note_count": note_count_changed,
+            "distinct_midi_pitches": pitch_diversity_changed,
+            "pitch_span_semitones": pitch_span_changed,
+            "absolute_key_tonic": tonic_changed,
+            "mean_velocity": mean_velocity_changed,
+            "velocity_spread": velocity_spread_changed,
+            "mean_note_duration_beats": note_duration_changed,
+            "mean_section_intensity": section_intensity_changed,
+            "section_intensity_spread": intensity_spread_changed,
+            "emphasis_counts": emphasis_changed,
+            "form_availability_or_section_count": form_availability_changed,
+            "no_observed_change_at_tested_points": no_observed_change_at_tested_points,
+        },
         "response_shape": {
             "tempo_bpm_vs_control": monotonicity(&tempo_points),
             "total_duration_beats_vs_control": monotonicity(&duration_points),
@@ -416,6 +526,8 @@ fn curve_json(style: Style, control: &str) -> serde_json::Value {
             "mean_velocity_vs_control": monotonicity(&velocity_points),
             "mean_note_duration_beats_vs_control": monotonicity(&duration_mean_points),
             "mean_section_intensity_vs_control": monotonicity(&intensity_points),
+            "velocity_spread_vs_control": monotonicity(&velocity_spread_points),
+            "section_intensity_spread_vs_control": monotonicity(&intensity_spread_points),
             "structural_distance_note": "Per-point distance from baseline is recorded below. It is a displacement magnitude, not a directional target metric, so no monotonicity class is assigned to it.",
             "note": "Shape labels describe observed points only; they are not correctness or quality scores. Tonic and seed are not treated as ordinal axes. Dynamics and key are reported separately because the exact fingerprint omits velocity/emphasis and pitch-class structural features are transposition-invariant."
         },
