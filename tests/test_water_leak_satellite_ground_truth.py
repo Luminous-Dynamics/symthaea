@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import unittest
 
 from tools.water_leak_satellite.ground_truth import (
@@ -144,6 +143,8 @@ class GroundTruthTests(unittest.TestCase):
         b["zone_id"] = "zone-b"
         b["asset_segment_id"] = "pipe-seg-2"
         b["observed_at"] = "2026-09-01T10:00:00Z"
+        b["location"]["longitude"] = 28.15
+        b["location"]["latitude"] = -26.25
         a["rights"]["allowed_uses"] = ["internal_research", "commercial_model_training"]
         b["rights"]["allowed_uses"] = ["internal_research", "commercial_model_training"]
         errors, counts = validate_corpus(corpus([a, b]), purpose="commercial_model_training")
