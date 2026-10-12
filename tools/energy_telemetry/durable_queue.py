@@ -48,21 +48,26 @@ class DurableTelemetryQueue:
         if (
             not isinstance(database_path, str)
             or not database_path.strip()
+            or "\\x00" in database_path
             or database_path == ":memory:"
         ):
             raise ValueError("database_path must be a persistent filesystem path, not :memory:")
-        if type(max_queue_bytes) is not int or max_queue_bytes < 1:
-            raise ValueError("max_queue_bytes must be a positive integer")
-        if type(max_records) is not int or max_records < 1:
-            raise ValueError("max_records must be a positive integer")
-        if type(max_future_skew_seconds) is not int or max_future_skew_seconds < 0:
-            raise ValueError("max_future_skew_seconds must be a non-negative integer")
+        sqlite_int_max = (1 << 63) - 1
+        if type(max_queue_bytes) is not int or not 1 <= max_queue_bytes <= sqlite_int_max:
+            raise ValueError("max_queue_bytes must be a positive SQLite integer")
+        if type(max_records) is not int or not 1 <= max_records <= sqlite_int_max:
+            raise ValueError("max_records must be a positive SQLite integer")
+        if (
+            type(max_future_skew_seconds) is not int
+            or not 0 <= max_future_skew_seconds <= 31_536_000
+        ):
+            raise ValueError("max_future_skew_seconds must be in [0, 31536000]")
         if (
             type(busy_timeout_seconds) not in (int, float)
             or not math.isfinite(busy_timeout_seconds)
-            or busy_timeout_seconds <= 0
+            or not 0 < busy_timeout_seconds <= 300
         ):
-            raise ValueError("busy_timeout_seconds must be finite and positive")
+            raise ValueError("busy_timeout_seconds must be finite and in (0, 300]")
         self.database_path = database_path
         self.max_queue_bytes = max_queue_bytes
         self.max_records = max_records
