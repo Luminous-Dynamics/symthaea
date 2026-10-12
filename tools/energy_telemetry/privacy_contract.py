@@ -73,7 +73,12 @@ def _is_int(value: Any) -> bool:
 
 
 def _is_finite_number(value: Any) -> bool:
-    return type(value) in (int, float) and math.isfinite(float(value))
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (OverflowError, ValueError):
+        return False
 
 
 def _parse_utc(value: Any, prefix: str, errors: list[str]) -> datetime | None:

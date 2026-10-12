@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import unittest
+from pathlib import Path
 
 from tools.energy_telemetry.privacy_contract import (
     MAX_RELEASE_DELTA,
@@ -108,6 +109,21 @@ class PrivacyContractTests(unittest.TestCase):
         document = valid_envelope()
         document["aggregation"]["coverage_fraction"] = float("nan")
         self.assertTrue(any("coverage_fraction" in e for e in validate_envelope(document)))
+
+    def test_extremely_large_coverage_integer_fails_closed_without_overflow(self):
+        document = valid_envelope()
+        document["aggregation"]["coverage_fraction"] = 10 ** 10000
+        self.assertTrue(any("coverage_fraction" in e for e in validate_envelope(document)))
+
+    def test_schema_and_validator_required_fields_stay_aligned(self):
+        schema_path = Path(__file__).resolve().parents[1] / "docs/research/energy_telemetry_envelope.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        self.assertEqual(set(schema["required"]), set(schema["properties"]))
+        for section in ("window", "aggregation"):
+            definition = schema["properties"][section]
+            self.assertEqual(set(definition["required"]), set(definition["properties"]))
+        dp = schema["$defs"]["dpRelease"]
+        self.assertEqual(set(dp["required"]), set(dp["properties"]))
 
     def test_coverage_outside_range_is_rejected(self):
         document = valid_envelope()

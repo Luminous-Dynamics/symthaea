@@ -121,7 +121,7 @@ Files:
 - `tools/energy_telemetry/privacy_contract.py`
 - `tests/test_energy_telemetry_privacy_contract.py`
 
-The initial unit suite contains 31 deterministic, network-free cases covering schema shape, privacy-policy gates, edge cases and ambiguous JSON input. They are implemented cases; no hosted CI pass is implied.
+The initial unit suite contains 33 deterministic, network-free cases covering schema/validator alignment, privacy-policy gates, extreme numeric inputs, edge cases and ambiguous JSON input. They are implemented cases; no hosted CI pass is implied.
 
 The validator checks the aggregate envelope's exact keys, UTC/time-window consistency, cohort floor, bounded integer energy value, finite coverage fraction, privacy-mechanism/recipient compatibility and per-release DP parameter limits. A dedicated [pinned GitHub Actions workflow](https://github.com/Luminous-Dynamics/symthaea/blob/research/privacy-preserving-satellite-energy-telemetry/.github/workflows/energy-telemetry-privacy-tests.yml) compiles and runs the offline tests on relevant branch/PR changes. It also rejects duplicate JSON keys, non-standard `NaN`/`Infinity` constants and malformed container types without crashing. It does not establish cryptographic authenticity, hardware provenance, meter calibration, the reality of claimed cohort membership or a mathematical privacy proof.
 
