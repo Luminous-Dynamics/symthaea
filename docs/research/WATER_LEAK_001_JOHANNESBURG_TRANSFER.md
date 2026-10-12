@@ -312,6 +312,17 @@ Six offline test cases are defined against mocked STAC responses. The GitHub Act
 
 As of 2026-10-12, I did successfully retrieve the official STAC collection metadata pages for `sentinel-1-grd` and `sentinel-2-l2a`. That confirms the collection identifiers, product descriptions and endpoints exist; it does not establish any scene intersection, acquisition continuity or data suitability for the reconnaissance area. Direct item-search URLs were inaccessible through the research browser, and the working container could not resolve external DNS. Do not claim a live AOI inventory or test PASS until an actual completed run and its artifact are independently inspected.
 
+### Ground-truth label and data-rights contract
+
+A new strict record schema and standard-library-only validator define a safe handoff for any future labelled dataset:
+- Schema: `docs/research/water_leak_ground_truth.schema.json`
+- Validator: `tools/water_leak_satellite/ground_truth.py`
+- Offline tests: `tests/test_water_leak_satellite_ground_truth.py`
+
+The contract separates four outcomes: `confirmed_leak`, `inspected_no_leak`, `inconclusive`, and `unknown`. An acoustic localization, complaint, or work-order entry alone cannot become a confirmed positive; a negative requires an actual documented inspection, not the absence of a leak record. The validator also requires coordinate uncertainty, timezone-aware observation time, permission evidence and explicit permitted purposes. Commercial training fails closed unless the rights record explicitly allows it. A spatiotemporal split group cannot be reused across evaluation partitions.
+
+Running this validator only establishes consistency with the declared data/label contract. It does not prove the underlying field claim is true, resolve biased sampling, prove representativeness, or qualify a model. Raw personal information and residential addresses must not be stored in the public corpus; use permissioned source references and pseudonymous asset IDs. Coordinate detail should be access-controlled in the utility's authorized store when necessary.
+
 ### Near-term go/no-go decision
 
 The immediate scientific question is not "can an algorithm draw a hotspot map?" It is whether repeatable satellite-derived anomalies overlap with independently confirmed leaks often enough to reduce real inspection burden in the selected area.
