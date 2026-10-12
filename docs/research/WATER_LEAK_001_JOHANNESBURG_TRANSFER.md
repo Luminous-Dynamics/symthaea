@@ -273,7 +273,9 @@ python3 tools/water_leak_satellite/catalog_inventory.py \
 
 The bounding box is a coarse Johannesburg reconnaissance extent, not an approved evaluation area. The utility queries Copernicus STAC for Sentinel-1 GRD and Sentinel-2 L2A, writes item metadata plus per-item and per-page SHA-256 hashes, records the explicit query and retrieval time, follows only HTTPS pagination links on the official STAC host, deduplicates repeated item IDs and fails closed when pagination is ambiguous or incomplete. It does not download raster imagery or claim that scenes are suitable for detecting leaks.
 
-Six offline unit tests were run locally against mocked catalog responses and passed. **A live catalogue query has not yet been run in this environment**, so there is no measured Johannesburg scene count or coverage result yet. A live inventory must be created and reviewed before any model or benchmark eligibility claim.
+Six offline test cases are defined against mocked STAC responses. The GitHub Actions run for this PR has remained queued/cancelled during branch updates, so a completed hosted test pass has not yet been observed. **A live item-search query has not completed**, so there is no measured Johannesburg scene count or coverage result.
+
+As of 2026-10-12, I did successfully retrieve the official STAC collection metadata pages for `sentinel-1-grd` and `sentinel-2-l2a`. That confirms the collection identifiers, product descriptions and endpoints exist; it does not establish any scene intersection, acquisition continuity or data suitability for the reconnaissance area. Direct item-search URLs were inaccessible through the research browser, and the working container could not resolve external DNS. Do not claim a live AOI inventory or test PASS until an actual completed run and its artifact are independently inspected.
 
 ### Near-term go/no-go decision
 
