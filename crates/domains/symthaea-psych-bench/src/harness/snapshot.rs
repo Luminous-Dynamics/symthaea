@@ -1559,7 +1559,7 @@ mod tests {
 
     #[test]
     fn test_backward_compat_roundtrip() {
-        // Create v1.1 snapshot, serialize, deserialize — schema_version preserved
+        // Create current-schema snapshot, serialize, deserialize — schema_version preserved
         let s = make_test_snapshot("roundtrip", 0.90);
         assert_eq!(s.schema_version, SNAPSHOT_SCHEMA_VERSION);
         let json = s.to_json().unwrap();
