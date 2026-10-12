@@ -69,7 +69,10 @@ pub fn bench_bitwise_majority(
     let mut witness = circuit.new_witness_filler();
     let mut input_values: Vec<Vec<u64>> = Vec::with_capacity(participants);
     for p in 0..participants {
-        let values: Vec<u64> = (0..dim_words).map(|_| rand::random()).collect();
+        let values = crate::bench_inputs::deterministic_words(
+            crate::bench_inputs::SEED_FL_TRIPLE_BASE.wrapping_add(p as u64),
+            dim_words,
+        );
         for w in 0..dim_words {
             witness[inputs[p][w]] = Word(values[w]);
         }

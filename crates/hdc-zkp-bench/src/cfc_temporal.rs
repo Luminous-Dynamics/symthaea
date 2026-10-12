@@ -106,17 +106,21 @@ pub fn bench_cfc_temporal(neurons: usize, timesteps: usize) -> CfcBenchResult {
     // Witness must fill gate_wires in the SAME order
     let mut witness = circuit.new_witness_filler();
 
-    // Generate all initial values
-    let h0_vals: Vec<u64> = (0..neurons).map(|_| rand::random()).collect();
-    let x_inf_vals: Vec<u64> = (0..neurons).map(|_| rand::random()).collect();
+    // Generate deterministic synthetic initial values, independent by role.
+    let h0_vals =
+        crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_CFC_INITIAL_STATE, neurons);
+    let x_inf_vals = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_CFC_INPUT, neurons);
 
     for n in 0..neurons {
         witness[h_wires[n]] = Word(h0_vals[n]);
         witness[x_inf_wires[n]] = Word(x_inf_vals[n]);
     }
 
-    // Pre-generate all gate values in timestep-major order (matching circuit)
-    let gate_vals: Vec<u64> = (0..timesteps * neurons).map(|_| rand::random()).collect();
+    // Pre-generate deterministic gate values in timestep-major order (matching circuit).
+    let gate_vals = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_CFC_GATE,
+        timesteps * neurons,
+    );
     for (i, &gate) in gate_vals.iter().enumerate() {
         witness[gate_wires[i]] = Word(gate);
     }

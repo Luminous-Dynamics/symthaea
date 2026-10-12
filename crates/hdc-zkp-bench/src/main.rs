@@ -29,6 +29,7 @@
 //! - Verifier time (ms) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
 //! - Proof size (bytes) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
 
+mod bench_inputs;
 mod boolean_gadgets;
 
 #[cfg(test)]
@@ -101,10 +102,13 @@ fn bench_binius_hdc_xor() -> BenchResult {
     // Fill witness with random HDC vectors
     let mut witness = circuit.new_witness_filler();
     let mut expected_xor = vec![0u64; hv_dim_words];
+    // Fixed fixtures make the same synthetic relation reproducible between runs.
+    let a_values = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_HDC_XOR_A, hv_dim_words);
+    let b_values = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_HDC_XOR_B, hv_dim_words);
 
     for i in 0..hv_dim_words {
-        let a_val: u64 = rand::random();
-        let b_val: u64 = rand::random();
+        let a_val = a_values[i];
+        let b_val = b_values[i];
         witness[vec_a[i]] = Word(a_val);
         witness[vec_b[i]] = Word(b_val);
         expected_xor[i] = a_val ^ b_val;

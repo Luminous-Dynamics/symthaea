@@ -79,15 +79,13 @@ pub fn bench_hamming(dim_words: usize) -> HammingBenchResult {
     println!("  Word XOR operations: {} (linear gates)", dim_words);
 
     let mut witness = circuit.new_witness_filler();
-    let mut a_values = Vec::with_capacity(dim_words);
-    let mut b_values = Vec::with_capacity(dim_words);
+    let a_values =
+        crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_HAMMING_A, dim_words);
+    let b_values =
+        crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_HAMMING_B, dim_words);
     for i in 0..dim_words {
-        let a: u64 = rand::random();
-        let b: u64 = rand::random();
-        witness[vec_a[i]] = Word(a);
-        witness[vec_b[i]] = Word(b);
-        a_values.push(a);
-        b_values.push(b);
+        witness[vec_a[i]] = Word(a_values[i]);
+        witness[vec_b[i]] = Word(b_values[i]);
     }
     let expected_distance: u64 = a_values
         .iter()

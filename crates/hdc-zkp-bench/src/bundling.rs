@@ -92,10 +92,13 @@ pub fn bench_bundling(num_vectors: usize, dim_words: usize) -> BundlingBenchResu
     // Fill witness
     let mut witness = circuit.new_witness_filler();
 
-    // Random input vectors
+    // Deterministic synthetic vectors; each participant gets a domain-separated seed.
     let mut input_vals: Vec<Vec<u64>> = Vec::new();
     for v in 0..num_vectors {
-        let vals: Vec<u64> = (0..dim_words).map(|_| rand::random()).collect();
+        let vals = crate::bench_inputs::deterministic_words(
+            crate::bench_inputs::SEED_BUNDLING_BASE.wrapping_add(v as u64),
+            dim_words,
+        );
         for w in 0..dim_words {
             witness[inputs[v][w]] = Word(vals[w]);
         }

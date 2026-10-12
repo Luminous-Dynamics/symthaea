@@ -101,18 +101,22 @@ pub fn bench_masked_gate_recurrence(neurons: usize, timesteps: usize) -> MaskedG
     );
     println!("  XOR operations: {} (all FREE)", neurons * timesteps * 2);
 
-    // Fill witness
+    // Fill witness with deterministic synthetic fixtures.
     let mut witness = circuit.new_witness_filler();
-    let h0_vals: Vec<u64> = (0..neurons).map(|_| rand::random()).collect();
-    let x_inf_vals: Vec<u64> = (0..neurons).map(|_| rand::random()).collect();
+    let h0_vals =
+        crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_MASK_INITIAL_STATE, neurons);
+    let x_inf_vals = crate::bench_inputs::deterministic_words(crate::bench_inputs::SEED_MASK_INPUT, neurons);
 
     for n in 0..neurons {
         witness[h_wires[n]] = Word(h0_vals[n]);
         witness[x_inf_wires[n]] = Word(x_inf_vals[n]);
     }
 
-    // Pre-generate private gate inputs
-    let gate_input_values: Vec<u64> = (0..timesteps * neurons).map(|_| rand::random()).collect();
+    // Pre-generate synthetic private gate inputs in circuit order.
+    let gate_input_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_MASK_GATE,
+        timesteps * neurons,
+    );
     for (i, &value) in gate_input_values.iter().enumerate() {
         witness[gate_input_wires[i]] = Word(value);
     }
