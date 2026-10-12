@@ -154,6 +154,15 @@ class RuntimeInventoryTests(unittest.TestCase):
             self.assertEqual(report["summary"]["styles_with_grammar_family"], 2)
             self.assertEqual(report["summary"]["styles_with_composition_spec"], 2)
             self.assertEqual(report["summary"]["styles_with_instrument_pool"], 2)
+            self.assertEqual(
+                report["summary"]["intent_axis_count_distribution"],
+                {"2": 1, "4": 1},
+            )
+            self.assertEqual(report["summary"]["styles_with_zero_intent_axes"], [])
+            self.assertEqual(
+                report["summary"]["styles_with_partial_intent_axes"],
+                ["Other"],
+            )
             self.assertEqual(profiles["Default"]["grammar_family"], "PeriodSentence")
             self.assertEqual(profiles["Default"]["meter_beats"], 4)
             self.assertEqual(profiles["Default"]["tempo_range_bpm"], [60.0, 150.0])
