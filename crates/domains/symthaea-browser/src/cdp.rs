@@ -406,15 +406,6 @@ impl CdpSession {
         Ok(bytes)
     }
 
-    /// Compatibility shim. The JavaScript observation fallback has been removed.
-    ///
-    /// Prefer the native accessibility-tree API. This shim is kept for source
-    /// compatibility and no longer evaluates page JavaScript.
-    #[deprecated(note = "JavaScript observation fallback removed; use get_accessibility_tree")]
-    pub(crate) async fn get_page_state_js(&self) -> Result<PageObservation> {
-        self.get_accessibility_tree().await
-    }
-
     /// Observe through the native accessibility tree only.
     ///
     /// An unavailable tree is returned as an error; there is no silent JavaScript
