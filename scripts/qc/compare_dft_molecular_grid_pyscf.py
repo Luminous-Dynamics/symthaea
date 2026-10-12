@@ -14,6 +14,7 @@ the density imperfectly.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -42,20 +43,86 @@ ELEMENT_SYMBOLS = {1: "H", 2: "He", 8: "O"}
 HARTREE_TO_KCAL_MOL = 627.5094740631
 
 
-def symthaea_becke_radial(n: int, charge: int, *args: Any, **kwargs: Any) -> tuple[np.ndarray, np.ndarray]:
+RADIUS_SCALE_EXACT_BOHR = {1: 0.661, 2: 0.567}
+RADIUS_SCALE_RANGES_BOHR = ((3, 4, 2.268), (5, 10, 1.323))
+RADIUS_SCALE_FALLBACK_BOHR = 1.5
+
+
+def symthaea_radial_scale_bohr(charge: int) -> float:
+    """Return the production grid's current explicit radial scale policy."""
+    if charge < 1:
+        raise ValueError(f"atomic number must be positive, got {charge}")
+    if charge in RADIUS_SCALE_EXACT_BOHR:
+        return RADIUS_SCALE_EXACT_BOHR[charge]
+    for lower, upper, radius in RADIUS_SCALE_RANGES_BOHR:
+        if lower <= charge <= upper:
+            return radius
+    return RADIUS_SCALE_FALLBACK_BOHR
+
+
+def radial_scale_policy_record() -> dict[str, Any]:
+    return {
+        "exact_atomic_number_scales_bohr": {
+            str(charge): radius for charge, radius in sorted(RADIUS_SCALE_EXACT_BOHR.items())
+        },
+        "inclusive_atomic_number_ranges_bohr": [
+            {"z_min": lower, "z_max": upper, "scale_bohr": radius}
+            for lower, upper, radius in RADIUS_SCALE_RANGES_BOHR
+        ],
+        "fallback_for_other_positive_atomic_numbers_bohr": RADIUS_SCALE_FALLBACK_BOHR,
+    }
+
+
+def source_identity(path: Path) -> dict[str, str]:
+    """Record both a Git-compatible blob ID and SHA-256 of the exact callback source file."""
+    payload = path.read_bytes()
+    git_payload = b"blob " + str(len(payload)).encode("ascii") + b"\\0" + payload
+    return {
+        "path": path.name,
+        "git_blob_sha1": hashlib.sha1(git_payload).hexdigest(),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+
+def assert_matched_grid_settings(
+    grids: Any, radial_count: int, angular_count: int
+) -> dict[str, Any]:
+    """Fail closed if PySCF's actual grid configuration differs from the matched-grid contract."""
+    radial_method = getattr(grids.radi_method, "__name__", type(grids.radi_method).__name__)
+    if radial_method != "symthaea_becke_radial":
+        raise RuntimeError(f"unexpected PySCF radial callback: {radial_method}")
+    if grids.becke_scheme is not gen_grid.original_becke:
+        raise RuntimeError("PySCF Becke partition is not original_becke")
+    if grids.radii_adjust is not None:
+        raise RuntimeError("PySCF atomic-radii adjustment must remain disabled for this matched-grid lane")
+    if grids.prune is not None:
+        raise RuntimeError("PySCF grid pruning must remain disabled for this matched-grid lane")
+    configured_atom_grid = grids.atom_grid
+    if not isinstance(configured_atom_grid, (tuple, list)) or tuple(configured_atom_grid) != (
+        radial_count, angular_count
+    ):
+        raise RuntimeError(
+            "unexpected PySCF atom_grid: "
+            f"{configured_atom_grid!r} != {(radial_count, angular_count)!r}"
+        )
+    return {
+        "radial_method": radial_method,
+        "becke_scheme": "original_becke",
+        "radii_adjust": None,
+        "prune": None,
+        "atom_grid": [radial_count, angular_count],
+        "atomic_radii_adjustment_table_used": False,
+        "radial_scale_source": "symthaea_becke_radial callback; PySCF BRAGG_RADII is not used when radii_adjust=None",
+    }
+
+
+def symthaea_becke_radial(
+    n: int, charge: int, *args: Any, **kwargs: Any
+) -> tuple[np.ndarray, np.ndarray]:
     """Reproduce Symthaea's Becke-mapped second-kind Gauss-Chebyshev radial rule."""
     if n < 1:
         raise ValueError(f"radial point count must be positive, got {n}")
-    if charge == 1:
-        radius = 0.661
-    elif charge == 2:
-        radius = 0.567
-    elif charge in (3, 4):
-        radius = 2.268
-    elif 5 <= charge <= 10:
-        radius = 1.323
-    else:
-        radius = 1.5
+    radius = symthaea_radial_scale_bohr(charge)
 
     i = np.arange(1, n + 1, dtype=float)
     xi = np.cos(i * math.pi / (n + 1.0))
@@ -63,7 +130,6 @@ def symthaea_becke_radial(n: int, charge: int, *args: Any, **kwargs: Any) -> tup
     dr_dxi = 2.0 * radius / ((1.0 - xi) ** 2)
     radial_weights = (math.pi / (n + 1.0)) * np.sqrt(1.0 - xi * xi) * dr_dxi
     return radial, radial_weights
-
 
 def require_finite(name: str, value: float) -> float:
     converted = float(value)
@@ -167,6 +233,9 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
     mean_field.grids.radi_method = symthaea_becke_radial
     mean_field.grids.becke_scheme = gen_grid.original_becke
     mean_field.grids.radii_adjust = None
+    runtime_grid_contract = assert_matched_grid_settings(
+        mean_field.grids, radial_count, angular_count
+    )
     total_energy = float(mean_field.kernel())
 
     density_matrix = mean_field.make_rdm1()
@@ -175,6 +244,23 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
         molecule, ao_grid, density_matrix, xctype="LDA"
     )
     integrated_electron_count = float(np.dot(rho_grid, mean_field.grids.weights))
+    actual_grid_points = int(mean_field.grids.weights.size)
+    expected_unpadded_grid_points = len(atoms) * expected_points_per_atom
+    alignment = int(mean_field.grids.alignment)
+    padding_points = actual_grid_points - expected_unpadded_grid_points
+    if alignment < 1 or padding_points < 0 or padding_points >= alignment:
+        raise RuntimeError(
+            "unexpected PySCF grid shape: "
+            f"actual={actual_grid_points}, expected_unpadded={expected_unpadded_grid_points}, "
+            f"alignment={alignment}, padding={padding_points}"
+        )
+    runtime_grid_contract.update({
+        "expected_unpadded_grid_points": expected_unpadded_grid_points,
+        "actual_grid_array_points_including_padding": actual_grid_points,
+        "alignment_unit": alignment,
+        "padding_points": padding_points,
+        "zero_weight_points_including_padding": int(np.count_nonzero(mean_field.grids.weights == 0.0)),
+    })
     expected_total_energy = require_finite(f"{molecule_name} PySCF total energy", total_energy)
     integrated_electron_count = require_finite(
         f"{molecule_name} PySCF grid electron count", integrated_electron_count
@@ -200,7 +286,14 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
         "scf_iterations": (
             int(mean_field.cycles) if getattr(mean_field, "cycles", None) is not None else None
         ),
-        "n_grid_points": int(mean_field.grids.weights.size),
+        "n_grid_points": actual_grid_points,
+        "expected_unpadded_grid_points": expected_unpadded_grid_points,
+        "padding_grid_points": padding_points,
+        "radial_scale_by_atomic_number_bohr": {
+            str(int(atom["atomic_number"])): symthaea_radial_scale_bohr(int(atom["atomic_number"]))
+            for atom in geometry["atoms"]
+        },
+        "grid_runtime_contract": runtime_grid_contract,
         "integrated_electron_count": integrated_electron_count,
         "integrated_electron_count_abs_error": abs(integrated_electron_count - expected_electrons),
     }
@@ -439,9 +532,12 @@ def main() -> int:
         "functional": "LDA_X + LDA_C_VWN (PySCF alias lda,vwn)",
         "grid_matching": {
             "radial_rule": "Symthaea Becke map + second-kind Gauss-Chebyshev nodes and weights",
-            "angular_rule": "Lebedev–Laikov node count selected by the Symthaea preset; no pruning",
+            "radial_callback_source_identity": source_identity(Path(__file__).resolve()),
+            "radial_scale_policy": radial_scale_policy_record(),
+            "angular_rule": "PySCF Lebedev-Laikov nodes selected by the Symthaea preset; no pruning",
             "partition": "original Becke three-pass polynomial; no radius adjustment",
-            "radial_scales": "exact hard-coded per-element scales used by Symthaea",
+            "runtime_configuration_asserted": True,
+            "padding_policy": "report unpadded expected points, actual aligned array size, and explicit padding count per molecule/grid",
             "intent": "matched quadrature isolates implementation differences from grid-choice differences",
         },
         "energy_tolerance_hartree": args.energy_tolerance_hartree,
