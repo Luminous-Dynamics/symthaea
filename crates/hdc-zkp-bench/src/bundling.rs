@@ -106,7 +106,6 @@ pub fn bench_bundling(num_vectors: usize, dim_words: usize) -> BundlingBenchResu
     }
 
     circuit
-        .populate_wire_witness    circuit
         .populate_wire_witness(&mut witness)
         .expect("witness failed");
 
