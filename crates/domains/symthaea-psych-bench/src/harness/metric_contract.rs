@@ -116,6 +116,27 @@ impl MetricDefinitionV1 {
                     "target-range bounds must be finite and lower must not exceed upper"
                         .to_string(),
                 );
+            } else {
+                match self.value_domain {
+                    MetricValueDomainV1::UnitInterval
+                        if *lower < 0.0 || *upper > 1.0 =>
+                    {
+                        errors.push(
+                            "unit-interval target bounds must be contained in [0, 1]".to_string(),
+                        );
+                    }
+                    MetricValueDomainV1::NonNegative | MetricValueDomainV1::IntegerCount
+                        if *lower < 0.0 =>
+                    {
+                        errors.push(
+                            "non-negative metric target bounds must not be negative".to_string(),
+                        );
+                    }
+                    MetricValueDomainV1::Real
+                    | MetricValueDomainV1::NonNegative
+                    | MetricValueDomainV1::UnitInterval
+                    | MetricValueDomainV1::IntegerCount => {}
+                }
             }
         }
 
@@ -453,12 +474,16 @@ fn validate_value_domain(
             definition.benchmark, definition.metric, value.mean, definition.value_domain
         ));
     }
-    if definition.value_domain == MetricValueDomainV1::UnitInterval
-        && (!valid_domain(value.ci_lower) || !valid_domain(value.ci_upper))
+    if matches!(
+        definition.value_domain,
+        MetricValueDomainV1::NonNegative
+            | MetricValueDomainV1::UnitInterval
+            | MetricValueDomainV1::IntegerCount
+    ) && (!valid_domain(value.ci_lower) || !valid_domain(value.ci_upper))
     {
         errors.push(format!(
-            "{}/{}: confidence bounds violate the declared unit-interval domain",
-            definition.benchmark, definition.metric
+            "{}/{}: confidence bounds violate the declared {:?} domain",
+            definition.benchmark, definition.metric, definition.value_domain
         ));
     }
 }
