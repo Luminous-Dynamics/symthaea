@@ -15,6 +15,7 @@ from tools.water_leak_satellite.catalog_inventory import (
     inventory_collection,
     main,
     parse_bbox,
+    _validate_next_url,
 )
 
 
@@ -227,12 +228,7 @@ class InventoryTests(unittest.TestCase):
         ):
             with self.subTest(href=href):
                 with self.assertRaises(CatalogError):
-                    inventory_collection(
-                        endpoint="https://stac.dataspace.copernicus.eu/v1/search",
-                        collection="sentinel-1-grd", bbox=[27.7, -26.5, 28.4, -25.8],
-                        interval="2025-01-01T00:00:00Z/2025-01-02T23:59:59Z",
-                        limit=100, max_pages=10, timeout=2,
-                    ) if False else _validate_next_url("https://stac.dataspace.copernicus.eu/v1/search", href)
+                    _validate_next_url("https://stac.dataspace.copernicus.eu/v1/search", href)
 
     def test_main_writes_auditable_json_with_mock_catalog(self):
         response = {"type": "FeatureCollection", "features": [self.feature], "links": []}
