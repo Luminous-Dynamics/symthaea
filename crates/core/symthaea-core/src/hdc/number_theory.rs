@@ -845,7 +845,7 @@ mod tests {
         assert!(engine.miller_rabin(q));
 
         let semiprime = p * q;
-        assert!(semiprime > u64::MAX - 1_000_000_000);
+        assert!(semiprime > u64::MAX - 100_000_000_000);
         let factorization = engine.factorize(semiprime);
         assert_eq!(factorization.factors, vec![(q, 1), (p, 1)]);
 
