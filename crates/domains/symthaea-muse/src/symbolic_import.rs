@@ -9,7 +9,8 @@
 use midly::{MetaMessage, MidiMessage, Smf, TrackEventKind};
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use symthaea_muse_protocol::{
-    ImportedMotifSummary, ImportedSectionSummary, ImportedWorkAnalysis, SymbolicImportFormat,
+    ImportedBeatRational, ImportedMotifOccurrence, ImportedMotifSummary, ImportedNoteReference,
+    ImportedSectionSummary, ImportedWorkAnalysis, SymbolicImportFormat,
 };
 use symthaea_music_theory::{
     Duration, Emphasis, Key, Pitch, PitchClass, Score, ScoreNote, VoiceRole, score::PartId,
@@ -1766,7 +1767,10 @@ mod tests {
             0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("lyric events are not represented by Score"), "{error}");
+        assert!(
+            error.contains("lyric events are not represented by Score"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2282,7 +2286,10 @@ mod tests {
                 "<lyric><syllabic>single</syllabic><text>Hello</text></lyric></note>",
             );
         let error = parse_musicxml(xml.as_bytes()).unwrap_err();
-        assert!(error.contains("lyrics are not represented by Score"), "{error}");
+        assert!(
+            error.contains("lyrics are not represented by Score"),
+            "{error}"
+        );
     }
 
     #[test]
