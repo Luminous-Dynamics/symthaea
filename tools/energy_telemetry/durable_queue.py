@@ -23,6 +23,7 @@ from tools.energy_telemetry.store_forward import (
 )
 
 _SCHEMA_VERSION = 2
+_APPLICATION_ID = 0x53594D54  # ASCII 'SYMT'; identifies this SQLite file format
 
 
 class DurableTelemetryQueue:
@@ -95,6 +96,19 @@ class DurableTelemetryQueue:
             version = db.execute("PRAGMA user_version").fetchone()[0]
             if version not in (0, 1, _SCHEMA_VERSION):
                 raise TelemetryQueueError(f"unsupported telemetry queue schema version: {version}")
+            application_id = db.execute("PRAGMA application_id").fetchone()[0]
+            if application_id not in (0, _APPLICATION_ID):
+                raise TelemetryQueueError("SQLite database belongs to a different application")
+            if application_id == 0:
+                existing_tables = {
+                    row[0] for row in db.execute(
+                        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+                    ).fetchall()
+                }
+                if existing_tables - {"telemetry_events", "telemetry_queue_config"}:
+                    raise TelemetryQueueError(
+                        "refusing to claim an unowned SQLite database with unrelated tables"
+                    )
             journal_mode = db.execute("PRAGMA journal_mode").fetchone()[0].lower()
             if journal_mode != "wal":
                 journal_mode = db.execute("PRAGMA journal_mode = WAL").fetchone()[0].lower()
@@ -147,6 +161,22 @@ class DurableTelemetryQueue:
             # another worker's capacity/clock-skew policy.
             db.execute("BEGIN IMMEDIATE")
             try:
+                # Re-check ownership under the write lock to close the race
+                # between preflight and initialization by another process.
+                application_id = db.execute("PRAGMA application_id").fetchone()[0]
+                if application_id not in (0, _APPLICATION_ID):
+                    raise TelemetryQueueError("SQLite database belongs to a different application")
+                if application_id == 0:
+                    existing_tables = {
+                        row[0] for row in db.execute(
+                            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+                        ).fetchall()
+                    }
+                    if existing_tables - {"telemetry_events", "telemetry_queue_config"}:
+                        raise TelemetryQueueError(
+                            "refusing to claim an unowned SQLite database with unrelated tables"
+                        )
+                    db.execute(f"PRAGMA application_id = {_APPLICATION_ID}")
                 config = db.execute(
                     "SELECT max_queue_bytes, max_records, max_future_skew_seconds "
                     "FROM telemetry_queue_config WHERE singleton = 1"
