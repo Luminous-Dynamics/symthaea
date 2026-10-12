@@ -287,7 +287,7 @@ class DurableQueueTests(unittest.TestCase):
             self.reopen()
 
     def test_invalid_busy_timeout_and_numeric_overflow_are_rejected(self):
-        for timeout in (float("nan"), float("inf"), float("-inf"), 0, -1, 301, 1e300):
+        for timeout in (float("nan"), float("inf"), float("-inf"), 0, -1, 301, 1e300, 10 ** 1000):
             with self.subTest(timeout=timeout):
                 with self.assertRaisesRegex(ValueError, "finite and in"):
                     DurableTelemetryQueue(self.database, busy_timeout_seconds=timeout)
