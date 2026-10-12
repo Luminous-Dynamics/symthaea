@@ -104,7 +104,7 @@ class PrimalityProofTests(unittest.TestCase):
     def test_decoder_rejects_magic_truncation_trailing_and_oversize(self) -> None:
         encoded = verifier.encode_primality_proof(proof_seventeen())
         bad_magic = b"X" + encoded[1:]
-        for data in (bad_magic, encoded[:-1], encoded + b"\\x00", b"X" * (verifier.MAX_WIRE_BYTES + 1)):
+        for data in (bad_magic, encoded[:-1], encoded + b"\x00", b"X" * (verifier.MAX_WIRE_BYTES + 1)):
             with self.subTest(length=len(data)):
                 with self.assertRaises(verifier.CertificateError):
                     verifier.decode_primality_proof(data)
@@ -172,7 +172,7 @@ class CertifiedFactorizationTests(unittest.TestCase):
         with self.assertRaisesRegex(verifier.CertificateError, "truncated"):
             verifier.decode_certified_factorization(encoded[:-1])
         with self.assertRaisesRegex(verifier.CertificateError, "trailing bytes"):
-            verifier.decode_certified_factorization(encoded + b"\\x00")
+            verifier.decode_certified_factorization(encoded + b"\x00")
 
         bad_nested = bytearray(encoded)
         bad_nested[-1] = 1
