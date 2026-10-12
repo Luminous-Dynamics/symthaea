@@ -678,9 +678,12 @@ fn autonomous_discovery_request_is_bounded(
         || config.population_size > MAX_AUTONOMOUS_SEARCH_POPULATION
         || config.generations == 0
         || config.generations > MAX_AUTONOMOUS_SEARCH_GENERATIONS
+        || config.max_complexity == 0
         || config.max_complexity > MAX_AUTONOMOUS_SEARCH_COMPLEXITY
+        || config.max_depth == 0
         || config.max_depth > MAX_AUTONOMOUS_SEARCH_DEPTH
         || config.tournament_size == 0
+        || config.diverse_trajectory_count == 0
         || config.diverse_trajectory_count > MAX_AUTONOMOUS_SEARCH_TRAJECTORIES
         || !config.lambda.is_finite()
         || config.lambda < 0.0
@@ -689,7 +692,7 @@ fn autonomous_discovery_request_is_bounded(
         || !config.prior_composition_rate.is_finite()
         || !(0.0..=1.0).contains(&config.prior_composition_rate)
         || !config.prior_fragment_bonus.is_finite()
-        || config.prior_fragment_bonus < 0.0
+        || !(0.0..=1.0).contains(&config.prior_fragment_bonus)
         || !config.orthogonality_penalty.is_finite()
         || config.orthogonality_penalty < 0.0
         || !config.orthogonality_threshold.is_finite()
@@ -1706,6 +1709,64 @@ mod cold_discovery_provenance_tests {
             harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.01,
         );
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn cold_entry_point_fails_closed_on_zero_diverse_trajectory_count() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            diverse_trajectory_count: 0,
+            ..RegressorConfig::default()
+        };
+        let result = discover_invariants_autonomous_cold(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.01,
+        );
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn cold_entry_point_rejects_zero_depth_and_complexity_budgets() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+        for config in [
+            RegressorConfig {
+                population_size: 20,
+                generations: 2,
+                max_depth: 0,
+                ..RegressorConfig::default()
+            },
+            RegressorConfig {
+                population_size: 20,
+                generations: 2,
+                max_complexity: 0,
+                ..RegressorConfig::default()
+            },
+        ] {
+            assert!(discover_invariants_autonomous_cold(
+                harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.01,
+            ).is_empty());
+        }
+    }
+
+    #[test]
+    fn cold_entry_point_rejects_out_of_range_prior_fragment_bonus() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            prior_fragment_bonus: 1.5,
+            ..RegressorConfig::default()
+        };
+        assert!(discover_invariants_autonomous_cold(
+            harmonic_rhs, &[1.0, 0.0], &["x", "v"], None, &config, 1.0, 0.01,
+        ).is_empty());
     }
 
     #[test]
