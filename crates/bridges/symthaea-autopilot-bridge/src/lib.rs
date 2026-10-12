@@ -12,18 +12,18 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
-/// Receiver-clock MAVLink heartbeat evidence and PX4 freshness qualification.
-pub mod heartbeat;
-/// Companion-side PX4 Offboard proof-of-life submission cadence evidence.
-pub mod offboard_submission;
-/// PX4-reported navigation-mode and failsafe-state observations.
-pub mod offboard_observation;
-/// PX4 FailsafeFlags Offboard control-signal-loss input evidence.
-pub mod offboard_loss_flag;
-/// Firmware-profile-bound Offboard-loss parameter configuration evidence.
-pub mod offboard_loss_configuration;
 /// PX4 external-mode SetpointConfig request/reply evidence.
 pub mod external_mode_setpoint_config;
+/// Receiver-clock MAVLink heartbeat evidence and PX4 freshness qualification.
+pub mod heartbeat;
+/// Firmware-profile-bound Offboard-loss parameter configuration evidence.
+pub mod offboard_loss_configuration;
+/// PX4 FailsafeFlags Offboard control-signal-loss input evidence.
+pub mod offboard_loss_flag;
+/// PX4-reported navigation-mode and failsafe-state observations.
+pub mod offboard_observation;
+/// Companion-side PX4 Offboard proof-of-life submission cadence evidence.
+pub mod offboard_submission;
 /// Evidence-backed PX4 operational-readiness profiles and assessments.
 pub mod readiness;
 /// Readiness-specific content-addressed PX4 status projections.
@@ -191,12 +191,9 @@ impl Px4TimesyncStatusEvidenceV1 {
         px4_clock_domain: ClockDomainId,
     ) -> Result<ClockAlignmentSampleV1, Px4TimesyncEvidenceError> {
         self.validate()?;
-        let method_profile_id = self
-            .source()
-            .raw_alignment_profile()
-            .ok_or(Px4TimesyncEvidenceError::UnsupportedSourceProtocol(
-                self.source_protocol,
-            ))?;
+        let method_profile_id = self.source().raw_alignment_profile().ok_or(
+            Px4TimesyncEvidenceError::UnsupportedSourceProtocol(self.source_protocol),
+        )?;
 
         let remote_ns = micros_to_nanos(self.remote_timestamp_us, "remote_timestamp_us")?;
         let offset_ns = i128::from(self.observed_offset_us) * 1_000;
@@ -250,10 +247,7 @@ impl Px4TimesyncStatusEvidenceV1 {
 
 fn validate_identifier(value: &str) -> Result<(), Px4TimesyncEvidenceError> {
     let trimmed = value.trim();
-    if trimmed.is_empty()
-        || trimmed.len() != value.len()
-        || value.chars().any(char::is_control)
-    {
+    if trimmed.is_empty() || trimmed.len() != value.len() || value.chars().any(char::is_control) {
         return Err(Px4TimesyncEvidenceError::InvalidProducerProfileId);
     }
     Ok(())
@@ -416,7 +410,10 @@ mod tests {
     fn content_mutation_is_detected_before_derivation() {
         let mut value = status(1, 1_000, 100, 90, 20);
         value.observed_offset_us = 101;
-        assert_eq!(value.validate(), Err(Px4TimesyncEvidenceError::DigestMismatch));
+        assert_eq!(
+            value.validate(),
+            Err(Px4TimesyncEvidenceError::DigestMismatch)
+        );
         assert_eq!(
             value.raw_observed_alignment_sample(clock("remote"), clock("px4.hrt")),
             Err(Px4TimesyncEvidenceError::DigestMismatch)
