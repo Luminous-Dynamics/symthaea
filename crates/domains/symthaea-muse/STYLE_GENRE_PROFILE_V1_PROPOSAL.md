@@ -16,6 +16,10 @@ This builds on work already present in Muse:
 
 Those foundations are valuable and should not be replaced. The gap is that the current anatomy frequently inherits constellation-level descriptions, executable styles and research catalog entries are different kinds of things, and the current hybrid validator has only a small number of hard-coded compatibility cases.
 
+### Measured source baseline (2026-10-12)
+
+The frozen inventory in [style-genre-coverage-baseline-v1.json](./style-genre-coverage-baseline-v1.json) was generated from the explicit main-branch registry source (catalog blob `ad68241b9c826f21f5ce9124a3d1b3cd61a79fd4`) and declared `Style::ALL` length (style source blob `3eee7a25a5acfe95e215467d1f19f3abb71de31a`). It contains 152 stable catalog IDs across 19 constellations; 29 entries have distinct composer routes and 123 catalog entries have no direct composer route. Status counts are 24 Developing, 123 Research, and 5 ExpertReviewRequired; none are Foundation. The executable `Style::ALL` declaration contains 29 variants. This is a route/status inventory, **not** evidence that the 29 routes are musically distinct, renderer-backed, or culturally authenticated. The snapshot is intentionally frozen for comparison; future inventory generation should read these sources rather than treating the JSON as a second source of truth.
+
 ## Design principle: distinguish identity from mechanism
 
 **Genre/tradition is a contextual identity claim. Style profile is an executable compositional recipe. Palette is the sound. Mood is intent.**
