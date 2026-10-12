@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from muse_style_capability_inventory import _runtime_report  # noqa: E402
-from muse_style_coverage import CATALOG_RELATIVE, CoverageError, STYLE_RELATIVE  # noqa: E402
+from muse_style_coverage import CATALOG_RELATIVE, CoverageError, STYLE_RELATIVE, git_blob_sha  # noqa: E402
 from muse_style_capability_inventory import REALIZATION_RELATIVE  # noqa: E402
 from muse_style_capability_inventory import GRAMMAR_RELATIVE  # noqa: E402
 from muse_style_capability_inventory import CAUSAL_EVIDENCE_RELATIVE  # noqa: E402
@@ -195,7 +195,7 @@ class RuntimeInventoryTests(unittest.TestCase):
             self.assertIsNone(rows[3]["runtime_capability"])
             self.assertEqual(
                 report["source"]["catalog_blob_sha"],
-                report["source"]["catalog_blob_sha"],
+                git_blob_sha((root / CATALOG_RELATIVE).read_bytes()),
             )
 
     def test_reports_grammar_dispatch_modes_separately(self) -> None:
