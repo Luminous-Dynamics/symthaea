@@ -1469,6 +1469,27 @@ mod tests {
     }
 
     #[test]
+    fn test_migrate_v1_1_snapshot_keeps_missing_provenance_unknown() {
+        let json = r#"{
+            "name": "legacy-v1.1",
+            "timestamp": "2026-10-10T00:00:00Z",
+            "git_hash": null,
+            "config_summary": "",
+            "schema_version": "1.1",
+            "metrics": {
+                "Bench": {
+                    "accuracy": {"mean": 0.8, "std_dev": 0.1, "n": 10, "ci_lower": 0.6, "ci_upper": 1.0}
+                }
+            }
+        }"#;
+        let migrated = RegressionSnapshot::migrate(json).unwrap();
+        assert_eq!(migrated.schema_version, SNAPSHOT_SCHEMA_VERSION);
+        assert!(migrated.metrics["Bench"]["accuracy"]
+            .uncertainty_provenance()
+            .is_none());
+    }
+
+    #[test]
     fn test_validate_valid() {
         let s = make_test_snapshot("valid", 0.85);
         assert!(s.validate().is_ok());
@@ -1515,7 +1536,7 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_v1_0_to_v1_1() {
+    fn test_migrate_v1_0_to_current_schema_without_inventing_provenance() {
         let json = r#"{
             "name": "legacy",
             "timestamp": "2026-01-15T00:00:00Z",
@@ -1531,6 +1552,9 @@ mod tests {
         assert_eq!(migrated.schema_version, SNAPSHOT_SCHEMA_VERSION);
         assert_eq!(migrated.name, "legacy");
         assert!(migrated.metrics.contains_key("Stroop"));
+        assert!(migrated.metrics["Stroop"]["interference"]
+            .uncertainty_provenance()
+            .is_none());
     }
 
     #[test]
