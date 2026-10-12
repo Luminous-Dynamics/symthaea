@@ -169,8 +169,8 @@ jobs:
               "",
               "## Annotation-ready packets (not annotated)",
               "",
-              "| Baseline | Review units | Packet SHA-256 | State |",
-              "|---|---:|---|---|",
+              "| Baseline | Review units | Packet SHA-256 | Guide SHA-256 | State |",
+              "|---|---:|---|---|---|",
           ])
           for item in data["methods"]:
               if item["state"] != "executed":
@@ -179,7 +179,8 @@ jobs:
               seed = json.load(open(seed_path, encoding="utf-8"))
               lines.append(
                   f"| {item['method_id']} | {seed['unit_count']} | "
-                  f"{hashlib.sha256(seed_path.read_bytes()).hexdigest()} | UNANNOTATED |"
+                  f"{hashlib.sha256(seed_path.read_bytes()).hexdigest()} | "
+                  f"{seed['annotation_guide_sha256']} | UNANNOTATED |"
               )
           lines.extend([
               "",
