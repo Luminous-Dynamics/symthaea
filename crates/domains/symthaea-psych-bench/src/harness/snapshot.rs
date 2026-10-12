@@ -313,6 +313,17 @@ impl RegressionReport {
         {
             errors.push("critical_pct must be greater than or equal to warning_pct".to_string());
         }
+        let has_comparable_metric = baseline.metrics.iter().any(|(benchmark, metrics)| {
+            current.metrics.get(benchmark).is_some_and(|current_metrics| {
+                metrics.keys().any(|metric| current_metrics.contains_key(metric))
+            })
+        });
+        if !has_comparable_metric {
+            errors.push(
+                "baseline and current snapshots have no comparable metric keys".to_string(),
+            );
+        }
+
         if !errors.is_empty() {
             return Err(errors);
         }
@@ -807,6 +818,20 @@ mod tests {
         let report = RegressionReport::compare(&baseline, &current, f64::NAN, 0.10);
         assert!(report.has_critical());
         assert_eq!(report.summary.passed, 0);
+    }
+
+    #[test]
+    fn test_compare_rejects_no_overlapping_metrics() {
+        let baseline = make_test_snapshot("baseline", 0.90);
+        let mut current = make_test_snapshot("current", 0.91);
+        current.metrics.clear();
+        current.metrics.insert("UnrelatedBenchmark".to_string(), BTreeMap::new());
+
+        assert!(RegressionReport::try_compare(&baseline, &current, 0.05, 0.10).is_err());
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        assert!(report.has_critical());
+        assert_eq!(report.summary.passed, 0);
+        assert!(report.format_summary().contains("no comparable metric keys"));
     }
 
     #[test]
