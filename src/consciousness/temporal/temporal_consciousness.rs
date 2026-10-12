@@ -809,8 +809,11 @@ pub struct TemporalConsciousnessAnalyzer {
 /// Statistics for temporal consciousness
 #[derive(Debug, Clone, Default)]
 pub struct TemporalConsciousnessStats {
-    /// Total observations
+    /// Number of accepted observations used to update temporal metrics.
     pub observations: usize,
+
+    /// Number of observations rejected before temporal metrics were updated.
+    pub rejected_observations: usize,
 
     /// Discontinuities detected
     pub discontinuities_detected: usize,
@@ -867,8 +870,9 @@ impl TemporalConsciousnessAnalyzer {
 
     /// Update temporal analyses only after Φ is admitted by the trajectory.
     ///
-    /// A rejected Φ sample must not contaminate continuity, temporal binding,
-    /// Husserlian state, identity metrics, or observation counters.
+    /// A rejected Φ sample must not contaminate continuity, Husserlian state,
+    /// identity metrics, or accepted-observation counters. Its rejection is counted
+    /// separately so invalid input is not silently presented as an accepted sample.
     pub(crate) fn try_observe(
         &mut self,
         state: &BinaryHV,
@@ -880,6 +884,7 @@ impl TemporalConsciousnessAnalyzer {
 
         // Fail closed before mutating any downstream temporal analysis.
         if !self.phi_trajectory.try_observe(phi) {
+            self.stats.rejected_observations += 1;
             return false;
         }
 
@@ -1186,6 +1191,7 @@ mod tests {
 
         assert!(!analyzer.try_observe(&state, f64::NAN, None, None));
         assert_eq!(analyzer.stats.observations, 0);
+        assert_eq!(analyzer.stats.rejected_observations, 1);
         assert!(analyzer.phi_trajectory.history().is_empty());
         assert!(analyzer.continuity.recent_states.is_empty());
         assert!(analyzer.husserlian.primal_impression.is_none());
