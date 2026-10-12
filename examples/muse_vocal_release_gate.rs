@@ -150,6 +150,15 @@ fn private_output_dir(output: &Path) -> Result<PathBuf> {
     Ok(output.with_file_name(format!("{}.private", name.to_string_lossy())))
 }
 
+/// Check directory entries without following symlinks (including dangling ones).
+fn path_entry_exists(path: &Path) -> Result<bool> {
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error.into()),
+    }
+}
+
 /// Migrate legacy organizer-only artifacts out of older listening packs.
 /// Never overwrite prior private evidence; move colliding legacy files under a
 /// distinct archived name so the shareable directory no longer contains them.
@@ -160,18 +169,17 @@ fn relocate_legacy_private_artifacts(output: &Path, private_output: &Path) -> Re
         "release_status.json",
     ] {
         let legacy_path = output.join(name);
-        if !legacy_path.is_file() {
+        if !path_entry_exists(&legacy_path)? {
             continue;
         }
         let preferred_path = private_output.join(name);
-        let private_path = if !preferred_path.exists() {
+        let private_path = if !path_entry_exists(&preferred_path)? {
             preferred_path
         } else {
             let mut suffix = 0usize;
             loop {
-                let candidate =
-                    private_output.join(format!("{name}.legacy-{suffix}"));
-                if !candidate.exists() {
+                let candidate = private_output.join(format!("{name}.legacy-{suffix}"));
+                if !path_entry_exists(&candidate)? {
                     break candidate;
                 }
                 suffix = suffix
