@@ -116,7 +116,8 @@ quotients, square-root/logarithm domains, logarithm enclosure over subnormal,
 normal, near-one and extreme finite inputs, exponential enclosure from subnormal
 underflow through large finite inputs, trigonometric series across [-2, 2],
 quadrant reduction at moderate and large finite magnitudes, acceptance of bounded reductions across
-half-integer quotient-cell boundaries, fixed high-precision reference brackets
+half-integer quotient-cell boundaries, an adjacent-binary64 pi/2 bracket check,
+and fixed high-precision reference brackets
 through magnitude 1e12, broad fallback for ambiguous/extreme inputs, and a
 deterministic interval-grid probe across sine critical-point bands and cosine's
 maximum. Integer
