@@ -596,9 +596,9 @@ impl TemporalIdentityCoherence {
 
     /// Number of the three pairwise alignments supported by actual representations.
     pub fn alignment_coverage(&self) -> usize {
-        usize::from(self.past_present_alignment_available)
-            + usize::from(self.present_future_alignment_available)
-            + usize::from(self.past_future_alignment_available)
+        self.past_present_alignment_available as usize
+            + self.present_future_alignment_available as usize
+            + self.past_future_alignment_available as usize
     }
 
     /// Check if identity is temporally coherent.
@@ -983,8 +983,24 @@ impl TemporalConsciousnessAnalyzer {
         let husserlian = self.husserlian.coherence();
         let binding = self.binding.binding_strength;
 
-        // Weighted average
-        0.2 * phi_health + 0.2 * continuity + 0.25 * identity + 0.2 * husserlian + 0.15 * binding
+        // Reduce the identity contribution in proportion to the number of measured
+        // pairwise relationships. Missing future-projection evidence must not count
+        // as a complete identity metric; normalize by the weight actually included.
+        let identity_coverage =
+            self.identity_coherence.alignment_coverage() as f64 / 3.0;
+        let identity_weight = 0.25 * identity_coverage;
+        let weighted_sum = 0.2 * phi_health
+            + 0.2 * continuity
+            + identity_weight * identity
+            + 0.2 * husserlian
+            + 0.15 * binding;
+        let total_weight = 0.2 + 0.2 + identity_weight + 0.2 + 0.15;
+
+        if total_weight > 0.0 {
+            weighted_sum / total_weight
+        } else {
+            0.0
+        }
     }
 
     /// Check if temporal consciousness is healthy
@@ -1283,6 +1299,19 @@ mod tests {
         assert_eq!(coherence.present_future_alignment, 0.0);
         assert_eq!(coherence.past_future_alignment, 0.0);
         assert!(!coherence.is_coherent());
+    }
+
+    #[test]
+    fn temporal_report_labels_unavailable_identity_alignments_as_na() {
+        let analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        let report = analyzer.report();
+
+        assert_eq!(report.identity_alignment_coverage, 0);
+        assert!(!report.present_future_alignment_available);
+        let rendered = report.to_string();
+        assert!(rendered.contains("Present↔Future:     N/A"));
+        assert!(rendered.contains("Past↔Future:        N/A"));
     }
 
     #[test]
