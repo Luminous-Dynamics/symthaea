@@ -241,6 +241,10 @@ def prepare(
             except OSError as exc:
                 raise ValueError(f"cannot execute ffmpeg for one test clip: {exc}") from exc
             _need(result.returncode == 0, f"ffmpeg conversion failed with exit code {result.returncode}")
+            if os.name == "posix":
+                # ffmpeg's own file mode depends on the caller's umask; enforce
+                # private clip permissions even though the parent is 0700.
+                wav_path.chmod(0o600)
             audio_evidence = _decode_wav(wav_path, float(max_duration_s))
             test_samples.append({
                 "id": row["id"],
