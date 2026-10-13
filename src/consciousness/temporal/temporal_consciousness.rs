@@ -1018,8 +1018,14 @@ pub struct TemporalConsciousnessStats {
     /// Accepted observations recorded before the configured trajectory sample minimum.
     pub trajectory_evidence_gaps: usize,
 
-    /// Average temporal coherence
+    /// Mean normalized aggregate score over accepted observations with any measured evidence.
     pub avg_temporal_coherence: f64,
+
+    /// Number of accepted observations included in avg_temporal_coherence.
+    pub coherence_measurements: usize,
+
+    /// Mean nominal evidence coverage across observations included in the average.
+    pub avg_temporal_evidence_coverage: f64,
 }
 
 impl TemporalConsciousnessAnalyzer {
@@ -1142,11 +1148,20 @@ impl TemporalConsciousnessAnalyzer {
             self.stats.trajectory_evidence_gaps += 1;
         }
 
-        // Update average temporal coherence
-        let n = self.stats.observations as f64;
-        let current_coherence = self.overall_temporal_coherence();
-        self.stats.avg_temporal_coherence =
-            (self.stats.avg_temporal_coherence * (n - 1.0) + current_coherence) / n;
+        // Only evidence-bearing aggregate scores contribute to running averages.
+        // Early zero-coverage observations are missing measurements, not zero-valued
+        // coherence outcomes. Track average coverage too, since the measured component
+        // set can still vary as the analyzer accumulates evidence.
+        let current_coverage = self.overall_evidence_coverage();
+        if current_coverage > 0.0 {
+            let current_coherence = self.overall_temporal_coherence();
+            self.stats.coherence_measurements += 1;
+            let n = self.stats.coherence_measurements as f64;
+            self.stats.avg_temporal_coherence =
+                (self.stats.avg_temporal_coherence * (n - 1.0) + current_coherence) / n;
+            self.stats.avg_temporal_evidence_coverage =
+                (self.stats.avg_temporal_evidence_coverage * (n - 1.0) + current_coverage) / n;
+        }
         true
     }
 
@@ -1816,6 +1831,34 @@ mod tests {
         assert_eq!(qualified.trajectory_sample_count, 3);
         assert!(qualified.trajectory_evidence_sufficient);
         assert!(qualified.overall_evidence_coverage > pending.overall_evidence_coverage);
+    }
+
+    #[test]
+    fn temporal_average_ignores_observations_with_zero_evidence_coverage() {
+        let mut analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+
+        assert!(analyzer.observe_at(&BinaryHV::random(3101), 0.5, Duration::ZERO));
+        assert_eq!(analyzer.stats.coherence_measurements, 0);
+        assert_eq!(analyzer.stats.avg_temporal_coherence, 0.0);
+        assert_eq!(analyzer.stats.avg_temporal_evidence_coverage, 0.0);
+
+        assert!(analyzer.observe_at(
+            &BinaryHV::random(3102),
+            0.5,
+            Duration::from_secs(1),
+        ));
+        assert!(analyzer.overall_evidence_coverage() > 0.0);
+        assert_eq!(analyzer.stats.coherence_measurements, 1);
+        assert!(
+            (analyzer.stats.avg_temporal_coherence - analyzer.overall_temporal_coherence()).abs()
+                < 1e-12
+        );
+        assert!(
+            (analyzer.stats.avg_temporal_evidence_coverage - analyzer.overall_evidence_coverage())
+                .abs()
+                < 1e-12
+        );
     }
 
     #[test]
