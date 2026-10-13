@@ -47,11 +47,11 @@ The legacy metadata-only `enqueue` and `select_batch` interface remains for poli
 
 The SQLite row still stores parsed event metadata in plaintext for local sorting, freshness and capacity policy. The BLOB is encrypted by this envelope profile; the database itself is **not** encrypted by this module. Restrictive local file permissions help but are not a substitute for device-level/app-level storage encryption and a private parent directory.
 
-The existing ACK method checks the event ID, the exact envelope digest, expiry and delivery-attempt state, but it does not authenticate ACK origin cryptographically. An authenticated ACK format and a receiver-side durable replay ledger remain required before operational deployment.
+The authenticated-envelope module now defines a canonical receiver-signed ACK (`telemetry-ack/v1`) and verifies it against an explicitly provided trusted Ed25519 receiver-key map. `DurableTelemetryQueue.acknowledge_protected` accepts only a valid positive signed ACK and checks its timestamp against sender clock-skew policy. The legacy unsigned `acknowledge` method refuses rows containing protected envelope bytes. This authenticates the asserting key; it does not prove that the receiver actually committed delivery. The receiver must persist and deduplicate the event before signing acceptance, and that receiver-side transaction/replay ledger is not implemented here.
 
 ## Tests added
 
-The authenticated-envelope test suite uses fixed test-only keys and synthetic payloads. It covers round-trip, hidden metadata, payload/digest binding, signature tampering, AEAD tag tampering with a valid signature, wrong/missing keys, unknown fields, duplicate JSON keys, non-canonical serialization, malformed base64, metadata validation, key bounds and envelope length limits.
+The authenticated-envelope test suite has 22 cases using fixed test-only keys and synthetic payloads. It covers round-trip, hidden metadata, payload/digest binding, signature tampering, AEAD tag tampering with a valid signature, wrong/missing keys, unknown fields, duplicate JSON keys, non-canonical serialization, malformed base64, metadata validation, key bounds, envelope length limits and signed receiver ACK verification.
 
 Durable queue tests cover ciphertext persistence across reopen, byte-for-byte replay, digest-bound enqueue, wire-byte capacity, separation from metadata-only rows, and schema migration to version 3. These tests have been committed but must not be reported as passing until the exact-head CI run is complete.
 
@@ -59,7 +59,7 @@ Durable queue tests cover ciphertext persistence across reopen, byte-for-byte re
 
 - Key generation, secure provisioning, rotation, revocation, hardware-backed storage and incident response.
 - Enforcement and audit of per-key AEAD message limits/nonce policy across restarts, backup restoration and multiple producers.
-- Receiver-side durable anti-replay state and cryptographically authenticated ACKs.
+- Receiver-side durable anti-replay state and a receiver transaction that commits the event before it emits a positive signed ACK.
 - Encryption of local persistent metadata as required by the device threat model.
 - Canonical signed trust/policy context, authorization, and an independently reviewed key-to-producer binding.
 - Multi-process, crash/power-loss, storage-full, key rotation, backup/restore and target-device tests.
