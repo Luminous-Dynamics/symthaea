@@ -186,6 +186,7 @@ def build_predictions(
         _need(runtime_metadata_log_path is not None,
               "Transformers runtime requires --runtime-metadata-log from worker stderr")
         observed = read_transformers_runtime_metadata(runtime_metadata_log_path)
+        runtime_startup_log_sha256 = sha256_file(runtime_metadata_log_path)
         observed_fields = {
             "python_version": observed["python_version"],
             "torch_version": observed["torch_version"],
@@ -253,6 +254,7 @@ def build_predictions(
           "runtime_binary must be a regular non-symlink file")
     runtime_sha = sha256_file(runtime_binary)
     runtime_record: dict[str, Any]
+    runtime_startup_log_sha256: str | None = None
     if runtime_kind == "whisper.cpp":
         _need(converted_root_real != source_root_real,
               "whisper.cpp converted export and source snapshot must be separate directories")
@@ -282,6 +284,8 @@ def build_predictions(
         _need(source_snapshot_sha == runtime_model_snapshot_sha256,
               "local model snapshot digest differs from the value observed at worker startup")
         observed = read_transformers_runtime_metadata(runtime_metadata_log_path)
+        _need(sha256_file(runtime_metadata_log_path) == runtime_startup_log_sha256,
+              "runtime metadata log changed during prediction packaging")
         _need(_source_file_count == observed["model_snapshot_file_count"]
               and _source_bytes == observed["model_snapshot_bytes"],
               "model snapshot file count/size differs from the worker startup metadata")
@@ -294,7 +298,7 @@ def build_predictions(
             "python_executable_sha256": runtime_sha,
             "worker_script_sha256": actual_worker_sha,
             "model_snapshot_manifest_sha256": source_snapshot_sha,
-            "startup_metadata_log_sha256": sha256_file(runtime_metadata_log_path),
+            "startup_metadata_log_sha256": runtime_startup_log_sha256,
             "python_version": python_version,
             "torch_version": torch_version,
             "transformers_version": transformers_version,
