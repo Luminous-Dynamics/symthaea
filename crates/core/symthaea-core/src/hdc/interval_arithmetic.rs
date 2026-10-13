@@ -334,7 +334,10 @@ mod tests {
         assert_eq!(Interval::new(0.0, f64::NAN), Err(IntervalError::NaNBound));
         assert_eq!(Interval::new(2.0, 1.0), Err(IntervalError::InvalidBounds));
         assert_eq!(Interval::new(f64::INFINITY, f64::INFINITY), Err(IntervalError::InvalidBounds));
-        assert_eq!(Interval::new(f64::NEG_INFINITY, f64::NEG_INFINITY), Err(IntervalError::InvalidBounds));
+        assert_eq!(
+            Interval::new(f64::NEG_INFINITY, f64::NEG_INFINITY),
+            Err(IntervalError::InvalidBounds)
+        );
         assert_eq!(Interval::point(f64::INFINITY), Err(IntervalError::NonFinitePoint));
     }
 
