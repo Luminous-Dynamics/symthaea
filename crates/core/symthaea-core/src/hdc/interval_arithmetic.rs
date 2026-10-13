@@ -1175,7 +1175,12 @@ mod tests {
         assert_eq!(zero.checked_cos().unwrap(), Interval::point(1.0).unwrap());
 
         let half_pi = half_pi_enclosure().expect("Machin series should enclose pi/2");
-        assert!(half_pi.contains(std::f64::consts::FRAC_PI_2));
+        // These adjacent binary64 values bracket the mathematical pi/2; the
+        // interval itself is computed independently from Machin's identity.
+        let pi_half_lower = f64::from_bits(0x3ff9_21fb_5444_2d18);
+        let pi_half_upper = f64::from_bits(0x3ff9_21fb_5444_2d19);
+        assert!(half_pi.lower() <= pi_half_lower);
+        assert!(half_pi.upper() >= pi_half_upper);
         assert!(half_pi.upper() - half_pi.lower() < 1e-12);
 
         let edge_sine = Interval::point(2.0).unwrap().checked_sin().unwrap();
