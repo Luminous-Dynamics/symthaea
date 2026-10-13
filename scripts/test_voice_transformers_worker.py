@@ -4,6 +4,7 @@
 """Model-free contract tests for the offline Transformers worker."""
 from __future__ import annotations
 
+import json
 import math
 import unittest
 
@@ -108,6 +109,20 @@ class TransformersWorkerTests(unittest.TestCase):
             parse_request('{"operation":"transcribe"}')
         with self.assertRaisesRegex(ValueError, "unknown"):
             parse_request('{"operation":"mystery","request_id":"1"}')
+
+    def test_accepts_valid_transcribe_request_shape(self):
+        request = parse_request(json.dumps({
+            "operation": "transcribe", "request_id": "req-1", "observation": observation()
+        }))
+        self.assertEqual(set(request), {"operation", "request_id", "observation"})
+
+    def test_request_operation_requires_exact_fields(self):
+        with self.assertRaisesRegex(ValueError, "request fields mismatch"):
+            parse_request('{"operation":"transcribe","request_id":"req-1"}')
+        with self.assertRaisesRegex(ValueError, "request fields mismatch"):
+            parse_request('{"operation":"capabilities","request_id":"req-1","observation":{}}')
+        with self.assertRaisesRegex(ValueError, "target_language"):
+            parse_request('{"operation":"translate_speech","request_id":"req-1","observation":{},"target_language":" "}')
 
     def test_accepts_valid_16khz_mono_observation(self):
         self.assertEqual(validate_observation(observation(), max_audio_seconds=60), [0.0, 0.1, -0.1])
