@@ -223,13 +223,30 @@ def _rate(errors: int, references: int) -> float:
     return errors / references
 
 
-def _bootstrap_ci(samples: list[dict[str, int]], metric: str, iterations: int = 1000, seed: int = 20261013) -> dict[str, float]:
+def _bootstrap_ci(
+    speaker_clusters: list[list[dict[str, int]]],
+    metric: str,
+    iterations: int = 1000,
+    seed: int = 20261013,
+) -> dict[str, Any]:
+    """Percentile bootstrap at speaker-cluster level, never treating same-speaker clips as independent."""
     _need(iterations > 0, "bootstrap iterations must be positive")
+    cluster_count = len(speaker_clusters)
+    if cluster_count < 2:
+        return {
+            "low_95": None,
+            "high_95": None,
+            "iterations": iterations,
+            "seed": seed,
+            "cluster_count": cluster_count,
+            "method": "speaker-cluster percentile bootstrap",
+            "interval_status": "not_estimable_fewer_than_2_speakers",
+        }
     rng = random.Random(seed)
     values: list[float] = []
-    count = len(samples)
     for _ in range(iterations):
-        selected = [samples[rng.randrange(count)] for _ in range(count)]
+        selected_clusters = [speaker_clusters[rng.randrange(cluster_count)] for _ in range(cluster_count)]
+        selected = [item for cluster in selected_clusters for item in cluster]
         denominator = sum(item[f"ref_{metric}"] for item in selected)
         numerator = sum(item[f"err_{metric}"] for item in selected)
         values.append(numerator / denominator if denominator else 0.0)
@@ -239,7 +256,9 @@ def _bootstrap_ci(samples: list[dict[str, int]], metric: str, iterations: int = 
         "high_95": _percentile(values, 0.975),
         "iterations": iterations,
         "seed": seed,
-        "method": "deterministic percentile bootstrap resampling clips with replacement",
+        "cluster_count": cluster_count,
+        "method": "deterministic percentile bootstrap resampling pseudonymous speaker clusters with replacement",
+        "interval_status": "estimated",
     }
 
 
@@ -345,6 +364,8 @@ def score_predictions(
 
     model_tree_sha, model_files, model_bytes = _hash_tree(model_root)
     per_clip: list[dict[str, int]] = []
+    word_speaker_clusters: dict[str, list[dict[str, int]]] = {}
+    char_speaker_clusters: dict[str, list[dict[str, int]]] = {}
     bucket_rows: dict[str, list[dict[str, int]]] = {
         "short_1_to_5_words": [], "medium_6_to_10_words": [], "long_11_plus_words": []
     }
@@ -363,6 +384,15 @@ def score_predictions(
             "ref_chars": ref_chars, "err_chars": char_errors,
         }
         per_clip.append(item)
+        # Pseudonymous client_id is used only to keep same-speaker clips in
+        # one bootstrap cluster. No token is copied into the score report.
+        speaker_token = row["client_id"]
+        word_speaker_clusters.setdefault(speaker_token, []).append({
+            "ref_words": len(ref_words), "err_words": word_errors,
+        })
+        char_speaker_clusters.setdefault(speaker_token, []).append({
+            "ref_chars": ref_chars, "err_chars": char_errors,
+        })
         if len(ref_words) <= 5:
             bucket_rows["short_1_to_5_words"].append(item)
         elif len(ref_words) <= 10:
@@ -391,13 +421,20 @@ def score_predictions(
             "cer_percent": 100.0 * char_errors / ref_chars,
         }
 
-    word_bootstrap_rows = [{"ref_word": x["ref_words"], "err_word": x["err_words"]} for x in per_clip]
-    char_bootstrap_rows = [{"ref_char": x["ref_chars"], "err_char": x["err_chars"]} for x in per_clip]
-    def ci_rows(items: list[dict[str, int]], ref_key: str, err_key: str) -> list[dict[str, int]]:
-        return [{"ref_metric": item[ref_key], "err_metric": item[err_key]} for item in items]
-    # Avoid a Python/package dependency on jiwer or evaluate; the normalization and edit distance are versioned above.
-    word_ci = _bootstrap_ci(ci_rows(word_bootstrap_rows, "ref_word", "err_word"), "metric", bootstrap_iterations)
-    char_ci = _bootstrap_ci(ci_rows(char_bootstrap_rows, "ref_char", "err_char"), "metric", bootstrap_iterations)
+    # Cluster bootstrap treats same-speaker clips as a unit rather than assuming
+    # that every utterance is statistically independent.
+    word_ci = _bootstrap_ci(
+        [[{"ref_word": item["ref_words"], "err_word": item["err_words"]} for item in cluster]
+         for cluster in word_speaker_clusters.values()],
+        "word",
+        bootstrap_iterations,
+    )
+    char_ci = _bootstrap_ci(
+        [[{"ref_char": item["ref_chars"], "err_char": item["err_chars"]} for item in cluster]
+         for cluster in char_speaker_clusters.values()],
+        "char",
+        bootstrap_iterations,
+    )
 
     archive_sha = dataset["archive_sha256"]
     test_meta_sha = test_sha
@@ -442,6 +479,8 @@ def score_predictions(
             "wer": word_ci,
             "cer": char_ci,
             "bootstrap_seed": 20261013,
+            "resampling_unit": "pseudonymous speaker clusters",
+            "speaker_cluster_count": len(word_speaker_clusters),
         },
         "reference_length_buckets": {
             name: aggregate(items) if items else {"sample_count": 0, "wer": None, "cer": None}
