@@ -1107,15 +1107,42 @@ impl TemporalConsciousnessAnalyzer {
         (weighted_sum, measured_weight)
     }
 
-    /// Check if temporal consciousness is healthy
+    /// Qualified temporal health, separating observed failures from missing evidence.
+    pub fn health_status(&self) -> TemporalHealthStatus {
+        let trajectory_measured = self
+            .phi_trajectory
+            .has_minimum_samples(self.config.min_samples_for_trajectory);
+        let continuity_measured = self.continuity.recent_states.len() >= 2;
+        let identity_measured = self.identity_coherence.alignment_coverage() > 0;
+        let husserlian_measured = self.husserlian.primal_impression.is_some();
+        let binding_measured = !self.binding.bindings.is_empty();
+
+        let measured_failure = (trajectory_measured && !self.phi_trajectory.is_healthy())
+            || (continuity_measured && !self.continuity.is_continuous())
+            || self.identity_coherence.has_low_measured_alignment()
+            || (husserlian_measured && self.husserlian.coherence() <= 0.6)
+            || (binding_measured && !self.binding.is_unified());
+
+        if measured_failure {
+            return TemporalHealthStatus::Unhealthy;
+        }
+
+        let evidence_complete = trajectory_measured
+            && continuity_measured
+            && self.identity_coherence.alignment_coverage() == 3
+            && husserlian_measured
+            && binding_measured;
+
+        if evidence_complete {
+            TemporalHealthStatus::Healthy
+        } else {
+            TemporalHealthStatus::InsufficientEvidence
+        }
+    }
+
+    /// Compatibility boolean. A system with incomplete evidence is not qualified healthy.
     pub fn is_temporally_healthy(&self) -> bool {
-        self.phi_trajectory
-            .has_minimum_samples(self.config.min_samples_for_trajectory)
-            && self.phi_trajectory.is_healthy()
-            && self.continuity.is_continuous()
-            && self.identity_coherence.is_coherent()
-            && self.husserlian.coherence() > 0.6
-            && self.binding.is_unified()
+        self.health_status() == TemporalHealthStatus::Healthy
     }
 
     /// Get detailed temporal report
@@ -1131,6 +1158,7 @@ impl TemporalConsciousnessAnalyzer {
                 .has_minimum_samples(self.config.min_samples_for_trajectory),
             trajectory_qualification_possible: self.phi_trajectory.sample_capacity()
                 >= self.config.min_samples_for_trajectory.max(1),
+            health_status: self.health_status(),
             phi_velocity: self.phi_trajectory.velocity,
             phi_acceleration: self.phi_trajectory.acceleration,
             phi_stability: self.phi_trajectory.stability,
@@ -1237,6 +1265,27 @@ impl TemporalConsciousnessAnalyzer {
     }
 }
 
+/// Evidence-qualified state of the temporal analyzer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TemporalHealthStatus {
+    /// All required evidence is present and measured metrics satisfy thresholds.
+    Healthy,
+    /// At least one measured metric violates its declared threshold.
+    Unhealthy,
+    /// No measured failure was found, but one or more required evidence sources are absent.
+    InsufficientEvidence,
+}
+
+impl TemporalHealthStatus {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Healthy => "HEALTHY",
+            Self::Unhealthy => "UNHEALTHY",
+            Self::InsufficientEvidence => "INSUFFICIENT EVIDENCE",
+        }
+    }
+}
+
 /// Comprehensive temporal consciousness report
 #[derive(Debug, Clone)]
 pub struct TemporalConsciousnessReport {
@@ -1254,6 +1303,8 @@ pub struct TemporalConsciousnessReport {
     pub trajectory_evidence_sufficient: bool,
     /// Whether the configured minimum can be met within the history capacity.
     pub trajectory_qualification_possible: bool,
+    /// Three-way health qualification; missing evidence is distinct from failure.
+    pub health_status: TemporalHealthStatus,
 
     // Φ Trajectory
     pub phi_velocity: f64,
@@ -1307,7 +1358,8 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║     TEMPORAL CONSCIOUSNESS REPORT (#75) - Consciousness Through Time     ║
 ╠══════════════════════════════════════════════════════════════════════════╣
-║ OVERALL TEMPORAL COHERENCE: {:.1}%  {}                                  ║
+║ OVERALL TEMPORAL COHERENCE: {:.1}%                                       ║
+║ STATUS: {:<24}                                                  ║
 ║ EVIDENCE COVERAGE:          {:.1}%                                       ║
 ║ Φ SAMPLES:                  {}/{} (minimum {}) {}                       ║
 ╠══════════════════════════════════════════════════════════════════════════╣
@@ -1343,11 +1395,7 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ╚══════════════════════════════════════════════════════════════════════════╝
 "#,
             self.overall_coherence * 100.0,
-            if self.is_healthy {
-                "✓ HEALTHY"
-            } else {
-                "⚠ ATTENTION"
-            },
+            self.health_status.label(),
             self.overall_evidence_coverage * 100.0,
             self.trajectory_sample_count,
             self.trajectory_sample_capacity,
@@ -1554,6 +1602,10 @@ mod tests {
         assert_eq!(initial.overall_evidence_coverage, 0.0);
         assert_eq!(initial.overall_coherence, 0.0);
         assert!(!initial.is_healthy);
+        assert_eq!(
+            initial.health_status,
+            TemporalHealthStatus::InsufficientEvidence
+        );
 
         assert!(analyzer.observe_at(&BinaryHV::random(91), 0.4, Duration::ZERO));
         assert!(analyzer.observe_at(
@@ -1576,6 +1628,28 @@ mod tests {
         assert_eq!(qualified.trajectory_sample_count, 3);
         assert!(qualified.trajectory_evidence_sufficient);
         assert!(qualified.overall_evidence_coverage > pending.overall_evidence_coverage);
+    }
+
+    #[test]
+    fn qualified_bad_trajectory_is_unhealthy_not_merely_under_observed() {
+        let mut config = TemporalConsciousnessConfig::default();
+        config.min_samples_for_trajectory = 3;
+        config.phi_history_depth = 4;
+        config.enable_husserlian_analysis = false;
+        let mut analyzer = TemporalConsciousnessAnalyzer::new(config);
+
+        for i in 0..3 {
+            assert!(analyzer.observe_at(
+                &BinaryHV::random(110 + i),
+                0.1,
+                Duration::from_secs(i as u64),
+            ));
+        }
+
+        let report = analyzer.report();
+        assert!(report.trajectory_evidence_sufficient);
+        assert_eq!(report.health_status, TemporalHealthStatus::Unhealthy);
+        assert!(!report.is_healthy);
     }
 
     #[test]
