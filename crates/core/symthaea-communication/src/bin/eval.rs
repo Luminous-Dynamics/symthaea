@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use symthaea_communication::benchmark::{
     BenchmarkReport, EvaluationPlan, ReleaseGate, compare_reports,
 };
@@ -88,6 +89,9 @@ enum Command {
         output: PathBuf,
         #[arg(long = "worker-arg")]
         worker_args: Vec<String>,
+        /// Per-response timeout, including local model cold-start latency.
+        #[arg(long, default_value_t = 600)]
+        worker_timeout_seconds: u64,
     },
     /// Aggregate per-sample pilot JSONL without manufacturing release evidence.
     SummarizePilot { outcomes: PathBuf, output: PathBuf },
@@ -299,8 +303,13 @@ fn run() -> Result<(), String> {
             provider_id,
             output,
             worker_args,
+            worker_timeout_seconds,
         } => {
-            let policy = WorkerPolicy::allow_one(&worker)?;
+            if worker_timeout_seconds == 0 || worker_timeout_seconds > 3_600 {
+                return Err("worker-timeout-seconds must be in [1, 3600]".into());
+            }
+            let mut policy = WorkerPolicy::allow_one(&worker)?;
+            policy.response_timeout = Duration::from_secs(worker_timeout_seconds);
             let mut provider =
                 LocalJsonlProvider::spawn(provider_id, &worker, &worker_args, policy)?;
             let input = fs::File::open(&samples).map_err(|error| error.to_string())?;
