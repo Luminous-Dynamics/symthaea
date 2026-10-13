@@ -1198,7 +1198,9 @@ impl TemporalConsciousnessAnalyzer {
 
         // Update continuity in the same time domain as the admitted observation.
         match elapsed {
-            Some(elapsed) => self.continuity.observe_at(state, phi, phi_prev, elapsed),
+            Some(elapsed) => {
+                let _ = self.continuity.observe_at(state, phi, phi_prev, elapsed);
+            }
             None => self.continuity.observe(state, phi, phi_prev),
         }
 
