@@ -156,7 +156,7 @@ class OutcomesToPredictionsTests(unittest.TestCase):
 
     def test_private_writer_is_exclusive_and_does_not_overwrite(self):
         doc=self.build()
-        write_private_exclusive(self.output,doc,[self.dataset,self.model_root,self.outcomes_path.parent])
+        write_private_exclusive(self.output,doc,[self.dataset,self.model_root])
         self.assertEqual(self.output.stat().st_mode & 0o777,0o600)
         with self.assertRaisesRegex(ValueError,"must be new"):
             write_private_exclusive(self.output,doc,[self.dataset,self.model_root,self.outcomes_path.parent])
