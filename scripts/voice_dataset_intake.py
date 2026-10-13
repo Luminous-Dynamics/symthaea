@@ -52,6 +52,7 @@ def _safe_relative(value: Any, *, field: str) -> Path:
 
 
 def _resolve_inside(root: Path, relative: Path, *, field: str, must_exist: bool = True) -> Path:
+    _need(not root.is_symlink(), f"{field} root must not be a symlink")
     root_real = root.resolve(strict=True)
     candidate = root / relative
     _need(not candidate.is_symlink(), f"{field} must not be a symlink")
