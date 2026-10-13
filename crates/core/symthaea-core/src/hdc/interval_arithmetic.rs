@@ -1080,6 +1080,39 @@ mod tests {
     }
 
     #[test]
+    fn trigonometric_interval_ranges_enclose_deterministic_grid() {
+        // All 153 ordered endpoints on a quarter-unit grid in [-2, 2], with
+        // nine interior probes per interval. This exercises monotone segments,
+        // zero-crossing cosine ranges, and the conservative +/-1 sine extrema.
+        for lower_step in -8_i32..=8 {
+            let lower = lower_step as f64 / 4.0;
+            for upper_step in lower_step..=8 {
+                let upper = upper_step as f64 / 4.0;
+                let input = interval(lower, upper);
+                let sine = input.checked_sin().unwrap();
+                let cosine = input.checked_cos().unwrap();
+                for probe in 0_i32..=8 {
+                    let x = if probe == 0 {
+                        lower
+                    } else if probe == 8 {
+                        upper
+                    } else {
+                        lower + (upper - lower) * (probe as f64 / 8.0)
+                    };
+                    assert!(
+                        sine.contains(x.sin()),
+                        "sine range {sine:?} failed for input [{lower}, {upper}] at x={x}"
+                    );
+                    assert!(
+                        cosine.contains(x.cos()),
+                        "cosine range {cosine:?} failed for input [{lower}, {upper}] at x={x}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn small_integer_grid_encloses_exact_arithmetic() {
         for a0 in -8i32..=8 {
             for a1 in a0..=8 {
