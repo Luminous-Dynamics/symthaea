@@ -42,7 +42,9 @@ class VoiceAsrScoreTests(unittest.TestCase):
         (self.model_root / "model.bin").write_bytes(b"synthetic converted model artifact")
         self.runtime_binary = self.base / "whisper-cli"
         self.runtime_binary.write_bytes(b"synthetic whisper runtime executable")
-        self.runtime_worker = self.base / "voice_transformers_worker.py"
+        self.worker_root = self.base / "worker-source"
+        self.worker_root.mkdir()
+        self.runtime_worker = self.worker_root / "voice_transformers_worker.py"
         self.runtime_worker.write_text("# synthetic test worker\\n", encoding="utf-8")
         self.runtime = {
             "kind": "whisper.cpp",
@@ -453,6 +455,14 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertEqual(report["metrics"]["sample_count"],100)
         self.assertIn("model-training corpus overlap is not assessed",report["interpretation"])
         self.assertEqual(report["training_data_overlap_status"], "not_assessed")
+
+    def test_report_writer_rejects_worker_source_tree(self):
+        report = self.score()
+        with self.assertRaisesRegex(ValueError, "outside protected trees"):
+            write_report_exclusive(
+                self.worker_root / "report.json", report,
+                [self.root, self.model_root, self.source_model_root, self.worker_root],
+            )
 
     def test_report_writer_refuses_overwrite(self):
         report = self.score()
