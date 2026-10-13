@@ -522,8 +522,13 @@ fn exp_positive_point(value: f64, ln_two: Interval) -> Result<Interval, Interval
         return Interval::point(1.0);
     }
     if value < -745.0 {
-        // e^-745 is less than the least positive binary64 subnormal.
-        return Interval::new(0.0, f64::from_bits(1));
+        // Derive the subnormal cutoff from the same ln(2) enclosure used by
+        // range reduction. If this check unexpectedly fails, widen safely.
+        let log_min_subnormal = ln_two.checked_multiply(Interval::point(-1074.0)?);
+        if value < log_min_subnormal.lower {
+            return Interval::new(0.0, f64::from_bits(1));
+        }
+        return Interval::new(0.0, f64::INFINITY);
     }
     if value > 700.0 {
         // Broad but safe; do not manufacture a finite bound beyond this range.
@@ -537,19 +542,20 @@ fn exp_positive_point(value: f64, ln_two: Interval) -> Result<Interval, Interval
     }
     let exponent = exponent_float as i32;
 
-    // Even if the approximate quotient selected a poor integer, the checked
-    // reduced interval below rejects it and returns a conservative wide bound.
-    if exponent < -1074 {
-        return Interval::new(0.0, f64::from_bits(1));
-    }
-    if exponent > 1023 {
-        return Interval::new(0.0, f64::INFINITY);
-    }
-
+    // Check the actual interval reduction before using any range-based fallback.
     let exponent_interval = Interval::point(exponent as f64)?;
     let scaled_ln_two = ln_two.checked_multiply(exponent_interval);
     let reduced = Interval::point(value)?.checked_subtract(scaled_ln_two);
     if reduced.lower < -EXP_REDUCTION_LIMIT || reduced.upper > EXP_REDUCTION_LIMIT {
+        return Interval::new(0.0, f64::INFINITY);
+    }
+
+    // Once the checked reduction is known to satisfy |r| <= 0.36, exp(r) < 2;
+    // this makes the underflow enclosure [0, min_subnormal] conservative.
+    if exponent < -1074 {
+        return Interval::new(0.0, f64::from_bits(1));
+    }
+    if exponent > 1023 {
         return Interval::new(0.0, f64::INFINITY);
     }
 
