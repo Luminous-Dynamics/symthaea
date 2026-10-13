@@ -252,12 +252,20 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         self.assertEqual(self.ledger.reservation_count, 1)
         self.assertEqual(self.ledger.participant_spend(people()[0]), (0.5, 0.0, 1))
 
-    def test_infinite_numeric_budget_configuration_is_rejected(self):
-        with self.assertRaisesRegex(DurablePrivacyPolicyError, "finite numeric"):
+    def test_nonfinite_and_extreme_budget_configurations_fail_closed(self):
+        for value in (float("inf"), float("nan"), float("-inf")):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(DurablePrivacyPolicyError, "finite numeric"):
+                    DurablePrivacyLedger(
+                        str(Path(self.temp.name) / f"bad-{str(value)}.sqlite3"),
+                        participant_hmac_key=self.key,
+                        max_epsilon_per_participant=value,
+                    )
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "exceeds the configured release limit"):
             DurablePrivacyLedger(
-                str(Path(self.temp.name) / "bad-budget.sqlite3"),
+                str(Path(self.temp.name) / "giant-budget.sqlite3"),
                 participant_hmac_key=self.key,
-                max_epsilon_per_participant=float("inf"),
+                max_epsilon_per_participant=10 ** 10000,
             )
         with self.assertRaisesRegex(ValueError, "positive SQLite integer"):
             DurablePrivacyLedger(
@@ -265,6 +273,18 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
                 participant_hmac_key=self.key,
                 max_reservations=1 << 100,
             )
+
+    def test_output_commit_time_cannot_precede_reservation(self):
+        reservation = self.reserve()
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "cannot precede"):
+            self.ledger.commit_output(
+                release_id=reservation.release_id,
+                output_bytes=b'{"noisy":1}',
+                committed_at_utc=dt("2026-10-13T05:59:59Z"),
+            )
+        self.assertEqual(self.ledger.reservation_count, 1)
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
+            self.ledger.committed_output(reservation.release_id)
 
 
 if __name__ == "__main__":
