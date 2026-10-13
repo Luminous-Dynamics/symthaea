@@ -35,6 +35,13 @@ PREDICTION_KEYS = {
     "archive_sha256", "test_metadata_sha256", "model_id", "model_revision",
     "model_license", "source_model_snapshot_sha256", "outcomes_sha256", "runtime", "predictions",
 }
+PILOT_OUTCOME_KEYS = {
+    "id", "language", "detected_language", "language_confidence", "transcript",
+    "word_error_rate", "character_error_rate", "entity_preservation",
+    "translation_en", "translation_chrf", "response_language_correct",
+    "latency_ms", "preflight_latency_ms", "transcription_latency_ms",
+    "translation_latency_ms", "error",
+}
 WHISPER_CPP_RUNTIME_KEYS = {
     "kind", "runtime_commit", "converter_commit", "runtime_binary_sha256",
     "artifact_path", "artifact_sha256", "quantization",
@@ -92,6 +99,82 @@ def safe_relative_path(value: Any, where: str) -> Path:
           f"{where} must not be absolute or contain traversal components")
     _need(bool(parsed.parts) and not parsed.parts[0].endswith(":"), f"{where} must be repository-relative")
     return Path(*parsed.parts)
+
+
+def _read_pilot_outcomes(
+    path: Path,
+    *,
+    expected_paths: set[str],
+    locale: str,
+) -> dict[str, dict[str, Any]]:
+    """Read exact outcomes, bind transcripts to predictions, and validate phase timings."""
+    _need(path.is_file() and not path.is_symlink(), "outcomes must be a regular non-symlink file")
+    rows: dict[str, dict[str, Any]] = {}
+    try:
+        with path.open("r", encoding="utf-8") as stream:
+            for line_number, line in enumerate(stream, start=1):
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(
+                        line,
+                        object_pairs_hook=_unique_object,
+                        parse_constant=lambda value: (_ for _ in ()).throw(
+                            ValueError(f"non-standard JSON numeric constant {value}")
+                        ),
+                    )
+                except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
+                    raise ValueError(f"malformed pilot outcome JSON on line {line_number}: {exc}") from exc
+                _need(isinstance(row, dict) and set(row) == PILOT_OUTCOME_KEYS,
+                      f"pilot outcome line {line_number} has unexpected fields")
+                relative_id = safe_relative_path(row["id"], f"pilot outcome line {line_number} id").as_posix()
+                _need(relative_id in expected_paths,
+                      f"pilot outcome line {line_number} references an unknown clip")
+                _need(relative_id not in rows, f"duplicate pilot outcome for clip {relative_id}")
+                _need(row["language"] == locale,
+                      f"pilot outcome line {line_number} language differs from locale")
+                _need(row["error"] is None,
+                      f"pilot outcome for {relative_id} records an inference error")
+                _need(isinstance(row["transcript"], str),
+                      f"pilot outcome for {relative_id} transcript must be text")
+                for field in ("latency_ms", "preflight_latency_ms", "transcription_latency_ms", "translation_latency_ms"):
+                    metric = row[field]
+                    if metric is None and field != "latency_ms":
+                        continue
+                    _need(isinstance(metric, (int, float)) and not isinstance(metric, bool)
+                          and math.isfinite(metric) and metric >= 0,
+                          f"pilot outcome line {line_number} {field} must be finite and non-negative"
+                          if field == "latency_ms" else
+                          f"pilot outcome line {line_number} {field} must be null or finite and non-negative")
+                rows[relative_id] = row
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f"cannot read pilot outcomes: {exc}") from exc
+    missing = expected_paths - set(rows)
+    _need(not missing, f"missing {len(missing)} pilot outcomes; phase timings are incomplete")
+    return rows
+
+
+def _latency_summary(outcomes: dict[str, dict[str, Any]], field: str) -> dict[str, Any]:
+    values = sorted(
+        float(row[field]) for row in outcomes.values() if row[field] is not None
+    )
+    if not values:
+        return {
+            "sample_count": 0, "mean_ms": None, "p50_ms": None,
+            "p95_ms": None, "max_ms": None,
+        }
+
+    def nearest_rank(percentile: float) -> float:
+        index = max(0, min(len(values) - 1, math.ceil(percentile * len(values)) - 1))
+        return values[index]
+
+    return {
+        "sample_count": len(values),
+        "mean_ms": sum(values) / len(values),
+        "p50_ms": nearest_rank(0.50),
+        "p95_ms": nearest_rank(0.95),
+        "max_ms": values[-1],
+    }
 
 
 def normalize_text(value: str) -> str:
@@ -419,6 +502,7 @@ def score_predictions(
     _need(isinstance(hypotheses, list), "predictions must be an array")
     expected = {row["path"]: row for row in test_rows}
     seen: dict[str, str] = {}
+    raw_seen: dict[str, str] = {}
     for index, row in enumerate(hypotheses):
         _need(isinstance(row, dict) and set(row) == {"path", "text"},
               f"prediction {index} must contain only path and text")
@@ -426,9 +510,28 @@ def score_predictions(
         _need(path in expected, f"prediction {index} references an unknown clip")
         _need(path not in seen, f"duplicate prediction for clip path {path}")
         _need(isinstance(row["text"], str), f"prediction {index} text must be a string")
+        raw_seen[path] = row["text"]
         seen[path] = normalize_text(row["text"])
     missing = set(expected) - set(seen)
     _need(not missing, f"missing {len(missing)} ASR predictions; scoring is incomplete")
+    outcome_rows = _read_pilot_outcomes(
+        outcomes_path, expected_paths=set(expected), locale=locale
+    )
+    for clip_path, transcript in raw_seen.items():
+        _need(outcome_rows[clip_path]["transcript"] == transcript,
+              f"prediction text for {clip_path} differs from raw pilot outcome transcript")
+    latency_metrics = {
+        "end_to_end_ms": _latency_summary(outcome_rows, "latency_ms"),
+        "preflight_request_ms": _latency_summary(outcome_rows, "preflight_latency_ms"),
+        "transcription_ms": _latency_summary(outcome_rows, "transcription_latency_ms"),
+        "translation_ms": _latency_summary(outcome_rows, "translation_latency_ms"),
+        "first_sample_preflight_ms": next(iter(outcome_rows.values()))["preflight_latency_ms"],
+        "interpretation": (
+            "end_to_end_ms includes all requested operations; preflight_request_ms for a monolingual "
+            "worker may include first-use model startup, while transcription_ms measures the ASR operation; "
+            "runtime-specific loading semantics differ, and whisper.cpp may load its model per clip"
+        ),
+    }
 
     model_tree_sha, model_files, model_bytes = _hash_tree(model_root)
     if runtime["kind"] == "transformers":
@@ -593,6 +696,7 @@ def score_predictions(
             "intake_report_sha256": sha256_file(intake_report_path),
         },
         "metrics": aggregate(per_clip),
+        "latency": latency_metrics,
         "speaker_macro_metrics": {
             "speaker_count": len(speaker_word_clusters),
             "mean_speaker_wer": sum(speaker_word_rates) / len(speaker_word_rates) if speaker_word_rates else None,
