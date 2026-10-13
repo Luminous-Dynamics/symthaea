@@ -768,6 +768,12 @@ pub struct HusserlianAnalysis {
     /// Protention depth (how far into future is anticipated)
     pub protention_depth: usize,
 
+    /// Configured retained-state limit. The depth is a count, not elapsed time.
+    retention_capacity: usize,
+
+    /// Configured prediction limit.
+    protention_capacity: usize,
+
     /// Temporal horizon width (retention + protention span)
     pub temporal_horizon: f64,
 }
@@ -780,6 +786,8 @@ impl HusserlianAnalysis {
             protention: VecDeque::with_capacity(protention_capacity),
             retention_depth: 0,
             protention_depth: 0,
+            retention_capacity,
+            protention_capacity,
             temporal_horizon: 0.0,
         }
     }
@@ -788,10 +796,12 @@ impl HusserlianAnalysis {
     pub fn update_primal(&mut self, state: BinaryHV, phi: f64) {
         // Move current primal to retention
         if let Some((old_state, old_phi)) = self.primal_impression.take() {
-            self.retention
-                .push_back((Instant::now(), old_state, old_phi));
-            if self.retention.len() > 10 {
-                self.retention.pop_front();
+            if self.retention_capacity > 0 {
+                self.retention
+                    .push_back((Instant::now(), old_state, old_phi));
+                while self.retention.len() > self.retention_capacity {
+                    self.retention.pop_front();
+                }
             }
         }
 
@@ -803,9 +813,8 @@ impl HusserlianAnalysis {
     /// Update protentions (what we anticipate)
     pub fn update_protentions(&mut self, predictions: Vec<(BinaryHV, f64)>) {
         self.protention.clear();
-        for pred in predictions.into_iter().take(5) {
-            self.protention.push_back(pred);
-        }
+        self.protention
+            .extend(predictions.into_iter().take(self.protention_capacity));
         self.protention_depth = self.protention.len();
         self.update_horizon();
     }
@@ -2067,6 +2076,34 @@ mod tests {
         assert!(report.to_string().contains("Coherence:            N/A"));
         assert_eq!(report.overall_evidence_coverage, 0.0);
         assert_eq!(report.health_status, TemporalHealthStatus::InsufficientEvidence);
+    }
+
+    #[test]
+    fn husserlian_analysis_respects_configured_retention_and_protention_capacities() {
+        let mut husserlian = HusserlianAnalysis::new(2, 1);
+        for i in 0..7 {
+            husserlian.update_primal(BinaryHV::random(3200 + i), 0.4 + i as f64 * 0.01);
+        }
+        assert_eq!(husserlian.retention.len(), 2);
+        assert_eq!(husserlian.retention_depth, 2);
+
+        husserlian.update_protentions(vec![
+            (BinaryHV::random(3301), 0.4),
+            (BinaryHV::random(3302), 0.5),
+            (BinaryHV::random(3303), 0.6),
+        ]);
+        assert_eq!(husserlian.protention.len(), 1);
+        assert_eq!(husserlian.protention_depth, 1);
+        assert_eq!(husserlian.temporal_horizon, 3.0);
+
+        let mut zero_capacity = HusserlianAnalysis::new(0, 0);
+        zero_capacity.update_primal(BinaryHV::random(3401), 0.5);
+        zero_capacity.update_primal(BinaryHV::random(3402), 0.6);
+        zero_capacity.update_protentions(vec![(BinaryHV::random(3403), 0.7)]);
+        assert!(zero_capacity.retention.is_empty());
+        assert!(zero_capacity.protention.is_empty());
+        assert_eq!(zero_capacity.retention_depth, 0);
+        assert_eq!(zero_capacity.protention_depth, 0);
     }
 
     #[test]
