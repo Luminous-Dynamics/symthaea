@@ -62,6 +62,10 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             mechanism="discrete_laplace",
             mechanism_id="integer-energy-sum-v1",
             privacy_unit="household",
+            adjacency="add_remove_one_participant",
+            contribution_policy_id="energy-cap-v1",
+            privacy_policy_id="dp-policy-v1",
+            max_contribution_limit_wh=1000,
             expected_feature_flags=(),
         )
         self.attestation_verifier = QualifiedOutputVerifier(self.attestation_policy)
@@ -511,6 +515,10 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             "mechanism": "discrete_laplace",
             "mechanism_id": "integer-energy-sum-v1",
             "privacy_unit": "household",
+            "adjacency": "add_remove_one_participant",
+            "contribution_policy_id": "energy-cap-v1",
+            "privacy_policy_id": "dp-policy-v1",
+            "max_contribution_limit_wh": 1000,
             "expected_feature_flags": (),
         }
         for change in ({"mechanism": []}, {"privacy_unit": []}, {"expected_feature_flags": ["contrib"]}):
@@ -629,6 +637,15 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
                 with self.assertRaises(MechanismAttestationError):
                     self.verify_signed_output(reservation, output, raw, signature)
 
+    def test_reservation_cannot_exceed_deployment_qualified_contribution_cap(self):
+        reservation = self.reserve(contribution_limit=2000)
+        output = b'{"value":1}'
+        raw, signature = self.make_signed_attestation(reservation, output)
+        with self.assertRaisesRegex(MechanismAttestationError, "exceeds deployment-qualified maximum"):
+            self.verify_signed_output(reservation, output, raw, signature)
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
+            self.ledger._committed_output_storage(reservation.release_id)
+
     def test_unapproved_feature_flags_fail_closed(self):
         reservation = self.reserve()
         output = b'{"value":1}'
@@ -653,6 +670,10 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             mechanism="discrete_laplace",
             mechanism_id="integer-energy-sum-v1",
             privacy_unit="household",
+            adjacency="add_remove_one_participant",
+            contribution_policy_id="energy-cap-v1",
+            privacy_policy_id="dp-policy-v1",
+            max_contribution_limit_wh=1000,
             expected_feature_flags=(),
         ))
         with self.assertRaisesRegex(MechanismAttestationError, "signature is invalid"):
