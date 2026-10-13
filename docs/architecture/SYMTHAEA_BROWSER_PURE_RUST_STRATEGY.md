@@ -188,7 +188,7 @@ The P1 property is accepted only when:
 
 ## 10. Implementation update — 2026-10-13
 
-The native-CDP implementation is under review in [PR #7429](https://github.com/Luminous-Dynamics/symthaea/pull/7429), on branch `feat/symthaea-browser-native-cdp-actions-001`. The current implementation head at the time of this update is `053b4dea36d16331aa12a574991d6baf8df9af57`.
+The native-CDP implementation is under review in [PR #7429](https://github.com/Luminous-Dynamics/symthaea/pull/7429), on branch `feat/symthaea-browser-native-cdp-actions-001`. The current implementation head at the time of this update is `a562162e04ddec8b6bd67c4b14972df54e519e3c`.
 
 The maintained `cdp.rs` controller path no longer uses authored page-evaluation helpers for accessibility-target resolution, scroll, clicks, history, focus detection, title retrieval or text extraction. Operations use typed CDP requests and Rust `scraper 0.25.0`; CSS selectors for actions/extraction must match exactly one node, and click/type targets require live Accessibility-tree evidence. Disabled click targets and disabled/read-only text inputs fail closed. The old JavaScript fallback observation and arbitrary `eval_js` helper were removed, and the dead JS-named compatibility shim was removed as well.
 
@@ -196,7 +196,7 @@ Raw session reads and screenshot methods are crate-private. Maintained `WebAgent
 
 Text extraction excludes script/style/noscript/template and explicit hidden-state subtrees, bounds parsed markup at 2 MiB, and caps output at 32 Ki characters. The size check occurs after CDP returns the markup, so it is not a transport-level response-size limit; the result is DOM text, not exact pixel-rendered `innerText`. Computed CSS visibility, shadow-root flattening, and iframe text are not synthesized.
 
-The raw Praxis exploration examples are preserved under `examples/archive/` with archive banners; the maintained journey uses the policy-checked executor. A structural unit test scans all maintained browser modules and the active journey for direct evaluation and JS-backed Chromiumoxide convenience APIs, and checks that the raw session observation APIs are not public.
+The raw Praxis exploration examples are preserved under `examples/archive/` with archive banners; the maintained journey uses the policy-checked executor. A structural unit test scans all maintained browser modules and the active journey for direct evaluation and JS-backed Chromiumoxide convenience APIs, checks that raw session observation APIs are not public, and prevents the maintained WebAgent/BrowserBridge/Praxis callers from invoking low-level CdpSession action or observation methods directly.
 
 **Verification remains unqualified.** At the last check, broad repository CI, formatting, Clippy and regression jobs for the implementation head were queued/pending, with the benchmark suite skipped. No Cargo formatting, compilation, unit/integration or live-Chromium hostile-page pass is confirmed for the exact head; this environment does not have Cargo/Rust installed. Queued/skipped checks are not passes.
 
