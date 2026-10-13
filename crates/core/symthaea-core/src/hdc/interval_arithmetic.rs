@@ -34,9 +34,10 @@ const EXP_REDUCTION_LIMIT: f64 = 0.36;
 // Critical-point handling keeps interval ranges sound beyond sine's monotone
 // region without requiring platform-dependent argument reduction.
 const TRIG_SMALL_ARGUMENT_LIMIT: f64 = 2.0;
-// Bound the quadrant index so uncertainty in the cached pi/2 interval remains
-// small and midpoint/nearest-integer operations stay far from binary64 limits.
-const TRIG_MAX_REDUCTION_QUADRANT: f64 = 1_000_000_000.0;
+// Bound quadrant magnitude so the cached pi/2 enclosure contributes at most
+// about 1e-2 radians of reduction width and integer conversion remains exact.
+// Larger arguments conservatively return [-1, 1].
+const TRIG_MAX_REDUCTION_QUADRANT: f64 = 1_000_000_000_000.0;
 const TRIG_SERIES_TAIL_BOUND: f64 = f64::from_bits(943_u64 << 52);
 
 // The atan(1/5) and atan(1/239) series below each use a symmetric 2^-120
@@ -1221,6 +1222,14 @@ mod tests {
             assert!(cosine.upper() - cosine.lower() < 1e-3, "cosine reduction unexpectedly wide at {value}: {cosine:?}");
         }
 
+        // The wider accepted horizon trades a still-conservative, bounded
+        // enclosure width for more coverage; the exact endpoints stay enclosed.
+        let trillion = Interval::point(1.0e12).unwrap();
+        let trillion_sin = trillion.checked_sin().unwrap();
+        let trillion_cos = trillion.checked_cos().unwrap();
+        assert!(trillion_sin.upper() - trillion_sin.lower() < 0.02);
+        assert!(trillion_cos.upper() - trillion_cos.lower() < 0.02);
+
         let reducible_range = interval(1000.0, 1001.0);
         let sine = reducible_range.checked_sin().unwrap();
         let cosine = reducible_range.checked_cos().unwrap();
@@ -1261,6 +1270,14 @@ mod tests {
                     0.8378871813, 0.8378871815),
             (-1.0e9, -0.5458434495, -0.5458434494,
                      0.8378871813, 0.8378871815),
+            (1.0e10, -0.4875060251, -0.4875060250,
+                     0.8731196226, 0.8731196228),
+            (1.0e11, 0.9286936604, 0.9286936606,
+                     0.3708477920, 0.3708477923),
+            (1.0e12, -0.6112387025, -0.6112387022,
+                     0.7914463017, 0.7914463020),
+            (-1.0e12, 0.6112387022, 0.6112387025,
+                      0.7914463017, 0.7914463020),
         ];
 
         for (x, sin_lower, sin_upper, cos_lower, cos_upper) in cases {
