@@ -1597,6 +1597,19 @@ mod tests {
         assert!(valence_channels.iter().any(|item| item["channel"] == "meter_beats"));
         assert!(valence_channels.iter().any(|item| item["channel"] == "tempo_bpm"));
         assert!(!valence_channels.iter().any(|item| item["channel"] == "key_tonality"));
+        for channel_name in ["absolute_key_tonic_pc", "meter_beats", "tempo_bpm"] {
+            let channel = valence_channels
+                .iter()
+                .find(|item| item["channel"] == channel_name)
+                .expect("declared valence non-target invariant");
+            assert_eq!(channel["checked_point_count"].as_u64(), Some(4));
+            assert_eq!(
+                channel["changed_point_count"].as_u64(),
+                Some(0),
+                "unexpected non-target change: {:?}",
+                channel
+            );
+        }
 
         let arousal_curve = curve_json(Style::Classical, "arousal", BASE_SEED);
         let arousal = &arousal_curve["control_target_evaluation"]["non_target_invariance"];
@@ -1605,6 +1618,19 @@ mod tests {
         assert!(arousal_channels.iter().any(|item| item["channel"] == "key_tonality"));
         assert!(arousal_channels.iter().any(|item| item["channel"] == "meter_beats"));
         assert!(!arousal_channels.iter().any(|item| item["channel"] == "tempo_bpm"));
+        for channel_name in ["absolute_key_tonic_pc", "key_tonality", "meter_beats"] {
+            let channel = arousal_channels
+                .iter()
+                .find(|item| item["channel"] == channel_name)
+                .expect("declared arousal non-target invariant");
+            assert_eq!(channel["checked_point_count"].as_u64(), Some(4));
+            assert_eq!(
+                channel["changed_point_count"].as_u64(),
+                Some(0),
+                "unexpected non-target change: {:?}",
+                channel
+            );
+        }
 
         let tempo_channel = arousal_curve["control_target_evaluation"]["target_fidelity"]["points"]
             .as_array()
