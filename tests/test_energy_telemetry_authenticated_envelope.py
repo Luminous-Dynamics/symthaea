@@ -6,9 +6,7 @@ from datetime import datetime
 import json
 import unittest
 
-from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from tools.energy_telemetry.authenticated_envelope import (
     EnvelopeAuthenticationError,
