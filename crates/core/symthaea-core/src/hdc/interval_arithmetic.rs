@@ -14,6 +14,7 @@
 //! See the repository-root INTERVAL_ARITHMETIC.md for the current scope and limits.
 
 use std::fmt;
+use std::sync::OnceLock;
 
 // For z <= 1/3, the tail after the first 64 terms of
 // ln(m) = 2 * sum(z^(2j+1)/(2j+1)), z=(m-1)/(m+1), is
@@ -34,6 +35,10 @@ const EXP_REDUCTION_LIMIT: f64 = 0.36;
 // region without requiring platform-dependent argument reduction.
 const TRIG_SMALL_ARGUMENT_LIMIT: f64 = 2.0;
 const TRIG_SERIES_TAIL_BOUND: f64 = f64::from_bits(943_u64 << 52);
+
+// The atan(1/5) and atan(1/239) series below each use a symmetric 2^-120
+// remainder allowance, comfortably wider than their first omitted terms.
+const PI_ATAN_SERIES_TAIL_BOUND: f64 = f64::from_bits(903_u64 << 52);
 
 /// Errors while constructing or evaluating a real interval.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -364,14 +369,18 @@ impl Interval {
         let upper_point = sin_point_enclosure(self.upper)?;
         let mut lower = lower_point.lower.min(upper_point.lower).max(-1.0);
         let mut upper = lower_point.upper.max(upper_point.upper).min(1.0);
-        // Since 3 < pi < 4, the critical points +/-pi/2 lie in (-2, 2)
-        // and have absolute value greater than 1.5. Detect them conservatively:
-        // entering either outer band may include an extremum, so include +/-1.
-        if self.lower <= -1.5 {
-            lower = -1.0;
-        }
-        if self.upper >= 1.5 {
+        // Include an extremum exactly when this interval overlaps our cached,
+        // series-derived enclosure of +/-pi/2. If that enclosure cannot be
+        // constructed, fail wide rather than make an ungrounded extrema claim.
+        let Some(half_pi) = half_pi_enclosure() else {
+            return Ok(Self { lower: -1.0, upper: 1.0 });
+        };
+        let negative_half_pi = half_pi.negate();
+        if self.lower <= half_pi.upper && self.upper >= half_pi.lower {
             upper = 1.0;
+        }
+        if self.lower <= negative_half_pi.upper && self.upper >= negative_half_pi.lower {
+            lower = -1.0;
         }
         if lower <= upper {
             Ok(Self { lower, upper })
@@ -485,6 +494,57 @@ impl Interval {
             Self { lower, upper }
         }
     }
+}
+
+/// Enclose atan(1/d) with the alternating series and a symmetric remainder bound.
+fn atan_reciprocal_enclosure(
+    denominator: u32,
+    terms: usize,
+) -> Result<Interval, IntervalError> {
+    if denominator == 0 || terms == 0 {
+        return Err(IntervalError::InvalidBounds);
+    }
+
+    // Division in interval arithmetic encloses the exact rational 1/d; this
+    // avoids treating its rounded f64 representation as exact.
+    let z = Interval::point(1.0)?.checked_divide(Interval::point(denominator as f64)?)?;
+    let negative_z_squared = z.checked_multiply(z).negate();
+    let mut term = z;
+    let mut sum = term;
+    for n in 0..(terms - 1) {
+        let numerator = Interval::point((2 * n + 1) as f64)?;
+        let divisor = Interval::point((2 * n + 3) as f64)?;
+        term = term
+            .checked_multiply(negative_z_squared)
+            .checked_multiply(numerator)
+            .checked_divide(divisor)?;
+        sum = sum.checked_add(term);
+    }
+
+    let remainder = Interval::new(
+        -PI_ATAN_SERIES_TAIL_BOUND,
+        PI_ATAN_SERIES_TAIL_BOUND,
+    )?;
+    Ok(sum.checked_add(remainder))
+}
+
+/// Machin's identity gives pi/2 = 8 atan(1/5) - 2 atan(1/239).
+/// The interval series and remainder bounds are cached to avoid paying the
+/// construction cost on subsequent evaluations. Failure is represented as
+/// None, so callers can fail wide.
+fn half_pi_enclosure() -> Option<Interval> {
+    static HALF_PI: OnceLock<Option<Interval>> = OnceLock::new();
+    *HALF_PI.get_or_init(|| {
+        let atan_fifth = atan_reciprocal_enclosure(5, 25).ok()?;
+        let atan_239th = atan_reciprocal_enclosure(239, 8).ok()?;
+        let eight = Interval::point(8.0).ok()?;
+        let minus_two = Interval::point(-2.0).ok()?;
+        Some(
+            atan_fifth
+                .checked_multiply(eight)
+                .checked_add(atan_239th.checked_multiply(minus_two)),
+        )
+    })
 }
 
 /// Compute one alternating Taylor term using interval division by exact small integers.
@@ -1031,8 +1091,14 @@ mod tests {
         assert_eq!(zero.checked_sin().unwrap(), zero);
         assert_eq!(zero.checked_cos().unwrap(), Interval::point(1.0).unwrap());
 
+        let half_pi = half_pi_enclosure().expect("Machin series should enclose pi/2");
+        assert!(half_pi.contains(std::f64::consts::FRAC_PI_2));
+        assert!(half_pi.upper() - half_pi.lower() < 1e-12);
+
         let edge_sine = Interval::point(2.0).unwrap().checked_sin().unwrap();
         assert!(edge_sine.contains(0.9092974268256817));
+        assert!(edge_sine.upper() < 0.95);
+        assert!(edge_sine.upper() - edge_sine.lower() < 1e-12);
 
         let edge_cosine = Interval::point(2.0).unwrap().checked_cos().unwrap();
         assert!(edge_cosine.contains(-0.4161468365471424));
@@ -1048,7 +1114,9 @@ mod tests {
 
         let outer_positive = interval(1.6, 1.8).checked_sin().unwrap();
         assert!(outer_positive.lower() > 0.9);
-        assert_eq!(outer_positive.upper(), 1.0);
+        assert!(outer_positive.upper() < 1.0);
+        let crosses_maximum = interval(1.55, 1.6).checked_sin().unwrap();
+        assert_eq!(crosses_maximum.upper(), 1.0);
         let cosine_outer = interval(1.6, 2.0).checked_cos().unwrap();
         assert!(cosine_outer.lower() > -0.5);
         assert!(cosine_outer.upper() < 0.0);
