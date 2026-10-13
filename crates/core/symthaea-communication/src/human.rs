@@ -306,6 +306,7 @@ impl HumanCommunicationProvider for LocalJsonlProvider {
         &mut self,
         observation: &SignalObservation,
     ) -> Result<Vec<LanguageCandidate>, String> {
+        observation.validate_identity().map_err(|error| error.to_string())?;
         let request_id = self.request_id();
         match self.send(&HumanProviderRequest::IdentifyLanguage {
             request_id,
@@ -317,6 +318,7 @@ impl HumanCommunicationProvider for LocalJsonlProvider {
     }
 
     fn transcribe(&mut self, observation: &SignalObservation) -> Result<PreservedText, String> {
+        observation.validate_identity().map_err(|error| error.to_string())?;
         let request_id = self.request_id();
         match self.send(&HumanProviderRequest::Transcribe {
             request_id,
@@ -355,6 +357,7 @@ impl HumanCommunicationProvider for LocalJsonlProvider {
         observation: &SignalObservation,
         target_language: &str,
     ) -> Result<PreservedText, String> {
+        observation.validate_identity().map_err(|error| error.to_string())?;
         let request_id = self.request_id();
         match self.send(&HumanProviderRequest::TranslateSpeech {
             request_id,
