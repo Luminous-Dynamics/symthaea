@@ -1106,9 +1106,11 @@ impl TemporalConsciousnessAnalyzer {
         let husserlian_measured = self.husserlian.primal_impression.is_some();
         let binding_measured = !self.binding.bindings.is_empty();
 
+        let identity_fully_measured = self.identity_coherence.alignment_coverage() == 3;
         let measured_failure = (trajectory_measured && !self.phi_trajectory.is_healthy())
             || (continuity_measured && !self.continuity.is_continuous())
             || self.identity_coherence.has_low_measured_alignment()
+            || (identity_fully_measured && !self.identity_coherence.is_coherent())
             || (husserlian_measured && self.husserlian.coherence() <= 0.6)
             || (binding_measured && !self.binding.is_unified());
 
@@ -1617,6 +1619,25 @@ mod tests {
         assert_eq!(qualified.trajectory_sample_count, 3);
         assert!(qualified.trajectory_evidence_sufficient);
         assert!(qualified.overall_evidence_coverage > pending.overall_evidence_coverage);
+    }
+
+    #[test]
+    fn fully_measured_low_identity_score_is_unhealthy() {
+        let mut analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        let identity = &mut analyzer.identity_coherence;
+        identity.past_present_alignment_available = true;
+        identity.present_future_alignment_available = true;
+        identity.past_future_alignment_available = true;
+        identity.past_present_alignment = 0.55;
+        identity.present_future_alignment = 0.55;
+        identity.past_future_alignment = 0.55;
+        identity.coherence = 0.55;
+
+        assert_eq!(
+            analyzer.health_status(),
+            TemporalHealthStatus::Unhealthy
+        );
     }
 
     #[test]
