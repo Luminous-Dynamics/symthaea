@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Small, fail-closed interval arithmetic for certified numerical work.
+//! Small, fail-closed interval arithmetic for conservative numerical enclosures.
 //!
 //! Arithmetic outputs are widened one representable f64 step outward. This is
 //! not a claim that arbitrary libm functions are correctly rounded; functions
