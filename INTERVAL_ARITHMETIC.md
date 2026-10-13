@@ -115,9 +115,11 @@ operator, division-by-zero ranges, overflow, underflow, unbounded indeterminate
 quotients, square-root/logarithm domains, logarithm enclosure over subnormal,
 normal, near-one and extreme finite inputs, exponential enclosure from subnormal
 underflow through large finite inputs, trigonometric series across [-2, 2],
-quadrant reduction at moderate and large finite magnitudes, broad fallback for
-ambiguous or extreme inputs, and a deterministic interval-grid probe across sine
-critical-point bands and cosine's maximum. Integer
+quadrant reduction at moderate and large finite magnitudes, rejection of
+half-integer quadrant-boundary ambiguity, fixed high-precision reference brackets
+through magnitude 1e9, broad fallback for ambiguous/extreme inputs, and a
+deterministic interval-grid probe across sine critical-point bands and cosine's
+maximum. Integer
 power domains and a deterministic grid of small integer intervals remain covered. Expression tests
 cover polynomial enclosure, square-root/logarithm/exponential/sine/cosine
 enclosures, finite sums, integer exponent requirements, and division-domain
