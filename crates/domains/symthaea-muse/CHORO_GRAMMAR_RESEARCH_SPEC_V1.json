@@ -255,5 +255,17 @@
       "no third-party corpus data or musical excerpts are used",
       "commercial corpus use still requires appropriate rights clearance"
     ]
+  },
+  "alternative_source_intake": {
+    "path": "crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json",
+    "schema": "muse-choro-source-intake-v1",
+    "source_records": 4,
+    "records_rights_cleared": 0,
+    "records_pending_rights_review": 4,
+    "files_downloaded": 0,
+    "score_content_transcribed": 0,
+    "empirical_analysis_performed": 0,
+    "status": "metadata_only_candidate_inventory_not_rights_cleared",
+    "note": "Per-work source leads only. No score data is copied or analyzed; commercial or empirical use remains gated on an appropriate rights review."
   }
 }

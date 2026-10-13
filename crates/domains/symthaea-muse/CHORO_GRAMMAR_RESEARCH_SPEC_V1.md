@@ -34,3 +34,10 @@ Passing the research contract does not itself create a composer route or justify
 
 
 The synthetic harness is run by `scripts/muse_choro_synthetic_harness.py --check` and tested by `tests/python/test_muse_choro_synthetic_harness.py`. Its report is explicitly labelled non-empirical; no corpus rows, audio or transcriptions are used.
+
+
+## Rights-aware source intake: individual scores, not bulk corpus ingestion
+
+The separate [Choro source-intake inventory](CHORO_SOURCE_INTAKE_V1.json) records four metadata-only source leads: an IMSLP score of José Mauricio Braga's *Chorinho* (ca. 1918) labeled Public Domain; Davi Rocha's contemporary *Choro mineiro* score labeled CC BY 4.0; Rocha's *Choros Songbook* collection of 14 works labeled CC BY 4.0; and *Chóra, chóra, choradô*, listed as *Samba Rio-Grandense*, retained only as a possible boundary/control item.
+
+**None is rights-cleared in this inventory.** These catalog pages are research leads, not legal opinions. Rights in the composition, score edition, digitization, performance recording, lyrics and annotations may differ. Verify the exact source file, attribution/license, territorial scope and intended use before acquisition, transcription or analysis. The historical piano score and contemporary single-composer collection are not representative samples by themselves. The inventory confirms zero downloads, zero transcriptions, and zero empirical analysis.

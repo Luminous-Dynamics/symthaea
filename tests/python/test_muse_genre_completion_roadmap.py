@@ -49,6 +49,20 @@ class GenreCompletionRoadmapTests(unittest.TestCase):
   self.assertTrue(all(h.get("operationalization") and h.get("falsification_or_no_pass") and h.get("null_model") is not None for h in hs if h["state"]=="proposed_falsifiable_hypothesis_not_tested"))
   self.assertTrue(any("held-out-by-composition" in x for x in spec["route_promotion_gates"]))
   self.assertTrue(any("knowledgeable Choro" in x for x in spec["route_promotion_gates"]))
+ def test_choro_source_intake_is_metadata_only_and_per_work_rights_gated(self):
+  path=ROOT/"crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json"
+  intake=json.loads(path.read_text(encoding="utf-8"))
+  self.assertEqual(intake["schema"],"muse-choro-source-intake-v1")
+  summary=intake["summary"]; self.assertEqual(summary["source_records"],4)
+  self.assertEqual(summary["records_rights_cleared"],0); self.assertEqual(summary["records_pending_rights_review"],4)
+  self.assertEqual(summary["files_downloaded"],0); self.assertEqual(summary["score_content_transcribed"],0); self.assertEqual(summary["empirical_analysis_performed"],0)
+  self.assertEqual(len(intake["sources"]),4)
+  self.assertTrue(all(s["status"]=="candidate_not_rights_cleared" and s["commercial_use_status"]=="not_approved" and s["source_url"].startswith("https://") and s["unresolved"] for s in intake["sources"]))
+  self.assertTrue(any("Samba Rio-Grandense" in s["title"] and "boundary" in s["scope"] for s in intake["sources"]))
+  self.assertTrue(all(any("rights" in gate.lower() or "license" in gate.lower() for gate in intake["global_gates"]) for _ in [0]))
+  spec=json.loads((ROOT/"crates/domains/symthaea-muse/CHORO_GRAMMAR_RESEARCH_SPEC_V1.json").read_text(encoding="utf-8"))
+  self.assertEqual(spec["alternative_source_intake"]["records_rights_cleared"],0)
+  self.assertEqual(spec["alternative_source_intake"]["path"],"crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json")
  def test_focus_parser_fails_closed_on_missing_entry(self):
   s=(ROOT/"crates/domains/symthaea-muse-protocol/src/catalog.rs").read_text(encoding="utf-8"); self.assertEqual(len(parse_grammar_foci(s,160)),160); s=s.replace('        "South African bubblegum pop song",\n',"",1)
   with self.assertRaisesRegex(CoverageError,"cardinality mismatch|does not match"): parse_grammar_foci(s,160)

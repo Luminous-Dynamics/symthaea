@@ -74,3 +74,7 @@ The only work committed now is the research specification and its integrity test
 ## Choro synthetic harness boundary
 
 The Choro pilot now has a deterministic source-data-free harness for metric direction. It checks a synthetic phrase-alignment fixture against a counterexample and balanced circular shifts, conditional transition entropy on an authored cycle vs. a seeded shuffle with identical symbol counts, and a synthetic temporal trend vs. its reversal. These are code-path/metric sanity checks only—not empirical Choro results. The harness emits `source_data_used=false`, `corpus_data_ingested=false`, `empirical_results=null` and must not be cited as evidence of style fidelity.
+
+## Rights-aware Choro source intake
+
+The Choro pilot now lists four individual score records as metadata-only candidates instead of assuming the 295-piece non-commercial corpus is commercially usable. The candidates include a score page labeled Public Domain, contemporary composer-published scores labeled CC BY 4.0, and a possible Samba boundary/control example. Every item is still marked `candidate_not_rights_cleared`; no PDF or score content was downloaded or transcribed. Per-work licensing, territorial rights, and representativeness must be checked before any use. See `CHORO_SOURCE_INTAKE_V1.json`.
