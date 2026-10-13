@@ -38,6 +38,35 @@ A snapshot checked on **2026-10-12** narrows the initial adapter plan:
 
 These Common Voice snapshots can exercise ingestion, decoding, tokenizer/G2P wiring, and a few reproducible smoke cases. Their tiny validated/test partitions are **not sufficient evidence of robust ASR, dialect coverage, voice quality, or synthesis capability**. Do not train or promote a model based on these clip counts alone. The next responsible step is to pin permitted artefacts and metadata, build a language-aware pipeline smoke test, then gather additional consented/licensed audio and a held-out-speaker evaluation set with language-community input. The registry intentionally keeps Afrikaans, isiZulu, and isiXhosa unverified; the existence of these datasets does not alter that status.
 
+### First runnable dataset-intake gate: Afrikaans ASR
+
+The first additional-language *pipeline smoke target* is **Afrikaans** (`af`). This is a prioritization choice for a locally relevant Latin-script language and an available public ASR dataset, not a claim that Afrikaans is already supported or that this corpus has sufficient quality for production. Mozilla announced Common Voice Scripted Speech v27.0 on **September 18, 2026**, covering 295 languages overall; that global figure is not a per-language coverage metric ([release announcement](https://discourse.mozilla.org/t/common-voice-scripted-speech-v27-0-and-spontaneous-speech-v5-0-released/149490)). The current dataset index lists Afrikaans as a CC0-1.0 ASR corpus; use the exact locale page and release metadata, not just the index, when pinning a run ([Mozilla Data Collective datasets](https://mozilladatacollective.com/datasets)).
+
+I added `scripts/voice_dataset_intake.py` and its dependency-free tests in `scripts/test_voice_dataset_intake.py`, and wired the tests into CI. The tool:
+
+- Requires a language tag, exact dataset release and ID, source page URL, an operator-supplied licence identifier, an archive digest, and explicit acknowledgment of Common Voice's no-speaker-identification and no-rehosting/redistribution restrictions.
+- Audits `train.tsv`, `dev.tsv`, and `test.tsv` for required columns, nonempty text, duplicate clip paths, safe relative paths, nonempty referenced audio files, and stable metadata SHA-256 digests. It rejects symbolic-link dataset roots/audio roots/files and an empty or symlinked archive.
+- Reports only aggregate row/speaker counts and pairwise speaker-overlap counts; it does not print speaker tokens, transcripts or per-clip paths. The hashed Common Voice `client_id` is used only for overlap detection, never for attempting identification.
+- Has two explicitly different modes: `ingestion-smoke` checks whether the local dataset is structurally usable but never claims ASR quality; `heldout-evaluation` additionally requires pseudonymous speaker IDs on all rows, zero cross-split speaker overlap, at least 100 test clips, and at least 10 test speakers. These are a basic exploratory-data floor, not a statistically validated or production-release threshold.
+
+Example command after the corpus is acquired lawfully and extracted into a local directory (set the exact dataset ID/URL from its page; keep the output under a private directory):
+
+```sh
+python3 scripts/voice_dataset_intake.py \\
+  --dataset-root "$CV_ROOT/af" \\
+  --archive "$CV_ARCHIVE" \\
+  --locale af \\
+  --dataset-version cv-corpus-27.0-2026-09-11 \\
+  --dataset-id "$CV_DATASET_ID" \\
+  --source-url "$CV_SOURCE_URL" \\
+  --license-id CC0-1.0 \\
+  --acknowledge-usage-restrictions \\
+  --mode ingestion-smoke \\
+  --report "$PRIVATE_DIR/af-dataset-intake.json"
+```
+
+The example was **not executed** here: no Common Voice archive or licensed audio was downloaded into the repository. The report pins the supplied archive digest and each split-metadata digest, but the operator must still verify the exact source-page metadata and local dataset provenance. When creating a speaker-disjoint evaluation partition, preserve only the dataset's provided pseudonymous IDs for assignment; do not infer real identity, and do not publish the audio or metadata export. This dataset gate is a prerequisite to an ASR adapter experiment, not the adapter experiment itself.
+
 ## Can she produce click consonants?
 
 **Not through the current custom singing path, and not reliably in the current DiffSinger bridge.** The five core click place symbols in the IPA are `ʘ` (bilabial), `ǀ` (dental), `ǃ` (post-alveolar), `ǂ` (palatoalveolar), and `ǁ` (alveolar lateral). These are non-pulmonic, velaric-ingressive articulations with a different pressure/closure/release mechanism from ordinary English stop consonants. See the [International Phonetic Association chart](https://www.internationalphoneticassociation.org/IPAcharts/IPA_charts_EI/IPA_charts_EI.html) and [University of Newcastle IPA consonants guide](https://teaching.ncl.ac.uk/ipa/consonants-non-pulmonic.html).
