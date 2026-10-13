@@ -208,17 +208,18 @@ pub enum ActionOutput {
 /// Clone, or Debug; cancelling the execute future yields no result and does
 /// not implicitly persist a receipt.
 pub struct ActionExecution {
-    pub receipt: ActionReceipt,
-    /// Convenience mirror of the safe outcome class.
-    pub outcome: ActionOutcome,
+    receipt: ActionReceipt,
     /// Immediate caller output; may contain sensitive page content.
     pub output: ActionOutput,
-    /// Convenience mirror of the safe elapsed time.
-    pub elapsed_ms: u128,
     diagnostic: Option<String>,
 }
 
 impl ActionExecution {
+    /// Read-only access to the safe audit receipt.
+    pub fn receipt(&self) -> &ActionReceipt {
+        &self.receipt
+    }
+
     pub fn succeeded(&self) -> bool {
         self.receipt.succeeded()
     }
@@ -262,8 +263,6 @@ fn build_execution(
         elapsed_ms,
     };
     ActionExecution {
-        outcome: receipt.outcome,
-        elapsed_ms: receipt.elapsed_ms,
         receipt,
         output,
         diagnostic,

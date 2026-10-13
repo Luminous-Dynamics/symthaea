@@ -45,17 +45,18 @@ async fn main() -> Result<()> {
 
     for (name, route) in routes {
         let url = format!("http://localhost:8107{route}");
-        let receipt = executor
+        let execution = executor
             .execute(BrowserAction::Navigate { url: url.clone() })
             .await;
         println!(
             "[→] {name}: {:?} ({} ms)",
-            receipt.outcome, receipt.elapsed_ms
+            execution.receipt().outcome,
+            execution.receipt().elapsed_ms
         );
         ensure!(
-            receipt.succeeded(),
+            execution.succeeded(),
             "navigation to {url} failed: {:?}",
-            receipt.outcome
+            execution.receipt().outcome
         );
 
         let observation = executor.observe().await?;
