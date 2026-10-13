@@ -12,11 +12,12 @@ and runtime metadata go to stderr.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
-import re
 import sys
+from pathlib import Path
 from typing import Any
 
 PROTOCOL_VERSION = 1
@@ -217,13 +218,55 @@ def validate_local_model_snapshot(model_dir: str) -> str:
     return root
 
 
-def load_runtime(model_dir: str, device_choice: str, dtype_choice: str) -> tuple[Any, Any, Any, Any, str, Any, dict[str, str]]:
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def hash_local_model_snapshot(model_dir: str) -> tuple[str, int, int]:
+    """Match the scorer's SHA-256 manifest format for the exact startup snapshot."""
+    root = Path(model_dir)
+    entries: list[dict[str, Any]] = []
+    total_bytes = 0
+    for current, directories, files in os.walk(root, topdown=True, followlinks=False):
+        current_path = Path(current)
+        directories.sort()
+        for dirname in directories:
+            candidate = current_path / dirname
+            if candidate.is_symlink():
+                raise ValueError("model snapshot changed to contain a symlinked directory")
+        for filename in sorted(files):
+            candidate = current_path / filename
+            if candidate.is_symlink() or not candidate.is_file():
+                raise ValueError("model snapshot changed to contain a symlink or non-regular file")
+            size = candidate.stat().st_size
+            entries.append({
+                "path": candidate.relative_to(root).as_posix(),
+                "size_bytes": size,
+                "sha256": sha256_file(candidate),
+            })
+            total_bytes += size
+    if not entries:
+        raise ValueError("model snapshot contains no regular files")
+    canonical = json.dumps(entries, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest(), len(entries), total_bytes
+
+
+def load_runtime(model_dir: str, device_choice: str, dtype_choice: str) -> tuple[Any, Any, Any, Any, str, Any, dict[str, Any]]:
     # Set offline flags before importing libraries which may consult the Hub.
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
     os.environ["HF_DATASETS_OFFLINE"] = "1"
 
     model_dir = validate_local_model_snapshot(model_dir)
+    model_snapshot_sha256, model_file_count, model_bytes = hash_local_model_snapshot(model_dir)
+    worker_script = Path(__file__).resolve(strict=True)
+    python_executable = Path(sys.executable).resolve(strict=True)
+    worker_script_sha256 = sha256_file(worker_script)
+    python_executable_sha256 = sha256_file(python_executable)
 
     import numpy as np
     import torch
@@ -265,7 +308,12 @@ def load_runtime(model_dir: str, device_choice: str, dtype_choice: str) -> tuple
         "numpy_version": str(np.__version__),
         "device": device,
         "dtype": dtype_name,
-        "offline": "true",
+        "offline": True,
+        "model_snapshot_manifest_sha256": model_snapshot_sha256,
+        "model_snapshot_file_count": model_file_count,
+        "model_snapshot_bytes": model_bytes,
+        "python_executable_sha256": python_executable_sha256,
+        "worker_script_sha256": worker_script_sha256,
     }
     return processor, model, torch, np, device, dtype, metadata
 
