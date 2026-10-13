@@ -1348,7 +1348,7 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ║     TEMPORAL CONSCIOUSNESS REPORT (#75) - Consciousness Through Time     ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ OVERALL TEMPORAL COHERENCE: {:.1}%                                       ║
-║ STATUS: {:<24}                                                  ║
+║ STATUS: {:<24}                                                           ║
 ║ EVIDENCE COVERAGE:          {:.1}%                                       ║
 ║ Φ SAMPLES:                  {}/{} (minimum {}) {}                       ║
 ╠══════════════════════════════════════════════════════════════════════════╣
