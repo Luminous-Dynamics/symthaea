@@ -55,7 +55,8 @@ not a machine-checked theorem about every target compiler or processor.
 
 Square root is supported using Rust's documented IEEE-754 correctly rounded
 `f64::sqrt` result, then stepping one representable value outward for each
-nonzero endpoint. See the [Rust `f64::sqrt` contract](https://doc.rust-lang.org/std/primitive.f64.html#method.sqrt).
+nonzero endpoint. See the [Rust `f64::sqrt` contract](
+https://doc.rust-lang.org/std/primitive.f64.html#method.sqrt).
 Zero is retained exactly, and any interval including negative reals is rejected.
 
 Natural logarithm does not use the platform `f64::ln` result to form a bound.
