@@ -579,9 +579,12 @@ impl ConsciousnessContinuity {
         }
     }
 
-    /// Check if consciousness is continuous
+    /// Check if consciousness continuity is measured and meets its threshold.
+    ///
+    /// A single state is not evidence of continuity; require at least one
+    /// pairwise transition before returning true.
     pub fn is_continuous(&self) -> bool {
-        self.score > 0.7 && self.discontinuities.is_empty()
+        self.recent_states.len() >= 2 && self.score > 0.7 && self.discontinuities.is_empty()
     }
 }
 
@@ -966,9 +969,11 @@ impl TemporalBindingAnalysis {
         self.gamma_sync = self.binding_strength * 0.8 + 0.2;
     }
 
-    /// Check if all components are bound within binding window
+    /// Check if measured bindings satisfy the unification thresholds.
+    ///
+    /// An empty binding set is insufficient evidence, not a unified system.
     pub fn is_unified(&self) -> bool {
-        self.binding_strength > 0.7 && self.gamma_sync > 0.6
+        !self.bindings.is_empty() && self.binding_strength > 0.7 && self.gamma_sync > 0.6
     }
 }
 
@@ -1354,9 +1359,11 @@ impl TemporalConsciousnessAnalyzer {
             }
         }
 
-        if !self.continuity.is_continuous() {
+        if self.continuity.recent_states.len() < 2 {
+            recs.push("Continuity evidence pending: observe at least two states".to_string());
+        } else if !self.continuity.is_continuous() {
             recs.push(format!(
-                "Consciousness continuity at {:.1}% - reduce context switching",
+                "Consciousness continuity at {:.1}% - inspect state transitions and discontinuity events",
                 self.continuity.score * 100.0
             ));
         }
@@ -1388,7 +1395,9 @@ impl TemporalConsciousnessAnalyzer {
             recs.push("Limited temporal horizon - expand retention and protention".to_string());
         }
 
-        if !self.binding.is_unified() {
+        if self.binding.bindings.is_empty() {
+            recs.push("Temporal binding evidence pending: no bindings recorded".to_string());
+        } else if !self.binding.is_unified() {
             recs.push(
                 "Weak temporal binding - strengthen cross-component synchronization".to_string(),
             );
@@ -2000,6 +2009,19 @@ mod tests {
     }
 
     #[test]
+    fn continuity_predicate_requires_at_least_two_states() {
+        let mut continuity = ConsciousnessContinuity::new(10, 0.5);
+        assert!(!continuity.is_continuous());
+
+        let state = BinaryHV::random(4001);
+        continuity.observe(&state, 0.5, 0.5);
+        assert!(!continuity.is_continuous());
+
+        continuity.observe(&state, 0.5, 0.5);
+        assert!(continuity.is_continuous());
+    }
+
+    #[test]
     fn test_continuity_detection() {
         let mut continuity = ConsciousnessContinuity::new(10, 0.5);
 
@@ -2140,6 +2162,24 @@ mod tests {
         assert!(report.overall_coherence >= 0.0);
 
         println!("{}", report);
+    }
+
+    #[test]
+    fn binding_predicate_requires_at_least_one_binding() {
+        let mut binding = TemporalBindingAnalysis::new();
+        assert!(!binding.is_unified());
+
+        binding.add_binding("perception", "memory", AllenRelation::Overlaps, 0.9);
+        assert!(binding.is_unified());
+    }
+
+    #[test]
+    fn empty_analyzer_recommends_more_continuity_and_binding_evidence() {
+        let analyzer = TemporalConsciousnessAnalyzer::default_config();
+        let recommendations = analyzer.generate_recommendations();
+        assert!(recommendations.iter().any(|r| r.contains("Continuity evidence pending")));
+        assert!(recommendations.iter().any(|r| r.contains("Temporal binding evidence pending")));
+        assert!(!recommendations.iter().any(|r| r.contains("Temporal consciousness is healthy")));
     }
 
     #[test]
