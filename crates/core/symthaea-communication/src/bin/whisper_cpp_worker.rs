@@ -96,6 +96,16 @@ fn make_temporary_run(root: &Path) -> Result<TemporaryRun, String> {
                     let _ = fs::remove_dir_all(&resolved);
                     return Err("temporary run directory escaped scratch_dir".into());
                 }
+                // The scratch parent is owner-only, but also make the per-request
+                // directory owner-only so its privacy does not depend on umask.
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Err(error) = fs::set_permissions(&resolved, fs::Permissions::from_mode(0o700)) {
+                        let _ = fs::remove_dir_all(&resolved);
+                        return Err(format!("cannot restrict temporary run directory: {error}"));
+                    }
+                }
                 return Ok(TemporaryRun { path: resolved });
             }
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
@@ -148,7 +158,11 @@ fn write_pcm16_wav(path: &Path, sample_rate: u32, samples: &[f32]) -> Result<(),
     let mut writer =
         WavWriter::create(path, spec).map_err(|error| format!("cannot create temporary WAV: {error}"))?;
     for sample in samples {
-        let quantized = (*sample * i16::MAX as f32).round() as i16;
+        let quantized = if *sample <= -1.0 {
+            i16::MIN
+        } else {
+            (*sample * i16::MAX as f32).round() as i16
+        };
         writer
             .write_sample(quantized)
             .map_err(|error| format!("cannot write temporary WAV: {error}"))?;
@@ -414,6 +428,31 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn temporary_run_is_owner_only_and_confined_to_scratch_dir() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = TestDirectory::new();
+        let scratch = directory.path.join("scratch");
+        fs::create_dir(&scratch).unwrap();
+        fs::set_permissions(&scratch, fs::Permissions::from_mode(0o700)).unwrap();
+        let run = make_temporary_run(&scratch).unwrap();
+        assert!(run.path.starts_with(scratch.canonicalize().unwrap()));
+        assert_ne!(run.path, scratch.canonicalize().unwrap());
+        assert_eq!(fs::metadata(&run.path).unwrap().permissions().mode() & 0o777, 0o700);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn temporary_run_rejects_symlinked_scratch_root() {
+        let directory = TestDirectory::new();
+        let scratch = directory.path.join("scratch");
+        fs::create_dir(&scratch).unwrap();
+        let alias = directory.path.join("scratch-link");
+        std::os::unix::fs::symlink(&scratch, &alias).unwrap();
+        assert!(make_temporary_run(&alias).unwrap_err().contains("not a symlink"));
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn pcm_writer_emits_mono_16_bit_pcm_with_expected_rate() {
         let directory = TestDirectory::new();
         let wav = directory.path.join("roundtrip.wav");
@@ -425,7 +464,7 @@ mod tests {
         assert_eq!(spec.bits_per_sample, 16);
         assert_eq!(spec.sample_format, SampleFormat::Int);
         let values = reader.samples::<i16>().collect::<Result<Vec<_>, _>>().unwrap();
-        assert_eq!(values, vec![-32_767, 0, i16::MAX]);
+        assert_eq!(values, vec![i16::MIN, 0, i16::MAX]);
     }
 
     #[cfg(unix)]
