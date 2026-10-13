@@ -8,7 +8,7 @@
 
 Use one transport-neutral telemetry contract across energy, water, agriculture, infrastructure and spacecraft-health domains. Keep each domain's physical meaning and admissible action policy separate. The shared layer handles delivery semantics, time integrity, quality/freshness and retry behavior; it must not equate transport success with truth.
 
-This follows the core idea of delay-tolerant networking rather than inventing a satellite protocol. IETF RFC 9171 specifies Bundle Protocol Version 7 for store-carry-forward environments with intermittent connectivity, delay and error-prone links. The prototype here is intentionally smaller than BPv7 and must not be described as a BPv7 implementation: https://www.rfc-editor.org/rfc/rfc9171.html
+This follows the core idea of delay-tolerant networking rather than inventing a satellite protocol. IETF RFC 9171 specifies Bundle Protocol Version 7 for store-carry-forward environments with intermittent connectivity, delay and error-prone links. BPv7 should be implemented against its current update set: RFC 9713 clarifies the Bundle Administrative Record Types registry; RFC 9758 updates `ipn` endpoint-identifier rules and encodings. The prototype here is intentionally smaller than BPv7 and must not be described as a BPv7 implementation. References: https://www.rfc-editor.org/rfc/rfc9171.html, https://www.rfc-editor.org/rfc/rfc9713.html, https://www.rfc-editor.org/rfc/rfc9758.html.
 
 For actual spacecraft packet interoperability, select a mission-appropriate CCSDS profile instead of assuming an ordinary Internet IoT envelope is a space-link packet: https://ccsds.org/publications/bluebooks/
 
@@ -75,7 +75,7 @@ The new DurablePrivacyLedger transactionally reserves cumulative epsilon/delta b
 
 ## Reference standards and research anchors
 
-- **IETF RFC 9171 — Bundle Protocol Version 7:** store-carry-forward networking for stressed and intermittently connected paths. Use the existing standard where appropriate instead of treating this policy prototype as a new transport standard: https://www.rfc-editor.org/rfc/rfc9171.html
+- **IETF RFC 9171 + updates RFC 9713 and RFC 9758:** BPv7 store-carry-forward networking, administrative-record registry semantics, and current `ipn` endpoint identifier encoding. Keep this application-level prototype distinct from a BPv7 transport implementation: https://www.rfc-editor.org/rfc/rfc9171.html, https://www.rfc-editor.org/rfc/rfc9713.html, https://www.rfc-editor.org/rfc/rfc9758.html
 - **NIST IR 8259A — IoT Device Cybersecurity Capability Core Baseline:** useful device and data security capabilities, including the separation between device identity, data protection, access control and security-state awareness: https://csrc.nist.gov/pubs/ir/8259/a/final
 - **CCSDS Blue Books — recommended space communication standards:** select space-packet, encapsulation and link procedures based on mission requirements: https://ccsds.org/publications/bluebooks/
 
