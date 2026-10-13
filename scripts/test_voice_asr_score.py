@@ -137,6 +137,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertEqual(report["model"]["snapshot_file_count"], 1)
         self.assertEqual(report["mode"], "smoke")
         self.assertIn("exploratory smoke metric only", report["interpretation"])
+        self.assertEqual(report["training_data_overlap_status"], "not_assessed")
 
     def test_aggregate_report_contains_no_transcripts_paths_or_speaker_tokens(self):
         report = self.score()
@@ -232,7 +233,8 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self._write_predictions()
         report = self.score(mode="heldout-evaluation",bootstrap_iterations=100)
         self.assertEqual(report["metrics"]["sample_count"],100)
-        self.assertIn("not by themselves a production-support claim",report["interpretation"])
+        self.assertIn("model-training corpus overlap is not assessed",report["interpretation"])
+        self.assertEqual(report["training_data_overlap_status"], "not_assessed")
 
     def test_report_writer_refuses_overwrite(self):
         report = self.score()
