@@ -39,7 +39,7 @@ This is a reasoned local persistence configuration, not proof against all hardwa
 ## Security boundaries that remain outside the prototype
 
 1. **Authenticity:** the queue validates shapes and state only. The network adapter must authenticate the sender and bind a canonical envelope (including the metadata, digest, expiry and policy/version context) to a vetted signature or MAC.
-2. **ACK authenticity:** a digest match is not a proof that the authorized receiver acknowledged delivery. ACKs need authenticated identity, replay protection and receiver-side idempotency.
+2. **ACK authenticity:** protected queue records must use `acknowledge_protected`, which verifies a canonical Ed25519 receiver-signed positive ACK against an explicitly supplied trusted-key map. The legacy unsigned ACK path refuses protected records. The signature proves the mapped key-holder asserted acceptance; a receiver-side durable deduplication/commit-before-ACK transaction is still needed to establish the delivery contract.
 3. **Payload protection:** the protected API persists AEAD-encrypted envelope bytes, validates their SHA-256 digest/size binding, and replays the exact bytes. The queue itself does not encrypt or verify signatures; the caller must use the envelope adapter and the receiver must verify. The database is not encrypted by this module, so event metadata remains readable at rest.
 4. **Schema migration:** schema migration advances version 1/2 to version 3 with PRAGMA user_version and adds an optional `envelope_bytes` BLOB; unsupported future versions fail closed. Future changes need versioned, transactional migrations and downgrade/upgrade tests.
 5. **Privacy budgeting:** delivery retries must not double-charge a retransmission of an identical private release. The separate DP accountant must transactionally reserve unique release identity, participant contribution bounds, mechanism, adjacency definition, and cumulative privacy spend. It is still a separate, not-yet-production component.
@@ -47,7 +47,7 @@ This is a reasoned local persistence configuration, not proof against all hardwa
 
 ## Test plan added
 
-The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files, test-only keys and synthetic event metadata. Twenty-eight deterministic tests are added; they cover:
+The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files, test-only keys and synthetic event metadata. Thirty-one deterministic tests are added; they cover:
 - enqueue and pending-byte recovery after creating a fresh process-like queue instance;
 - re-transmission after restart and persisted attempt counts;
 - ACK and duplicate ACK behavior across queue instances;
@@ -56,9 +56,10 @@ The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses
 - queue byte budget and total-row fail-closed limits;
 - concurrent duplicate enqueues, concurrent byte-capacity enforcement and concurrent idempotent ACKs;
 - invalid inputs and SQLite integrity_check;
-- protected envelope persistence/reopen, exact-byte retransmission, hash/size mismatch rejection and separation of metadata-only rows from protected-envelope delivery.
+- protected envelope persistence/reopen, exact-byte retransmission, hash/size mismatch rejection and separation of metadata-only rows from protected-envelope delivery;
+- requirement for receiver-signed ACKs on protected rows, rejection of forged/unknown/future-dated ACKs, and rejection of a signed ACK for the wrong envelope digest.
 
-The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 17 test cases covering AEAD/signature tampering, canonical encoding, key lookup and size bounds. These and the queue tests have been added to the dedicated GitHub Actions workflow. At the time this document was authored, the exact-head CI run was queued/pending; these tests are not declared passed until that specific run concludes successfully.
+The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 22 test cases covering AEAD/signature tampering, canonical encoding, key lookup, size bounds and receiver-signed ACK validation. These and the queue tests have been added to the dedicated GitHub Actions workflow. At the time this document was authored, the exact-head CI run was queued/pending; these tests are not declared passed until that specific run concludes successfully.
 
 ## Standards and security research
 
@@ -72,7 +73,7 @@ The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 17 tes
 - Execute the exact-head CI suite and preserve the successful run link and commit SHA.
 - Run multi-process contention and deterministic kill/reopen tests against a temporary DB; assert transaction atomicity for selected batch attempts and ACK transitions.
 - Test database full, read-only path, locked DB, malformed DB, unsupported schema version, backup and restore.
-- Add authenticated canonical message/ACK validation at the adapter boundary.
+- Implement the receiver-side durable acceptance and anti-replay transaction; verify it commits the accepted event before signing an ACK, and validate the trusted receiver-key registry.
 - Define and review a bounded terminal-record archive policy before field operation.
 - Benchmark CPU, flash write amplification, energy use and queue throughput on target edge hardware.
 - Keep event payloads out of Mycelix evidence records; pass only authorized, minimized receipts or aggregate envelopes.
