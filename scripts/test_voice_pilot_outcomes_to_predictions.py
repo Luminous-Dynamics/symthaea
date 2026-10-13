@@ -41,6 +41,8 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.artifact.write_bytes(b"synthetic converted weights")
         self.runtime_binary = self.base / "whisper-cli"
         self.runtime_binary.write_bytes(b"synthetic whisper executable")
+        self.runtime_worker = self.base / "voice_transformers_worker.py"
+        self.runtime_worker.write_text("# synthetic test worker\\n", encoding="utf-8")
         self.outcomes_path = self.base / "outcomes.jsonl"
         self.output = self.base / "private-predictions.json"
 
@@ -110,6 +112,52 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.assertEqual(doc["runtime"]["runtime_binary_sha256"],sha256_file(self.runtime_binary))
         self.assertEqual(doc["predictions"],[{"path":"nested/clip.mp3","text":"Môre"}])
         self.assertEqual(len(doc["outcomes_sha256"]),64)
+
+    def test_transformers_pack_pins_native_runtime_and_uses_exact_model_snapshot(self):
+        doc = self.build(
+            model_root=self.source_model_root,
+            source_model_root=self.source_model_root,
+            runtime_kind="transformers",
+            runtime_worker_path=self.runtime_worker,
+            runtime_commit=None,
+            converter_commit=None,
+            artifact_path=None,
+            quantization=None,
+            python_version="3.12.1",
+            torch_version="2.8.0",
+            transformers_version="4.56.0",
+            numpy_version="2.1.0",
+            device="cpu",
+            dtype="float32",
+        )
+        self.assertEqual(doc["runtime"]["kind"], "transformers")
+        self.assertEqual(doc["source_model_snapshot_sha256"], _hash_tree(self.source_model_root)[0])
+        self.assertEqual(doc["runtime"]["python_executable_sha256"], sha256_file(self.runtime_binary))
+        self.assertEqual(doc["runtime"]["worker_script_sha256"], sha256_file(self.runtime_worker))
+        self.assertEqual(doc["runtime"]["python_version"], "3.12.1")
+        self.assertTrue(doc["runtime"]["offline"])
+        self.assertNotIn("converter_commit", doc["runtime"])
+
+    def test_transformers_pack_rejects_symlinked_worker_script(self):
+        alias = self.base / "worker-link.py"
+        alias.symlink_to(self.runtime_worker)
+        with self.assertRaisesRegex(ValueError, "regular runtime_worker_path"):
+            self.build(
+                model_root=self.source_model_root,
+                source_model_root=self.source_model_root,
+                runtime_kind="transformers",
+                runtime_worker_path=alias,
+                runtime_commit=None,
+                converter_commit=None,
+                artifact_path=None,
+                quantization=None,
+                python_version="3.12.1",
+                torch_version="2.8.0",
+                transformers_version="4.56.0",
+                numpy_version="2.1.0",
+                device="cpu",
+                dtype="float32",
+            )
 
     def test_duplicate_keys_in_raw_outcomes_are_rejected(self):
         self.outcomes_path.write_text(
