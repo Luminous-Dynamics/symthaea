@@ -9,6 +9,7 @@
 //!
 //! The enclosure guarantee assumes ordinary IEEE-754 binary64 round-to-nearest
 //! operations and compilation without unsafe fast-math reassociation.
+//! See the repository-root INTERVAL_ARITHMETIC.md for the current scope and limits.
 
 use std::fmt;
 
