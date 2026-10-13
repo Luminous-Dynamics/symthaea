@@ -24,19 +24,19 @@ crate::hdc::interval_arithmetic::{Interval, IntervalError}.
   endpoint calculations.
 - Division fails with DivisionByIntervalContainingZero when the divisor might
   be zero. Indeterminate endpoint quotients widen to the whole real line.
-- square, checked_sqrt, checked_ln, checked_exp, absolute, and checked_powi
-  provide conservative range operations. Square root rejects any interval
-  containing negative reals and expands each nonzero endpoint outward by one
-  representable value. Natural logarithm rejects intervals containing
-  nonpositive reals and uses binary range reduction plus an atanh series with a
-  bounded remainder. Exponential uses reduction by an enclosed ln(2), an interval
-  Taylor series, and a bounded remainder; extreme ranges conservatively widen.
-  The integer-power path is logarithmic in the exponent and rejects zero-to-zero
-  and negative powers over intervals containing zero.
+- square, checked_sqrt, checked_ln, checked_exp, checked_sin, checked_cos,
+  absolute, and checked_powi provide conservative range operations. Square root
+  rejects intervals containing negative reals and expands nonzero endpoints
+  outward. Natural logarithm and exponential use interval series, range reduction,
+  and explicit remainder bounds. Sine/cosine use Taylor series only when the full
+  interval lies within [-1/2, 1/2]; elsewhere they return the always-sound but
+  coarse enclosure [-1, 1] until a validated argument-reduction path exists. The
+  integer-power path is logarithmic in the exponent and rejects zero-to-zero and
+  negative powers over intervals containing zero.
 - Expr::eval_interval evaluates symbolic arithmetic and finite sums over
   interval-valued variable bindings. It supports integer powers, square root,
-  natural logarithm, exponential, absolute value, floor, and finite sums with
-  the existing maximum bound of 100.
+  natural logarithm, exponential, sine/cosine, absolute value, floor, and finite
+  sums with the existing maximum bound of 100.
 
 Example:
 
@@ -90,10 +90,17 @@ an exactly represented normal or subnormal power of two. For inputs beyond the
 well-resolved reduction range it returns broad but conservative enclosures
 instead of relying on the platform exponential.
 
-The evaluator still does **not** claim interval bounds for sin or cos. Rust
-documents their precision as unspecified and potentially platform-dependent,
-so they remain `UnsupportedFunction` until separately reviewed enclosure
-algorithms are added.
+Sine and cosine now have a deliberately bounded contract. For a complete input
+interval inside [-1/2, 1/2], the implementation evaluates sine endpoint series
+through degree 19 and cosine endpoint series through degree 18, using interval
+arithmetic at every step. The degree-19 Taylor remainder is at most
+`(1/2)^20 / 20! < 2^-81`; the implementation adds the wider, exactly represented
+`2^-80` symmetric allowance. Monotonicity on this small interval determines the
+image range, with cosine's maximum set to exactly 1 when zero is included. For
+any interval extending outside [-1/2, 1/2]—including unbounded and very large
+arguments—the result is the conservative `[-1, 1]`. This intentionally sacrifices
+precision rather than implement unvalidated argument reduction. No platform
+`f64::sin` or `f64::cos` result is used to form an enclosure.
 
 A wider interval is conservative, not proof of a desired property. For example,
 an interval whose lower bound is negative does not prove the true result is
@@ -106,11 +113,12 @@ Unit tests cover invalid endpoints, outward enclosures for each arithmetic
 operator, division-by-zero ranges, overflow, underflow, unbounded indeterminate
 quotients, square-root/logarithm domains, logarithm enclosure over subnormal,
 normal, near-one and extreme finite inputs, exponential enclosure from subnormal
-underflow through large finite inputs, integer-power domains, and a deterministic
-grid of small integer intervals. Expression tests cover polynomial enclosure,
-square-root/logarithm/exponential enclosure and domain behavior, finite sums,
-integer exponent requirements, division-domain rejection, and fail-closed
-handling of unsupported trigonometric functions.
+underflow through large finite inputs, small-argument trigonometric series,
+conservative fallback for large/unbounded trigonometric inputs, integer-power
+domains, and a deterministic grid of small integer intervals. Expression tests
+cover polynomial enclosure, square-root/logarithm/exponential/sine/cosine
+enclosures, finite sums, integer exponent requirements, and division-domain
+rejection.
 
 These tests are regression evidence, not a proof of the implementation for every
 possible binary64 input. A separate deterministic Python translation cross-check
