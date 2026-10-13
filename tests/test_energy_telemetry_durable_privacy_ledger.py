@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 from tools.energy_telemetry.durable_privacy_ledger import (
+    MAX_COHORT_PARTICIPANTS,
     DurablePrivacyLedger,
     DurablePrivacyPolicyError,
     EventIdentityConflict,
@@ -379,6 +380,24 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
             self.ledger.committed_output(reservation.release_id)
 
+
+    def test_unbounded_participant_iterable_is_bounded_before_budget_write(self):
+        consumed = 0
+
+        def unbounded_participants():
+            nonlocal consumed
+            while True:
+                consumed += 1
+                yield f"generated-local-participant-{consumed}"
+
+        with self.assertRaisesRegex(
+            DurablePrivacyPolicyError,
+            f"exceeds hard maximum of {MAX_COHORT_PARTICIPANTS}",
+        ):
+            self.reserve(participants=unbounded_participants())
+
+        self.assertEqual(consumed, MAX_COHORT_PARTICIPANTS + 1)
+        self.assertEqual(self.ledger.reservation_count, 0)
 
 if __name__ == "__main__":
     unittest.main()
