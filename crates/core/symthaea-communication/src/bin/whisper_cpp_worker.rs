@@ -196,11 +196,16 @@ fn transcribe(args: &Args, model: &Path, whisper_cli: &Path, observation: &Signa
 
     let deadline = Instant::now() + Duration::from_secs(args.timeout_seconds);
     let status = loop {
-        if let Some(status) = child
-            .try_wait()
-            .map_err(|error| format!("cannot wait for whisper-cli: {error}"))?
-        {
-            break status;
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(error) => {
+                // Do not orphan a recognizer if polling itself fails. Wait after
+                // the best-effort kill so the child is reaped before returning.
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("cannot wait for whisper-cli: {error}"));
+            }
         }
         if Instant::now() >= deadline {
             let _ = child.kill();
