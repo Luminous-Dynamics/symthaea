@@ -161,8 +161,8 @@ impl Expr {
     /// Evaluate using interval inputs and outward-rounded arithmetic.
     ///
     /// The enclosure evaluator supports arithmetic, integer powers, square
-    /// root, absolute value, floor, and finite sums. Other transcendental
-    /// functions are rejected until reviewed range enclosures exist.
+    /// root, natural logarithm, absolute value, floor, and finite sums. Other
+    /// transcendental functions are rejected until reviewed enclosures exist.
     pub fn eval_interval(
         &self,
         vars: &[(&str, Interval)],
@@ -216,6 +216,7 @@ impl Expr {
                 let value = argument.eval_interval_in_environment(vars)?;
                 match function {
                     UnaryFn::Sqrt => Ok(value.checked_sqrt()?),
+                    UnaryFn::Log => Ok(value.checked_ln()?),
                     UnaryFn::Abs => Ok(value.absolute()),
                     UnaryFn::Floor => Ok(Interval::new(
                         value.lower().floor(),
@@ -1196,6 +1197,24 @@ mod domain_safe_simplification_tests {
             expression.eval_interval(&[("x", Interval::new(-1.0, 4.0).unwrap())]),
             Err(ExprIntervalError::Interval(
                 IntervalError::SquareRootOfNegativeInterval
+            ))
+        );
+    }
+
+    #[test]
+    fn interval_evaluation_encloses_natural_logarithm_and_checks_domain() {
+        let expression = Expr::Func(UnaryFn::Log, Box::new(Expr::Var("x".into())));
+        let result = expression
+            .eval_interval(&[("x", Interval::new(1.0, 4.0).unwrap())])
+            .unwrap();
+        assert!(result.lower() <= 0.0);
+        assert!(result.upper() >= 4.0_f64.ln());
+        assert!(result.contains(2.0_f64.ln()));
+
+        assert_eq!(
+            expression.eval_interval(&[("x", Interval::new(0.0, 4.0).unwrap())]),
+            Err(ExprIntervalError::Interval(
+                IntervalError::LogarithmOfNonPositiveInterval
             ))
         );
     }
