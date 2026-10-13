@@ -161,8 +161,9 @@ impl Expr {
     /// Evaluate using interval inputs and outward-rounded arithmetic.
     ///
     /// The enclosure evaluator supports arithmetic, integer powers, square
-    /// root, natural logarithm, exponential, absolute value, floor, and finite
-    /// sums. Trigonometric functions remain unsupported until reviewed bounds exist.
+    /// root, natural logarithm, exponential, bounded sine/cosine, absolute value,
+    /// floor, and finite sums. Sine/cosine use series on [-1/2, 1/2] and the
+    /// conservative [-1, 1] enclosure outside that range.
     pub fn eval_interval(
         &self,
         vars: &[(&str, Interval)],
@@ -218,6 +219,8 @@ impl Expr {
                     UnaryFn::Sqrt => Ok(value.checked_sqrt()?),
                     UnaryFn::Log => Ok(value.checked_ln()?),
                     UnaryFn::Exp => Ok(value.checked_exp()?),
+                    UnaryFn::Sin => Ok(value.checked_sin()?),
+                    UnaryFn::Cos => Ok(value.checked_cos()?),
                     UnaryFn::Abs => Ok(value.absolute()),
                     UnaryFn::Floor => Ok(Interval::new(
                         value.lower().floor(),
@@ -1238,11 +1241,29 @@ mod domain_safe_simplification_tests {
     }
 
     #[test]
-    fn interval_evaluation_fails_closed_for_unsupported_trigonometric_functions() {
-        let expression = Expr::Func(UnaryFn::Sin, Box::new(Expr::Var("x".into())));
+    fn interval_evaluation_encloses_bounded_sine_and_cosine() {
+        let sine = Expr::Func(UnaryFn::Sin, Box::new(Expr::Var("x".into())));
+        let cosine = Expr::Func(UnaryFn::Cos, Box::new(Expr::Var("x".into())));
+        let input = Interval::new(-0.5, 0.5).unwrap();
+
+        let sin_range = sine.eval_interval(&[("x", input)]).unwrap();
+        assert!(sin_range.lower() <= -0.47942553860420301);
+        assert!(sin_range.upper() >= 0.47942553860420301);
+
+        let cos_range = cosine.eval_interval(&[("x", input)]).unwrap();
+        assert!(cos_range.lower() <= 0.8775825618903728);
+        assert_eq!(cos_range.upper(), 1.0);
+
+        // Argument reduction is intentionally not guessed: the sound fallback
+        // is broad, but it remains useful to callers that need a valid enclosure.
+        let broad = Interval::new(0.5, 1.0).unwrap();
         assert_eq!(
-            expression.eval_interval(&[("x", Interval::new(0.0, 1.0).unwrap())]),
-            Err(ExprIntervalError::UnsupportedFunction(UnaryFn::Sin)),
+            sine.eval_interval(&[("x", broad)]).unwrap(),
+            Interval::new(-1.0, 1.0).unwrap()
+        );
+        assert_eq!(
+            cosine.eval_interval(&[("x", broad)]).unwrap(),
+            Interval::new(-1.0, 1.0).unwrap()
         );
     }
 
