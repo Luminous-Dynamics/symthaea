@@ -928,14 +928,20 @@ impl TemporalConsciousnessAnalyzer {
         self.try_observe_with_elapsed(state, phi, None, narrative)
     }
 
-    /// Deterministic full-analyzer entry point for replay and temporal conformance tests.
-    pub(crate) fn try_observe_at(
+    /// Deterministic observation entry point for fixed-clock replay and conformance tests.
+    ///
+    /// This variant has no external narrative or predictor context; unavailable identity
+    /// representations are kept unknown rather than synthesized.
+    pub fn observe_at(&mut self, state: &BinaryHV, phi: f64, elapsed: Duration) -> bool {
+        self.try_observe_at_with_context(state, phi, elapsed, None)
+    }
+
+    pub(crate) fn try_observe_at_with_context(
         &mut self,
         state: &BinaryHV,
         phi: f64,
         elapsed: Duration,
         narrative: Option<&NarrativeSelfModel>,
-        _predictive: Option<&PredictiveSelfModel>,
     ) -> bool {
         self.try_observe_with_elapsed(state, phi, Some(elapsed), narrative)
     }
@@ -1109,7 +1115,7 @@ impl TemporalConsciousnessAnalyzer {
             }
             if !self.identity_coherence.past_future_alignment_available {
                 recs.push(
-                    "Past-future alignment unavailable - long-term stability is unknown".to_string(),
+                    "Past-future alignment unavailable - stability unknown".to_string(),
                 );
             }
         }
@@ -1379,17 +1385,15 @@ mod tests {
         let rejected_state = BinaryHV::random(71);
         let first_time = Duration::from_secs(1);
 
-        assert!(analyzer.try_observe_at(&first_state, 0.4, first_time, None, None));
+        assert!(analyzer.observe_at(&first_state, 0.4, first_time));
         assert_eq!(analyzer.stats.observations, 1);
         assert_eq!(analyzer.continuity.recent_states.len(), 1);
 
-        assert!(!analyzer.try_observe_at(&rejected_state, 0.9, first_time, None, None));
-        assert!(!analyzer.try_observe_at(
+        assert!(!analyzer.observe_at(&rejected_state, 0.9, first_time));
+        assert!(!analyzer.observe_at(
             &rejected_state,
             0.9,
             Duration::from_millis(500),
-            None,
-            None,
         ));
 
         assert_eq!(analyzer.stats.observations, 1);
