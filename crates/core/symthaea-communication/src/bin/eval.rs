@@ -374,7 +374,7 @@ fn main() {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
-    use std::os::unix::fs::{PermissionsExt, OpenOptionsExt};
+    use std::os::unix::fs::PermissionsExt;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
