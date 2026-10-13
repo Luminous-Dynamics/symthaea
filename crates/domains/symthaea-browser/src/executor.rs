@@ -15,7 +15,7 @@ use url::Url;
 use crate::actions::{BrowserAction, ElementSelector};
 use crate::cdp::CdpSession;
 use crate::observation::PageObservation;
-use crate::safety::{BrowserSafetyPolicy, PolicyDecision, PolicyDenial};
+use crate::safety::{BrowserSafetyPolicy, PolicyDecision};
 
 const MAX_AUDIT_ORIGIN_CHARS: usize = 512;
 
@@ -536,6 +536,7 @@ mod current_page_policy_tests {
 #[cfg(test)]
 mod receipt_privacy_tests {
     use super::*;
+    use crate::safety::PolicyDenial;
 
     const PASSWORD: &str = "supersecret-password";
     const OTP: &str = "481516";
@@ -599,7 +600,14 @@ mod receipt_privacy_tests {
         assert!(serialized.contains("text_len_bytes"));
         assert!(serialized.contains("text_len_chars"));
         assert!(serialized.contains("BrowserOperationFailed"));
-        assert_eq!(execution.output_len_for_test(), PAGE_SECRET.len());
+        assert!(matches!(
+            &execution.output,
+            ActionOutput::Text(text) if text == PAGE_SECRET
+        ));
+        assert!(matches!(
+            &action,
+            BrowserAction::Type { text, .. } if text == input
+        ));
     }
 
     #[test]
@@ -670,14 +678,4 @@ mod receipt_privacy_tests {
         );
     }
 
-    impl ActionExecution {
-        // Test-only assertion helper intentionally exposes only output length.
-        fn output_len_for_test(&self) -> usize {
-            match &self.output {
-                ActionOutput::Text(text) => text.len(),
-                ActionOutput::Screenshot(bytes) => bytes.len(),
-                ActionOutput::None => 0,
-            }
-        }
-    }
 }
