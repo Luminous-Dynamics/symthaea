@@ -84,11 +84,21 @@ def shape(kind,r):
   for v in r["weights"].values(): dec(v)
   if not isinstance(r["actions"],list) or len(r["actions"])<2: fail("need actions")
   for a in r["actions"]: action(a)
+  if kind=="EnumerationInvariant":
+   ids=[a["id"] for a in r["actions"]]
+   orders=r["orders"]
+   if not isinstance(orders,list) or len(orders)<2: fail("need at least two enumeration orders")
+   for order in orders:
+    if not isinstance(order,list) or len(order)!=len(ids): fail("bad order length")
+    if not all(isinstance(x,str) and x for x in order): fail("bad order action id")
+    if len(order)!=len(set(order)) or set(order)!=set(ids): fail("order must be a permutation of action ids")
  elif kind=="SetIdentity":
   for a in r["actions"]: action(a,False)
  elif kind=="HistoryPurity":
+  if not isinstance(r["action_id"],str) or not r["action_id"].strip(): fail("bad action_id")
   nni(r["candidate_score_calls"]); nni(r["initial_committed_count"]); nni(r["commit_events"])
  elif kind=="HistoryUpdate":
+  if not isinstance(r["action_id"],str) or not r["action_id"].strip(): fail("bad action_id")
   nni(r["initial_committed_count"]); nni(r["commit_events"])
  elif kind=="EventClassBoundary":
   if r["novelty_event_class"]!=EVENT_CLASS: fail("wrong event class")
@@ -144,8 +154,18 @@ def derive(c):
  elif k=="HistoryUpdate":
   f=r["initial_committed_count"]+r["commit_events"]; o.update(final_committed_count=f,novelty=format(nov(f),"f"),novelty_fraction=str(Fraction(1,1+f)),novelty_semantics="CommittedActionCount")
  elif k=="EnumerationInvariant":
-  s=scores(r); ids=set(s)
-  if any(set(x)!=ids or len(x)!=len(ids) for x in r["orders"]):fail("bad order")
+  by_id={a["id"]:a for a in r["actions"]}
+  outputs=[]
+  for order in r["orders"]:
+   ordered=dict(r)
+   ordered["actions"]=[by_id[action_id] for action_id in order]
+   result=scores(ordered)
+   outputs.append({
+    action_id:{component:result[action_id][component] for component in ("epistemic","pragmatic","novelty","total")}
+    for action_id in sorted(result)
+   })
+  if any(output!=outputs[0] for output in outputs[1:]):
+   fail("candidate scores depend on enumeration order")
   o.update(enumeration_invariance="Required",per_action_outputs="IdenticalAcrossOrders")
  elif k=="SetIdentity":
   ids=[a["id"] for a in r["actions"]]
@@ -199,7 +219,7 @@ def detected(m):
 def mutations(d):
  fs=[]
  def add(name,f):fs.append((name,f))
- add("schema",lambda m:m.__setitem__("schema","bad")); add("top-field",lambda m:m.__setitem__("x",1)); add("profile",lambda m:m.__setitem__("reference_profile","bad")); add("profile-promotion",lambda m:m.__setitem__("reference_profile","ExpectedInformationGainV1")); add("novelty-profile",lambda m:m.__setitem__("novelty_profile","ExecutedActionCountNoveltyV1")); add("event-class",lambda m:m.__setitem__("novelty_event_class","ExecutedAction")); add("numeric",lambda m:m["numeric_policy"].__setitem__("decimal_precision",34)); add("claim",lambda m:m.__setitem__("claim_ceiling","broad")); add("vocab",lambda m:m["vocabularies"].__setitem__("novelty_semantics",["ExecutedActionCount"])); add("remove-case",lambda m:m["cases"].pop()); add("reorder",lambda m:m["cases"].__setitem__(slice(0,2),[m["cases"][1],m["cases"][0]])); add("flatten-E",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["1","1"])); add("reverse-E",lambda m:case(m,"F03")["raw"]["actions"][0].__setitem__("predicted_precision",["4","4"])); add("erase-N",lambda m:case(m,"F08")["raw"]["actions"][1].__setitem__("committed_count",0)); add("score-as-commit",lambda m:case(m,"F09")["raw"].__setitem__("commit_events",1)); add("erase-commit",lambda m:case(m,"F10")["raw"].__setitem__("commit_events",0)); add("erase-second-commit",lambda m:case(m,"F11")["raw"].__setitem__("commit_events",1)); add("boundary-class",lambda m:case(m,"F25")["raw"].__setitem__("novelty_event_class","SelectedAction")); add("boundary-commit",lambda m:case(m,"F25")["raw"].__setitem__("commit_events",1)); add("dup-id",lambda m:case(m,"F01")["raw"]["actions"][1].__setitem__("id","A")); add("missing-pred",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",None)); add("zero-precision",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["0","2"])); add("dim",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["2"])); add("zero-E-weight",lambda m:case(m,"F01")["raw"]["weights"].__setitem__("epistemic","0")); add("break-tie",lambda m:case(m,"F21")["raw"]["actions"][0].__setitem__("pragmatic","1")); add("currentness",lambda m:case(m,"F18")["raw"].__setitem__("current_generation","G1")); add("legacy-upgrade",lambda m:case(m,"F24")["raw"].__setitem__("epistemic_values",["0","1","0"])); add("erase-blocker",lambda m:case(m,"F22")["raw"].update({"feasibility":"Observable","execution_authority":"Present"})); add("expected-tamper",lambda m:case(m,"F01")["expected"].__setitem__("total_relation","A=B")); add("action-field",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("mystery",1)); add("disposition",lambda m:case(m,"F04")["expected"].__setitem__("disposition","MagicPass"))
+ add("schema",lambda m:m.__setitem__("schema","bad")); add("top-field",lambda m:m.__setitem__("x",1)); add("profile",lambda m:m.__setitem__("reference_profile","bad")); add("profile-promotion",lambda m:m.__setitem__("reference_profile","ExpectedInformationGainV1")); add("novelty-profile",lambda m:m.__setitem__("novelty_profile","ExecutedActionCountNoveltyV1")); add("event-class",lambda m:m.__setitem__("novelty_event_class","ExecutedAction")); add("numeric",lambda m:m["numeric_policy"].__setitem__("decimal_precision",34)); add("claim",lambda m:m.__setitem__("claim_ceiling","broad")); add("vocab",lambda m:m["vocabularies"].__setitem__("novelty_semantics",["ExecutedActionCount"])); add("remove-case",lambda m:m["cases"].pop()); add("reorder",lambda m:m["cases"].__setitem__(slice(0,2),[m["cases"][1],m["cases"][0]])); add("flatten-E",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["1","1"])); add("reverse-E",lambda m:case(m,"F03")["raw"]["actions"][0].__setitem__("predicted_precision",["4","4"])); add("erase-N",lambda m:case(m,"F08")["raw"]["actions"][1].__setitem__("committed_count",0)); add("history-empty-action-id",lambda m:case(m,"F09")["raw"].__setitem__("action_id","")); add("history-whitespace-action-id",lambda m:case(m,"F10")["raw"].__setitem__("action_id","   ")); add("history-null-action-id",lambda m:case(m,"F11")["raw"].__setitem__("action_id",None)); add("history-wrong-type-action-id",lambda m:case(m,"F09")["raw"].__setitem__("action_id",{})); add("score-as-commit",lambda m:case(m,"F09")["raw"].__setitem__("commit_events",1)); add("erase-commit",lambda m:case(m,"F10")["raw"].__setitem__("commit_events",0)); add("erase-second-commit",lambda m:case(m,"F11")["raw"].__setitem__("commit_events",1)); add("enum-single-order",lambda m:case(m,"F12")["raw"].__setitem__("orders",[case(m,"F12")["raw"]["orders"][0]])); add("enum-missing-id",lambda m:case(m,"F12")["raw"]["orders"][1].pop()); add("enum-duplicate-id",lambda m:case(m,"F12")["raw"]["orders"][1].__setitem__(0,"B")); add("enum-non-string-id",lambda m:case(m,"F12")["raw"]["orders"][0].__setitem__(0,None)); add("boundary-class",lambda m:case(m,"F25")["raw"].__setitem__("novelty_event_class","SelectedAction")); add("boundary-commit",lambda m:case(m,"F25")["raw"].__setitem__("commit_events",1)); add("dup-id",lambda m:case(m,"F01")["raw"]["actions"][1].__setitem__("id","A")); add("missing-pred",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",None)); add("zero-precision",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["0","2"])); add("dim",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["2"])); add("zero-E-weight",lambda m:case(m,"F01")["raw"]["weights"].__setitem__("epistemic","0")); add("break-tie",lambda m:case(m,"F21")["raw"]["actions"][0].__setitem__("pragmatic","1")); add("currentness",lambda m:case(m,"F18")["raw"].__setitem__("current_generation","G1")); add("legacy-upgrade",lambda m:case(m,"F24")["raw"].__setitem__("epistemic_values",["0","1","0"])); add("erase-blocker",lambda m:case(m,"F22")["raw"].update({"feasibility":"Observable","execution_authority":"Present"})); add("expected-tamper",lambda m:case(m,"F01")["expected"].__setitem__("total_relation","A=B")); add("action-field",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("mystery",1)); add("disposition",lambda m:case(m,"F04")["expected"].__setitem__("disposition","MagicPass"))
  n=0
  for name,f in fs:
   m=copy.deepcopy(d);f(m)
