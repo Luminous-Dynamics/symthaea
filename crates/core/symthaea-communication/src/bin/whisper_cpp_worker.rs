@@ -322,6 +322,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
 
+    fn observation(samples: Vec<f32>, sample_rate_hz: u32, channels: u16) -> SignalObservation {
+        let duration = if sample_rate_hz == 0 {
+            0.0
+        } else {
+            samples.len() as f64 / sample_rate_hz as f64
+        };
+        let mut value = SignalObservation {
+            id: String::new(),
+            modality: Modality::Audio {
+                sample_rate_hz,
+                channels,
+            },
+            samples,
+            features: Default::default(),
+            original_text: None,
+            normalized_text: None,
+            uncertain_spans: vec![],
+            timing: symthaea_communication::TimeSpan {
+                start_s: 0.0,
+                end_s: duration,
+            },
+            location: None,
+            calibration: Default::default(),
+            source_identity: None,
+            environment: Default::default(),
+        };
+        value.refresh_id().expect("fixture observation serializes");
+        value
+    }
+
     #[test]
     fn empty_transcript_is_an_explicit_empty_hypothesis() {
         let text = preserved_transcript(String::new(), "af");
@@ -329,28 +359,183 @@ mod tests {
         assert_eq!(text.normalized.as_deref(), Some(""));
         assert_eq!(text.primary_language.as_deref(), Some("af"));
         assert!(text.spans.is_empty());
+        assert!(text.validate().is_ok());
     }
 
     #[test]
     fn audio_validation_rejects_out_of_range_samples() {
-        let mut observation = SignalObservation {
-            id: String::new(),
-            modality: Modality::Audio {
-                sample_rate_hz: 16_000,
-                channels: 1,
-            },
-            samples: vec![0.0, 1.2],
-            features: Default::default(),
-            original_text: None,
-            normalized_text: None,
-            uncertain_spans: vec![],
-            timing: symthaea_communication::TimeSpan { start_s: 0.0, end_s: 1.0 / 16_000.0 },
-            location: None,
-            calibration: Default::default(),
-            source_identity: None,
-            environment: Default::default(),
+        let value = observation(vec![0.0, 1.2], 16_000, 1);
+        assert!(validated_audio(&value, 60).unwrap_err().contains("normalized"));
+    }
+
+    #[test]
+    fn audio_validation_rejects_non_finite_samples() {
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let value = observation(vec![invalid], 16_000, 1);
+            assert!(validated_audio(&value, 60).unwrap_err().contains("finite"));
+        }
+    }
+
+    #[test]
+    fn audio_validation_rejects_empty_audio() {
+        let value = observation(vec![], 16_000, 1);
+        assert!(validated_audio(&value, 60).unwrap_err().contains("empty"));
+    }
+
+    #[test]
+    fn audio_validation_rejects_wrong_rate_and_multiple_channels() {
+        let wrong_rate = observation(vec![0.0], 44_100, 1);
+        assert!(validated_audio(&wrong_rate, 60).unwrap_err().contains("16 kHz"));
+        let multi_channel = observation(vec![0.0, 0.0], 16_000, 2);
+        assert!(validated_audio(&multi_channel, 60).unwrap_err().contains("mono"));
+    }
+
+    #[test]
+    fn audio_validation_enforces_the_configured_duration_cap() {
+        let value = observation(vec![0.0; 16_001], 16_000, 1);
+        assert!(validated_audio(&value, 1).unwrap_err().contains("duration"));
+    }
+
+    #[test]
+    fn audio_validation_rejects_text_modality() {
+        let mut value = observation(vec![0.0], 16_000, 1);
+        value.modality = Modality::Text {
+            language: Some("af".into()),
+            script: Some("Latn".into()),
         };
-        observation.refresh_id().unwrap();
-        assert!(validated_audio(&observation, 60).is_err());
+        value.refresh_id().unwrap();
+        assert!(validated_audio(&value, 60).unwrap_err().contains("only accepts audio"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pcm_writer_emits_mono_16_bit_pcm_with_expected_rate() {
+        let directory = TestDirectory::new();
+        let wav = directory.path.join("roundtrip.wav");
+        write_pcm16_wav(&wav, 16_000, &[-1.0, 0.0, 1.0]).unwrap();
+        let mut reader = hound::WavReader::open(&wav).unwrap();
+        let spec = reader.spec();
+        assert_eq!(spec.channels, 1);
+        assert_eq!(spec.sample_rate, 16_000);
+        assert_eq!(spec.bits_per_sample, 16);
+        assert_eq!(spec.sample_format, SampleFormat::Int);
+        let values = reader.samples::<i16>().collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(values, vec![-32_767, 0, i16::MAX]);
+    }
+
+    #[cfg(unix)]
+    struct TestDirectory {
+        path: PathBuf,
+    }
+
+    #[cfg(unix)]
+    impl TestDirectory {
+        fn new() -> Self {
+            use std::os::unix::fs::PermissionsExt;
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock is after Unix epoch")
+                .as_nanos();
+            let path = std::env::temp_dir().join(format!(
+                "symthaea-whisper-worker-test-{}-{timestamp}",
+                std::process::id()
+            ));
+            fs::create_dir(&path).expect("create test directory");
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+                .expect("restrict test directory");
+            Self { path }
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for TestDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[cfg(unix)]
+    fn fake_worker(directory: &TestDirectory, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let path = directory.path.join("fake-whisper-cli");
+        fs::write(&path, format!("#!/bin/sh\nset -eu\n{body}\n"))
+            .expect("write fake whisper-cli");
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+            .expect("make fake whisper-cli executable");
+        path
+    }
+
+    #[cfg(unix)]
+    fn worker_args(directory: &TestDirectory, whisper_cli: PathBuf, timeout_seconds: u64) -> Args {
+        use std::os::unix::fs::PermissionsExt;
+        let model = directory.path.join("fake-model.bin");
+        fs::write(&model, b"test-only fake model").expect("write fake model");
+        let scratch_dir = directory.path.join("scratch");
+        fs::create_dir(&scratch_dir).expect("create private scratch directory");
+        fs::set_permissions(&scratch_dir, fs::Permissions::from_mode(0o700))
+            .expect("restrict scratch directory");
+        Args {
+            whisper_cli,
+            model,
+            language: "af".into(),
+            provider_id: "test-whisper".into(),
+            scratch_dir,
+            max_audio_seconds: 60,
+            timeout_seconds,
+        }
+    }
+
+    #[cfg(unix)]
+    fn scratch_is_empty(directory: &TestDirectory) {
+        let scratch = directory.path.join("scratch");
+        let mut entries = fs::read_dir(&scratch).unwrap();
+        assert!(entries.next().is_none(), "temporary request files must be cleaned up");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fake_cli_transcribes_and_cleans_temporary_audio_and_transcript() {
+        let directory = TestDirectory::new();
+        let cli = fake_worker(
+            &directory,
+            r#"output_base=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-of" ]; then shift; output_base="$1"; fi
+  shift
+done
+test -n "$output_base"
+printf 'Môre\n' > "$output_base.txt""#,
+        );
+        let args = worker_args(&directory, cli.clone(), 5);
+        let audio = observation(vec![0.0; 160], 16_000, 1);
+        let result = transcribe(&args, &args.model, &cli, &audio).unwrap();
+        assert_eq!(result.original, "Môre");
+        assert_eq!(result.primary_language.as_deref(), Some("af"));
+        assert!(result.validate().is_ok());
+        scratch_is_empty(&directory);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_cli_is_reported_and_temporary_files_are_cleaned() {
+        let directory = TestDirectory::new();
+        let cli = fake_worker(&directory, "exit 19");
+        let args = worker_args(&directory, cli.clone(), 5);
+        let audio = observation(vec![0.0; 160], 16_000, 1);
+        let error = transcribe(&args, &args.model, &cli, &audio).unwrap_err();
+        assert!(error.contains("exit status"));
+        scratch_is_empty(&directory);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cli_timeout_kills_the_child_and_cleans_temporary_files() {
+        let directory = TestDirectory::new();
+        let cli = fake_worker(&directory, "exec sleep 3");
+        let args = worker_args(&directory, cli.clone(), 1);
+        let audio = observation(vec![0.0; 160], 16_000, 1);
+        let error = transcribe(&args, &args.model, &cli, &audio).unwrap_err();
+        assert!(error.contains("exceeded 1 seconds"));
+        scratch_is_empty(&directory);
     }
 }
