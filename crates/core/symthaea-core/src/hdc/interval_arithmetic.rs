@@ -584,13 +584,13 @@ fn half_pi_enclosure() -> Option<Interval> {
     })
 }
 
-/// Reduce an interval to a unique nearest multiple of pi/2, when possible.
+/// Choose an integer multiple of pi/2 that gives a bounded reduced interval.
 ///
-/// The quotient interval encloses x/(pi/2). A quadrant is accepted only when
-/// every possible quotient lies strictly inside one nearest-integer cell,
-/// away from half-integer boundaries. The computed reduced interval must fit
-/// inside the local Taylor domain. These checks deliberately reject uncertain
-/// reductions instead of picking a quadrant from a rounded quotient.
+/// The quotient midpoint is only a heuristic for choosing the integer: the
+/// proof does not require it to be the mathematically nearest quadrant. The
+/// trigonometric shift identities hold for every integer. Soundness comes from
+/// using the pi/2 enclosure to compute the reduced interval and requiring that
+/// whole interval to fit inside the local Taylor domain.
 fn try_reduce_quadrant(input: Interval) -> Option<(Interval, i64)> {
     if !input.lower.is_finite() || !input.upper.is_finite() {
         return None;
@@ -612,10 +612,7 @@ fn try_reduce_quadrant(input: Interval) -> Option<(Interval, i64)> {
     // of the pi/2 enclosure width during multiplication by the quadrant index.
     let midpoint = quotient.lower + (quotient.upper - quotient.lower) * 0.5;
     let nearest = midpoint.round();
-    if nearest.abs() > TRIG_MAX_REDUCTION_QUADRANT
-        || quotient.lower <= nearest - 0.5
-        || quotient.upper >= nearest + 0.5
-    {
+    if nearest.abs() > TRIG_MAX_REDUCTION_QUADRANT {
         return None;
     }
 
@@ -1240,12 +1237,23 @@ mod tests {
     }
 
     #[test]
-    fn quadrant_reduction_rejects_half_integer_boundary_overlap() {
+    fn quadrant_reduction_accepts_a_boundary_when_its_remainder_is_bounded() {
         let half_pi = half_pi_enclosure().expect("Machin series should enclose pi/2");
-        // This input interval intentionally touches the q=3.5 nearest-quadrant
-        // boundary. The quotient enclosure must not guess which quadrant wins.
+        // The quotient interval straddles the q=3.5 nearest-cell boundary.
+        // Choosing q=4 is nevertheless valid because the shift identity holds
+        // for any integer; the resulting remainder remains inside [-2, 2].
         let boundary = half_pi.checked_multiply(Interval::point(3.5).unwrap());
-        assert!(try_reduce_quadrant(boundary).is_none());
+        let (reduced, quadrant) =
+            try_reduce_quadrant(boundary).expect("bounded reduction should succeed");
+        assert_eq!(quadrant, 4);
+        assert!(reduced.lower() > -1.0 && reduced.upper() < -0.5);
+
+        // This input interval straddles a nearest-cell boundary too, but a
+        // single bounded remainder still gives a useful enclose of its range.
+        let crosses_boundary = interval(2.0, 3.0);
+        let sine = crosses_boundary.checked_sin().unwrap();
+        assert!(sine.lower() > 0.1);
+        assert!(sine.upper() < 1.0);
     }
 
     #[test]
