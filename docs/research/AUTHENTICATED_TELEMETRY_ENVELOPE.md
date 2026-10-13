@@ -59,7 +59,7 @@ Durable queue tests cover ciphertext persistence across reopen, byte-for-byte re
 
 - Key generation, secure provisioning, rotation, revocation, hardware-backed storage and incident response.
 - Enforcement and audit of per-key AEAD message limits/nonce policy across restarts, backup restoration and multiple producers.
-- Receiver-side durable anti-replay state and a receiver transaction that commits the event before it emits a positive signed ACK; the sender does not treat an unsigned digest-only receipt as sufficient for protected rows.
+- Production key provisioning/rotation/revocation, target-filesystem crash/power-loss tests and a reviewed downstream outbox/transaction. The receiver inbox added here commits its own replay record before ACK but does not provide exactly-once downstream effects.
 - Encryption of local persistent metadata as required by the device threat model.
 - Canonical signed trust/policy context, authorization, and an independently reviewed key-to-producer binding.
 - Multi-process, crash/power-loss, storage-full, key rotation, backup/restore and target-device tests.
