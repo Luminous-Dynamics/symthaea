@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import os
 import sqlite3
 import tempfile
@@ -9,6 +11,16 @@ import threading
 import unittest
 from pathlib import Path
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
+from tools.energy_telemetry.qualified_output import (
+    MechanismAttestationError,
+    MechanismAttestationPolicy,
+    QualifiedOutputVerifier,
+    attestation_signing_message,
+    canonical_attestation_bytes,
+)
 from tools.energy_telemetry.durable_privacy_ledger import (
     MAX_COHORT_PARTICIPANTS,
     DurablePrivacyLedger,
@@ -35,6 +47,22 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         self.ledger = DurablePrivacyLedger(
             self.database, participant_hmac_key=self.key,
         )
+        # Stable test-only key. Never use these bytes as a deployment trust root.
+        self.attestation_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+        self.attestation_public_key = self.attestation_private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        self.attestation_policy = MechanismAttestationPolicy(
+            trusted_public_key=self.attestation_public_key,
+            qualification_reference="test-qualification-v1",
+            library_name="test-reviewed-library",
+            library_version="1.2.3",
+            mechanism_id="integer-energy-sum-v1",
+            privacy_unit="household",
+            expected_feature_flags=(),
+        )
+        self.attestation_verifier = QualifiedOutputVerifier(self.attestation_policy)
         self.a = dt("2026-10-13T05:00:00Z")
         self.b = dt("2026-10-13T05:15:00Z")
         self.c = dt("2026-10-13T05:30:00Z")
@@ -398,6 +426,198 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
 
         self.assertEqual(consumed, MAX_COHORT_PARTICIPANTS + 1)
         self.assertEqual(self.ledger.reservation_count, 0)
+
+    def make_signed_attestation(self, reservation, output_bytes, **overrides):
+        context = self.ledger.reservation_context(reservation.release_id)
+        fields = {
+            "schema_version": 1,
+            "release_id": context.release_id,
+            "reservation_receipt_sha256": context.receipt_sha256,
+            "query_sha256": context.query_sha256,
+            "window_start_utc": context.window_start_utc,
+            "window_end_utc": context.window_end_utc,
+            "recipient_class": context.recipient_class,
+            "mechanism": context.mechanism,
+            "library_name": "test-reviewed-library",
+            "library_version": "1.2.3",
+            "mechanism_id": "integer-energy-sum-v1",
+            "feature_flags": [],
+            "privacy_unit": "household",
+            "adjacency": context.adjacency,
+            "contribution_limit_wh": context.contribution_limit_wh,
+            "sensitivity_wh": context.contribution_limit_wh,
+            "contribution_policy_id": context.contribution_policy_id,
+            "privacy_policy_id": context.privacy_policy_id,
+            "epsilon_nano": context.epsilon_nano,
+            "delta_pico": context.delta_pico,
+            "cohort_size": context.cohort_size,
+            "qualification_reference": "test-qualification-v1",
+            "execution_id": "e" * 32,
+            "signer_key_sha256": hashlib.sha256(self.attestation_public_key).hexdigest(),
+            "output_sha256": hashlib.sha256(output_bytes).hexdigest(),
+        }
+        fields.update(overrides)
+        raw = canonical_attestation_bytes(fields)
+        signature = self.attestation_private_key.sign(attestation_signing_message(raw))
+        return raw, signature
+
+    def verify_signed_output(self, reservation, output_bytes, attestation=None, signature=None, verifier=None):
+        if attestation is None or signature is None:
+            attestation, signature = self.make_signed_attestation(reservation, output_bytes)
+        return (self.attestation_verifier if verifier is None else verifier).verify_and_commit(
+            self.ledger,
+            release_id=reservation.release_id,
+            output_bytes=output_bytes,
+            attestation_bytes=attestation,
+            signature=signature,
+            committed_at_utc=self.now,
+        )
+
+    def test_signed_mechanism_attestation_binds_reservation_and_output(self):
+        reservation = self.reserve()
+        output = b'{"energy_wh_noisy":4012,"schema":"v1"}'
+        raw, signature = self.make_signed_attestation(reservation, output)
+        committed = self.verify_signed_output(reservation, output, raw, signature)
+        self.assertFalse(committed.duplicate)
+        self.assertEqual(committed.output_bytes, output)
+        self.assertEqual(committed.output_sha256, hashlib.sha256(output).hexdigest())
+        replay = self.verify_signed_output(reservation, output, raw, signature)
+        self.assertTrue(replay.duplicate)
+        self.assertEqual(self.ledger.committed_output(reservation.release_id).output_bytes, output)
+
+    def test_unsigned_or_tampered_attestation_cannot_commit_output(self):
+        reservation = self.reserve()
+        output = b'{"energy_wh_noisy":4012}'
+        raw, signature = self.make_signed_attestation(reservation, output)
+        damaged = bytearray(signature)
+        damaged[0] ^= 1
+        with self.assertRaisesRegex(MechanismAttestationError, "signature is invalid"):
+            self.verify_signed_output(reservation, output, raw, bytes(damaged))
+        self.assertEqual(self.ledger.reservation_count, 1)
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
+            self.ledger.committed_output(reservation.release_id)
+
+    def test_attestation_for_different_output_cannot_be_replayed(self):
+        reservation = self.reserve()
+        original = b'{"energy_wh_noisy":4012}'
+        raw, signature = self.make_signed_attestation(reservation, original)
+        with self.assertRaisesRegex(MechanismAttestationError, "output digest"):
+            self.verify_signed_output(reservation, b'{"energy_wh_noisy":4013}', raw, signature)
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
+            self.ledger.committed_output(reservation.release_id)
+
+    def test_attestation_must_match_exact_reservation_fields(self):
+        mismatch_cases = (
+            {"release_id": "f" * 32},
+            {"reservation_receipt_sha256": "0" * 64},
+            {"query_sha256": "0" * 64},
+            {"epsilon_nano": 500_000_001},
+            {"delta_pico": 1},
+            {"cohort_size": 21},
+            {"adjacency": "replace_one_participant"},
+            {"contribution_limit_wh": 2000},
+            {"contribution_policy_id": "changed-cap-v2"},
+            {"privacy_policy_id": "changed-policy-v2"},
+            {"recipient_class": "public_reporting"},
+            {"window_start_utc": "2026-10-13T04:00:00.000000Z"},
+            {"window_end_utc": "2026-10-13T05:20:00.000000Z"},
+        )
+        for mismatch in mismatch_cases:
+            with self.subTest(mismatch=mismatch):
+                reservation = self.reserve(
+                    release=chr(97 + mismatch_cases.index(mismatch)),
+                    query=chr(97 + mismatch_cases.index(mismatch)),
+                )
+                output = b'{"value":1}'
+                raw, signature = self.make_signed_attestation(reservation, output, **mismatch)
+                with self.assertRaises(MechanismAttestationError):
+                    self.verify_signed_output(reservation, output, raw, signature)
+                with self.assertRaises(DurablePrivacyPolicyError):
+                    self.ledger.committed_output(reservation.release_id)
+
+    def test_unapproved_library_version_constructor_privacy_unit_and_reference_fail(self):
+        policy_changes = (
+            {"library_name": "other-library"},
+            {"library_version": "9.9.9"},
+            {"mechanism_id": "unreviewed-sampler"},
+            {"privacy_unit": "site"},
+            {"qualification_reference": "unreviewed-qualification"},
+            {"signer_key_sha256": "0" * 64},
+        )
+        for index, change in enumerate(policy_changes):
+            with self.subTest(change=change):
+                reservation = self.reserve(release=chr(97 + index), query=chr(97 + index))
+                output = b'{"value":1}'
+                raw, signature = self.make_signed_attestation(reservation, output, **change)
+                with self.assertRaises(MechanismAttestationError):
+                    self.verify_signed_output(reservation, output, raw, signature)
+
+    def test_unapproved_feature_flags_fail_closed(self):
+        reservation = self.reserve()
+        output = b'{"value":1}'
+        raw, signature = self.make_signed_attestation(reservation, output, feature_flags=["contrib"])
+        with self.assertRaisesRegex(MechanismAttestationError, "feature_flags"):
+            self.verify_signed_output(reservation, output, raw, signature)
+
+    def test_wrong_pinned_trust_key_fails_even_for_valid_other_signature(self):
+        reservation = self.reserve()
+        output = b'{"value":1}'
+        raw, signature = self.make_signed_attestation(reservation, output)
+        other_private = ed25519.Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
+        other_public = other_private.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        other_verifier = QualifiedOutputVerifier(MechanismAttestationPolicy(
+            trusted_public_key=other_public,
+            qualification_reference="test-qualification-v1",
+            library_name="test-reviewed-library",
+            library_version="1.2.3",
+            mechanism_id="integer-energy-sum-v1",
+            privacy_unit="household",
+            expected_feature_flags=(),
+        ))
+        with self.assertRaisesRegex(MechanismAttestationError, "signature is invalid"):
+            self.verify_signed_output(reservation, output, raw, signature, verifier=other_verifier)
+
+    def test_noncanonical_json_and_duplicate_keys_are_rejected(self):
+        reservation = self.reserve()
+        output = b'{"value":1}'
+        raw, signature = self.make_signed_attestation(reservation, output)
+        with self.assertRaisesRegex(MechanismAttestationError, "canonical form"):
+            self.verify_signed_output(reservation, output, raw + b" ", signature)
+        duplicate = b'{"schema_version":1,"schema_version":1}'
+        with self.assertRaisesRegex(MechanismAttestationError, "duplicate JSON key"):
+            self.verify_signed_output(reservation, output, duplicate, signature)
+
+    def test_malformed_and_extra_attestation_fields_are_rejected(self):
+        reservation = self.reserve()
+        output = b'{"value":1}'
+        raw, signature = self.make_signed_attestation(reservation, output, untrusted_extra_field="x")
+        with self.assertRaisesRegex(MechanismAttestationError, "field set mismatch"):
+            self.verify_signed_output(reservation, output, raw, signature)
+        with self.assertRaisesRegex(MechanismAttestationError, "valid UTF-8 JSON"):
+            self.verify_signed_output(reservation, output, b"not-json", signature)
+
+    def test_sensitivity_must_match_integer_energy_bound(self):
+        reservation = self.reserve()
+        output = b'{"value":1}'
+        raw, signature = self.make_signed_attestation(reservation, output, sensitivity_wh=999)
+        with self.assertRaisesRegex(MechanismAttestationError, "sensitivity_wh"):
+            self.verify_signed_output(reservation, output, raw, signature)
+
+    def test_attestation_verification_requires_a_real_reservation(self):
+        output = b'{"value":1}'
+        # Build a structurally sound, signed receipt for an identifier never reserved.
+        fake = type("FakeReservation", (), {
+            "release_id": "f" * 32,
+        })()
+        raw, signature = self.make_signed_attestation(self.reserve(), output, release_id="f" * 32)
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "without a reservation"):
+            self.attestation_verifier.verify_and_commit(
+                self.ledger, release_id=fake.release_id, output_bytes=output,
+                attestation_bytes=raw, signature=signature, committed_at_utc=self.now,
+            )
 
 if __name__ == "__main__":
     unittest.main()
