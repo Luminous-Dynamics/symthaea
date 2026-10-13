@@ -15,6 +15,8 @@ Every control evaluation therefore keeps four questions separate:
 
 No aggregate “control quality” score is defined. Missing output, a missing seed, an absent plan field, or an undeclared target remains unknown/not-predeclared rather than a pass.
 
+The current probe also computes a small set of **candidate non-target invariants** from the one-factor-at-a-time grids: absolute key tonic (except during a tonic sweep), key tonality (except during a valence sweep), meter, and tempo (except during an arousal sweep). Each curve reports its baseline value, number of checked points, number of deviations, and point-level deviations. These are diagnostic rather than automatic failures; the purpose is to expose leakage and unexpected coupling without collapsing it into a single score. This follows the separation of invariance and transformation response used in the [ICASSP 2026 controllable-music evaluation study](https://doi.org/10.1109/ICASSP55912.2026.11461451), while keeping the Muse checks grounded in observable symbolic fields.
+
 ## Versioned control contracts
 
 | Control | Current target contract | Applicability and explicit limits |
