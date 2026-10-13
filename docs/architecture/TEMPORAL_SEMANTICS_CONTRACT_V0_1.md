@@ -61,7 +61,24 @@ Keep these concepts separate:
 
 The times can differ legitimately. A delayed sensor observation can describe an earlier physical event. A future appointment has future valid time but is recorded now. An imported causal event can arrive after a dependent-looking local wall timestamp because the source clock is skewed.
 
-### 2.3 Interval rules
+### 2.3 Bitemporal history, retroactive corrections, and “known as of”
+
+For claims, policies, evidence, and other facts that can be corrected after the fact, keep at least these temporal meanings distinct:
+
+- **Valid time:** when the proposition applies in the modeled world.
+- **Transaction/recorded time:** when this system accepted and stored this version of the proposition.
+- **Event time:** when the represented event occurred, according to the best available evidence and its stated precision.
+- **Observed time:** when this observer obtained the evidence.
+
+Do not collapse these into one `timestamp`. In particular, **“what do we now believe was true at time T?”** differs from **“what did this system record as its belief at time R?”** Both queries can be legitimate and must not silently return the same history.
+
+A correction received later may change the current valid-time interpretation of an earlier period, but it must not erase the earlier record of what was known at transaction time. Preserve the original claim, its recording boundary, the correction, their provenance, and the supersession/dispute relation. The current view can prefer a corrected claim while an as-of query can still reconstruct the earlier recorded belief. A correction is not retroactive proof that the system knew the corrected fact earlier.
+
+**Conformance case BT-01:** Record claim A as valid over `[t1,t3)` at transaction time `r1`. At later transaction time `r2`, receive correction B stating that the fact was valid only over `[t0,t2)`. A current valid-time query at `t2.5` must not treat A as current; an as-of-transaction-time query for `r1` must still reconstruct that A was the recorded claim then. Both versions and the correction link remain auditable.
+
+This distinction is especially useful for Mycelix claims/disputes, Symtropy chronicles, audit receipts, civic/economic decisions, and any workflow that can receive delayed evidence. It is grounded in temporal-database work distinguishing event, valid and transaction time, not a new claim that all repositories currently implement bitemporal storage. [Jensen et al., “Resolution of time concepts in temporal databases” (1994)](https://doi.org/10.1016/0020-0255(94)90059-0).
+
+### 2.4 Interval rules
 
 Use instants, durations and intervals as distinct types. Apply Allen's interval relations only when intervals inhabit the same reference system or have been converted by an explicit mapping. `start: f64` and `end: f64` without a unit and reference origin are not sufficient for cross-system reasoning.
 
@@ -146,6 +163,7 @@ Build a shared temporal contract test corpus and adapt it to each runtime. Minim
 - interval comparisons across mismatched reference systems are rejected;
 - TDB/TT/UTC conversion is explicit and carries an ephemeris/version provenance;
 - source data whose publication time differs from the modeled valid interval;
+- retroactive corrections where valid-time and transaction-time queries must preserve different answers;
 - requested horizon beyond executed simulation duration fails closed.
 
 Every result is reported against an exact commit, toolchain, schema and fixture corpus. Source presence and authored tests are not test passes.
