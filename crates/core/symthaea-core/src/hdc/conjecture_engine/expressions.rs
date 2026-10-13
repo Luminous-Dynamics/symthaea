@@ -106,15 +106,25 @@ impl fmt::Display for ExprIntervalError {
         match self {
             Self::Interval(error) => write!(f, "{error}"),
             Self::MissingVariable(name) => write!(f, "missing interval variable binding: {name}"),
-            Self::DuplicateVariableBinding(name) => write!(f, "duplicate interval variable binding: {name}"),
-            Self::InvalidSummationBound => write!(f, "summation bound n must be a finite nonnegative integer"),
-            Self::NonSingletonSummationBound => write!(f, "interval summation bound n must be a singleton"),
+            Self::DuplicateVariableBinding(name) => {
+                write!(f, "duplicate interval variable binding: {name}")
+            },
+            Self::InvalidSummationBound => {
+                write!(f, "summation bound n must be a finite nonnegative integer")
+            },
+            Self::NonSingletonSummationBound => {
+                write!(f, "interval summation bound n must be a singleton")
+            },
             Self::SummationLimitExceeded { bound, max } => {
                 write!(f, "summation upper bound {bound} exceeds configured maximum {max}")
             }
             Self::NonSingletonExponent => write!(f, "interval exponent must be a singleton"),
-            Self::NonIntegerExponent => write!(f, "interval evaluator only supports integer exponents"),
-            Self::ExponentOutOfRange => write!(f, "integer exponent is outside the supported i32 range"),
+            Self::NonIntegerExponent => {
+                write!(f, "interval evaluator only supports integer exponents")
+            },
+            Self::ExponentOutOfRange => {
+                write!(f, "integer exponent is outside the supported i32 range")
+            },
             Self::UnsupportedFunction(function) => {
                 write!(f, "interval evaluation has no certified rule for {function:?}")
             }
@@ -206,7 +216,10 @@ impl Expr {
                 let value = argument.eval_interval_in_environment(vars)?;
                 match function {
                     UnaryFn::Abs => Ok(value.absolute()),
-                    UnaryFn::Floor => Ok(Interval::new(value.lower().floor(), value.upper().floor())?),
+                    UnaryFn::Floor => Ok(Interval::new(
+                        value.lower().floor(),
+                        value.upper().floor(),
+                    )?),
                     unsupported => Err(ExprIntervalError::UnsupportedFunction(*unsupported)),
                 }
             }
