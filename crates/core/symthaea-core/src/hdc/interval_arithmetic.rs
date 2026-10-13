@@ -4,9 +4,10 @@
 //! Small, fail-closed interval arithmetic for conservative numerical enclosures.
 //!
 //! Basic arithmetic widens one representable f64 step outward. Square root uses
-//! its documented IEEE-754 correctly rounded contract; natural logarithm uses
-//! range reduction, interval series arithmetic and an explicit remainder bound.
-//! Other platform libm functions remain unsupported as interval enclosures.
+//! its documented IEEE-754 correctly rounded contract; natural logarithm and
+//! exponential use range reduction, interval series arithmetic and explicit
+//! remainder bounds. Other platform libm functions remain unsupported as
+//! interval enclosures.
 //!
 //! The enclosure guarantee assumes ordinary IEEE-754 binary64 round-to-nearest
 //! operations and compilation without unsafe fast-math reassociation.
@@ -19,6 +20,12 @@ use std::fmt;
 // less than 9 / (516 * 3^129) < 2^-134. This is exactly 2^-134.
 const LN_SERIES_TERMS: usize = 64;
 const LN_SERIES_TAIL_BOUND: f64 = f64::from_bits(889_u64 << 52);
+
+// For |r| <= 0.36, the exponential Taylor remainder after terms 0..39 is
+// exp(xi)*r^40/40!, whose absolute value is < 2^-200.
+const EXP_SERIES_TERMS: usize = 40;
+const EXP_SERIES_TAIL_BOUND: f64 = f64::from_bits(823_u64 << 52);
+const EXP_REDUCTION_LIMIT: f64 = 0.36;
 
 /// Errors while constructing or evaluating a real interval.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -304,6 +311,32 @@ impl Interval {
         Self::new(lower_log.lower, upper_bound)
     }
 
+    /// Exponential enclosed by range reduction and a Taylor series with a
+    /// bounded remainder.
+    ///
+    /// The finite-point path reduces x = r + k*ln(2), with |r| <= 0.36 checked
+    /// against an interval enclosure of ln(2). The first 40 terms of exp(r) are
+    /// evaluated using interval arithmetic; the absolute Taylor remainder is
+    /// bounded by 2^-200. Scaling uses an exactly represented power of two.
+    /// Extremely large or tiny inputs widen conservatively instead of relying
+    /// on the platform's unspecified-precision `f64::exp`.
+    pub fn checked_exp(self) -> Result<Self, IntervalError> {
+        let ln_two = ln_mantissa_enclosure(2.0)?;
+        let lower = if self.lower == f64::NEG_INFINITY {
+            0.0
+        } else {
+            exp_positive_point(self.lower, ln_two)?.lower.max(0.0)
+        };
+        let upper = if self.upper == f64::INFINITY {
+            f64::INFINITY
+        } else {
+            exp_positive_point(self.upper, ln_two)?.upper
+        };
+
+        // exp is strictly positive and monotone over the real line.
+        Self::new(lower, upper)
+    }
+
     /// Integer power with a checked domain for zero and negative exponents.
     ///
     /// Exponentiation by squaring limits the number of interval multiplications
@@ -452,6 +485,104 @@ fn ln_positive_point(value: f64, ln_two: Interval) -> Result<Interval, IntervalE
     Ok(log_mantissa.checked_add(log_scale))
 }
 
+/// Enclose exp(r) by Taylor expansion. The input interval must lie inside
+/// [-EXP_REDUCTION_LIMIT, EXP_REDUCTION_LIMIT].
+fn exp_reduced_enclosure(r: Interval) -> Result<Interval, IntervalError> {
+    if r.lower < -EXP_REDUCTION_LIMIT || r.upper > EXP_REDUCTION_LIMIT {
+        return Ok(Interval::new(0.0, f64::INFINITY)?);
+    }
+
+    if r.is_exact_zero() {
+        return Interval::point(1.0);
+    }
+
+    let mut sum = Interval::point(1.0)?;
+    let mut term = Interval::point(1.0)?;
+    for index in 1..EXP_SERIES_TERMS {
+        term = term.checked_multiply(r);
+        term = term.checked_divide(Interval::point(index as f64)?)?;
+        sum = sum.checked_add(term);
+    }
+
+    // Taylor's theorem bounds the omitted remainder in magnitude. Widen both
+    // sides because the reduced argument may be negative.
+    let remainder = Interval::new(-EXP_SERIES_TAIL_BOUND, EXP_SERIES_TAIL_BOUND)?;
+    sum.checked_add(remainder).checked_exp_nonnegative()
+}
+
+/// Reconstruct exp(x) for a finite endpoint without using f64::exp as a bound.
+fn exp_positive_point(value: f64, ln_two: Interval) -> Result<Interval, IntervalError> {
+    debug_assert!(value.is_finite());
+
+    if value == 0.0 {
+        return Interval::point(1.0);
+    }
+    if value < -745.0 {
+        // e^-745 is less than the least positive binary64 subnormal.
+        return Interval::new(0.0, f64::from_bits(1));
+    }
+    if value > 700.0 {
+        // Broad but safe; do not manufacture a finite bound beyond this range.
+        return Interval::new(0.0, f64::INFINITY);
+    }
+
+    let ln_two_mid = ln_two.lower + (ln_two.upper - ln_two.lower) * 0.5;
+    let exponent_float = (value / ln_two_mid).round();
+    if !exponent_float.is_finite() || exponent_float < -2000.0 || exponent_float > 2000.0 {
+        return Interval::new(0.0, f64::INFINITY);
+    }
+    let exponent = exponent_float as i32;
+
+    // Even if the approximate quotient selected a poor integer, the checked
+    // reduced interval below rejects it and returns a conservative wide bound.
+    if exponent < -1074 {
+        return Interval::new(0.0, f64::from_bits(1));
+    }
+    if exponent > 1023 {
+        return Interval::new(0.0, f64::INFINITY);
+    }
+
+    let exponent_interval = Interval::point(exponent as f64)?;
+    let scaled_ln_two = ln_two.checked_multiply(exponent_interval);
+    let reduced = Interval::point(value)?.checked_subtract(scaled_ln_two);
+    if reduced.lower < -EXP_REDUCTION_LIMIT || reduced.upper > EXP_REDUCTION_LIMIT {
+        return Interval::new(0.0, f64::INFINITY);
+    }
+
+    let exp_reduced = exp_reduced_enclosure(reduced)?;
+    let scale = exact_power_of_two(exponent)
+        .ok_or(IntervalError::InvalidBounds)?;
+    let scaled = exp_reduced.checked_multiply(Interval::point(scale)?);
+    // Exact exp(x) is positive. Outward rounding of a subnormal product can
+    // extend below zero; tightening that known mathematical invariant is safe.
+    Interval::new(scaled.lower.max(0.0), scaled.upper)
+}
+
+/// Return 2^exponent exactly for representable normal or subnormal powers of two.
+fn exact_power_of_two(exponent: i32) -> Option<f64> {
+    if (-1022..=1023).contains(&exponent) {
+        let encoded = ((exponent + 1023) as u64) << 52;
+        Some(f64::from_bits(encoded))
+    } else if (-1074..-1022).contains(&exponent) {
+        Some(f64::from_bits(1_u64 << (exponent + 1074)))
+    } else {
+        None
+    }
+}
+
+// Apply the known positivity of exp after adding its symmetric Taylor remainder.
+trait PositiveInterval {
+    fn checked_exp_nonnegative(self) -> Result<Interval, IntervalError>;
+}
+impl PositiveInterval for Interval {
+    fn checked_exp_nonnegative(self) -> Result<Interval, IntervalError> {
+        if self.upper < 0.0 {
+            return Ok(Interval::new(0.0, f64::INFINITY)?);
+        }
+        Interval::new(self.lower.max(0.0), self.upper)
+    }
+}
+
 /// Product of interval endpoints. Zero times infinity contributes zero to the
 /// hull; NaN at that corner would otherwise be silently mishandled by min/max.
 fn endpoint_product(lhs: f64, rhs: f64) -> f64 {
@@ -581,6 +712,58 @@ mod tests {
         let unbounded = interval(1.0, f64::INFINITY).checked_sqrt().unwrap();
         assert!(unbounded.lower() <= 1.0);
         assert_eq!(unbounded.upper(), f64::INFINITY);
+    }
+
+    #[test]
+    fn exponential_encloses_reference_values_across_supported_and_wide_ranges() {
+        let samples = [
+            -745.0,
+            -744.7,
+            -100.0,
+            -10.0,
+            -1.0,
+            -0.1,
+            0.0,
+            0.1,
+            0.5,
+            1.0,
+            2.0,
+            10.0,
+            100.0,
+            700.0,
+            701.0,
+        ];
+
+        for value in samples {
+            let result = Interval::point(value).unwrap().checked_exp().unwrap();
+            let reference = value.exp();
+            assert!(
+                result.contains(reference),
+                "computed enclosure {result:?} should contain platform exp({value:?}) = {reference:?}"
+            );
+            assert!(result.lower() >= 0.0);
+            assert!(result.lower() <= result.upper());
+        }
+        assert_eq!(
+            Interval::point(0.0).unwrap().checked_exp().unwrap(),
+            Interval::point(1.0).unwrap()
+        );
+    }
+
+    #[test]
+    fn exponential_is_monotone_and_handles_unbounded_domains() {
+        let range = interval(-2.0, 3.0).checked_exp().unwrap();
+        assert!(range.lower() <= (-2.0_f64).exp());
+        assert!(range.upper() >= 3.0_f64.exp());
+        assert!(range.lower() >= 0.0);
+
+        let lower_unbounded = interval(f64::NEG_INFINITY, 0.0).checked_exp().unwrap();
+        assert_eq!(lower_unbounded.lower(), 0.0);
+        assert!(lower_unbounded.upper() >= 1.0);
+
+        let upper_unbounded = interval(0.0, f64::INFINITY).checked_exp().unwrap();
+        assert_eq!(upper_unbounded.lower(), 1.0);
+        assert_eq!(upper_unbounded.upper(), f64::INFINITY);
     }
 
     #[test]
