@@ -16,13 +16,14 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import wave
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-LANGUAGE_TAG = __import__("re").compile(r"^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$")
+LANGUAGE_TAG = re.compile(r"^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$")
 
 
 def _need(condition: bool, message: str) -> None:
