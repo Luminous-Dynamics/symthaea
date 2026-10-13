@@ -484,14 +484,17 @@ pub struct TemporalIdentityCoherence {
     /// Overall coherence score
     pub coherence: f64,
 
-    /// Past-present alignment
+    /// Past-present alignment; meaningful only when its availability flag is true.
     pub past_present_alignment: f64,
+    pub past_present_alignment_available: bool,
 
-    /// Present-future alignment
+    /// Present-future alignment; unknown until a projected future representation exists.
     pub present_future_alignment: f64,
+    pub present_future_alignment_available: bool,
 
-    /// Past-future alignment (long-term stability)
+    /// Past-future alignment (long-term stability); requires both representations.
     pub past_future_alignment: f64,
+    pub past_future_alignment_available: bool,
 
     /// Configuration weights
     config: TemporalConsciousnessConfig,
@@ -503,31 +506,32 @@ impl TemporalIdentityCoherence {
             past_self: None,
             present_self: None,
             future_self: None,
-            coherence: 1.0,
-            past_present_alignment: 1.0,
-            present_future_alignment: 1.0,
-            past_future_alignment: 1.0,
+            coherence: 0.0,
+            past_present_alignment: 0.0,
+            past_present_alignment_available: false,
+            present_future_alignment: 0.0,
+            present_future_alignment_available: false,
+            past_future_alignment: 0.0,
+            past_future_alignment_available: false,
             config,
         }
     }
 
-    /// Update from narrative, present, and predictive selves
+    /// Update with the historical and present representations currently available.
+    ///
+    /// The predictor currently forecasts scalar Φ/coherence values, not an
+    /// independently projected HDC vector. A copy of the present vector is not
+    /// evidence of future alignment, so future alignment remains unavailable
+    /// until a genuine projected representation is supplied.
     pub(crate) fn update(
         &mut self,
         narrative: &NarrativeSelfModel,
         present_state: &BinaryHV,
         _predictive: &PredictiveSelfModel,
     ) {
-        // Get past self from narrative
         self.past_self = Some(*narrative.unified_self());
-
-        // Present is given
         self.present_self = Some(*present_state);
-
-        // Get future self from predictions (if available)
-        // Use the predictor's last observed state as proxy for future trajectory
-        self.future_self = Some(*present_state); // Simplified for now
-
+        self.future_self = None;
         self.compute_coherence();
     }
 
@@ -540,37 +544,74 @@ impl TemporalIdentityCoherence {
     }
 
     fn compute_coherence(&mut self) {
-        // Compute pairwise alignments
+        // Reset to explicit unknowns before recomputing: absence must never reuse a
+        // stale score from an earlier update or inherit a perfect initialization.
+        self.past_present_alignment = 0.0;
+        self.past_present_alignment_available = false;
+        self.present_future_alignment = 0.0;
+        self.present_future_alignment_available = false;
+        self.past_future_alignment = 0.0;
+        self.past_future_alignment_available = false;
+
+        let mut weighted_sum = 0.0;
+        let mut total_weight = 0.0;
+
         if let (Some(past), Some(present)) = (&self.past_self, &self.present_self) {
             self.past_present_alignment = past.similarity(present) as f64;
+            self.past_present_alignment_available = true;
+            let weight = self.config.past_weight;
+            if weight.is_finite() && weight > 0.0 {
+                weighted_sum += weight * self.past_present_alignment;
+                total_weight += weight;
+            }
         }
 
         if let (Some(present), Some(future)) = (&self.present_self, &self.future_self) {
             self.present_future_alignment = present.similarity(future) as f64;
+            self.present_future_alignment_available = true;
+            let weight = self.config.present_weight;
+            if weight.is_finite() && weight > 0.0 {
+                weighted_sum += weight * self.present_future_alignment;
+                total_weight += weight;
+            }
         }
 
         if let (Some(past), Some(future)) = (&self.past_self, &self.future_self) {
             self.past_future_alignment = past.similarity(future) as f64;
+            self.past_future_alignment_available = true;
+            let weight = self.config.future_weight;
+            if weight.is_finite() && weight > 0.0 {
+                weighted_sum += weight * self.past_future_alignment;
+                total_weight += weight;
+            }
         }
 
-        // Weighted coherence
-        self.coherence = self.config.past_weight * self.past_present_alignment
-            + self.config.present_weight * self.present_future_alignment
-            + self.config.future_weight * self.past_future_alignment;
-
-        // Normalize
-        let total_weight =
-            self.config.past_weight + self.config.present_weight + self.config.future_weight;
-        if total_weight > 0.0 {
-            self.coherence /= total_weight;
-        }
+        // Score only measured relationships, and expose coverage separately.
+        self.coherence = if total_weight > 0.0 {
+            weighted_sum / total_weight
+        } else {
+            0.0
+        };
     }
 
-    /// Check if identity is temporally coherent
+    /// Number of the three pairwise alignments supported by actual representations.
+    pub fn alignment_coverage(&self) -> usize {
+        usize::from(self.past_present_alignment_available)
+            + usize::from(self.present_future_alignment_available)
+            + usize::from(self.past_future_alignment_available)
+    }
+
+    /// Check if identity is temporally coherent.
+    ///
+    /// Missing past/present/future evidence is not interpreted as perfect alignment.
     pub fn is_coherent(&self) -> bool {
-        self.coherence > 0.6
+        self.past_present_alignment_available
+            && self.present_future_alignment_available
+            && self.past_future_alignment_available
+            && self.coherence > 0.6
             && self.past_present_alignment > 0.5
             && self.present_future_alignment > 0.5
+            && self.past_future_alignment > 0.5
     }
 }
 
@@ -966,9 +1007,13 @@ impl TemporalConsciousnessAnalyzer {
             continuity_score: self.continuity.score,
             discontinuities: self.continuity.discontinuities.len(),
             identity_coherence: self.identity_coherence.coherence,
+            identity_alignment_coverage: self.identity_coherence.alignment_coverage(),
             past_present_alignment: self.identity_coherence.past_present_alignment,
+            past_present_alignment_available: self.identity_coherence.past_present_alignment_available,
             present_future_alignment: self.identity_coherence.present_future_alignment,
+            present_future_alignment_available: self.identity_coherence.present_future_alignment_available,
             past_future_alignment: self.identity_coherence.past_future_alignment,
+            past_future_alignment_available: self.identity_coherence.past_future_alignment_available,
             husserlian_coherence: self.husserlian.coherence(),
             retention_depth: self.husserlian.retention_depth,
             protention_depth: self.husserlian.protention_depth,
@@ -1000,11 +1045,18 @@ impl TemporalConsciousnessAnalyzer {
         }
 
         if !self.identity_coherence.is_coherent() {
-            if self.identity_coherence.past_present_alignment < 0.5 {
+            if !self.identity_coherence.past_present_alignment_available {
+                recs.push("Past-present alignment unavailable - obtain both representations".to_string());
+            } else if self.identity_coherence.past_present_alignment < 0.5 {
                 recs.push("Past-present disconnect - reinforce narrative continuity".to_string());
             }
-            if self.identity_coherence.present_future_alignment < 0.5 {
+            if !self.identity_coherence.present_future_alignment_available {
+                recs.push("Present-future alignment unavailable - a projected future representation is not yet available".to_string());
+            } else if self.identity_coherence.present_future_alignment < 0.5 {
                 recs.push("Present-future disconnect - clarify intentions".to_string());
+            }
+            if !self.identity_coherence.past_future_alignment_available {
+                recs.push("Past-future alignment unavailable - do not infer long-term identity stability".to_string());
             }
         }
 
@@ -1046,9 +1098,14 @@ pub struct TemporalConsciousnessReport {
 
     // Identity
     pub identity_coherence: f64,
+    /// Count of measured pairwise alignment relationships (0..=3).
+    pub identity_alignment_coverage: usize,
     pub past_present_alignment: f64,
+    pub past_present_alignment_available: bool,
     pub present_future_alignment: f64,
+    pub present_future_alignment_available: bool,
     pub past_future_alignment: f64,
+    pub past_future_alignment_available: bool,
 
     // Husserlian
     pub husserlian_coherence: f64,
@@ -1063,6 +1120,14 @@ pub struct TemporalConsciousnessReport {
     // Overall
     pub is_healthy: bool,
     pub recommendations: Vec<String>,
+}
+
+fn format_alignment(value: f64, available: bool) -> String {
+    if available {
+        format!("{:.1}%", value * 100.0)
+    } else {
+        "N/A".to_string()
+    }
 }
 
 impl std::fmt::Display for TemporalConsciousnessReport {
@@ -1086,10 +1151,11 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ║   Discontinuities:   {}                                                  ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ TEMPORAL IDENTITY COHERENCE                                              ║
-║   Overall:           {:.1}%                                              ║
-║   Past↔Present:      {:.1}%                                              ║
-║   Present↔Future:    {:.1}%                                              ║
-║   Past↔Future:       {:.1}%                                              ║
+║   Known-pair score:  {:.1}%                                              ║
+║   Coverage:          {}/3 relationships                                  ║
+║   Past↔Present:      {:>6}                                               ║
+║   Present↔Future:    {:>6}                                               ║
+║   Past↔Future:       {:>6}                                               ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ HUSSERLIAN ANALYSIS (Retention → Now → Protention)                       ║
 ║   Coherence:         {:.1}%                                              ║
@@ -1122,9 +1188,10 @@ impl std::fmt::Display for TemporalConsciousnessReport {
             self.continuity_score * 100.0,
             self.discontinuities,
             self.identity_coherence * 100.0,
-            self.past_present_alignment * 100.0,
-            self.present_future_alignment * 100.0,
-            self.past_future_alignment * 100.0,
+            self.identity_alignment_coverage,
+            format_alignment(self.past_present_alignment, self.past_present_alignment_available),
+            format_alignment(self.present_future_alignment, self.present_future_alignment_available),
+            format_alignment(self.past_future_alignment, self.past_future_alignment_available),
             self.husserlian_coherence * 100.0,
             self.retention_depth,
             self.protention_depth,
@@ -1198,6 +1265,24 @@ mod tests {
         assert!(analyzer.phi_trajectory.history().is_empty());
         assert!(analyzer.continuity.recent_states.is_empty());
         assert!(analyzer.husserlian.primal_impression.is_none());
+    }
+
+    #[test]
+    fn missing_future_projection_is_unknown_not_perfect_alignment() {
+        let mut coherence = TemporalIdentityCoherence::new(TemporalConsciousnessConfig::default());
+        coherence.past_self = Some(BinaryHV::random(41));
+        coherence.present_self = Some(BinaryHV::random(42));
+        coherence.future_self = None;
+
+        coherence.compute_coherence();
+
+        assert_eq!(coherence.alignment_coverage(), 1);
+        assert!(coherence.past_present_alignment_available);
+        assert!(!coherence.present_future_alignment_available);
+        assert!(!coherence.past_future_alignment_available);
+        assert_eq!(coherence.present_future_alignment, 0.0);
+        assert_eq!(coherence.past_future_alignment, 0.0);
+        assert!(!coherence.is_coherent());
     }
 
     #[test]
