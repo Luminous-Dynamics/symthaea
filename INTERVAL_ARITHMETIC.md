@@ -113,16 +113,25 @@ a Payne–Hanek-style fixed-point reduction based on a sufficiently long enclosu
 of 2/pi, return an explicit enclosure for the residual phase, and be tested
 against an independent high-precision oracle across exponent bands and
 quadrant-boundary cases. The proof obligation includes table truncation,
-fixed-point multiplication, and the complete residual error budget.
+fixed-point multiplication, and the complete residual error budget. A recent
+research lead is the September 28, 2026 preprint
+[A performance enhancement of the Payne-Hanek range reduction algorithm](https://arxiv.org/abs/2609.35015),
+which describes an FMA-oriented, branch-free approach and claims an LLVM libc
+implementation. Treat it as a candidate to inspect—not as a correctness result
+for this Rust interval implementation—and verify the exact upstream source,
+error bounds, licensing, and tests before adapting it.
 
 A separate implementation candidate is the Rust `crlibm` binding, which
 exposes directed-rounding `sin_rd`/`sin_ru` and
 `cos_rd`/`cos_ru` functions
 ([API documentation](https://docs.rs/crlibm/latest/crlibm/)). That could simplify
-point-function enclosures, but it introduces a bundled native C implementation
-and requires a portability, maintenance, licensing, and build-matrix review;
-it is not adopted by this module. Either route still needs interval-range
-handling for interior extrema, reproducible high-precision tests, and successful
+point-function enclosures, but it bundles native C code; the crate documentation
+also says the implementation has been superseded by MetaLibm and will not
+receive updates
+([crate maintenance note](https://docs.rs/crate/crlibm/latest)). It therefore
+requires a portability, maintenance, licensing, and build-matrix review and is
+not adopted by this module. Either route still needs interval-range handling
+for interior extrema, reproducible high-precision tests, and successful
 verification on the exact PR head before broadening the guarantee.
 
 A wider interval is conservative, not proof of a desired property. For example,
