@@ -1310,8 +1310,8 @@ mod tests {
         assert_eq!(report.identity_alignment_coverage, 0);
         assert!(!report.present_future_alignment_available);
         let rendered = report.to_string();
-        assert!(rendered.contains("Present↔Future:     N/A"));
-        assert!(rendered.contains("Past↔Future:        N/A"));
+        assert!(rendered.contains("Present↔Future:       N/A"));
+        assert!(rendered.contains("Past↔Future:          N/A"));
     }
 
     #[test]
