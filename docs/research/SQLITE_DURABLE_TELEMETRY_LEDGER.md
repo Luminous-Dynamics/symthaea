@@ -59,7 +59,7 @@ The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses
 - protected envelope persistence/reopen, exact-byte retransmission, hash/size mismatch rejection and separation of metadata-only rows from protected-envelope delivery;
 - requirement for receiver-signed ACKs on protected rows, rejection of forged/unknown/future-dated ACKs, and rejection of a signed ACK for the wrong envelope digest.
 
-The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 22 test cases, and `tests/test_energy_telemetry_receiver_inbox.py` adds 17 receiver-inbox cases covering signature/decryption failures, expiry/future timestamps, duplicate replay, concurrent acceptance and injected commit failure. These and the queue tests have been added to the dedicated GitHub Actions workflow. At the time this document was authored, the exact-head CI run was queued/pending; these tests are not declared passed until that specific run concludes successfully.
+The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 22 test cases, `tests/test_energy_telemetry_receiver_inbox.py` adds 17 receiver-inbox cases, and `tests/test_energy_telemetry_pipeline_integration.py` adds 3 end-to-end tests for normal signed delivery, a lost ACK with idempotent retry, and a tampered transmission. These and the queue tests have been added to the dedicated GitHub Actions workflow. At the time this document was authored, the exact-head CI run was queued/pending; these tests are not declared passed until that specific run concludes successfully.
 
 ## Standards and security research
 
