@@ -199,8 +199,8 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.assertEqual(self.build()["predictions"],[{"path":"nested/clip.mp3","text":""}])
 
     def test_invalid_latency_metrics_block_packaging(self):
-        self.outcome["transcription_latency_ms"] = float("nan")
-        self.outcomes_path.write_text(json.dumps(self.outcome, allow_nan=True) + "\n", encoding="utf-8")
+        self.outcome["transcription_latency_ms"] = -0.1
+        self.outcomes_path.write_text(json.dumps(self.outcome) + "\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "transcription_latency_ms must be null or a finite"):
             self.build()
 
