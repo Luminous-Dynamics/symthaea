@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 3
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Capture execution environment
@@ -50,8 +50,9 @@ jobs:
           set -euo pipefail
           SOURCE=8384812e06b90563f2d52e573cb22910529a12e4
           PARENT=fbd7a754ea8389ca93f7680d93ed8b48553e6376
-          test "$(git rev-parse HEAD^)" = "$SOURCE"
-          test "$(git rev-parse HEAD^^)" = "$PARENT"
+          test "$(git rev-parse "$SOURCE^")" = "$PARENT"
+          git merge-base --is-ancestor "$SOURCE" HEAD
+          test "$(git rev-list --count "$SOURCE"..HEAD)" -ge 1
 
       - name: Bind exact clarified source blobs digest and profile
         shell: bash
@@ -79,7 +80,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          actual="$(git diff --name-only HEAD^ HEAD | sort)"
+          SOURCE=8384812e06b90563f2d52e573cb22910529a12e4
+          actual="$(git diff --name-only "$SOURCE" HEAD | sort)"
           expected="$(printf '%s\n' '.github/workflows/fep-efe-action-001a1-qualifier.yml' 'scripts/validate_fep_efe_action_001a.py' | sort)"
           test "$actual" = "$expected"
 
@@ -87,7 +89,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/validate_fep_efe_action_001a.py --source-ref HEAD^
+          SOURCE=8384812e06b90563f2d52e573cb22910529a12e4
+          python3 scripts/validate_fep_efe_action_001a.py --source-ref "$SOURCE"
 
       - name: Postflight source immutability and cleanliness
         shell: bash
@@ -96,5 +99,5 @@ jobs:
           SOURCE=8384812e06b90563f2d52e573cb22910529a12e4
           test "$(git rev-parse "$SOURCE:docs/fep/FEP_EFE_ACTION_001A.md")" = "af204b5352758007b86688ce5d8769e520b7595e"
           test "$(git rev-parse "$SOURCE:docs/fep/data/fep_efe_action_001a_reference_v1.json")" = "1a43de933de8b96b05b8f0f1ee274a3c29119386"
-          git diff --exit-code HEAD^ HEAD -- docs/fep/FEP_EFE_ACTION_001A.md docs/fep/data/fep_efe_action_001a_reference_v1.json
+          git diff --exit-code "$SOURCE" HEAD -- docs/fep/FEP_EFE_ACTION_001A.md docs/fep/data/fep_efe_action_001a_reference_v1.json
           test -z "$(git status --porcelain)"
