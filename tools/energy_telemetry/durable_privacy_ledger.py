@@ -421,6 +421,10 @@ class DurablePrivacyLedger:
             raise DurablePrivacyPolicyError(
                 f"minimum_cohort_size cannot be below policy floor {self.minimum_cohort_size}"
             )
+        if isinstance(participant_tokens, (str, bytes)):
+            raise DurablePrivacyPolicyError(
+                "participant_tokens must be an iterable of local tokens, not a single string"
+            )
         try:
             tokens = list(participant_tokens)
         except (TypeError, ValueError) as exc:
