@@ -2228,7 +2228,7 @@ mod tests {
         ));
         assert!(!binding.try_add_binding(
             "perception",
-            "\\t",
+            "\t",
             AllenRelation::Overlaps,
             0.8,
         ));
