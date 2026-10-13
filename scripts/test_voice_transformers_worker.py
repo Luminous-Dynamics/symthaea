@@ -15,6 +15,7 @@ from voice_transformers_worker import (
     response_envelope,
     transcribe_observation,
     validate_observation,
+    validate_local_model_snapshot,
 )
 
 
@@ -122,6 +123,10 @@ class TransformersWorkerTests(unittest.TestCase):
             validate_observation(observation(channels=True), max_audio_seconds=60)
         with self.assertRaisesRegex(ValueError, "16 kHz"):
             validate_observation(observation(sample_rate_hz=True), max_audio_seconds=60)
+        extra = observation()
+        extra["modality"]["Audio"]["unexpected"] = "ignored field"
+        with self.assertRaisesRegex(ValueError, "fields do not match"):
+            validate_observation(extra, max_audio_seconds=60)
 
     def test_rejects_empty_oversized_and_bad_samples(self):
         with self.assertRaisesRegex(ValueError, "empty"):
@@ -132,6 +137,23 @@ class TransformersWorkerTests(unittest.TestCase):
             with self.subTest(bad=repr(bad)):
                 with self.assertRaisesRegex(ValueError, "sample"):
                     validate_observation(observation([bad]), max_audio_seconds=60)
+
+    def test_local_model_snapshot_requires_real_directory_and_regular_files(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "model"
+            root.mkdir()
+            (root / "config.json").write_text("{}", encoding="utf-8")
+            self.assertEqual(validate_local_model_snapshot(str(root)), str(root.resolve()))
+            alias = Path(tmp) / "link"
+            alias.symlink_to(root, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "not a symlink"):
+                validate_local_model_snapshot(str(alias))
+            (root / "external-link").symlink_to(Path(tmp) / "outside.bin")
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                validate_local_model_snapshot(str(root))
 
     def test_transcription_uses_model_config_prompt_without_language_override(self):
         processor, model = FakeProcessor("Môre!"), FakeModel()
