@@ -298,15 +298,18 @@ class DurableQueueTests(unittest.TestCase):
     def test_schema_v1_migrates_transactionally_to_v3(self):
         with sqlite3.connect(self.database) as db:
             db.execute("DROP TABLE telemetry_queue_config")
+            db.execute("ALTER TABLE telemetry_events DROP COLUMN envelope_bytes")
             db.execute("PRAGMA user_version = 1")
         migrated = self.reopen()
         self.assertEqual(migrated.integrity_check(), "ok")
         with sqlite3.connect(self.database) as db:
             self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
+            columns = {row[1] for row in db.execute("PRAGMA table_info(telemetry_events)")}
             config = db.execute(
                 "SELECT max_queue_bytes, max_records, max_future_skew_seconds "
                 "FROM telemetry_queue_config WHERE singleton = 1"
             ).fetchone()
+        self.assertIn("envelope_bytes", columns)
         self.assertEqual(config, (1000, 100_000, 300))
 
     def test_unknown_schema_version_fails_closed(self):
