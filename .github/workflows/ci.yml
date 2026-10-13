@@ -113,6 +113,9 @@ jobs:
       - name: Crate registry integrity
         run: cargo run -q -p xtask -- crate-status
 
+      - name: Test communication contracts and local ASR worker
+        run: cargo test -p symthaea-communication --all-targets
+
   embodiment-safety-composition:
     name: Embodiment Safety Composition
     runs-on: ubuntu-latest
