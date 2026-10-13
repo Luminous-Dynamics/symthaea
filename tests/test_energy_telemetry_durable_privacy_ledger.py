@@ -185,11 +185,11 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
     def test_commit_output_is_immutable_and_survives_restart(self):
         reservation = self.reserve()
         output = b'{"cohort_energy_wh_noisy":4200,"schema":"v1"}'
-        committed = self.ledger.commit_output(
+        committed = self.ledger._commit_output_after_attestation(
             release_id=reservation.release_id, output_bytes=output, committed_at_utc=self.now
         )
         self.assertFalse(committed.duplicate)
-        retry = self.reopen().commit_output(
+        retry = self.reopen()._commit_output_after_attestation(
             release_id=reservation.release_id, output_bytes=output, committed_at_utc=self.now
         )
         self.assertTrue(retry.duplicate)
@@ -216,23 +216,23 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
 
     def test_second_output_for_same_reservation_is_rejected(self):
         result = self.reserve()
-        self.ledger.commit_output(
+        self.ledger._commit_output_after_attestation(
             release_id=result.release_id, output_bytes=b'{"noisy":1}', committed_at_utc=self.now
         )
         with self.assertRaises(EventIdentityConflict):
-            self.ledger.commit_output(
+            self.ledger._commit_output_after_attestation(
                 release_id=result.release_id, output_bytes=b'{"noisy":2}', committed_at_utc=self.now
             )
 
     def test_output_cannot_be_committed_without_budget_reservation(self):
         with self.assertRaisesRegex(DurablePrivacyPolicyError, "without a reservation"):
-            self.ledger.commit_output(
+            self.ledger._commit_output_after_attestation(
                 release_id="f" * 32, output_bytes=b'{"noisy":1}', committed_at_utc=self.now
             )
 
     def test_committed_output_digest_is_rechecked(self):
         result = self.reserve()
-        self.ledger.commit_output(
+        self.ledger._commit_output_after_attestation(
             release_id=result.release_id, output_bytes=b'{"noisy":1}', committed_at_utc=self.now
         )
         with sqlite3.connect(self.database) as db:
@@ -387,7 +387,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             reserved=self.now,
         )
         with self.assertRaisesRegex(DurablePrivacyPolicyError, "before its release window ends"):
-            self.ledger.commit_output(
+            self.ledger._commit_output_after_attestation(
                 release_id=reservation.release_id,
                 output_bytes=b'{"noisy":4200}',
                 committed_at_utc=dt("2026-10-13T06:01:00Z"),
@@ -399,7 +399,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
     def test_output_commit_time_cannot_precede_reservation(self):
         reservation = self.reserve()
         with self.assertRaisesRegex(DurablePrivacyPolicyError, "cannot precede"):
-            self.ledger.commit_output(
+            self.ledger._commit_output_after_attestation(
                 release_id=reservation.release_id,
                 output_bytes=b'{"noisy":1}',
                 committed_at_utc=dt("2026-10-13T05:59:59Z"),
@@ -472,6 +472,10 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             signature=signature,
             committed_at_utc=self.now,
         )
+
+    def test_no_public_unqualified_output_commit_api_is_exposed(self):
+        self.assertFalse(hasattr(self.ledger, "commit_output"))
+        self.assertTrue(hasattr(self.ledger, "_commit_output_after_attestation"))
 
     def test_signed_mechanism_attestation_binds_reservation_and_output(self):
         reservation = self.reserve()
