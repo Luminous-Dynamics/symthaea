@@ -12,7 +12,7 @@ import unittest
 import wave
 from pathlib import Path
 
-from prepare_voice_asr_pilot import prepare
+from prepare_voice_asr_pilot import _read_json, prepare
 from voice_dataset_intake import audit_dataset
 
 
@@ -87,6 +87,12 @@ class PrepareVoiceAsrPilotTests(unittest.TestCase):
         manifest=json.loads((output/"prepared_manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["sample_count"],1)
         self.assertIn("preprocessing evidence only",manifest["interpretation"])
+
+    def test_duplicate_keys_in_intake_receipt_are_rejected(self):
+        duplicate = self.base / "duplicate-intake.json"
+        duplicate.write_text('{"schema_version":1,"schema_version":2}', encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "duplicate JSON object key"):
+            _read_json(duplicate)
 
     def test_source_archive_drift_is_rejected(self):
         self.archive.write_bytes(b"different archive")
