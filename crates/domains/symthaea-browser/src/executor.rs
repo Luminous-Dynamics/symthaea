@@ -619,9 +619,9 @@ mod receipt_privacy_tests {
         let execution = build_execution(
             &action,
             allowed(),
-            ActionOutcome::Denied,
+            ActionOutcome::Executed,
             ActionOutput::None,
-            Some(ActionReasonCode::PolicyDenied),
+            None,
             1,
             None,
         );
