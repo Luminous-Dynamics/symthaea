@@ -38,6 +38,39 @@ A snapshot checked on **2026-10-12** narrows the initial adapter plan:
 
 These Common Voice snapshots can exercise ingestion, decoding, tokenizer/G2P wiring, and a few reproducible smoke cases. Their tiny validated/test partitions are **not sufficient evidence of robust ASR, dialect coverage, voice quality, or synthesis capability**. Do not train or promote a model based on these clip counts alone. The next responsible step is to pin permitted artefacts and metadata, build a language-aware pipeline smoke test, then gather additional consented/licensed audio and a held-out-speaker evaluation set with language-community input. The registry intentionally keeps Afrikaans, isiZulu, and isiXhosa unverified; the existence of these datasets does not alter that status.
 
+### Candidate ASR baseline: BuzzASR Afrikaans
+
+A particularly relevant publicly documented candidate is [BuzzASR/afrikaans](https://huggingface.co/BuzzASR/afrikaans). Its model card declares an MIT licence, describes it as a language-specialized fine-tune of Whisper large-v3 that retains Whisper's tokenizer, and reports **normalized WER 4.21% on Common Voice 25** versus **22.36% on FLEURS**. It is a useful comparator, not a Symthaea result. The two reported WERs differ sharply, which is a concrete reminder that dataset and domain change the result; metrics are reproduced here only as model-card-reported claims, not independently verified measurements. The associated [BuzzASR paper](https://arxiv.org/abs/2609.09554) describes a broader suite of 102 language-specific models.
+
+The current hypothesis is to export a fixed BuzzASR snapshot, attempt the documented [whisper.cpp fine-tuned-model conversion path](https://github.com/ggml-org/whisper.cpp/blob/master/models/README.md#fine-tuned-models), and run it through a pinned local worker. Conversion must be validated before any result is trusted: the converted model, converter commit, tokenizer/config files, quantization mode and runtime build must all be pinned and hashed. A Q5-quantized artifact is a **separate candidate** from F16; compare both on identical clips and don't assume equal quality. Do not automatically fetch model weights from the runtime or CI.
+
+Important evaluation caveat: BuzzASR reports training on FLEURS and Common Voice 25. A Common Voice 27 run is newer, but that fact alone does **not** prove there is zero overlap of contributors or audio across releases. The scorer below records exact local artifacts and held-out splits, but it cannot establish that a candidate model never saw the same audio or source text during training. Record the model's training-corpus provenance separately; treat overlap as `not_assessed` unless it has been independently checked. Do not use the reported Common Voice 25 score as an unbiased, apples-to-apples baseline for a Common Voice 27 result.
+
+### Reproducible WER/CER scorer
+
+I added `scripts/voice_asr_score.py` plus `scripts/test_voice_asr_score.py`, wired into the CI `muse` job. The scorer itself runs on the Python standard library; model inference remains a separate local adapter/runtime step. It requires an intake report, the exact local archive and test metadata, a regular-file model export, and one prediction for every test row. The prediction JSON pins locale, dataset ID/version, archive SHA-256, test.tsv SHA-256, model ID, exact 40-hex model repository revision and declared licence.
+
+For the report it computes micro-averaged WER and CER, per-reference-length buckets and deterministic 95% percentile-bootstrap confidence intervals. Text normalization is explicitly versioned (`NFKC`, Unicode case-folding, punctuation-to-space, whitespace collapse) and preserves diacritics. It records an SHA-256 manifest of every model-export file. Reports contain only aggregate metrics and hashes—not transcripts, clip paths or speaker tokens—and use exclusive-create semantics to prevent overwrite. Empty ASR output counts as deletions rather than being silently dropped; missing, duplicate or unknown predictions fail the evaluation.
+
+Example, after producing a complete local prediction JSON using an approved adapter:
+
+```sh
+python3 scripts/voice_asr_score.py \\
+  --dataset-root "$CV_ROOT/af" \\
+  --archive "$CV_ARCHIVE" \\
+  --intake-report "$PRIVATE_DIR/af-dataset-intake.json" \\
+  --predictions "$PRIVATE_DIR/af-asr-predictions.json" \\
+  --model-root "$PRIVATE_MODEL_EXPORT" \\
+  --locale af \\
+  --model-id BuzzASR/afrikaans \\
+  --model-revision "$MODEL_REVISION_40_HEX" \\
+  --model-license MIT \\
+  --mode smoke \\
+  --report "$PRIVATE_DIR/af-asr-score.json"
+```
+
+The predictions file has schema version 1, the pinned dataset/model metadata described above, and a `predictions` array of objects with exactly `path` and `text`. It contains the private transcripts and must remain in a private directory. `--mode smoke` is exploratory only. `--mode heldout-evaluation` additionally requires the intake audit's speaker-disjoint mode, at least 100 test clips and at least 10 test speakers. Neither mode alone promotes the language registry. No model was downloaded or run during this change, and no WER/CER result is being claimed for Symthaea.
+
 ### First runnable dataset-intake gate: Afrikaans ASR
 
 The first additional-language *pipeline smoke target* is **Afrikaans** (`af`). This is a prioritization choice for a locally relevant Latin-script language and an available public ASR dataset, not a claim that Afrikaans is already supported or that this corpus has sufficient quality for production. Mozilla announced Common Voice Scripted Speech v27.0 on **September 18, 2026**, covering 295 languages overall; that global figure is not a per-language coverage metric ([release announcement](https://discourse.mozilla.org/t/common-voice-scripted-speech-v27-0-and-spontaneous-speech-v5-0-released/149490)). The current dataset index lists Afrikaans as a CC0-1.0 ASR corpus; use the exact locale page and release metadata, not just the index, when pinning a run ([Mozilla Data Collective datasets](https://mozilladatacollective.com/datasets)).
