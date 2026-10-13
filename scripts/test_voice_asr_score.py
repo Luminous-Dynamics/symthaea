@@ -263,6 +263,30 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertEqual(report["model"]["runtime_model_snapshot_file_count"], 2)
         self.assertNotIn("converted_export_file_count", report["model"])
 
+    def test_transformers_runtime_rejects_startup_metadata_log_drift(self):
+        doc = copy.deepcopy(self.pred_doc)
+        doc["runtime"] = {
+            "kind": "transformers",
+            "python_executable_sha256": sha256_file(self.runtime_binary),
+            "worker_script_sha256": sha256_file(self.runtime_worker),
+            "model_snapshot_manifest_sha256": _hash_tree(self.source_model_root)[0],
+            "startup_metadata_log_sha256": "0" * 64,
+            "python_version": "3.12.1",
+            "torch_version": "2.8.0",
+            "transformers_version": "4.56.0",
+            "numpy_version": "2.1.0",
+            "device": "cpu",
+            "dtype": "float32",
+            "offline": True,
+        }
+        with self.assertRaisesRegex(ValueError, "startup metadata log SHA-256"):
+            self.score(
+                prediction_doc=doc,
+                model_root=self.source_model_root,
+                source_model_root=self.source_model_root,
+                runtime_worker_path=self.runtime_worker,
+            )
+
     def test_transformers_runtime_rejects_model_snapshot_digest_drift(self):
         doc = copy.deepcopy(self.pred_doc)
         doc["runtime"] = {
