@@ -1,9 +1,10 @@
-"""SQLite-backed restart-safe store-and-forward policy prototype.
+"""SQLite-backed store-and-forward ledger for metadata and sealed envelopes.
 
-This module persists event metadata and payload digests, not sensor payloads.
-It provides transactional queue state and bounded, fail-closed growth. It is
-not a network transport, cryptographic authenticator, encrypted storage layer,
-or complete production telemetry service.
+The metadata-only API stores no application payload. The protected API stores
+canonical AEAD-encrypted envelope bytes produced by authenticated_envelope.py.
+This module provides transactional retry/ACK state and bounded, fail-closed
+growth; it is not an authenticated ACK protocol, key manager, database
+encryption layer, network transport, or production telemetry service.
 """
 from __future__ import annotations
 
