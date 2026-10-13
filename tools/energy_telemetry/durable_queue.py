@@ -8,6 +8,7 @@ or complete production telemetry service.
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 import hashlib
 import os
@@ -29,7 +30,7 @@ _SCHEMA_VERSION = 3
 _APPLICATION_ID = 0x53594D54  # ASCII 'SYMT'; identifies this SQLite file format
 
 
-@__import__("dataclasses").dataclass(frozen=True)
+@dataclass(frozen=True)
 class QueuedProtectedTransmission:
     """Exact persisted protected bytes selected for at-least-once delivery."""
 
