@@ -42,6 +42,8 @@ class VoiceAsrScoreTests(unittest.TestCase):
         (self.model_root / "model.bin").write_bytes(b"synthetic converted model artifact")
         self.runtime_binary = self.base / "whisper-cli"
         self.runtime_binary.write_bytes(b"synthetic whisper runtime executable")
+        self.runtime_worker = self.base / "voice_transformers_worker.py"
+        self.runtime_worker.write_text("# synthetic test worker\\n", encoding="utf-8")
         self.runtime = {
             "kind": "whisper.cpp",
             "runtime_commit": "d" * 40,
@@ -174,6 +176,54 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertEqual(report["mode"], "smoke")
         self.assertIn("exploratory smoke metric only", report["interpretation"])
         self.assertEqual(report["training_data_overlap_status"], "not_assessed")
+
+    def test_transformers_runtime_scores_against_the_exact_native_model_snapshot(self):
+        doc = copy.deepcopy(self.pred_doc)
+        doc["runtime"] = {
+            "kind": "transformers",
+            "python_executable_sha256": sha256_file(self.runtime_binary),
+            "worker_script_sha256": sha256_file(self.runtime_worker),
+            "python_version": "3.12.1",
+            "torch_version": "2.8.0",
+            "transformers_version": "4.56.0",
+            "numpy_version": "2.1.0",
+            "device": "cpu",
+            "dtype": "float32",
+            "offline": True,
+        }
+        report = self.score(
+            prediction_doc=doc,
+            model_root=self.source_model_root,
+            source_model_root=self.source_model_root,
+            runtime_worker_path=self.runtime_worker,
+        )
+        self.assertEqual(report["runtime"]["kind"], "transformers")
+        self.assertEqual(report["runtime"]["worker_script_sha256"], sha256_file(self.runtime_worker))
+        self.assertEqual(report["runtime"]["offline"], True)
+        self.assertEqual(report["model"]["runtime_model_snapshot_file_count"], 2)
+        self.assertNotIn("converted_export_file_count", report["model"])
+
+    def test_transformers_runtime_requires_matching_worker_digest(self):
+        doc = copy.deepcopy(self.pred_doc)
+        doc["runtime"] = {
+            "kind": "transformers",
+            "python_executable_sha256": sha256_file(self.runtime_binary),
+            "worker_script_sha256": "0" * 64,
+            "python_version": "3.12.1",
+            "torch_version": "2.8.0",
+            "transformers_version": "4.56.0",
+            "numpy_version": "2.1.0",
+            "device": "cpu",
+            "dtype": "float32",
+            "offline": True,
+        }
+        with self.assertRaisesRegex(ValueError, "worker script SHA-256"):
+            self.score(
+                prediction_doc=doc,
+                model_root=self.source_model_root,
+                source_model_root=self.source_model_root,
+                runtime_worker_path=self.runtime_worker,
+            )
 
     def test_aggregate_report_contains_no_transcripts_paths_or_speaker_tokens(self):
         report = self.score()
