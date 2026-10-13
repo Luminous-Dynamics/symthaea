@@ -930,8 +930,9 @@ impl TemporalConsciousnessAnalyzer {
 
     /// Deterministic observation entry point for fixed-clock replay and conformance tests.
     ///
-    /// This variant has no external narrative or predictor context; unavailable identity
-    /// representations are kept unknown rather than synthesized.
+    /// `elapsed` must be an offset from one fixed replay origin and use the same origin
+    /// for every call; it is not a wall-clock timestamp. This variant has no external
+    /// narrative or predictor context, so unavailable identity representations stay unknown.
     pub fn observe_at(&mut self, state: &BinaryHV, phi: f64, elapsed: Duration) -> bool {
         self.try_observe_at_with_context(state, phi, elapsed, None)
     }
