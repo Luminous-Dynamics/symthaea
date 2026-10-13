@@ -151,7 +151,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
                 "error": None,
             })
         self.outcomes_path.write_text(
-            "".join(json.dumps(row, ensure_ascii=False) + "\\n" for row in rows),
+            "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
             encoding="utf-8",
         )
 
