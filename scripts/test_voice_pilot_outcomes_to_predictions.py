@@ -16,6 +16,7 @@ from voice_asr_score import _hash_tree, sha256_file
 from voice_pilot_outcomes_to_predictions import (
     OUTCOME_KEYS,
     build_predictions,
+    read_outcomes,
     write_private_exclusive,
 )
 
@@ -109,6 +110,13 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.assertEqual(doc["runtime"]["runtime_binary_sha256"],sha256_file(self.runtime_binary))
         self.assertEqual(doc["predictions"],[{"path":"nested/clip.mp3","text":"Môre"}])
         self.assertEqual(len(doc["outcomes_sha256"]),64)
+
+    def test_duplicate_keys_in_raw_outcomes_are_rejected(self):
+        self.outcomes_path.write_text(
+            '{"id":"nested/clip.mp3","id":"other.mp3"}\\n', encoding="utf-8"
+        )
+        with self.assertRaisesRegex(ValueError, "duplicate JSON object key"):
+            read_outcomes(self.outcomes_path)
 
     def test_empty_transcript_is_preserved_not_discarded(self):
         self.outcome["transcript"]=""
