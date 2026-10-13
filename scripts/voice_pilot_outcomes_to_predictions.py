@@ -19,9 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from voice_asr_score import (
-    RUNTIME_KEYS,
     SHA1_RE,
-    SHA256_RE,
     _load_intake,
     _need,
     _read_json,
@@ -212,7 +210,7 @@ def main() -> int:
         )
         write_private_exclusive(
             args.output, doc,
-            [args.dataset_root, args.model_root, args.outcomes.parent.resolve(strict=True)],
+            [args.dataset_root, args.model_root],
         )
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
