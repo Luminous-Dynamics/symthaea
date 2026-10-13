@@ -101,6 +101,9 @@ def build_predictions(
     numpy_version: str | None = None,
     device: str | None = None,
     dtype: str | None = None,
+    runtime_model_snapshot_sha256: str | None = None,
+    runtime_python_executable_sha256: str | None = None,
+    runtime_worker_sha256: str | None = None,
     mode: str = "smoke",
 ) -> dict[str, Any]:
     _need(mode in {"smoke", "heldout-evaluation"}, "mode must be smoke or heldout-evaluation")
@@ -129,6 +132,13 @@ def build_predictions(
                   f"{name} must be explicitly recorded")
         _need(device in {"cpu", "cuda"}, "Transformers device must be cpu or cuda")
         _need(dtype in {"float32", "float16", "bfloat16"}, "Transformers dtype is unsupported")
+        for name, value in (
+            ("runtime_model_snapshot_sha256", runtime_model_snapshot_sha256),
+            ("runtime_python_executable_sha256", runtime_python_executable_sha256),
+            ("runtime_worker_sha256", runtime_worker_sha256),
+        ):
+            _need(isinstance(value, str) and SHA256_RE.fullmatch(value) is not None,
+                  f"{name} must be a 64-hex digest observed at worker startup")
 
     dataset, test_rows, test_sha = _load_intake(
         intake_report, dataset_root=dataset_root, archive=archive, locale=locale, expected_mode=mode
@@ -189,10 +199,18 @@ def build_predictions(
     else:
         _need(converted_root_real == source_root_real,
               "Transformers model-root must be the exact source-model-root snapshot")
+        actual_worker_sha = sha256_file(runtime_worker_path)
+        _need(source_snapshot_sha == runtime_model_snapshot_sha256,
+              "local model snapshot digest differs from the value observed at worker startup")
+        _need(runtime_sha == runtime_python_executable_sha256,
+              "Python executable digest differs from the value observed at worker startup")
+        _need(actual_worker_sha == runtime_worker_sha,
+              "worker script digest differs from the value observed at worker startup")
         runtime_record = {
             "kind": "transformers",
             "python_executable_sha256": runtime_sha,
-            "worker_script_sha256": sha256_file(runtime_worker_path),
+            "worker_script_sha256": actual_worker_sha,
+            "model_snapshot_manifest_sha256": source_snapshot_sha,
             "python_version": python_version,
             "torch_version": torch_version,
             "transformers_version": transformers_version,
@@ -269,6 +287,9 @@ def main() -> int:
     parser.add_argument("--numpy-version", help="exact NumPy version reported by the worker")
     parser.add_argument("--device", choices=("cpu", "cuda"), help="actual device reported by the worker")
     parser.add_argument("--dtype", choices=("float32", "float16", "bfloat16"), help="actual dtype reported by the worker")
+    parser.add_argument("--runtime-model-snapshot-sha256", help="model manifest digest printed by the worker at startup")
+    parser.add_argument("--runtime-python-executable-sha256", help="Python executable digest printed by the worker at startup")
+    parser.add_argument("--runtime-worker-sha256", help="worker script digest printed by the worker at startup")
     parser.add_argument("--mode", choices=("smoke", "heldout-evaluation"), default="smoke")
     parser.add_argument("--output", required=True, type=Path, help="new private predictions JSON; contains all reference and hypothesis text")
     args = parser.parse_args()
@@ -284,7 +305,10 @@ def main() -> int:
             runtime_kind=args.runtime_kind, runtime_worker_path=args.runtime_worker,
             python_version=args.python_version, torch_version=args.torch_version,
             transformers_version=args.transformers_version, numpy_version=args.numpy_version,
-            device=args.device, dtype=args.dtype, mode=args.mode,
+            device=args.device, dtype=args.dtype,
+            runtime_model_snapshot_sha256=args.runtime_model_snapshot_sha256,
+            runtime_python_executable_sha256=args.runtime_python_executable_sha256,
+            runtime_worker_sha256=args.runtime_worker_sha256, mode=args.mode,
         )
         write_private_exclusive(
             args.output, doc,
