@@ -1244,25 +1244,28 @@ mod domain_safe_simplification_tests {
     fn interval_evaluation_encloses_bounded_sine_and_cosine() {
         let sine = Expr::Func(UnaryFn::Sin, Box::new(Expr::Var("x".into())));
         let cosine = Expr::Func(UnaryFn::Cos, Box::new(Expr::Var("x".into())));
-        let input = Interval::new(-1.5, 1.5).unwrap();
+        let input = Interval::new(-2.0, 2.0).unwrap();
 
         let sin_range = sine.eval_interval(&[("x", input)]).unwrap();
-        assert!(sin_range.lower() <= -0.9974949866040544);
-        assert!(sin_range.upper() >= 0.9974949866040544);
+        assert_eq!(sin_range, Interval::new(-1.0, 1.0).unwrap());
 
         let cos_range = cosine.eval_interval(&[("x", input)]).unwrap();
-        assert!(cos_range.lower() <= 0.0707372016677029);
+        assert!(cos_range.lower() <= -0.4161468365471424);
         assert_eq!(cos_range.upper(), 1.0);
 
-        // Argument reduction is intentionally not guessed: the sound fallback
-        // is broad, but it remains useful to callers that need a valid enclosure.
-        let broad = Interval::new(1.5, 1.6).unwrap();
+        // The extremum-aware endpoint hull is useful even when the argument
+        // interval lies to one side of zero, without guessing argument reduction.
+        let narrow = Interval::new(1.6, 1.8).unwrap();
+        let sin_narrow = sine.eval_interval(&[("x", narrow)]).unwrap();
+        assert!(sin_narrow.lower() > 0.9);
+        assert_eq!(sin_narrow.upper(), 1.0);
+        let cos_narrow = cosine.eval_interval(&[("x", narrow)]).unwrap();
+        assert!(cos_narrow.lower() > -0.5);
+        assert!(cos_narrow.upper() < 0.0);
+
+        let beyond = Interval::new(2.0, 2.1).unwrap();
         assert_eq!(
-            sine.eval_interval(&[("x", broad)]).unwrap(),
-            Interval::new(-1.0, 1.0).unwrap()
-        );
-        assert_eq!(
-            cosine.eval_interval(&[("x", broad)]).unwrap(),
+            sine.eval_interval(&[("x", beyond)]).unwrap(),
             Interval::new(-1.0, 1.0).unwrap()
         );
     }
