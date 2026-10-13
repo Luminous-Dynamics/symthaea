@@ -31,6 +31,7 @@ from tools.energy_telemetry.store_forward import (
 _SCHEMA_VERSION = 1
 _APPLICATION_ID = 0x4450524C  # ASCII 'DPRL'
 MINIMUM_COHORT_SIZE = 20
+MAX_COHORT_PARTICIPANTS = 10_000  # hard resource ceiling; review before changing
 EPSILON_SCALE = 1_000_000_000
 DELTA_SCALE = 1_000_000_000_000
 MAX_RELEASE_EPSILON_NANO = EPSILON_SCALE
@@ -425,8 +426,18 @@ class DurablePrivacyLedger:
             raise DurablePrivacyPolicyError(
                 "participant_tokens must be an iterable of local tokens, not a single string"
             )
+        # Bound materialization before hashing or opening the SQLite write transaction.
+        # Otherwise an unbounded iterable can exhaust memory before policy rejects it.
+        tokens = []
         try:
-            tokens = list(participant_tokens)
+            for token in participant_tokens:
+                if len(tokens) >= MAX_COHORT_PARTICIPANTS:
+                    raise DurablePrivacyPolicyError(
+                        f"participant cohort exceeds hard maximum of {MAX_COHORT_PARTICIPANTS}"
+                    )
+                tokens.append(token)
+        except DurablePrivacyPolicyError:
+            raise
         except (TypeError, ValueError) as exc:
             raise DurablePrivacyPolicyError("participant_tokens must be an iterable of local tokens") from exc
         if any(not isinstance(token, str) or not token.strip() or len(token) > 1024 for token in tokens):
