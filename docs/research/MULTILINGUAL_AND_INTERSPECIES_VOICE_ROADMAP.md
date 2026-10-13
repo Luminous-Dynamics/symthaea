@@ -89,13 +89,14 @@ python3 scripts/voice_pilot_outcomes_to_predictions.py \\
   --output "$PRIVATE_DIR/af-predictions.json"
 ```
 
-6. Score it. The scorer independently checks the archive, test.tsv, runtime executable hash, converted artifact hash, and full model-export file-manifest hash; it refuses schema and metadata drift.
+6. Score it. The scorer independently checks the archive, test.tsv, raw pilot outcome JSONL digest, runtime executable hash, converted artifact hash, and full model-export file-manifest hash; it refuses schema and metadata drift.
 
 ```sh
 python3 scripts/voice_asr_score.py \\
   --dataset-root "$CV_ROOT/af" --archive "$CV_ARCHIVE" \\
   --intake-report "$PRIVATE_DIR/af-dataset-intake.json" \\
   --predictions "$PRIVATE_DIR/af-predictions.json" \\
+  --outcomes "$PRIVATE_DIR/af-outcomes.jsonl" \\
   --model-root "$MODEL_EXPORT" \\
   --runtime-binary "$WHISPER_CPP_DIR/build/bin/whisper-cli" \\
   --locale af --model-id BuzzASR/afrikaans \\
