@@ -101,7 +101,7 @@ overlaps a cached enclosure of +/-pi/2. That enclosure is computed from Machin's
 identity `pi/2 = 8 atan(1/5) - 2 atan(1/239)`, using 25 and 8 alternating-series
 terms with symmetric `2^-120` remainder allowances; if construction fails, sine
 returns `[-1, 1]`. Cosine uses its endpoint hull and the exact maximum 1 when the
-input contains zero. For intervals extending outside [-2, 2], a checked quadrant-reduction path is attempted. It encloses the quotient by pi/2, requires every possible quotient to lie strictly inside one nearest-integer cell, computes an interval for `r = x - k*pi/2`, and checks that `r` remains inside [-2, 2]. Sine/cosine are then mapped through the exact quadrant identity using the local series enclosures. The accepted quadrant index is capped at 1,000,000,000; ambiguous, non-finite, excessive, or otherwise unusable reductions return `[-1, 1]`. This extends tight enclosures to many moderate and large finite values without claiming all-binary64 coverage. No platform `f64::sin` or `f64::cos` result is used to form an enclosure.
+input contains zero. For intervals extending outside [-2, 2], a checked quadrant-reduction path is attempted. It encloses the quotient by pi/2, requires every possible quotient to lie strictly inside one nearest-integer cell, computes an interval for `r = x - k*pi/2`, and checks that `r` remains inside [-2, 2]. Sine/cosine are then mapped through the exact quadrant identity using the local series enclosures. The accepted quadrant index is capped at 1,000,000,000,000; ambiguous, non-finite, excessive, or otherwise unusable reductions return `[-1, 1]`. This extends tight enclosures to many moderate and large finite values without claiming all-binary64 coverage. No platform `f64::sin` or `f64::cos` result is used to form an enclosure.
 
 A wider interval is conservative, not proof of a desired property. For example,
 an interval whose lower bound is negative does not prove the true result is
@@ -117,7 +117,7 @@ normal, near-one and extreme finite inputs, exponential enclosure from subnormal
 underflow through large finite inputs, trigonometric series across [-2, 2],
 quadrant reduction at moderate and large finite magnitudes, rejection of
 half-integer quadrant-boundary ambiguity, fixed high-precision reference brackets
-through magnitude 1e9, broad fallback for ambiguous/extreme inputs, and a
+through magnitude 1e12, broad fallback for ambiguous/extreme inputs, and a
 deterministic interval-grid probe across sine critical-point bands and cosine's
 maximum. Integer
 power domains and a deterministic grid of small integer intervals remain covered. Expression tests
