@@ -46,30 +46,66 @@ The current hypothesis is to export a fixed BuzzASR snapshot, attempt the docume
 
 Important evaluation caveat: BuzzASR reports training on FLEURS and Common Voice 25. A Common Voice 27 run is newer, but that fact alone does **not** prove there is zero overlap of contributors or audio across releases. The scorer below records exact local artifacts and held-out splits, but it cannot establish that a candidate model never saw the same audio or source text during training. Record the model's training-corpus provenance separately; treat overlap as `not_assessed` unless it has been independently checked. Do not use the reported Common Voice 25 score as an unbiased, apples-to-apples baseline for a Common Voice 27 result.
 
-### Reproducible WER/CER scorer
+### Reproducible WER/CER scorer and end-to-end local pilot
 
-I added `scripts/voice_asr_score.py` plus `scripts/test_voice_asr_score.py`, wired into the CI `muse` job. The scorer itself runs on the Python standard library; model inference remains a separate local adapter/runtime step. It requires an intake report, the exact local archive and test metadata, a regular-file model export, and one prediction for every test row. The prediction JSON pins locale, dataset ID/version, archive SHA-256, test.tsv SHA-256, model ID, exact 40-hex model repository revision and declared licence.
+I added `scripts/voice_asr_score.py`, `scripts/test_voice_asr_score.py`, `scripts/prepare_voice_asr_pilot.py`, `scripts/test_prepare_voice_asr_pilot.py`, `scripts/voice_pilot_outcomes_to_predictions.py`, and `scripts/test_voice_pilot_outcomes_to_predictions.py`. CI runs each of the three dependency-free Python test suites in the `muse` job. A Rust worker at `crates/core/symthaea-communication/src/bin/whisper_cpp_worker.rs` implements the existing JSON-lines provider contract for a **pre-converted local whisper.cpp model**; a new Rust CI step compiles/tests every `symthaea-communication` target.
 
-For the report it computes micro-averaged WER and CER, per-reference-length buckets and deterministic 95% percentile-bootstrap confidence intervals. Text normalization is explicitly versioned (`NFKC`, Unicode case-folding, punctuation-to-space, whitespace collapse) and preserves diacritics. It records an SHA-256 manifest of every model-export file. Reports contain only aggregate metrics and hashes—not transcripts, clip paths or speaker tokens—and use exclusive-create semantics to prevent overwrite. Empty ASR output counts as deletions rather than being silently dropped; missing, duplicate or unknown predictions fail the evaluation.
+The worker deliberately does **not** download model weights, perform language identification, or translate. It accepts mono 16 kHz audio, validates waveform bounds, applies runtime and transcript size/time limits, runs the explicitly supplied local `whisper-cli`, and cleans temporary files. The scratch directory must be owner-only on Unix. It leaves an empty transcript as an explicit empty ASR hypothesis so the scorer counts deletions rather than treating a failed/empty hypothesis as a successful omission. This is a candidate adapter implementation, not an inference result; it still requires the pinned upstream conversion and runtime to be tested on real audio.
 
-Example, after producing a complete local prediction JSON using an approved adapter:
+The data-to-score path is now explicit:
+
+1. Audit the locally acquired Common Voice archive with `scripts/voice_dataset_intake.py`. Record the exact dataset page, version, source archive digest, train/dev/test metadata digests, usage restrictions, and split overlap.
+2. Prepare the test split to private 16 kHz mono PCM WAVs: `scripts/prepare_voice_asr_pilot.py --dataset-root "$CV_ROOT/af" --archive "$CV_ARCHIVE" --intake-report "$PRIVATE_DIR/af-dataset-intake.json" --output-dir "$PRIVATE_DIR/af-prepared-v1" --locale af`. The output directory must be new. The script uses the existing local `ffmpeg`, pins its executable SHA-256, verifies every output WAV, and writes private `samples.jsonl` plus `prepared_manifest.json`. No audio or transcript leaves the local machine.
+3. Acquire and pin a specific BuzzASR model revision, then convert it with a pinned `whisper.cpp` checkout according to the upstream [fine-tuned model conversion notes](https://github.com/ggml-org/whisper.cpp/blob/master/models/README.md#fine-tuned-models). Keep the converted model and conversion metadata in an offline export directory; never auto-download weights in the worker. For any F16/Q5 alternative, store it as a separate export and evaluate it on identical clips—quantization is not presumed quality-neutral.
+4. Compile the local worker and run a pilot. Example below uses the default provider ID, explicit worker argument forwarding, and a private fresh outcome path:
+
+```sh
+cargo build --release -p symthaea-communication --bin symthaea-whisper-cpp-worker
+cargo run --release -p symthaea-communication --bin symthaea-comm-eval -- pilot \\
+  --samples "$PRIVATE_DIR/af-prepared-v1/samples.jsonl" \\
+  --worker "$REPO_ROOT/target/release/symthaea-whisper-cpp-worker" \\
+  --provider-id buzzasr-afrikaans \\
+  --output "$PRIVATE_DIR/af-outcomes.jsonl" \\
+  --worker-arg=--whisper-cli --worker-arg="$WHISPER_CPP_DIR/build/bin/whisper-cli" \\
+  --worker-arg=--model --worker-arg="$MODEL_EXPORT/ggml-model.bin" \\
+  --worker-arg=--language --worker-arg=af \\
+  --worker-arg=--scratch-dir --worker-arg="$PRIVATE_DIR/scratch"
+```
+
+5. Convert complete outcomes to a prediction pack. This converter rejects missing, duplicate, unknown or error outcomes; enforces the exact dataset test manifest; and records upstream model, conversion/runtime commit IDs, runtime binary hash, converted model artifact hash, quantization label, and raw pilot outcomes hash. The prediction pack contains transcripts and clip paths, so keep it private.
+
+```sh
+python3 scripts/voice_pilot_outcomes_to_predictions.py \\
+  --outcomes "$PRIVATE_DIR/af-outcomes.jsonl" \\
+  --intake-report "$PRIVATE_DIR/af-dataset-intake.json" \\
+  --dataset-root "$CV_ROOT/af" --archive "$CV_ARCHIVE" \\
+  --model-root "$MODEL_EXPORT" \\
+  --runtime-binary "$WHISPER_CPP_DIR/build/bin/whisper-cli" \\
+  --locale af --model-id BuzzASR/afrikaans \\
+  --model-revision "$MODEL_REVISION_40_HEX" --model-license MIT \\
+  --runtime-commit "$WHISPER_CPP_COMMIT_40_HEX" \\
+  --converter-commit "$CONVERTER_COMMIT_40_HEX" \\
+  --artifact-path ggml-model.bin --quantization f16 --mode smoke \\
+  --output "$PRIVATE_DIR/af-predictions.json"
+```
+
+6. Score it. The scorer independently checks the archive, test.tsv, runtime executable hash, converted artifact hash, and full model-export file-manifest hash; it refuses schema and metadata drift.
 
 ```sh
 python3 scripts/voice_asr_score.py \\
-  --dataset-root "$CV_ROOT/af" \\
-  --archive "$CV_ARCHIVE" \\
+  --dataset-root "$CV_ROOT/af" --archive "$CV_ARCHIVE" \\
   --intake-report "$PRIVATE_DIR/af-dataset-intake.json" \\
-  --predictions "$PRIVATE_DIR/af-asr-predictions.json" \\
-  --model-root "$PRIVATE_MODEL_EXPORT" \\
-  --locale af \\
-  --model-id BuzzASR/afrikaans \\
-  --model-revision "$MODEL_REVISION_40_HEX" \\
-  --model-license MIT \\
-  --mode smoke \\
-  --report "$PRIVATE_DIR/af-asr-score.json"
+  --predictions "$PRIVATE_DIR/af-predictions.json" \\
+  --model-root "$MODEL_EXPORT" \\
+  --runtime-binary "$WHISPER_CPP_DIR/build/bin/whisper-cli" \\
+  --locale af --model-id BuzzASR/afrikaans \\
+  --model-revision "$MODEL_REVISION_40_HEX" --model-license MIT \\
+  --mode smoke --report "$PRIVATE_DIR/af-asr-score.json"
 ```
 
-The predictions file has schema version 1, the pinned dataset/model metadata described above, and a `predictions` array of objects with exactly `path` and `text`. It contains the private transcripts and must remain in a private directory. `--mode smoke` is exploratory only. `--mode heldout-evaluation` additionally requires the intake audit's speaker-disjoint mode, at least 100 test clips and at least 10 test speakers. Neither mode alone promotes the language registry. No model was downloaded or run during this change, and no WER/CER result is being claimed for Symthaea.
+The scorer computes micro-averaged WER and CER, reference-length buckets, and deterministic 95% percentile-bootstrap confidence intervals. Normalization is explicitly versioned (`NFKC`, Unicode case-folding, punctuation-to-space, whitespace collapse) and preserves diacritics. Reports contain aggregate metrics and hashes—not transcripts, clip paths or speaker tokens—and use exclusive-create semantics. Every score explicitly records `training_data_overlap_status: not_assessed`: a new dataset release number alone does not establish that no contributor, audio, or text overlaps with training data.
+
+`--mode smoke` is exploratory only. `--mode heldout-evaluation` requires the intake audit's speaker-disjoint mode, at least 100 test clips, and at least 10 test speakers. That is an initial data-volume floor, not a statistically validated release standard. Neither mode promotes the language registry. No Common Voice archive or BuzzASR weights were downloaded, no inference was executed, and no Symthaea WER/CER result is claimed in this PR increment. The tests use synthetic fixtures and a fake `ffmpeg` executable; they demonstrate validation logic, not ASR quality.
 
 ### First runnable dataset-intake gate: Afrikaans ASR
 
