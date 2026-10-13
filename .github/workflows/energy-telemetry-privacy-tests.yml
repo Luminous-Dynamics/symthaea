@@ -10,6 +10,7 @@ on:
       - "docs/research/energy_telemetry_envelope.schema.json"
       - "docs/research/DOMAIN_GENERAL_DELAY_TOLERANT_TELEMETRY.md"
       - "docs/research/SQLITE_DURABLE_TELEMETRY_LEDGER.md"
+      - "docs/research/AUTHENTICATED_TELEMETRY_ENVELOPE.md"
       - ".github/workflows/energy-telemetry-privacy-tests.yml"
   pull_request:
     paths:
