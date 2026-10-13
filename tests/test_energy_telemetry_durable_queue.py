@@ -438,6 +438,26 @@ class DurableQueueTests(unittest.TestCase):
             )
         self.assertEqual(self.queue.pending_count, 1)
 
+    def test_future_dated_signed_ack_is_rejected(self):
+        sealed = protected()
+        self.queue.enqueue_protected(sealed, now_utc=self.now)
+        self.queue.select_protected_batch(now_utc=self.now, max_bytes=1000)
+        receiver_key = Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
+        ack = create_ack(
+            receiver_key_id="receiver-test-epoch",
+            event_id=sealed.event.event_id,
+            payload_sha256=sealed.event.payload_sha256,
+            acknowledged_at_utc=dt("2026-10-12T12:00:00Z"),
+            signing_key=receiver_key,
+        )
+        with self.assertRaisesRegex(TelemetryQueueError, "ACK timestamp exceeds"):
+            self.queue.acknowledge_protected(
+                ack,
+                verification_keys={"receiver-test-epoch": receiver_key.public_key()},
+                now_utc=self.now,
+            )
+        self.assertEqual(self.queue.pending_count, 1)
+
     def test_legacy_metadata_queue_does_not_expose_fake_payload_bytes(self):
         e = event()
         self.queue.enqueue(e, now_utc=self.now)
