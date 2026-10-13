@@ -1267,13 +1267,18 @@ impl TemporalConsciousnessAnalyzer {
                 >= self.config.min_samples_for_trajectory.max(1),
             health_status: self.health_status(),
             phi_velocity: self.phi_trajectory.velocity,
+            phi_velocity_available: self.phi_trajectory.sample_count() >= 2,
             phi_acceleration: self.phi_trajectory.acceleration,
             phi_acceleration_available: self.phi_trajectory.acceleration_available,
             phi_stability: self.phi_trajectory.stability,
+            phi_stability_available: self.phi_trajectory.sample_count() >= 3,
             phi_trend: self.phi_trajectory.trend,
+            phi_trend_available: self.phi_trajectory.sample_count() >= 2,
             continuity_score: self.continuity.score,
+            continuity_score_available: self.continuity.recent_states.len() >= 2,
             discontinuities: self.continuity.discontinuities.len(),
             identity_coherence: self.identity_coherence.coherence,
+            identity_coherence_available: self.identity_coherence.alignment_coverage() > 0,
             identity_alignment_coverage: self.identity_coherence.alignment_coverage(),
             past_present_alignment: self.identity_coherence.past_present_alignment,
             past_present_alignment_available: self
@@ -1294,6 +1299,7 @@ impl TemporalConsciousnessAnalyzer {
             temporal_horizon: self.husserlian.temporal_horizon,
             binding_strength: self.binding.binding_strength,
             gamma_sync: self.binding.gamma_sync,
+            binding_evidence_available: !self.binding.bindings.is_empty(),
             is_healthy: self.is_temporally_healthy(),
             recommendations: self.generate_recommendations(),
         }
@@ -1417,19 +1423,24 @@ pub struct TemporalConsciousnessReport {
 
     // Φ Trajectory
     pub phi_velocity: f64,
+    pub phi_velocity_available: bool,
     /// Acceleration value; see availability flag before interpreting the number.
     pub phi_acceleration: f64,
     /// False until two distinct velocity intervals can be compared.
     pub phi_acceleration_available: bool,
     pub phi_stability: f64,
+    pub phi_stability_available: bool,
     pub phi_trend: i8,
+    pub phi_trend_available: bool,
 
     // Continuity
     pub continuity_score: f64,
+    pub continuity_score_available: bool,
     pub discontinuities: usize,
 
     // Identity
     pub identity_coherence: f64,
+    pub identity_coherence_available: bool,
     /// Count of measured pairwise alignment relationships (0..=3).
     pub identity_alignment_coverage: usize,
     pub past_present_alignment: f64,
@@ -1451,6 +1462,7 @@ pub struct TemporalConsciousnessReport {
     // Binding
     pub binding_strength: f64,
     pub gamma_sync: f64,
+    pub binding_evidence_available: bool,
 
     // Overall
     pub is_healthy: bool,
@@ -1479,17 +1491,17 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ║ Φ SAMPLES:                  {}/{} (minimum {}) {}                       ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ Φ TRAJECTORY                                                             ║
-║   Velocity:     {:>+.4} Φ/s   (rate of change)                           ║
+║   Velocity:     {:>7} Φ/s   (rate of change)                           ║
 ║   Acceleration: {:>9} Φ/s²  (change of change)                         ║
-║   Stability:    {:>.4}       (inverse variance)                          ║
-║   Trend:        {}                                                       ║
+║   Stability:    {:>7}       (inverse variance)                          ║
+║   Trend:        {:>9}                                                      ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ CONSCIOUSNESS CONTINUITY                                                 ║
-║   Continuity Score:  {:.1}%                                              ║
+║   Continuity Score:  {:>6}                                              ║
 ║   Discontinuities:   {}                                                  ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ TEMPORAL IDENTITY COHERENCE                                              ║
-║   Known-pair score:  {:.1}%                                              ║
+║   Known-pair score:  {:>6}                                              ║
 ║   Coverage:          {}/3 relationships                                  ║
 ║   Past↔Present:      {:>6}                                               ║
 ║   Present↔Future:    {:>6}                                               ║
@@ -1502,8 +1514,8 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ║   Temporal Horizon:  {:.1} units                                         ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ TEMPORAL BINDING                                                         ║
-║   Binding Strength:  {:.1}%                                              ║
-║   Gamma Sync:        {:.1}%                                              ║
+║   Binding Strength:  {:>6}                                              ║
+║   Gamma Sync:        {:>6}                                              ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ RECOMMENDATIONS                                                          ║
 {}║
@@ -1522,21 +1534,41 @@ impl std::fmt::Display for TemporalConsciousnessReport {
             } else {
                 "IMPOSSIBLE"
             },
-            self.phi_velocity,
+            if self.phi_velocity_available {
+                format!("{:+.4}", self.phi_velocity)
+            } else {
+                "N/A".to_string()
+            },
             if self.phi_acceleration_available {
                 format!("{:+.4}", self.phi_acceleration)
             } else {
                 "N/A".to_string()
             },
-            self.phi_stability,
-            match self.phi_trend {
-                1 => "↑ Rising",
-                -1 => "↓ Declining",
-                _ => "→ Stable",
+            if self.phi_stability_available {
+                format!("{:.4}", self.phi_stability)
+            } else {
+                "N/A".to_string()
             },
-            self.continuity_score * 100.0,
+            if self.phi_trend_available {
+                match self.phi_trend {
+                    1 => "↑ Rising",
+                    -1 => "↓ Declining",
+                    _ => "→ Stable",
+                }
+            } else {
+                "N/A"
+            },
+            if self.continuity_score_available {
+                format!("{:.1}%", self.continuity_score * 100.0)
+            } else {
+                "N/A".to_string()
+            },
             self.discontinuities,
-            self.identity_coherence * 100.0,
+            if self.identity_coherence_available {
+                format!("{:.1}%", self.identity_coherence * 100.0)
+            } else {
+                "N/A".to_string()
+            },
             self.identity_alignment_coverage,
             format_alignment(
                 self.past_present_alignment,
@@ -1558,8 +1590,16 @@ impl std::fmt::Display for TemporalConsciousnessReport {
             self.retention_depth,
             self.protention_depth,
             self.temporal_horizon,
-            self.binding_strength * 100.0,
-            self.gamma_sync * 100.0,
+            if self.binding_evidence_available {
+                format!("{:.1}%", self.binding_strength * 100.0)
+            } else {
+                "N/A".to_string()
+            },
+            if self.binding_evidence_available {
+                format!("{:.1}%", self.gamma_sync * 100.0)
+            } else {
+                "N/A".to_string()
+            },
             self.recommendations
                 .iter()
                 .map(|r| format!("║   • {r}\n"))
@@ -1678,10 +1718,21 @@ mod tests {
         let report = analyzer.report();
 
         assert_eq!(report.identity_alignment_coverage, 0);
+        assert!(!report.identity_coherence_available);
+        assert!(!report.phi_velocity_available);
+        assert!(!report.phi_stability_available);
+        assert!(!report.phi_trend_available);
+        assert!(!report.continuity_score_available);
+        assert!(!report.binding_evidence_available);
         assert!(!report.present_future_alignment_available);
         let rendered = report.to_string();
         assert!(rendered.contains("Present↔Future:       N/A"));
         assert!(rendered.contains("Past↔Future:          N/A"));
+        assert!(rendered.contains("Velocity:         N/A Φ/s"));
+        assert!(rendered.contains("Continuity Score:   N/A"));
+        assert!(rendered.contains("Known-pair score:   N/A"));
+        assert!(rendered.contains("Binding Strength:   N/A"));
+        assert!(rendered.contains("Gamma Sync:         N/A"));
     }
 
     #[test]
