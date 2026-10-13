@@ -129,6 +129,9 @@ class OutcomesToPredictionsTests(unittest.TestCase):
             numpy_version="2.1.0",
             device="cpu",
             dtype="float32",
+            runtime_model_snapshot_sha256=_hash_tree(self.source_model_root)[0],
+            runtime_python_executable_sha256=sha256_file(self.runtime_binary),
+            runtime_worker_sha256=sha256_file(self.runtime_worker),
         )
         self.assertEqual(doc["runtime"]["kind"], "transformers")
         self.assertEqual(doc["source_model_snapshot_sha256"], _hash_tree(self.source_model_root)[0])
