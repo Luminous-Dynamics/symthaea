@@ -147,6 +147,10 @@ class TransformersWorkerTests(unittest.TestCase):
             root.mkdir()
             (root / "config.json").write_text("{}", encoding="utf-8")
             self.assertEqual(validate_local_model_snapshot(str(root)), str(root.resolve()))
+            digest, count, total_bytes = hash_local_model_snapshot(str(root))
+            self.assertRegex(digest, r"^[0-9a-f]{64}$")
+            self.assertEqual(count, 1)
+            self.assertEqual(total_bytes, 2)
             alias = Path(tmp) / "link"
             alias.symlink_to(root, target_is_directory=True)
             with self.assertRaisesRegex(ValueError, "not a symlink"):
