@@ -31,12 +31,25 @@ def _need(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        value[key] = item
+    return value
+
+
 def _read_json(path: Path) -> Any:
     def reject_constant(value: str) -> None:
         raise ValueError(f"non-standard JSON numeric constant {value}")
     try:
-        return json.loads(path.read_text(encoding="utf-8"), parse_constant=reject_constant)
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return json.loads(
+            path.read_text(encoding="utf-8"),
+            parse_constant=reject_constant,
+            object_pairs_hook=_unique_object,
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         raise ValueError(f"cannot read valid JSON from {path}: {exc}") from exc
 
 
