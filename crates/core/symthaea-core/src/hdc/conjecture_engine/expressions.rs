@@ -160,9 +160,9 @@ impl Expr {
 
     /// Evaluate using interval inputs and outward-rounded arithmetic.
     ///
-    /// The enclosure evaluator supports arithmetic, integer powers, absolute
-    /// value, floor, and finite sums. Transcendental functions are rejected
-    /// until a separately reviewed range enclosure is implemented for them.
+    /// The enclosure evaluator supports arithmetic, integer powers, square
+    /// root, absolute value, floor, and finite sums. Other transcendental
+    /// functions are rejected until reviewed range enclosures exist.
     pub fn eval_interval(
         &self,
         vars: &[(&str, Interval)],
@@ -215,6 +215,7 @@ impl Expr {
             Expr::Func(function, argument) => {
                 let value = argument.eval_interval_in_environment(vars)?;
                 match function {
+                    UnaryFn::Sqrt => Ok(value.checked_sqrt()?),
                     UnaryFn::Abs => Ok(value.absolute()),
                     UnaryFn::Floor => Ok(Interval::new(
                         value.lower().floor(),
@@ -1182,7 +1183,25 @@ mod domain_safe_simplification_tests {
     }
 
     #[test]
-    fn interval_evaluation_fails_closed_for_unbounded_transcendentals() {
+    fn interval_evaluation_encloses_square_root_and_checks_domain() {
+        let expression = Expr::Func(UnaryFn::Sqrt, Box::new(Expr::Var("x".into())));
+        let result = expression
+            .eval_interval(&[("x", Interval::new(4.0, 9.0).unwrap())])
+            .unwrap();
+        assert!(result.lower() <= 2.0);
+        assert!(result.upper() >= 3.0);
+        assert!(result.lower() >= 0.0);
+
+        assert_eq!(
+            expression.eval_interval(&[("x", Interval::new(-1.0, 4.0).unwrap())]),
+            Err(ExprIntervalError::Interval(
+                IntervalError::SquareRootOfNegativeInterval
+            ))
+        );
+    }
+
+    #[test]
+    fn interval_evaluation_fails_closed_for_unsupported_transcendentals() {
         let expression = Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".into())));
         assert_eq!(
             expression.eval_interval(&[("x", Interval::new(0.0, 1.0).unwrap())]),
