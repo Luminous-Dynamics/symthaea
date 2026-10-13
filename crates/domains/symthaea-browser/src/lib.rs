@@ -7,7 +7,7 @@
 //!
 //! Bridges the cognitive loop to a headless Chrome/Chromium instance via the
 //! Chrome DevTools Protocol (CDP). The browser becomes a sensory organ: the
-//! accessibility tree is encoded as a 16,384D `ContinuousHV`, and actions
+//! accessibility tree is encoded as a 16,384D ContinuousHV, and actions
 //! (navigate, click, type) are Phi-gated to ensure conscious intent.
 //!
 //! ## Architecture
@@ -35,16 +35,18 @@
 //!                      │ BrowserAction proposal
 //! ┌────────────────────▼────────────────────────────────┐
 //! │  BrowserExecutor                                   │
-//! │  capability + Phi + URL policy → ActionReceipt     │
+//! │  policy → safe ActionReceipt + transient output    │
 //! └─────────────────────────────────────────────────────┘
 //! ```
 //!
 //! ## Safety
 //!
-//! Every `BrowserAction` requires both an explicit capability and a finite
-//! `required_phi()` threshold. Phi can increase caution but cannot create
-//! authority. `BrowserSafetyPolicy` also applies canonical origin checks and
-//! denies local-network targets by default.
+//! Every BrowserAction requires both an explicit capability and a finite
+//! required_phi() threshold. Phi can increase caution but cannot create
+//! authority. BrowserSafetyPolicy also applies canonical origin checks and
+//! denies local-network targets by default. Persistable ActionReceipt values
+//! contain summary metadata only; outputs and detailed diagnostics are
+//! transient and require a separate retention decision.
 
 #![deny(unsafe_code)]
 
@@ -63,7 +65,10 @@ pub use cdp::CdpSession;
 pub use config::BrowserAgentConfig;
 pub use embodiment::BrowserBridge;
 pub use encoder::BrowserHdcEncoder;
-pub use executor::{ActionOutcome, ActionOutput, ActionReceipt, BrowserExecutor};
+pub use executor::{
+    ActionExecution, ActionOutcome, ActionOutput, ActionReceipt, ActionReasonCode, ActionSummary,
+    BrowserActionKind, BrowserExecutor, SelectorKind,
+};
 pub use observation::{
     AccessibleElement, MAX_OBSERVATION_TEXT_CHARS, PageObservation, UNTRUSTED_WEB_CONTENT_LABEL,
 };

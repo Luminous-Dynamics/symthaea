@@ -137,15 +137,15 @@ impl WebAgent {
 
         for &(engine_name, base_url) in SEARCH_URLS {
             let requested_url = format!("{base_url}{encoded_query}");
-            let receipt = executor
+            let execution = executor
                 .execute(BrowserAction::Navigate {
                     url: requested_url.clone(),
                 })
                 .await;
-            if !receipt.succeeded() {
+            if !execution.succeeded() {
                 tracing::warn!(
                     engine = engine_name,
-                    outcome = ?receipt.outcome,
+                    outcome = ?execution.receipt().outcome,
                     "Search navigation denied or failed"
                 );
                 continue;
