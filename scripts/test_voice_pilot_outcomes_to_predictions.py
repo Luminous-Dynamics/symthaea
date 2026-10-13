@@ -45,6 +45,27 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.worker_root.mkdir()
         self.runtime_worker = self.worker_root / "voice_transformers_worker.py"
         self.runtime_worker.write_text("# synthetic test worker\\n", encoding="utf-8")
+        self.runtime_metadata_log = self.base / "transformers-worker-stderr.log"
+        model_sha, model_count, model_bytes = _hash_tree(self.source_model_root)
+        self.runtime_metadata = {
+            "python_version": "3.12.1",
+            "torch_version": "2.8.0",
+            "transformers_version": "4.56.0",
+            "numpy_version": "2.1.0",
+            "device": "cpu",
+            "dtype": "float32",
+            "offline": True,
+            "model_snapshot_manifest_sha256": model_sha,
+            "model_snapshot_file_count": model_count,
+            "model_snapshot_bytes": model_bytes,
+            "python_executable_sha256": sha256_file(self.runtime_binary),
+            "worker_script_sha256": sha256_file(self.runtime_worker),
+        }
+        self.runtime_metadata_log.write_text(
+            "startup noise\\nSYMTHEA_TRANSFORMERS_RUNTIME "
+            + json.dumps(self.runtime_metadata, sort_keys=True) + "\\n",
+            encoding="utf-8",
+        )
         self.outcomes_path = self.base / "outcomes.jsonl"
         self.output = self.base / "private-predictions.json"
 
@@ -91,6 +112,7 @@ class OutcomesToPredictionsTests(unittest.TestCase):
             model_root=kwargs.pop("model_root",self.model_root),
             source_model_root=kwargs.pop("source_model_root",self.source_model_root),
             runtime_binary=kwargs.pop("runtime_binary",self.runtime_binary),
+            runtime_metadata_log_path=kwargs.pop("runtime_metadata_log_path",self.runtime_metadata_log),
             locale=kwargs.pop("locale","af"),
             model_id=kwargs.pop("model_id","BuzzASR/afrikaans"),
             model_revision=kwargs.pop("model_revision",self.model_revision),
@@ -142,8 +164,37 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.assertEqual(doc["runtime"]["python_executable_sha256"], sha256_file(self.runtime_binary))
         self.assertEqual(doc["runtime"]["worker_script_sha256"], sha256_file(self.runtime_worker))
         self.assertEqual(doc["runtime"]["python_version"], "3.12.1")
+        self.assertEqual(doc["runtime"]["startup_metadata_log_sha256"], sha256_file(self.runtime_metadata_log))
         self.assertTrue(doc["runtime"]["offline"])
         self.assertNotIn("converter_commit", doc["runtime"])
+
+    def test_transformers_pack_rejects_duplicate_startup_records(self):
+        original = self.runtime_metadata_log.read_text(encoding="utf-8")
+        self.runtime_metadata_log.write_text(
+            original + "SYMTHEA_TRANSFORMERS_RUNTIME "
+            + json.dumps(self.runtime_metadata, sort_keys=True) + "\\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ValueError, "exactly one worker startup record"):
+            self.build(
+                model_root=self.source_model_root,
+                source_model_root=self.source_model_root,
+                runtime_kind="transformers",
+                runtime_worker_path=self.runtime_worker,
+                runtime_commit=None,
+                converter_commit=None,
+                artifact_path=None,
+                quantization=None,
+                python_version="3.12.1",
+                torch_version="2.8.0",
+                transformers_version="4.56.0",
+                numpy_version="2.1.0",
+                device="cpu",
+                dtype="float32",
+                runtime_model_snapshot_sha256=_hash_tree(self.source_model_root)[0],
+                runtime_python_executable_sha256=sha256_file(self.runtime_binary),
+                runtime_worker_sha256=sha256_file(self.runtime_worker),
+            )
 
     def test_transformers_pack_rejects_startup_snapshot_digest_drift(self):
         with self.assertRaisesRegex(ValueError, "model snapshot digest differs"):
