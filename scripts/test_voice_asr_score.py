@@ -46,6 +46,27 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.worker_root.mkdir()
         self.runtime_worker = self.worker_root / "voice_transformers_worker.py"
         self.runtime_worker.write_text("# synthetic test worker\\n", encoding="utf-8")
+        self.runtime_metadata_log = self.base / "transformers-worker-stderr.log"
+        model_sha, model_count, model_bytes = _hash_tree(self.source_model_root)
+        self.runtime_metadata = {
+            "python_version": "3.12.1",
+            "torch_version": "2.8.0",
+            "transformers_version": "4.56.0",
+            "numpy_version": "2.1.0",
+            "device": "cpu",
+            "dtype": "float32",
+            "offline": True,
+            "model_snapshot_manifest_sha256": model_sha,
+            "model_snapshot_file_count": model_count,
+            "model_snapshot_bytes": model_bytes,
+            "python_executable_sha256": sha256_file(self.runtime_binary),
+            "worker_script_sha256": sha256_file(self.runtime_worker),
+        }
+        self.runtime_metadata_log.write_text(
+            "startup noise\\nSYMTHEA_TRANSFORMERS_RUNTIME "
+            + json.dumps(self.runtime_metadata, sort_keys=True) + "\\n",
+            encoding="utf-8",
+        )
         self.runtime = {
             "kind": "whisper.cpp",
             "runtime_commit": "d" * 40,
@@ -180,6 +201,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
             locale=kwargs.pop("locale", self.locale),
             intake_report_path=kwargs.pop("intake_report_path", self.intake_path),
             runtime_binary_path=kwargs.pop("runtime_binary_path", self.runtime_binary),
+            runtime_metadata_log_path=kwargs.pop("runtime_metadata_log_path", self.runtime_metadata_log),
             mode=kwargs.pop("mode", "smoke"),
             bootstrap_iterations=kwargs.pop("bootstrap_iterations", 100),
             **kwargs,
@@ -219,6 +241,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
             "python_executable_sha256": sha256_file(self.runtime_binary),
             "worker_script_sha256": sha256_file(self.runtime_worker),
             "model_snapshot_manifest_sha256": _hash_tree(self.source_model_root)[0],
+            "startup_metadata_log_sha256": sha256_file(self.runtime_metadata_log),
             "python_version": "3.12.1",
             "torch_version": "2.8.0",
             "transformers_version": "4.56.0",
@@ -235,6 +258,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
         )
         self.assertEqual(report["runtime"]["kind"], "transformers")
         self.assertEqual(report["runtime"]["worker_script_sha256"], sha256_file(self.runtime_worker))
+        self.assertEqual(report["runtime"]["startup_metadata_log_sha256"], sha256_file(self.runtime_metadata_log))
         self.assertEqual(report["runtime"]["offline"], True)
         self.assertEqual(report["model"]["runtime_model_snapshot_file_count"], 2)
         self.assertNotIn("converted_export_file_count", report["model"])
@@ -246,6 +270,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
             "python_executable_sha256": sha256_file(self.runtime_binary),
             "worker_script_sha256": sha256_file(self.runtime_worker),
             "model_snapshot_manifest_sha256": "0" * 64,
+            "startup_metadata_log_sha256": sha256_file(self.runtime_metadata_log),
             "python_version": "3.12.1",
             "torch_version": "2.8.0",
             "transformers_version": "4.56.0",
@@ -269,6 +294,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
             "python_executable_sha256": sha256_file(self.runtime_binary),
             "worker_script_sha256": "0" * 64,
             "model_snapshot_manifest_sha256": _hash_tree(self.source_model_root)[0],
+            "startup_metadata_log_sha256": sha256_file(self.runtime_metadata_log),
             "python_version": "3.12.1",
             "torch_version": "2.8.0",
             "transformers_version": "4.56.0",
