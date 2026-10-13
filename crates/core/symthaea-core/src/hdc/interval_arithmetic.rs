@@ -34,6 +34,9 @@ const EXP_REDUCTION_LIMIT: f64 = 0.36;
 // Critical-point handling keeps interval ranges sound beyond sine's monotone
 // region without requiring platform-dependent argument reduction.
 const TRIG_SMALL_ARGUMENT_LIMIT: f64 = 2.0;
+// Bound the quadrant index so uncertainty in the cached pi/2 interval remains
+// small and midpoint/nearest-integer operations stay far from binary64 limits.
+const TRIG_MAX_REDUCTION_QUADRANT: f64 = 1_000_000_000.0;
 const TRIG_SERIES_TAIL_BOUND: f64 = f64::from_bits(943_u64 << 52);
 
 // The atan(1/5) and atan(1/239) series below each use a symmetric 2^-120
@@ -350,15 +353,33 @@ impl Interval {
         Self::new(lower, upper)
     }
 
-    /// Sine enclosure with a bounded local series and a conservative global fallback.
+    /// Enclose sine for bounded and reducible finite intervals.
     ///
-    /// For intervals wholly inside [-2, 2], endpoint Taylor polynomials through
-    /// degree 39 are evaluated with interval arithmetic and widened by 2^-80.
-    /// The endpoint hull is augmented by -1 or +1 when the interval enters the
-    /// corresponding possible sine-extremum region. This may be wider than the
-    /// true range, but avoids unqualified argument reduction. Larger/unbounded
-    /// intervals return [-1, 1].
+    /// Small intervals use the Taylor enclosure directly. Larger finite inputs
+    /// are reduced only when the entire interval quotient by the computed pi/2
+    /// enclosure proves one unique nearest quadrant. Otherwise the method fails
+    /// wide to [-1, 1].
     pub fn checked_sin(self) -> Result<Self, IntervalError> {
+        if self.lower >= -TRIG_SMALL_ARGUMENT_LIMIT
+            && self.upper <= TRIG_SMALL_ARGUMENT_LIMIT
+        {
+            return self.checked_sin_local();
+        }
+        let Some((reduced, quadrant)) = try_reduce_quadrant(self) else {
+            return Ok(Self { lower: -1.0, upper: 1.0 });
+        };
+        let sine = reduced.checked_sin_local()?;
+        let cosine = reduced.checked_cos_local()?;
+        Ok(match quadrant.rem_euclid(4) {
+            0 => sine,
+            1 => cosine,
+            2 => sine.negate(),
+            _ => cosine.negate(),
+        })
+    }
+
+    /// Compute the local sine enclosure on [-2, 2], including critical points.
+    fn checked_sin_local(self) -> Result<Self, IntervalError> {
         if self.lower < -TRIG_SMALL_ARGUMENT_LIMIT
             || self.upper > TRIG_SMALL_ARGUMENT_LIMIT
         {
@@ -369,9 +390,6 @@ impl Interval {
         let upper_point = sin_point_enclosure(self.upper)?;
         let mut lower = lower_point.lower.min(upper_point.lower).max(-1.0);
         let mut upper = lower_point.upper.max(upper_point.upper).min(1.0);
-        // Include an extremum exactly when this interval overlaps our cached,
-        // series-derived enclosure of +/-pi/2. If that enclosure cannot be
-        // constructed, fail wide rather than make an ungrounded extrema claim.
         let Some(half_pi) = half_pi_enclosure() else {
             return Ok(Self { lower: -1.0, upper: 1.0 });
         };
@@ -389,14 +407,32 @@ impl Interval {
         }
     }
 
-    /// Cosine enclosure with a bounded local series and a conservative global fallback.
+    /// Enclose cosine for bounded and reducible finite intervals.
     ///
-    /// For intervals wholly inside [-2, 2], endpoint Taylor polynomials through
-    /// degree 38 use interval arithmetic and a 2^-80 remainder allowance. Since
-    /// 2 < pi, cosine has no critical point there except its maximum at zero;
-    /// the endpoint hull plus that exact maximum gives a sound range. Outside
-    /// this region, return the sound but coarse range [-1, 1].
+    /// A large input is reduced only when the whole interval proves a unique
+    /// nearest quadrant using an interval quotient and the computed pi/2 bound.
+    /// Ambiguous boundaries or excessive quadrant indices fail wide.
     pub fn checked_cos(self) -> Result<Self, IntervalError> {
+        if self.lower >= -TRIG_SMALL_ARGUMENT_LIMIT
+            && self.upper <= TRIG_SMALL_ARGUMENT_LIMIT
+        {
+            return self.checked_cos_local();
+        }
+        let Some((reduced, quadrant)) = try_reduce_quadrant(self) else {
+            return Ok(Self { lower: -1.0, upper: 1.0 });
+        };
+        let sine = reduced.checked_sin_local()?;
+        let cosine = reduced.checked_cos_local()?;
+        Ok(match quadrant.rem_euclid(4) {
+            0 => cosine,
+            1 => sine.negate(),
+            2 => cosine.negate(),
+            _ => sine,
+        })
+    }
+
+    /// Compute the local cosine enclosure on [-2, 2].
+    fn checked_cos_local(self) -> Result<Self, IntervalError> {
         if self.lower < -TRIG_SMALL_ARGUMENT_LIMIT
             || self.upper > TRIG_SMALL_ARGUMENT_LIMIT
         {
@@ -545,6 +581,52 @@ fn half_pi_enclosure() -> Option<Interval> {
                 .checked_add(atan_239th.checked_multiply(minus_two)),
         )
     })
+}
+
+/// Reduce an interval to a unique nearest multiple of pi/2, when possible.
+///
+/// The quotient interval encloses x/(pi/2). A quadrant is accepted only when
+/// every possible quotient lies strictly inside one nearest-integer cell,
+/// away from half-integer boundaries. The computed reduced interval must fit
+/// inside the local Taylor domain. These checks deliberately reject uncertain
+/// reductions instead of picking a quadrant from a rounded quotient.
+fn try_reduce_quadrant(input: Interval) -> Option<(Interval, i64)> {
+    if !input.lower.is_finite() || !input.upper.is_finite() {
+        return None;
+    }
+    let half_pi = half_pi_enclosure()?;
+    if half_pi.lower <= 0.0 {
+        return None;
+    }
+    let quotient = input.checked_divide(half_pi).ok()?;
+    if !quotient.lower.is_finite()
+        || !quotient.upper.is_finite()
+        || quotient.lower < -(TRIG_MAX_REDUCTION_QUADRANT + 1.0)
+        || quotient.upper > TRIG_MAX_REDUCTION_QUADRANT + 1.0
+    {
+        return None;
+    }
+
+    // The magnitude cap keeps integer conversion exact and limits propagation
+    // of the pi/2 enclosure width during multiplication by the quadrant index.
+    let midpoint = quotient.lower + (quotient.upper - quotient.lower) * 0.5;
+    let nearest = midpoint.round();
+    if nearest.abs() > TRIG_MAX_REDUCTION_QUADRANT
+        || quotient.lower <= nearest - 0.5
+        || quotient.upper >= nearest + 0.5
+    {
+        return None;
+    }
+
+    let quadrant_interval = Interval::point(nearest).ok()?;
+    let shift = half_pi.checked_multiply(quadrant_interval);
+    let reduced = input.checked_subtract(shift);
+    if reduced.lower < -TRIG_SMALL_ARGUMENT_LIMIT
+        || reduced.upper > TRIG_SMALL_ARGUMENT_LIMIT
+    {
+        return None;
+    }
+    Some((reduced, nearest as i64))
 }
 
 /// Compute one alternating Taylor term using interval division by exact small integers.
@@ -1125,10 +1207,27 @@ mod tests {
     #[test]
     fn trigonometric_functions_fail_wide_outside_the_certified_small_range() {
         let unit_range = interval(-1.0, 1.0);
-        assert_eq!(interval(2.0, 2.0000000001).checked_sin().unwrap(), unit_range);
         assert_eq!(interval(-2.1, 2.0).checked_cos().unwrap(), unit_range);
         assert_eq!(interval(f64::NEG_INFINITY, f64::INFINITY).checked_sin().unwrap(), unit_range);
-        assert_eq!(interval(1000.0, 1001.0).checked_cos().unwrap(), unit_range);
+        assert_eq!(interval(1.0e20, 1.0e20).checked_cos().unwrap(), unit_range);
+
+        for value in [2.0000000001, 10.0, -10.0, 1000.0, -1000.0, 1.0e6, -1.0e6, 1.0e9, -1.0e9] {
+            let point = Interval::point(value).unwrap();
+            let sine = point.checked_sin().unwrap();
+            let cosine = point.checked_cos().unwrap();
+            assert!(sine.contains(value.sin()), "sin enclosure failed at {value}: {sine:?}");
+            assert!(cosine.contains(value.cos()), "cos enclosure failed at {value}: {cosine:?}");
+            assert!(sine.upper() - sine.lower() < 1e-3, "sine reduction unexpectedly wide at {value}: {sine:?}");
+            assert!(cosine.upper() - cosine.lower() < 1e-3, "cosine reduction unexpectedly wide at {value}: {cosine:?}");
+        }
+
+        let reducible_range = interval(1000.0, 1001.0);
+        let sine = reducible_range.checked_sin().unwrap();
+        let cosine = reducible_range.checked_cos().unwrap();
+        assert!(sine.contains(1000.0_f64.sin()) && sine.contains(1001.0_f64.sin()));
+        assert!(cosine.contains(1000.0_f64.cos()) && cosine.contains(1001.0_f64.cos()));
+        assert!(sine.upper() - sine.lower() < 1.0);
+        assert!(cosine.upper() - cosine.lower() < 1.0);
     }
 
     #[test]
