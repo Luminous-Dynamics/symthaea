@@ -95,9 +95,12 @@ impl Interval {
         self.upper
     }
 
-    /// Whether a value belongs to this enclosure. NaN is never contained.
+    /// Whether a finite real value belongs to this enclosure.
+    ///
+    /// Infinite endpoints represent unbounded real ranges; infinity itself is
+    /// not treated as a member of the represented real-number set.
     pub fn contains(self, value: f64) -> bool {
-        !value.is_nan() && self.lower <= value && value <= self.upper
+        value.is_finite() && self.lower <= value && value <= self.upper
     }
 
     /// Whether zero is included in this interval.
@@ -327,6 +330,17 @@ mod tests {
             value.lower() <= lower && value.upper() >= upper,
             "{value:?} must enclose [{lower}, {upper}]"
         );
+    }
+
+    #[test]
+    fn unbounded_endpoints_enclose_finite_values_not_infinity_as_a_real_member() {
+        let whole = Interval::entire();
+        assert!(whole.contains(-f64::MAX));
+        assert!(whole.contains(0.0));
+        assert!(whole.contains(f64::MAX));
+        assert!(!whole.contains(f64::INFINITY));
+        assert!(!whole.contains(f64::NEG_INFINITY));
+        assert!(!whole.contains(f64::NAN));
     }
 
     #[test]
