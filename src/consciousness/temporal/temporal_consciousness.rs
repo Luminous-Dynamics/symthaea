@@ -947,7 +947,11 @@ impl TemporalBindingAnalysis {
         relation: AllenRelation,
         strength: f64,
     ) -> bool {
-        if !strength.is_finite() || !(0.0..=1.0).contains(&strength) {
+        if a.trim().is_empty()
+            || b.trim().is_empty()
+            || !strength.is_finite()
+            || !(0.0..=1.0).contains(&strength)
+        {
             return false;
         }
         if self.bindings.len() >= 256 {
@@ -2208,6 +2212,53 @@ mod tests {
         ));
         assert_eq!(binding.bindings.len(), 1);
         assert!((binding.binding_strength - 0.9).abs() < 1e-12);
+
+        // Labels are identifiers, not optional display text.
+        assert!(!binding.try_add_binding(
+            "",
+            "memory",
+            AllenRelation::Overlaps,
+            0.8,
+        ));
+        assert!(!binding.try_add_binding(
+            "   ",
+            "memory",
+            AllenRelation::Overlaps,
+            0.8,
+        ));
+        assert!(!binding.try_add_binding(
+            "perception",
+            "\\t",
+            AllenRelation::Overlaps,
+            0.8,
+        ));
+        assert_eq!(binding.bindings.len(), 1);
+    }
+
+    #[test]
+    fn invalid_binding_does_not_evict_when_retention_is_full() {
+        let mut binding = TemporalBindingAnalysis::new();
+        for i in 0..256 {
+            let a = format!("source-{i}");
+            let b = format!("target-{i}");
+            assert!(binding.try_add_binding(
+                &a,
+                &b,
+                AllenRelation::Overlaps,
+                i as f64 / 255.0,
+            ));
+        }
+        assert_eq!(binding.bindings.len(), 256);
+        assert_eq!(binding.bindings[0].component_a, "source-0");
+
+        assert!(!binding.try_add_binding(
+            "",
+            "replacement",
+            AllenRelation::Overlaps,
+            1.0,
+        ));
+        assert_eq!(binding.bindings.len(), 256);
+        assert_eq!(binding.bindings[0].component_a, "source-0");
     }
 
     #[test]
