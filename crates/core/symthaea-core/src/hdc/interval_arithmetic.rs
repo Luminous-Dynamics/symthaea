@@ -1300,6 +1300,26 @@ mod tests {
     }
 
     #[test]
+    fn quadrant_reduction_cap_is_inclusive_and_fails_wide_beyond_it() {
+        let half_pi = half_pi_enclosure().expect("Machin series should enclose pi/2");
+        let cap = Interval::point(TRIG_MAX_REDUCTION_QUADRANT).unwrap();
+        let at_limit = half_pi.checked_multiply(cap);
+        let (reduced, quadrant) =
+            try_reduce_quadrant(at_limit).expect("the documented quadrant limit is inclusive");
+        assert_eq!(quadrant, TRIG_MAX_REDUCTION_QUADRANT as i64);
+        assert!(reduced.lower() >= -TRIG_SMALL_ARGUMENT_LIMIT);
+        assert!(reduced.upper() <= TRIG_SMALL_ARGUMENT_LIMIT);
+
+        // Two quadrants beyond the cap must not accidentally pass because of
+        // quotient rounding or an overly permissive conversion boundary.
+        let above_cap = Interval::point(TRIG_MAX_REDUCTION_QUADRANT + 2.0).unwrap();
+        let unreducible = half_pi.checked_multiply(above_cap);
+        let whole_unit_range = Interval::new(-1.0, 1.0).unwrap();
+        assert_eq!(unreducible.checked_sin().unwrap(), whole_unit_range);
+        assert_eq!(unreducible.checked_cos().unwrap(), whole_unit_range);
+    }
+
+    #[test]
     fn reduced_trigonometry_encloses_fixed_high_precision_reference_brackets() {
         // Bounds below were generated with a 230-digit Decimal oracle after
         // reducing the exact binary64 input. They intentionally avoid using
