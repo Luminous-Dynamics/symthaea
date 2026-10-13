@@ -73,7 +73,9 @@ class OutcomesToPredictionsTests(unittest.TestCase):
             "language_confidence":0.0, "transcript":"Môre", "word_error_rate":0.0,
             "character_error_rate":0.0, "entity_preservation":1.0,
             "translation_en":None, "translation_chrf":None,
-            "response_language_correct":None, "latency_ms":12.5, "error":None,
+            "response_language_correct":None, "latency_ms":12.5,
+            "preflight_latency_ms":1.5, "transcription_latency_ms":10.0,
+            "translation_latency_ms":None, "error":None,
         }
         self.outcomes_path.write_text(json.dumps(self.outcome,ensure_ascii=False)+"\n",encoding="utf-8")
 
@@ -195,6 +197,12 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.outcome["transcript"]=""
         self.outcomes_path.write_text(json.dumps(self.outcome)+"\n",encoding="utf-8")
         self.assertEqual(self.build()["predictions"],[{"path":"nested/clip.mp3","text":""}])
+
+    def test_invalid_latency_metrics_block_packaging(self):
+        self.outcome["transcription_latency_ms"] = float("nan")
+        self.outcomes_path.write_text(json.dumps(self.outcome, allow_nan=True) + "\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "transcription_latency_ms must be null or a finite"):
+            self.build()
 
     def test_error_outcome_blocks_pack(self):
         self.outcome["error"]="worker timeout"
