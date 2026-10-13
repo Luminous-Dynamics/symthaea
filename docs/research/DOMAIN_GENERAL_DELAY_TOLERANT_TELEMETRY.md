@@ -1,6 +1,6 @@
 # Domain-General Delay-Tolerant Telemetry: Symthaea, Mycelix and Sol-Atlas
 
-**Status:** Research architecture plus in-memory/SQLite store-and-forward, signed AEAD envelope, and durable receiver-inbox prototypes.  
+**Status:** Research architecture plus store-and-forward, signed AEAD envelope, durable receiver inbox and durable privacy-budget ledger prototypes.  
 **Threat-model review:** 2026-10-12.  
 **Not claimed:** production readiness, correct key-to-producer binding, receiver-side durable anti-replay, deployed satellite connectivity, a formal safety case, real meter/sensor evaluation, or live Sol-Atlas/Mycelix integration.
 
@@ -71,7 +71,7 @@ The queue's now_utc argument is injected by the caller for reproducibility. It d
 - Do not publish hashes of low-entropy private values as if they anonymize them. In this prototype the payload digest is only an idempotency binding; a production envelope should authenticate canonical metadata and payload together (for example with a signed canonical-envelope digest). No digest scheme is anonymization, and privacy-sensitive values must not be inferable from published material.
 - Keep differential-privacy accounting separate from delivery idempotency. At-least-once transmission must not spend a privacy budget twice for the same exact release, while a semantically new release must be accounted for even if it has similar values.
 
-The system does not implement a durable DP accountant or secure aggregation. The envelope uses a maintained AEAD/signature library; the sender queue verifies receiver-signed ACKs for protected rows; and the receiver inbox commits exact ciphertext plus an event-ID/digest replay record before producing a signed ACK. Still open are key provisioning, rotation/revocation, enforced per-key nonce usage, receiver backup/power-loss validation, downstream processing transactions and database encryption. Those remain production design tasks, not implied by these tests.
+The new DurablePrivacyLedger transactionally reserves cumulative epsilon/delta budgets, hashes participant tokens with a caller-managed HMAC key, blocks overlapping participant windows, and commits one immutable output byte string per release ID. It is an accountant/reservation prototype, not a differential-privacy mechanism: it does not generate noise, prove clipping or validate the adjacency/sensitivity assumptions. Secure aggregation remains unimplemented. The envelope uses a maintained AEAD/signature library; the sender queue verifies receiver-signed ACKs for protected rows; and the receiver inbox commits ciphertext plus replay identity before ACK. Key lifecycle, nonce-use enforcement, receiver backup/power-loss validation, downstream processing transactions, DB encryption and a reviewed DP generator/clipper remain production gates.
 
 ## Reference standards and research anchors
 
@@ -83,7 +83,7 @@ The system does not implement a durable DP accountant or secure aggregation. The
 
 The accompanying unittest suites use synthetic timestamps, fixed test-only keys, synthetic payloads, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
 
-Local verification recorded in the previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed sender ledger has 32 deterministic tests, the authenticated-envelope/ACK suite has 22, the receiver inbox has 17, and the end-to-end sender/receiver pipeline has 3 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
+Local verification recorded in a previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed sender ledger has 32 deterministic tests, the authenticated-envelope/ACK suite has 22, the receiver inbox has 17, the end-to-end pipeline has 3 and the durable privacy ledger has 17 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
 
 ## Required next steps before deployment
 
