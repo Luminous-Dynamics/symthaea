@@ -196,7 +196,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         )
         self.assertTrue(retry.duplicate)
         self.assertEqual(retry.output_sha256, committed.output_sha256)
-        self.assertEqual(self.reopen().committed_output(reservation.release_id).output_bytes, output)
+        self.assertEqual(self.reopen()._committed_output_storage(reservation.release_id).output_bytes, output)
         reservation_retry = self.reopen().reserve_release(
             release_id="a" * 32,
             query_sha256="b" * 64,
@@ -243,7 +243,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
                 ("0" * 64, result.release_id),
             )
         with self.assertRaisesRegex(TelemetryQueueError, "digest mismatch"):
-            self.ledger.committed_output(result.release_id)
+            self.ledger._committed_output_storage(result.release_id)
 
     def test_changed_participant_hmac_key_is_rejected_after_restart(self):
         self.reserve()
@@ -396,7 +396,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             )
         self.assertEqual(self.ledger.reservation_count, 1)
         with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
-            self.ledger.committed_output(reservation.release_id)
+            self.ledger._committed_output_storage(reservation.release_id)
 
     def test_output_commit_time_cannot_precede_reservation(self):
         reservation = self.reserve()
@@ -408,7 +408,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             )
         self.assertEqual(self.ledger.reservation_count, 1)
         with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
-            self.ledger.committed_output(reservation.release_id)
+            self.ledger._committed_output_storage(reservation.release_id)
 
 
     def test_unbounded_participant_iterable_is_bounded_before_budget_write(self):
@@ -475,6 +475,33 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             committed_at_utc=self.now,
         )
 
+    def test_unqualified_low_level_output_cannot_be_reloaded_as_attested(self):
+        reservation = self.reserve()
+        self.ledger._commit_output_after_attestation(
+            release_id=reservation.release_id,
+            output_bytes=b'{"value":1}',
+            committed_at_utc=self.now,
+        )
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "no retained signed attestation"):
+            self.attestation_verifier.load_committed_output(
+                self.ledger, release_id=reservation.release_id
+            )
+
+    def test_stored_attestation_tampering_is_detected_after_restart(self):
+        reservation = self.reserve()
+        output = b'{"value":1}'
+        raw, signature = self.make_signed_attestation(reservation, output)
+        self.verify_signed_output(reservation, output, raw, signature)
+        with sqlite3.connect(self.database) as db:
+            db.execute(
+                "UPDATE privacy_release_attestations SET attestation_bytes = ? WHERE release_id = ?",
+                (b"{}", reservation.release_id),
+            )
+        with self.assertRaisesRegex(TelemetryQueueError, "attestation evidence failed integrity"):
+            self.attestation_verifier.load_committed_output(
+                self.reopen(), release_id=reservation.release_id
+            )
+
     def test_verifier_rejects_malformed_deployment_policy_types(self):
         base = {
             "trusted_public_key": self.attestation_public_key,
@@ -507,6 +534,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
 
     def test_no_public_unqualified_output_commit_api_is_exposed(self):
         self.assertFalse(hasattr(self.ledger, "commit_output"))
+        self.assertFalse(hasattr(self.ledger, "committed_output"))
         self.assertTrue(hasattr(self.ledger, "_commit_output_after_attestation"))
 
     def test_signed_mechanism_attestation_binds_reservation_and_output(self):
@@ -519,7 +547,13 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         self.assertEqual(committed.output_sha256, hashlib.sha256(output).hexdigest())
         replay = self.verify_signed_output(reservation, output, raw, signature)
         self.assertTrue(replay.duplicate)
-        self.assertEqual(self.ledger.committed_output(reservation.release_id).output_bytes, output)
+        self.assertEqual(self.ledger._committed_output_storage(reservation.release_id).output_bytes, output)
+        reopened = self.reopen()
+        recovered = self.attestation_verifier.load_committed_output(
+            reopened, release_id=reservation.release_id
+        )
+        self.assertTrue(recovered.duplicate)
+        self.assertEqual(recovered.output_bytes, output)
 
     def test_unsigned_or_tampered_attestation_cannot_commit_output(self):
         reservation = self.reserve()
@@ -531,7 +565,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             self.verify_signed_output(reservation, output, raw, bytes(damaged))
         self.assertEqual(self.ledger.reservation_count, 1)
         with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
-            self.ledger.committed_output(reservation.release_id)
+            self.ledger._committed_output_storage(reservation.release_id)
 
     def test_attestation_for_different_output_cannot_be_replayed(self):
         reservation = self.reserve()
@@ -540,7 +574,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(MechanismAttestationError, "output digest"):
             self.verify_signed_output(reservation, b'{"energy_wh_noisy":4013}', raw, signature)
         with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
-            self.ledger.committed_output(reservation.release_id)
+            self.ledger._committed_output_storage(reservation.release_id)
 
     def test_attestation_must_match_exact_reservation_fields(self):
         mismatch_cases = (
@@ -572,7 +606,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
                 with self.assertRaises(MechanismAttestationError):
                     self.verify_signed_output(reservation, output, raw, signature)
                 with self.assertRaises(DurablePrivacyPolicyError):
-                    self.ledger.committed_output(reservation.release_id)
+                    self.ledger._committed_output_storage(reservation.release_id)
 
     def test_unapproved_library_version_constructor_privacy_unit_and_reference_fail(self):
         policy_changes = (
