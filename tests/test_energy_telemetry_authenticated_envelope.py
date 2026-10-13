@@ -12,8 +12,10 @@ from tools.energy_telemetry.authenticated_envelope import (
     EnvelopeAuthenticationError,
     EnvelopeError,
     TelemetryMetadata,
+    create_ack,
     open_envelope,
     seal_payload,
+    verify_ack,
 )
 
 
@@ -209,6 +211,63 @@ class AuthenticatedEnvelopeTests(unittest.TestCase):
             verification_keys=self.verification_keys,
         )
         self.assertEqual(opened.payload, b"")
+
+    def make_ack(self):
+        receiver_key = Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
+        ack = create_ack(
+            receiver_key_id="receiver-epoch-4",
+            event_id=self.metadata.event_id,
+            payload_sha256="d" * 64,
+            acknowledged_at_utc=dt("2026-10-13T06:03:00Z"),
+            signing_key=receiver_key,
+        )
+        return ack, receiver_key
+
+    def test_signed_receiver_ack_round_trips(self):
+        ack_bytes, receiver_key = self.make_ack()
+        ack = verify_ack(ack_bytes, verification_keys={"receiver-epoch-4": receiver_key.public_key()})
+        self.assertEqual(ack.receiver_key_id, "receiver-epoch-4")
+        self.assertEqual(ack.event_id, self.metadata.event_id)
+        self.assertEqual(ack.payload_sha256, "d" * 64)
+        self.assertEqual(ack.disposition, "accepted")
+        self.assertEqual(ack.acknowledged_at_utc, dt("2026-10-13T06:03:00Z"))
+
+    def test_unknown_receiver_key_cannot_acknowledge(self):
+        ack_bytes, _receiver_key = self.make_ack()
+        with self.assertRaisesRegex(EnvelopeAuthenticationError, "no trusted Ed25519 key"):
+            verify_ack(ack_bytes, verification_keys={})
+
+    def test_modified_ack_digest_is_rejected_by_signature(self):
+        import base64
+        import json
+
+        ack_bytes, receiver_key = self.make_ack()
+        value = json.loads(ack_bytes)
+        value["payload_sha256"] = "e" * 64
+        forged = canonical(value)
+        with self.assertRaisesRegex(EnvelopeAuthenticationError, "signature verification failed"):
+            verify_ack(forged, verification_keys={"receiver-epoch-4": receiver_key.public_key()})
+
+    def test_ack_is_canonical_and_rejects_unknown_fields(self):
+        import json
+
+        ack_bytes, receiver_key = self.make_ack()
+        with self.assertRaisesRegex(EnvelopeError, "not canonical JSON"):
+            verify_ack(ack_bytes + b" ", verification_keys={"receiver-epoch-4": receiver_key.public_key()})
+        value = json.loads(ack_bytes)
+        value["free_form_identity"] = "private"
+        with self.assertRaisesRegex(EnvelopeError, "unknown or missing fields"):
+            verify_ack(canonical(value), verification_keys={"receiver-epoch-4": receiver_key.public_key()})
+
+    def test_ack_creation_rejects_invalid_digest_and_disallows_negative_disposition(self):
+        with self.assertRaises(EnvelopeError):
+            create_ack(
+                receiver_key_id="receiver-epoch-4",
+                event_id=self.metadata.event_id,
+                payload_sha256="not-a-digest",
+                acknowledged_at_utc=dt("2026-10-13T06:03:00Z"),
+                signing_key=self.signing_key,
+            )
 
 
 if __name__ == "__main__":
