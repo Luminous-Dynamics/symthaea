@@ -32,7 +32,11 @@ NORMALIZATION_ID = "nfkc-casefold-punctuation-to-space-v1"
 PREDICTION_KEYS = {
     "schema_version", "locale", "dataset_id", "dataset_version",
     "archive_sha256", "test_metadata_sha256", "model_id", "model_revision",
-    "model_license", "predictions",
+    "model_license", "outcomes_sha256", "runtime", "predictions",
+}
+RUNTIME_KEYS = {
+    "kind", "runtime_commit", "converter_commit", "runtime_binary_sha256",
+    "artifact_path", "artifact_sha256", "quantization",
 }
 
 
@@ -252,6 +256,7 @@ def score_predictions(
     model_license: str,
     locale: str,
     intake_report_path: Path,
+    runtime_binary_path: Path,
     mode: str = "smoke",
     bootstrap_iterations: int = 1000,
 ) -> dict[str, Any]:
@@ -265,6 +270,8 @@ def score_predictions(
           "predictions_path must be a regular non-symlink file")
     _need(isinstance(intake_report_path, Path) and intake_report_path.is_file() and not intake_report_path.is_symlink(),
           "intake_report_path must be a regular non-symlink file")
+    _need(isinstance(runtime_binary_path, Path) and runtime_binary_path.is_file() and not runtime_binary_path.is_symlink(),
+          "runtime_binary_path must be a regular non-symlink file")
     _need(isinstance(prediction_doc, dict), "prediction document must be an object")
     _need(set(prediction_doc) == PREDICTION_KEYS,
           f"prediction document keys mismatch; missing={sorted(PREDICTION_KEYS-set(prediction_doc))}, extra={sorted(set(prediction_doc)-PREDICTION_KEYS)}")
@@ -274,6 +281,37 @@ def score_predictions(
     _need(prediction_doc["model_id"] == model_id, "prediction model_id mismatch")
     _need(prediction_doc["model_revision"] == model_revision, "prediction model_revision mismatch")
     _need(prediction_doc["model_license"] == model_license, "prediction model_license mismatch")
+    outcomes_sha = prediction_doc["outcomes_sha256"]
+    _need(isinstance(outcomes_sha, str) and SHA256_RE.fullmatch(outcomes_sha) is not None,
+          "outcomes_sha256 must be a 64-hex SHA-256 digest")
+    runtime = prediction_doc["runtime"]
+    _need(isinstance(runtime, dict) and set(runtime) == RUNTIME_KEYS,
+          f"runtime keys mismatch; missing={sorted(RUNTIME_KEYS-set(runtime) if isinstance(runtime, dict) else RUNTIME_KEYS)}, extra={sorted(set(runtime)-RUNTIME_KEYS) if isinstance(runtime, dict) else []}")
+    _need(runtime["kind"] == "whisper.cpp", "runtime.kind must be whisper.cpp for this scorer")
+    for field in ("runtime_commit", "converter_commit"):
+        _need(isinstance(runtime[field], str) and SHA1_RE.fullmatch(runtime[field]) is not None,
+              f"runtime.{field} must be a 40-hex commit SHA")
+    _need(isinstance(runtime["quantization"], str) and re.fullmatch(r"[A-Za-z0-9._+-]{1,32}", runtime["quantization"]) is not None,
+          "runtime.quantization must be an explicit compact identifier")
+    _need(isinstance(runtime["runtime_binary_sha256"], str) and SHA256_RE.fullmatch(runtime["runtime_binary_sha256"]) is not None,
+          "runtime.runtime_binary_sha256 must be a 64-hex digest")
+    actual_runtime_sha = sha256_file(runtime_binary_path)
+    _need(actual_runtime_sha == runtime["runtime_binary_sha256"],
+          "runtime binary SHA-256 differs from prediction provenance")
+    artifact_relative = safe_relative_path(runtime["artifact_path"], "runtime artifact_path")
+    _need(isinstance(runtime["artifact_sha256"], str) and SHA256_RE.fullmatch(runtime["artifact_sha256"]) is not None,
+          "runtime.artifact_sha256 must be a 64-hex digest")
+    _need(model_root.is_dir() and not model_root.is_symlink(), "model_root must be a real directory, not a symlink")
+    artifact_path = model_root / artifact_relative
+    current = model_root
+    for part in artifact_relative.parts:
+        current = current / part
+        _need(not current.is_symlink(), "runtime model artifact path contains a symlink")
+    _need(artifact_path.is_file(), "runtime model artifact_path does not name a regular file")
+    _need(artifact_path.resolve(strict=True).is_relative_to(model_root.resolve(strict=True)),
+          "runtime model artifact escapes model_root")
+    _need(sha256_file(artifact_path) == runtime["artifact_sha256"],
+          "runtime model artifact SHA-256 differs from prediction provenance")
 
     dataset, test_rows, test_sha = _load_intake(
         intake_report, dataset_root=dataset_root, archive=archive, locale=locale, expected_mode=mode
@@ -375,12 +413,22 @@ def score_predictions(
             "snapshot_manifest_sha256": model_tree_sha, "snapshot_file_count": model_files,
             "snapshot_bytes": model_bytes,
         },
+        "runtime": {
+            "kind": runtime["kind"],
+            "runtime_commit": runtime["runtime_commit"],
+            "converter_commit": runtime["converter_commit"],
+            "runtime_binary_sha256": actual_runtime_sha,
+            "artifact_path": artifact_relative.as_posix(),
+            "artifact_sha256": runtime["artifact_sha256"],
+            "quantization": runtime["quantization"],
+        },
         "dataset": {
             "id": dataset["id"], "version": dataset["version"], "license_id_operator_supplied": dataset.get("license_id_operator_supplied"),
             "archive_sha256": archive_sha, "test_metadata_sha256": test_meta_sha,
         },
         "inputs": {
             "prediction_file_sha256": prediction_sha,
+            "outcomes_sha256": outcomes_sha,
             "intake_report_sha256": sha256_file(intake_report_path),
         },
         "metrics": aggregate(per_clip),
@@ -448,6 +496,7 @@ def main() -> int:
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--model-revision", required=True, help="40-hex repository commit SHA used to export model-root")
     parser.add_argument("--model-license", required=True, help="license identifier from the model card")
+    parser.add_argument("--runtime-binary", required=True, type=Path, help="exact local whisper.cpp executable used for inference")
     parser.add_argument("--mode", choices=("smoke", "heldout-evaluation"), default="smoke")
     parser.add_argument("--bootstrap-iterations", type=int, default=1000)
     parser.add_argument("--report", required=True, type=Path)
@@ -469,6 +518,7 @@ def main() -> int:
             model_license=args.model_license,
             locale=args.locale,
             intake_report_path=args.intake_report,
+            runtime_binary_path=args.runtime_binary,
             mode=args.mode,
             bootstrap_iterations=args.bootstrap_iterations,
         )
