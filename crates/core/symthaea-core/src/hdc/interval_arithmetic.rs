@@ -27,10 +27,11 @@ const EXP_SERIES_TERMS: usize = 40;
 const EXP_SERIES_TAIL_BOUND: f64 = f64::from_bits(823_u64 << 52);
 const EXP_REDUCTION_LIMIT: f64 = 0.36;
 
-// Trigonometric series are evaluated only for |x| <= 1/2, where no argument
-// reduction is required. The degree-19 Taylor remainder is bounded by
-// |x|^20 / 20! < 2^-81; use the wider exactly represented allowance 2^-80.
-const TRIG_SMALL_ARGUMENT_LIMIT: f64 = 0.5;
+// Trigonometric series are evaluated only for |x| <= 3/2, safely inside
+// sine's monotone region and cosine's single-maximum region. At this limit,
+// the omitted sine/cosine terms are respectively < 2^-140 and < 2^-135.
+// The wider exactly represented allowance 2^-80 covers either remainder.
+const TRIG_SMALL_ARGUMENT_LIMIT: f64 = 1.5;
 const TRIG_SERIES_TAIL_BOUND: f64 = f64::from_bits(943_u64 << 52);
 
 /// Errors while constructing or evaluating a real interval.
@@ -345,8 +346,8 @@ impl Interval {
 
     /// Sine enclosure with a bounded local series and a conservative global fallback.
     ///
-    /// For intervals wholly inside [-1/2, 1/2], sine is monotone increasing.
-    /// Endpoint Taylor polynomials through degree 19 are evaluated with interval
+    /// For intervals wholly inside [-3/2, 3/2], sine is monotone increasing.
+    /// Endpoint Taylor polynomials through degree 39 are evaluated with interval
     /// arithmetic, then widened by 2^-80 for the explicit Taylor remainder.
     /// Larger or unbounded intervals return [-1, 1]: this is always sound and
     /// intentionally avoids an unqualified floating-point argument reduction.
@@ -370,10 +371,10 @@ impl Interval {
 
     /// Cosine enclosure with a bounded local series and a conservative global fallback.
     ///
-    /// On [-1/2, 1/2], cosine increases to its exact maximum 1 at zero and
-    /// decreases afterwards. The endpoint Taylor polynomials through degree 18
-    /// use interval arithmetic and a 2^-80 remainder allowance. Outside this
-    /// region, return the sound but coarse range [-1, 1].
+    /// On [-3/2, 3/2], cosine increases to its exact maximum 1 at zero and
+    /// decreases with absolute argument. Endpoint Taylor polynomials through
+    /// degree 38 use interval arithmetic and a 2^-80 remainder allowance.
+    /// Outside this region, return the sound but coarse range [-1, 1].
     pub fn checked_cos(self) -> Result<Self, IntervalError> {
         if self.lower < -TRIG_SMALL_ARGUMENT_LIMIT
             || self.upper > TRIG_SMALL_ARGUMENT_LIMIT
@@ -487,7 +488,7 @@ fn next_alternating_trig_term(
     numerator.checked_divide(first)?.checked_divide(second)
 }
 
-/// Enclose sin(x) for a finite point |x| <= 1/2 using terms through degree 19.
+/// Enclose sin(x) for |x| <= 3/2 using terms through degree 39.
 fn sin_point_enclosure(value: f64) -> Result<Interval, IntervalError> {
     if value == 0.0 {
         return Interval::point(0.0);
@@ -496,7 +497,7 @@ fn sin_point_enclosure(value: f64) -> Result<Interval, IntervalError> {
     let x_squared = x.checked_multiply(x);
     let mut term = x;
     let mut sum = x;
-    for n in 1..=9 {
+    for n in 1..=19 {
         term = next_alternating_trig_term(term, x_squared, 2 * n, 2 * n + 1)?;
         sum = sum.checked_add(term);
     }
@@ -504,7 +505,7 @@ fn sin_point_enclosure(value: f64) -> Result<Interval, IntervalError> {
     Ok(sum.checked_add(remainder))
 }
 
-/// Enclose cos(x) for a finite point |x| <= 1/2 using terms through degree 18.
+/// Enclose cos(x) for |x| <= 3/2 using terms through degree 38.
 fn cos_point_enclosure(value: f64) -> Result<Interval, IntervalError> {
     if value == 0.0 {
         return Interval::point(1.0);
@@ -513,7 +514,7 @@ fn cos_point_enclosure(value: f64) -> Result<Interval, IntervalError> {
     let x_squared = x.checked_multiply(x);
     let mut term = Interval::point(1.0)?;
     let mut sum = term;
-    for n in 1..=9 {
+    for n in 1..=19 {
         term = next_alternating_trig_term(term, x_squared, 2 * n - 1, 2 * n)?;
         sum = sum.checked_add(term);
     }
@@ -1018,13 +1019,13 @@ mod tests {
         assert_eq!(zero.checked_sin().unwrap(), zero);
         assert_eq!(zero.checked_cos().unwrap(), Interval::point(1.0).unwrap());
 
-        let half_sine = Interval::point(0.5).unwrap().checked_sin().unwrap();
-        assert!(half_sine.contains(0.47942553860420301));
+        let edge_sine = Interval::point(1.5).unwrap().checked_sin().unwrap();
+        assert!(edge_sine.contains(0.9974949866040544));
 
-        let half_cosine = Interval::point(0.5).unwrap().checked_cos().unwrap();
-        assert!(half_cosine.contains(0.8775825618903728));
+        let edge_cosine = Interval::point(1.5).unwrap().checked_cos().unwrap();
+        assert!(edge_cosine.contains(0.0707372016677029));
 
-        let crossing = interval(-0.5, 0.5);
+        let crossing = interval(-1.5, 1.5);
         let sine = crossing.checked_sin().unwrap();
         assert!(sine.lower() <= -0.47942553860420301);
         assert!(sine.upper() >= 0.47942553860420301);
@@ -1038,7 +1039,7 @@ mod tests {
     #[test]
     fn trigonometric_functions_fail_wide_outside_the_certified_small_range() {
         let unit_range = interval(-1.0, 1.0);
-        assert_eq!(interval(0.5, 0.5000000001).checked_sin().unwrap(), unit_range);
+        assert_eq!(interval(1.5, 1.5000000001).checked_sin().unwrap(), unit_range);
         assert_eq!(interval(-2.0, 2.0).checked_cos().unwrap(), unit_range);
         assert_eq!(interval(f64::NEG_INFINITY, f64::INFINITY).checked_sin().unwrap(), unit_range);
         assert_eq!(interval(1000.0, 1001.0).checked_cos().unwrap(), unit_range);
@@ -1046,7 +1047,7 @@ mod tests {
 
     #[test]
     fn bounded_trigonometric_series_cross_check_representable_points() {
-        for step in -50_i32..=50 {
+        for step in -150_i32..=150 {
             let value = step as f64 / 100.0;
             let point = Interval::point(value).unwrap();
             assert!(
