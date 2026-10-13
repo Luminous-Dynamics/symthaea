@@ -970,17 +970,7 @@ impl TemporalConsciousnessAnalyzer {
     /// for every call; it is not a wall-clock timestamp. This variant has no external
     /// narrative or predictor context, so unavailable identity representations stay unknown.
     pub fn observe_at(&mut self, state: &BinaryHV, phi: f64, elapsed: Duration) -> bool {
-        self.try_observe_at_with_context(state, phi, elapsed, None)
-    }
-
-    pub(crate) fn try_observe_at_with_context(
-        &mut self,
-        state: &BinaryHV,
-        phi: f64,
-        elapsed: Duration,
-        narrative: Option<&NarrativeSelfModel>,
-    ) -> bool {
-        self.try_observe_with_elapsed(state, phi, Some(elapsed), narrative)
+        self.try_observe_with_elapsed(state, phi, Some(elapsed), None)
     }
 
     fn try_observe_with_elapsed(
