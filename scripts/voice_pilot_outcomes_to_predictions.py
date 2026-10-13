@@ -320,10 +320,10 @@ def main() -> int:
             runtime_python_executable_sha256=args.runtime_python_executable_sha256,
             runtime_worker_sha256=args.runtime_worker_sha256, mode=args.mode,
         )
-        write_private_exclusive(
-            args.output, doc,
-            [args.dataset_root, args.model_root, args.source_model_root],
-        )
+        forbidden_roots = [args.dataset_root, args.model_root, args.source_model_root]
+        if args.runtime_worker is not None:
+            forbidden_roots.append(args.runtime_worker.parent)
+        write_private_exclusive(args.output, doc, forbidden_roots)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
     print(json.dumps({
