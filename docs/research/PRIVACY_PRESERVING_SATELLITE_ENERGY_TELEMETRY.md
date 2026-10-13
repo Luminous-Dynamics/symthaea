@@ -1,6 +1,6 @@
 # Privacy-Preserving Electrical Usage Telemetry over Satellite
 
-**Status:** Research design and offline contract prototype. No meter has been connected; no satellite transmission, production cryptography, or field trial is claimed.  
+**Status:** Research design plus offline contract, authenticated-envelope, and SQLite delivery prototypes. No meter has been connected, no satellite transmission or field trial is claimed, and no production-ready cryptographic deployment is asserted.  
 **Scope:** Aggregated electricity-use telemetry for remote feeders, rural sites, microgrids and resilience monitoring, with satellite as a transport option—not a privacy control by itself.  
 **Threat model reviewed:** 2026-10-12.
 
@@ -123,9 +123,9 @@ Files:
 - `tests/test_energy_telemetry_privacy_contract.py`
 - `tests/test_energy_telemetry_release_guard.py`
 
-The deterministic, network-free suite contains 51 cases: 33 envelope/parser cases and 18 release-policy cases. The release guard rejects overlapping time windows for shared participants, deduplicates exact same-batch retransmissions, and composes epsilon/delta budgets per local participant token. This release guard is in-memory only; production requires a durable, access-controlled and tamper-evident ledger whose restart/recovery path cannot reset privacy budgets. They are implemented cases; no hosted CI pass is implied.
+The original deterministic parser and release-policy suites contain 51 cases: 33 envelope/parser cases and 18 release-policy cases. Later increments add a cryptographic protected-envelope suite, durable queue recovery tests, and in-memory delay-tolerant queue tests. The release guard remains in-memory only; production requires a durable, access-controlled and tamper-evident ledger whose restart/recovery path cannot reset privacy budgets. All added cases are implemented but have not been established as passing by the hosted exact-head CI.
 
-The validator checks the aggregate envelope's exact keys, UTC/time-window consistency, cohort floor, bounded integer energy value, finite coverage fraction, privacy-mechanism/recipient compatibility and per-release DP parameter limits. A dedicated [pinned GitHub Actions workflow](https://github.com/Luminous-Dynamics/symthaea/blob/research/privacy-preserving-satellite-energy-telemetry/.github/workflows/energy-telemetry-privacy-tests.yml) compiles and runs the offline tests on relevant branch/PR changes. It also rejects duplicate JSON keys, non-standard `NaN`/`Infinity` constants and malformed container types without crashing. It does not establish cryptographic authenticity, hardware provenance, meter calibration, the reality of claimed cohort membership or a mathematical privacy proof.
+The aggregate validator checks exact keys, UTC/time-window consistency, cohort floor, bounded integer energy value, finite coverage fraction, privacy-mechanism/recipient compatibility and per-release DP parameter limits. The separate authenticated-envelope prototype encrypts event metadata and payload with ChaCha20-Poly1305 and signs its canonical outer envelope with Ed25519 using the maintained `cryptography` library. Its key registry, nonce lifecycle, signed ACKs and receiver anti-replay state remain outside the prototype. A dedicated [pinned GitHub Actions workflow](https://github.com/Luminous-Dynamics/symthaea/blob/research/privacy-preserving-satellite-energy-telemetry/.github/workflows/energy-telemetry-privacy-tests.yml) compiles and runs the offline tests on relevant branch/PR changes. It also rejects duplicate JSON keys, non-standard `NaN`/`Infinity` constants and malformed container types without crashing. It does not establish cryptographic authenticity, hardware provenance, meter calibration, the reality of claimed cohort membership or a mathematical privacy proof.
 
 ## Research and standards base
 
@@ -143,7 +143,7 @@ The validator checks the aggregate envelope's exact keys, UTC/time-window consis
 2. Data-flow test proves no individual reading or identifying field leaves the local boundary in aggregate mode.
 3. Cohort size, geography precision, output cadence and overlapping-query controls are validated adversarially.
 4. Differential-privacy accountant composes budgets across releases and records auditable receipts.
-5. Message authentication, key rotation, replay rejection, offline buffering and stale-data handling are tested.
+5. The prototype has contract tests for signature and AEAD tampering, protected-envelope persistence/replay, offline queue behavior and stale-data gating. Production key rotation, durable nonce/key usage state, authenticated ACKs and receiver-side replay rejection are still open implementation and verification gates.
 6. Meter measurement accuracy, clock uncertainty, calibration and dropout rates are reported separately from privacy.
 7. Link budget, coverage, unit economics and alternative terrestrial channels are assessed at the actual site.
 8. Local legal review, participant notice/consent where applicable, retention schedule and incident procedure are approved.
@@ -151,4 +151,4 @@ The validator checks the aggregate envelope's exact keys, UTC/time-window consis
 
 ## Claim ceiling
 
-This is an architecture and an offline contract prototype. It does not prove anonymity, regulatory compliance, cryptographic correctness, energy savings, meter accuracy, satellite coverage, cost effectiveness, availability in Johannesburg, or safe control of the electrical grid. The next step is simulation and adversarial testing with synthetic values—not live household collection.
+This is an architecture and a set of offline research prototypes. It does not prove anonymity, regulatory compliance, production cryptographic correctness, safe key management, energy savings, meter accuracy, satellite coverage, cost effectiveness, availability in Johannesburg, or safe control of the electrical grid. The next step is simulation and adversarial testing with synthetic values—not live household collection.
