@@ -59,21 +59,20 @@ nonzero endpoint. See the [Rust `f64::sqrt` contract](https://doc.rust-lang.org/
 Zero is retained exactly, and any interval including negative reals is rejected.
 
 Natural logarithm does not use the platform `f64::ln` result to form a bound.
-Each positive finite binary64 endpoint is decomposed exactly as (x=m2^k),
-where (1\le m<2), using its stored significand and exponent (including exact
-normalization of subnormals). It then encloses
-[
-\ln(m)=2\sum_{j=0}^{\infty}\frac{z^{2j+1}}{2j+1},\qquad
-z=\frac{m-1}{m+1},\quad 0\le z<\frac13.
-]
+Each positive finite binary64 endpoint is decomposed exactly as `x = m * 2^k`,
+where `1 <= m < 2`, using its stored significand and exponent (including exact
+normalization of subnormals). It then encloses the series
+
+`ln(m) = 2 * sum(z^(2j+1) / (2j+1))`, where `z = (m - 1) / (m + 1)` and
+`0 <= z < 1/3`.
+
 The first 64 terms are evaluated using interval operations. Since the omitted
 tail is bounded by
-[
-\frac{2z^{129}}{129(1-z^2)}
-\le \frac{9}{516\cdot3^{129}} < 2^{-134},
-]
-the upper bound includes an exact (2^{-134}) remainder allowance. The same
-series encloses \(\ln 2\), then \(\ln x=\ln m+k\ln2\) is evaluated with
+
+`2*z^129 / (129*(1-z^2)) <= 9 / (516*3^129) < 2^-134`,
+
+the upper bound includes an exact `2^-134` remainder allowance. The same
+series encloses `ln(2)`, then `ln(x) = ln(m) + k*ln(2)` is evaluated with
 outward-rounded interval arithmetic. The result remains conditional on the
 basic-operation assumptions above; the source has not been machine-checked.
 
@@ -91,10 +90,12 @@ when the **entire** returned interval is on one side of zero.
 
 Unit tests cover invalid endpoints, outward enclosures for each arithmetic
 operator, division-by-zero ranges, overflow, underflow, unbounded indeterminate
-quotients, integer-power domains, and a deterministic grid of small integer
-intervals. Expression tests cover polynomial enclosure, finite sums, integer
-exponent requirements, division-domain rejection, and fail-closed handling of
-unsupported transcendental operations.
+quotients, square-root and logarithm domains, logarithm enclosure over subnormal,
+normal, near-one and extreme finite inputs, integer-power domains, and a
+deterministic grid of small integer intervals. Expression tests cover polynomial
+enclosure, square-root/logarithm enclosure and domain rejection, finite sums,
+integer exponent requirements, division-domain rejection, and fail-closed
+handling of unsupported transcendental operations.
 
 These tests are regression evidence, not a proof of the implementation for every
 possible binary64 input. The repository CI result for the exact current PR head
