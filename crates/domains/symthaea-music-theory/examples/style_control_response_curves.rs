@@ -610,7 +610,7 @@ fn control_target_evaluation(
         let has_plan_contract = observations.iter().all(|observation| {
             observation.plan_requested_bars.is_some()
                 && observation.plan_realized_bars.is_some()
-                && observation.plan_bars_per_chorus.is_some()
+                && observation.plan_bars_per_chorus.unwrap_or(0) > 0
         });
         if !has_plan_contract {
             return serde_json::json!({
