@@ -19,6 +19,17 @@ class GenreCompletionRoadmapTests(unittest.TestCase):
   self.assertTrue(expected <= {e["name"] for e in q})
   self.assertTrue(all(e["sources"] and all(s.startswith("https://") for s in e["sources"]) for e in q))
   self.assertTrue(all(e["catalog_id"] is None and e["state"]=="proposal_only_not_in_catalog" and e["name"].casefold() not in names and e["implementation_claim"] for e in q))
+ def test_every_expansion_candidate_has_an_explicit_source_assessment(self):
+  r=build_roadmap(ROOT); q=r["expansion_candidates"]
+  self.assertEqual(len(q),60)
+  allowed={"tradition_specific_context_present","broad_scholarly_context_only","journalism_lead_only","curated_reference_or_repository_only","discovery_only"}
+  self.assertEqual({e["source_evidence_state"] for e in q},set(r["summary"]["candidate_source_evidence_states"]))
+  self.assertTrue(all(e["source_assessments"] and e["source_evidence_state"] in allowed for e in q))
+  self.assertTrue(all(all(x["url"].startswith("https://") and x["source_kind"] and x["scope"] and x["supports"] and x["does_not_establish"] for x in e["source_assessments"]) for e in q))
+  self.assertTrue(all("does not prove" in e["source_evidence_limit"] or "none of these labels proves" in e["source_evidence_limit"] for e in q))
+  directory_only=[e for e in q if e["source_evidence_state"]=="discovery_only"]
+  self.assertTrue(directory_only); self.assertTrue(all("directory-only" in e["next_gate"] for e in directory_only))
+  self.assertTrue(all(e["catalog_id"] is None and e["state"]=="proposal_only_not_in_catalog" for e in q))
  def test_focus_parser_fails_closed_on_missing_entry(self):
   s=(ROOT/"crates/domains/symthaea-muse-protocol/src/catalog.rs").read_text(encoding="utf-8"); self.assertEqual(len(parse_grammar_foci(s,160)),160); s=s.replace('        "South African bubblegum pop song",\n',"",1)
   with self.assertRaisesRegex(CoverageError,"cardinality mismatch|does not match"): parse_grammar_foci(s,160)

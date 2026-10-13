@@ -44,3 +44,18 @@ For each tradition, document what evidence says, what remains uncertain, and wha
 ## Scope and limitations
 
 The registry and queue are designed to become more useful through accountable, revisable research, not to freeze living music cultures into a final list. Candidate coverage remains incomplete by design. The next useful unit of progress is a reviewed, testable style contract with observable distinguishing behavior—not simply another row or another large genre count.
+
+## Per-candidate source assessment (added in v1.1)
+
+The roadmap now assesses every cited URL instead of implicitly treating all links alike. It records a source kind, the limited scope the source can support, and what it does **not** establish. Each candidate inherits one evidence state:
+
+- `tradition_specific_context_present`: at least one focused academic or heritage/public-history source is linked; the candidate still needs scope checks and practitioner review.
+- `broad_scholarly_context_only`: the scholarly source mentions or situates the tradition in a wider historical account; focused study remains required.
+- `journalism_lead_only`: reporting has surfaced terminology that needs corroboration.
+- `curated_reference_or_repository_only`: a library profile or repository record is useful for discovery but should be checked against stronger sources.
+- `discovery_only`: sources are taxonomy/directories and do not yet provide tradition-specific support.
+
+These are evidence-routing labels, not quality scores or culture rankings. They describe the kind of source linked, not a judgment about the tradition. The evidence state is deliberately separate from the P0/P1/P2 engineering-sequencing field. Even a UNESCO heritage record establishes cultural context and transmission, not an executable music grammar. A peer-reviewed article may study only one period, community, parameter, or interpretive question. The source record's `does_not_establish` field preserves this boundary for each URL.
+
+Where a candidate currently has directory-only sources, it remains outside the registry and is assigned a source-upgrade gate. This is intentional visible incompleteness, not a reason to invent source confidence. The generator fails closed if a candidate links to a URL without an explicit assessment entry, and tests enforce that all sixty candidate records carry their source assessments and remain proposal-only.
+

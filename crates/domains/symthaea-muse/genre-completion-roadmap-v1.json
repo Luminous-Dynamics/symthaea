@@ -20,7 +20,13 @@
     "workstreams_with_explicit_plan": 20,
     "proposed_expansion_candidates_not_in_catalog": 60,
     "roadmap_rows_are_not_implementation_evidence": true,
-    "priority_definition": "P0/P1/P2 express suggested work sequencing only, never cultural or artistic value."
+    "priority_definition": "P0/P1/P2 express suggested work sequencing only, never cultural or artistic value.",
+    "candidate_source_evidence_states": {
+      "broad_scholarly_context_only": 2,
+      "discovery_only": 34,
+      "journalism_lead_only": 3,
+      "tradition_specific_context_present": 21
+    }
   },
   "workstreams": [
     {
@@ -4406,9 +4412,20 @@
       "sources": [
         "https://doi.org/10.1080/00064246.2024.2370204"
       ],
+      "source_assessments": [
+        {
+          "url": "https://doi.org/10.1080/00064246.2024.2370204",
+          "source_kind": "scholarly_article",
+          "scope": "tradition_specific_context",
+          "supports": "A scholarly discussion distinguishing contemporary Afrobeats from Afrobeat terminology.",
+          "does_not_establish": "A terminology discussion does not define an executable groove, arrangement, or production contract."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4419,9 +4436,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4432,9 +4460,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4445,9 +4484,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4458,9 +4508,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4471,9 +4532,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4484,9 +4556,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4497,9 +4580,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4510,9 +4604,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4523,9 +4628,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4536,9 +4652,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4549,9 +4676,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4562,9 +4700,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4575,9 +4724,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4588,9 +4748,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4601,9 +4772,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4614,9 +4796,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4627,9 +4820,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4640,9 +4844,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4653,9 +4868,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4666,9 +4892,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4679,9 +4916,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4692,9 +4940,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4705,9 +4964,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4718,9 +4988,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4731,9 +5012,20 @@
       "sources": [
         "https://musicbrainz.org/doc/Genre"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/doc/Genre",
+          "source_kind": "community_taxonomy_methodology",
+          "scope": "taxonomy_only",
+          "supports": "The role and subjective nature of community-maintained genre tags as a discovery mechanism.",
+          "does_not_establish": "It does not establish source quality, musical properties, cultural authenticity, or a generation route for any candidate."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4742,11 +5034,30 @@
       "priority": "P0",
       "rationale": "A named Kenyan/East African guitar-led popular tradition missing from the current registry; define period, region and ensemble roles before implementation.",
       "sources": [
-        "https://doi.org/10.1017/S0261143000003524"
+        "https://doi.org/10.1017/S0261143000003524",
+        "https://doi.org/10.21504/amj.v9i4.1888"
       ],
+      "source_assessments": [
+        {
+          "url": "https://doi.org/10.1017/S0261143000003524",
+          "source_kind": "peer_reviewed_musicology_article",
+          "scope": "broad_scholarly_context",
+          "supports": "A historical survey situating named African popular-music traditions within regional histories.",
+          "does_not_establish": "It is not a complete or contemporary style specification for every tradition it mentions."
+        },
+        {
+          "url": "https://doi.org/10.21504/amj.v9i4.1888",
+          "source_kind": "peer_reviewed_musicology_article",
+          "scope": "tradition_specific_context",
+          "supports": "A focused study of Benga beat formation in Kenyan Luo song style and its later adaptations.",
+          "does_not_establish": "The article's historical scope does not establish one canonical Benga pattern for all communities or eras."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4755,11 +5066,30 @@
       "priority": "P0",
       "rationale": "A Zimbabwean music field with historical and political context; do not reduce it to generic guitar-band patterns.",
       "sources": [
-        "https://doi.org/10.1017/S0261143000003524"
+        "https://doi.org/10.1017/S0261143000003524",
+        "https://www.jstor.org/stable/j.ctt17w8gb6"
       ],
+      "source_assessments": [
+        {
+          "url": "https://doi.org/10.1017/S0261143000003524",
+          "source_kind": "peer_reviewed_musicology_article",
+          "scope": "broad_scholarly_context",
+          "supports": "A historical survey situating named African popular-music traditions within regional histories.",
+          "does_not_establish": "It is not a complete or contemporary style specification for every tradition it mentions."
+        },
+        {
+          "url": "https://www.jstor.org/stable/j.ctt17w8gb6",
+          "source_kind": "university_press_monograph_record",
+          "scope": "tradition_specific_context",
+          "supports": "A scholarly monograph examining African music, colonial Zimbabwe, and the historical context of Chimurenga music.",
+          "does_not_establish": "A historical monograph is not an exhaustive present-day repertoire survey or a generative specification."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4770,9 +5100,20 @@
       "sources": [
         "https://doi.org/10.11606/issn.1983-6023.sank.2016.119064"
       ],
+      "source_assessments": [
+        {
+          "url": "https://doi.org/10.11606/issn.1983-6023.sank.2016.119064",
+          "source_kind": "scholarly_article",
+          "scope": "tradition_specific_context",
+          "supports": "A focused study of Mbalax as Senegalese popular music and its changing boundaries.",
+          "does_not_establish": "It does not validate a complete generative grammar or establish present-day practitioner consensus."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4783,9 +5124,20 @@
       "sources": [
         "https://doi.org/10.1017/S0261143000003524"
       ],
+      "source_assessments": [
+        {
+          "url": "https://doi.org/10.1017/S0261143000003524",
+          "source_kind": "peer_reviewed_musicology_article",
+          "scope": "broad_scholarly_context",
+          "supports": "A historical survey situating named African popular-music traditions within regional histories.",
+          "does_not_establish": "It is not a complete or contemporary style specification for every tradition it mentions."
+        }
+      ],
+      "source_evidence_state": "broad_scholarly_context_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Add focused tradition-specific research and practitioner review before treating this name as a stable identity or proposing a grammar.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4794,11 +5146,22 @@
       "priority": "P1",
       "rationale": "A major Nigerian popular tradition; boundaries and development relative to Apala and Juju require specialist sources.",
       "sources": [
-        "https://musicbrainz.org/genres"
+        "https://doi.org/10.1080/17411912.2023.2260405"
       ],
+      "source_assessments": [
+        {
+          "url": "https://doi.org/10.1080/17411912.2023.2260405",
+          "source_kind": "peer_reviewed_ethnomusicology_article",
+          "scope": "tradition_specific_context",
+          "supports": "A study of Fújì music, genre-making, and social context in Lagos, Nigeria.",
+          "does_not_establish": "It does not yield a universal musical recipe or collapse related Yoruba traditions."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4809,9 +5172,20 @@
       "sources": [
         "https://doi.org/10.1017/S0261143000003524"
       ],
+      "source_assessments": [
+        {
+          "url": "https://doi.org/10.1017/S0261143000003524",
+          "source_kind": "peer_reviewed_musicology_article",
+          "scope": "broad_scholarly_context",
+          "supports": "A historical survey situating named African popular-music traditions within regional histories.",
+          "does_not_establish": "It is not a complete or contemporary style specification for every tradition it mentions."
+        }
+      ],
+      "source_evidence_state": "broad_scholarly_context_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Add focused tradition-specific research and practitioner review before treating this name as a stable identity or proposing a grammar.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4823,9 +5197,27 @@
         "https://www.africanmusiclibrary.org/genre/Azonto",
         "https://www.theguardian.com/music/2026/oct/06/african-music-afrobeats-tyla"
       ],
+      "source_assessments": [
+        {
+          "url": "https://www.africanmusiclibrary.org/genre/Azonto",
+          "source_kind": "music_library_genre_profile",
+          "scope": "curated_reference_profile",
+          "supports": "A focused library/profile entry that can help locate Azonto-specific references.",
+          "does_not_establish": "A library profile alone is not practitioner consensus or an implementation-ready rhythmic contract."
+        },
+        {
+          "url": "https://www.theguardian.com/music/2026/oct/06/african-music-afrobeats-tyla",
+          "source_kind": "journalistic_reporting",
+          "scope": "current_reporting_lead",
+          "supports": "A contemporary reporting lead about terminology and emerging labels in African popular music.",
+          "does_not_establish": "Journalism is a lead for follow-up, not sufficient evidence of a stable identity or musical contract."
+        }
+      ],
+      "source_evidence_state": "journalism_lead_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Corroborate this reporting lead with tradition-specific research and direct practitioner/primary sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4836,9 +5228,20 @@
       "sources": [
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4850,9 +5253,27 @@
         "https://folkways.si.edu/genre/calypso",
         "https://folklife.si.edu/magazine/calypso-music-trinidad-and-tobago"
       ],
+      "source_assessments": [
+        {
+          "url": "https://folkways.si.edu/genre/calypso",
+          "source_kind": "museum_music_library_catalog",
+          "scope": "curated_reference_profile",
+          "supports": "A Smithsonian Folkways curated music-library reference for Calypso.",
+          "does_not_establish": "Catalog classification alone does not establish regional variation or compositional rules."
+        },
+        {
+          "url": "https://folklife.si.edu/magazine/calypso-music-trinidad-and-tobago",
+          "source_kind": "museum_public_history",
+          "scope": "tradition_specific_context",
+          "supports": "Smithsonian Folklife context for Calypso in Trinidad and Tobago.",
+          "does_not_establish": "Public-history coverage is a starting point, not a complete technical analysis or practitioner review."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4864,9 +5285,27 @@
         "https://folklife.si.edu/magazine/calypso-music-trinidad-and-tobago",
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://folklife.si.edu/magazine/calypso-music-trinidad-and-tobago",
+          "source_kind": "museum_public_history",
+          "scope": "tradition_specific_context",
+          "supports": "Smithsonian Folklife context for Calypso in Trinidad and Tobago.",
+          "does_not_establish": "Public-history coverage is a starting point, not a complete technical analysis or practitioner review."
+        },
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4875,11 +5314,22 @@
       "priority": "P1",
       "rationale": "A geographically varied family; regional versions should be linked rather than treated as one universal rhythmic template.",
       "sources": [
-        "https://musicbrainz.org/genres"
+        "https://www.revistahistoriaindigena.uchile.cl/index.php/RMCH/article/view/44886"
       ],
+      "source_assessments": [
+        {
+          "url": "https://www.revistahistoriaindigena.uchile.cl/index.php/RMCH/article/view/44886",
+          "source_kind": "scholarly_musicology_article",
+          "scope": "tradition_specific_context",
+          "supports": "Research on the social construction, history, and changing usage of Cumbia in Colombia.",
+          "does_not_establish": "Its central caution is against treating Cumbia as a fixed or homogeneous identity."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4890,9 +5340,20 @@
       "sources": [
         "https://ich.unesco.org/en/USL/vallenato-traditional-music-of-the-greater-magdalena-region-01095"
       ],
+      "source_assessments": [
+        {
+          "url": "https://ich.unesco.org/en/USL/vallenato-traditional-music-of-the-greater-magdalena-region-01095",
+          "source_kind": "unesco_intangible_heritage_record",
+          "scope": "tradition_specific_context",
+          "supports": "A region-specific heritage record for traditional Vallenato music.",
+          "does_not_establish": "One heritage record cannot be treated as exhaustive for every regional and modern variant."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4901,11 +5362,22 @@
       "priority": "P1",
       "rationale": "Research the guitar, percussion, bass, song and dance relationship; source material supports tradition identity, not a ready-made generator.",
       "sources": [
-        "https://ich.unesco.org/en/Decisions/14.COM/10.b.10"
+        "https://ich.unesco.org/en/RL/music-and-dance-of-dominican-bachata-01514"
       ],
+      "source_assessments": [
+        {
+          "url": "https://ich.unesco.org/en/RL/music-and-dance-of-dominican-bachata-01514",
+          "source_kind": "unesco_intangible_heritage_record",
+          "scope": "tradition_specific_context",
+          "supports": "A UNESCO record detailing Dominican Bachata's social context, instrumentation, rhythmic outline, song, and dance.",
+          "does_not_establish": "The record is a point of cultural grounding, not complete implementation evidence or permission for authenticity claims."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4914,11 +5386,22 @@
       "priority": "P1",
       "rationale": "Candidate for independent review of rhythm, arrangement and regional variants; do not merge it into Bachata or Salsa.",
       "sources": [
-        "https://musicbrainz.org/genres"
+        "https://ich.unesco.org/en/RL/bon-01162"
       ],
+      "source_assessments": [
+        {
+          "url": "https://ich.unesco.org/en/RL/bon-01162",
+          "source_kind": "unesco_intangible_heritage_record",
+          "scope": "tradition_specific_context",
+          "supports": "A UNESCO heritage record describing music and dance of Merengue in the Dominican Republic.",
+          "does_not_establish": "The record does not cover every regional variation or define an executable rhythm engine."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4927,11 +5410,22 @@
       "priority": "P1",
       "rationale": "A regional family with variant styles, instruments and dance relationships; define scope before assigning one route.",
       "sources": [
-        "https://musicbrainz.org/genres"
+        "https://www.cambridge.org/core/journals/latin-american-research-review/article/forros-wars-of-maneuver-and-position-popular-northeastern-music-critical-regionalism-and-a-culture-of-migration/1BD823B5294A93F26BE24AD65F19B9CF"
       ],
+      "source_assessments": [
+        {
+          "url": "https://www.cambridge.org/core/journals/latin-american-research-review/article/forros-wars-of-maneuver-and-position-popular-northeastern-music-critical-regionalism-and-a-culture-of-migration/1BD823B5294A93F26BE24AD65F19B9CF",
+          "source_kind": "peer_reviewed_music_and_culture_article",
+          "scope": "tradition_specific_context",
+          "supports": "A cultural-historical study of northeastern Brazilian popular music and the relationship between baião and forró.",
+          "does_not_establish": "The article emphasizes history and regional politics rather than a complete performance-level style grammar."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4940,11 +5434,22 @@
       "priority": "P2",
       "rationale": "Candidate for a dedicated study of instrumental interaction, phrasing and ornament rather than a generic samba preset.",
       "sources": [
-        "https://musicbrainz.org/genres"
+        "https://doi.org/10.1080/09298215.2020.1797109"
       ],
+      "source_assessments": [
+        {
+          "url": "https://doi.org/10.1080/09298215.2020.1797109",
+          "source_kind": "scholarly_corpus_study",
+          "scope": "tradition_specific_context",
+          "supports": "A corpus-driven analysis of harmony and form in Brazilian Choro based on a set of representative pieces.",
+          "does_not_establish": "Its corpus and analytical dimensions are bounded; it does not prove an engine produces perceptually authentic Choro."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4955,9 +5460,20 @@
       "sources": [
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4968,9 +5484,20 @@
       "sources": [
         "https://ich.unesco.org/en/RL/rai-popular-folk-song-of-algeria-01894"
       ],
+      "source_assessments": [
+        {
+          "url": "https://ich.unesco.org/en/RL/rai-popular-folk-song-of-algeria-01894",
+          "source_kind": "unesco_intangible_heritage_record",
+          "scope": "tradition_specific_context",
+          "supports": "The heritage record for Raï as Algerian popular folk song.",
+          "does_not_establish": "The record does not cover every contemporary substyle or provide a complete composing algorithm."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4979,11 +5506,22 @@
       "priority": "P0",
       "rationale": "A high-salience Indonesian popular-music identity missing from the current registry; investigate internal variation before choosing a representative scope.",
       "sources": [
-        "https://musicbrainz.org/genres"
+        "https://academic.oup.com/book/27688"
       ],
+      "source_assessments": [
+        {
+          "url": "https://academic.oup.com/book/27688",
+          "source_kind": "scholarly_monograph_record",
+          "scope": "tradition_specific_context",
+          "supports": "A social and musical history of Dangdut including vocal style, melody, rhythm, harmony, form, lyrics, and performance meaning.",
+          "does_not_establish": "Historical analysis still requires explicit corpus selection and validation before any code claims fidelity."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -4995,9 +5533,27 @@
         "https://so02.tci-thaijo.org/index.php/jg-mcukk/article/view/244782",
         "https://www.researchgate.net/publication/303940861_Lukthung_Authenticity_and_Modernity_in_Thai_Country_Music"
       ],
+      "source_assessments": [
+        {
+          "url": "https://so02.tci-thaijo.org/index.php/jg-mcukk/article/view/244782",
+          "source_kind": "scholarly_journal_article",
+          "scope": "tradition_specific_context",
+          "supports": "A study of language in Luk Thung performances by a Mor Lam Siang-Isan band, directly relevant to the overlap between the two forms.",
+          "does_not_establish": "Its language-focused scope is not a complete musical grammar and should not erase differences between Luk Thung and Mor Lam."
+        },
+        {
+          "url": "https://www.researchgate.net/publication/303940861_Lukthung_Authenticity_and_Modernity_in_Thai_Country_Music",
+          "source_kind": "research_repository_record",
+          "scope": "repository_record_only",
+          "supports": "A repository discovery record for a work about authenticity and modernity in Thai country music.",
+          "does_not_establish": "The hosting page is not by itself a publisher-of-record validation; verify the full bibliographic record and argument."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5009,9 +5565,27 @@
         "https://so02.tci-thaijo.org/index.php/jg-mcukk/article/view/244782",
         "https://www.researchgate.net/publication/303940861_Lukthung_Authenticity_and_Modernity_in_Thai_Country_Music"
       ],
+      "source_assessments": [
+        {
+          "url": "https://so02.tci-thaijo.org/index.php/jg-mcukk/article/view/244782",
+          "source_kind": "scholarly_journal_article",
+          "scope": "tradition_specific_context",
+          "supports": "A study of language in Luk Thung performances by a Mor Lam Siang-Isan band, directly relevant to the overlap between the two forms.",
+          "does_not_establish": "Its language-focused scope is not a complete musical grammar and should not erase differences between Luk Thung and Mor Lam."
+        },
+        {
+          "url": "https://www.researchgate.net/publication/303940861_Lukthung_Authenticity_and_Modernity_in_Thai_Country_Music",
+          "source_kind": "research_repository_record",
+          "scope": "repository_record_only",
+          "supports": "A repository discovery record for a work about authenticity and modernity in Thai country music.",
+          "does_not_establish": "The hosting page is not by itself a publisher-of-record validation; verify the full bibliographic record and argument."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5020,11 +5594,30 @@
       "priority": "P0",
       "rationale": "A named East African popular-music field needing regional, language, production and historical sourcing.",
       "sources": [
-        "https://musicbrainz.org/genres"
+        "https://escholarship.org/uc/item/03d1v7fh",
+        "https://www.journals.codesria.org/index.php/ad/article/view/968"
       ],
+      "source_assessments": [
+        {
+          "url": "https://escholarship.org/uc/item/03d1v7fh",
+          "source_kind": "university_repository_dissertation",
+          "scope": "tradition_specific_context",
+          "supports": "A dissertation studying Bongo Flava, Tanzanian hip-hop/pop, and the music's sociopolitical development.",
+          "does_not_establish": "A dissertation's scope and author perspective should be represented; it is not a universal definition of all Tanzanian popular music."
+        },
+        {
+          "url": "https://www.journals.codesria.org/index.php/ad/article/view/968",
+          "source_kind": "scholarly_journal_article",
+          "scope": "tradition_specific_context",
+          "supports": "Research on Bongo Flava and hip-hop in contemporary Tanzania, including its linguistic and social setting.",
+          "does_not_establish": "The article does not prescribe an executable composition model."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5036,9 +5629,27 @@
         "https://doi.org/10.25024/kj.2013.53.4.14",
         "https://experts.arizona.edu/en/publications/k-pop-genres-a-cross-cultural-exploration/"
       ],
+      "source_assessments": [
+        {
+          "url": "https://doi.org/10.25024/kj.2013.53.4.14",
+          "source_kind": "scholarly_publication_record",
+          "scope": "broad_scholarly_context",
+          "supports": "Research context for K-pop's production and international dissemination.",
+          "does_not_establish": "A broad media or industry account does not specify one K-pop musical grammar."
+        },
+        {
+          "url": "https://experts.arizona.edu/en/publications/k-pop-genres-a-cross-cultural-exploration/",
+          "source_kind": "scholarly_publication_record",
+          "scope": "tradition_specific_context",
+          "supports": "A cross-cultural study of genre labels applied within K-pop.",
+          "does_not_establish": "It does not make K-pop internally homogeneous or prescribe a generator."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5047,11 +5658,22 @@
       "priority": "P2",
       "rationale": "A broad market label that needs scoped subfamilies, time periods and local terminology before implementation.",
       "sources": [
-        "https://musicbrainz.org/genres"
+        "https://onlinelibrary.wiley.com/doi/10.1002/9781119518297.eowe00042"
       ],
+      "source_assessments": [
+        {
+          "url": "https://onlinelibrary.wiley.com/doi/10.1002/9781119518297.eowe00042",
+          "source_kind": "scholarly_reference_article",
+          "scope": "tradition_specific_context",
+          "supports": "A 2025 reference article discussing J-pop, language contact, and its historical relationship to other Japanese popular forms.",
+          "does_not_establish": "A linguistic and historical account does not define every J-pop substyle or a complete musical grammar."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5062,9 +5684,20 @@
       "sources": [
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5073,11 +5706,22 @@
       "priority": "P2",
       "rationale": "A historically distinct Korean popular tradition; scope vocal, rhythmic and period differences through sources and specialist review.",
       "sources": [
-        "https://musicbrainz.org/genres"
+        "https://researchportal.helsinki.fi/en/publications/interrogating-trot-situating-the-boom-inewtroi-nostalgia-old-song/"
       ],
+      "source_assessments": [
+        {
+          "url": "https://researchportal.helsinki.fi/en/publications/interrogating-trot-situating-the-boom-inewtroi-nostalgia-old-song/",
+          "source_kind": "peer_reviewed_music_culture_article",
+          "scope": "tradition_specific_context",
+          "supports": "A study of Trot as a Korean popular-music genre and the historical discourse around its 2019–2020 revival.",
+          "does_not_establish": "A study of a particular revival period is not a full transhistorical Trot definition."
+        }
+      ],
+      "source_evidence_state": "tradition_specific_context_present",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Disambiguate names and aliases; check source date, region, internal variants, and community terms; then seek knowledgeable-practitioner review and formulate falsifiable musical hypotheses.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5088,9 +5732,20 @@
       "sources": [
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5101,9 +5756,20 @@
       "sources": [
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5114,9 +5780,20 @@
       "sources": [
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5127,9 +5804,20 @@
       "sources": [
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5140,9 +5828,20 @@
       "sources": [
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5153,9 +5852,20 @@
       "sources": [
         "https://musicbrainz.org/genres"
       ],
+      "source_assessments": [
+        {
+          "url": "https://musicbrainz.org/genres",
+          "source_kind": "community_taxonomy_directory",
+          "scope": "discovery_only",
+          "supports": "A maintained directory of genre labels and naming leads.",
+          "does_not_establish": "A directory listing is not tradition-specific evidence, scholarly validation, or a compositional specification."
+        }
+      ],
+      "source_evidence_state": "discovery_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Replace or supplement directory-only discovery links with tradition-specific scholarly, archival, heritage, or practitioner sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5166,9 +5876,20 @@
       "sources": [
         "https://www.theguardian.com/music/2026/oct/06/african-music-afrobeats-tyla"
       ],
+      "source_assessments": [
+        {
+          "url": "https://www.theguardian.com/music/2026/oct/06/african-music-afrobeats-tyla",
+          "source_kind": "journalistic_reporting",
+          "scope": "current_reporting_lead",
+          "supports": "A contemporary reporting lead about terminology and emerging labels in African popular music.",
+          "does_not_establish": "Journalism is a lead for follow-up, not sufficient evidence of a stable identity or musical contract."
+        }
+      ],
+      "source_evidence_state": "journalism_lead_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Corroborate this reporting lead with tradition-specific research and direct practitioner/primary sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     },
     {
@@ -5179,9 +5900,20 @@
       "sources": [
         "https://www.theguardian.com/music/2026/oct/06/african-music-afrobeats-tyla"
       ],
+      "source_assessments": [
+        {
+          "url": "https://www.theguardian.com/music/2026/oct/06/african-music-afrobeats-tyla",
+          "source_kind": "journalistic_reporting",
+          "scope": "current_reporting_lead",
+          "supports": "A contemporary reporting lead about terminology and emerging labels in African popular music.",
+          "does_not_establish": "Journalism is a lead for follow-up, not sufficient evidence of a stable identity or musical contract."
+        }
+      ],
+      "source_evidence_state": "journalism_lead_only",
+      "source_evidence_limit": "Source presence grounds research intake only; none of these labels proves a unique executable grammar, runtime generation, perceptual distinctness, or cultural authenticity.",
       "catalog_id": null,
       "state": "proposal_only_not_in_catalog",
-      "next_gate": "Deduplicate names/aliases, source distinction, define a non-overlapping profile, then decide whether to assign a stable ID.",
+      "next_gate": "Corroborate this reporting lead with tradition-specific research and direct practitioner/primary sources before taxonomy review.",
       "implementation_claim": "No registry row, composer route, or runtime capability is implied."
     }
   ],
