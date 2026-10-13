@@ -252,6 +252,8 @@ jobs:
         run: python3 scripts/test_prepare_voice_asr_pilot.py
       - name: Test pilot outcome provenance packaging
         run: python3 scripts/test_voice_pilot_outcomes_to_predictions.py
+      - name: Test offline Transformers ASR worker contract
+        run: python3 scripts/test_voice_transformers_worker.py
       - name: Test spoken-passage comprehension pack
         run: python3 scripts/test_voice_comprehension_gate.py
 
