@@ -356,10 +356,12 @@ impl Interval {
 
     /// Enclose sine for bounded and reducible finite intervals.
     ///
-    /// Small intervals use the Taylor enclosure directly. Larger finite inputs
-    /// are reduced only when the entire interval quotient by the computed pi/2
-    /// enclosure proves one unique nearest quadrant. Otherwise the method fails
-    /// wide to [-1, 1].
+    /// Small intervals use the Taylor enclosure directly. For larger inputs, the
+    /// quotient midpoint selects an integer multiple of pi/2 and the resulting
+    /// interval remainder is checked against the local Taylor domain. The
+    /// selected integer need not be the unique nearest quadrant; the exact shift
+    /// identity and bounded remainder provide the enclosure. Unusable reductions
+    /// fail wide to [-1, 1].
     pub fn checked_sin(self) -> Result<Self, IntervalError> {
         if self.lower >= -TRIG_SMALL_ARGUMENT_LIMIT
             && self.upper <= TRIG_SMALL_ARGUMENT_LIMIT
@@ -410,9 +412,10 @@ impl Interval {
 
     /// Enclose cosine for bounded and reducible finite intervals.
     ///
-    /// A large input is reduced only when the whole interval proves a unique
-    /// nearest quadrant using an interval quotient and the computed pi/2 bound.
-    /// Ambiguous boundaries or excessive quadrant indices fail wide.
+    /// For larger inputs, the quotient midpoint selects an integer multiple of
+    /// pi/2. The reduced interval, not unique-quadrant status, is the soundness
+    /// gate: it must fit the local Taylor domain. Excessive or unbounded inputs
+    /// fail wide.
     pub fn checked_cos(self) -> Result<Self, IntervalError> {
         if self.lower >= -TRIG_SMALL_ARGUMENT_LIMIT
             && self.upper <= TRIG_SMALL_ARGUMENT_LIMIT
@@ -1209,14 +1212,36 @@ mod tests {
         assert_eq!(interval(f64::NEG_INFINITY, f64::INFINITY).checked_sin().unwrap(), unit_range);
         assert_eq!(interval(1.0e20, 1.0e20).checked_cos().unwrap(), unit_range);
 
-        for value in [2.0000000001, 10.0, -10.0, 1000.0, -1000.0, 1.0e6, -1.0e6, 1.0e9, -1.0e9] {
+        for value in [
+            2.0000000001,
+            10.0,
+            -10.0,
+            1000.0,
+            -1000.0,
+            1.0e6,
+            -1.0e6,
+            1.0e9,
+            -1.0e9,
+        ] {
             let point = Interval::point(value).unwrap();
             let sine = point.checked_sin().unwrap();
             let cosine = point.checked_cos().unwrap();
-            assert!(sine.contains(value.sin()), "sin enclosure failed at {value}: {sine:?}");
-            assert!(cosine.contains(value.cos()), "cos enclosure failed at {value}: {cosine:?}");
-            assert!(sine.upper() - sine.lower() < 1e-3, "sine reduction unexpectedly wide at {value}: {sine:?}");
-            assert!(cosine.upper() - cosine.lower() < 1e-3, "cosine reduction unexpectedly wide at {value}: {cosine:?}");
+            assert!(
+                sine.contains(value.sin()),
+                "sin enclosure failed at {value}: {sine:?}"
+            );
+            assert!(
+                cosine.contains(value.cos()),
+                "cos enclosure failed at {value}: {cosine:?}"
+            );
+            assert!(
+                sine.upper() - sine.lower() < 1e-3,
+                "sine reduction unexpectedly wide at {value}: {sine:?}"
+            );
+            assert!(
+                cosine.upper() - cosine.lower() < 1e-3,
+                "cosine reduction unexpectedly wide at {value}: {cosine:?}"
+            );
         }
 
         // The wider accepted horizon trades a still-conservative, bounded
@@ -1230,8 +1255,12 @@ mod tests {
         let reducible_range = interval(1000.0, 1001.0);
         let sine = reducible_range.checked_sin().unwrap();
         let cosine = reducible_range.checked_cos().unwrap();
-        assert!(sine.contains(1000.0_f64.sin()) && sine.contains(1001.0_f64.sin()));
-        assert!(cosine.contains(1000.0_f64.cos()) && cosine.contains(1001.0_f64.cos()));
+        assert!(
+            sine.contains(1000.0_f64.sin()) && sine.contains(1001.0_f64.sin())
+        );
+        assert!(
+            cosine.contains(1000.0_f64.cos()) && cosine.contains(1001.0_f64.cos())
+        );
         assert!(sine.upper() - sine.lower() < 1.0);
         assert!(cosine.upper() - cosine.lower() < 1.0);
     }
@@ -1250,10 +1279,18 @@ mod tests {
 
         // This input interval straddles a nearest-cell boundary too, but a
         // single bounded remainder still gives a useful enclose of its range.
+        let boundary_sine = boundary.checked_sin().unwrap();
+        let boundary_cosine = boundary.checked_cos().unwrap();
+        assert!(boundary_sine.contains(-0.7071067811865476));
+        assert!(boundary_cosine.contains(0.7071067811865476));
+
         let crosses_boundary = interval(2.0, 3.0);
         let sine = crosses_boundary.checked_sin().unwrap();
+        let cosine = crosses_boundary.checked_cos().unwrap();
         assert!(sine.lower() > 0.1);
         assert!(sine.upper() < 1.0);
+        assert!(cosine.lower() > -1.0);
+        assert!(cosine.upper() < 0.0);
     }
 
     #[test]
