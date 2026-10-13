@@ -1113,7 +1113,6 @@ impl TemporalConsciousnessAnalyzer {
             .phi_trajectory
             .has_minimum_samples(self.config.min_samples_for_trajectory);
         let continuity_measured = self.continuity.recent_states.len() >= 2;
-        let identity_measured = self.identity_coherence.alignment_coverage() > 0;
         let husserlian_measured = self.husserlian.primal_impression.is_some();
         let binding_measured = !self.binding.bindings.is_empty();
 
@@ -1130,7 +1129,7 @@ impl TemporalConsciousnessAnalyzer {
         let evidence_complete = trajectory_measured
             && continuity_measured
             && self.identity_coherence.alignment_coverage() == 3
-            && husserlian_measured
+            && (!self.config.enable_husserlian_analysis || husserlian_measured)
             && binding_measured;
 
         if evidence_complete {
