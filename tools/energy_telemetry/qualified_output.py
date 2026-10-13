@@ -75,6 +75,7 @@ class MechanismAttestationPolicy:
     qualification_reference: str
     library_name: str
     library_version: str
+    mechanism: str
     mechanism_id: str
     privacy_unit: str
     expected_feature_flags: tuple[str, ...] = ()
@@ -147,6 +148,8 @@ class QualifiedOutputVerifier:
             value = getattr(policy, name)
             if not isinstance(value, str) or not value or len(value) > 256:
                 raise MechanismAttestationError(f"policy {name} must be non-empty and bounded")
+        if policy.mechanism not in {"discrete_laplace", "gaussian"}:
+            raise MechanismAttestationError("policy mechanism must be a supported ledger mechanism")
         if policy.privacy_unit not in {"household", "site"}:
             raise MechanismAttestationError("policy privacy_unit must be household or site")
         flags = policy.expected_feature_flags
@@ -218,6 +221,7 @@ class QualifiedOutputVerifier:
             ("qualification_reference", self.policy.qualification_reference),
             ("library_name", self.policy.library_name),
             ("library_version", self.policy.library_version),
+            ("mechanism", self.policy.mechanism),
             ("mechanism_id", self.policy.mechanism_id),
             ("privacy_unit", self.policy.privacy_unit),
         ):
