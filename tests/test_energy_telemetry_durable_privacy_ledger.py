@@ -265,7 +265,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             DurablePrivacyLedger(
                 str(Path(self.temp.name) / "giant-budget.sqlite3"),
                 participant_hmac_key=self.key,
-                max_epsilon_per_participant=10 ** 10000,
+                max_epsilon_per_participant=10 ** 1000,
             )
         with self.assertRaisesRegex(ValueError, "positive SQLite integer"):
             DurablePrivacyLedger(
