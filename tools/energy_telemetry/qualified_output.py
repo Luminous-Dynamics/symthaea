@@ -20,6 +20,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from tools.energy_telemetry.durable_privacy_ledger import (
+    MAX_DP_OUTPUT_BYTES,
     CommittedPrivacyOutput,
     DurablePrivacyLedger,
     DurablePrivacyPolicyError,
@@ -92,7 +93,7 @@ def canonical_attestation_bytes(fields: Mapping[str, object]) -> bytes:
             ensure_ascii=True,
             allow_nan=False,
         ).encode("ascii")
-    except (TypeError, ValueError, UnicodeEncodeError) as exc:
+    except (TypeError, ValueError, UnicodeEncodeError, RecursionError, OverflowError) as exc:
         raise MechanismAttestationError("attestation fields are not canonical JSON values") from exc
 
 
@@ -149,7 +150,7 @@ class QualifiedOutputVerifier:
             value = getattr(policy, name)
             if not isinstance(value, str) or not value or len(value) > 256:
                 raise MechanismAttestationError(f"policy {name} must be non-empty and bounded")
-        if policy.mechanism not in {"discrete_laplace", "gaussian"}:
+        if not isinstance(policy.mechanism, str) or policy.mechanism not in {"discrete_laplace", "gaussian"}:
             raise MechanismAttestationError("policy mechanism must be a supported ledger mechanism")
         if policy.privacy_unit not in {"household", "site"}:
             raise MechanismAttestationError("policy privacy_unit must be household or site")
@@ -187,8 +188,8 @@ class QualifiedOutputVerifier:
             raise MechanismAttestationError("attestation must be non-empty and at most 16 KiB")
         if not isinstance(signature, bytes) or len(signature) != 64:
             raise MechanismAttestationError("Ed25519 signature must be exactly 64 bytes")
-        if not isinstance(output_bytes, bytes) or not output_bytes:
-            raise MechanismAttestationError("output must be non-empty bytes")
+        if not isinstance(output_bytes, bytes) or not 1 <= len(output_bytes) <= MAX_DP_OUTPUT_BYTES:
+            raise MechanismAttestationError("output must be non-empty bytes and at most 1 MiB")
 
         try:
             fields = json.loads(
@@ -198,7 +199,7 @@ class QualifiedOutputVerifier:
             )
         except MechanismAttestationError:
             raise
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
             raise MechanismAttestationError("attestation is not valid UTF-8 JSON") from exc
         if not isinstance(fields, dict):
             raise MechanismAttestationError("attestation must be a JSON object")
