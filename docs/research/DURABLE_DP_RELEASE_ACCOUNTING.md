@@ -71,7 +71,7 @@ A production system still needs:
 - a reviewed retention/archive design that preserves budget history and release IDs;
 - authenticated authorization that binds query purpose and policy to the requesting service;
 - tamper-evident or signed receipts if the database operator is in the threat model;
-- an output service that enforces commit-before-publish and obtains the output only through `committed_output`;
+- an output service that enforces commit-before-publish and obtains first-time releases only through `QualifiedOutputVerifier.verify_and_commit` and restart recovery only through `QualifiedOutputVerifier.load_committed_output`;
 - a migration plan for HMAC key rotation without resetting subject budgets.
 
 ## Deterministic test coverage
