@@ -69,6 +69,26 @@ class CommittedPrivacyOutput:
     duplicate: bool
 
 
+@dataclass(frozen=True)
+class PrivacyReservationContext:
+    """Non-sensitive policy context needed to verify a release attestation."""
+
+    release_id: str
+    receipt_sha256: str
+    query_sha256: str
+    window_start_utc: str
+    window_end_utc: str
+    recipient_class: str
+    mechanism: str
+    adjacency: str
+    contribution_limit_wh: int
+    contribution_policy_id: str
+    privacy_policy_id: str
+    epsilon_nano: int
+    delta_pico: int
+    cohort_size: int
+
+
 def _canonical(value: object) -> bytes:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
@@ -601,6 +621,42 @@ class DurablePrivacyLedger:
         # The privacy ledger's timestamp window may not extend far past the
         # reservation time. Keep a small constant consistent with telemetry.
         return timedelta(seconds=300)
+
+    def reservation_context(self, release_id: str) -> PrivacyReservationContext:
+        """Return the exact stored policy fields to which a signed attestation must bind.
+
+        This is an audit/read interface. It does not assert that the claimed
+        mechanism ran; that claim must be checked by a separately configured
+        trusted-attestation verifier.
+        """
+        if not isinstance(release_id, str) or not RELEASE_ID_RE.fullmatch(release_id):
+            raise DurablePrivacyPolicyError("release_id must be a random 32-character lowercase hex ID")
+        with self._connection() as db:
+            row = db.execute(
+                "SELECT receipt_sha256, query_sha256, window_start_utc, window_end_utc, "
+                "recipient_class, mechanism, adjacency, contribution_limit_wh, "
+                "contribution_policy_id, privacy_policy_id, epsilon_nano, delta_pico, cohort_size "
+                "FROM privacy_releases WHERE release_id = ?",
+                (release_id,),
+            ).fetchone()
+        if row is None:
+            raise DurablePrivacyPolicyError("cannot attest a release without a reservation")
+        return PrivacyReservationContext(
+            release_id=release_id,
+            receipt_sha256=row[0],
+            query_sha256=row[1],
+            window_start_utc=row[2],
+            window_end_utc=row[3],
+            recipient_class=row[4],
+            mechanism=row[5],
+            adjacency=row[6],
+            contribution_limit_wh=row[7],
+            contribution_policy_id=row[8],
+            privacy_policy_id=row[9],
+            epsilon_nano=row[10],
+            delta_pico=row[11],
+            cohort_size=row[12],
+        )
 
     def commit_output(
         self,
