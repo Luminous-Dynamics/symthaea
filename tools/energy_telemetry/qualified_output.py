@@ -80,6 +80,10 @@ class MechanismAttestationPolicy:
     mechanism: str
     mechanism_id: str
     privacy_unit: str
+    adjacency: str
+    contribution_policy_id: str
+    privacy_policy_id: str
+    max_contribution_limit_wh: int
     expected_feature_flags: tuple[str, ...] = ()
 
 
@@ -145,7 +149,8 @@ class QualifiedOutputVerifier:
             raise MechanismAttestationError("trusted Ed25519 public key must be exactly 32 raw bytes")
         for name in (
             "qualification_reference", "library_name", "library_version",
-            "mechanism_id", "privacy_unit",
+            "mechanism_id", "privacy_unit", "adjacency",
+            "contribution_policy_id", "privacy_policy_id",
         ):
             value = getattr(policy, name)
             if not isinstance(value, str) or not value or len(value) > 256:
@@ -154,6 +159,13 @@ class QualifiedOutputVerifier:
             raise MechanismAttestationError("policy mechanism must be a supported ledger mechanism")
         if policy.privacy_unit not in {"household", "site"}:
             raise MechanismAttestationError("policy privacy_unit must be household or site")
+        if policy.adjacency not in {"add_remove_one_participant", "replace_one_participant"}:
+            raise MechanismAttestationError("policy adjacency must be a supported neighboring-dataset relation")
+        if (
+            type(policy.max_contribution_limit_wh) is not int
+            or not 1 <= policy.max_contribution_limit_wh <= 10**15
+        ):
+            raise MechanismAttestationError("policy max_contribution_limit_wh must be a bounded positive integer")
         flags = policy.expected_feature_flags
         if (
             not isinstance(flags, tuple)
@@ -226,6 +238,9 @@ class QualifiedOutputVerifier:
             ("mechanism", self.policy.mechanism),
             ("mechanism_id", self.policy.mechanism_id),
             ("privacy_unit", self.policy.privacy_unit),
+            ("adjacency", self.policy.adjacency),
+            ("contribution_policy_id", self.policy.contribution_policy_id),
+            ("privacy_policy_id", self.policy.privacy_policy_id),
         ):
             if _require_text(fields, field_name) != expected:
                 raise MechanismAttestationError(f"{field_name} differs from deployment-approved policy")
@@ -248,6 +263,10 @@ class QualifiedOutputVerifier:
             raise MechanismAttestationError("attested output digest does not match exact output bytes")
 
         context = ledger.reservation_context(release_id)
+        if context.contribution_limit_wh > self.policy.max_contribution_limit_wh:
+            raise MechanismAttestationError(
+                "reservation contribution limit exceeds deployment-qualified maximum"
+            )
         expected_context = {
             "release_id": context.release_id,
             "reservation_receipt_sha256": context.receipt_sha256,
