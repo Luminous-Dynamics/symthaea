@@ -24,7 +24,6 @@ import re
 import unicodedata
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.parse import urlparse
 
 SHA1_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -158,8 +157,10 @@ def _load_intake(
     locale: str,
     expected_mode: str,
 ) -> tuple[dict[str, Any], list[dict[str, str]], str]:
-    _need(isinstance(intake_report, dict) and intake_report.get("schema_version") == 1,
-          "intake report must have schema_version=1")
+    _need(isinstance(intake_report, dict) and isinstance(intake_report.get("schema_version"), int)
+          and not isinstance(intake_report.get("schema_version"), bool)
+          and intake_report.get("schema_version") == 1,
+          "intake report must have integer schema_version=1")
     _need(intake_report.get("audit_kind") == "common_voice_local_dataset_intake",
           "intake report was not produced by the Common Voice intake auditor")
     _need(intake_report.get("language_tag") == locale, "locale mismatch between CLI and intake report")
@@ -262,10 +263,13 @@ def score_predictions(
     _need(isinstance(model_license, str) and model_license.strip(), "model_license must be explicitly declared")
     _need(isinstance(predictions_path, Path) and predictions_path.is_file() and not predictions_path.is_symlink(),
           "predictions_path must be a regular non-symlink file")
+    _need(isinstance(intake_report_path, Path) and intake_report_path.is_file() and not intake_report_path.is_symlink(),
+          "intake_report_path must be a regular non-symlink file")
     _need(isinstance(prediction_doc, dict), "prediction document must be an object")
     _need(set(prediction_doc) == PREDICTION_KEYS,
           f"prediction document keys mismatch; missing={sorted(PREDICTION_KEYS-set(prediction_doc))}, extra={sorted(set(prediction_doc)-PREDICTION_KEYS)}")
-    _need(prediction_doc["schema_version"] == 1, "prediction schema_version must equal 1")
+    _need(isinstance(prediction_doc["schema_version"], int) and not isinstance(prediction_doc["schema_version"], bool)
+          and prediction_doc["schema_version"] == 1, "prediction schema_version must equal integer 1")
     _need(prediction_doc["locale"] == locale, "prediction locale mismatch")
     _need(prediction_doc["model_id"] == model_id, "prediction model_id mismatch")
     _need(prediction_doc["model_revision"] == model_revision, "prediction model_revision mismatch")
@@ -361,8 +365,9 @@ def score_predictions(
         "interpretation": (
             "exploratory smoke metric only; not evidence of production readiness or language support"
             if mode == "smoke"
-            else "held-out ASR metrics for this exact model/data split; not by themselves a production-support claim"
+            else "held-out ASR metrics for this exact supplied dataset split; model-training corpus overlap is not assessed and this is not by itself a production-support claim"
         ),
+        "training_data_overlap_status": "not_assessed",
         "locale": locale,
         "normalization": NORMALIZATION_ID,
         "model": {
