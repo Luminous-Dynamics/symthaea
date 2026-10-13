@@ -9,9 +9,8 @@
 
 use clap::Parser;
 use hound::{SampleFormat, WavSpec, WavWriter};
-use serde_json::Value;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -113,18 +112,18 @@ fn validated_audio<'a>(
     observation
         .validate_identity()
         .map_err(|error| format!("observation identity failed: {error}"))?;
-    let (sample_rate_hz, channels) = match observation.modality {
+    let (sample_rate_hz, channels) = match &observation.modality {
         Modality::Audio {
             sample_rate_hz,
             channels,
-        } => (sample_rate_hz, channels),
+        } => (*sample_rate_hz, *channels),
         _ => return Err("whisper.cpp worker only accepts audio observations".into()),
     };
     if channels != 1 {
         return Err("whisper.cpp worker requires mono audio".into());
     }
-    if !(8_000..=192_000).contains(&sample_rate_hz) {
-        return Err("sample rate must be between 8 kHz and 192 kHz".into());
+    if sample_rate_hz != 16_000 {
+        return Err("whisper.cpp pilot input must be mono 16 kHz WAV audio".into());
     }
     if observation.samples.is_empty() {
         return Err("audio sample array is empty".into());
@@ -260,15 +259,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     if args.provider_id.trim().is_empty()
         || args.language.trim().is_empty()
+        || !args.language.chars().all(|character| character.is_ascii_alphanumeric() || character == '-')
         || args.max_audio_seconds == 0
+        || args.max_audio_seconds > 600
         || args.timeout_seconds == 0
+        || args.timeout_seconds > 3_600
     {
-        return Err("provider id, language, and positive audio/runtime limits are required".into());
+        return Err("provider/language id and bounded positive audio/runtime limits are required".into());
     }
     let whisper_cli = require_file(&args.whisper_cli, "whisper_cli")?;
     let model = require_file(&args.model, "model")?;
     if args.scratch_dir.is_symlink() || !args.scratch_dir.is_dir() {
         return Err("scratch_dir must be an existing real directory, not a symlink".into());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(&args.scratch_dir)?.permissions().mode() & 0o777;
+        if mode & 0o077 != 0 {
+            return Err("scratch_dir permissions must be owner-only (0700 or stricter)".into());
+        }
     }
 
     let stdin = io::stdin();
