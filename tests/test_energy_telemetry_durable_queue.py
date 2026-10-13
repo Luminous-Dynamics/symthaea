@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import hashlib
 import os
 import sqlite3
 import tempfile
@@ -10,6 +11,9 @@ import unittest
 from pathlib import Path
 import stat
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from tools.energy_telemetry.authenticated_envelope import TelemetryMetadata, open_envelope, seal_payload
 from tools.energy_telemetry.durable_queue import DurableTelemetryQueue
 from tools.energy_telemetry.store_forward import (
     EventIdentityConflict,
@@ -37,6 +41,28 @@ def event(event_id="a", *, domain="energy", observed="2026-10-12T10:00:00Z",
         quality=quality,
         payload_sha256=digest * 64,
         wire_size_bytes=size,
+    )
+
+
+def protected(event_id="a", *, payload=b"test energy payload", observed="2026-10-12T10:00:00Z", expires="2026-10-12T11:00:00Z", priority=1):
+    metadata = TelemetryMetadata(
+        event_id=event_id * 32,
+        domain="energy",
+        source_sequence=3,
+        observed_at_utc=dt(observed),
+        expires_at_utc=dt(expires),
+        max_action_age_seconds=900,
+        priority=priority,
+        quality="validated",
+    )
+    signing_key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+    return seal_payload(
+        metadata=metadata,
+        payload=payload,
+        encryption_key_id="enc-test-epoch",
+        encryption_key=bytes(range(32)),
+        signer_key_id="signer-test-epoch",
+        signing_key=signing_key,
     )
 
 
@@ -269,14 +295,14 @@ class DurableQueueTests(unittest.TestCase):
         with self.assertRaisesRegex(TelemetryQueueError, "configuration mismatch"):
             DurableTelemetryQueue(self.database, max_future_skew_seconds=299)
 
-    def test_schema_v1_migrates_transactionally_to_v2(self):
+    def test_schema_v1_migrates_transactionally_to_v3(self):
         with sqlite3.connect(self.database) as db:
             db.execute("DROP TABLE telemetry_queue_config")
             db.execute("PRAGMA user_version = 1")
         migrated = self.reopen()
         self.assertEqual(migrated.integrity_check(), "ok")
         with sqlite3.connect(self.database) as db:
-            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
             config = db.execute(
                 "SELECT max_queue_bytes, max_records, max_future_skew_seconds "
                 "FROM telemetry_queue_config WHERE singleton = 1"
@@ -288,6 +314,65 @@ class DurableQueueTests(unittest.TestCase):
             db.execute("PRAGMA user_version = 999")
         with self.assertRaisesRegex(TelemetryQueueError, "unsupported telemetry queue schema"):
             self.reopen()
+
+    def test_protected_envelope_bytes_survive_restart_and_replay(self):
+        sealed = protected()
+        self.assertEqual(sealed.event.wire_size_bytes, len(sealed.envelope_bytes))
+        self.assertEqual(sealed.event.payload_sha256, hashlib.sha256(sealed.envelope_bytes).hexdigest())
+        self.assertEqual(self.queue.enqueue_protected(sealed, now_utc=self.now), "queued")
+        # Metadata-only selection is deliberately not allowed to select ciphertext rows.
+        self.assertEqual(self.queue.select_batch(now_utc=self.now, max_bytes=1000), ())
+        reopened = self.reopen()
+        batch = reopened.select_protected_batch(now_utc=self.now, max_bytes=1000)
+        self.assertEqual(len(batch), 1)
+        self.assertEqual(batch[0].envelope_bytes, sealed.envelope_bytes)
+        self.assertEqual(batch[0].event, sealed.event)
+        opened = open_envelope(
+            batch[0].envelope_bytes,
+            encryption_keys={"enc-test-epoch": bytes(range(32))},
+            verification_keys={"signer-test-epoch": Ed25519PrivateKey.from_private_bytes(bytes(range(32))).public_key()},
+        )
+        self.assertEqual(opened.payload, b"test energy payload")
+        self.assertEqual(batch[0].attempt_count, 1)
+        batch_again = self.reopen().select_protected_batch(now_utc=self.now, max_bytes=1000)
+        self.assertEqual(batch_again[0].envelope_bytes, sealed.envelope_bytes)
+        self.assertEqual(batch_again[0].attempt_count, 2)
+        self.assertEqual(
+            self.reopen().acknowledge(
+                event_id=sealed.event.event_id,
+                payload_sha256=sealed.event.payload_sha256,
+                now_utc=self.now,
+            ),
+            "acknowledged",
+        )
+        self.assertEqual(self.reopen().select_protected_batch(now_utc=self.now, max_bytes=1000), ())
+
+    def test_protected_envelope_digest_or_size_tampering_is_rejected(self):
+        sealed = protected()
+        damaged = type(sealed)(event=sealed.event, envelope_bytes=sealed.envelope_bytes + b"x")
+        with self.assertRaisesRegex(TelemetryQueueError, "binding is invalid"):
+            self.queue.enqueue_protected(damaged, now_utc=self.now)
+        self.assertEqual(self.queue.record_count, 0)
+
+    def test_metadata_only_event_cannot_be_replayed_as_protected_payload(self):
+        sealed = protected()
+        self.queue.enqueue(sealed.event, now_utc=self.now)
+        with self.assertRaises(EventIdentityConflict):
+            self.queue.enqueue_protected(sealed, now_utc=self.now)
+
+    def test_protected_enqueue_respects_actual_wire_byte_budget(self):
+        sealed = protected()
+        limited_path = str(Path(self.temp.name) / "protected-limited.sqlite3")
+        limited = DurableTelemetryQueue(limited_path, max_queue_bytes=sealed.event.wire_size_bytes - 1)
+        with self.assertRaises(QueueCapacityError):
+            limited.enqueue_protected(sealed, now_utc=self.now)
+        self.assertEqual(limited.pending_count, 0)
+
+    def test_legacy_metadata_queue_does_not_expose_fake_payload_bytes(self):
+        e = event()
+        self.queue.enqueue(e, now_utc=self.now)
+        self.assertEqual(self.queue.select_protected_batch(now_utc=self.now, max_bytes=1000), ())
+        self.assertEqual(len(self.queue.select_batch(now_utc=self.now, max_bytes=1000)), 1)
 
     def test_application_id_is_set_and_preserved_across_restart(self):
         with sqlite3.connect(self.database) as db:
