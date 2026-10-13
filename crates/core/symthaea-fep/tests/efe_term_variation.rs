@@ -52,7 +52,7 @@ fn score_all(
 #[test]
 fn characterize_epistemic_term_is_action_invariant() {
     let (efe, model, state) = fixture();
-    let scored = score_all(&mut efe, &model, &state, 0..NUM_ACTIONS);
+    let scored = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
 
     let first = scored[0].1;
     for (action, epistemic, _, _) in &scored {
@@ -73,7 +73,7 @@ fn characterize_epistemic_term_is_action_invariant() {
 #[test]
 fn characterize_pragmatic_term_varies_only_by_action_parity() {
     let (efe, model, state) = fixture();
-    let scored = score_all(&mut efe, &model, &state, 0..NUM_ACTIONS);
+    let scored = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
 
     let distinct: std::collections::BTreeSet<u64> =
         scored.iter().map(|(_, _, _, p)| p.to_bits()).collect();
@@ -220,7 +220,7 @@ fn committed_action_history_remains_bounded() {
 #[ignore = "known defect: epistemic term is action-invariant. See docs/EFE_DISPATCH_GATE_2026-07-31.md"]
 fn aspirational_epistemic_term_varies_across_actions() {
     let (efe, model, state) = fixture();
-    let scored = score_all(&mut efe, &model, &state, 0..NUM_ACTIONS);
+    let scored = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
 
     let epistemic: Vec<f64> = scored.iter().map(|(_, e, _, _)| *e).collect();
     let pragmatic: Vec<f64> = scored.iter().map(|(_, _, _, p)| *p).collect();
