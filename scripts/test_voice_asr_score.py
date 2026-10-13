@@ -157,6 +157,8 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertEqual(report["runtime"]["kind"], "whisper.cpp")
         self.assertEqual(report["runtime"]["quantization"], "f16")
         self.assertEqual(report["inputs"]["outcomes_sha256"], sha256_file(self.outcomes_path))
+        self.assertEqual(report["confidence_intervals_95"]["resampling_unit"], "pseudonymous speaker clusters")
+        self.assertEqual(report["confidence_intervals_95"]["speaker_cluster_count"], 3)
         self.assertEqual(report["mode"], "smoke")
         self.assertIn("exploratory smoke metric only", report["interpretation"])
         self.assertEqual(report["training_data_overlap_status"], "not_assessed")
@@ -208,6 +210,28 @@ class VoiceAsrScoreTests(unittest.TestCase):
     def test_model_identity_drift_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "model_revision mismatch"):
             self.score(model_revision="b" * 40)
+
+    def test_cluster_bootstrap_marks_interval_unestimable_for_single_speaker(self):
+        for split, row in (
+            ("train", {"client_id":"single","path":"train.mp3","sentence":"Opleiding."}),
+            ("dev", {"client_id":"single","path":"dev.mp3","sentence":"Toetsing."}),
+            ("test", {"client_id":"single","path":"clip-001.mp3","sentence":"Goeie môre."}),
+        ):
+            path = self.root / f"{split}.tsv"
+            with path.open("w", encoding="utf-8", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=["client_id","path","sentence"],
+                                        delimiter="\\t", lineterminator="\\n")
+                writer.writeheader(); writer.writerow(row)
+            audio = self.root / "clips" / row["path"]
+            audio.parent.mkdir(parents=True, exist_ok=True)
+            audio.write_bytes(b"synthetic-audio-fixture")
+        self._build_intake("ingestion-smoke")
+        self._write_predictions([{"path":"clip-001.mp3","text":"Goeie môre."}])
+        report = self.score()
+        self.assertEqual(report["confidence_intervals_95"]["speaker_cluster_count"], 1)
+        self.assertIsNone(report["confidence_intervals_95"]["wer"]["low_95"])
+        self.assertEqual(report["confidence_intervals_95"]["wer"]["interval_status"],
+                         "not_estimable_fewer_than_2_speakers")
 
     def test_raw_pilot_outcome_drift_fails_closed(self):
         self.outcomes_path.write_text("different outcomes\\n",encoding="utf-8")
