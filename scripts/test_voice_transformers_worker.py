@@ -16,6 +16,7 @@ from voice_transformers_worker import (
     transcribe_observation,
     validate_observation,
     validate_local_model_snapshot,
+    hash_local_model_snapshot,
 )
 
 
