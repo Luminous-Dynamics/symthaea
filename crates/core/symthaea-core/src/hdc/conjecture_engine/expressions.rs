@@ -1258,7 +1258,12 @@ mod domain_safe_simplification_tests {
         let narrow = Interval::new(1.6, 1.8).unwrap();
         let sin_narrow = sine.eval_interval(&[("x", narrow)]).unwrap();
         assert!(sin_narrow.lower() > 0.9);
-        assert_eq!(sin_narrow.upper(), 1.0);
+        assert!(sin_narrow.upper() < 1.0);
+        let crosses_maximum = Interval::new(1.55, 1.6).unwrap();
+        assert_eq!(
+            sine.eval_interval(&[("x", crosses_maximum)]).unwrap().upper(),
+            1.0
+        );
         let cos_narrow = cosine.eval_interval(&[("x", narrow)]).unwrap();
         assert!(cos_narrow.lower() > -0.5);
         assert!(cos_narrow.upper() < 0.0);
