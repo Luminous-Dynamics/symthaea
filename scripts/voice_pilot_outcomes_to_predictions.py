@@ -20,6 +20,7 @@ from typing import Any
 
 from voice_asr_score import (
     SHA1_RE,
+    _hash_tree,
     _load_intake,
     _need,
     _read_json,
@@ -72,6 +73,7 @@ def build_predictions(
     dataset_root: Path,
     archive: Path,
     model_root: Path,
+    source_model_root: Path,
     runtime_binary: Path,
     locale: str,
     model_id: str,
@@ -115,6 +117,9 @@ def build_predictions(
 
     _need(model_root.is_dir() and not model_root.is_symlink(),
           "model_root must be a real directory, not a symlink")
+    _need(source_model_root.is_dir() and not source_model_root.is_symlink(),
+          "source_model_root must be a real directory, not a symlink")
+    source_snapshot_sha, _source_file_count, _source_bytes = _hash_tree(source_model_root)
     _need(runtime_binary.is_file() and not runtime_binary.is_symlink(),
           "runtime_binary must be a regular non-symlink file")
     model_root_real = model_root.resolve(strict=True)
@@ -140,6 +145,7 @@ def build_predictions(
         "model_id": model_id,
         "model_revision": model_revision,
         "model_license": model_license,
+        "source_model_snapshot_sha256": source_snapshot_sha,
         "outcomes_sha256": outcomes_hash,
         "runtime": {
             "kind": "whisper.cpp",
@@ -185,7 +191,8 @@ def main() -> int:
     parser.add_argument("--intake-report", required=True, type=Path)
     parser.add_argument("--dataset-root", required=True, type=Path)
     parser.add_argument("--archive", required=True, type=Path)
-    parser.add_argument("--model-root", required=True, type=Path)
+    parser.add_argument("--model-root", required=True, type=Path, help="converted local whisper.cpp model package")
+    parser.add_argument("--source-model-root", required=True, type=Path, help="exact upstream model snapshot as acquired locally")
     parser.add_argument("--runtime-binary", required=True, type=Path)
     parser.add_argument("--locale", required=True)
     parser.add_argument("--model-id", required=True)
@@ -203,14 +210,14 @@ def main() -> int:
         doc = build_predictions(
             outcomes_path=args.outcomes, intake_report_path=args.intake_report, intake_report=intake,
             dataset_root=args.dataset_root, archive=args.archive, model_root=args.model_root,
-            runtime_binary=args.runtime_binary, locale=args.locale, model_id=args.model_id,
+            source_model_root=args.source_model_root, runtime_binary=args.runtime_binary, locale=args.locale, model_id=args.model_id,
             model_revision=args.model_revision, model_license=args.model_license,
             runtime_commit=args.runtime_commit, converter_commit=args.converter_commit,
             artifact_path=args.artifact_path, quantization=args.quantization, mode=args.mode,
         )
         write_private_exclusive(
             args.output, doc,
-            [args.dataset_root, args.model_root],
+            [args.dataset_root, args.model_root, args.source_model_root],
         )
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
