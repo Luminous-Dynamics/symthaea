@@ -671,7 +671,7 @@ class DurablePrivacyLedger:
             cohort_size=row[12],
         )
 
-    def _commit_output_after_attestation(
+    def _commit_output_storage(
         self,
         *,
         release_id: str,
@@ -681,12 +681,12 @@ class DurablePrivacyLedger:
         signature: bytes | None = None,
         signer_key_sha256: str | None = None,
     ) -> CommittedPrivacyOutput:
-        """Internal storage primitive: bind bytes after trusted attestation verification.
+        """Internal storage primitive; not a release-authorization method.
 
-        Production callers must use QualifiedOutputVerifier.verify_and_commit.
-        This low-level method checks reservation timing and immutability only;
-        it does NOT authenticate a mechanism receipt and must never be used as a
-        public-release authorization path.
+        It enforces reservation timing and output immutability and can atomically
+        retain attestation bytes supplied by the trusted verifier. It does NOT
+        authenticate the receipt itself. Production callers must use
+        QualifiedOutputVerifier.verify_and_commit / load_committed_output.
         """
         committed_text = self._timestamp(committed_at_utc, "committed_at_utc")
         if not isinstance(release_id, str) or not RELEASE_ID_RE.fullmatch(release_id):
