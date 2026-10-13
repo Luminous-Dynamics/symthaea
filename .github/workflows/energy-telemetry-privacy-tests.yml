@@ -23,6 +23,7 @@ on:
       - "docs/research/DOMAIN_GENERAL_DELAY_TOLERANT_TELEMETRY.md"
       - "docs/research/SQLITE_DURABLE_TELEMETRY_LEDGER.md"
       - "docs/research/DURABLE_DP_RELEASE_ACCOUNTING.md"
+      - "docs/research/DP_MECHANISM_QUALIFICATION_GATE.md"
       - "docs/research/RECEIVER_INBOX_COMMIT_BEFORE_ACK.md"
       - ".github/workflows/energy-telemetry-privacy-tests.yml"
   workflow_dispatch:
