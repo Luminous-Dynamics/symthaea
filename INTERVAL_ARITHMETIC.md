@@ -24,17 +24,19 @@ crate::hdc::interval_arithmetic::{Interval, IntervalError}.
   endpoint calculations.
 - Division fails with DivisionByIntervalContainingZero when the divisor might
   be zero. Indeterminate endpoint quotients widen to the whole real line.
-- square, checked_sqrt, checked_ln, absolute, and checked_powi provide
-  conservative range operations. Square root rejects any interval containing
-  negative reals and expands each nonzero endpoint outward by one representable
-  value. Natural logarithm rejects intervals containing nonpositive reals and
-  uses binary range reduction plus an atanh series with a bounded remainder.
+- square, checked_sqrt, checked_ln, checked_exp, absolute, and checked_powi
+  provide conservative range operations. Square root rejects any interval
+  containing negative reals and expands each nonzero endpoint outward by one
+  representable value. Natural logarithm rejects intervals containing
+  nonpositive reals and uses binary range reduction plus an atanh series with a
+  bounded remainder. Exponential uses reduction by an enclosed ln(2), an interval
+  Taylor series, and a bounded remainder; extreme ranges conservatively widen.
   The integer-power path is logarithmic in the exponent and rejects zero-to-zero
   and negative powers over intervals containing zero.
 - Expr::eval_interval evaluates symbolic arithmetic and finite sums over
   interval-valued variable bindings. It supports integer powers, square root,
-  natural logarithm, absolute value, floor, and finite sums with the existing
-  maximum bound of 100.
+  natural logarithm, exponential, absolute value, floor, and finite sums with
+  the existing maximum bound of 100.
 
 Example:
 
@@ -77,8 +79,19 @@ series encloses `ln(2)`, then `ln(x) = ln(m) + k*ln(2)` is evaluated with
 outward-rounded interval arithmetic. The result remains conditional on the
 basic-operation assumptions above; the source has not been machine-checked.
 
-The evaluator still does **not** claim interval bounds for sin, cos, or exp.
-Rust documents their precision as unspecified and potentially platform-dependent,
+Exponential does not use platform `f64::exp` as a bound. It reduces each
+finite endpoint using an enclosed `ln(2)`, checks that the reduced interval lies
+within `[-0.36, 0.36]`, and evaluates the first 40 Taylor terms using interval
+operations. The Lagrange remainder is bounded by
+`exp(0.36) * 0.36^40 / 40!`. Since `exp(0.36) < 2`,
+`0.36 < 3/8), `(3/8)^40 < 2^-56), and `40! > 2^150`, this remainder is less
+than `2^-205`; the implementation safely allows `2^-200`. Scaling then uses
+an exactly represented normal or subnormal power of two. For inputs beyond the
+well-resolved reduction range it returns broad but conservative enclosures
+instead of relying on the platform exponential.
+
+The evaluator still does **not** claim interval bounds for sin or cos. Rust
+documents their precision as unspecified and potentially platform-dependent,
 so they remain `UnsupportedFunction` until separately reviewed enclosure
 algorithms are added.
 
@@ -91,12 +104,13 @@ when the **entire** returned interval is on one side of zero.
 
 Unit tests cover invalid endpoints, outward enclosures for each arithmetic
 operator, division-by-zero ranges, overflow, underflow, unbounded indeterminate
-quotients, square-root and logarithm domains, logarithm enclosure over subnormal,
-normal, near-one and extreme finite inputs, integer-power domains, and a
-deterministic grid of small integer intervals. Expression tests cover polynomial
-enclosure, square-root/logarithm enclosure and domain rejection, finite sums,
+quotients, square-root/logarithm domains, logarithm enclosure over subnormal,
+normal, near-one and extreme finite inputs, exponential enclosure from subnormal
+underflow through large finite inputs, integer-power domains, and a deterministic
+grid of small integer intervals. Expression tests cover polynomial enclosure,
+square-root/logarithm/exponential enclosure and domain behavior, finite sums,
 integer exponent requirements, division-domain rejection, and fail-closed
-handling of unsupported transcendental operations.
+handling of unsupported trigonometric functions.
 
 These tests are regression evidence, not a proof of the implementation for every
 possible binary64 input. The repository CI result for the exact current PR head
