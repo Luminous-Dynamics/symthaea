@@ -24,14 +24,17 @@ crate::hdc::interval_arithmetic::{Interval, IntervalError}.
   endpoint calculations.
 - Division fails with DivisionByIntervalContainingZero when the divisor might
   be zero. Indeterminate endpoint quotients widen to the whole real line.
-- square, checked_sqrt, absolute, and checked_powi provide conservative range
-  operations. Square root rejects any interval containing negative reals and
-  expands each nonzero endpoint by one representable value outward. The integer-
-  power path is logarithmic in the exponent and rejects zero-to-zero and negative
-  powers over intervals containing zero.
+- square, checked_sqrt, checked_ln, absolute, and checked_powi provide
+  conservative range operations. Square root rejects any interval containing
+  negative reals and expands each nonzero endpoint outward by one representable
+  value. Natural logarithm rejects intervals containing nonpositive reals and
+  uses binary range reduction plus an atanh series with a bounded remainder.
+  The integer-power path is logarithmic in the exponent and rejects zero-to-zero
+  and negative powers over intervals containing zero.
 - Expr::eval_interval evaluates symbolic arithmetic and finite sums over
   interval-valued variable bindings. It supports integer powers, square root,
-  absolute value, floor, and finite sums with the existing maximum bound of 100.
+  natural logarithm, absolute value, floor, and finite sums with the existing
+  maximum bound of 100.
 
 Example:
 
@@ -52,15 +55,32 @@ not a machine-checked theorem about every target compiler or processor.
 
 Square root is supported using Rust's documented IEEE-754 correctly rounded
 `f64::sqrt` result, then stepping one representable value outward for each
-nonzero endpoint. See the [Rust `f64::sqrt` contract](https://doc.rust-lang.org/stable/std/primitive.f64.html#method.sqrt).
+nonzero endpoint. See the [Rust `f64::sqrt` contract](https://doc.rust-lang.org/std/primitive.f64.html#method.sqrt).
 Zero is retained exactly, and any interval including negative reals is rejected.
-This is a narrower, explicit rule than assuming arbitrary platform math calls
-are safe to widen by one ULP.
 
-The evaluator still does **not** claim interval bounds for sin, cos, exp, or ln.
-Rust documents several of these functions' precision as unspecified and
-potentially platform-dependent, so they remain `UnsupportedFunction` until a
-separately reviewed enclosure algorithm is added.
+Natural logarithm does not use the platform `f64::ln` result to form a bound.
+Each positive finite binary64 endpoint is decomposed exactly as (x=m2^k),
+where (1\le m<2), using its stored significand and exponent (including exact
+normalization of subnormals). It then encloses
+[
+\ln(m)=2\sum_{j=0}^{\infty}\frac{z^{2j+1}}{2j+1},\qquad
+z=\frac{m-1}{m+1},\quad 0\le z<\frac13.
+]
+The first 64 terms are evaluated using interval operations. Since the omitted
+tail is bounded by
+[
+\frac{2z^{129}}{129(1-z^2)}
+\le \frac{9}{516\cdot3^{129}} < 2^{-134},
+]
+the upper bound includes an exact (2^{-134}) remainder allowance. The same
+series encloses \(\ln 2\), then \(\ln x=\ln m+k\ln2\) is evaluated with
+outward-rounded interval arithmetic. The result remains conditional on the
+basic-operation assumptions above; the source has not been machine-checked.
+
+The evaluator still does **not** claim interval bounds for sin, cos, or exp.
+Rust documents their precision as unspecified and potentially platform-dependent,
+so they remain `UnsupportedFunction` until separately reviewed enclosure
+algorithms are added.
 
 A wider interval is conservative, not proof of a desired property. For example,
 an interval whose lower bound is negative does not prove the true result is
