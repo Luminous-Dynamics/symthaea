@@ -64,15 +64,17 @@ def validate_observation(
         raise ValueError("observation must be an object")
     observation_id = observation.get("id")
     if not isinstance(observation_id, str) or not observation_id:
-        raise ValueError("observation must have a non-empty content-addressed id")
+        raise ValueError("observation must have a non-empty id; the Rust caller validates its content address")
     modality = observation.get("modality")
     # Serde's externally tagged enum serializes this Rust variant as {"Audio": {...}}.
     if not isinstance(modality, dict) or set(modality) != {"Audio"} or not isinstance(modality["Audio"], dict):
         raise ValueError("Transformers worker only accepts Audio observations")
     audio = modality["Audio"]
-    if audio.get("sample_rate_hz") != 16000:
+    sample_rate_hz = audio.get("sample_rate_hz")
+    channels = audio.get("channels")
+    if isinstance(sample_rate_hz, bool) or not isinstance(sample_rate_hz, int) or sample_rate_hz != 16000:
         raise ValueError("pilot audio must be mono 16 kHz")
-    if audio.get("channels") != 1:
+    if isinstance(channels, bool) or not isinstance(channels, int) or channels != 1:
         raise ValueError("pilot audio must be mono 16 kHz")
     samples = observation.get("samples")
     if not isinstance(samples, list) or not samples:
@@ -190,7 +192,7 @@ def handle_request(
         return response_envelope(provider_id, request_id, error=f"{type(error).__name__}: {error}")
 
 
-def load_runtime(model_dir: str, device_choice: str, dtype_choice: str) -> tuple[Any, Any, Any, str, Any, dict[str, str]]:
+def load_runtime(model_dir: str, device_choice: str, dtype_choice: str) -> tuple[Any, Any, Any, Any, str, Any, dict[str, str]]:
     # Set offline flags before importing libraries which may consult the Hub.
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
