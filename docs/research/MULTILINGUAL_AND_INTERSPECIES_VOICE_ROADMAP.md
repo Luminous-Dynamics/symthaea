@@ -118,7 +118,7 @@ The scorer computes micro-averaged WER and CER, reference-length buckets, and de
 
 ### Native Transformers reference worker and runtime-aware scoring
 
-The repo now contains `scripts/voice_transformers_worker.py`, a local-only BuzzASR Afrikaans reference adapter for the same JSON-lines protocol used by `symthaea-comm-eval pilot`. It loads `WhisperProcessor` and `WhisperForConditionalGeneration` only from an existing materialized snapshot with `local_files_only=True`, `trust_remote_code=False`, and Hugging Face offline flags set before library import. It emits a startup diagnostic prefixed `SYMTHEA_TRANSFORMERS_RUNTIME` on stderr containing observed Python, PyTorch, Transformers and NumPy versions, device, dtype and offline mode. Stdout is reserved for protocol JSONL. The model-generated language/task prompt is left intact; the worker does not pass a second language prompt. Language identification and translation remain explicitly unimplemented.
+The repo now contains `scripts/voice_transformers_worker.py`, a local-only BuzzASR Afrikaans reference adapter for the same JSON-lines protocol used by `symthaea-comm-eval pilot`. It loads `WhisperProcessor` and `WhisperForConditionalGeneration` only from an existing materialized snapshot with `local_files_only=True`, `trust_remote_code=False`, and Hugging Face offline flags set before library import. It emits a startup diagnostic prefixed `SYMTHEA_TRANSFORMERS_RUNTIME` on stderr containing observed Python, PyTorch, Transformers and NumPy versions, device, dtype, offline mode, the model-snapshot manifest digest and the Python/worker SHA-256 digests. Stdout is reserved for protocol JSONL. The model-generated language/task prompt is left intact; the worker does not pass a second language prompt. Language identification and translation remain explicitly unimplemented.
 
 The worker rejects symlinked or empty model snapshots, unsupported modality fields, non-mono/non-16 kHz audio, invalid sample values, duplicate JSON keys and non-standard JSON constants. The Rust `LocalJsonlProvider` now validates each observation's content-address before handing it to any external worker. The adapter has dependency-free contract tests using fake processor/model/tensor objects; these do not import PyTorch and do not load real weights.
 
@@ -155,7 +155,10 @@ python3 scripts/voice_pilot_outcomes_to_predictions.py \
   --model-revision "$MODEL_REVISION_40_HEX" --model-license MIT \
   --python-version "$PYTHON_VERSION" --torch-version "$TORCH_VERSION" \
   --transformers-version "$TRANSFORMERS_VERSION" --numpy-version "$NUMPY_VERSION" \
-  --device "$DEVICE" --dtype "$DTYPE" --mode smoke \
+  --device "$DEVICE" --dtype "$DTYPE" \
+  --runtime-model-snapshot-sha256 "$MODEL_SNAPSHOT_SHA256" \
+  --runtime-python-executable-sha256 "$PYTHON_EXECUTABLE_SHA256" \
+  --runtime-worker-sha256 "$WORKER_SCRIPT_SHA256" --mode smoke \
   --output "$PRIVATE_DIR/af-transformers-predictions.json"
 
 python3 scripts/voice_asr_score.py \
@@ -171,7 +174,7 @@ python3 scripts/voice_asr_score.py \
   --mode smoke --report "$PRIVATE_DIR/af-transformers-score.json"
 ```
 
-The runtime version strings in the pack are supplied by the operator from the worker startup diagnostic; the scorer independently checks the Python executable digest, worker script digest, model snapshot, outcomes digest and dataset artifacts, but does not claim a tamper-proof attestation that those version strings were captured automatically. Keep the runtime log and local environment lockfile with the private experiment record. Do not commit prediction packs, outcomes, transcripts or private runtime logs. This native path is now wired into the local packer/scorer schema but remains **unexecuted**: no model weights were downloaded, no model was loaded, and no WER/CER or latency result is claimed. The existing held-out gate still applies; a smoke run does not promote the language registry.
+The runtime version strings and three observed digests in the pack are supplied by the operator from the worker startup diagnostic. The packer fails if the model snapshot, Python executable, or worker script no longer matches those observed hashes; the scorer rechecks the same hashes alongside outcomes and dataset artifacts. Version strings themselves remain operator-supplied fields rather than a cryptographically attested environment lock. Keep the complete startup line, runtime log and local environment lockfile with the private experiment record. Do not commit prediction packs, outcomes, transcripts or private runtime logs. This native path is now wired into the local packer/scorer schema but remains **unexecuted**: no model weights were downloaded, no model was loaded, and no WER/CER or latency result is claimed. The existing held-out gate still applies; a smoke run does not promote the language registry.
 
 ### First runnable dataset-intake gate: Afrikaans ASR
 
