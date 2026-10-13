@@ -525,12 +525,14 @@ impl TemporalIdentityCoherence {
     /// until a genuine projected representation is supplied.
     pub(crate) fn update(
         &mut self,
-        narrative: &NarrativeSelfModel,
+        narrative: Option<&NarrativeSelfModel>,
         present_state: &BinaryHV,
-        _predictive: &PredictiveSelfModel,
     ) {
-        self.past_self = Some(*narrative.unified_self());
+        // Always refresh current evidence. Missing context clears stale values.
+        self.past_self = narrative.map(|model| *model.unified_self());
         self.present_self = Some(*present_state);
+
+        // Scalar forecasts do not provide a future HDC representation.
         self.future_self = None;
         self.compute_coherence();
     }
@@ -922,7 +924,7 @@ impl TemporalConsciousnessAnalyzer {
         state: &BinaryHV,
         phi: f64,
         narrative: Option<&NarrativeSelfModel>,
-        predictive: Option<&PredictiveSelfModel>,
+        _predictive: Option<&PredictiveSelfModel>,
     ) -> bool {
         let phi_prev = self.phi_trajectory.ema;
 
@@ -940,10 +942,9 @@ impl TemporalConsciousnessAnalyzer {
             self.husserlian.update_primal(*state, phi);
         }
 
-        // Update identity coherence if we have all components
-        if let (Some(narr), Some(pred)) = (narrative, predictive) {
-            self.identity_coherence.update(narr, state, pred);
-        }
+        // Refresh identity evidence on every accepted sample. The predictor does
+        // not yet supply a projected HDC self-state, so future alignment stays unknown.
+        self.identity_coherence.update(narrative, state);
 
         // Update stats
         self.stats.observations += 1;
@@ -1299,6 +1300,14 @@ mod tests {
         assert_eq!(coherence.present_future_alignment, 0.0);
         assert_eq!(coherence.past_future_alignment, 0.0);
         assert!(!coherence.is_coherent());
+
+        // A later sample without historical context must clear a previously
+        // available past representation rather than preserving stale alignment.
+        coherence.past_self = None;
+        coherence.present_self = Some(BinaryHV::random(43));
+        coherence.compute_coherence();
+        assert_eq!(coherence.alignment_coverage(), 0);
+        assert!(!coherence.past_present_alignment_available);
     }
 
     #[test]
