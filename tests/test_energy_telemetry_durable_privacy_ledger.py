@@ -524,9 +524,11 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         )
         for mismatch in mismatch_cases:
             with self.subTest(mismatch=mismatch):
+                case_index = mismatch_cases.index(mismatch)
                 reservation = self.reserve(
-                    release=chr(97 + mismatch_cases.index(mismatch)),
-                    query=chr(97 + mismatch_cases.index(mismatch)),
+                    release=chr(97 + case_index),
+                    query=chr(97 + case_index),
+                    participants=people((case_index + 1) * 20, 20),
                 )
                 output = b'{"value":1}'
                 raw, signature = self.make_signed_attestation(reservation, output, **mismatch)
@@ -546,7 +548,11 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         )
         for index, change in enumerate(policy_changes):
             with self.subTest(change=change):
-                reservation = self.reserve(release=chr(97 + index), query=chr(97 + index))
+                reservation = self.reserve(
+                    release=chr(97 + index),
+                    query=chr(97 + index),
+                    participants=people((index + 30) * 20, 20),
+                )
                 output = b'{"value":1}'
                 raw, signature = self.make_signed_attestation(reservation, output, **change)
                 with self.assertRaises(MechanismAttestationError):
