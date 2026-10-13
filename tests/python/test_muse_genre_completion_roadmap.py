@@ -12,6 +12,13 @@ class GenreCompletionRoadmapTests(unittest.TestCase):
   r=build_roadmap(ROOT); rows=[e for e in r["entries"] if e["constellation"]=="SouthernAfricanUrbanFolkDance"]; self.assertEqual(len(rows),8); self.assertTrue(all(e["catalog_status"]=="ResearchExpertReviewRequired" and e["requires_expert_review"] and e["current_composer_route"] is None and e["route_state"]=="research_only_unrouted" for e in rows)); self.assertTrue(all(any("review" in g.lower() for g in e["minimum_evidence_gates"]) for e in rows))
  def test_future_candidates_stay_outside_catalog(self):
   r=build_roadmap(ROOT); q=r["expansion_candidates"]; names={e["name"].casefold() for e in r["entries"]}; self.assertGreaterEqual(len(q),20); self.assertTrue(all(e["catalog_id"] is None and e["state"]=="proposal_only_not_in_catalog" and e["name"].casefold() not in names for e in q))
+ def test_global_expansion_queue_is_source_linked_and_stays_proposal_only(self):
+  r=build_roadmap(ROOT); q=r["expansion_candidates"]; names={e["name"].casefold() for e in r["entries"]}
+  self.assertEqual(len(q),60); self.assertEqual(len({e["name"].casefold() for e in q}),len(q))
+  expected={"Benga","Chimurenga","Mbalax","Calypso","Cumbia","Vallenato","Bachata","Raï","Dangdut","Luk Thung","Mor Lam","K-pop","J-pop","Bongo Flava","Azonto","Banku Music"}
+  self.assertTrue(expected <= {e["name"] for e in q})
+  self.assertTrue(all(e["sources"] and all(s.startswith("https://") for s in e["sources"]) for e in q))
+  self.assertTrue(all(e["catalog_id"] is None and e["state"]=="proposal_only_not_in_catalog" and e["name"].casefold() not in names and e["implementation_claim"] for e in q))
  def test_focus_parser_fails_closed_on_missing_entry(self):
   s=(ROOT/"crates/domains/symthaea-muse-protocol/src/catalog.rs").read_text(encoding="utf-8"); self.assertEqual(len(parse_grammar_foci(s,160)),160); s=s.replace('        "South African bubblegum pop song",\n',"",1)
   with self.assertRaisesRegex(CoverageError,"cardinality mismatch|does not match"): parse_grammar_foci(s,160)

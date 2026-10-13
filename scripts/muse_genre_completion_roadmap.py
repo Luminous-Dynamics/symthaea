@@ -428,6 +428,318 @@ EXTENSION_CANDIDATES=json.loads(r'''[
     "sources": [
       "https://musicbrainz.org/doc/Genre"
     ]
+  },
+  {
+    "name": "Benga",
+    "area": "East African popular music",
+    "priority": "P0",
+    "rationale": "A named Kenyan/East African guitar-led popular tradition missing from the current registry; define period, region and ensemble roles before implementation.",
+    "sources": [
+      "https://doi.org/10.1017/S0261143000003524"
+    ]
+  },
+  {
+    "name": "Chimurenga",
+    "area": "Zimbabwean popular music",
+    "priority": "P0",
+    "rationale": "A Zimbabwean music field with historical and political context; do not reduce it to generic guitar-band patterns.",
+    "sources": [
+      "https://doi.org/10.1017/S0261143000003524"
+    ]
+  },
+  {
+    "name": "Mbalax",
+    "area": "Senegalese popular music",
+    "priority": "P0",
+    "rationale": "A distinct Senegalese popular-music trajectory; research the relation between local rhythmic practice, song and modern production.",
+    "sources": [
+      "https://doi.org/10.11606/issn.1983-6023.sank.2016.119064"
+    ]
+  },
+  {
+    "name": "Apala",
+    "area": "Yoruba/Nigerian popular music",
+    "priority": "P1",
+    "rationale": "A named Yoruba popular tradition meriting its own sourced ensemble, rhythm and performance study.",
+    "sources": [
+      "https://doi.org/10.1017/S0261143000003524"
+    ]
+  },
+  {
+    "name": "Fuji",
+    "area": "Yoruba/Nigerian popular music",
+    "priority": "P1",
+    "rationale": "A major Nigerian popular tradition; boundaries and development relative to Apala and Juju require specialist sources.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Makossa",
+    "area": "Cameroonian popular music",
+    "priority": "P1",
+    "rationale": "A regional popular music identity not represented by a generic pan-African route.",
+    "sources": [
+      "https://doi.org/10.1017/S0261143000003524"
+    ]
+  },
+  {
+    "name": "Azonto",
+    "area": "Ghanaian contemporary dance music",
+    "priority": "P0",
+    "rationale": "A named Ghanaian dance-music practice; distinguish musical structure from the related dance and from broader Afrobeats marketing labels.",
+    "sources": [
+      "https://www.africanmusiclibrary.org/genre/Azonto",
+      "https://www.theguardian.com/music/2026/oct/06/african-music-afrobeats-tyla"
+    ]
+  },
+  {
+    "name": "Coupé-Décalé",
+    "area": "Ivorian contemporary dance music",
+    "priority": "P1",
+    "rationale": "Candidate for a separately sourced rhythm, arrangement and scene contract; a directory label alone is only discovery evidence.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Calypso",
+    "area": "Trinidadian and wider Caribbean music",
+    "priority": "P0",
+    "rationale": "A regionally grounded form with lyrical, rhythmic and social functions that a generic Caribbean label would hide.",
+    "sources": [
+      "https://folkways.si.edu/genre/calypso",
+      "https://folklife.si.edu/magazine/calypso-music-trinidad-and-tobago"
+    ]
+  },
+  {
+    "name": "Soca",
+    "area": "Trinidadian contemporary dance music",
+    "priority": "P1",
+    "rationale": "Research as a distinct contemporary lineage; do not collapse it into Calypso or generic dance-pop.",
+    "sources": [
+      "https://folklife.si.edu/magazine/calypso-music-trinidad-and-tobago",
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Cumbia",
+    "area": "Latin American regional dance music",
+    "priority": "P1",
+    "rationale": "A geographically varied family; regional versions should be linked rather than treated as one universal rhythmic template.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Vallenato",
+    "area": "Greater Magdalena region, Colombia",
+    "priority": "P0",
+    "rationale": "A regionally identified song tradition with distinct rhythmic airs, instruments and intergenerational context; protect regional variants.",
+    "sources": [
+      "https://ich.unesco.org/en/USL/vallenato-traditional-music-of-the-greater-magdalena-region-01095"
+    ]
+  },
+  {
+    "name": "Bachata",
+    "area": "Dominican Republic",
+    "priority": "P1",
+    "rationale": "Research the guitar, percussion, bass, song and dance relationship; source material supports tradition identity, not a ready-made generator.",
+    "sources": [
+      "https://ich.unesco.org/en/Decisions/14.COM/10.b.10"
+    ]
+  },
+  {
+    "name": "Merengue",
+    "area": "Dominican and broader Caribbean music",
+    "priority": "P1",
+    "rationale": "Candidate for independent review of rhythm, arrangement and regional variants; do not merge it into Bachata or Salsa.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Forró",
+    "area": "Brazilian regional dance music",
+    "priority": "P1",
+    "rationale": "A regional family with variant styles, instruments and dance relationships; define scope before assigning one route.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Choro",
+    "area": "Brazilian instrumental popular music",
+    "priority": "P2",
+    "rationale": "Candidate for a dedicated study of instrumental interaction, phrasing and ornament rather than a generic samba preset.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Sertanejo",
+    "area": "Brazilian country/popular music",
+    "priority": "P2",
+    "rationale": "A broad and historically changing field; scope early/modern variants and regional distinctions before modeling.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Raï",
+    "area": "Algerian popular folk song",
+    "priority": "P0",
+    "rationale": "A documented living tradition whose language, social function and changing performance contexts belong in its evidence record.",
+    "sources": [
+      "https://ich.unesco.org/en/RL/rai-popular-folk-song-of-algeria-01894"
+    ]
+  },
+  {
+    "name": "Dangdut",
+    "area": "Indonesian popular music",
+    "priority": "P0",
+    "rationale": "A high-salience Indonesian popular-music identity missing from the current registry; investigate internal variation before choosing a representative scope.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Luk Thung",
+    "area": "Thai popular and regional music",
+    "priority": "P1",
+    "rationale": "A Thai country/popular tradition with regional language and style distinctions; avoid treating it as generic Western country.",
+    "sources": [
+      "https://so02.tci-thaijo.org/index.php/jg-mcukk/article/view/244782",
+      "https://www.researchgate.net/publication/303940861_Lukthung_Authenticity_and_Modernity_in_Thai_Country_Music"
+    ]
+  },
+  {
+    "name": "Mor Lam",
+    "area": "Isan/Lao-linked performance traditions",
+    "priority": "P1",
+    "rationale": "Research its local-language, poetic, improvisational and contemporary hybrid contexts; keep links to Luk Thung explicit rather than equating them.",
+    "sources": [
+      "https://so02.tci-thaijo.org/index.php/jg-mcukk/article/view/244782",
+      "https://www.researchgate.net/publication/303940861_Lukthung_Authenticity_and_Modernity_in_Thai_Country_Music"
+    ]
+  },
+  {
+    "name": "Bongo Flava",
+    "area": "Tanzanian contemporary popular music",
+    "priority": "P0",
+    "rationale": "A named East African popular-music field needing regional, language, production and historical sourcing.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "K-pop",
+    "area": "South Korean popular music",
+    "priority": "P1",
+    "rationale": "Research production, performance and dissemination conventions as well as intra-genre labels; global influence does not imply a single grammar.",
+    "sources": [
+      "https://doi.org/10.25024/kj.2013.53.4.14",
+      "https://experts.arizona.edu/en/publications/k-pop-genres-a-cross-cultural-exploration/"
+    ]
+  },
+  {
+    "name": "J-pop",
+    "area": "Japanese popular music",
+    "priority": "P2",
+    "rationale": "A broad market label that needs scoped subfamilies, time periods and local terminology before implementation.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Cantopop",
+    "area": "Cantonese-language popular music",
+    "priority": "P2",
+    "rationale": "Research its language, repertoire and production scope as a separate linguistic/popular field; do not assume equivalence to Mandopop.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Trot",
+    "area": "Korean popular music",
+    "priority": "P2",
+    "rationale": "A historically distinct Korean popular tradition; scope vocal, rhythmic and period differences through sources and specialist review.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Ethio-jazz",
+    "area": "Ethiopian jazz and popular music",
+    "priority": "P1",
+    "rationale": "Candidate for a scoped fusion study; identify which Ethiopian melodic practices and historical periods are actually supported.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Jungle",
+    "area": "UK electronic dance music",
+    "priority": "P1",
+    "rationale": "Research breakbeat, bass and arrangement behavior separately from Drum and Bass rather than using a shared umbrella route.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Footwork / Juke",
+    "area": "Chicago electronic dance music",
+    "priority": "P2",
+    "rationale": "Candidate for highly specific rhythmic and phrase behavior; resolve whether this is one queue item or two related identities.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Psytrance",
+    "area": "Electronic dance music",
+    "priority": "P2",
+    "rationale": "Research long-form arrangement, periodicity and sound-design constraints; symbolic composition and rendered production require separate evidence.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Hardstyle",
+    "area": "Electronic dance music",
+    "priority": "P2",
+    "rationale": "Candidate for its own arrangement, kick/bass and section-transition model, contingent on sound-rendering support.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Hyperpop",
+    "area": "Contemporary internet-native pop",
+    "priority": "P2",
+    "rationale": "Highly time-sensitive and heterogeneous label; capture temporal scope and production dependencies before making a stable identity.",
+    "sources": [
+      "https://musicbrainz.org/genres"
+    ]
+  },
+  {
+    "name": "Banku Music",
+    "area": "Ghanaian contemporary popular music",
+    "priority": "P1",
+    "rationale": "Emerging label named in contemporary reporting; obtain locally grounded sources and practitioner definitions before any registry promotion.",
+    "sources": [
+      "https://www.theguardian.com/music/2026/oct/06/african-music-afrobeats-tyla"
+    ]
+  },
+  {
+    "name": "Mara",
+    "area": "African contemporary popular music; scope unconfirmed",
+    "priority": "P2",
+    "rationale": "An emerging label noted in contemporary reporting; identity, geographic scope and community usage need independent confirmation.",
+    "sources": [
+      "https://www.theguardian.com/music/2026/oct/06/african-music-afrobeats-tyla"
+    ]
   }
 ]''')
 BASE_EVIDENCE_GATES=["versioned grammar/recipe contract names target behavior and known limits","one-factor response curves run through actual routed composition path","candidate non-target invariants reported separately from target fidelity","fixed-seed response and exact source/artifact digests are complete","nearest-neighbor distinctness/collision analysis is published","renderer substitutions and unavailable layers are disclosed"]
