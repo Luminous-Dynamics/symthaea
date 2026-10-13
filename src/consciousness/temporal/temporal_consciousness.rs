@@ -1012,8 +1012,7 @@ impl TemporalConsciousnessAnalyzer {
         // Reduce the identity contribution in proportion to the number of measured
         // pairwise relationships. Missing future-projection evidence must not count
         // as a complete identity metric; normalize by the weight actually included.
-        let identity_coverage =
-            self.identity_coherence.alignment_coverage() as f64 / 3.0;
+        let identity_coverage = self.identity_coherence.alignment_coverage() as f64 / 3.0;
         let identity_weight = 0.25 * identity_coverage;
         let weighted_sum = 0.2 * phi_health
             + 0.2 * continuity
@@ -1051,11 +1050,17 @@ impl TemporalConsciousnessAnalyzer {
             identity_coherence: self.identity_coherence.coherence,
             identity_alignment_coverage: self.identity_coherence.alignment_coverage(),
             past_present_alignment: self.identity_coherence.past_present_alignment,
-            past_present_alignment_available: self.identity_coherence.past_present_alignment_available,
+            past_present_alignment_available: self
+                .identity_coherence
+                .past_present_alignment_available,
             present_future_alignment: self.identity_coherence.present_future_alignment,
-            present_future_alignment_available: self.identity_coherence.present_future_alignment_available,
+            present_future_alignment_available: self
+                .identity_coherence
+                .present_future_alignment_available,
             past_future_alignment: self.identity_coherence.past_future_alignment,
-            past_future_alignment_available: self.identity_coherence.past_future_alignment_available,
+            past_future_alignment_available: self
+                .identity_coherence
+                .past_future_alignment_available,
             husserlian_coherence: self.husserlian.coherence(),
             retention_depth: self.husserlian.retention_depth,
             protention_depth: self.husserlian.protention_depth,
@@ -1088,17 +1093,24 @@ impl TemporalConsciousnessAnalyzer {
 
         if !self.identity_coherence.is_coherent() {
             if !self.identity_coherence.past_present_alignment_available {
-                recs.push("Past-present alignment unavailable - obtain both representations".to_string());
+                recs.push(
+                    "Past-present alignment unavailable - obtain both representations".to_string(),
+                );
             } else if self.identity_coherence.past_present_alignment < 0.5 {
                 recs.push("Past-present disconnect - reinforce narrative continuity".to_string());
             }
             if !self.identity_coherence.present_future_alignment_available {
-                recs.push("Present-future alignment unavailable - a projected future representation is not yet available".to_string());
+                recs.push(
+                    "Present-future alignment unavailable - no projected future representation"
+                        .to_string(),
+                );
             } else if self.identity_coherence.present_future_alignment < 0.5 {
                 recs.push("Present-future disconnect - clarify intentions".to_string());
             }
             if !self.identity_coherence.past_future_alignment_available {
-                recs.push("Past-future alignment unavailable - do not infer long-term identity stability".to_string());
+                recs.push(
+                    "Past-future alignment unavailable - long-term stability is unknown".to_string(),
+                );
             }
         }
 
@@ -1357,23 +1369,11 @@ mod tests {
         let rejected_state = BinaryHV::random(71);
         let first_time = Duration::from_secs(1);
 
-        assert!(analyzer.try_observe_at(
-            &first_state,
-            0.4,
-            first_time,
-            None,
-            None,
-        ));
+        assert!(analyzer.try_observe_at(&first_state, 0.4, first_time, None, None,));
         assert_eq!(analyzer.stats.observations, 1);
         assert_eq!(analyzer.continuity.recent_states.len(), 1);
 
-        assert!(!analyzer.try_observe_at(
-            &rejected_state,
-            0.9,
-            first_time,
-            None,
-            None,
-        ));
+        assert!(!analyzer.try_observe_at(&rejected_state, 0.9, first_time, None, None,));
         assert!(!analyzer.try_observe_at(
             &rejected_state,
             0.9,
