@@ -56,7 +56,11 @@ impl Style {
 
 class ParseCatalogTests(unittest.TestCase):
     def test_parses_three_supported_macro_shapes_and_ignores_comments_strings(self) -> None:
-        entries = parse_catalog(CATALOG_FIXTURE)
+        research_review_fixture = CATALOG_FIXTURE.replace(
+            'style!(3, "Research Only", C),',
+            'style!(3, "Research Only", C, ResearchExpertReviewRequired),',
+        )
+        entries = parse_catalog(research_review_fixture)
         self.assertEqual([entry["id"] for entry in entries], [1, 2, 3])
         self.assertEqual(entries[1]["name"], "Display Label")
         self.assertEqual(entries[1]["display_name"], "Display Name")
@@ -65,7 +69,8 @@ class ParseCatalogTests(unittest.TestCase):
         self.assertEqual(entries[1]["status"], "ExpertReviewRequired")
         self.assertTrue(entries[1]["requires_expert_review"])
         self.assertEqual(entries[2]["composer_style"], None)
-        self.assertEqual(entries[2]["status"], "Research")
+        self.assertEqual(entries[2]["status"], "ResearchExpertReviewRequired")
+        self.assertTrue(entries[2]["requires_expert_review"])
 
     def test_rejects_duplicate_ids(self) -> None:
         duplicate = CATALOG_FIXTURE.replace(
@@ -107,6 +112,23 @@ class CoverageReportTests(unittest.TestCase):
         style_path.parent.mkdir(parents=True, exist_ok=True)
         catalog_path.write_text(CATALOG_FIXTURE, encoding="utf-8")
         style_path.write_text(STYLE_FIXTURE, encoding="utf-8")
+
+    def test_research_expert_review_status_remains_unrouted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.make_root(root)
+            catalog_path = root / CATALOG_RELATIVE
+            source = catalog_path.read_text(encoding="utf-8").replace(
+                'style!(3, "Research Only", C),',
+                'style!(3, "Research Only", C, ResearchExpertReviewRequired),',
+            )
+            catalog_path.write_text(source, encoding="utf-8")
+            report = build_current_report(root)
+            self.assertEqual(report["summary"]["composer_routed_entries"], 2)
+            self.assertEqual(report["summary"]["unrouted_catalog_entries"], 1)
+            self.assertEqual(report["summary"]["status_counts"]["ResearchExpertReviewRequired"], 1)
+            self.assertIsNone(report["entries"][2]["composer_style"])
+            self.assertTrue(report["entries"][2]["requires_expert_review"])
 
     def test_report_counts_catalog_routes_and_statuses(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

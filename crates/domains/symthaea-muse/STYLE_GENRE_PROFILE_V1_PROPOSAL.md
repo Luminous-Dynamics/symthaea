@@ -8,7 +8,7 @@
 Do not add more names to a flat genre enum. Build an editable, versioned **music recipe** whose independently defined layers describe how a piece is composed, performed, and rendered. A genre/style name selects a meaningful starting recipe and adds provenance; it is not a substitute for the recipe itself.
 
 This builds on work already present in Muse:
-- 152 catalog entries arranged in 19 constellations;
+- 160 catalog entries arranged in 20 constellations;
 - catalog status and optional routing to the 29-variant executable `symthaea_music_theory::Style` enum;
 - eight-field `StyleAnatomy`;
 - `HybridStyleSpec` with one structural owner and optional rhythmic, harmonic, ensemble, performance, and production layers;
@@ -159,7 +159,7 @@ A study published on 1 October 2026 examined 75 Suno outputs using the same Turk
 ## Implementation sequence
 
 ### M0a — Bidirectional source-routing inventory (implemented foundation)
-Emit a deterministic source-derived report for the 152 catalog entries and 29 executable `Style` variants. The current audit checks stable catalog IDs, source digests, status/route consistency, routes that reference enum variants, and executable variants that lack a catalog route. It lists routed/unrouted catalog IDs per constellation and pins the aggregate inventory in a frozen baseline.
+Emit a deterministic source-derived report for the 160 catalog entries and 29 executable `Style` variants. The current audit checks stable catalog IDs, source digests, status/route consistency, routes that reference enum variants, and executable variants that lack a catalog route. It lists routed/unrouted catalog IDs per constellation and pins the aggregate inventory in a frozen baseline.
 
 This phase reports **routing and source integrity only**. A route, enum variant, catalog row, or non-empty anatomy field is not proof of an independent musical implementation. The audit explicitly does not claim musical distinctness, renderer availability, or cultural authenticity.
 
@@ -173,7 +173,7 @@ This phase reports **routing and source integrity only**. A route, enum variant,
 
 The independent source pass currently resolves 12 styles to the named period pipeline, 6 to dedicated grammar engines, and 11 to the compatibility fallback. These are dispatch categories, not quality grades: a dedicated call site does not prove an engine has the intended causal effect, a sound bank exists, or the rendered audio is distinctive. The report explicitly retains that distinction.
 
-The report now also joins all 152 catalog rows to their runtime profile by composer route: 29 rows expose the parsed source profile, while 123 catalog-only rows carry an explicit null runtime profile. The intent-axis source metadata points to the existing `diversity_census.rs` one-factor-at-a-time census using a blob digest and function-marker check. It does **not** execute that census or claim to independently reproduce its measurements. A further source-derived count makes control gaps visible: 13 styles declare all four intent axes, 10 declare three, 4 declare two, and 2 declare none (`Passacaglia` and `RenaissancePolyphony`). The latter reflects the existing `supported_intent_axes()` declaration and its cited census contract; it is a priority for measured M0c follow-up, not proof that every possible input can never affect those styles.
+The report now also joins all 160 catalog rows to their runtime profile by composer route: 29 rows expose the parsed source profile, while 131 catalog-only rows carry an explicit null runtime profile. Eight catalog-only entries explicitly require expert review and are not composable. The intent-axis source metadata points to the existing `diversity_census.rs` one-factor-at-a-time census using a blob digest and function-marker check. It does **not** execute that census or claim to independently reproduce its measurements. A further source-derived count makes control gaps visible: 13 styles declare all four intent axes, 10 declare three, 4 declare two, and 2 declare none (`Passacaglia` and `RenaissancePolyphony`). The latter reflects the existing `supported_intent_axes()` declaration and its cited census contract; it is a priority for measured M0c follow-up, not proof that every possible input can never affect those styles.
 ### M0c — Routed symbolic control-response curves (probe implemented; execution pending)
 `crates/domains/symthaea-music-theory/examples/style_control_response_curves.rs` measures the real public styled-composition dispatch path via `compose_with_grammar_plan(style.grammar_profile(), ...)`. This matters because the existing `diversity_census.rs` sensitivity matrix calls `compose_with_spec_and_form`, which does not exercise the same grammar-dispatch path for styles routed to dedicated engines.
 
@@ -209,7 +209,7 @@ Move existing hybrid validation rules into data-driven constraints. Add countere
 Offer two entry paths: choose a canonical named style and modify layers, or start from explicit musical intent and compose a recipe. Always show the result as a hybrid/derived recipe when an override changes its historical identity. Explain unsupported settings and fallbacks.
 
 ### M5 — Distinctness and regression evidence
-Run deterministic structural probes and audio-capture comparisons, then owner/user playtest the changes. Publish coverage, collisions, unsupported axes, and regressions alongside showcases rather than claiming every one of 152 entries is equally mature.
+Run deterministic structural probes and audio-capture comparisons, then owner/user playtest the changes. Publish coverage, collisions, unsupported axes, and regressions alongside showcases rather than claiming every one of 160 entries is equally mature.
 
 ## Research basis
 
@@ -231,3 +231,12 @@ Run deterministic structural probes and audio-capture comparisons, then owner/us
 ## Follow-up: source-grounded control targets
 
 The routed response-curve probe now has a separate, versioned contract for target fidelity, observed response, non-target invariance, and evidence boundaries: [Muse Control-Target Contracts v0.1](MUSE_CONTROL_TARGET_CONTRACTS_V0_1.md). It treats zero valence as neutral/unscored for the directional major/minor proxy and scores requested-bar fidelity only on the Blues and Jazz chorus routes whose plans expose an explicit quantization contract and can be checked against the emitted note span. These are evaluation changes, not composer behavior changes; the exact-head Actions artifact remains the authority for runtime outcomes. The probe also reports candidate non-target invariance for key tonic, key tonality, meter, and tempo, excluding the active target channel; for preset/fixed-mode valence routes it checks mode-lock instead. Deviations are diagnostics rather than a quality score, and the workflow summary aggregates them by style, control, channel, and seed-curve coverage. Numeric response curves also carry tie-aware Spearman rank correlations for key descriptors, with per-seed ranges in the Actions summary; these are descriptive associations, not control-success scores.
+
+
+## M0e — Whole-catalog completion roadmap and Southern African expansion
+
+The public catalog now contains 160 stable IDs across 20 constellations. Eight additional Southern African entries—Kwaito, Maskandi, Isicathamiya, Mbaqanga, Kwela, Marabi, Township Jazz, and South African Bubblegum Pop—use the explicit ResearchExpertReviewRequired status. They remain non-composable and have no composer route. This constellation is an index for separate research tracks, not a shared engine or authenticity claim. See [the research brief](./SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md).
+
+The generated [genre-completion-roadmap-v1.json](./genre-completion-roadmap-v1.json) binds a proposed next-step track to every catalog row and maintains a separate proposal-only queue for further genres not yet cataloged. Candidate track names and P0/P1/P2 labels are design hypotheses and work sequencing only; they do not improve runtime coverage until a route and evidence exist.
+
+Every track must earn its route through source-grounded target contracts, measured response and invariance, nearest-neighbor distinctness evidence, renderer receipts, and applicable specialist review.

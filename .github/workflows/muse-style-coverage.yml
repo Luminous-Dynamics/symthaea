@@ -11,6 +11,10 @@ on:
       - "crates/domains/symthaea-muse/src/theory_realize.rs"
       - "scripts/muse_style_capability_inventory.py"
       - "tests/python/test_muse_style_capability_inventory.py"
+      - "scripts/muse_genre_completion_roadmap.py"
+      - "tests/python/test_muse_genre_completion_roadmap.py"
+      - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
+      - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
       - "crates/domains/symthaea-muse/style-genre-coverage-baseline-v1.json"
       - "scripts/muse_style_coverage.py"
       - "tests/python/test_muse_style_coverage.py"
@@ -27,6 +31,10 @@ on:
       - "crates/domains/symthaea-muse/src/theory_realize.rs"
       - "scripts/muse_style_capability_inventory.py"
       - "tests/python/test_muse_style_capability_inventory.py"
+      - "scripts/muse_genre_completion_roadmap.py"
+      - "tests/python/test_muse_genre_completion_roadmap.py"
+      - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
+      - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
       - "crates/domains/symthaea-muse/style-genre-coverage-baseline-v1.json"
       - "scripts/muse_style_coverage.py"
       - "tests/python/test_muse_style_coverage.py"
@@ -128,3 +136,9 @@ jobs:
 
       - name: Test runtime capability inventory parser and fail-closed guards
         run: python3 tests/python/test_muse_style_capability_inventory.py -v
+
+      - name: Verify all-genre completion roadmap against source
+        run: python3 scripts/muse_genre_completion_roadmap.py --check
+
+      - name: Test completion coverage, workstream routing, and expansion intake
+        run: python3 tests/python/test_muse_genre_completion_roadmap.py -v
