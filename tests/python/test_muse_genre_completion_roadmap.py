@@ -60,8 +60,14 @@ class GenreCompletionRoadmapTests(unittest.TestCase):
   self.assertTrue(all(s["status"]=="candidate_not_rights_cleared" and s["commercial_use_status"]=="not_approved" and s["source_url"].startswith("https://") and s["unresolved"] for s in intake["sources"]))
   self.assertTrue(any("Samba Rio-Grandense" in s["title"] and "boundary" in s["scope"] for s in intake["sources"]))
   self.assertTrue(all(any("rights" in gate.lower() or "license" in gate.lower() for gate in intake["global_gates"]) for _ in [0]))
+  bulk=intake["restricted_reference_corpus"]
+  self.assertEqual(bulk["zenodo_record_rights_display"],"Other (Open) — no further description.")
+  self.assertEqual(bulk["repository_license_stated"],"CC BY-NC-SA 4.0")
+  self.assertTrue("non-commercial" in bulk["published_paper_data_availability"].lower())
+  self.assertEqual(bulk["status"],"non_commercial_reference_not_approved_for_commercial_analysis")
   spec=json.loads((ROOT/"crates/domains/symthaea-muse/CHORO_GRAMMAR_RESEARCH_SPEC_V1.json").read_text(encoding="utf-8"))
   self.assertEqual(spec["alternative_source_intake"]["records_rights_cleared"],0)
+  self.assertEqual(spec["license_and_data_handling"]["zenodo_record_rights_display"],"Other (Open) — no further description.")
   self.assertEqual(spec["alternative_source_intake"]["path"],"crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json")
  def test_focus_parser_fails_closed_on_missing_entry(self):
   s=(ROOT/"crates/domains/symthaea-muse-protocol/src/catalog.rs").read_text(encoding="utf-8"); self.assertEqual(len(parse_grammar_foci(s,160)),160); s=s.replace('        "South African bubblegum pop song",\n',"",1)

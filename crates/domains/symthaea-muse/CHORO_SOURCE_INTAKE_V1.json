@@ -97,5 +97,22 @@
     "This inventory is not permission to use or reproduce any score.",
     "This inventory does not create a training dataset or represent the scores as analyzed.",
     "This inventory does not change Choro's proposal-only state or create a composer route."
-  ]
+  ],
+  "restricted_reference_corpus": {
+    "title": "Choro Songbook Corpus",
+    "doi": "10.5281/zenodo.3881347",
+    "zenodo_record_url": "https://zenodo.org/records/3881347",
+    "zenodo_record_rights_display": "Other (Open) — no further description.",
+    "related_repository_url": "https://github.com/DCMLab/choro",
+    "repository_license_file_url": "https://github.com/DCMLab/choro/blob/fe409c62deed50fc7f4b0d667863cd13ab230ff6/LICENSE",
+    "repository_license_stated": "CC BY-NC-SA 4.0",
+    "published_paper_data_availability": "The paper states the dataset is available for non-commercial use.",
+    "status": "non_commercial_reference_not_approved_for_commercial_analysis",
+    "use_decision": "No corpus data is downloaded, ingested or analyzed by this work. For a commercial or broader use, do not rely on the Zenodo label 'Other (Open)' as a specific grant; resolve license/permission with rights holders or use individually reviewed alternative sources.",
+    "sources": [
+      "https://doi.org/10.1080/09298215.2020.1797109",
+      "https://zenodo.org/records/3881347",
+      "https://github.com/DCMLab/choro/tree/fe409c62deed50fc7f4b0d667863cd13ab230ff6"
+    ]
+  }
 }

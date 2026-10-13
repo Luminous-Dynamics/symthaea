@@ -89,6 +89,19 @@
         "That any single rhythmic pattern, instrumentation, or subtype is universal to all Choro.",
         "That the chord/form corpus alone is sufficient to test melody, rhythmic feel, or performance practice."
       ]
+    },
+    {
+      "id": "choro-songbook-corpus-zenodo-record",
+      "kind": "archived_dataset_metadata_record",
+      "citation": "Choro Songbook Corpus, version 1.1, Zenodo record 10.5281/zenodo.3881347.",
+      "url": "https://zenodo.org/records/3881347",
+      "supports": [
+        "The versioned record identifies the archived Choro Songbook Corpus release and links to the DCMLab repository."
+      ],
+      "does_not_establish": [
+        "The Rights field says 'Other (Open)' without a further description; that metadata is not itself a specific commercial license.",
+        "The paper's data availability statement says non-commercial use, and the related GitHub repository has a separate CC BY-NC-SA 4.0 LICENSE. Resolve the relevant rights before use."
+      ]
     }
   ],
   "license_and_data_handling": {
@@ -106,7 +119,11 @@
       "Obtain written permission or select an independently rights-cleared corpus if the intended use is commercial or licensing is uncertain.",
       "Record corpus commit, license text version, exact purpose, allowed outputs and retention/deletion policy.",
       "Do not export substantial derived data or note sequences until permitted use has been reviewed."
-    ]
+    ],
+    "zenodo_corpus_record_url": "https://zenodo.org/records/3881347",
+    "zenodo_record_rights_display": "Other (Open) — no further description.",
+    "published_paper_data_availability": "The paper states the dataset is available for non-commercial use; the Zenodo label alone does not define broader permission.",
+    "rights_interpretation": "Do not infer a commercial-use license from Zenodo's generic 'Other (Open)' metadata. The associated repository separately states CC BY-NC-SA 4.0. Resolve use-specific rights and underlying Songbook transcription rights before empirical work."
   },
   "hypotheses": [
     {

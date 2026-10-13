@@ -78,3 +78,5 @@ The Choro pilot now has a deterministic source-data-free harness for metric dire
 ## Rights-aware Choro source intake
 
 The Choro pilot now lists four individual score records as metadata-only candidates instead of assuming the 295-piece non-commercial corpus is commercially usable. The candidates include a score page labeled Public Domain, contemporary composer-published scores labeled CC BY 4.0, and a possible Samba boundary/control example. Every item is still marked `candidate_not_rights_cleared`; no PDF or score content was downloaded or transcribed. Per-work licensing, territorial rights, and representativeness must be checked before any use. See `CHORO_SOURCE_INTAKE_V1.json`.
+
+The intake record also separates rights signals for the older 295-piece reference corpus: the paper states non-commercial availability, the Zenodo v1.1 metadata says “Other (Open)” without defining a license, and the linked GitHub repository carries a CC BY-NC-SA 4.0 license file. The vague archive label is not treated as commercial permission.

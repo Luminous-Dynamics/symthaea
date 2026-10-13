@@ -41,3 +41,8 @@ The synthetic harness is run by `scripts/muse_choro_synthetic_harness.py --check
 The separate [Choro source-intake inventory](CHORO_SOURCE_INTAKE_V1.json) records four metadata-only source leads: an IMSLP score of José Mauricio Braga's *Chorinho* (ca. 1918) labeled Public Domain; Davi Rocha's contemporary *Choro mineiro* score labeled CC BY 4.0; Rocha's *Choros Songbook* collection of 14 works labeled CC BY 4.0; and *Chóra, chóra, choradô*, listed as *Samba Rio-Grandense*, retained only as a possible boundary/control item.
 
 **None is rights-cleared in this inventory.** These catalog pages are research leads, not legal opinions. Rights in the composition, score edition, digitization, performance recording, lyrics and annotations may differ. Verify the exact source file, attribution/license, territorial scope and intended use before acquisition, transcription or analysis. The historical piano score and contemporary single-composer collection are not representative samples by themselves. The inventory confirms zero downloads, zero transcriptions, and zero empirical analysis.
+
+
+## Clarification on the archived corpus's rights metadata
+
+The paper's data-availability statement says the dataset is available for non-commercial use, while the [Zenodo v1.1 record](https://zenodo.org/records/3881347) displays Rights as **Other (Open)** with no further description. The associated [GitHub repository](https://github.com/DCMLab/choro) separately has a CC BY-NC-SA 4.0 license file. Do not treat the generic Zenodo label as a commercial license. The source-intake JSON records these as separate observations; this work has not downloaded or analyzed the dataset.
