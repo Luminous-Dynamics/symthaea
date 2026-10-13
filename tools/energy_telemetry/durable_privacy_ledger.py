@@ -238,6 +238,7 @@ class DurablePrivacyLedger:
             allowed = {
                 "privacy_releases", "privacy_release_members",
                 "privacy_participant_spend", "privacy_ledger_config",
+                "privacy_release_attestations",
             }
             if app_id == 0:
                 tables = {
@@ -313,6 +314,18 @@ class DurablePrivacyLedger:
                     max_reservations INTEGER NOT NULL CHECK(max_reservations > 0),
                     minimum_cohort_size INTEGER NOT NULL CHECK(minimum_cohort_size >= 20),
                     participant_key_check TEXT NOT NULL
+                )
+                """
+            )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS privacy_release_attestations (
+                    release_id TEXT PRIMARY KEY,
+                    attestation_sha256 TEXT NOT NULL CHECK(length(attestation_sha256) = 64),
+                    attestation_bytes BLOB NOT NULL CHECK(length(attestation_bytes) BETWEEN 1 AND 16384),
+                    signature BLOB NOT NULL CHECK(length(signature) = 64),
+                    signer_key_sha256 TEXT NOT NULL CHECK(length(signer_key_sha256) = 64),
+                    FOREIGN KEY(release_id) REFERENCES privacy_releases(release_id) ON DELETE RESTRICT
                 )
                 """
             )
