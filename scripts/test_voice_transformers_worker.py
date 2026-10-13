@@ -53,6 +53,11 @@ class FakeProcessor:
         return [self.transcript]
 
 
+class NoFeaturesProcessor(FakeProcessor):
+    def __call__(self, samples, **kwargs):
+        return {}
+
+
 class FakeModel:
     def __init__(self, generated=None):
         self.generated = ["fake-token-ids"] if generated is None else generated
@@ -113,6 +118,10 @@ class TransformersWorkerTests(unittest.TestCase):
             validate_observation(observation(sample_rate_hz=44100), max_audio_seconds=60)
         with self.assertRaisesRegex(ValueError, "mono"):
             validate_observation(observation(channels=2), max_audio_seconds=60)
+        with self.assertRaisesRegex(ValueError, "mono"):
+            validate_observation(observation(channels=True), max_audio_seconds=60)
+        with self.assertRaisesRegex(ValueError, "16 kHz"):
+            validate_observation(observation(sample_rate_hz=True), max_audio_seconds=60)
 
     def test_rejects_empty_oversized_and_bad_samples(self):
         with self.assertRaisesRegex(ValueError, "empty"):
@@ -165,8 +174,7 @@ class TransformersWorkerTests(unittest.TestCase):
         self.assertEqual(preserved_text(""), text)
 
     def test_missing_features_and_bad_decode_fail_closed(self):
-        processor, model = FakeProcessor(), FakeModel()
-        processor.__call__ = lambda *args, **kwargs: {}
+        processor, model = NoFeaturesProcessor(), FakeModel()
         with self.assertRaisesRegex(ValueError, "input_features"):
             transcribe_observation(observation(), processor=processor, model=model,
                 torch_module=FakeTorch, numpy_module=FakeNumpy, device="cpu", dtype="float32", max_audio_seconds=60)
