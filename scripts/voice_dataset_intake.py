@@ -65,6 +65,7 @@ def _resolve_inside(root: Path, relative: Path, *, field: str, must_exist: bool 
 
 
 def _read_split(path: Path, *, split: str, root: Path, check_audio: bool) -> dict[str, Any]:
+    digest_before = _sha256(path)
     try:
         with path.open("r", encoding="utf-8", newline="") as stream:
             reader = csv.DictReader(stream, delimiter="\t")
@@ -100,9 +101,11 @@ def _read_split(path: Path, *, split: str, root: Path, check_audio: bool) -> dic
     except (OSError, UnicodeError, csv.Error) as exc:
         raise ValueError(f"cannot read {split} metadata {path}: {exc}") from exc
     _need(rows > 0, f"{split}.tsv has no data rows")
+    digest_after = _sha256(path)
+    _need(digest_before == digest_after, f"{split}.tsv changed while it was being audited")
     return {
         "metadata_file": path.name,
-        "metadata_sha256": _sha256(path),
+        "metadata_sha256": digest_after,
         "rows": rows,
         "unique_pseudonymous_speaker_tokens": len(speakers),
         "rows_missing_speaker_token": missing_speaker_rows,
@@ -155,6 +158,7 @@ def audit_dataset(
     archive_real = archive.resolve(strict=True)
     _need(archive_real != root and root not in archive_real.parents,
           "archive must be outside the extracted dataset root")
+    _need(archive_real.stat().st_size > 0, "archive must not be empty")
     metadata: dict[str, dict[str, Any]] = {}
     for split in SPLITS:
         metadata_path = _resolve_inside(root, Path(f"{split}.tsv"), field=f"{split}.tsv")
