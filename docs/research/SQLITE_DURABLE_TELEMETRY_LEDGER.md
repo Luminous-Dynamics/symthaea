@@ -12,7 +12,7 @@ The new module, tools/energy_telemetry/durable_queue.py, uses Python's standard 
 
 ## Persisted state
 
-The ledger stores envelope metadata and a payload digest, not actual sensor payloads or household readings:
+The ledger stores event metadata and an envelope digest. Metadata-only enqueue rows contain no application payload. The protected enqueue path stores the complete canonical signed envelope BLOB, where event metadata and application payload are AEAD-encrypted by the envelope creator—not plaintext sensor values:
 
 - event ID and domain;
 - source-local sequence number;
@@ -40,14 +40,14 @@ This is a reasoned local persistence configuration, not proof against all hardwa
 
 1. **Authenticity:** the queue validates shapes and state only. The network adapter must authenticate the sender and bind a canonical envelope (including the metadata, digest, expiry and policy/version context) to a vetted signature or MAC.
 2. **ACK authenticity:** a digest match is not a proof that the authorized receiver acknowledged delivery. ACKs need authenticated identity, replay protection and receiver-side idempotency.
-3. **Payload protection:** this module stores no payload bytes and performs no encryption. The caller must encrypt transit; production should not place actual values in the digest field or mistake a digest for anonymization.
-4. **Schema migration:** schema migration advances version 1 to version 2 with PRAGMA user_version; unsupported future versions fail closed. Future changes need versioned, transactional migrations and downgrade/upgrade tests.
+3. **Payload protection:** the protected API persists AEAD-encrypted envelope bytes, validates their SHA-256 digest/size binding, and replays the exact bytes. The queue itself does not encrypt or verify signatures; the caller must use the envelope adapter and the receiver must verify. The database is not encrypted by this module, so event metadata remains readable at rest.
+4. **Schema migration:** schema migration advances version 1/2 to version 3 with PRAGMA user_version and adds an optional `envelope_bytes` BLOB; unsupported future versions fail closed. Future changes need versioned, transactional migrations and downgrade/upgrade tests.
 5. **Privacy budgeting:** delivery retries must not double-charge a retransmission of an identical private release. The separate DP accountant must transactionally reserve unique release identity, participant contribution bounds, mechanism, adjacency definition, and cumulative privacy spend. It is still a separate, not-yet-production component.
 6. **Power/control:** a queue ACK is never actuator authorization. Any later actuator command path needs separate credentials, local interlocks, bounded capabilities and a safety case.
 
 ## Test plan added
 
-The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files and synthetic event metadata. Twenty-three deterministic tests are added; they cover:
+The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses temporary local database files, test-only keys and synthetic event metadata. Twenty-eight deterministic tests are added; they cover:
 - enqueue and pending-byte recovery after creating a fresh process-like queue instance;
 - re-transmission after restart and persisted attempt counts;
 - ACK and duplicate ACK behavior across queue instances;
@@ -55,9 +55,10 @@ The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses
 - expiry persistence and rejection of ACK after expiry;
 - queue byte budget and total-row fail-closed limits;
 - concurrent duplicate enqueues, concurrent byte-capacity enforcement and concurrent idempotent ACKs;
-- invalid inputs and SQLite integrity_check.
+- invalid inputs and SQLite integrity_check;
+- protected envelope persistence/reopen, exact-byte retransmission, hash/size mismatch rejection and separation of metadata-only rows from protected-envelope delivery.
 
-These tests have been added to the dedicated GitHub Actions workflow. At the time this document was authored, the exact-head CI run was queued/pending; these tests are not declared passed until that specific run concludes successfully.
+The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 17 test cases covering AEAD/signature tampering, canonical encoding, key lookup and size bounds. These and the queue tests have been added to the dedicated GitHub Actions workflow. At the time this document was authored, the exact-head CI run was queued/pending; these tests are not declared passed until that specific run concludes successfully.
 
 ## Standards and security research
 
