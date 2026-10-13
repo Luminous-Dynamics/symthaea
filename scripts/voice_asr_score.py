@@ -41,6 +41,7 @@ WHISPER_CPP_RUNTIME_KEYS = {
 }
 TRANSFORMERS_RUNTIME_KEYS = {
     "kind", "python_executable_sha256", "worker_script_sha256",
+    "model_snapshot_manifest_sha256",
     "python_version", "torch_version", "transformers_version", "numpy_version",
     "device", "dtype", "offline",
 }
@@ -388,6 +389,8 @@ def score_predictions(
                   f"runtime.{field} must be a 64-hex digest")
         _need(actual_runtime_sha == runtime["python_executable_sha256"],
               "Python executable SHA-256 differs from prediction provenance")
+        _need(runtime["model_snapshot_manifest_sha256"] == source_tree_sha,
+              "model snapshot manifest SHA-256 differs from value observed by the native worker")
         _need(isinstance(runtime_worker_path, Path) and runtime_worker_path.is_file()
               and not runtime_worker_path.is_symlink(),
               "Transformers runtime requires a regular --runtime-worker script")
@@ -428,6 +431,9 @@ def score_predictions(
     _need(not missing, f"missing {len(missing)} ASR predictions; scoring is incomplete")
 
     model_tree_sha, model_files, model_bytes = _hash_tree(model_root)
+    if runtime["kind"] == "transformers":
+        _need(model_tree_sha == runtime["model_snapshot_manifest_sha256"],
+              "native model snapshot changed during scoring")
     per_clip: list[dict[str, int]] = []
     word_speaker_clusters: dict[str, list[dict[str, int]]] = {}
     char_speaker_clusters: dict[str, list[dict[str, int]]] = {}
@@ -549,6 +555,7 @@ def score_predictions(
             "kind": runtime["kind"],
             "python_executable_sha256": actual_runtime_sha,
             "worker_script_sha256": runtime["worker_script_sha256"],
+            "model_snapshot_manifest_sha256": runtime["model_snapshot_manifest_sha256"],
             "python_version": runtime["python_version"],
             "torch_version": runtime["torch_version"],
             "transformers_version": runtime["transformers_version"],
