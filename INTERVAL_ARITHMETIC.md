@@ -108,6 +108,21 @@ an interval whose lower bound is negative does not prove the true result is
 negative; it may simply be too wide. Conversely, sign checks are meaningful only
 when the **entire** returned interval is on one side of zero.
 
+## Standards alignment (not a conformance claim)
+
+IEEE 1788.1-2017 is the simplified IEEE interval-arithmetic standard for
+operations on IEEE 754 binary64 endpoints and a decoration system. It is a
+useful external design baseline for interval semantics and error handling:
+https://standards.ieee.org/ieee/1788.1/6074/.
+
+This module is **not claimed to conform** to IEEE 1788.1-2017. In particular,
+it does not implement the standard's decoration model or a complete conformance
+test suite. Any future compatibility claim should be gated on a requirements
+matrix, reviewed semantics for each exposed operation, and independent tests.
+The IEEE catalog currently marks the full 1788-2015 standard inactive-reserved;
+the simplified 1788.1-2017 entry remains active:
+https://standards.ieee.org/ieee/1788/4431/.
+
 ## Qualification and tests
 
 Unit tests cover invalid endpoints, outward enclosures for each arithmetic
