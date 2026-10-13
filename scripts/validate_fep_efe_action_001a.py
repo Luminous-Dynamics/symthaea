@@ -141,11 +141,22 @@ def entropy(p):
   return (d+d*(Decimal(2)*pi).ln()-logs)/Decimal(2)
 def epi(cur,pred):
  if len(cur)!=len(pred): fail("dimension mismatch")
- return entropy(pred)-entropy(cur)
-def nov(count): return Decimal(1)/Decimal(1+nni(count,"committed_count"))
+ with localcontext() as c:
+  c.prec=PREC; c.rounding=ROUND_HALF_EVEN
+  return entropy(pred)-entropy(cur)
+def nov(count):
+ with localcontext() as c:
+  c.prec=PREC; c.rounding=ROUND_HALF_EVEN
+  return Decimal(1)/Decimal(1+nni(count,"committed_count"))
+def weighted_total(wp,p,we,e,wn,n):
+ with localcontext() as c:
+  c.prec=PREC; c.rounding=ROUND_HALF_EVEN
+  return wp*p+we*e-wn*n
 def cmp(a,b):
- z=a-b
- return 0 if abs(z)<=TOL else (-1 if z<0 else 1)
+ with localcontext() as c:
+  c.prec=PREC; c.rounding=ROUND_HALF_EVEN
+  z=a-b
+  return 0 if abs(z)<=TOL else (-1 if z<0 else 1)
 def rel(ai,a,bi,b): return f"{ai}{'=' if cmp(a,b)==0 else '<' if cmp(a,b)<0 else '>'}{bi}"
 def scores(r):
  cur=prec(r["current_precision"],"current_precision"); w=r["weights"]
@@ -158,7 +169,7 @@ def scores(r):
   pp=prec(a["predicted_precision"],"predicted_precision")
   if len(pp)!=len(cur): fail("dimension mismatch")
   p=dec(a["pragmatic"]); e=epi(cur,pp); n=nov(a["committed_count"])
-  out[a["id"]]={"pragmatic":p,"epistemic":e,"novelty":n,"total":wp*p+we*e-wn*n}
+  out[a["id"]]={"pragmatic":p,"epistemic":e,"novelty":n,"total":weighted_total(wp,p,we,e,wn,n)}
  return out
 def pref(r):
  if "<" in r:return r.split("<")[0]
@@ -263,7 +274,7 @@ def mutations(d):
  if f25["raw"]["commit_events"]+f25["raw"]["external_execution_events"]==f25["expected"]["counted_events"]:fail("execution-as-commit mutant escaped")
  n+=1
  if f25["raw"]["commit_events"]+f25["raw"]["selection_events"]==f25["expected"]["counted_events"]:fail("selection-as-commit mutant escaped")
- return n+1
+ return n
 
 def main():
  p=argparse.ArgumentParser();p.add_argument("--source-ref");p.add_argument("--corpus-file");a=p.parse_args()
