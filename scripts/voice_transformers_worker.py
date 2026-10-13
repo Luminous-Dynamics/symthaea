@@ -299,6 +299,12 @@ def load_runtime(model_dir: str, device_choice: str, dtype_choice: str) -> tuple
         trust_remote_code=False,
         torch_dtype=dtype,
     )
+    # Detect snapshot mutation while the processor/model were being loaded.
+    loaded_snapshot_sha256, loaded_file_count, loaded_bytes = hash_local_model_snapshot(model_dir)
+    if (loaded_snapshot_sha256, loaded_file_count, loaded_bytes) != (
+        model_snapshot_sha256, model_file_count, model_bytes
+    ):
+        raise ValueError("model snapshot changed while loading; refusing to report provenance")
     model.to(device)
     model.eval()
     metadata = {
