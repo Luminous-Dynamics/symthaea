@@ -96,9 +96,11 @@ through degree 39 and cosine endpoint series through degree 38, using interval
 arithmetic at every step. On this domain, the first omitted alternating terms
 are bounded by `2^41 / 41! < 2^-123` for sine and `2^40 / 40! < 2^-119` for
 cosine; the implementation adds the wider, exactly represented `2^-80`
-symmetric allowance. The sine range uses the endpoint hull and conservatively
-includes -1 or +1 when entering the corresponding outer band where a critical
-point may occur. Cosine uses its endpoint hull and the exact maximum 1 when the
+symmetric allowance. The sine range uses the endpoint hull and includes -1 or +1 only when the input
+overlaps a cached enclosure of +/-pi/2. That enclosure is computed from Machin's
+identity `pi/2 = 8 atan(1/5) - 2 atan(1/239)`, using 25 and 8 alternating-series
+terms with symmetric `2^-120` remainder allowances; if construction fails, sine
+returns `[-1, 1]`. Cosine uses its endpoint hull and the exact maximum 1 when the
 input contains zero. For any interval extending outside [-2, 2]—including unbounded and very large
 arguments—the result is the conservative `[-1, 1]`. This intentionally sacrifices
 precision rather than implement unvalidated argument reduction. No platform
