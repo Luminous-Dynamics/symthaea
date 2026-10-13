@@ -87,30 +87,49 @@ def prec(x,n):
 
 def action(a,score=True):
  keys(a,{"id","predicted_precision","pragmatic","committed_count"} if score else {"id"},"action")
- if not isinstance(a["id"],str) or not a["id"]: fail("bad action id")
+ if not isinstance(a["id"],str) or not a["id"].strip(): fail("bad action id")
  if score:
   if a["predicted_precision"] is not None and not isinstance(a["predicted_precision"],list): fail("bad predicted precision")
-  dec(a["pragmatic"]); nni(a["committed_count"],"committed_count")
+  p=dec(a["pragmatic"])
+  if p<0: fail("pragmatic divergence must be nonnegative")
+  nni(a["committed_count"],"committed_count")
 
 def shape(kind,r):
  if kind=="InputValidation":
   if set(r)=={"action_ids"}:
-   if not isinstance(r["action_ids"],list) or not all(isinstance(x,str) for x in r["action_ids"]): fail("bad action_ids")
+   ids=r["action_ids"]
+   if not isinstance(ids,list) or not all(isinstance(x,str) and x.strip() for x in ids): fail("bad action_ids")
    return
   keys(r,{"current_precision","actions"},"input raw")
+  prec(r["current_precision"],"current_precision")
   if not isinstance(r["actions"],list) or not r["actions"]: fail("missing actions")
   for a in r["actions"]:
    keys(a,{"id","predicted_precision"},"validation action")
-   if not isinstance(a["id"],str) or not a["id"]: fail("bad validation id")
+   if not isinstance(a["id"],str) or not a["id"].strip(): fail("bad validation id")
    if a["predicted_precision"] is not None and not isinstance(a["predicted_precision"],list): fail("bad validation precision")
   return
  if kind=="IdentityChange":
-  if set(r) not in ({"profile_before","profile_after"},{"weights_before","weights_after"}): fail("bad identity shape")
+  if set(r)=={"profile_before","profile_after"}:
+   before,after=r["profile_before"],r["profile_after"]
+   if not isinstance(before,dict) or not isinstance(after,dict) or not before or set(before)!=set(after): fail("bad profile identity shape")
+   for action_id in before:
+    if not isinstance(action_id,str) or not action_id.strip(): fail("bad profile action id")
+    a=prec(before[action_id],"profile_before precision")
+    b=prec(after[action_id],"profile_after precision")
+    if len(a)!=len(b): fail("profile dimension change requires a new reference profile")
+  elif set(r)=={"weights_before","weights_after"}:
+   for name in ("weights_before","weights_after"):
+    weights=r[name]
+    keys(weights,{"pragmatic","epistemic","novelty"},name)
+    for value in weights.values():
+     if dec(value)<0: fail("weights must be nonnegative")
+  else: fail("bad identity shape")
   return
  keys(r,RAW[kind],f"{kind} raw")
  if kind in {"ScoreSet","EnumerationInvariant"}:
   keys(r["weights"],{"pragmatic","epistemic","novelty"},"weights")
-  for v in r["weights"].values(): dec(v)
+  for v in r["weights"].values():
+   if dec(v)<0: fail("weights must be nonnegative")
   if not isinstance(r["actions"],list) or len(r["actions"])<2: fail("need actions")
   for a in r["actions"]: action(a)
   if kind=="EnumerationInvariant":
@@ -119,16 +138,43 @@ def shape(kind,r):
    if not isinstance(orders,list) or len(orders)<2: fail("need at least two enumeration orders")
    for order in orders:
     if not isinstance(order,list) or len(order)!=len(ids): fail("bad order length")
-    if not all(isinstance(x,str) and x for x in order): fail("bad order action id")
+    if not all(isinstance(x,str) and x.strip() for x in order): fail("bad order action id")
     if len(order)!=len(set(order)) or set(order)!=set(ids): fail("order must be a permutation of action ids")
  elif kind=="SetIdentity":
+  if not isinstance(r["actions"],list) or len(r["actions"])<2: fail("need set-identity actions")
   for a in r["actions"]: action(a,False)
+  ids=[a["id"] for a in r["actions"]]
+  if len(ids)!=len(set(ids)): fail("duplicate set-identity action")
+  orders=r["orders"]
+  if not isinstance(orders,list) or len(orders)<2: fail("need at least two set-identity orders")
+  for order in orders:
+   if not isinstance(order,list) or len(order)!=len(ids): fail("bad set-identity order length")
+   if not all(isinstance(x,str) and x.strip() for x in order): fail("bad set-identity order id")
+   if len(order)!=len(set(order)) or set(order)!=set(ids): fail("set-identity order must be a permutation")
  elif kind=="HistoryPurity":
   if not isinstance(r["action_id"],str) or not r["action_id"].strip(): fail("bad action_id")
   nni(r["candidate_score_calls"]); nni(r["initial_committed_count"]); nni(r["commit_events"])
  elif kind=="HistoryUpdate":
   if not isinstance(r["action_id"],str) or not r["action_id"].strip(): fail("bad action_id")
   nni(r["initial_committed_count"]); nni(r["commit_events"])
+ elif kind=="Currentness":
+  for key in ("result_generation","current_generation"):
+   if not isinstance(r[key],str) or not r[key].strip(): fail("bad generation identity")
+ elif kind=="ExternalConstraint":
+  if not isinstance(r["action_id"],str) or not r["action_id"].strip(): fail("bad external-constraint action id")
+  if not isinstance(r["epistemic_gain"],str) or not r["epistemic_gain"].strip(): fail("bad epistemic-gain descriptor")
+  if r["feasibility"] not in {"Observable","NotObservable"}: fail("unknown feasibility value")
+  if r["execution_authority"] not in {"Present","Absent"}: fail("unknown execution-authority value")
+ elif kind=="ClaimCeiling":
+  if not isinstance(r["reference_profile_pass"],bool): fail("reference_profile_pass must be boolean")
+ elif kind=="LegacyProfile":
+  if not isinstance(r["profile"],str) or not r["profile"].strip(): fail("bad legacy profile identity")
+  values=r["epistemic_values"]
+  actions=r["actions"]
+  if not isinstance(values,list) or not values: fail("missing legacy epistemic values")
+  if not isinstance(actions,list) or len(actions)!=len(values): fail("legacy action/value count mismatch")
+  if not all(isinstance(x,str) and x.strip() for x in actions) or len(actions)!=len(set(actions)): fail("bad legacy action identities")
+  for value in values: dec(value)
  elif kind=="EventClassBoundary":
   if r["novelty_event_class"]!=EVENT_CLASS: fail("wrong event class")
   for k in ("candidate_score_calls","selection_events","commit_events","external_execution_events"): nni(r[k],k)
@@ -261,7 +307,7 @@ def detected(m):
 def mutations(d):
  fs=[]
  def add(name,f):fs.append((name,f))
- add("schema",lambda m:m.__setitem__("schema","bad")); add("top-field",lambda m:m.__setitem__("x",1)); add("profile",lambda m:m.__setitem__("reference_profile","bad")); add("profile-promotion",lambda m:m.__setitem__("reference_profile","ExpectedInformationGainV1")); add("novelty-profile",lambda m:m.__setitem__("novelty_profile","ExecutedActionCountNoveltyV1")); add("event-class",lambda m:m.__setitem__("novelty_event_class","ExecutedAction")); add("numeric",lambda m:m["numeric_policy"].__setitem__("decimal_precision",34)); add("claim",lambda m:m.__setitem__("claim_ceiling","broad")); add("vocab",lambda m:m["vocabularies"].__setitem__("novelty_semantics",["ExecutedActionCount"])); add("remove-case",lambda m:m["cases"].pop()); add("reorder",lambda m:m["cases"].__setitem__(slice(0,2),[m["cases"][1],m["cases"][0]])); add("flatten-E",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["1","1"])); add("reverse-E",lambda m:case(m,"F03")["raw"]["actions"][0].__setitem__("predicted_precision",["4","4"])); add("erase-N",lambda m:case(m,"F08")["raw"]["actions"][1].__setitem__("committed_count",0)); add("history-empty-action-id",lambda m:case(m,"F09")["raw"].__setitem__("action_id","")); add("history-whitespace-action-id",lambda m:case(m,"F10")["raw"].__setitem__("action_id","   ")); add("history-null-action-id",lambda m:case(m,"F11")["raw"].__setitem__("action_id",None)); add("history-wrong-type-action-id",lambda m:case(m,"F09")["raw"].__setitem__("action_id",{})); add("score-as-commit",lambda m:case(m,"F09")["raw"].__setitem__("commit_events",1)); add("erase-commit",lambda m:case(m,"F10")["raw"].__setitem__("commit_events",0)); add("erase-second-commit",lambda m:case(m,"F11")["raw"].__setitem__("commit_events",1)); add("enum-single-order",lambda m:case(m,"F12")["raw"].__setitem__("orders",[case(m,"F12")["raw"]["orders"][0]])); add("enum-missing-id",lambda m:case(m,"F12")["raw"]["orders"][1].pop()); add("enum-duplicate-id",lambda m:case(m,"F12")["raw"]["orders"][1].__setitem__(0,"B")); add("enum-non-string-id",lambda m:case(m,"F12")["raw"]["orders"][0].__setitem__(0,None)); add("boundary-class",lambda m:case(m,"F25")["raw"].__setitem__("novelty_event_class","SelectedAction")); add("boundary-commit",lambda m:case(m,"F25")["raw"].__setitem__("commit_events",1)); add("dup-id",lambda m:case(m,"F01")["raw"]["actions"][1].__setitem__("id","A")); add("missing-pred",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",None)); add("zero-precision",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["0","2"])); add("dim",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["2"])); add("zero-E-weight",lambda m:case(m,"F01")["raw"]["weights"].__setitem__("epistemic","0")); add("break-tie",lambda m:case(m,"F21")["raw"]["actions"][0].__setitem__("pragmatic","1")); add("currentness",lambda m:case(m,"F18")["raw"].__setitem__("current_generation","G1")); add("legacy-upgrade",lambda m:case(m,"F24")["raw"].__setitem__("epistemic_values",["0","1","0"])); add("erase-blocker",lambda m:case(m,"F22")["raw"].update({"feasibility":"Observable","execution_authority":"Present"})); add("expected-delete-assertion",lambda m:case(m,"F01")["expected"].pop("epistemic_relation")); add("expected-delete-validity",lambda m:case(m,"F14")["expected"].pop("input_validity")); add("expected-add-unknown-assertion",lambda m:case(m,"F01")["expected"].__setitem__("future_claim","PASS")); add("expected-tamper",lambda m:case(m,"F01")["expected"].__setitem__("total_relation","A=B")); add("action-field",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("mystery",1)); add("disposition",lambda m:case(m,"F04")["expected"].__setitem__("disposition","MagicPass"))
+ add("schema",lambda m:m.__setitem__("schema","bad")); add("top-field",lambda m:m.__setitem__("x",1)); add("profile",lambda m:m.__setitem__("reference_profile","bad")); add("profile-promotion",lambda m:m.__setitem__("reference_profile","ExpectedInformationGainV1")); add("novelty-profile",lambda m:m.__setitem__("novelty_profile","ExecutedActionCountNoveltyV1")); add("event-class",lambda m:m.__setitem__("novelty_event_class","ExecutedAction")); add("numeric",lambda m:m["numeric_policy"].__setitem__("decimal_precision",34)); add("claim",lambda m:m.__setitem__("claim_ceiling","broad")); add("vocab",lambda m:m["vocabularies"].__setitem__("novelty_semantics",["ExecutedActionCount"])); add("remove-case",lambda m:m["cases"].pop()); add("reorder",lambda m:m["cases"].__setitem__(slice(0,2),[m["cases"][1],m["cases"][0]])); add("flatten-E",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["1","1"])); add("reverse-E",lambda m:case(m,"F03")["raw"]["actions"][0].__setitem__("predicted_precision",["4","4"])); add("erase-N",lambda m:case(m,"F08")["raw"]["actions"][1].__setitem__("committed_count",0)); add("history-empty-action-id",lambda m:case(m,"F09")["raw"].__setitem__("action_id","")); add("history-whitespace-action-id",lambda m:case(m,"F10")["raw"].__setitem__("action_id","   ")); add("history-null-action-id",lambda m:case(m,"F11")["raw"].__setitem__("action_id",None)); add("history-wrong-type-action-id",lambda m:case(m,"F09")["raw"].__setitem__("action_id",{})); add("score-as-commit",lambda m:case(m,"F09")["raw"].__setitem__("commit_events",1)); add("erase-commit",lambda m:case(m,"F10")["raw"].__setitem__("commit_events",0)); add("erase-second-commit",lambda m:case(m,"F11")["raw"].__setitem__("commit_events",1)); add("enum-single-order",lambda m:case(m,"F12")["raw"].__setitem__("orders",[case(m,"F12")["raw"]["orders"][0]])); add("enum-missing-id",lambda m:case(m,"F12")["raw"]["orders"][1].pop()); add("enum-duplicate-id",lambda m:case(m,"F12")["raw"]["orders"][1].__setitem__(0,"B")); add("enum-non-string-id",lambda m:case(m,"F12")["raw"]["orders"][0].__setitem__(0,None)); add("boundary-class",lambda m:case(m,"F25")["raw"].__setitem__("novelty_event_class","SelectedAction")); add("boundary-commit",lambda m:case(m,"F25")["raw"].__setitem__("commit_events",1)); add("dup-id",lambda m:case(m,"F01")["raw"]["actions"][1].__setitem__("id","A")); add("missing-pred",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",None)); add("zero-precision",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["0","2"])); add("dim",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("predicted_precision",["2"])); add("zero-E-weight",lambda m:case(m,"F01")["raw"]["weights"].__setitem__("epistemic","0")); add("break-tie",lambda m:case(m,"F21")["raw"]["actions"][0].__setitem__("pragmatic","1")); add("currentness",lambda m:case(m,"F18")["raw"].__setitem__("current_generation","G1")); add("legacy-upgrade",lambda m:case(m,"F24")["raw"].__setitem__("epistemic_values",["0","1","0"])); add("erase-blocker",lambda m:case(m,"F22")["raw"].update({"feasibility":"Observable","execution_authority":"Present"})); add("expected-delete-assertion",lambda m:case(m,"F01")["expected"].pop("epistemic_relation")); add("expected-delete-validity",lambda m:case(m,"F14")["expected"].pop("input_validity")); add("expected-add-unknown-assertion",lambda m:case(m,"F01")["expected"].__setitem__("future_claim","PASS")); add("expected-tamper",lambda m:case(m,"F01")["expected"].__setitem__("total_relation","A=B")); add("action-field",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("mystery",1)); add("set-identity-single-order",lambda m:case(m,"F13")["raw"].__setitem__("orders",[case(m,"F13")["raw"]["orders"][0]])); add("set-identity-wrong-order-type",lambda m:case(m,"F13")["raw"]["orders"].__setitem__(0,None)); add("set-identity-duplicate-order-id",lambda m:case(m,"F13")["raw"]["orders"][1].__setitem__(0,"B")); add("currentness-empty-generation",lambda m:case(m,"F18")["raw"].__setitem__("current_generation","  ")); add("currentness-nonstring-generation",lambda m:case(m,"F18")["raw"].__setitem__("current_generation",None)); add("identity-empty-action-key",lambda m:case(m,"F19")["raw"]["profile_after"].__setitem__("",["2","1"])); add("identity-unknown-weight-key",lambda m:case(m,"F20")["raw"]["weights_after"].__setitem__("hidden","1")); add("constraint-empty-action-id",lambda m:case(m,"F22")["raw"].__setitem__("action_id","")); add("constraint-unknown-feasibility",lambda m:case(m,"F22")["raw"].__setitem__("feasibility","maybe")); add("constraint-unknown-authority",lambda m:case(m,"F22")["raw"].__setitem__("execution_authority","maybe")); add("claim-pass-nonboolean",lambda m:case(m,"F23")["raw"].__setitem__("reference_profile_pass","true")); add("legacy-action-count-mismatch",lambda m:case(m,"F24")["raw"]["actions"].pop()); add("legacy-nonfinite-epistemic",lambda m:case(m,"F24")["raw"]["epistemic_values"].__setitem__(0,"NaN")); add("negative-score-weight",lambda m:case(m,"F01")["raw"]["weights"].__setitem__("pragmatic","-1")); add("negative-pragmatic-divergence",lambda m:case(m,"F01")["raw"]["actions"][0].__setitem__("pragmatic","-0.1")); add("input-empty-action-id",lambda m:case(m,"F14")["raw"]["action_ids"].__setitem__(0,"")); add("disposition",lambda m:case(m,"F04")["expected"].__setitem__("disposition","MagicPass"))
  n=0
  for name,f in fs:
   m=copy.deepcopy(d);f(m)
