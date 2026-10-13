@@ -530,9 +530,10 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         for mismatch in mismatch_cases:
             with self.subTest(mismatch=mismatch):
                 case_index = mismatch_cases.index(mismatch)
+                case_id = "0123456789abc"[case_index]
                 reservation = self.reserve(
-                    release=chr(97 + case_index),
-                    query=chr(97 + case_index),
+                    release=case_id,
+                    query=case_id,
                     participants=people((case_index + 1) * 20, 20),
                 )
                 output = b'{"value":1}'
