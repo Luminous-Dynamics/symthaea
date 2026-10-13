@@ -161,8 +161,8 @@ impl Expr {
     /// Evaluate using interval inputs and outward-rounded arithmetic.
     ///
     /// The enclosure evaluator supports arithmetic, integer powers, square
-    /// root, natural logarithm, absolute value, floor, and finite sums. Other
-    /// transcendental functions are rejected until reviewed enclosures exist.
+    /// root, natural logarithm, exponential, absolute value, floor, and finite
+    /// sums. Trigonometric functions remain unsupported until reviewed bounds exist.
     pub fn eval_interval(
         &self,
         vars: &[(&str, Interval)],
@@ -217,6 +217,7 @@ impl Expr {
                 match function {
                     UnaryFn::Sqrt => Ok(value.checked_sqrt()?),
                     UnaryFn::Log => Ok(value.checked_ln()?),
+                    UnaryFn::Exp => Ok(value.checked_exp()?),
                     UnaryFn::Abs => Ok(value.absolute()),
                     UnaryFn::Floor => Ok(Interval::new(
                         value.lower().floor(),
@@ -1202,6 +1203,23 @@ mod domain_safe_simplification_tests {
     }
 
     #[test]
+    fn interval_evaluation_encloses_exponential_and_unbounded_inputs() {
+        let expression = Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".into())));
+        let result = expression
+            .eval_interval(&[("x", Interval::new(-1.0, 2.0).unwrap())])
+            .unwrap();
+        assert!(result.lower() <= (-1.0_f64).exp());
+        assert!(result.upper() >= 2.0_f64.exp());
+        assert!(result.lower() >= 0.0);
+
+        let tiny = expression
+            .eval_interval(&[("x", Interval::new(f64::NEG_INFINITY, -745.0).unwrap())])
+            .unwrap();
+        assert_eq!(tiny.lower(), 0.0);
+        assert!(tiny.upper() >= f64::from_bits(1));
+    }
+
+    #[test]
     fn interval_evaluation_encloses_natural_logarithm_and_checks_domain() {
         let expression = Expr::Func(UnaryFn::Log, Box::new(Expr::Var("x".into())));
         let result = expression
@@ -1220,11 +1238,11 @@ mod domain_safe_simplification_tests {
     }
 
     #[test]
-    fn interval_evaluation_fails_closed_for_unsupported_transcendentals() {
-        let expression = Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".into())));
+    fn interval_evaluation_fails_closed_for_unsupported_trigonometric_functions() {
+        let expression = Expr::Func(UnaryFn::Sin, Box::new(Expr::Var("x".into())));
         assert_eq!(
             expression.eval_interval(&[("x", Interval::new(0.0, 1.0).unwrap())]),
-            Err(ExprIntervalError::UnsupportedFunction(UnaryFn::Exp)),
+            Err(ExprIntervalError::UnsupportedFunction(UnaryFn::Sin)),
         );
     }
 
