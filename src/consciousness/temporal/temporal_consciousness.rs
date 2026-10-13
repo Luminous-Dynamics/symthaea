@@ -394,6 +394,11 @@ pub struct ConsciousnessContinuity {
     /// Detected discontinuities
     pub discontinuities: Vec<DiscontinuityEvent>,
 
+    /// Time basis associated with each retained event. Some means elapsed replay
+    /// time; None means only the host monotonic timestamp is available.
+    /// Kept parallel to discontinuities to preserve the public event shape.
+    discontinuity_elapsed_offsets: Vec<Option<Duration>>,
+
     /// Threshold for discontinuity detection
     threshold: f64,
 
@@ -438,13 +443,46 @@ impl ConsciousnessContinuity {
             recent_states: VecDeque::with_capacity(capacity),
             score: 1.0,
             discontinuities: Vec::new(),
+            discontinuity_elapsed_offsets: Vec::new(),
             threshold,
             capacity,
         }
     }
 
-    /// Add a new consciousness state
+    /// Add a new consciousness state using the host monotonic clock for expiry.
     pub fn observe(&mut self, state: &BinaryHV, phi: f64, phi_prev: f64) {
+        self.observe_with_elapsed(state, phi, phi_prev, None);
+    }
+
+    /// Add a state in a deterministic replay timeline.
+    ///
+    /// Event expiry follows this elapsed offset, not the speed at which the replay
+    /// happens to execute on the host. Use one fixed origin for every observation.
+    pub fn observe_at(
+        &mut self,
+        state: &BinaryHV,
+        phi: f64,
+        phi_prev: f64,
+        elapsed: Duration,
+    ) {
+        self.observe_with_elapsed(state, phi, phi_prev, Some(elapsed));
+    }
+
+    fn observe_with_elapsed(
+        &mut self,
+        state: &BinaryHV,
+        phi: f64,
+        phi_prev: f64,
+        elapsed: Option<Duration>,
+    ) {
+        // The event list is public for compatibility; if an external caller has
+        // mutated it directly, restore safe alignment and treat those entries as
+        // host-timestamp-only diagnostics.
+        if self.discontinuity_elapsed_offsets.len() != self.discontinuities.len() {
+            self.discontinuity_elapsed_offsets = vec![None; self.discontinuities.len()];
+        }
+        let host_timestamp = Instant::now();
+
         // Check for discontinuity
         if let Some(prev_state) = self.recent_states.back() {
             let similarity = state.similarity(prev_state) as f64;
@@ -452,22 +490,24 @@ impl ConsciousnessContinuity {
             // Detect content discontinuity
             if similarity < self.threshold {
                 self.discontinuities.push(DiscontinuityEvent {
-                    timestamp: Instant::now(),
+                    timestamp: host_timestamp,
                     magnitude: 1.0 - similarity,
                     kind: DiscontinuityKind::ContentShift,
                     description: format!("Content similarity dropped to {similarity:.3}"),
                 });
+                self.discontinuity_elapsed_offsets.push(elapsed);
             }
 
             // Detect Φ drop
             let phi_change = phi - phi_prev;
             if phi_change < -0.2 {
                 self.discontinuities.push(DiscontinuityEvent {
-                    timestamp: Instant::now(),
+                    timestamp: host_timestamp,
                     magnitude: -phi_change,
                     kind: DiscontinuityKind::PhiDrop,
                     description: format!("Φ dropped by {:.3}", -phi_change),
                 });
+                self.discontinuity_elapsed_offsets.push(elapsed);
             }
         }
 
@@ -480,12 +520,41 @@ impl ConsciousnessContinuity {
         // Compute continuity score
         self.compute_continuity_score();
 
-        // Keep only recent discontinuities (time-based + hard cap)
-        let cutoff = Instant::now() - std::time::Duration::from_secs(60);
-        self.discontinuities.retain(|d| d.timestamp > cutoff);
+        // Events must be aged in the same time domain in which they were created.
+        // Host Instants remain diagnostic metadata; deterministic qualification uses
+        // replay offsets so host execution speed cannot change expiry.
+        let host_cutoff = if elapsed.is_none() {
+            Some(Instant::now() - Duration::from_secs(60))
+        } else {
+            None
+        };
+        let mut retained_events = Vec::with_capacity(self.discontinuities.len());
+        let mut retained_offsets = Vec::with_capacity(self.discontinuity_elapsed_offsets.len());
+        for (event, event_elapsed) in self
+            .discontinuities
+            .drain(..)
+            .zip(self.discontinuity_elapsed_offsets.drain(..))
+        {
+            let keep = match (elapsed, event_elapsed, host_cutoff) {
+                (Some(now), Some(then), _) => {
+                    then <= now && now.saturating_sub(then) <= Duration::from_secs(60)
+                }
+                (None, None, Some(cutoff)) => event.timestamp > cutoff,
+                // Do not compare elapsed offsets with host Instants or vice versa.
+                _ => false,
+            };
+            if keep {
+                retained_events.push(event);
+                retained_offsets.push(event_elapsed);
+            }
+        }
+        self.discontinuities = retained_events;
+        self.discontinuity_elapsed_offsets = retained_offsets;
+
         if self.discontinuities.len() > 1000 {
-            self.discontinuities
-                .drain(..self.discontinuities.len() - 1000);
+            let drain_count = self.discontinuities.len() - 1000;
+            self.discontinuities.drain(..drain_count);
+            self.discontinuity_elapsed_offsets.drain(..drain_count);
         }
     }
 
@@ -1022,8 +1091,11 @@ impl TemporalConsciousnessAnalyzer {
             return false;
         }
 
-        // Update continuity
-        self.continuity.observe(state, phi, phi_prev);
+        // Update continuity in the same time domain as the admitted observation.
+        match elapsed {
+            Some(elapsed) => self.continuity.observe_at(state, phi, phi_prev, elapsed),
+            None => self.continuity.observe(state, phi, phi_prev),
+        }
 
         // Update Husserlian analysis
         if self.config.enable_husserlian_analysis {
@@ -1770,6 +1842,22 @@ mod tests {
 
         assert!(trajectory.trend >= 0, "Should detect rising trend");
         assert!(trajectory.ema > 0.3, "EMA should increase");
+    }
+
+    #[test]
+    fn deterministic_continuity_expires_events_by_replay_time_not_host_time() {
+        let mut continuity = ConsciousnessContinuity::new(10, 1.0);
+        let first = BinaryHV::random(2001);
+        let second = BinaryHV::random(2002);
+
+        continuity.observe_at(&first, 0.5, 0.5, Duration::ZERO);
+        continuity.observe_at(&second, 0.5, 0.5, Duration::from_secs(1));
+        assert_eq!(continuity.discontinuities.len(), 1);
+
+        // Although these calls execute almost immediately, 61 seconds of replay
+        // time have elapsed since the event, so it must no longer affect health.
+        continuity.observe_at(&second, 0.5, 0.5, Duration::from_secs(62));
+        assert!(continuity.discontinuities.is_empty());
     }
 
     #[test]
