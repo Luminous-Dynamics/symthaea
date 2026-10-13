@@ -184,6 +184,12 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertFalse(report["privacy"]["clip_paths_included"])
         self.assertFalse(report["privacy"]["speaker_tokens_included"])
 
+    def test_json_loader_rejects_duplicate_object_keys(self):
+        duplicate = self.base / "duplicate.json"
+        duplicate.write_text('{"locale":"af","locale":"en"}', encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "duplicate JSON object key"):
+            _read_json(duplicate)
+
     def test_normalizer_preserves_afrikaans_diacritics_and_folds_case(self):
         self.assertEqual(normalize_text("MÔRE!"), "môre")
         self.assertNotEqual(normalize_text("môre"), normalize_text("more"))
