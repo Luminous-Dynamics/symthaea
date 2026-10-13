@@ -814,7 +814,21 @@ impl HusserlianAnalysis {
         self.temporal_horizon = (self.retention_depth + self.protention_depth) as f64;
     }
 
-    /// Get the temporal experience coherence
+    /// Whether at least one temporal relationship is available to score.
+    ///
+    /// A lone primal impression is a point observation, not evidence of temporal
+    /// coherence. Measurements require at least one relation between retained,
+    /// present, or predicted states.
+    pub fn coherence_available(&self) -> bool {
+        self.retention.len() >= 2
+            || (self.retention.back().is_some() && self.primal_impression.is_some())
+            || (self.primal_impression.is_some() && !self.protention.is_empty())
+    }
+
+    /// Get the temporal experience coherence.
+    ///
+    /// Returns zero as a neutral numeric fallback when no relationships exist;
+    /// callers must check coherence_available before interpreting that number.
     pub fn coherence(&self) -> f64 {
         let mut total_sim = 0.0;
         let mut count = 0;
@@ -849,7 +863,7 @@ impl HusserlianAnalysis {
         if count > 0 {
             total_sim / count as f64
         } else {
-            1.0
+            0.0
         }
     }
 }
@@ -1186,7 +1200,7 @@ impl TemporalConsciousnessAnalyzer {
             measured_weight += identity_weight;
         }
 
-        if self.husserlian.primal_impression.is_some() {
+        if self.husserlian.coherence_available() {
             weighted_sum += 0.2 * self.husserlian.coherence();
             measured_weight += 0.2;
         }
@@ -1205,7 +1219,7 @@ impl TemporalConsciousnessAnalyzer {
             .phi_trajectory
             .has_minimum_samples(self.config.min_samples_for_trajectory);
         let continuity_measured = self.continuity.recent_states.len() >= 2;
-        let husserlian_measured = self.husserlian.primal_impression.is_some();
+        let husserlian_measured = self.husserlian.coherence_available();
         let binding_measured = !self.binding.bindings.is_empty();
 
         let identity_fully_measured = self.identity_coherence.alignment_coverage() == 3;
@@ -1274,6 +1288,7 @@ impl TemporalConsciousnessAnalyzer {
                 .identity_coherence
                 .past_future_alignment_available,
             husserlian_coherence: self.husserlian.coherence(),
+            husserlian_coherence_available: self.husserlian.coherence_available(),
             retention_depth: self.husserlian.retention_depth,
             protention_depth: self.husserlian.protention_depth,
             temporal_horizon: self.husserlian.temporal_horizon,
@@ -1425,7 +1440,10 @@ pub struct TemporalConsciousnessReport {
     pub past_future_alignment_available: bool,
 
     // Husserlian
+    /// Numeric score; consult availability before interpreting it.
     pub husserlian_coherence: f64,
+    /// Whether at least one retention/present/protention relation was measured.
+    pub husserlian_coherence_available: bool,
     pub retention_depth: usize,
     pub protention_depth: usize,
     pub temporal_horizon: f64,
@@ -1478,7 +1496,7 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ║   Past↔Future:       {:>6}                                               ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ HUSSERLIAN ANALYSIS (Retention → Now → Protention)                       ║
-║   Coherence:         {:.1}%                                              ║
+║   Coherence:         {:>6}                                              ║
 ║   Retention Depth:   {} states                                           ║
 ║   Protention Depth:  {} predictions                                      ║
 ║   Temporal Horizon:  {:.1} units                                         ║
@@ -1532,7 +1550,11 @@ impl std::fmt::Display for TemporalConsciousnessReport {
                 self.past_future_alignment,
                 self.past_future_alignment_available,
             ),
-            self.husserlian_coherence * 100.0,
+            if self.husserlian_coherence_available {
+                format!("{:.1}%", self.husserlian_coherence * 100.0)
+            } else {
+                "N/A".to_string()
+            },
             self.retention_depth,
             self.protention_depth,
             self.temporal_horizon,
@@ -1907,6 +1929,36 @@ mod tests {
             "Identical selves should be coherent"
         );
         assert!(coherence.is_coherent());
+    }
+
+    #[test]
+    fn husserlian_coherence_is_unknown_until_a_temporal_relation_exists() {
+        let mut husserlian = HusserlianAnalysis::new(10, 5);
+        assert!(!husserlian.coherence_available());
+        assert_eq!(husserlian.coherence(), 0.0);
+
+        husserlian.update_primal(BinaryHV::random(3001), 0.5);
+        assert!(!husserlian.coherence_available());
+        assert_eq!(husserlian.coherence(), 0.0);
+
+        // A second observation creates a retained-present relationship.
+        husserlian.update_primal(BinaryHV::random(3002), 0.6);
+        assert!(husserlian.coherence_available());
+        assert!((0.0..=1.0).contains(&husserlian.coherence()));
+    }
+
+    #[test]
+    fn analyzer_does_not_score_a_single_primal_as_measured_coherence() {
+        let mut analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        assert!(analyzer.observe_at(&BinaryHV::random(3011), 0.5, Duration::ZERO));
+
+        let report = analyzer.report();
+        assert!(!report.husserlian_coherence_available);
+        assert_eq!(report.husserlian_coherence, 0.0);
+        assert!(report.to_string().contains("Coherence:            N/A"));
+        assert_eq!(report.overall_evidence_coverage, 0.0);
+        assert_eq!(report.health_status, TemporalHealthStatus::InsufficientEvidence);
     }
 
     #[test]
