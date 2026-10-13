@@ -559,7 +559,7 @@ mod receipt_privacy_tests {
         for value in values {
             assert!(
                 !serialized.contains(value),
-                "receipt leaked sensitive literal: {value}"
+                "receipt leaked a sensitive literal"
             );
         }
     }
@@ -640,15 +640,23 @@ mod receipt_privacy_tests {
     fn receipt_never_contains_screenshot_bytes_on_denial_or_failure() {
         let action = BrowserAction::Screenshot;
         for outcome in [ActionOutcome::Denied, ActionOutcome::Failed] {
+            let (decision, reason_code) = match outcome {
+                ActionOutcome::Denied => (
+                    PolicyDecision::Deny {
+                        reason: PolicyDenial::InvalidUrl,
+                        required_phi: Some(0.05),
+                    },
+                    ActionReasonCode::PolicyDenied,
+                ),
+                ActionOutcome::Failed => (allowed(), ActionReasonCode::BrowserOperationFailed),
+                _ => unreachable!("the test only exercises denied and failed outcomes"),
+            };
             let execution = build_execution(
                 &action,
-                PolicyDecision::Deny {
-                    reason: PolicyDenial::InvalidUrl,
-                    required_phi: Some(0.05),
-                },
+                decision,
                 outcome,
                 ActionOutput::Screenshot(SCREENSHOT_SECRET.to_vec()),
-                Some(ActionReasonCode::PolicyDenied),
+                Some(reason_code),
                 0,
                 Some(DIAGNOSTIC_SECRET.to_string()),
             );
