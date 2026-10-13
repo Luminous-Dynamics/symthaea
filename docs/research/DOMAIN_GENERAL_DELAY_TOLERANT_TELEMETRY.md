@@ -1,8 +1,8 @@
 # Domain-General Delay-Tolerant Telemetry: Symthaea, Mycelix and Sol-Atlas
 
-**Status:** Research architecture plus deterministic in-memory and SQLite-backed store-and-forward policy prototypes.  
+**Status:** Research architecture plus in-memory/SQLite store-and-forward prototypes and a signed AEAD envelope/receiver-ACK prototype.  
 **Threat-model review:** 2026-10-12.  
-**Not claimed:** production queue durability, deployed satellite connectivity, source authentication, cryptographic signature verification, a formal safety case, real meter/sensor evaluation, or live Sol-Atlas/Mycelix integration.
+**Not claimed:** production readiness, correct key-to-producer binding, receiver-side durable anti-replay, deployed satellite connectivity, a formal safety case, real meter/sensor evaluation, or live Sol-Atlas/Mycelix integration.
 
 ## Decision
 
@@ -53,7 +53,7 @@ The queue's now_utc argument is injected by the caller for reproducibility. It d
 
 ## Delivery rules and safety invariants
 
-1. **At-least-once until acknowledged.** Selection does not remove an event. The same event can be resent after lost acknowledgements. Receivers must be idempotent. ACKs must refer to an event that was selected, arrive before expiry and match its digest; an expired event needs an explicit expiry receipt rather than a delivery ACK. Production ACKs still need authenticated transport.
+1. **At-least-once until acknowledged.** Selection does not remove an event. The same event can be resent after lost acknowledgements. Receivers must be idempotent. Protected events require a canonical Ed25519 receiver-signed ACK that refers to the exact event digest, is within clock-skew policy, and arrives before expiry. The receiver-side durable acceptance/replay transaction is still unimplemented; a signature does not prove that a receiver committed the event.
 2. **Duplicate is not new evidence.** Exact event replay is idempotent. Reusing an ID for different metadata or payload is an identity conflict and fails closed.
 3. **Expiry is explicit.** Expiration returns event IDs so the caller can write audit receipts. Queue expiration in this prototype is volatile; a production system must durably record decisions before deleting stored bytes.
 4. **Priority is deterministic.** Candidate batches sort by priority, then observation time, then event ID; events that do not fit the byte budget remain pending. Queue capacity errors do not silently evict earlier events.
@@ -83,12 +83,12 @@ The policy model does not implement a durable DP accountant or secure aggregatio
 
 The accompanying unittest suite uses synthetic timestamps, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
 
-Local verification recorded in the previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed ledger now has 28 deterministic tests and the authenticated envelope has 17 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
+Local verification recorded in the previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed ledger now has 31 deterministic tests and the authenticated-envelope/ACK suite has 22 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
 
 ## Required next steps before deployment
 
 - Harden the SQLite prototype with multi-process contention, crash/reopen, database-full, read-only path, backup/restore and target-filesystem power-loss tests before deployment.
-- Implement a key lifecycle/nonce-use policy, receiver-side durable anti-replay checks and cryptographically authenticated ACKs; the current queue ACK only checks the expected envelope digest and state.
+- Implement a key lifecycle/nonce-use policy and a receiver-side durable anti-replay/acceptance transaction that commits before signing the protected ACK.
 - Specify canonical serialization and authenticate message, ACK, source identity, policy version and freshness metadata end to end.
 - Define retention ceilings and bounds for terminal receipts, replay windows and participant-level privacy accounting.
 - Add deterministic chaos simulation for link loss, reordering, duplication, clock drift, key expiry, reboot/recovery, storage-full and compromised-sensor cases.
