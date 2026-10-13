@@ -48,9 +48,16 @@ WHISPER_CPP_RUNTIME_KEYS = {
 }
 TRANSFORMERS_RUNTIME_KEYS = {
     "kind", "python_executable_sha256", "worker_script_sha256",
-    "model_snapshot_manifest_sha256",
+    "model_snapshot_manifest_sha256", "startup_metadata_log_sha256",
     "python_version", "torch_version", "transformers_version", "numpy_version",
     "device", "dtype", "offline",
+}
+RUNTIME_METADATA_PREFIX = "SYMTHEA_TRANSFORMERS_RUNTIME "
+RUNTIME_METADATA_KEYS = {
+    "python_version", "torch_version", "transformers_version", "numpy_version",
+    "device", "dtype", "offline", "model_snapshot_manifest_sha256",
+    "model_snapshot_file_count", "model_snapshot_bytes",
+    "python_executable_sha256", "worker_script_sha256",
 }
 # Backwards-compatible name for code that imports the v1 whisper.cpp schema.
 RUNTIME_KEYS = WHISPER_CPP_RUNTIME_KEYS
@@ -81,6 +88,46 @@ def _read_json(path: Path) -> Any:
         )
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         raise ValueError(f"cannot read valid JSON from {path}: {exc}") from exc
+
+
+def read_transformers_runtime_metadata(path: Path) -> dict[str, Any]:
+    _need(path.is_file() and not path.is_symlink(),
+          "Transformers runtime metadata log must be a regular non-symlink file")
+    before = sha256_file(path)
+    lines = path.read_text(encoding="utf-8").splitlines()
+    matches = [line[len(RUNTIME_METADATA_PREFIX):] for line in lines
+               if line.startswith(RUNTIME_METADATA_PREFIX)]
+    _need(len(matches) == 1,
+          "Transformers runtime metadata log must contain exactly one worker startup record")
+
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"non-standard JSON numeric constant {value}")
+
+    try:
+        metadata = json.loads(
+            matches[0], object_pairs_hook=_unique_object, parse_constant=reject_constant
+        )
+    except (json.JSONDecodeError, ValueError) as error:
+        raise ValueError(f"Transformers startup metadata is malformed: {error}") from error
+    _need(isinstance(metadata, dict) and set(metadata) == RUNTIME_METADATA_KEYS,
+          "Transformers startup metadata fields mismatch")
+    for field in ("python_version", "torch_version", "transformers_version", "numpy_version"):
+        _need(isinstance(metadata[field], str) and metadata[field].strip()
+              and "\n" not in metadata[field] and "\r" not in metadata[field],
+              f"Transformers startup metadata {field} must be explicit")
+    _need(metadata["device"] in {"cpu", "cuda"}, "Transformers startup device must be cpu or cuda")
+    _need(metadata["dtype"] in {"float32", "float16", "bfloat16"},
+          "Transformers startup dtype is unsupported")
+    _need(metadata["offline"] is True, "Transformers startup metadata must declare offline=true")
+    for field in ("model_snapshot_manifest_sha256", "python_executable_sha256", "worker_script_sha256"):
+        _need(isinstance(metadata[field], str) and SHA256_RE.fullmatch(metadata[field]) is not None,
+              f"Transformers startup metadata {field} must be a 64-hex digest")
+    for field in ("model_snapshot_file_count", "model_snapshot_bytes"):
+        _need(isinstance(metadata[field], int) and not isinstance(metadata[field], bool)
+              and metadata[field] >= 0, f"Transformers startup metadata {field} must be non-negative")
+    _need(metadata["model_snapshot_file_count"] > 0, "Transformers startup snapshot has no files")
+    _need(before == sha256_file(path), "Transformers runtime metadata log changed while being read")
+    return metadata
 
 
 def sha256_file(path: Path) -> str:
@@ -384,6 +431,7 @@ def score_predictions(
     intake_report_path: Path,
     runtime_binary_path: Path,
     runtime_worker_path: Path | None = None,
+    runtime_metadata_log_path: Path | None = None,
     mode: str = "smoke",
     bootstrap_iterations: int = 1000,
 ) -> dict[str, Any]:
@@ -486,6 +534,29 @@ def score_predictions(
         _need(runtime["device"] in {"cpu", "cuda"}, "runtime.device must be cpu or cuda")
         _need(runtime["dtype"] in {"float32", "float16", "bfloat16"}, "runtime.dtype is unsupported")
         _need(runtime["offline"] is True, "Transformers runtime must declare offline=true")
+        _need(isinstance(runtime["startup_metadata_log_sha256"], str)
+              and SHA256_RE.fullmatch(runtime["startup_metadata_log_sha256"]) is not None,
+              "runtime.startup_metadata_log_sha256 must be a 64-hex digest")
+        _need(isinstance(runtime_metadata_log_path, Path)
+              and runtime_metadata_log_path.is_file()
+              and not runtime_metadata_log_path.is_symlink(),
+              "Transformers runtime requires a regular --runtime-metadata-log file")
+        _need(sha256_file(runtime_metadata_log_path) == runtime["startup_metadata_log_sha256"],
+              "Transformers startup metadata log SHA-256 differs from prediction provenance")
+        observed = read_transformers_runtime_metadata(runtime_metadata_log_path)
+        for field in ("python_version", "torch_version", "transformers_version", "numpy_version",
+                      "device", "dtype", "offline", "python_executable_sha256", "worker_script_sha256",
+                      "model_snapshot_manifest_sha256"):
+            runtime_field = field
+            _need(runtime[runtime_field] == observed[field],
+                  f"runtime.{runtime_field} differs from the startup metadata log")
+        _need(observed["python_executable_sha256"] == actual_runtime_sha,
+              "startup metadata Python executable digest differs from the actual runtime binary")
+        _need(observed["worker_script_sha256"] == sha256_file(runtime_worker_path),
+              "startup metadata worker script digest differs from the actual worker script")
+        _need(observed["model_snapshot_file_count"] == source_file_count
+              and observed["model_snapshot_bytes"] == source_bytes,
+              "startup metadata model snapshot inventory differs from the supplied snapshot")
     else:
         raise ValueError(f"unsupported runtime.kind: {runtime['kind']}")
 
@@ -659,6 +730,7 @@ def score_predictions(
             "python_executable_sha256": actual_runtime_sha,
             "worker_script_sha256": runtime["worker_script_sha256"],
             "model_snapshot_manifest_sha256": runtime["model_snapshot_manifest_sha256"],
+            "startup_metadata_log_sha256": runtime["startup_metadata_log_sha256"],
             "python_version": runtime["python_version"],
             "torch_version": runtime["torch_version"],
             "transformers_version": runtime["transformers_version"],
@@ -773,6 +845,7 @@ def main() -> int:
     parser.add_argument("--model-license", required=True, help="license identifier from the model card")
     parser.add_argument("--runtime-binary", required=True, type=Path, help="exact local whisper-cli executable or Python interpreter used for inference")
     parser.add_argument("--runtime-worker", type=Path, help="exact Transformers worker script; required when runtime.kind is transformers")
+    parser.add_argument("--runtime-metadata-log", type=Path, help="private stderr log with the exact Transformers startup record")
     parser.add_argument("--mode", choices=("smoke", "heldout-evaluation"), default="smoke")
     parser.add_argument("--bootstrap-iterations", type=int, default=1000)
     parser.add_argument("--report", required=True, type=Path)
@@ -798,6 +871,7 @@ def main() -> int:
             intake_report_path=args.intake_report,
             runtime_binary_path=args.runtime_binary,
             runtime_worker_path=args.runtime_worker,
+            runtime_metadata_log_path=args.runtime_metadata_log,
             mode=args.mode,
             bootstrap_iterations=args.bootstrap_iterations,
         )
