@@ -736,7 +736,7 @@ mod tests {
             let reference = value.exp();
             assert!(
                 result.contains(reference),
-                "computed enclosure {result:?} should contain platform exp({value:?}) = {reference:?}"
+                "enclosure {result:?} should contain platform exp({value:?}) = {reference:?}"
             );
             assert!(result.lower() >= 0.0);
             assert!(result.lower() <= result.upper());
