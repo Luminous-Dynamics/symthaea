@@ -1,6 +1,6 @@
 # Domain-General Delay-Tolerant Telemetry: Symthaea, Mycelix and Sol-Atlas
 
-**Status:** Research architecture plus in-memory/SQLite store-and-forward prototypes and a signed AEAD envelope/receiver-ACK prototype.  
+**Status:** Research architecture plus in-memory/SQLite store-and-forward, signed AEAD envelope, and durable receiver-inbox prototypes.  
 **Threat-model review:** 2026-10-12.  
 **Not claimed:** production readiness, correct key-to-producer binding, receiver-side durable anti-replay, deployed satellite connectivity, a formal safety case, real meter/sensor evaluation, or live Sol-Atlas/Mycelix integration.
 
@@ -40,7 +40,7 @@ These are proposed responsibilities and interface boundaries, not claims that th
 
 ## Shared event contract implemented by the current prototype
 
-The tools/energy_telemetry/store_forward.py module is a deterministic in-memory reference policy model. The tools/energy_telemetry/authenticated_envelope.py module adds ChaCha20-Poly1305 encryption of metadata plus payload and Ed25519 signatures over a canonical outer envelope. The tools/energy_telemetry/durable_queue.py module adds a SQLite-backed restart-recovery prototype for metadata, exact protected-envelope bytes, attempts, expiry and ACK state. Each event carries:
+The tools/energy_telemetry/store_forward.py module is a deterministic in-memory reference policy model. The tools/energy_telemetry/authenticated_envelope.py module adds ChaCha20-Poly1305 encryption of metadata plus payload and Ed25519 signatures over a canonical outer envelope and receiver ACK. The tools/energy_telemetry/durable_queue.py module adds a SQLite-backed sender queue with exact protected-envelope retries. The tools/energy_telemetry/receiver_inbox.py module verifies received envelopes, commits exact ciphertext plus replay identity to SQLite, and only then signs an acceptance ACK. Each event carries:
 
 - Random per-event ID (format checked; randomness is not established by the module).
 - Domain label: energy, water, agriculture, infrastructure or spacecraft.
@@ -53,7 +53,7 @@ The queue's now_utc argument is injected by the caller for reproducibility. It d
 
 ## Delivery rules and safety invariants
 
-1. **At-least-once until acknowledged.** Selection does not remove an event. The same event can be resent after lost acknowledgements. Receivers must be idempotent. Protected events require a canonical Ed25519 receiver-signed ACK that refers to the exact event digest, is within clock-skew policy, and arrives before expiry. The receiver-side durable acceptance/replay transaction is still unimplemented; a signature does not prove that a receiver committed the event.
+1. **At-least-once until acknowledged.** Selection does not remove an event. The same event can be resent after lost acknowledgements. Protected events require a canonical Ed25519 receiver-signed ACK bound to the exact digest. The new receiver-inbox prototype commits the exact encrypted bytes and replay record before signing that ACK; if the ACK is lost, a retry returns an idempotent acceptance. The prototype still needs target-filesystem crash/power-loss validation and does not make downstream side effects exactly-once.
 2. **Duplicate is not new evidence.** Exact event replay is idempotent. Reusing an ID for different metadata or payload is an identity conflict and fails closed.
 3. **Expiry is explicit.** Expiration returns event IDs so the caller can write audit receipts. Queue expiration in this prototype is volatile; a production system must durably record decisions before deleting stored bytes.
 4. **Priority is deterministic.** Candidate batches sort by priority, then observation time, then event ID; events that do not fit the byte budget remain pending. Queue capacity errors do not silently evict earlier events.
@@ -83,7 +83,7 @@ The policy model does not implement a durable DP accountant or secure aggregatio
 
 The accompanying unittest suites use synthetic timestamps, fixed test-only keys, synthetic payloads, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
 
-Local verification recorded in the previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed ledger now has 31 deterministic tests and the authenticated-envelope/ACK suite has 22 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
+Local verification recorded in the previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed sender ledger now has 32 deterministic tests, the authenticated-envelope/ACK suite has 22, and the receiver inbox has 17 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
 
 ## Required next steps before deployment
 
