@@ -547,6 +547,7 @@ class DurableTelemetryQueue:
             payload_sha256=ack.payload_sha256,
             now_utc=now_utc,
             protected_ack=True,
+            acknowledged_at_utc=ack.acknowledged_at_utc,
         )
 
     def _acknowledge(
@@ -556,6 +557,7 @@ class DurableTelemetryQueue:
         payload_sha256: str,
         now_utc: datetime,
         protected_ack: bool,
+        acknowledged_at_utc: datetime | None = None,
     ) -> str:
         now_text = self._timestamp(now_utc)
         if not isinstance(event_id, str) or len(event_id) != 32 or any(ch not in "0123456789abcdef" for ch in event_id):
@@ -582,6 +584,11 @@ class DurableTelemetryQueue:
                     raise TelemetryQueueError(
                         "authenticated receiver ACK cannot acknowledge a metadata-only event"
                     )
+                if protected_ack:
+                    if acknowledged_at_utc is None:
+                        raise TelemetryQueueError("signed ACK timestamp is required")
+                    if acknowledged_at_utc >= event.expires_at_utc:
+                        raise TelemetryQueueError("ACK timestamp is not before event expiry")
                 if status == "delivered" and event.payload_sha256 == payload_sha256:
                     db.execute("COMMIT")
                     return "idempotent_ack"
