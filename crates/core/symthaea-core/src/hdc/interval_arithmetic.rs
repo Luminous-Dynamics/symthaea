@@ -604,7 +604,7 @@ mod tests {
             let result = Interval::point(value).unwrap().checked_ln().unwrap();
             assert!(
                 result.contains(value.ln()),
-                "computed enclosure {result:?} should contain the platform reference for ln({value:?}) = {:?}",
+                "computed enclosure {result:?} should contain platform ln({value:?}) = {:?}",
                 value.ln()
             );
             assert!(result.lower() <= result.upper());
@@ -614,8 +614,20 @@ mod tests {
             Interval::point(1.0).unwrap().checked_ln().unwrap(),
             Interval::point(0.0).unwrap()
         );
-        assert!(Interval::point(2.0).unwrap().checked_ln().unwrap().contains(std::f64::consts::LN_2));
-        assert!(Interval::point(0.5).unwrap().checked_ln().unwrap().contains(-std::f64::consts::LN_2));
+        assert!(
+            Interval::point(2.0)
+                .unwrap()
+                .checked_ln()
+                .unwrap()
+                .contains(std::f64::consts::LN_2)
+        );
+        assert!(
+            Interval::point(0.5)
+                .unwrap()
+                .checked_ln()
+                .unwrap()
+                .contains(-std::f64::consts::LN_2)
+        );
     }
 
     #[test]
