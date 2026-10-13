@@ -1244,19 +1244,19 @@ mod domain_safe_simplification_tests {
     fn interval_evaluation_encloses_bounded_sine_and_cosine() {
         let sine = Expr::Func(UnaryFn::Sin, Box::new(Expr::Var("x".into())));
         let cosine = Expr::Func(UnaryFn::Cos, Box::new(Expr::Var("x".into())));
-        let input = Interval::new(-0.5, 0.5).unwrap();
+        let input = Interval::new(-1.5, 1.5).unwrap();
 
         let sin_range = sine.eval_interval(&[("x", input)]).unwrap();
-        assert!(sin_range.lower() <= -0.47942553860420301);
-        assert!(sin_range.upper() >= 0.47942553860420301);
+        assert!(sin_range.lower() <= -0.9974949866040544);
+        assert!(sin_range.upper() >= 0.9974949866040544);
 
         let cos_range = cosine.eval_interval(&[("x", input)]).unwrap();
-        assert!(cos_range.lower() <= 0.8775825618903728);
+        assert!(cos_range.lower() <= 0.0707372016677029);
         assert_eq!(cos_range.upper(), 1.0);
 
         // Argument reduction is intentionally not guessed: the sound fallback
         // is broad, but it remains useful to callers that need a valid enclosure.
-        let broad = Interval::new(0.5, 1.0).unwrap();
+        let broad = Interval::new(1.5, 1.6).unwrap();
         assert_eq!(
             sine.eval_interval(&[("x", broad)]).unwrap(),
             Interval::new(-1.0, 1.0).unwrap()
