@@ -226,8 +226,18 @@ jobs:
                       if statuses != {"measured"}:
                           return ", ".join(sorted(statuses)) or "missing"
                       matched = sum(row.get("matching_point_count", 0) for row in rows)
-                      tested = sum(row.get("tested_point_count", 0) for row in rows)
-                      return f"{matched}/{tested} points matched"
+                      scored = sum(
+                          row.get("scored_point_count", row.get("tested_point_count", 0))
+                          for row in rows
+                      )
+                      neutral_unscored = sum(
+                          row.get("unscored_neutral_point_count", 0) for row in rows
+                      )
+                      suffix = (
+                          f"; {neutral_unscored} neutral unscored"
+                          if neutral_unscored else ""
+                      )
+                      return f"{matched}/{scored} scored points matched{suffix}"
 
                   valence_text = target_summary(by_control.get("valence", []))
                   energy_text = target_summary(by_control.get("energy", []))
