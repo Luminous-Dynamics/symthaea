@@ -458,7 +458,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
 
     def test_report_writer_rejects_worker_source_tree(self):
         report = self.score()
-        with self.assertRaisesRegex(ValueError, "outside protected trees"):
+        with self.assertRaisesRegex(ValueError, "aggregate report must be outside dataset and model directories"):
             write_report_exclusive(
                 self.worker_root / "report.json", report,
                 [self.root, self.model_root, self.source_model_root, self.worker_root],
