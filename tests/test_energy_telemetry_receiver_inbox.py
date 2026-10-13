@@ -13,6 +13,7 @@ from pathlib import Path
 import stat
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from sqlite3 import IntegrityError
 
 from tools.energy_telemetry.authenticated_envelope import (
     EnvelopeAuthenticationError,
@@ -285,15 +286,16 @@ class ReceiverInboxTests(unittest.TestCase):
 
     def test_receiver_ack_is_not_created_if_commit_fails(self):
         packet = sealed()
-        # Make the SQLite DB unavailable after construction. The inbox must
-        # raise on insertion and must not produce a positive signed ACK.
-        os.chmod(self.database, 0o400)
-        try:
-            with self.assertRaises(Exception):
-                self.accept(packet)
-            self.assertEqual(self.inbox.record_count, 0)
-        finally:
-            os.chmod(self.database, 0o600)
+        # A deterministic abort trigger simulates failure at the durable
+        # acceptance write. No positive ACK may be returned for this input.
+        with sqlite3.connect(self.database) as db:
+            db.execute(
+                "CREATE TRIGGER reject_receiver_insert BEFORE INSERT ON received_envelopes "
+                "BEGIN SELECT RAISE(ABORT, 'forced receiver commit failure'); END"
+            )
+        with self.assertRaises(IntegrityError):
+            self.accept(packet)
+        self.assertEqual(self.inbox.record_count, 0)
 
 
 if __name__ == "__main__":
