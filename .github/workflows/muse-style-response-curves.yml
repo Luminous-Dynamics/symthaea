@@ -246,6 +246,44 @@ jobs:
                   )
               stream.write("\n")
 
+              stream.write("## Candidate non-target invariance by style/control\n\n")
+              stream.write(
+                  "Channel-level candidates are reported as measured diagnostics, not quality scores. "
+                  "The tonic sweep's structural-layer diagnostics remain in the section above; this "
+                  "table covers the other controls. Seed identity coverage is reported separately below.\n\n"
+              )
+              stream.write(
+                  "| Style | Control | Channel | Curves with data | Curves with deviations | Point-level deviations |\n"
+              )
+              stream.write("|---|---|---|---:|---:|---:|\n")
+              for profile in report["profiles"]:
+                  for control in ["valence", "arousal", "energy", "bars", "seed"]:
+                      matching_curves = [
+                          curve for curve in profile["curves"]
+                          if curve["control"] == control
+                      ]
+                      by_channel = {}
+                      for curve in matching_curves:
+                          invariance = curve["control_target_evaluation"].get(
+                              "non_target_invariance", {}
+                          )
+                          for channel in invariance.get("checked_channels", []):
+                              by_channel.setdefault(channel["channel"], []).append(channel)
+                      for channel_name in sorted(by_channel):
+                          rows = by_channel[channel_name]
+                          deviating_curves = sum(
+                              row.get("changed_point_count", 0) > 0 for row in rows
+                          )
+                          point_deviations = sum(
+                              row.get("changed_point_count", 0) for row in rows
+                          )
+                          stream.write(
+                              f"| {profile['style']} | {control} | {channel_name} | "
+                              f"{len(rows)}/4 | {deviating_curves}/{len(rows)} | "
+                              f"{point_deviations} |\n"
+                          )
+              stream.write("\n")
+
               stream.write("## Seed robustness by style/control\n\n")
               stream.write(
                   "| Style | Control | Seeds with any observed change | "
