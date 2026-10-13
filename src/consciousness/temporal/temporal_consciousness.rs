@@ -382,6 +382,13 @@ impl PhiTrajectory {
 // CONSCIOUSNESS CONTINUITY
 // ============================================================================
 
+/// Which elapsed-time domain governs continuity-event expiry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ContinuityTimeBasis {
+    HostMonotonic,
+    ReplayElapsed,
+}
+
 /// Measures the "smoothness" of consciousness stream
 #[derive(Debug, Clone)]
 pub struct ConsciousnessContinuity {
@@ -401,6 +408,13 @@ pub struct ConsciousnessContinuity {
 
     /// Threshold for discontinuity detection
     threshold: f64,
+
+    /// Clock basis is fixed by the first accepted observation; the domains
+    /// cannot be mixed because their coordinates are not comparable.
+    time_basis: Option<ContinuityTimeBasis>,
+
+    /// Most recent accepted replay offset. Host-clock observations leave this None.
+    last_elapsed_observation: Option<Duration>,
 
     /// Maximum states to track
     capacity: usize,
@@ -445,27 +459,34 @@ impl ConsciousnessContinuity {
             discontinuities: Vec::new(),
             discontinuity_elapsed_offsets: Vec::new(),
             threshold,
+            time_basis: None,
+            last_elapsed_observation: None,
             capacity,
         }
     }
 
     /// Add a new consciousness state using the host monotonic clock for expiry.
+    ///
+    /// This compatibility entry point discards the admission result. A continuity
+    /// instance already operating on replay offsets rejects host-clock observations.
     pub fn observe(&mut self, state: &BinaryHV, phi: f64, phi_prev: f64) {
-        self.observe_with_elapsed(state, phi, phi_prev, None);
+        let _ = self.observe_with_elapsed(state, phi, phi_prev, None);
     }
 
     /// Add a state in a deterministic replay timeline.
     ///
     /// Event expiry follows this elapsed offset, not the speed at which the replay
     /// happens to execute on the host. Use one fixed origin for every observation.
+    /// Returns false without mutation for non-finite Φ values, duplicate/backwards
+    /// offsets, or attempts to mix host-clock and replay-clock observations.
     pub fn observe_at(
         &mut self,
         state: &BinaryHV,
         phi: f64,
         phi_prev: f64,
         elapsed: Duration,
-    ) {
-        self.observe_with_elapsed(state, phi, phi_prev, Some(elapsed));
+    ) -> bool {
+        self.observe_with_elapsed(state, phi, phi_prev, Some(elapsed))
     }
 
     fn observe_with_elapsed(
@@ -474,7 +495,28 @@ impl ConsciousnessContinuity {
         phi: f64,
         phi_prev: f64,
         elapsed: Option<Duration>,
-    ) {
+    ) -> bool {
+        let requested_basis = if elapsed.is_some() {
+            ContinuityTimeBasis::ReplayElapsed
+        } else {
+            ContinuityTimeBasis::HostMonotonic
+        };
+
+        // Clock coordinates are not interchangeable. Validate before repairing
+        // compatibility metadata or touching any retained state/evidence.
+        if self
+            .time_basis
+            .is_some_and(|accepted_basis| accepted_basis != requested_basis)
+            || !phi.is_finite()
+            || !phi_prev.is_finite()
+            || elapsed.is_some_and(|current| {
+                self.last_elapsed_observation
+                    .is_some_and(|previous| current <= previous)
+            })
+        {
+            return false;
+        }
+
         // The event list is public for compatibility; if an external caller has
         // mutated it directly, restore safe alignment and treat those entries as
         // host-timestamp-only diagnostics.
@@ -556,6 +598,10 @@ impl ConsciousnessContinuity {
             self.discontinuities.drain(..drain_count);
             self.discontinuity_elapsed_offsets.drain(..drain_count);
         }
+
+        self.time_basis = Some(requested_basis);
+        self.last_elapsed_observation = elapsed;
+        true
     }
 
     fn compute_continuity_score(&mut self) {
@@ -2031,6 +2077,54 @@ mod tests {
         // time have elapsed since the event, so it must no longer affect health.
         continuity.observe_at(&second, 0.5, 0.5, Duration::from_secs(62));
         assert!(continuity.discontinuities.is_empty());
+    }
+
+    #[test]
+    fn continuity_rejects_invalid_or_nonmonotonic_replay_observations_without_mutation() {
+        let mut continuity = ConsciousnessContinuity::new(10, 1.0);
+        let first = BinaryHV::random(4101);
+        let second = BinaryHV::random(4102);
+        let third = BinaryHV::random(4103);
+
+        assert!(continuity.observe_at(&first, 0.5, 0.5, Duration::from_secs(2)));
+        assert!(continuity.observe_at(&second, 0.5, 0.5, Duration::from_secs(3)));
+
+        let retained_states = continuity.recent_states.len();
+        let retained_events = continuity.discontinuities.len();
+        let score = continuity.score;
+
+        assert!(!continuity.observe_at(&third, 0.5, 0.5, Duration::from_secs(3)));
+        assert!(!continuity.observe_at(&third, 0.5, 0.5, Duration::from_secs(2)));
+        assert!(!continuity.observe_at(&third, f64::NAN, 0.5, Duration::from_secs(4)));
+        assert!(!continuity.observe_at(&third, 0.5, f64::INFINITY, Duration::from_secs(4)));
+
+        assert_eq!(continuity.recent_states.len(), retained_states);
+        assert_eq!(continuity.discontinuities.len(), retained_events);
+        assert_eq!(continuity.score, score);
+        assert_eq!(
+            continuity.last_elapsed_observation,
+            Some(Duration::from_secs(3))
+        );
+        assert!(continuity.observe_at(&third, 0.5, 0.5, Duration::from_secs(4)));
+    }
+
+    #[test]
+    fn continuity_rejects_mixing_host_and_replay_clock_domains_without_mutation() {
+        let first = BinaryHV::random(4201);
+        let second = BinaryHV::random(4202);
+
+        let mut replay_clock = ConsciousnessContinuity::new(10, 1.0);
+        assert!(replay_clock.observe_at(&first, 0.5, 0.5, Duration::ZERO));
+        let replay_state_count = replay_clock.recent_states.len();
+        replay_clock.observe(&second, 0.5, 0.5);
+        assert_eq!(replay_clock.recent_states.len(), replay_state_count);
+
+        let mut host_clock = ConsciousnessContinuity::new(10, 1.0);
+        host_clock.observe(&first, 0.5, 0.5);
+        let host_state_count = host_clock.recent_states.len();
+        assert!(!host_clock.observe_at(&second, 0.5, 0.5, Duration::from_secs(1)));
+        assert_eq!(host_clock.recent_states.len(), host_state_count);
+        assert_eq!(host_clock.last_elapsed_observation, None);
     }
 
     #[test]
