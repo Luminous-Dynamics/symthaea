@@ -1303,9 +1303,10 @@ mod tests {
 
         // A later sample without historical context must clear a previously
         // available past representation rather than preserving stale alignment.
-        coherence.past_self = None;
-        coherence.present_self = Some(BinaryHV::random(43));
-        coherence.compute_coherence();
+        coherence.future_self = Some(BinaryHV::random(44));
+        coherence.update(None, &BinaryHV::random(43));
+        assert!(coherence.past_self.is_none());
+        assert!(coherence.future_self.is_none());
         assert_eq!(coherence.alignment_coverage(), 0);
         assert!(!coherence.past_present_alignment_available);
     }
