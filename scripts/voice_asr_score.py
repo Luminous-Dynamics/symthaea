@@ -803,7 +803,7 @@ def main() -> int:
         )
         forbidden_roots = [args.dataset_root, args.model_root, args.source_model_root]
         if args.runtime_worker is not None:
-            forbidden_roots.append(args.runtime_worker)
+            forbidden_roots.append(args.runtime_worker.parent)
         write_report_exclusive(args.report, report, forbidden_roots)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
