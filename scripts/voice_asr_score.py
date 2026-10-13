@@ -21,7 +21,6 @@ import math
 import os
 import random
 import re
-import statistics
 import unicodedata
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -251,6 +250,7 @@ def score_predictions(
     model_revision: str,
     model_license: str,
     locale: str,
+    intake_report_path: Path,
     mode: str = "smoke",
     bootstrap_iterations: int = 1000,
 ) -> dict[str, Any]:
@@ -295,7 +295,6 @@ def score_predictions(
     missing = set(expected) - set(seen)
     _need(not missing, f"missing {len(missing)} ASR predictions; scoring is incomplete")
 
-    model_root = model_root.resolve(strict=True)
     model_tree_sha, model_files, model_bytes = _hash_tree(model_root)
     per_clip: list[dict[str, int]] = []
     bucket_rows: dict[str, list[dict[str, int]]] = {
@@ -308,8 +307,7 @@ def score_predictions(
         hyp_words = hyp.split()
         ref_chars = len(ref)
         _need(ref_words and ref_chars > 0, "test reference normalized to empty")
-        word_errors = edit_distance(" ".join(ref_words), " ".join(hyp_words))
-        # Word-level Levenshtein must operate on tokens, not the joined characters.
+        # Word-level Levenshtein operates on tokens, not joined characters.
         word_errors = _token_edit_distance(ref_words, hyp_words)
         char_errors = edit_distance(ref, hyp)
         item = {
@@ -328,13 +326,6 @@ def score_predictions(
     err_words_total = sum(row["err_words"] for row in per_clip)
     ref_chars_total = sum(row["ref_chars"] for row in per_clip)
     err_chars_total = sum(row["err_chars"] for row in per_clip)
-    aggregate_samples = [
-        {
-            "ref_word": row["ref_words"], "err_word": row["err_words"],
-            "ref_char": row["ref_chars"], "err_char": row["err_chars"],
-        }
-        for row in per_clip
-    ]
     def aggregate(items: list[dict[str, int]]) -> dict[str, Any]:
         ref_words = sum(item.get("ref_words", item.get("ref_word", 0)) for item in items)
         word_errors = sum(item.get("err_words", item.get("err_word", 0)) for item in items)
@@ -385,7 +376,7 @@ def score_predictions(
         },
         "inputs": {
             "prediction_file_sha256": prediction_sha,
-            "intake_report_sha256": sha256_file(intake_path) if (intake_path := _INTAKE_PATH.get()) else None,
+            "intake_report_sha256": sha256_file(intake_report_path),
         },
         "metrics": aggregate(per_clip),
         "confidence_intervals_95": {
@@ -403,18 +394,6 @@ def score_predictions(
             "speaker_tokens_included": False,
         },
     }
-
-
-# Context set by CLI only so that the score report can bind the exact intake receipt.
-class _IntakePath:
-    def __init__(self) -> None:
-        self.path: Path | None = None
-    def set(self, path: Path) -> None:
-        self.path = path
-    def get(self) -> Path | None:
-        return self.path
-
-_INTAKE_PATH = _IntakePath()
 
 
 def _token_edit_distance(reference: list[str], hypothesis: list[str]) -> int:
@@ -473,7 +452,6 @@ def main() -> int:
     try:
         intake = _read_json(args.intake_report)
         prediction_doc = _read_json(args.predictions)
-        _INTAKE_PATH.set(args.intake_report)
         report = score_predictions(
             prediction_doc=prediction_doc,
             intake_report=intake,
@@ -485,6 +463,7 @@ def main() -> int:
             model_revision=args.model_revision,
             model_license=args.model_license,
             locale=args.locale,
+            intake_report_path=args.intake_report,
             mode=args.mode,
             bootstrap_iterations=args.bootstrap_iterations,
         )
