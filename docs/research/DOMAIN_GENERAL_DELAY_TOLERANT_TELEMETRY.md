@@ -71,7 +71,7 @@ The queue's now_utc argument is injected by the caller for reproducibility. It d
 - Do not publish hashes of low-entropy private values as if they anonymize them. In this prototype the payload digest is only an idempotency binding; a production envelope should authenticate canonical metadata and payload together (for example with a signed canonical-envelope digest). No digest scheme is anonymization, and privacy-sensitive values must not be inferable from published material.
 - Keep differential-privacy accounting separate from delivery idempotency. At-least-once transmission must not spend a privacy budget twice for the same exact release, while a semantically new release must be accounted for even if it has similar values.
 
-The policy model does not implement a durable DP accountant or secure aggregation. The separate envelope prototype uses a maintained AEAD/signature library, but does not implement key provisioning, rotation/revocation, per-key nonce usage enforcement, authenticated ACKs, receiver-side anti-replay state or database encryption. Those remain production design tasks, not implied by these tests.
+The policy model does not implement a durable DP accountant or secure aggregation. The envelope prototype uses a maintained AEAD/signature library and the durable queue verifies receiver-signed ACKs for protected rows, but the system does not implement key provisioning, rotation/revocation, enforced per-key nonce usage, receiver-side durable anti-replay/acceptance state or database encryption. Those remain production design tasks, not implied by these tests.
 
 ## Reference standards and research anchors
 
@@ -81,7 +81,7 @@ The policy model does not implement a durable DP accountant or secure aggregatio
 
 ## Verification evidence
 
-The accompanying unittest suite uses synthetic timestamps, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
+The accompanying unittest suites use synthetic timestamps, fixed test-only keys, synthetic payloads, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
 
 Local verification recorded in the previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed ledger now has 31 deterministic tests and the authenticated-envelope/ACK suite has 22 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
 
