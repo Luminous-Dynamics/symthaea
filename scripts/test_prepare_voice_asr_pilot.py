@@ -81,6 +81,7 @@ class PrepareVoiceAsrPilotTests(unittest.TestCase):
         sample=json.loads(samples_path.read_text(encoding="utf-8").strip())
         self.assertEqual(sample["id"],"sub/clip.mp3")
         self.assertIn("Môre, Suid-Afrika!",sample["reference_transcript"])
+        self.assertEqual(Path(sample["audio_path"]).stat().st_mode & 0o777,0o600)
         with wave.open(sample["audio_path"],"rb") as wav:
             self.assertEqual((wav.getnchannels(),wav.getsampwidth(),wav.getframerate()),(1,2,16000))
             self.assertEqual(wav.getnframes(),160)
