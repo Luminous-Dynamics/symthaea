@@ -458,6 +458,26 @@ class DurableQueueTests(unittest.TestCase):
             )
         self.assertEqual(self.queue.pending_count, 1)
 
+    def test_signed_ack_claiming_acceptance_after_expiry_is_rejected(self):
+        expired_soon = protected(expires="2026-10-12T10:24:00Z")
+        self.queue.enqueue_protected(expired_soon, now_utc=self.now)
+        self.queue.select_protected_batch(now_utc=self.now, max_bytes=1000)
+        receiver_key = Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
+        ack = create_ack(
+            receiver_key_id="receiver-test-epoch",
+            event_id=expired_soon.event.event_id,
+            payload_sha256=expired_soon.event.payload_sha256,
+            acknowledged_at_utc=dt("2026-10-12T10:24:30Z"),
+            signing_key=receiver_key,
+        )
+        with self.assertRaisesRegex(TelemetryQueueError, "not before event expiry"):
+            self.queue.acknowledge_protected(
+                ack,
+                verification_keys={"receiver-test-epoch": receiver_key.public_key()},
+                now_utc=self.now,
+            )
+        self.assertEqual(self.queue.pending_count, 1)
+
     def test_legacy_metadata_queue_does_not_expose_fake_payload_bytes(self):
         e = event()
         self.queue.enqueue(e, now_utc=self.now)
