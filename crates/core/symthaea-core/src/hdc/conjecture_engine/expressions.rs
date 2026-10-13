@@ -4,6 +4,8 @@
 
 use std::fmt;
 
+use crate::hdc::interval_arithmetic::{Interval, IntervalError};
+
 /// A symbolic expression tree for regression.
 ///
 /// Kept simple and self-contained (no PrimitiveSystem dependency) for fast
@@ -81,7 +83,52 @@ impl fmt::Display for ExprEvalError {
     }
 }
 
+
 impl std::error::Error for ExprEvalError {}
+
+/// Failures from interval evaluation of a symbolic-regression expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExprIntervalError {
+    Interval(IntervalError),
+    MissingVariable(String),
+    DuplicateVariableBinding(String),
+    InvalidSummationBound,
+    NonSingletonSummationBound,
+    SummationLimitExceeded { bound: u64, max: u64 },
+    NonSingletonExponent,
+    NonIntegerExponent,
+    ExponentOutOfRange,
+    UnsupportedFunction(UnaryFn),
+}
+
+impl fmt::Display for ExprIntervalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Interval(error) => write!(f, "{error}"),
+            Self::MissingVariable(name) => write!(f, "missing interval variable binding: {name}"),
+            Self::DuplicateVariableBinding(name) => write!(f, "duplicate interval variable binding: {name}"),
+            Self::InvalidSummationBound => write!(f, "summation bound n must be a finite nonnegative integer"),
+            Self::NonSingletonSummationBound => write!(f, "interval summation bound n must be a singleton"),
+            Self::SummationLimitExceeded { bound, max } => {
+                write!(f, "summation upper bound {bound} exceeds configured maximum {max}")
+            }
+            Self::NonSingletonExponent => write!(f, "interval exponent must be a singleton"),
+            Self::NonIntegerExponent => write!(f, "interval evaluator only supports integer exponents"),
+            Self::ExponentOutOfRange => write!(f, "integer exponent is outside the supported i32 range"),
+            Self::UnsupportedFunction(function) => {
+                write!(f, "interval evaluation has no certified rule for {function:?}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ExprIntervalError {}
+
+impl From<IntervalError> for ExprIntervalError {
+    fn from(value: IntervalError) -> Self {
+        Self::Interval(value)
+    }
+}
 
 impl Expr {
     /// Evaluate with strict mathematical-domain and environment checks.
@@ -99,6 +146,106 @@ impl Expr {
             }
         }
         self.eval_in_environment(vars)
+    }
+
+    /// Evaluate using interval inputs and outward-rounded arithmetic.
+    ///
+    /// The enclosure evaluator supports arithmetic, integer powers, absolute
+    /// value, floor, and finite sums. Transcendental functions are rejected
+    /// until a separately reviewed range enclosure is implemented for them.
+    pub fn eval_interval(
+        &self,
+        vars: &[(&str, Interval)],
+    ) -> Result<Interval, ExprIntervalError> {
+        for (index, (name, _)) in vars.iter().enumerate() {
+            if vars[index + 1..].iter().any(|(other, _)| *other == *name) {
+                return Err(ExprIntervalError::DuplicateVariableBinding((*name).to_string()));
+            }
+        }
+        self.eval_interval_in_environment(vars)
+    }
+
+    fn eval_interval_in_environment(
+        &self,
+        vars: &[(&str, Interval)],
+    ) -> Result<Interval, ExprIntervalError> {
+        match self {
+            Expr::Var(name) => vars
+                .iter()
+                .find(|(candidate, _)| *candidate == name.as_str())
+                .map(|(_, value)| *value)
+                .ok_or_else(|| ExprIntervalError::MissingVariable(name.clone())),
+            Expr::Const(value) => Ok(Interval::point(*value)?),
+            Expr::BinOp(op, left, right) => {
+                let lhs = left.eval_interval_in_environment(vars)?;
+                let rhs = right.eval_interval_in_environment(vars)?;
+                match op {
+                    BinOp::Add => Ok(lhs.checked_add(rhs)),
+                    BinOp::Sub => Ok(lhs.checked_subtract(rhs)),
+                    BinOp::Mul => Ok(lhs.checked_multiply(rhs)),
+                    BinOp::Div => Ok(lhs.checked_divide(rhs)?),
+                    BinOp::Pow => {
+                        if rhs.lower() != rhs.upper() {
+                            return Err(ExprIntervalError::NonSingletonExponent);
+                        }
+                        let exponent = rhs.lower();
+                        if !exponent.is_finite() {
+                            return Err(ExprIntervalError::NonIntegerExponent);
+                        }
+                        if exponent.fract() != 0.0 {
+                            return Err(ExprIntervalError::NonIntegerExponent);
+                        }
+                        if exponent < i32::MIN as f64 || exponent > i32::MAX as f64 {
+                            return Err(ExprIntervalError::ExponentOutOfRange);
+                        }
+                        Ok(lhs.checked_powi(exponent as i32)?)
+                    }
+                }
+            }
+            Expr::Func(function, argument) => {
+                let value = argument.eval_interval_in_environment(vars)?;
+                match function {
+                    UnaryFn::Abs => Ok(value.absolute()),
+                    UnaryFn::Floor => Ok(Interval::new(value.lower().floor(), value.upper().floor())?),
+                    unsupported => Err(ExprIntervalError::UnsupportedFunction(*unsupported)),
+                }
+            }
+            Expr::Sum(body, var_name) => {
+                let upper = vars
+                    .iter()
+                    .find(|(name, _)| *name == "n")
+                    .map(|(_, value)| *value)
+                    .ok_or_else(|| ExprIntervalError::MissingVariable("n".to_string()))?;
+                if upper.lower() != upper.upper() {
+                    return Err(ExprIntervalError::NonSingletonSummationBound);
+                }
+                let bound = upper.lower();
+                if !bound.is_finite() || bound < 0.0 || bound.fract() != 0.0 {
+                    return Err(ExprIntervalError::InvalidSummationBound);
+                }
+                if bound > MAX_SUMMATION_UPPER_BOUND as f64 {
+                    return Err(ExprIntervalError::SummationLimitExceeded {
+                        bound: bound as u64,
+                        max: MAX_SUMMATION_UPPER_BOUND,
+                    });
+                }
+
+                let mut sum = Interval::point(0.0)?;
+                for k in 0..=(bound as u64) {
+                    // A summation binder shadows an outer variable with the
+                    // same name, just as it does in ordinary evaluation.
+                    let mut inner_vars: Vec<(&str, Interval)> = vars
+                        .iter()
+                        .copied()
+                        .filter(|(name, _)| *name != var_name.as_str())
+                        .collect();
+                    inner_vars.push((var_name.as_str(), Interval::point(k as f64)?));
+                    let term = body.eval_interval_in_environment(&inner_vars)?;
+                    sum = sum.checked_add(term);
+                }
+                Ok(sum)
+            }
+        }
     }
 
     /// Compatibility evaluator. Invalid or undefined expressions return NaN;
@@ -956,6 +1103,78 @@ mod domain_safe_simplification_tests {
         );
         let sum = Expr::Sum(Box::new(term), "k".into());
         assert!((sum.eval_checked(&[("n", 2.0)]).unwrap() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn interval_evaluation_encloses_polynomial_over_a_variable_range() {
+        let x_squared_minus_one = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::Const(1.0)),
+        );
+        let result = x_squared_minus_one
+            .eval_interval(&[("x", Interval::new(-2.0, 3.0).unwrap())])
+            .unwrap();
+        assert!(result.lower() <= -1.0);
+        assert!(result.upper() >= 8.0);
+        // The dedicated square operation preserves the nonnegative invariant
+        // before the subtraction, rather than reporting an impossible negative square.
+        let square = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(2.0)),
+        )
+        .eval_interval(&[("x", Interval::new(-2.0, 3.0).unwrap())])
+        .unwrap();
+        assert!(square.lower() >= 0.0);
+        assert!(square.upper() >= 9.0);
+    }
+
+    #[test]
+    fn interval_evaluation_checks_sum_scope_and_integer_exponents() {
+        let sum_k = Expr::Sum(Box::new(Expr::Var("k".into())), "k".into());
+        let result = sum_k
+            .eval_interval(&[
+                ("n", Interval::point(5.0).unwrap()),
+                ("k", Interval::point(99.0).unwrap()),
+            ])
+            .unwrap();
+        assert!(result.lower() <= 15.0 && result.upper() >= 15.0);
+
+        let fractional_power = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(0.5)),
+        );
+        assert_eq!(
+            fractional_power.eval_interval(&[("x", Interval::new(1.0, 4.0).unwrap())]),
+            Err(ExprIntervalError::NonIntegerExponent),
+        );
+
+        let zero_divisor = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Var("x".into())),
+        );
+        assert_eq!(
+            zero_divisor.eval_interval(&[("x", Interval::new(-1.0, 1.0).unwrap())]),
+            Err(ExprIntervalError::Interval(
+                IntervalError::DivisionByIntervalContainingZero
+            )),
+        );
+    }
+
+    #[test]
+    fn interval_evaluation_fails_closed_for_unbounded_transcendentals() {
+        let expression = Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".into())));
+        assert_eq!(
+            expression.eval_interval(&[("x", Interval::new(0.0, 1.0).unwrap())]),
+            Err(ExprIntervalError::UnsupportedFunction(UnaryFn::Exp)),
+        );
     }
 
     #[test]
