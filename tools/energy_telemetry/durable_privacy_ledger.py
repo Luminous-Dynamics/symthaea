@@ -391,11 +391,11 @@ class DurablePrivacyLedger:
             raise DurablePrivacyPolicyError("window_end_utc must be later than window_start_utc")
         if window_end_utc > reserved_at_utc + self.max_future_skew_for_ledger():
             raise DurablePrivacyPolicyError("release window end exceeds allowed future clock skew")
-        if recipient_class not in RECIPIENTS:
+        if not isinstance(recipient_class, str) or recipient_class not in RECIPIENTS:
             raise DurablePrivacyPolicyError("durable DP ledger only reserves research/public releases")
-        if mechanism not in MECHANISMS:
+        if not isinstance(mechanism, str) or mechanism not in MECHANISMS:
             raise DurablePrivacyPolicyError("unsupported differential-privacy mechanism")
-        if adjacency not in ADJACENCIES:
+        if not isinstance(adjacency, str) or adjacency not in ADJACENCIES:
             raise DurablePrivacyPolicyError("unsupported neighboring-dataset adjacency")
         if type(contribution_limit_wh) is not int or not 1 <= contribution_limit_wh <= 10**15:
             raise DurablePrivacyPolicyError("contribution_limit_wh must be a positive bounded integer")
@@ -410,6 +410,11 @@ class DurablePrivacyLedger:
             delta, scale=DELTA_SCALE, allow_zero=True,
             field="delta", maximum=MAX_RELEASE_DELTA_PICO,
         )
+        # Mechanism labels must agree with their privacy parameters.
+        if mechanism == "discrete_laplace" and delta_pico != 0:
+            raise DurablePrivacyPolicyError("discrete_laplace requires delta=0")
+        if mechanism == "gaussian" and delta_pico == 0:
+            raise DurablePrivacyPolicyError("gaussian mechanism requires positive delta")
 
         floor = self.minimum_cohort_size if minimum_cohort_size is None else minimum_cohort_size
         if type(floor) is not int or floor < self.minimum_cohort_size:
@@ -605,13 +610,13 @@ class DurablePrivacyLedger:
             db.execute("BEGIN IMMEDIATE")
             try:
                 row = db.execute(
-                    "SELECT receipt_sha256, status, output_sha256, output_bytes, reserved_at_utc "
+                    "SELECT receipt_sha256, status, output_sha256, output_bytes, reserved_at_utc, window_end_utc "
                     "FROM privacy_releases WHERE release_id = ?",
                     (release_id,),
                 ).fetchone()
                 if row is None:
                     raise DurablePrivacyPolicyError("cannot commit output without a reservation")
-                receipt_sha256, status, old_digest, old_bytes, reserved_at_text = row
+                receipt_sha256, status, old_digest, old_bytes, reserved_at_text, window_end_text = row
                 if status == "output_committed":
                     if old_digest != output_sha256 or old_bytes != output_bytes:
                         raise EventIdentityConflict(
@@ -623,6 +628,8 @@ class DurablePrivacyLedger:
                     )
                 if committed_text < reserved_at_text:
                     raise DurablePrivacyPolicyError("output commit time cannot precede its reservation")
+                if committed_text < window_end_text:
+                    raise DurablePrivacyPolicyError("output cannot be committed before its release window ends")
                 db.execute(
                     "UPDATE privacy_releases SET status='output_committed', output_sha256=?, "
                     "output_bytes=?, committed_at_utc=? WHERE release_id=? AND status='reserved'",
