@@ -677,6 +677,9 @@ class DurablePrivacyLedger:
         release_id: str,
         output_bytes: bytes,
         committed_at_utc: datetime,
+        attestation_bytes: bytes | None = None,
+        signature: bytes | None = None,
+        signer_key_sha256: str | None = None,
     ) -> CommittedPrivacyOutput:
         """Internal storage primitive: bind bytes after trusted attestation verification.
 
@@ -691,6 +694,20 @@ class DurablePrivacyLedger:
         if not isinstance(output_bytes, bytes) or not 1 <= len(output_bytes) <= MAX_DP_OUTPUT_BYTES:
             raise DurablePrivacyPolicyError("output_bytes must be non-empty and at most 1 MiB")
         output_sha256 = hashlib.sha256(output_bytes).hexdigest()
+        attestation_fields = (attestation_bytes, signature, signer_key_sha256)
+        if any(value is not None for value in attestation_fields) and not all(
+            value is not None for value in attestation_fields
+        ):
+            raise DurablePrivacyPolicyError("signed attestation bytes, signature and signer digest must be supplied together")
+        attestation_sha256 = None
+        if attestation_bytes is not None:
+            if not isinstance(attestation_bytes, bytes) or not 1 <= len(attestation_bytes) <= 16_384:
+                raise DurablePrivacyPolicyError("attestation bytes must be non-empty and at most 16 KiB")
+            if not isinstance(signature, bytes) or len(signature) != 64:
+                raise DurablePrivacyPolicyError("attestation signature must be exactly 64 bytes")
+            if not isinstance(signer_key_sha256, str) or not SHA256_RE.fullmatch(signer_key_sha256):
+                raise DurablePrivacyPolicyError("signer_key_sha256 must be a lowercase SHA-256 digest")
+            attestation_sha256 = hashlib.sha256(attestation_bytes).hexdigest()
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
@@ -707,6 +724,24 @@ class DurablePrivacyLedger:
                         raise EventIdentityConflict(
                             "release_id is already bound to different output bytes"
                         )
+                    stored_attestation = db.execute(
+                        "SELECT attestation_sha256, attestation_bytes, signature, signer_key_sha256 "
+                        "FROM privacy_release_attestations WHERE release_id = ?",
+                        (release_id,),
+                    ).fetchone()
+                    if attestation_bytes is None:
+                        if stored_attestation is not None:
+                            raise DurablePrivacyPolicyError(
+                                "attested output retries must use the signed-attestation verifier"
+                            )
+                    else:
+                        expected_attestation = (
+                            attestation_sha256, attestation_bytes, signature, signer_key_sha256
+                        )
+                        if stored_attestation is None or tuple(stored_attestation) != expected_attestation:
+                            raise EventIdentityConflict(
+                                "release_id is already bound to different or missing attestation evidence"
+                            )
                     db.execute("COMMIT")
                     return CommittedPrivacyOutput(
                         release_id, receipt_sha256, old_digest, old_bytes, True
@@ -720,6 +755,13 @@ class DurablePrivacyLedger:
                     "output_bytes=?, committed_at_utc=? WHERE release_id=? AND status='reserved'",
                     (output_sha256, output_bytes, committed_text, release_id),
                 )
+                if attestation_bytes is not None:
+                    db.execute(
+                        "INSERT INTO privacy_release_attestations "
+                        "(release_id, attestation_sha256, attestation_bytes, signature, signer_key_sha256) "
+                        "VALUES (?,?,?,?,?)",
+                        (release_id, attestation_sha256, attestation_bytes, signature, signer_key_sha256),
+                    )
                 db.execute("COMMIT")
                 return CommittedPrivacyOutput(
                     release_id, receipt_sha256, output_sha256, output_bytes, False
@@ -729,7 +771,7 @@ class DurablePrivacyLedger:
                     db.execute("ROLLBACK")
                 raise
 
-    def committed_output(self, release_id: str) -> CommittedPrivacyOutput:
+    def _committed_output_storage(self, release_id: str) -> CommittedPrivacyOutput:
         if not isinstance(release_id, str) or not RELEASE_ID_RE.fullmatch(release_id):
             raise DurablePrivacyPolicyError("release_id must be a random 32-character lowercase hex ID")
         with self._connection() as db:
@@ -743,6 +785,35 @@ class DurablePrivacyLedger:
         if not isinstance(row[3], bytes) or hashlib.sha256(row[3]).hexdigest() != row[2]:
             raise TelemetryQueueError("committed privacy output digest mismatch")
         return CommittedPrivacyOutput(release_id, row[0], row[2], row[3], True)
+
+    def _stored_attestation(
+        self, release_id: str
+    ) -> tuple[bytes, bytes, str, datetime]:
+        """Load retained signature evidence only after checking its stored digest."""
+        if not isinstance(release_id, str) or not RELEASE_ID_RE.fullmatch(release_id):
+            raise DurablePrivacyPolicyError("release_id must be a random 32-character lowercase hex ID")
+        with self._connection() as db:
+            row = db.execute(
+                "SELECT a.attestation_sha256, a.attestation_bytes, a.signature, "
+                "a.signer_key_sha256, r.status, r.committed_at_utc "
+                "FROM privacy_release_attestations a "
+                "JOIN privacy_releases r ON r.release_id = a.release_id "
+                "WHERE a.release_id = ?",
+                (release_id,),
+            ).fetchone()
+        if row is None or row[4] != "output_committed":
+            raise DurablePrivacyPolicyError("release has no retained signed attestation")
+        if (
+            not isinstance(row[1], bytes)
+            or hashlib.sha256(row[1]).hexdigest() != row[0]
+            or not isinstance(row[2], bytes)
+            or len(row[2]) != 64
+            or not isinstance(row[3], str)
+            or not SHA256_RE.fullmatch(row[3])
+            or not isinstance(row[5], str)
+        ):
+            raise TelemetryQueueError("stored signed-attestation evidence failed integrity checks")
+        return row[1], row[2], row[3], self._parse_timestamp(row[5])
 
     def integrity_check(self) -> str:
         with self._connection() as db:
