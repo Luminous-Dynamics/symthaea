@@ -16,7 +16,7 @@ import os
 import sqlite3
 from typing import Iterator
 
-from tools.energy_telemetry.authenticated_envelope import SealedTelemetry
+from tools.energy_telemetry.authenticated_envelope import SealedTelemetry, verify_ack
 from tools.energy_telemetry.store_forward import (
     EventIdentityConflict,
     QueueCapacityError,
@@ -522,6 +522,41 @@ class DurableTelemetryQueue:
     def acknowledge(
         self, *, event_id: str, payload_sha256: str, now_utc: datetime
     ) -> str:
+        """Acknowledge metadata-only events; protected envelopes require signed ACKs."""
+        return self._acknowledge(
+            event_id=event_id,
+            payload_sha256=payload_sha256,
+            now_utc=now_utc,
+            protected_ack=False,
+        )
+
+    def acknowledge_protected(
+        self,
+        ack_bytes: bytes,
+        *,
+        verification_keys: dict[str, object],
+        now_utc: datetime,
+    ) -> str:
+        """Verify a receiver-signed ACK before committing protected delivery state."""
+        self._timestamp(now_utc)
+        ack = verify_ack(ack_bytes, verification_keys=verification_keys)
+        if ack.acknowledged_at_utc > now_utc + self.max_future_skew:
+            raise TelemetryQueueError("ACK timestamp exceeds permitted future clock skew")
+        return self._acknowledge(
+            event_id=ack.event_id,
+            payload_sha256=ack.payload_sha256,
+            now_utc=now_utc,
+            protected_ack=True,
+        )
+
+    def _acknowledge(
+        self,
+        *,
+        event_id: str,
+        payload_sha256: str,
+        now_utc: datetime,
+        protected_ack: bool,
+    ) -> str:
         now_text = self._timestamp(now_utc)
         if not isinstance(event_id, str) or len(event_id) != 32 or any(ch not in "0123456789abcdef" for ch in event_id):
             raise TelemetryQueueError("ack event_id must be a 32-character lowercase hexadecimal ID")
@@ -538,6 +573,15 @@ class DurableTelemetryQueue:
                     raise TelemetryQueueError("ack references no pending event")
                 event = self._row_event(row)
                 status, attempts = row[10], row[11]
+                has_protected_bytes = row[14] is not None
+                if has_protected_bytes and not protected_ack:
+                    raise TelemetryQueueError(
+                        "protected envelope requires an authenticated receiver ACK"
+                    )
+                if protected_ack and not has_protected_bytes:
+                    raise TelemetryQueueError(
+                        "authenticated receiver ACK cannot acknowledge a metadata-only event"
+                    )
                 if status == "delivered" and event.payload_sha256 == payload_sha256:
                     db.execute("COMMIT")
                     return "idempotent_ack"
