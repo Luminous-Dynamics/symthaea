@@ -28,6 +28,15 @@ from voice_asr_score import (
     sha256_file,
 )
 
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        value[key] = item
+    return value
+
+
 OUTCOME_KEYS = {
     "id", "language", "detected_language", "language_confidence", "transcript",
     "word_error_rate", "character_error_rate", "entity_preservation",
@@ -51,6 +60,7 @@ def read_outcomes(path: Path) -> tuple[list[dict[str, Any]], str]:
                         parse_constant=lambda value: (_ for _ in ()).throw(
                             ValueError(f"non-standard JSON numeric constant {value}")
                         ),
+                        object_pairs_hook=_unique_object,
                     )
                 except (json.JSONDecodeError, ValueError) as exc:
                     raise ValueError(f"malformed outcome JSON on line {line_number}: {exc}") from exc
