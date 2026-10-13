@@ -209,7 +209,7 @@ pub fn rescore(samples: &[PilotSample], outcomes: &[PilotOutcome]) -> Vec<PilotO
 
 /// Normalize signed PCM using the asymmetric two's-complement endpoints.
 fn normalize_integer_sample(sample: i32, bits_per_sample: u16) -> Result<f32, String> {
-    if bits_per_sample == 0 || bits_per_sample > 32 {
+    if bits_per_sample < 2 || bits_per_sample > 32 {
         return Err("unsupported integer WAV bit depth".into());
     }
     let negative_scale = (1_i64 << (bits_per_sample - 1)) as f64;
@@ -301,6 +301,7 @@ mod pcm_normalization_tests {
     #[test]
     fn pcm_normalization_rejects_unsupported_bit_depth() {
         assert!(normalize_integer_sample(0, 0).is_err());
+        assert!(normalize_integer_sample(0, 1).is_err());
         assert!(normalize_integer_sample(0, 33).is_err());
     }
 
