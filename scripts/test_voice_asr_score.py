@@ -16,6 +16,7 @@ from voice_asr_score import (
     _read_json,
     normalize_text,
     score_predictions,
+    sha256_file,
     write_report_exclusive,
 )
 from voice_dataset_intake import audit_dataset
@@ -33,6 +34,18 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.model_root = self.base / "model-export"
         self.model_root.mkdir()
         (self.model_root / "config.json").write_text('{"synthetic": true}\n', encoding="utf-8")
+        (self.model_root / "model.bin").write_bytes(b"synthetic converted model artifact")
+        self.runtime_binary = self.base / "whisper-cli"
+        self.runtime_binary.write_bytes(b"synthetic whisper runtime executable")
+        self.runtime = {
+            "kind": "whisper.cpp",
+            "runtime_commit": "d" * 40,
+            "converter_commit": "e" * 40,
+            "runtime_binary_sha256": sha256_file(self.runtime_binary),
+            "artifact_path": "model.bin",
+            "artifact_sha256": sha256_file(self.model_root / "model.bin"),
+            "quantization": "f16",
+        }
         self.model_id = "BuzzASR/afrikaans"
         self.model_revision = "a" * 40
         self.model_license = "MIT"
@@ -101,6 +114,8 @@ class VoiceAsrScoreTests(unittest.TestCase):
             "model_id": self.model_id,
             "model_revision": self.model_revision,
             "model_license": self.model_license,
+            "outcomes_sha256": "f" * 64,
+            "runtime": copy.deepcopy(self.runtime),
             "predictions": hypotheses,
         }
 
@@ -122,6 +137,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
             model_license=kwargs.pop("model_license", self.model_license),
             locale=kwargs.pop("locale", self.locale),
             intake_report_path=kwargs.pop("intake_report_path", self.intake_path),
+            runtime_binary_path=kwargs.pop("runtime_binary_path", self.runtime_binary),
             mode=kwargs.pop("mode", "smoke"),
             bootstrap_iterations=kwargs.pop("bootstrap_iterations", 100),
             **kwargs,
@@ -134,7 +150,10 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertAlmostEqual(report["metrics"]["wer"], 2 / 10)
         self.assertLessEqual(report["confidence_intervals_95"]["wer"]["low_95"],
                              report["confidence_intervals_95"]["wer"]["high_95"])
-        self.assertEqual(report["model"]["snapshot_file_count"], 1)
+        self.assertEqual(report["model"]["snapshot_file_count"], 2)
+        self.assertEqual(report["runtime"]["kind"], "whisper.cpp")
+        self.assertEqual(report["runtime"]["quantization"], "f16")
+        self.assertEqual(report["inputs"]["outcomes_sha256"], "f" * 64)
         self.assertEqual(report["mode"], "smoke")
         self.assertIn("exploratory smoke metric only", report["interpretation"])
         self.assertEqual(report["training_data_overlap_status"], "not_assessed")
@@ -186,6 +205,22 @@ class VoiceAsrScoreTests(unittest.TestCase):
     def test_model_identity_drift_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "model_revision mismatch"):
             self.score(model_revision="b" * 40)
+
+    def test_runtime_binary_drift_fails_closed(self):
+        self.runtime_binary.write_bytes(b"updated runtime binary")
+        with self.assertRaisesRegex(ValueError, "runtime binary SHA-256 differs"):
+            self.score()
+
+    def test_converted_model_artifact_drift_fails_closed(self):
+        (self.model_root / "model.bin").write_bytes(b"updated converted model")
+        with self.assertRaisesRegex(ValueError, "runtime model artifact SHA-256 differs"):
+            self.score()
+
+    def test_runtime_commit_must_be_pinned(self):
+        doc = copy.deepcopy(self.pred_doc)
+        doc["runtime"]["runtime_commit"] = "unversioned"
+        with self.assertRaisesRegex(ValueError, "runtime.runtime_commit must be a 40-hex commit SHA"):
+            self.score(prediction_doc=doc)
 
     def test_archive_drift_fails_closed_against_intake_receipt(self):
         self.archive.write_bytes(b"modified archive")
