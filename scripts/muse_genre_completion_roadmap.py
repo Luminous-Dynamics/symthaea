@@ -575,7 +575,9 @@ EXTENSION_CANDIDATES=json.loads(r'''[
     "priority": "P2",
     "rationale": "Candidate for a dedicated study of instrumental interaction, phrasing and ornament rather than a generic samba preset.",
     "sources": [
-      "https://doi.org/10.1080/09298215.2020.1797109"
+      "https://doi.org/10.1080/09298215.2020.1797109",
+      "https://github.com/DCMLab/choro/tree/fe409c62deed50fc7f4b0d667863cd13ab230ff6",
+      "https://github.com/DCMLab/choro/blob/fe409c62deed50fc7f4b0d667863cd13ab230ff6/LICENSE"
     ]
   },
   {
@@ -919,6 +921,20 @@ SOURCE_ASSESSMENTS=json.loads(r'''{
     "scope": "tradition_specific_context",
     "supports": "A UNESCO record detailing Dominican Bachata's social context, instrumentation, rhythmic outline, song, and dance.",
     "does_not_establish": "The record is a point of cultural grounding, not complete implementation evidence or permission for authenticity claims."
+  },
+  "https://github.com/DCMLab/choro/tree/fe409c62deed50fc7f4b0d667863cd13ab230ff6": {
+    "source_kind": "scholarly_corpus_repository_pinned_commit",
+    "scope": "tradition_specific_context",
+    "supports": "The DCMLab Choro Songbooks Corpus repository README describes a corpus of 295 pieces and provides annotations for key, meter, form paths/phrases/parts, chord positions, chord types/extensions, and available composition-year/subgenre metadata.",
+    "does_not_establish": "The corpus is based on published Choro Songbook material and is not a universal sample of all Choro practice; repository metadata does not establish commercial reuse permission or that any Muse generator is faithful.",
+    "source_pin": "fe409c62deed50fc7f4b0d667863cd13ab230ff6"
+  },
+  "https://github.com/DCMLab/choro/blob/fe409c62deed50fc7f4b0d667863cd13ab230ff6/LICENSE": {
+    "source_kind": "corpus_license_text_pinned_commit",
+    "scope": "license_and_reuse_constraint",
+    "supports": "The repository LICENSE identifies Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0).",
+    "does_not_establish": "This is not legal advice and does not settle rights in third-party musical works represented by the transcriptions; do not use corpus data for commercial training or redistribute extracted data without legal clearance or separate permission.",
+    "source_pin": "fe409c62deed50fc7f4b0d667863cd13ab230ff6"
   }
 }''')
 BASE_EVIDENCE_GATES=["versioned grammar/recipe contract names target behavior and known limits","one-factor response curves run through actual routed composition path","candidate non-target invariants reported separately from target fidelity","fixed-seed response and exact source/artifact digests are complete","nearest-neighbor distinctness/collision analysis is published","renderer substitutions and unavailable layers are disclosed"]

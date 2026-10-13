@@ -59,3 +59,15 @@ These are evidence-routing labels, not quality scores or culture rankings. They 
 
 Where a candidate currently has directory-only sources, it remains outside the registry and is assigned a source-upgrade gate. This is intentional visible incompleteness, not a reason to invent source confidence. The generator fails closed if a candidate links to a URL without an explicit assessment entry, and tests enforce that all sixty candidate records carry their source assessments and remain proposal-only.
 
+## Pilot: Choro — a falsifiable research contract, not a new runtime style
+
+Choro is the first candidate with an explicit hypothesis pack because a published corpus study is available: Moss, Souza and Rohrmeier analyzed the harmony and form of 295 representative Choro Songbook pieces. The paper reports phrase/hypermeter findings for regular 16- and 32-bar phrases, differences in chord/key transitions within pieces, and a historical relation between composition year and chord modifications. These observations motivate replication hypotheses; they are **not** results produced by Symthaea.
+
+The new machine-readable research specification defines four falsifiable or explicitly gated questions: form/hypermeter, context-sensitive harmonic transitions, historical chord modifications, and subtype/rhythmic phrasing. It specifies fields, operationalizations, constrained nulls, falsification conditions, and route-promotion gates. No effect-size threshold is invented: thresholds must be registered after rights review and an eligibility/power audit, but before evaluating the data.
+
+The rhythm question is deliberately marked not testable from the chord/form corpus alone. Mário Sève's article describes historically situated phrase and rhythmic transformations, including polca-lundu, tango brasileiro, choro-amaxixado and choro-sambado; those require separate, rights-cleared note-onset/score evidence and expert review rather than being inferred from chord labels.
+
+**Licensing gate:** the cited DCMLab Choro Songbooks Corpus is pinned to commit fe409c62deed50fc7f4b0d667863cd13ab230ff6, and its LICENSE identifies CC BY-NC-SA 4.0. This branch does not copy or ingest the corpus. Before empirical analysis for a commercial system, obtain a suitable permission/legal review or select an independently rights-cleared source; a repository's availability does not grant commercial training rights. The spec separates scholarly findings and field-schema discovery from permission to use the transcribed musical material.
+
+The only work committed now is the research specification and its integrity test. Choro remains outside the catalog, has no composer route, and is not represented as implemented or culturally validated.
+

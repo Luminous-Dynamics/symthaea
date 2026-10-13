@@ -30,6 +30,25 @@ class GenreCompletionRoadmapTests(unittest.TestCase):
   directory_only=[e for e in q if e["source_evidence_state"]=="discovery_only"]
   self.assertTrue(directory_only); self.assertTrue(all("directory-only" in e["next_gate"] for e in directory_only))
   self.assertTrue(all(e["catalog_id"] is None and e["state"]=="proposal_only_not_in_catalog" for e in q))
+ def test_choro_pilot_is_bounded_falsifiable_and_license_gated(self):
+  path=ROOT/"crates/domains/symthaea-muse/CHORO_GRAMMAR_RESEARCH_SPEC_V1.json"
+  spec=json.loads(path.read_text(encoding="utf-8"))
+  self.assertEqual(spec["schema"],"muse-genre-specific-research-spec-v1")
+  self.assertEqual(spec["identity"]["name"],"Choro")
+  self.assertIsNone(spec["identity"]["catalog_id"]); self.assertIsNone(spec["identity"]["composer_route"])
+  self.assertFalse(spec["decision_boundary"]["implementation_started"])
+  self.assertFalse(spec["decision_boundary"]["runtime_capability_claimed"])
+  self.assertFalse(spec["decision_boundary"]["source_data_copied_into_symthaea"])
+  license=spec["license_and_data_handling"]
+  self.assertEqual(license["repository_license"],"CC BY-NC-SA 4.0")
+  self.assertFalse(license["commercial_use_authorized_by_this_spec"])
+  self.assertTrue(any("permission" in x.lower() or "legal review" in x.lower() for x in license["before_empirical_analysis"]))
+  hs=spec["hypotheses"]; self.assertGreaterEqual(len(hs),4); self.assertEqual(len({h["id"] for h in hs}),len(hs))
+  self.assertTrue(all(h["state"] in {"proposed_falsifiable_hypothesis_not_tested","research_question_not_testable_from_chord_form_corpus_alone"} for h in hs))
+  self.assertTrue(all(h.get("evidence_basis") or h.get("required_additional_evidence") for h in hs))
+  self.assertTrue(all(h.get("operationalization") and h.get("falsification_or_no_pass") and h.get("null_model") is not None for h in hs if h["state"]=="proposed_falsifiable_hypothesis_not_tested"))
+  self.assertTrue(any("held-out-by-composition" in x for x in spec["route_promotion_gates"]))
+  self.assertTrue(any("knowledgeable Choro" in x for x in spec["route_promotion_gates"]))
  def test_focus_parser_fails_closed_on_missing_entry(self):
   s=(ROOT/"crates/domains/symthaea-muse-protocol/src/catalog.rs").read_text(encoding="utf-8"); self.assertEqual(len(parse_grammar_foci(s,160)),160); s=s.replace('        "South African bubblegum pop song",\n',"",1)
   with self.assertRaisesRegex(CoverageError,"cardinality mismatch|does not match"): parse_grammar_foci(s,160)
