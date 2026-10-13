@@ -375,3 +375,104 @@ def open_envelope(
         encryption_key_id=encryption_key_id,
         signer_key_id=signer_key_id,
     )
+
+
+@dataclass(frozen=True)
+class AuthenticatedAck:
+    """Receiver-signed acceptance of one exact protected envelope."""
+
+    receiver_key_id: str
+    event_id: str
+    payload_sha256: str
+    acknowledged_at_utc: datetime
+    disposition: str = "accepted"
+
+
+ACK_VERSION = "telemetry-ack/v1"
+ACK_ID_RE = EVENT_ID_RE
+DIGEST_RE = re.compile(r"^[a-f0-9]{64}$")
+MAX_ACK_BYTES = 2_048
+
+
+def create_ack(
+    *,
+    receiver_key_id: str,
+    event_id: str,
+    payload_sha256: str,
+    acknowledged_at_utc: datetime,
+    signing_key: Ed25519PrivateKey,
+) -> bytes:
+    """Sign a positive ACK after receiver-side durable acceptance has committed."""
+    receiver_key_id = _key_id(receiver_key_id, "receiver_key_id")
+    if not isinstance(event_id, str) or not ACK_ID_RE.fullmatch(event_id):
+        raise EnvelopeError("ack event_id must be a 32-character lowercase hexadecimal ID")
+    if not isinstance(payload_sha256, str) or not DIGEST_RE.fullmatch(payload_sha256):
+        raise EnvelopeError("ack payload digest must be a lowercase SHA-256 digest")
+    if not isinstance(signing_key, Ed25519PrivateKey):
+        raise EnvelopeError("ACK signing_key must be an Ed25519 private key")
+    _utc(acknowledged_at_utc, "acknowledged_at_utc")
+    unsigned = {
+        "acknowledged_at_utc": _timestamp(acknowledged_at_utc),
+        "disposition": "accepted",
+        "event_id": event_id,
+        "payload_sha256": payload_sha256,
+        "receiver_key_id": receiver_key_id,
+        "version": ACK_VERSION,
+    }
+    signature = signing_key.sign(_canonical_json(unsigned))
+    full = dict(unsigned)
+    full["signature"] = _b64(signature)
+    encoded = _canonical_json(full)
+    if len(encoded) > MAX_ACK_BYTES:
+        raise EnvelopeError("authenticated ACK exceeds maximum size")
+    return encoded
+
+
+def verify_ack(
+    ack_bytes: bytes,
+    *,
+    verification_keys: Mapping[str, Ed25519PublicKey],
+) -> AuthenticatedAck:
+    """Verify a canonical receiver ACK; unknown signers and fields fail closed."""
+    if not isinstance(ack_bytes, bytes) or not 1 <= len(ack_bytes) <= MAX_ACK_BYTES:
+        raise EnvelopeError("authenticated ACK is outside the supported byte limit")
+    value = _strict_json(ack_bytes)
+    expected = {
+        "version", "receiver_key_id", "event_id", "payload_sha256",
+        "acknowledged_at_utc", "disposition", "signature",
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise EnvelopeError("ACK has unknown or missing fields")
+    if value["version"] != ACK_VERSION:
+        raise EnvelopeError("unsupported ACK version")
+    if value["disposition"] != "accepted":
+        raise EnvelopeError("only a positive accepted ACK can commit delivery")
+    receiver_key_id = _key_id(value["receiver_key_id"], "receiver_key_id")
+    event_id = value["event_id"]
+    if not isinstance(event_id, str) or not ACK_ID_RE.fullmatch(event_id):
+        raise EnvelopeError("ack event_id must be a 32-character lowercase hexadecimal ID")
+    payload_sha256 = value["payload_sha256"]
+    if not isinstance(payload_sha256, str) or not DIGEST_RE.fullmatch(payload_sha256):
+        raise EnvelopeError("ack payload digest must be a lowercase SHA-256 digest")
+    acknowledged_at_utc = _parse_timestamp(
+        value["acknowledged_at_utc"], "acknowledged_at_utc"
+    )
+    if _canonical_json(value) != ack_bytes:
+        raise EnvelopeError("ACK is not canonical JSON")
+    signature = _unb64(value["signature"], "signature", exact_length=SIGNATURE_BYTES)
+    verification_key = verification_keys.get(receiver_key_id)
+    if not isinstance(verification_key, Ed25519PublicKey):
+        raise EnvelopeAuthenticationError("no trusted Ed25519 key for ACK receiver")
+    unsigned = dict(value)
+    del unsigned["signature"]
+    try:
+        verification_key.verify(signature, _canonical_json(unsigned))
+    except InvalidSignature as exc:
+        raise EnvelopeAuthenticationError("receiver ACK signature verification failed") from exc
+    return AuthenticatedAck(
+        receiver_key_id=receiver_key_id,
+        event_id=event_id,
+        payload_sha256=payload_sha256,
+        acknowledged_at_utc=acknowledged_at_utc,
+        disposition="accepted",
+    )
