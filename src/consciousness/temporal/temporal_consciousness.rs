@@ -175,8 +175,11 @@ pub struct PhiTrajectory {
     /// Current Φ velocity (dΦ/dt)
     pub velocity: f64,
 
-    /// Current Φ acceleration (d²Φ/dt²)
+    /// Current Φ acceleration (d²Φ/dt²), measured only after two velocity intervals.
     pub acceleration: f64,
+
+    /// Whether acceleration has enough retained samples to be measured.
+    pub acceleration_available: bool,
 
     /// Φ stability (inverse of variance)
     pub stability: f64,
@@ -213,6 +216,7 @@ impl PhiTrajectory {
             ema_time_constant_secs,
             velocity: 0.0,
             acceleration: 0.0,
+            acceleration_available: false,
             stability: 1.0,
             trend: 0,
             ema: 0.5,
@@ -280,19 +284,45 @@ impl PhiTrajectory {
             return;
         }
 
-        // Compute velocity (rate of change)
+        // Velocity is a finite difference over the latest observed interval.
         let len = self.history.len();
         let (t1, phi1) = self.history[len - 2];
         let (t2, phi2) = self.history[len - 1];
 
         let dt = t2.saturating_sub(t1).as_secs_f64();
-        if dt > 0.0 {
-            let new_velocity = (phi2 - phi1) / dt;
+        if dt <= 0.0 {
+            return;
+        }
+        let new_velocity = (phi2 - phi1) / dt;
+        self.velocity = new_velocity;
 
-            // Compute acceleration
-            let old_velocity = self.velocity;
-            self.acceleration = (new_velocity - old_velocity) / dt.max(0.001);
-            self.velocity = new_velocity;
+        // Acceleration requires two velocity estimates, hence three observations.
+        // Each velocity belongs at its interval midpoint. With irregular sampling,
+        // adjacent velocity midpoints are separated by (dt_previous + dt) / 2,
+        // not simply by the most recent interval length.
+        if len >= 3 {
+            let (t0, phi0) = self.history[len - 3];
+            let previous_dt = t1.saturating_sub(t0).as_secs_f64();
+            let midpoint_delta = (previous_dt + dt) / 2.0;
+
+            if previous_dt > 0.0 && midpoint_delta > 0.0 {
+                let previous_velocity = (phi1 - phi0) / previous_dt;
+                let acceleration = (new_velocity - previous_velocity) / midpoint_delta;
+                if acceleration.is_finite() {
+                    self.acceleration = acceleration;
+                    self.acceleration_available = true;
+                } else {
+                    self.acceleration = 0.0;
+                    self.acceleration_available = false;
+                }
+            } else {
+                self.acceleration = 0.0;
+                self.acceleration_available = false;
+            }
+        } else {
+            // A default zero must not be presented as a measured acceleration.
+            self.acceleration = 0.0;
+            self.acceleration_available = false;
         }
 
         // Compute stability (inverse variance)
@@ -1152,6 +1182,7 @@ impl TemporalConsciousnessAnalyzer {
             health_status: self.health_status(),
             phi_velocity: self.phi_trajectory.velocity,
             phi_acceleration: self.phi_trajectory.acceleration,
+            phi_acceleration_available: self.phi_trajectory.acceleration_available,
             phi_stability: self.phi_trajectory.stability,
             phi_trend: self.phi_trajectory.trend,
             continuity_score: self.continuity.score,
@@ -1299,7 +1330,10 @@ pub struct TemporalConsciousnessReport {
 
     // Φ Trajectory
     pub phi_velocity: f64,
+    /// Acceleration value; see availability flag before interpreting the number.
     pub phi_acceleration: f64,
+    /// False until two distinct velocity intervals can be compared.
+    pub phi_acceleration_available: bool,
     pub phi_stability: f64,
     pub phi_trend: i8,
 
@@ -1356,7 +1390,7 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ Φ TRAJECTORY                                                             ║
 ║   Velocity:     {:>+.4} Φ/s   (rate of change)                           ║
-║   Acceleration: {:>+.4} Φ/s²  (change of change)                         ║
+║   Acceleration: {:>9} Φ/s²  (change of change)                         ║
 ║   Stability:    {:>.4}       (inverse variance)                          ║
 ║   Trend:        {}                                                       ║
 ╠══════════════════════════════════════════════════════════════════════════╣
@@ -1399,7 +1433,11 @@ impl std::fmt::Display for TemporalConsciousnessReport {
                 "IMPOSSIBLE"
             },
             self.phi_velocity,
-            self.phi_acceleration,
+            if self.phi_acceleration_available {
+                format!("{:+.4}", self.phi_acceleration)
+            } else {
+                "N/A".to_string()
+            },
             self.phi_stability,
             match self.phi_trend {
                 1 => "↑ Rising",
@@ -1691,6 +1729,33 @@ mod tests {
         assert!(trajectory.observe_at(0.2, Duration::ZERO));
         assert!(trajectory.observe_at(0.4, Duration::from_secs(2)));
         assert!((trajectory.velocity - 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn phi_acceleration_is_unavailable_until_two_velocity_intervals_exist() {
+        let mut trajectory = PhiTrajectory::new(8);
+        assert!(trajectory.observe_at(0.2, Duration::ZERO));
+        assert!(!trajectory.acceleration_available);
+
+        assert!(trajectory.observe_at(0.3, Duration::from_secs(1)));
+        assert!(!trajectory.acceleration_available);
+
+        assert!(trajectory.observe_at(0.9, Duration::from_secs(4)));
+        assert!(trajectory.acceleration_available);
+        // v₁ = (0.3 - 0.2) / 1 = 0.1; v₂ = (0.9 - 0.3) / 3 = 0.2.
+        // Their interval midpoints are two seconds apart, so acceleration = 0.05.
+        assert!((trajectory.velocity - 0.2).abs() < 1e-12);
+        assert!((trajectory.acceleration - 0.05).abs() < 1e-12);
+    }
+
+    #[test]
+    fn temporal_report_does_not_render_unmeasured_acceleration_as_zero() {
+        let analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        let report = analyzer.report();
+
+        assert!(!report.phi_acceleration_available);
+        assert!(report.to_string().contains("N/A Φ/s²"));
     }
 
     #[test]
