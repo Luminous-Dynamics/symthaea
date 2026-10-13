@@ -9,10 +9,12 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+import hashlib
 import os
 import sqlite3
 from typing import Iterator
 
+from tools.energy_telemetry.authenticated_envelope import SealedTelemetry
 from tools.energy_telemetry.store_forward import (
     EventIdentityConflict,
     QueueCapacityError,
@@ -23,8 +25,19 @@ from tools.energy_telemetry.store_forward import (
     make_transmission,
 )
 
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 _APPLICATION_ID = 0x53594D54  # ASCII 'SYMT'; identifies this SQLite file format
+
+
+@__import__("dataclasses").dataclass(frozen=True)
+class QueuedProtectedTransmission:
+    """Exact persisted protected bytes selected for at-least-once delivery."""
+
+    event: TelemetryEvent
+    envelope_bytes: bytes
+    evidence_state: str
+    actionable: bool
+    attempt_count: int
 
 
 class DurableTelemetryQueue:
@@ -118,7 +131,7 @@ class DurableTelemetryQueue:
     def _initialize(self) -> None:
         with self._connection() as db:
             version = db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1, _SCHEMA_VERSION):
+            if version not in (0, 1, 2, _SCHEMA_VERSION):
                 raise TelemetryQueueError(f"unsupported telemetry queue schema version: {version}")
             application_id = db.execute("PRAGMA application_id").fetchone()[0]
             if application_id not in (0, _APPLICATION_ID):
@@ -153,6 +166,7 @@ class DurableTelemetryQueue:
                     quality TEXT NOT NULL,
                     payload_sha256 TEXT NOT NULL,
                     wire_size_bytes INTEGER NOT NULL CHECK(wire_size_bytes BETWEEN 1 AND 65536),
+                    envelope_bytes BLOB,
                     status TEXT NOT NULL CHECK(status IN ('pending', 'delivered', 'expired')),
                     attempt_count INTEGER NOT NULL DEFAULT 0 CHECK(attempt_count >= 0),
                     accepted_at_utc TEXT NOT NULL,
@@ -164,6 +178,14 @@ class DurableTelemetryQueue:
                 )
                 """
             )
+            # Additive migration for databases created before ciphertext
+            # persistence. If a process stops after ALTER TABLE but before
+            # user_version advances, reopening sees the column and safely resumes.
+            event_columns = {
+                row[1] for row in db.execute("PRAGMA table_info(telemetry_events)").fetchall()
+            }
+            if "envelope_bytes" not in event_columns:
+                db.execute("ALTER TABLE telemetry_events ADD COLUMN envelope_bytes BLOB")
             db.execute(
                 """
                 CREATE INDEX IF NOT EXISTS telemetry_pending_order
@@ -256,7 +278,7 @@ class DurableTelemetryQueue:
         return (
             "event_id, domain, source_sequence, observed_at_utc, expires_at_utc, "
             "max_action_age_seconds, priority, quality, payload_sha256, wire_size_bytes, "
-            "status, attempt_count, accepted_at_utc, terminal_at_utc"
+            "status, attempt_count, accepted_at_utc, terminal_at_utc, envelope_bytes"
         )
 
     @staticmethod
@@ -284,6 +306,26 @@ class DurableTelemetryQueue:
             return db.execute("SELECT COUNT(*) FROM telemetry_events").fetchone()[0]
 
     def enqueue(self, event: TelemetryEvent, *, now_utc: datetime) -> str:
+        """Enqueue metadata-only event; it cannot be selected by protected delivery."""
+        return self._enqueue(event, envelope_bytes=None, now_utc=now_utc)
+
+    def enqueue_protected(self, sealed: SealedTelemetry, *, now_utc: datetime) -> str:
+        """Persist exactly the canonical signed ciphertext created by seal_payload."""
+        if not isinstance(sealed, SealedTelemetry):
+            raise TelemetryQueueError("enqueue_protected requires a SealedTelemetry result")
+        try:
+            sealed.validate_binding()
+        except ValueError as exc:
+            raise TelemetryQueueError(f"protected envelope binding is invalid: {exc}") from exc
+        if hashlib.sha256(sealed.envelope_bytes).hexdigest() != sealed.event.payload_sha256:
+            raise TelemetryQueueError("protected envelope digest mismatch")
+        if len(sealed.envelope_bytes) != sealed.event.wire_size_bytes:
+            raise TelemetryQueueError("protected envelope wire size mismatch")
+        return self._enqueue(sealed.event, envelope_bytes=sealed.envelope_bytes, now_utc=now_utc)
+
+    def _enqueue(
+        self, event: TelemetryEvent, *, envelope_bytes: bytes | None, now_utc: datetime
+    ) -> str:
         now_text = self._timestamp(now_utc)
         event.validate()
         if event.observed_at_utc > now_utc + self.max_future_skew:
@@ -308,6 +350,10 @@ class DurableTelemetryQueue:
                     if not self._same_event(existing, event):
                         raise EventIdentityConflict(
                             "event_id was reused with different event contents"
+                        )
+                    if existing[14] != envelope_bytes:
+                        raise EventIdentityConflict(
+                            "event_id replay changed or omitted the protected envelope bytes"
                         )
                     if existing[10] == "pending":
                         result = "duplicate_pending"
@@ -336,15 +382,15 @@ class DurableTelemetryQueue:
                     INSERT INTO telemetry_events (
                         event_id, domain, source_sequence, observed_at_utc, expires_at_utc,
                         max_action_age_seconds, priority, quality, payload_sha256, wire_size_bytes,
-                        status, attempt_count, accepted_at_utc, terminal_at_utc
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                        status, attempt_count, accepted_at_utc, terminal_at_utc, envelope_bytes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
                     """,
                     (
                         event.event_id, event.domain, event.source_sequence,
                         self._timestamp(event.observed_at_utc), self._timestamp(event.expires_at_utc),
                         event.max_action_age_seconds, event.priority, event.quality,
                         event.payload_sha256, event.wire_size_bytes, initial_status,
-                        now_text, terminal_text,
+                        now_text, terminal_text, envelope_bytes,
                     ),
                 )
                 db.execute("COMMIT")
@@ -365,7 +411,7 @@ class DurableTelemetryQueue:
             try:
                 rows = db.execute(
                     f"SELECT {self._row_select()} FROM telemetry_events "
-                    "WHERE status = 'pending' "
+                    "WHERE status = 'pending' AND envelope_bytes IS NULL "
                     "ORDER BY priority DESC, observed_at_utc ASC, event_id ASC"
                 ).fetchall()
                 for row in rows:
@@ -393,6 +439,61 @@ class DurableTelemetryQueue:
                          make_transmission(event, now_utc=now_utc).actionable)
             for event, _attempt_count in batch
         )
+
+    def select_protected_batch(
+        self, *, now_utc: datetime, max_bytes: int
+    ) -> tuple[QueuedProtectedTransmission, ...]:
+        """Select persisted ciphertext only; bytes stay pending until an ACK."""
+        self._timestamp(now_utc)
+        if type(max_bytes) is not int or max_bytes < 1:
+            raise TelemetryQueueError("max_bytes must be a positive integer")
+        batch: list[tuple[TelemetryEvent, bytes, int]] = []
+        used = 0
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                rows = db.execute(
+                    f"SELECT {self._row_select()} FROM telemetry_events "
+                    "WHERE status = 'pending' AND envelope_bytes IS NOT NULL "
+                    "ORDER BY priority DESC, observed_at_utc ASC, event_id ASC"
+                ).fetchall()
+                for row in rows:
+                    event = self._row_event(row)
+                    envelope_bytes = row[14]
+                    if not isinstance(envelope_bytes, bytes):
+                        raise TelemetryQueueError("protected event has invalid stored envelope bytes")
+                    if hashlib.sha256(envelope_bytes).hexdigest() != event.payload_sha256:
+                        raise TelemetryQueueError("stored protected envelope digest mismatch")
+                    if len(envelope_bytes) != event.wire_size_bytes:
+                        raise TelemetryQueueError("stored protected envelope size mismatch")
+                    if now_utc >= event.expires_at_utc:
+                        continue
+                    if used + len(envelope_bytes) > max_bytes:
+                        continue
+                    used += len(envelope_bytes)
+                    attempt_count = row[11] + 1
+                    db.execute(
+                        "UPDATE telemetry_events SET attempt_count = ? "
+                        "WHERE event_id = ? AND status = 'pending'",
+                        (attempt_count, event.event_id),
+                    )
+                    batch.append((event, envelope_bytes, attempt_count))
+                db.execute("COMMIT")
+            except Exception:
+                if db.in_transaction:
+                    db.execute("ROLLBACK")
+                raise
+        results: list[QueuedProtectedTransmission] = []
+        for event, envelope_bytes, attempt_count in batch:
+            assessed = make_transmission(event, now_utc=now_utc)
+            results.append(QueuedProtectedTransmission(
+                event=event,
+                envelope_bytes=envelope_bytes,
+                evidence_state=assessed.evidence_state,
+                actionable=assessed.actionable,
+                attempt_count=attempt_count,
+            ))
+        return tuple(results)
 
     def expire(self, *, now_utc: datetime) -> tuple[str, ...]:
         now_text = self._timestamp(now_utc)
