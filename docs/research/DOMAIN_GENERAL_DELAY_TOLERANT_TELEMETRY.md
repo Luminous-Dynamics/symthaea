@@ -2,7 +2,7 @@
 
 **Status:** Research architecture plus store-and-forward, signed AEAD envelope, durable receiver inbox and durable privacy-budget ledger prototypes.  
 **Threat-model review:** 2026-10-12.  
-**Not claimed:** production readiness, correct key-to-producer binding, receiver-side durable anti-replay, deployed satellite connectivity, a formal safety case, real meter/sensor evaluation, or live Sol-Atlas/Mycelix integration.
+**Not claimed:** production readiness, correct key-to-producer binding, target-filesystem power-loss proof, deployed satellite connectivity, a formal safety case, real meter/sensor evaluation, or live Sol-Atlas/Mycelix integration.
 
 ## Decision
 
@@ -83,14 +83,14 @@ The new DurablePrivacyLedger transactionally reserves cumulative epsilon/delta b
 
 The accompanying unittest suites use synthetic timestamps, fixed test-only keys, synthetic payloads, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
 
-Local verification recorded in a previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed sender ledger has 32 deterministic tests, the authenticated-envelope/ACK suite has 22, the receiver inbox has 17, the end-to-end pipeline has 3 and the durable privacy ledger has 18 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
+Local verification recorded in a previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed sender ledger has 32 deterministic tests, the authenticated-envelope/ACK suite has 22, the receiver inbox has 17, the end-to-end pipeline has 3 and the durable privacy ledger has 23 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
 
 ## Required next steps before deployment
 
 - Harden the SQLite prototype with multi-process contention, crash/reopen, database-full, read-only path, backup/restore and target-filesystem power-loss tests before deployment.
-- Implement a key lifecycle/nonce-use policy and a receiver-side durable anti-replay/acceptance transaction that commits before signing the protected ACK.
+- Implement and test key provisioning/rotation/revocation and per-key nonce-use limits; validate the receiver-inbox protocol against target-filesystem power loss, backup/restore and receiver-key rollover.
 - Specify canonical serialization and authenticate message, ACK, source identity, policy version and freshness metadata end to end.
-- Define retention ceilings and bounds for terminal receipts, replay windows and participant-level privacy accounting.
+- Define retention ceilings and bounds for terminal receipts, replay windows and participant-level privacy accounting; migrate all public-release callers to the durable privacy ledger before treating the in-memory guard as a durable budget.
 - Add deterministic chaos simulation for link loss, reordering, duplication, clock drift, key expiry, reboot/recovery, storage-full and compromised-sensor cases.
 - Benchmark bytes and joules per useful observation against cellular, fibre, radio mesh and local buffering; satellite should be selected per route rather than made mandatory.
 - Add domain-specific policy tests: grid operations, water-quality alerts, food-security indicators, infrastructure fault reports and spacecraft fault handling must not share unexamined alert thresholds.
