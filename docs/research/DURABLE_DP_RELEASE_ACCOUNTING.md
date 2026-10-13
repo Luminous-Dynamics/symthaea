@@ -26,7 +26,7 @@ Within a `BEGIN IMMEDIATE` transaction, the ledger:
 3. Checks each participant's remaining epsilon/delta budget.
 4. Writes the reservation, participant membership tags and cumulative spend atomically.
 
-The default cumulative per-participant budgets are epsilon 2.0 and delta 2e-6. The prototype caps a single release at epsilon 1.0 and delta 1e-6. Epsilon is stored as integer nano-epsilon units and delta as integer pico-delta units, rounding each reservation upward to avoid under-accounting caused by floating-point arithmetic.
+The default cumulative per-participant budgets are epsilon 2.0 and delta 2e-6. The prototype caps a single release at epsilon 1.0 and delta 1e-6. Composition is the basic additive (sequential) sum of per-release epsilon and delta, not an advanced-composition accountant. Epsilon is stored as integer nano-epsilon units and delta as integer pico-delta units, rounding each reservation upward to avoid under-accounting caused by floating-point arithmetic.
 
 ## Participant privacy in the ledger
 
@@ -74,6 +74,6 @@ A production system still needs:
 
 ## Deterministic test coverage
 
-The test suite uses synthetic tokens, fixed test-only keys, fixed timestamps and small synthetic output blobs. It covers restart recovery, idempotent reservation, release-ID conflicts, overlap suppression, disjoint cohorts, cumulative epsilon/delta exhaustion, cohort floor, policy-field validation, immutable output commit/replay, output digest checks, HMAC-key mismatch, record limits and concurrent duplicate reservations.
+The test suite has 18 cases using synthetic tokens, fixed test-only keys, fixed timestamps and small synthetic output blobs. It covers restart recovery, idempotent reservation, release-ID conflicts, overlap suppression, disjoint cohorts, cumulative epsilon/delta exhaustion, cohort floor, policy-field validation, immutable output commit/replay, output digest checks, HMAC-key mismatch, record limits, concurrent duplicate reservations, extreme numeric configuration and commit timestamp ordering.
 
 These tests are added to the telemetry GitHub Actions workflow. They must not be described as passing until a completed exact-head run succeeds.
