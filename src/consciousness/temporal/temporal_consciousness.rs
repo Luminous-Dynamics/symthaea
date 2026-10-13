@@ -255,14 +255,21 @@ impl PhiTrajectory {
     /// Returns false and leaves state unchanged for non-finite Φ values or
     /// duplicate/backwards timestamps. The first valid observation initializes
     /// the EMA; later observations use alpha = 1 - exp(-dt / tau).
-    pub fn observe_at(&mut self, phi: f64, elapsed: Duration) -> bool {
+    fn can_observe_at(&self, phi: f64, elapsed: Duration) -> bool {
         if !phi.is_finite() {
             return false;
         }
+        match self.history.back() {
+            Some((previous_time, _)) => elapsed > *previous_time,
+            None => true,
+        }
+    }
+
+    pub fn observe_at(&mut self, phi: f64, elapsed: Duration) -> bool {
+        if !self.can_observe_at(phi, elapsed) {
+            return false;
+        }
         if let Some((previous_time, _)) = self.history.back() {
-            if elapsed <= *previous_time {
-                return false;
-            }
             let dt = elapsed.saturating_sub(*previous_time).as_secs_f64();
             let decay = (-dt / self.ema_time_constant_secs).exp();
             self.ema = (1.0 - decay) * phi + decay * self.ema;
@@ -498,9 +505,8 @@ impl ConsciousnessContinuity {
         self.observe_with_elapsed(state, phi, phi_prev, Some(elapsed))
     }
 
-    fn observe_with_elapsed(
-        &mut self,
-        state: &BinaryHV,
+    fn can_accept_observation(
+        &self,
         phi: f64,
         phi_prev: f64,
         elapsed: Option<Duration>,
@@ -510,21 +516,32 @@ impl ConsciousnessContinuity {
         } else {
             ContinuityTimeBasis::HostMonotonic
         };
-
-        // Clock coordinates are not interchangeable. Validate before repairing
-        // compatibility metadata or touching any retained state/evidence.
-        if self
+        !self
             .time_basis
             .is_some_and(|accepted_basis| accepted_basis != requested_basis)
-            || !phi.is_finite()
-            || !phi_prev.is_finite()
-            || elapsed.is_some_and(|current| {
+            && phi.is_finite()
+            && phi_prev.is_finite()
+            && !elapsed.is_some_and(|current| {
                 self.last_elapsed_observation
                     .is_some_and(|previous| current <= previous)
             })
-        {
+    }
+
+    fn observe_with_elapsed(
+        &mut self,
+        state: &BinaryHV,
+        phi: f64,
+        phi_prev: f64,
+        elapsed: Option<Duration>,
+    ) -> bool {
+        if !self.can_accept_observation(phi, phi_prev, elapsed) {
             return false;
         }
+        let requested_basis = if elapsed.is_some() {
+            ContinuityTimeBasis::ReplayElapsed
+        } else {
+            ContinuityTimeBasis::HostMonotonic
+        };
 
         // The event list is public for compatibility; if an external caller has
         // mutated it directly, restore safe alignment and treat those entries as
@@ -1195,12 +1212,22 @@ impl TemporalConsciousnessAnalyzer {
     ) -> bool {
         let phi_prev = self.phi_trajectory.ema;
 
-        // Fail closed before mutating any downstream temporal analysis.
-        let accepted = match elapsed {
-            Some(elapsed) => self.phi_trajectory.observe_at(phi, elapsed),
-            None => self.phi_trajectory.try_observe(phi),
-        };
-        if !accepted {
+        // Preflight every time-sensitive component before mutating any of them.
+        // These fields are public for compatibility, so callers can legitimately
+        // pre-use continuity directly; an incompatible clock basis must not leave
+        // Φ trajectory advanced while continuity, identity, and counters disagree.
+        let trajectory_elapsed =
+            elapsed.unwrap_or_else(|| self.phi_trajectory.started_at.elapsed());
+        if !self.phi_trajectory.can_observe_at(phi, trajectory_elapsed)
+            || !self.continuity.can_accept_observation(phi, phi_prev, elapsed)
+        {
+            self.stats.rejected_observations += 1;
+            return false;
+        }
+
+        // Both preflight checks ran against the same exclusively borrowed state.
+        // Admission should now succeed; keep the defensive rejection path anyway.
+        if !self.phi_trajectory.observe_at(phi, trajectory_elapsed) {
             self.stats.rejected_observations += 1;
             return false;
         }
@@ -1931,6 +1958,31 @@ mod tests {
         assert_eq!(qualified.trajectory_sample_count, 3);
         assert!(qualified.trajectory_evidence_sufficient);
         assert!(qualified.overall_evidence_coverage > pending.overall_evidence_coverage);
+    }
+
+    #[test]
+    fn analyzer_rejects_incompatible_public_continuity_clock_without_partial_acceptance() {
+        let mut analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+
+        // The analyzer's fields are public; a caller can use the continuity tracker
+        // directly before using the analyzer's deterministic replay API.
+        assert!(analyzer
+            .continuity
+            .try_observe(&BinaryHV::random(4301), 0.5, 0.5));
+        let continuity_states = analyzer.continuity.recent_states.len();
+        let husserlian_retention = analyzer.husserlian.retention.len();
+
+        assert!(!analyzer.observe_at(
+            &BinaryHV::random(4302),
+            0.6,
+            Duration::ZERO,
+        ));
+        assert_eq!(analyzer.phi_trajectory.sample_count(), 0);
+        assert_eq!(analyzer.continuity.recent_states.len(), continuity_states);
+        assert_eq!(analyzer.husserlian.retention.len(), husserlian_retention);
+        assert_eq!(analyzer.stats.observations, 0);
+        assert_eq!(analyzer.stats.rejected_observations, 1);
     }
 
     #[test]
