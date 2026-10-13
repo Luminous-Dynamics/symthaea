@@ -1728,7 +1728,11 @@ mod tests {
         let rendered = report.to_string();
         assert!(rendered.contains("Present↔Future:       N/A"));
         assert!(rendered.contains("Past↔Future:          N/A"));
-        assert!(rendered.contains("Velocity:") && rendered.lines().any(|line| line.contains("Velocity:") && line.contains("N/A")));
+        assert!(
+            rendered
+                .lines()
+                .any(|line| line.contains("Velocity:") && line.contains("N/A"))
+        );
         for label in [
             "Continuity Score:",
             "Known-pair score:",
