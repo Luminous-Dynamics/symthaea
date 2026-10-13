@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+import base64
 import hashlib
+import json
 import os
 import sqlite3
 import tempfile
@@ -401,9 +403,16 @@ class DurableQueueTests(unittest.TestCase):
             self.queue.acknowledge_protected(ack, verification_keys={}, now_utc=self.now)
         self.assertEqual(self.queue.pending_count, 1)
 
+        ack_object = json.loads(ack)
+        signature = bytearray(base64.b64decode(ack_object["signature"], validate=True))
+        signature[0] ^= 1
+        ack_object["signature"] = base64.b64encode(bytes(signature)).decode("ascii")
+        forged_ack = json.dumps(
+            ack_object, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("ascii")
         with self.assertRaisesRegex(ValueError, "signature verification failed"):
             self.queue.acknowledge_protected(
-                ack[:-1] + (b"A" if ack[-1:] != b"A" else b"B"),
+                forged_ack,
                 verification_keys={"receiver-test-epoch": receiver_key.public_key()},
                 now_utc=self.now,
             )
