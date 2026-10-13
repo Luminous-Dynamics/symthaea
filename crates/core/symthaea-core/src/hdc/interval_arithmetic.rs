@@ -507,7 +507,11 @@ fn exp_reduced_enclosure(r: Interval) -> Result<Interval, IntervalError> {
     // Taylor's theorem bounds the omitted remainder in magnitude. Widen both
     // sides because the reduced argument may be negative.
     let remainder = Interval::new(-EXP_SERIES_TAIL_BOUND, EXP_SERIES_TAIL_BOUND)?;
-    sum.checked_add(remainder).checked_exp_nonnegative()
+    let widened = sum.checked_add(remainder);
+    if widened.upper < 0.0 {
+        return Interval::new(0.0, f64::INFINITY);
+    }
+    Interval::new(widened.lower.max(0.0), widened.upper)
 }
 
 /// Reconstruct exp(x) for a finite endpoint without using f64::exp as a bound.
@@ -567,19 +571,6 @@ fn exact_power_of_two(exponent: i32) -> Option<f64> {
         Some(f64::from_bits(1_u64 << (exponent + 1074)))
     } else {
         None
-    }
-}
-
-// Apply the known positivity of exp after adding its symmetric Taylor remainder.
-trait PositiveInterval {
-    fn checked_exp_nonnegative(self) -> Result<Interval, IntervalError>;
-}
-impl PositiveInterval for Interval {
-    fn checked_exp_nonnegative(self) -> Result<Interval, IntervalError> {
-        if self.upper < 0.0 {
-            return Ok(Interval::new(0.0, f64::INFINITY)?);
-        }
-        Interval::new(self.lower.max(0.0), self.upper)
     }
 }
 
