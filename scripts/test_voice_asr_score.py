@@ -156,7 +156,11 @@ class VoiceAsrScoreTests(unittest.TestCase):
     def test_smoke_scores_micro_wer_cer_and_deterministic_intervals(self):
         report = self.score()
         self.assertEqual(report["normalization"], NORMALIZATION_ID)
+        self.assertEqual(len(report["scorer"]["script_sha256"]), 64)
+        self.assertRegex(report["scorer"]["python_version"], r"^\\d+\\.\\d+")
         self.assertEqual(report["metrics"]["sample_count"], 3)
+        self.assertEqual(report["speaker_macro_metrics"]["speaker_count"], 3)
+        self.assertGreaterEqual(report["speaker_macro_metrics"]["mean_speaker_wer"], 0.0)
         self.assertAlmostEqual(report["metrics"]["wer"], 2 / 10)
         self.assertLessEqual(report["confidence_intervals_95"]["wer"]["low_95"],
                              report["confidence_intervals_95"]["wer"]["high_95"])
