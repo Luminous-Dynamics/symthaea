@@ -13,7 +13,7 @@ import stat
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from tools.energy_telemetry.authenticated_envelope import TelemetryMetadata, open_envelope, seal_payload
+from tools.energy_telemetry.authenticated_envelope import TelemetryMetadata, create_ack, open_envelope, seal_payload
 from tools.energy_telemetry.durable_queue import DurableTelemetryQueue
 from tools.energy_telemetry.store_forward import (
     EventIdentityConflict,
@@ -340,10 +340,24 @@ class DurableQueueTests(unittest.TestCase):
         batch_again = self.reopen().select_protected_batch(now_utc=self.now, max_bytes=1000)
         self.assertEqual(batch_again[0].envelope_bytes, sealed.envelope_bytes)
         self.assertEqual(batch_again[0].attempt_count, 2)
-        self.assertEqual(
+        receiver_key = Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
+        ack_bytes = create_ack(
+            receiver_key_id="receiver-test-epoch",
+            event_id=sealed.event.event_id,
+            payload_sha256=sealed.event.payload_sha256,
+            acknowledged_at_utc=self.now,
+            signing_key=receiver_key,
+        )
+        with self.assertRaisesRegex(TelemetryQueueError, "requires an authenticated receiver ACK"):
             self.reopen().acknowledge(
                 event_id=sealed.event.event_id,
                 payload_sha256=sealed.event.payload_sha256,
+                now_utc=self.now,
+            )
+        self.assertEqual(
+            self.reopen().acknowledge_protected(
+                ack_bytes,
+                verification_keys={"receiver-test-epoch": receiver_key.public_key()},
                 now_utc=self.now,
             ),
             "acknowledged",
@@ -370,6 +384,50 @@ class DurableQueueTests(unittest.TestCase):
         with self.assertRaises(QueueCapacityError):
             limited.enqueue_protected(sealed, now_utc=self.now)
         self.assertEqual(limited.pending_count, 0)
+
+    def test_protected_event_rejects_unknown_or_forged_receiver_ack(self):
+        sealed = protected()
+        self.queue.enqueue_protected(sealed, now_utc=self.now)
+        self.queue.select_protected_batch(now_utc=self.now, max_bytes=1000)
+        receiver_key = Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
+        ack = create_ack(
+            receiver_key_id="receiver-test-epoch",
+            event_id=sealed.event.event_id,
+            payload_sha256=sealed.event.payload_sha256,
+            acknowledged_at_utc=self.now,
+            signing_key=receiver_key,
+        )
+        with self.assertRaisesRegex(ValueError, "no trusted Ed25519 key"):
+            self.queue.acknowledge_protected(ack, verification_keys={}, now_utc=self.now)
+        self.assertEqual(self.queue.pending_count, 1)
+
+        with self.assertRaisesRegex(ValueError, "signature verification failed"):
+            self.queue.acknowledge_protected(
+                ack[:-1] + (b"A" if ack[-1:] != b"A" else b"B"),
+                verification_keys={"receiver-test-epoch": receiver_key.public_key()},
+                now_utc=self.now,
+            )
+        self.assertEqual(self.queue.pending_count, 1)
+
+    def test_signed_ack_for_wrong_digest_does_not_remove_protected_event(self):
+        sealed = protected()
+        self.queue.enqueue_protected(sealed, now_utc=self.now)
+        self.queue.select_protected_batch(now_utc=self.now, max_bytes=1000)
+        receiver_key = Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
+        ack = create_ack(
+            receiver_key_id="receiver-test-epoch",
+            event_id=sealed.event.event_id,
+            payload_sha256="c" * 64,
+            acknowledged_at_utc=self.now,
+            signing_key=receiver_key,
+        )
+        with self.assertRaises(EventIdentityConflict):
+            self.queue.acknowledge_protected(
+                ack,
+                verification_keys={"receiver-test-epoch": receiver_key.public_key()},
+                now_utc=self.now,
+            )
+        self.assertEqual(self.queue.pending_count, 1)
 
     def test_legacy_metadata_queue_does_not_expose_fake_payload_bytes(self):
         e = event()
