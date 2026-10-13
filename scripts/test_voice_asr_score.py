@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Synthetic tests for provenance-checked voice ASR scoring; no real corpus is used."""
+from __future__ import annotations
+
+import copy
+import csv
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from voice_asr_score import (
+    NORMALIZATION_ID,
+    _read_json,
+    normalize_text,
+    score_predictions,
+    write_report_exclusive,
+)
+from voice_dataset_intake import audit_dataset
+
+
+class VoiceAsrScoreTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.base = Path(self.temp.name)
+        self.root = self.base / "dataset"
+        (self.root / "clips").mkdir(parents=True)
+        self.archive = self.base / "cv-af.tar.gz"
+        self.archive.write_bytes(b"synthetic test archive")
+        self.model_root = self.base / "model-export"
+        self.model_root.mkdir()
+        (self.model_root / "config.json").write_text('{"synthetic": true}\n', encoding="utf-8")
+        self.model_id = "BuzzASR/afrikaans"
+        self.model_revision = "a" * 40
+        self.model_license = "MIT"
+        self.locale = "af"
+        self.intake_path = self.base / "intake.json"
+        self.predictions_path = self.base / "predictions.json"
+        self.report_path = self.base / "report.json"
+        self._write_dataset(
+            [{"client_id":"train-speaker","path":"train.mp3","sentence":"Opleiding."}],
+            [{"client_id":"dev-speaker","path":"dev.mp3","sentence":"Toetsing."}],
+            [
+                {"client_id":"speaker-a","path":"clip-001.mp3","sentence":"Goeie môre!"},
+                {"client_id":"speaker-b","path":"clip-002.mp3","sentence":"Ek weet dit nie."},
+                {"client_id":"speaker-c","path":"clip-003.mp3","sentence":"Die stem is mooi."},
+            ],
+        )
+        self._build_intake("ingestion-smoke")
+        self._write_predictions()
+
+    def _write_dataset(self, train, dev, test) -> None:
+        for split, rows in (("train", train), ("dev", dev), ("test", test)):
+            path = self.root / f"{split}.tsv"
+            with path.open("w", encoding="utf-8", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=["client_id", "path", "sentence"],
+                                        delimiter="\t", lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(rows)
+            for row in rows:
+                audio = self.root / "clips" / row["path"]
+                audio.write_bytes(b"fake-audio-content")
+
+    def _build_intake(self, mode: str) -> dict:
+        self.intake = audit_dataset(
+            dataset_root=self.root,
+            archive=self.archive,
+            locale=self.locale,
+            dataset_version="cv-corpus-27.0-test-fixture",
+            dataset_id="cmu-test-123",
+            source_url="https://mozilladatacollective.com/datasets/cmu-test-123",
+            license_id="CC0-1.0",
+            usage_restrictions_acknowledged=True,
+            mode=mode,
+            minimum_test_clips=1 if mode == "heldout-evaluation" else 100,
+            minimum_test_speakers=1 if mode == "heldout-evaluation" else 10,
+        )
+        self.intake_path.write_text(json.dumps(self.intake, ensure_ascii=False), encoding="utf-8")
+        return self.intake
+
+    def _prediction_doc(self, rows=None) -> dict:
+        test_rows = list(csv.DictReader((self.root / "test.tsv").open(encoding="utf-8"), delimiter="\t"))
+        hypotheses = [
+            {"path": row["path"], "text": {
+                "clip-001.mp3": "Goeie môre.",
+                "clip-002.mp3": "Ek weet",
+                "clip-003.mp3": "Die stem is mooi!",
+            }.get(row["path"], row["sentence"])}
+            for row in test_rows
+        ] if rows is None else rows
+        return {
+            "schema_version": 1,
+            "locale": self.locale,
+            "dataset_id": self.intake["dataset"]["id"],
+            "dataset_version": self.intake["dataset"]["version"],
+            "archive_sha256": self.intake["dataset"]["archive_sha256"],
+            "test_metadata_sha256": self.intake["split_audits"]["test"]["metadata_sha256"],
+            "model_id": self.model_id,
+            "model_revision": self.model_revision,
+            "model_license": self.model_license,
+            "predictions": hypotheses,
+        }
+
+    def _write_predictions(self, rows=None) -> dict:
+        self.pred_doc = self._prediction_doc(rows)
+        self.predictions_path.write_text(json.dumps(self.pred_doc, ensure_ascii=False), encoding="utf-8")
+        return self.pred_doc
+
+    def score(self, **kwargs):
+        return score_predictions(
+            prediction_doc=kwargs.pop("prediction_doc", self.pred_doc),
+            intake_report=kwargs.pop("intake_report", self.intake),
+            dataset_root=kwargs.pop("dataset_root", self.root),
+            archive=kwargs.pop("archive", self.archive),
+            model_root=kwargs.pop("model_root", self.model_root),
+            predictions_path=kwargs.pop("predictions_path", self.predictions_path),
+            model_id=kwargs.pop("model_id", self.model_id),
+            model_revision=kwargs.pop("model_revision", self.model_revision),
+            model_license=kwargs.pop("model_license", self.model_license),
+            locale=kwargs.pop("locale", self.locale),
+            intake_report_path=kwargs.pop("intake_report_path", self.intake_path),
+            mode=kwargs.pop("mode", "smoke"),
+            bootstrap_iterations=kwargs.pop("bootstrap_iterations", 100),
+            **kwargs,
+        )
+
+    def test_smoke_scores_micro_wer_cer_and_deterministic_intervals(self):
+        report = self.score()
+        self.assertEqual(report["normalization"], NORMALIZATION_ID)
+        self.assertEqual(report["metrics"]["sample_count"], 3)
+        self.assertAlmostEqual(report["metrics"]["wer"], 2 / 10)
+        self.assertLessEqual(report["confidence_intervals_95"]["wer"]["low_95"],
+                             report["confidence_intervals_95"]["wer"]["high_95"])
+        self.assertEqual(report["model"]["snapshot_file_count"], 1)
+        self.assertEqual(report["mode"], "smoke")
+        self.assertIn("exploratory smoke metric only", report["interpretation"])
+
+    def test_aggregate_report_contains_no_transcripts_paths_or_speaker_tokens(self):
+        report = self.score()
+        encoded = json.dumps(report, ensure_ascii=False)
+        for secret in ("Goeie môre", "clip-001.mp3", "speaker-a", "Ek weet dit nie"):
+            self.assertNotIn(secret, encoded)
+        self.assertFalse(report["privacy"]["raw_transcripts_included"])
+        self.assertFalse(report["privacy"]["clip_paths_included"])
+        self.assertFalse(report["privacy"]["speaker_tokens_included"])
+
+    def test_normalizer_preserves_afrikaans_diacritics_and_folds_case(self):
+        self.assertEqual(normalize_text("MÔRE!"), "môre")
+        self.assertNotEqual(normalize_text("môre"), normalize_text("more"))
+
+    def test_empty_hypothesis_is_scored_as_deletions_not_rejected(self):
+        rows = copy.deepcopy(self.pred_doc["predictions"])
+        rows[0]["text"] = ""
+        self._write_predictions(rows)
+        report = self.score()
+        self.assertGreater(report["metrics"]["wer"], 0.2)
+
+    def test_missing_prediction_fails_closed(self):
+        doc = copy.deepcopy(self.pred_doc)
+        doc["predictions"].pop()
+        with self.assertRaisesRegex(ValueError, "missing 1 ASR predictions"):
+            self.score(prediction_doc=doc)
+
+    def test_duplicate_prediction_fails_closed(self):
+        doc = copy.deepcopy(self.pred_doc)
+        doc["predictions"].append(copy.deepcopy(doc["predictions"][0]))
+        with self.assertRaisesRegex(ValueError, "duplicate prediction"):
+            self.score(prediction_doc=doc)
+
+    def test_unknown_clip_path_fails_closed(self):
+        doc = copy.deepcopy(self.pred_doc)
+        doc["predictions"][0]["path"] = "unknown.mp3"
+        with self.assertRaisesRegex(ValueError, "unknown clip"):
+            self.score(prediction_doc=doc)
+
+    def test_prediction_dataset_metadata_drift_fails_closed(self):
+        doc = copy.deepcopy(self.pred_doc)
+        doc["test_metadata_sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "test metadata hash mismatch"):
+            self.score(prediction_doc=doc)
+
+    def test_model_identity_drift_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "model_revision mismatch"):
+            self.score(model_revision="b" * 40)
+
+    def test_archive_drift_fails_closed_against_intake_receipt(self):
+        self.archive.write_bytes(b"modified archive")
+        with self.assertRaisesRegex(ValueError, "archive SHA-256 differs"):
+            self.score()
+
+    def test_modified_test_tsv_fails_closed_against_intake_receipt(self):
+        with (self.root / "test.tsv").open("a", encoding="utf-8") as stream:
+            stream.write("new-speaker\textra.mp3\tDit is nu anders.\n")
+        with self.assertRaisesRegex(ValueError, "test.tsv SHA-256 differs"):
+            self.score()
+
+    def test_model_root_symlink_is_rejected(self):
+        alias = self.base / "model-link"
+        alias.symlink_to(self.model_root, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "real exported directory"):
+            self.score(model_root=alias)
+
+    def test_model_snapshot_symlink_file_is_rejected(self):
+        target = self.base / "external-weights.bin"
+        target.write_bytes(b"outside weights")
+        (self.model_root / "linked-weights.bin").symlink_to(target)
+        with self.assertRaisesRegex(ValueError, "symlinked file"):
+            self.score()
+
+    def test_smoke_intake_cannot_be_promoted_to_heldout_evaluation(self):
+        with self.assertRaisesRegex(ValueError, "requires intake mode heldout-evaluation"):
+            self.score(mode="heldout-evaluation")
+
+    def test_heldout_evaluation_requires_minimum_size_and_speaker_disjointness(self):
+        self._build_intake("heldout-evaluation")
+        self._write_predictions()
+        with self.assertRaisesRegex(ValueError, "at least 100 test clips"):
+            self.score(mode="heldout-evaluation")
+
+    def test_heldout_evaluation_accepts_sufficient_disjoint_fixture(self):
+        train = [{"client_id":"train-speaker","path":"train.mp3","sentence":"Opleiding."}]
+        dev = [{"client_id":"dev-speaker","path":"dev.mp3","sentence":"Toetsing."}]
+        test = [
+            {"client_id":f"speaker-{i % 10}","path":f"heldout-{i:03}.mp3","sentence":"Dit is 'n held-out sin."}
+            for i in range(100)
+        ]
+        self._write_dataset(train,dev,test)
+        self._build_intake("heldout-evaluation")
+        self._write_predictions()
+        report = self.score(mode="heldout-evaluation",bootstrap_iterations=100)
+        self.assertEqual(report["metrics"]["sample_count"],100)
+        self.assertIn("not by themselves a production-support claim",report["interpretation"])
+
+    def test_report_writer_refuses_overwrite(self):
+        report = self.score()
+        write_report_exclusive(self.report_path, report, [self.root, self.model_root])
+        with self.assertRaisesRegex(ValueError, "must be new"):
+            write_report_exclusive(self.report_path, report, [self.root, self.model_root])
+
+
+if __name__ == "__main__":
+    unittest.main()
