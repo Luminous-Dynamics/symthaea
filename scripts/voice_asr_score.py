@@ -35,10 +35,17 @@ PREDICTION_KEYS = {
     "archive_sha256", "test_metadata_sha256", "model_id", "model_revision",
     "model_license", "source_model_snapshot_sha256", "outcomes_sha256", "runtime", "predictions",
 }
-RUNTIME_KEYS = {
+WHISPER_CPP_RUNTIME_KEYS = {
     "kind", "runtime_commit", "converter_commit", "runtime_binary_sha256",
     "artifact_path", "artifact_sha256", "quantization",
 }
+TRANSFORMERS_RUNTIME_KEYS = {
+    "kind", "python_executable_sha256", "worker_script_sha256",
+    "python_version", "torch_version", "transformers_version", "numpy_version",
+    "device", "dtype", "offline",
+}
+# Backwards-compatible name for code that imports the v1 whisper.cpp schema.
+RUNTIME_KEYS = WHISPER_CPP_RUNTIME_KEYS
 
 
 def _need(condition: bool, message: str) -> None:
@@ -292,6 +299,7 @@ def score_predictions(
     locale: str,
     intake_report_path: Path,
     runtime_binary_path: Path,
+    runtime_worker_path: Path | None = None,
     mode: str = "smoke",
     bootstrap_iterations: int = 1000,
 ) -> dict[str, Any]:
@@ -325,10 +333,10 @@ def score_predictions(
           "source_model_root must be a real directory, not a symlink")
     converted_root_real = model_root.resolve(strict=True)
     source_root_real = source_model_root.resolve(strict=True)
-    _need(converted_root_real != source_root_real
-          and converted_root_real not in source_root_real.parents
-          and source_root_real not in converted_root_real.parents,
-          "source_model_root and converted model_root must be separate, non-nested directories")
+    _need(converted_root_real == source_root_real or (
+          converted_root_real not in source_root_real.parents
+          and source_root_real not in converted_root_real.parents),
+          "source_model_root and runtime model_root must be the same snapshot or separate non-nested directories")
     source_tree_sha, source_file_count, source_bytes = _hash_tree(source_model_root)
     _need(source_tree_sha == source_digest, "source model snapshot SHA-256 differs from prediction provenance")
     outcomes_sha = prediction_doc["outcomes_sha256"]
@@ -338,33 +346,62 @@ def score_predictions(
     _need(actual_outcomes_sha == outcomes_sha,
           "raw pilot outcomes SHA-256 differs from prediction provenance")
     runtime = prediction_doc["runtime"]
-    _need(isinstance(runtime, dict) and set(runtime) == RUNTIME_KEYS,
-          f"runtime keys mismatch; missing={sorted(RUNTIME_KEYS-set(runtime) if isinstance(runtime, dict) else RUNTIME_KEYS)}, extra={sorted(set(runtime)-RUNTIME_KEYS) if isinstance(runtime, dict) else []}")
-    _need(runtime["kind"] == "whisper.cpp", "runtime.kind must be whisper.cpp for this scorer")
-    for field in ("runtime_commit", "converter_commit"):
-        _need(isinstance(runtime[field], str) and SHA1_RE.fullmatch(runtime[field]) is not None,
-              f"runtime.{field} must be a 40-hex commit SHA")
-    _need(isinstance(runtime["quantization"], str) and re.fullmatch(r"[A-Za-z0-9._+-]{1,32}", runtime["quantization"]) is not None,
-          "runtime.quantization must be an explicit compact identifier")
-    _need(isinstance(runtime["runtime_binary_sha256"], str) and SHA256_RE.fullmatch(runtime["runtime_binary_sha256"]) is not None,
-          "runtime.runtime_binary_sha256 must be a 64-hex digest")
+    _need(isinstance(runtime, dict) and isinstance(runtime.get("kind"), str),
+          "runtime must be an object with a kind")
     actual_runtime_sha = sha256_file(runtime_binary_path)
-    _need(actual_runtime_sha == runtime["runtime_binary_sha256"],
-          "runtime binary SHA-256 differs from prediction provenance")
-    artifact_relative = safe_relative_path(runtime["artifact_path"], "runtime artifact_path")
-    _need(isinstance(runtime["artifact_sha256"], str) and SHA256_RE.fullmatch(runtime["artifact_sha256"]) is not None,
-          "runtime.artifact_sha256 must be a 64-hex digest")
-    _need(model_root.is_dir() and not model_root.is_symlink(), "model_root must be a real directory, not a symlink")
-    artifact_path = model_root / artifact_relative
-    current = model_root
-    for part in artifact_relative.parts:
-        current = current / part
-        _need(not current.is_symlink(), "runtime model artifact path contains a symlink")
-    _need(artifact_path.is_file(), "runtime model artifact_path does not name a regular file")
-    _need(artifact_path.resolve(strict=True).is_relative_to(model_root.resolve(strict=True)),
-          "runtime model artifact escapes model_root")
-    _need(sha256_file(artifact_path) == runtime["artifact_sha256"],
-          "runtime model artifact SHA-256 differs from prediction provenance")
+    artifact_relative: PurePosixPath | None = None
+    if runtime["kind"] == "whisper.cpp":
+        _need(set(runtime) == WHISPER_CPP_RUNTIME_KEYS,
+              f"whisper.cpp runtime keys mismatch; missing={sorted(WHISPER_CPP_RUNTIME_KEYS-set(runtime))}, extra={sorted(set(runtime)-WHISPER_CPP_RUNTIME_KEYS)}")
+        for field in ("runtime_commit", "converter_commit"):
+            _need(isinstance(runtime[field], str) and SHA1_RE.fullmatch(runtime[field]) is not None,
+                  f"runtime.{field} must be a 40-hex commit SHA")
+        _need(isinstance(runtime["quantization"], str) and re.fullmatch(r"[A-Za-z0-9._+-]{1,32}", runtime["quantization"]) is not None,
+              "runtime.quantization must be an explicit compact identifier")
+        _need(isinstance(runtime["runtime_binary_sha256"], str) and SHA256_RE.fullmatch(runtime["runtime_binary_sha256"]) is not None,
+              "runtime.runtime_binary_sha256 must be a 64-hex digest")
+        _need(actual_runtime_sha == runtime["runtime_binary_sha256"],
+              "runtime binary SHA-256 differs from prediction provenance")
+        artifact_relative = safe_relative_path(runtime["artifact_path"], "runtime artifact_path")
+        _need(isinstance(runtime["artifact_sha256"], str) and SHA256_RE.fullmatch(runtime["artifact_sha256"]) is not None,
+              "runtime.artifact_sha256 must be a 64-hex digest")
+        _need(model_root.is_dir() and not model_root.is_symlink(), "model_root must be a real directory, not a symlink")
+        artifact_path = model_root / artifact_relative
+        current = model_root
+        for part in artifact_relative.parts:
+            current = current / part
+            _need(not current.is_symlink(), "runtime model artifact path contains a symlink")
+        _need(artifact_path.is_file(), "runtime model artifact_path does not name a regular file")
+        _need(artifact_path.resolve(strict=True).is_relative_to(model_root.resolve(strict=True)),
+              "runtime model artifact escapes model_root")
+        _need(sha256_file(artifact_path) == runtime["artifact_sha256"],
+              "runtime model artifact SHA-256 differs from prediction provenance")
+        _need(converted_root_real != source_root_real,
+              "whisper.cpp converted export and source snapshot must be separate directories")
+    elif runtime["kind"] == "transformers":
+        _need(set(runtime) == TRANSFORMERS_RUNTIME_KEYS,
+              f"Transformers runtime keys mismatch; missing={sorted(TRANSFORMERS_RUNTIME_KEYS-set(runtime))}, extra={sorted(set(runtime)-TRANSFORMERS_RUNTIME_KEYS)}")
+        _need(converted_root_real == source_root_real,
+              "Transformers runtime model-root must be the exact source-model-root snapshot")
+        for field in ("python_executable_sha256", "worker_script_sha256"):
+            _need(isinstance(runtime[field], str) and SHA256_RE.fullmatch(runtime[field]) is not None,
+                  f"runtime.{field} must be a 64-hex digest")
+        _need(actual_runtime_sha == runtime["python_executable_sha256"],
+              "Python executable SHA-256 differs from prediction provenance")
+        _need(isinstance(runtime_worker_path, Path) and runtime_worker_path.is_file()
+              and not runtime_worker_path.is_symlink(),
+              "Transformers runtime requires a regular --runtime-worker script")
+        _need(sha256_file(runtime_worker_path) == runtime["worker_script_sha256"],
+              "Transformers worker script SHA-256 differs from prediction provenance")
+        for field in ("python_version", "torch_version", "transformers_version", "numpy_version"):
+            _need(isinstance(runtime[field], str) and runtime[field].strip()
+                  and "\n" not in runtime[field] and "\r" not in runtime[field],
+                  f"runtime.{field} must be explicit")
+        _need(runtime["device"] in {"cpu", "cuda"}, "runtime.device must be cpu or cuda")
+        _need(runtime["dtype"] in {"float32", "float16", "bfloat16"}, "runtime.dtype is unsupported")
+        _need(runtime["offline"] is True, "Transformers runtime must declare offline=true")
+    else:
+        raise ValueError(f"unsupported runtime.kind: {runtime['kind']}")
 
     dataset, test_rows, test_sha = _load_intake(
         intake_report, dataset_root=dataset_root, archive=archive, locale=locale, expected_mode=mode
@@ -481,6 +518,45 @@ def score_predictions(
     archive_sha = dataset["archive_sha256"]
     test_meta_sha = test_sha
     prediction_sha = sha256_file(predictions_path)
+    model_record = {
+        "id": model_id, "revision_claimed": model_revision, "license_declared": model_license,
+        "source_snapshot_manifest_sha256": source_tree_sha,
+        "source_snapshot_file_count": source_file_count,
+        "source_snapshot_bytes": source_bytes,
+    }
+    if runtime["kind"] == "whisper.cpp":
+        model_record.update({
+            "converted_export_manifest_sha256": model_tree_sha,
+            "converted_export_file_count": model_files,
+            "converted_export_bytes": model_bytes,
+        })
+        runtime_record = {
+            "kind": runtime["kind"],
+            "runtime_commit": runtime["runtime_commit"],
+            "converter_commit": runtime["converter_commit"],
+            "runtime_binary_sha256": actual_runtime_sha,
+            "artifact_path": artifact_relative.as_posix(),
+            "artifact_sha256": runtime["artifact_sha256"],
+            "quantization": runtime["quantization"],
+        }
+    else:
+        model_record.update({
+            "runtime_model_snapshot_manifest_sha256": model_tree_sha,
+            "runtime_model_snapshot_file_count": model_files,
+            "runtime_model_snapshot_bytes": model_bytes,
+        })
+        runtime_record = {
+            "kind": runtime["kind"],
+            "python_executable_sha256": actual_runtime_sha,
+            "worker_script_sha256": runtime["worker_script_sha256"],
+            "python_version": runtime["python_version"],
+            "torch_version": runtime["torch_version"],
+            "transformers_version": runtime["transformers_version"],
+            "numpy_version": runtime["numpy_version"],
+            "device": runtime["device"],
+            "dtype": runtime["dtype"],
+            "offline": runtime["offline"],
+        }
     return {
         "schema_version": 1,
         "report_kind": "voice_asr_score",
@@ -498,24 +574,8 @@ def score_predictions(
             "python_version": sys.version.split()[0],
             "implementation": "stdlib deterministic edit-distance and speaker-cluster bootstrap",
         },
-        "model": {
-            "id": model_id, "revision_claimed": model_revision, "license_declared": model_license,
-            "source_snapshot_manifest_sha256": source_tree_sha,
-            "source_snapshot_file_count": source_file_count,
-            "source_snapshot_bytes": source_bytes,
-            "converted_export_manifest_sha256": model_tree_sha,
-            "converted_export_file_count": model_files,
-            "converted_export_bytes": model_bytes,
-        },
-        "runtime": {
-            "kind": runtime["kind"],
-            "runtime_commit": runtime["runtime_commit"],
-            "converter_commit": runtime["converter_commit"],
-            "runtime_binary_sha256": actual_runtime_sha,
-            "artifact_path": artifact_relative.as_posix(),
-            "artifact_sha256": runtime["artifact_sha256"],
-            "quantization": runtime["quantization"],
-        },
+        "model": model_record,
+        "runtime": runtime_record,
         "dataset": {
             "id": dataset["id"], "version": dataset["version"], "license_id_operator_supplied": dataset.get("license_id_operator_supplied"),
             "archive_sha256": archive_sha, "test_metadata_sha256": test_meta_sha,
@@ -594,13 +654,14 @@ def main() -> int:
     parser.add_argument("--intake-report", required=True, type=Path)
     parser.add_argument("--predictions", required=True, type=Path)
     parser.add_argument("--outcomes", required=True, type=Path, help="exact private outcomes JSONL hashed by the prediction pack")
-    parser.add_argument("--model-root", required=True, type=Path, help="converted local whisper.cpp model package directory")
-    parser.add_argument("--source-model-root", required=True, type=Path, help="exact local upstream model snapshot directory before conversion")
+    parser.add_argument("--model-root", required=True, type=Path, help="runtime model directory: converted whisper.cpp export or native Transformers snapshot")
+    parser.add_argument("--source-model-root", required=True, type=Path, help="exact local upstream model snapshot directory; same as --model-root for Transformers")
     parser.add_argument("--locale", required=True)
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--model-revision", required=True, help="40-hex repository commit SHA used to export model-root")
     parser.add_argument("--model-license", required=True, help="license identifier from the model card")
-    parser.add_argument("--runtime-binary", required=True, type=Path, help="exact local whisper.cpp executable used for inference")
+    parser.add_argument("--runtime-binary", required=True, type=Path, help="exact local whisper-cli executable or Python interpreter used for inference")
+    parser.add_argument("--runtime-worker", type=Path, help="exact Transformers worker script; required when runtime.kind is transformers")
     parser.add_argument("--mode", choices=("smoke", "heldout-evaluation"), default="smoke")
     parser.add_argument("--bootstrap-iterations", type=int, default=1000)
     parser.add_argument("--report", required=True, type=Path)
@@ -625,10 +686,14 @@ def main() -> int:
             locale=args.locale,
             intake_report_path=args.intake_report,
             runtime_binary_path=args.runtime_binary,
+            runtime_worker_path=args.runtime_worker,
             mode=args.mode,
             bootstrap_iterations=args.bootstrap_iterations,
         )
-        write_report_exclusive(args.report, report, [args.dataset_root, args.model_root, args.source_model_root])
+        forbidden_roots = [args.dataset_root, args.model_root, args.source_model_root]
+        if args.runtime_worker is not None:
+            forbidden_roots.append(args.runtime_worker)
+        write_report_exclusive(args.report, report, forbidden_roots)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
     print(json.dumps({
