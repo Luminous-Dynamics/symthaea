@@ -42,7 +42,7 @@ This is a reasoned local persistence configuration, not proof against all hardwa
 2. **ACK authenticity:** protected queue records must use `acknowledge_protected`, which verifies a canonical Ed25519 receiver-signed positive ACK against an explicitly supplied trusted-key map. The legacy unsigned ACK path refuses protected records. The new `ReceiverInbox` commits exact ciphertext and the event-ID/digest replay record before generating its signed ACK, so a retry after a commit-but-lost-ACK is idempotent. This prototype-level receiver flow is not yet proof of target-filesystem crash/power-loss behavior or downstream processing transaction atomicity.
 3. **Payload protection:** the protected API persists AEAD-encrypted envelope bytes, validates their SHA-256 digest/size binding, and replays the exact bytes. The queue itself does not encrypt or verify signatures; the caller must use the envelope adapter and the receiver must verify. The database is not encrypted by this module, so event metadata remains readable at rest.
 4. **Schema migration:** schema migration advances version 1/2 to version 3 with PRAGMA user_version and adds an optional `envelope_bytes` BLOB; unsupported future versions fail closed. Future changes need versioned, transactional migrations and downgrade/upgrade tests.
-5. **Privacy budgeting:** delivery retries must not double-charge a retransmission of an identical private release. The separate DP accountant must transactionally reserve unique release identity, participant contribution bounds, mechanism, adjacency definition, and cumulative privacy spend. It is still a separate, not-yet-production component.
+5. **Privacy budgeting:** delivery retries must not double-charge an identical private release. The separate `DurablePrivacyLedger` prototype now transactionally reserves unique release identity, HMAC-tagged participant membership, mechanism, adjacency, declared contribution cap/policy, and cumulative epsilon/delta spend. It does not generate noise or prove upstream clipping; see [DURABLE_DP_RELEASE_ACCOUNTING.md](DURABLE_DP_RELEASE_ACCOUNTING.md).
 6. **Power/control:** a queue ACK is never actuator authorization. Any later actuator command path needs separate credentials, local interlocks, bounded capabilities and a safety case.
 
 ## Test plan added
@@ -73,7 +73,7 @@ The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 22 tes
 - Execute the exact-head CI suite and preserve the successful run link and commit SHA.
 - Run multi-process contention and deterministic kill/reopen tests against a temporary DB; assert transaction atomicity for selected batch attempts and ACK transitions.
 - Test database full, read-only path, locked DB, malformed DB, unsupported schema version, backup and restore.
-- Validate the new receiver inbox with exact-head CI, target-filesystem crash/power-loss and backup/restore tests; bind sender and receiver key IDs to authorized identities using a reviewed trust registry.
+- Validate sender queue, receiver inbox and DurablePrivacyLedger with exact-head CI, target-filesystem crash/power-loss and backup/restore tests; bind key IDs to authorized identities; and separately verify the DP output generator and contribution clipping.
 - Define and review a bounded terminal-record archive policy before field operation.
 - Benchmark CPU, flash write amplification, energy use and queue throughput on target edge hardware.
 - Keep event payloads out of Mycelix evidence records; pass only authorized, minimized receipts or aggregate envelopes.
