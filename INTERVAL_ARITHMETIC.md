@@ -65,7 +65,7 @@ where `1 <= m < 2`, using its stored significand and exponent (including exact
 normalization of subnormals). It then encloses the series
 
 `ln(m) = 2 * sum(z^(2j+1) / (2j+1))`, where `z = (m - 1) / (m + 1)` and
-`0 <= z < 1/3`.
+`0 <= z <= 1/3`. The upper endpoint is attained when the routine evaluates `ln(2)` itself.
 
 The first 64 terms are evaluated using interval operations. Since the omitted
 tail is bounded by
