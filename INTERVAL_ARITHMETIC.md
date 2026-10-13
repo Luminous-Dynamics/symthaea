@@ -24,12 +24,14 @@ crate::hdc::interval_arithmetic::{Interval, IntervalError}.
   endpoint calculations.
 - Division fails with DivisionByIntervalContainingZero when the divisor might
   be zero. Indeterminate endpoint quotients widen to the whole real line.
-- square, absolute, and checked_powi provide conservative range operations.
-  The integer-power path is logarithmic in the exponent and rejects zero-to-zero
-  and negative powers over intervals containing zero.
+- square, checked_sqrt, absolute, and checked_powi provide conservative range
+  operations. Square root rejects any interval containing negative reals and
+  expands each nonzero endpoint by one representable value outward. The integer-
+  power path is logarithmic in the exponent and rejects zero-to-zero and negative
+  powers over intervals containing zero.
 - Expr::eval_interval evaluates symbolic arithmetic and finite sums over
-  interval-valued variable bindings. It supports integer powers, absolute value,
-  floor, and finite sums with the existing maximum bound of 100.
+  interval-valued variable bindings. It supports integer powers, square root,
+  absolute value, floor, and finite sums with the existing maximum bound of 100.
 
 Example:
 
@@ -48,12 +50,17 @@ The outward-rounding guarantee assumes normal IEEE-754 binary64 round-to-nearest
 basic arithmetic and compilation without unsafe fast-math reassociation. It is
 not a machine-checked theorem about every target compiler or processor.
 
-This implementation intentionally does **not** claim interval bounds for
-transcendental functions such as sin, cos, exp, ln, or sqrt. Their platform math
-library accuracy is not enough to assume that widening the result by one ULP is
-always sound without a separately reviewed guarantee. The interval expression
-evaluator returns UnsupportedFunction for those operations until a proper
-enclosure method is added.
+Square root is supported using Rust's documented IEEE-754 correctly rounded
+`f64::sqrt` result, then stepping one representable value outward for each
+nonzero endpoint. See the [Rust `f64::sqrt` contract](https://doc.rust-lang.org/stable/std/primitive.f64.html#method.sqrt).
+Zero is retained exactly, and any interval including negative reals is rejected.
+This is a narrower, explicit rule than assuming arbitrary platform math calls
+are safe to widen by one ULP.
+
+The evaluator still does **not** claim interval bounds for sin, cos, exp, or ln.
+Rust documents several of these functions' precision as unspecified and
+potentially platform-dependent, so they remain `UnsupportedFunction` until a
+separately reviewed enclosure algorithm is added.
 
 A wider interval is conservative, not proof of a desired property. For example,
 an interval whose lower bound is negative does not prove the true result is
