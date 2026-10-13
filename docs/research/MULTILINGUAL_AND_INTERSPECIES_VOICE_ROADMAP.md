@@ -243,7 +243,6 @@ A 2025 open-access review of ethical issues around AI-mediated interspecies comm
 - The validator checks evidence shape only. It does not contact GitHub to verify that a run passed, nor does it measure actual language quality. Promotion to a higher status still requires independent review of the linked artifacts and exact commit.
 
 - **M2 — Human-language adapter baseline:** compare an appropriate multilingual ASR/translation/TTS stack on a small set of high-value languages, starting with English, isiZulu, isiXhosa, Afrikaans and additional languages chosen with speakers. Keep translation, recognition and generation scores separate.
-- **M2 — Human-language adapter baseline:** compare an appropriate multilingual ASR/translation/TTS stack on a small set of high-value languages, starting with English, isiZulu, isiXhosa, Afrikaans and additional languages chosen with speakers. Keep translation, recognition and generation scores separate.
 - **M3 — Click prototype:** construct a click-specific transient event in isolation and test generated audio against recorded exemplars before placing it inside connected speech.
 - **M4 — Animal sound baseline:** choose one species/task with a usable ethical dataset, pin a model and dataset, and evaluate on held-out recordings. No “translation” label until independently validated.
 - **M5 — Controlled interaction trial:** only after M4, collaborate with relevant animal-behavior experts on minimal-risk, observable-outcome trials.
