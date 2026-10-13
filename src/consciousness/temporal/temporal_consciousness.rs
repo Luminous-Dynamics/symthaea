@@ -928,8 +928,28 @@ impl TemporalBindingAnalysis {
         }
     }
 
-    /// Add a temporal binding (capped at 256 to prevent unbounded growth).
+    /// Compatibility wrapper for adding a binding.
+    ///
+    /// Invalid strengths are rejected without mutation; use try_add_binding when
+    /// the caller needs to know whether the binding was admitted.
     pub fn add_binding(&mut self, a: &str, b: &str, relation: AllenRelation, strength: f64) {
+        let _ = self.try_add_binding(a, b, relation, strength);
+    }
+
+    /// Add a binding with a finite strength in the inclusive [0, 1] range.
+    ///
+    /// Returns false without mutation for NaN, infinity, or out-of-range strengths.
+    /// The retained set remains capped at 256 entries.
+    pub fn try_add_binding(
+        &mut self,
+        a: &str,
+        b: &str,
+        relation: AllenRelation,
+        strength: f64,
+    ) -> bool {
+        if !strength.is_finite() || !(0.0..=1.0).contains(&strength) {
+            return false;
+        }
         if self.bindings.len() >= 256 {
             // Evict weakest binding
             if let Some(min_idx) = self
@@ -953,6 +973,7 @@ impl TemporalBindingAnalysis {
             strength,
         });
         self.update_overall_strength();
+        true
     }
 
     fn update_overall_strength(&mut self) {
@@ -2162,6 +2183,31 @@ mod tests {
         assert!(report.overall_coherence >= 0.0);
 
         println!("{}", report);
+    }
+
+    #[test]
+    fn binding_rejects_nonfinite_and_out_of_range_strength_without_mutation() {
+        let mut binding = TemporalBindingAnalysis::new();
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.01, 1.01] {
+            assert!(!binding.try_add_binding(
+                "perception",
+                "memory",
+                AllenRelation::Overlaps,
+                invalid,
+            ));
+            assert!(binding.bindings.is_empty());
+            assert_eq!(binding.binding_strength, 1.0);
+            assert_eq!(binding.gamma_sync, 0.8);
+        }
+
+        assert!(binding.try_add_binding(
+            "perception",
+            "memory",
+            AllenRelation::Overlaps,
+            0.9,
+        ));
+        assert_eq!(binding.bindings.len(), 1);
+        assert!((binding.binding_strength - 0.9).abs() < 1e-12);
     }
 
     #[test]
