@@ -32,7 +32,7 @@ NORMALIZATION_ID = "nfkc-casefold-punctuation-to-space-v1"
 PREDICTION_KEYS = {
     "schema_version", "locale", "dataset_id", "dataset_version",
     "archive_sha256", "test_metadata_sha256", "model_id", "model_revision",
-    "model_license", "outcomes_sha256", "runtime", "predictions",
+    "model_license", "source_model_snapshot_sha256", "outcomes_sha256", "runtime", "predictions",
 }
 RUNTIME_KEYS = {
     "kind", "runtime_commit", "converter_commit", "runtime_binary_sha256",
@@ -269,6 +269,7 @@ def score_predictions(
     dataset_root: Path,
     archive: Path,
     model_root: Path,
+    source_model_root: Path,
     predictions_path: Path,
     outcomes_path: Path,
     model_id: str,
@@ -303,6 +304,13 @@ def score_predictions(
     _need(prediction_doc["model_id"] == model_id, "prediction model_id mismatch")
     _need(prediction_doc["model_revision"] == model_revision, "prediction model_revision mismatch")
     _need(prediction_doc["model_license"] == model_license, "prediction model_license mismatch")
+    source_digest = prediction_doc["source_model_snapshot_sha256"]
+    _need(isinstance(source_digest, str) and SHA256_RE.fullmatch(source_digest) is not None,
+          "source_model_snapshot_sha256 must be a 64-hex SHA-256 digest")
+    _need(source_model_root.is_dir() and not source_model_root.is_symlink(),
+          "source_model_root must be a real directory, not a symlink")
+    source_tree_sha, source_file_count, source_bytes = _hash_tree(source_model_root)
+    _need(source_tree_sha == source_digest, "source model snapshot SHA-256 differs from prediction provenance")
     outcomes_sha = prediction_doc["outcomes_sha256"]
     _need(isinstance(outcomes_sha, str) and SHA256_RE.fullmatch(outcomes_sha) is not None,
           "outcomes_sha256 must be a 64-hex SHA-256 digest")
@@ -453,8 +461,12 @@ def score_predictions(
         "normalization": NORMALIZATION_ID,
         "model": {
             "id": model_id, "revision_claimed": model_revision, "license_declared": model_license,
-            "snapshot_manifest_sha256": model_tree_sha, "snapshot_file_count": model_files,
-            "snapshot_bytes": model_bytes,
+            "source_snapshot_manifest_sha256": source_tree_sha,
+            "source_snapshot_file_count": source_file_count,
+            "source_snapshot_bytes": source_bytes,
+            "converted_export_manifest_sha256": model_tree_sha,
+            "converted_export_file_count": model_files,
+            "converted_export_bytes": model_bytes,
         },
         "runtime": {
             "kind": runtime["kind"],
@@ -537,7 +549,8 @@ def main() -> int:
     parser.add_argument("--intake-report", required=True, type=Path)
     parser.add_argument("--predictions", required=True, type=Path)
     parser.add_argument("--outcomes", required=True, type=Path, help="exact private outcomes JSONL hashed by the prediction pack")
-    parser.add_argument("--model-root", required=True, type=Path, help="regular-file export of the exact offline model snapshot")
+    parser.add_argument("--model-root", required=True, type=Path, help="converted local whisper.cpp model package directory")
+    parser.add_argument("--source-model-root", required=True, type=Path, help="exact local upstream model snapshot directory before conversion")
     parser.add_argument("--locale", required=True)
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--model-revision", required=True, help="40-hex repository commit SHA used to export model-root")
@@ -558,6 +571,7 @@ def main() -> int:
             dataset_root=args.dataset_root,
             archive=args.archive,
             model_root=args.model_root,
+            source_model_root=args.source_model_root,
             predictions_path=args.predictions,
             outcomes_path=args.outcomes,
             model_id=args.model_id,
