@@ -89,10 +89,18 @@ def build_predictions(
     model_id: str,
     model_revision: str,
     model_license: str,
-    runtime_commit: str,
-    converter_commit: str,
-    artifact_path: str,
-    quantization: str,
+    runtime_commit: str | None = None,
+    converter_commit: str | None = None,
+    artifact_path: str | None = None,
+    quantization: str | None = None,
+    runtime_kind: str = "whisper.cpp",
+    runtime_worker_path: Path | None = None,
+    python_version: str | None = None,
+    torch_version: str | None = None,
+    transformers_version: str | None = None,
+    numpy_version: str | None = None,
+    device: str | None = None,
+    dtype: str | None = None,
     mode: str = "smoke",
 ) -> dict[str, Any]:
     _need(mode in {"smoke", "heldout-evaluation"}, "mode must be smoke or heldout-evaluation")
@@ -100,11 +108,27 @@ def build_predictions(
     _need(isinstance(model_revision, str) and SHA1_RE.fullmatch(model_revision),
           "model_revision must be a 40-hex repository commit SHA")
     _need(isinstance(model_license, str) and model_license.strip(), "model license must be explicit")
-    for name, value in (("runtime_commit", runtime_commit), ("converter_commit", converter_commit)):
-        _need(isinstance(value, str) and SHA1_RE.fullmatch(value),
-              f"{name} must be a 40-hex repository commit SHA")
-    _need(isinstance(quantization, str) and re.fullmatch(r"[A-Za-z0-9._+-]{1,32}", quantization) is not None,
-          "quantization must be an explicit compact identifier")
+    _need(runtime_kind in {"whisper.cpp", "transformers"}, "runtime_kind must be whisper.cpp or transformers")
+    if runtime_kind == "whisper.cpp":
+        for name, value in (("runtime_commit", runtime_commit), ("converter_commit", converter_commit)):
+            _need(isinstance(value, str) and SHA1_RE.fullmatch(value),
+                  f"{name} must be a 40-hex repository commit SHA")
+        _need(isinstance(quantization, str) and re.fullmatch(r"[A-Za-z0-9._+-]{1,32}", quantization) is not None,
+              "quantization must be an explicit compact identifier")
+        _need(isinstance(artifact_path, str) and artifact_path.strip(),
+              "artifact_path is required for whisper.cpp")
+    else:
+        _need(runtime_worker_path is not None and runtime_worker_path.is_file()
+              and not runtime_worker_path.is_symlink(),
+              "Transformers runtime requires a regular runtime_worker_path")
+        for name, value in (
+            ("python_version", python_version), ("torch_version", torch_version),
+            ("transformers_version", transformers_version), ("numpy_version", numpy_version),
+        ):
+            _need(isinstance(value, str) and value.strip() and "\n" not in value and "\r" not in value,
+                  f"{name} must be explicitly recorded")
+        _need(device in {"cpu", "cuda"}, "Transformers device must be cpu or cuda")
+        _need(dtype in {"float32", "float16", "bfloat16"}, "Transformers dtype is unsupported")
 
     dataset, test_rows, test_sha = _load_intake(
         intake_report, dataset_root=dataset_root, archive=archive, locale=locale, expected_mode=mode
@@ -131,25 +155,52 @@ def build_predictions(
           "source_model_root must be a real directory, not a symlink")
     converted_root_real = model_root.resolve(strict=True)
     source_root_real = source_model_root.resolve(strict=True)
-    _need(converted_root_real != source_root_real
-          and converted_root_real not in source_root_real.parents
-          and source_root_real not in converted_root_real.parents,
-          "source_model_root and converted model_root must be separate, non-nested directories")
+    _need(converted_root_real == source_root_real or (
+          converted_root_real not in source_root_real.parents
+          and source_root_real not in converted_root_real.parents),
+          "source_model_root and runtime model_root must be the same snapshot or separate non-nested directories")
     source_snapshot_sha, _source_file_count, _source_bytes = _hash_tree(source_model_root)
     _need(runtime_binary.is_file() and not runtime_binary.is_symlink(),
           "runtime_binary must be a regular non-symlink file")
-    model_root_real = model_root.resolve(strict=True)
-    relative_artifact = safe_relative_path(artifact_path, "artifact_path")
-    artifact = model_root / relative_artifact
-    current = model_root
-    for part in relative_artifact.parts:
-        current = current / part
-        _need(not current.is_symlink(), "model artifact path contains a symlink")
-    _need(artifact.is_file(), "artifact_path must identify a regular model file")
-    _need(artifact.resolve(strict=True).is_relative_to(model_root_real),
-          "artifact_path escapes model_root")
-    artifact_sha = sha256_file(artifact)
     runtime_sha = sha256_file(runtime_binary)
+    runtime_record: dict[str, Any]
+    if runtime_kind == "whisper.cpp":
+        _need(converted_root_real != source_root_real,
+              "whisper.cpp converted export and source snapshot must be separate directories")
+        relative_artifact = safe_relative_path(artifact_path or "", "artifact_path")
+        artifact = model_root / relative_artifact
+        current = model_root
+        for part in relative_artifact.parts:
+            current = current / part
+            _need(not current.is_symlink(), "model artifact path contains a symlink")
+        _need(artifact.is_file(), "artifact_path must identify a regular model file")
+        _need(artifact.resolve(strict=True).is_relative_to(converted_root_real),
+              "artifact_path escapes model_root")
+        artifact_sha = sha256_file(artifact)
+        runtime_record = {
+            "kind": "whisper.cpp",
+            "runtime_commit": runtime_commit,
+            "converter_commit": converter_commit,
+            "runtime_binary_sha256": runtime_sha,
+            "artifact_path": relative_artifact.as_posix(),
+            "artifact_sha256": artifact_sha,
+            "quantization": quantization,
+        }
+    else:
+        _need(converted_root_real == source_root_real,
+              "Transformers model-root must be the exact source-model-root snapshot")
+        runtime_record = {
+            "kind": "transformers",
+            "python_executable_sha256": runtime_sha,
+            "worker_script_sha256": sha256_file(runtime_worker_path),
+            "python_version": python_version,
+            "torch_version": torch_version,
+            "transformers_version": transformers_version,
+            "numpy_version": numpy_version,
+            "device": device,
+            "dtype": dtype,
+            "offline": True,
+        }
 
     return {
         "schema_version": 1,
@@ -163,15 +214,7 @@ def build_predictions(
         "model_license": model_license,
         "source_model_snapshot_sha256": source_snapshot_sha,
         "outcomes_sha256": outcomes_hash,
-        "runtime": {
-            "kind": "whisper.cpp",
-            "runtime_commit": runtime_commit,
-            "converter_commit": converter_commit,
-            "runtime_binary_sha256": runtime_sha,
-            "artifact_path": relative_artifact.as_posix(),
-            "artifact_sha256": artifact_sha,
-            "quantization": quantization,
-        },
+        "runtime": runtime_record,
         "predictions": [
             {"path": path, "text": seen[path]}
             for path in sorted(expected)
@@ -207,17 +250,25 @@ def main() -> int:
     parser.add_argument("--intake-report", required=True, type=Path)
     parser.add_argument("--dataset-root", required=True, type=Path)
     parser.add_argument("--archive", required=True, type=Path)
-    parser.add_argument("--model-root", required=True, type=Path, help="converted local whisper.cpp model package")
-    parser.add_argument("--source-model-root", required=True, type=Path, help="exact upstream model snapshot as acquired locally")
-    parser.add_argument("--runtime-binary", required=True, type=Path)
+    parser.add_argument("--model-root", required=True, type=Path, help="runtime model directory: converted whisper.cpp export or native Transformers snapshot")
+    parser.add_argument("--source-model-root", required=True, type=Path, help="exact upstream snapshot; same directory as --model-root for Transformers")
+    parser.add_argument("--runtime-binary", required=True, type=Path, help="whisper-cli executable or exact Python interpreter used for inference")
+    parser.add_argument("--runtime-kind", choices=("whisper.cpp", "transformers"), default="whisper.cpp")
+    parser.add_argument("--runtime-worker", type=Path, help="exact local Transformers worker script; required for runtime-kind transformers")
     parser.add_argument("--locale", required=True)
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--model-revision", required=True, help="exact 40-hex upstream model repository commit")
     parser.add_argument("--model-license", required=True)
-    parser.add_argument("--runtime-commit", required=True, help="40-hex whisper.cpp source commit used to build runtime")
-    parser.add_argument("--converter-commit", required=True, help="40-hex whisper.cpp source commit used to convert model")
-    parser.add_argument("--artifact-path", required=True, help="model path relative to model-root")
-    parser.add_argument("--quantization", required=True, help="e.g. f16 or q5_0; never inferred from filename")
+    parser.add_argument("--runtime-commit", help="40-hex whisper.cpp source commit used to build runtime")
+    parser.add_argument("--converter-commit", help="40-hex whisper.cpp source commit used to convert model")
+    parser.add_argument("--artifact-path", help="model path relative to model-root for whisper.cpp")
+    parser.add_argument("--quantization", help="e.g. f16 or q5_0; never inferred from filename")
+    parser.add_argument("--python-version", help="exact Python version reported by the worker")
+    parser.add_argument("--torch-version", help="exact PyTorch version reported by the worker")
+    parser.add_argument("--transformers-version", help="exact Transformers version reported by the worker")
+    parser.add_argument("--numpy-version", help="exact NumPy version reported by the worker")
+    parser.add_argument("--device", choices=("cpu", "cuda"), help="actual device reported by the worker")
+    parser.add_argument("--dtype", choices=("float32", "float16", "bfloat16"), help="actual dtype reported by the worker")
     parser.add_argument("--mode", choices=("smoke", "heldout-evaluation"), default="smoke")
     parser.add_argument("--output", required=True, type=Path, help="new private predictions JSON; contains all reference and hypothesis text")
     args = parser.parse_args()
@@ -229,7 +280,11 @@ def main() -> int:
             source_model_root=args.source_model_root, runtime_binary=args.runtime_binary, locale=args.locale, model_id=args.model_id,
             model_revision=args.model_revision, model_license=args.model_license,
             runtime_commit=args.runtime_commit, converter_commit=args.converter_commit,
-            artifact_path=args.artifact_path, quantization=args.quantization, mode=args.mode,
+            artifact_path=args.artifact_path, quantization=args.quantization,
+            runtime_kind=args.runtime_kind, runtime_worker_path=args.runtime_worker,
+            python_version=args.python_version, torch_version=args.torch_version,
+            transformers_version=args.transformers_version, numpy_version=args.numpy_version,
+            device=args.device, dtype=args.dtype, mode=args.mode,
         )
         write_private_exclusive(
             args.output, doc,
