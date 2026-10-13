@@ -163,6 +163,7 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.assertEqual(doc["source_model_snapshot_sha256"], _hash_tree(self.source_model_root)[0])
         self.assertEqual(doc["runtime"]["python_executable_sha256"], sha256_file(self.runtime_binary))
         self.assertEqual(doc["runtime"]["worker_script_sha256"], sha256_file(self.runtime_worker))
+        self.assertEqual(doc["runtime"]["startup_metadata_log_sha256"], sha256_file(self.runtime_metadata_log))
         self.assertEqual(doc["runtime"]["python_version"], "3.12.1")
         self.assertEqual(doc["runtime"]["startup_metadata_log_sha256"], sha256_file(self.runtime_metadata_log))
         self.assertTrue(doc["runtime"]["offline"])
@@ -197,7 +198,7 @@ class OutcomesToPredictionsTests(unittest.TestCase):
             )
 
     def test_transformers_pack_rejects_startup_snapshot_digest_drift(self):
-        with self.assertRaisesRegex(ValueError, "model snapshot digest differs"):
+        with self.assertRaisesRegex(ValueError, "runtime_model_snapshot_sha256 differs from the worker startup metadata"):
             self.build(
                 model_root=self.source_model_root,
                 source_model_root=self.source_model_root,
