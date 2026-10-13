@@ -668,6 +668,59 @@ mod receipt_privacy_tests {
         }
     }
 
+
+    #[test]
+    fn navigation_origin_is_canonical_http_origin_only() {
+        assert_eq!(
+            safe_navigation_origin(
+                "HTTPS://user:password@Example.COM:443/private/path?token=query-secret#fragment-secret"
+            ),
+            Some("https://example.com".to_string())
+        );
+        assert_eq!(
+            safe_navigation_origin("http://[2001:db8::1]:8080/private"),
+            Some("http://[2001:db8::1]:8080".to_string())
+        );
+        assert_eq!(safe_navigation_origin("file:///private/secret"), None);
+        assert_eq!(safe_navigation_origin("javascript:alert(1)"), None);
+        assert_eq!(safe_navigation_origin("not a URL"), None);
+    }
+
+    #[test]
+    fn every_action_summary_omits_caller_controlled_selector_values() {
+        let actions = [
+            BrowserAction::Click {
+                selector: ElementSelector::Css(SELECTOR_SECRET.to_string()),
+            },
+            BrowserAction::ScrollTo {
+                selector: ElementSelector::Accessible {
+                    role: "button".to_string(),
+                    name: SELECTOR_SECRET.to_string(),
+                },
+            },
+            BrowserAction::ExtractText {
+                selector: Some(SELECTOR_SECRET.to_string()),
+            },
+            BrowserAction::Type {
+                selector: ElementSelector::BackendNodeId(42),
+                text: format!("{PASSWORD} {OTP} {BEARER} {EMAIL}"),
+            },
+            BrowserAction::GoBack,
+            BrowserAction::GoForward,
+            BrowserAction::Screenshot,
+            BrowserAction::NoOp,
+        ];
+
+        for action in &actions {
+            let serialized = serde_json::to_string(&ActionSummary::from_action(action))
+                .expect("summary serializes");
+            assert_no_literals(
+                &serialized,
+                &[PASSWORD, OTP, BEARER, EMAIL, SELECTOR_SECRET],
+            );
+        }
+    }
+
     #[test]
     fn summary_is_secret_safe_without_execution_output_for_abandoned_work() {
         // A cancelled execution future returns no ActionExecution. If a caller
