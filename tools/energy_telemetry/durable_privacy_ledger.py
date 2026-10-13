@@ -87,6 +87,8 @@ def _scaled(value: int | float, *, scale: int, allow_zero: bool, field: str, max
     if not lower_ok:
         comparator = "non-negative" if allow_zero else "positive"
         raise DurablePrivacyPolicyError(f"{field} must be {comparator}")
+    if number > Decimal(maximum) / Decimal(scale):
+        raise DurablePrivacyPolicyError(f"{field} exceeds the configured release limit")
     scaled = int((number * scale).to_integral_value(rounding=ROUND_CEILING))
     if scaled > maximum:
         raise DurablePrivacyPolicyError(f"{field} exceeds the configured release limit")
@@ -603,13 +605,13 @@ class DurablePrivacyLedger:
             db.execute("BEGIN IMMEDIATE")
             try:
                 row = db.execute(
-                    "SELECT receipt_sha256, status, output_sha256, output_bytes "
+                    "SELECT receipt_sha256, status, output_sha256, output_bytes, reserved_at_utc "
                     "FROM privacy_releases WHERE release_id = ?",
                     (release_id,),
                 ).fetchone()
                 if row is None:
                     raise DurablePrivacyPolicyError("cannot commit output without a reservation")
-                receipt_sha256, status, old_digest, old_bytes = row
+                receipt_sha256, status, old_digest, old_bytes, reserved_at_text = row
                 if status == "output_committed":
                     if old_digest != output_sha256 or old_bytes != output_bytes:
                         raise EventIdentityConflict(
@@ -619,6 +621,8 @@ class DurablePrivacyLedger:
                     return CommittedPrivacyOutput(
                         release_id, receipt_sha256, old_digest, old_bytes, True
                     )
+                if committed_text < reserved_at_text:
+                    raise DurablePrivacyPolicyError("output commit time cannot precede its reservation")
                 db.execute(
                     "UPDATE privacy_releases SET status='output_committed', output_sha256=?, "
                     "output_bytes=?, committed_at_utc=? WHERE release_id=? AND status='reserved'",
