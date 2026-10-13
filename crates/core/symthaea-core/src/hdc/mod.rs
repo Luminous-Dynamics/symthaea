@@ -388,11 +388,14 @@ pub mod lsh_index; // LSH index for fast approximate similarity search (heap-opt
 pub mod lsh_simhash; // SimHash for binary vectors (Hamming distance)
 pub mod lsh_similarity; // Adaptive LSH-backed similarity search (Session 7C)
 pub mod math_bridge; // Unified math bridge (NumericTower + Complex → single API)
+pub mod interval_arithmetic; // Outward-rounded interval enclosures for numerical analysis
 #[cfg(test)]
 mod math_integration_tests;
 pub mod native_similarity; // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod number_theory;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
+#[cfg(feature = "exact-rational")]
+pub mod exact_rational; // Bounded arbitrary-precision exact rational arithmetic
 pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
 #[cfg(feature = "parallel")]
 pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)

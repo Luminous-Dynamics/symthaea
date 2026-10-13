@@ -1,0 +1,115 @@
+name: Formal Math Certificate Checker
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/verify_math_certificate.py"
+      - "tools/math_certificate_golden_vectors.py"
+      - "tools/generate_lean_math_certificate.py"
+      - "tests/test_verify_math_certificate.py"
+      - "tests/test_generate_lean_math_certificate.py"
+      - "PRIMALITY_CERTIFICATES.md"
+      - "formal/math-certificate/**"
+      - ".github/workflows/formal-math-certificate-checker.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/verify_math_certificate.py"
+      - "tools/math_certificate_golden_vectors.py"
+      - "tools/generate_lean_math_certificate.py"
+      - "tests/test_verify_math_certificate.py"
+      - "tests/test_generate_lean_math_certificate.py"
+      - "PRIMALITY_CERTIFICATES.md"
+      - "formal/math-certificate/**"
+      - ".github/workflows/formal-math-certificate-checker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  formal-math-certificates:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact event revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Compile Python certificate tools and tests
+        run: >-
+          python3 -m py_compile
+          tools/verify_math_certificate.py
+          tools/math_certificate_golden_vectors.py
+          tools/generate_lean_math_certificate.py
+          tests/test_verify_math_certificate.py
+          tests/test_generate_lean_math_certificate.py
+
+      - name: Run independent byte-verifier regressions
+        run: python3 -m unittest discover -s tests -p 'test_verify_math_certificate.py' -v
+
+      - name: Run Lean-bridge and witness-combination regressions
+        run: python3 -m unittest discover -s tests -p 'test_generate_lean_math_certificate.py' -v
+
+      - name: Generate Lean claims from fixed wire fixtures
+        run: |
+          python3 tools/generate_lean_math_certificate.py \
+            --golden-vector primality-3 \
+            --output "$RUNNER_TEMP/SymthaeaPrimeThree.lean"
+          python3 tools/generate_lean_math_certificate.py \
+            --golden-vector factorization-2 \
+            --output "$RUNNER_TEMP/SymthaeaFactorizationTwo.lean"
+          python3 tools/generate_lean_math_certificate.py \
+            --golden-vector prime-13-multifactor \
+            --output "$RUNNER_TEMP/SymthaeaPrimeThirteen.lean"
+
+      - name: Guard the patched kernel and exact dependency lock
+        working-directory: formal/math-certificate
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          expected_toolchain = "leanprover/lean4:v4.33.1"
+          expected_mathlib = "0df444a360eaa60ab8c11dca51a86af692955474"
+          expected_primecert = "7d3a2de13bb08f111a95203634f9ea52e50e246e"
+
+          toolchain = Path("lean-toolchain").read_text(encoding="utf-8").strip()
+          if toolchain != expected_toolchain:
+              raise SystemExit(f"unexpected Lean kernel pin: {toolchain!r}")
+
+          manifest = json.loads(Path("lake-manifest.json").read_text(encoding="utf-8"))
+          packages = {package["name"]: package for package in manifest["packages"]}
+          mathlib = packages.get("mathlib")
+          primecert = packages.get("PrimeCert")
+          if not mathlib or mathlib["rev"] != expected_mathlib or mathlib["inputRev"] != "v4.33.1":
+              raise SystemExit("Mathlib lock does not match the patched Lean 4.33.1 release")
+          if not primecert or primecert["rev"] != expected_primecert:
+              raise SystemExit("PrimeCert source revision does not match the reviewed pin")
+          lakefile = Path("lakefile.toml").read_text(encoding="utf-8")
+          if 'rev = "v4.33.1"' not in lakefile:
+              raise SystemExit("Lakefile does not directly pin Mathlib v4.33.1")
+          print("Formal kernel and dependency pins match the reviewed trust configuration.")
+          PY
+
+      - name: Build the pinned Lean proof project
+        uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6
+        with:
+          lake-package-directory: formal/math-certificate
+          auto-config: "false"
+          build: "true"
+          test: "false"
+          axiom-audit: "true"
+          axiom-audit-root: "SymthaeaMathCertificates"
+          axiom-audit-allow: "propext,Classical.choice,Quot.sound"
+
+      - name: Kernel-check byte-bound claims including multi-factor Pocklington
+        working-directory: formal/math-certificate
+        run: |
+          lake env lean "$RUNNER_TEMP/SymthaeaPrimeThree.lean"
+          lake env lean "$RUNNER_TEMP/SymthaeaFactorizationTwo.lean"
+          lake env lean "$RUNNER_TEMP/SymthaeaPrimeThirteen.lean"

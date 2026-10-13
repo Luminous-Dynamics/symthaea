@@ -37,7 +37,10 @@
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::complex::{Complex, ComplexArithmeticEngine, HdcComplex};
-use crate::hdc::numeric_tower::{Number, NumberResult, NumericTower};
+use crate::hdc::numeric_tower::{
+    ArithmeticPrecision, Number, NumberResult, NumericArithmeticError, NumericArithmeticResult,
+    NumericTower,
+};
 use crate::hdc::primitive_system::PrimitiveSystem;
 
 // ============================================================================
@@ -103,6 +106,17 @@ impl MathValue {
             MathValue::Rational { .. } => 2,
             MathValue::Real(_) => 3,
             MathValue::Complex { .. } => 4,
+        }
+    }
+
+    /// Check exact zero without applying the legacy floating-point tolerance.
+    pub fn is_zero_exact(&self) -> bool {
+        match self {
+            MathValue::Natural(n) => *n == 0,
+            MathValue::Integer(n) => *n == 0,
+            MathValue::Rational { numerator, denominator } => *denominator != 0 && *numerator == 0,
+            MathValue::Real(x) => *x == 0.0,
+            MathValue::Complex { re, im } => *re == 0.0 && *im == 0.0,
         }
     }
 
@@ -182,6 +196,21 @@ impl std::fmt::Display for MathValue {
 // Conversion helpers: Number <-> MathValue
 // ============================================================================
 
+/// Check whether a public rational is in reduced form with a positive denominator.
+fn rational_components_are_canonical(numerator: i64, denominator: i64) -> bool {
+    if denominator <= 0 {
+        return false;
+    }
+    let mut a = numerator.unsigned_abs();
+    let mut b = denominator as u64;
+    while b != 0 {
+        let remainder = a % b;
+        a = b;
+        b = remainder;
+    }
+    a == 1
+}
+
 /// Convert a numeric tower `Number` into a `MathValue`.
 fn number_to_math_value(n: &Number) -> MathValue {
     match n {
@@ -236,6 +265,15 @@ pub struct MathResult {
     pub phi: f64,
     /// Ordered list of domain promotions that occurred (e.g. "ℕ → ℤ").
     pub domain_promotions: Vec<String>,
+}
+
+/// Unified math result that preserves whether the computation was exact.
+#[derive(Debug, Clone)]
+pub struct CheckedMathResult {
+    /// The ordinary unified math result, including HDC encoding and promotions.
+    pub result: MathResult,
+    /// Exactness classification from the numeric tower, or Approximate for complex math.
+    pub precision: ArithmeticPrecision,
 }
 
 // ============================================================================
@@ -532,6 +570,293 @@ impl UnifiedMathEngine {
         Some(self.from_tower_result(&nr, a, b, "divide"))
     }
 
+    /// Shared checked binary operation, retaining exactness and rejecting invalid values.
+    fn checked_arithmetic(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+        op: &str,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        Self::validate_checked_math_value(a)?;
+        Self::validate_checked_math_value(b)?;
+        if op == "divide" && b.is_zero_exact() {
+            return Err(NumericArithmeticError::DivisionByZero);
+        }
+
+        if Self::needs_complex(a, b) {
+            let ca = a.to_complex();
+            let cb = b.to_complex();
+            let complex_result = match op {
+                "add" => ca + cb,
+                "subtract" => ca - cb,
+                "multiply" => ca * cb,
+                "divide" => ca / cb,
+                _ => return Err(NumericArithmeticError::NonFiniteResult),
+            };
+            if !complex_result.re.is_finite() || !complex_result.im.is_finite() {
+                return Err(NumericArithmeticError::NonFiniteResult);
+            }
+            return Ok(CheckedMathResult {
+                result: self.from_complex_result(complex_result, a, b, op),
+                precision: ArithmeticPrecision::Approximate,
+            });
+        }
+
+        let na = a.to_tower_number();
+        let nb = b.to_tower_number();
+        let numeric_result: NumericArithmeticResult = match op {
+            "add" => self.tower.checked_add(&na, &nb),
+            "subtract" => self.tower.checked_subtract(&na, &nb),
+            "multiply" => self.tower.checked_multiply(&na, &nb),
+            "divide" => self.tower.checked_divide(&na, &nb),
+            _ => return Err(NumericArithmeticError::NonFiniteResult),
+        }?;
+
+        Ok(CheckedMathResult {
+            result: self.from_tower_result(&numeric_result.result, a, b, op),
+            precision: numeric_result.precision,
+        })
+    }
+
+    fn math_value_is_negative(value: &MathValue) -> bool {
+        match value {
+            MathValue::Integer(number) => *number < 0,
+            MathValue::Rational { numerator, denominator } => {
+                *denominator > 0 && *numerator < 0
+            }
+            MathValue::Real(number) => *number < 0.0,
+            MathValue::Natural(_) | MathValue::Complex { .. } => false,
+        }
+    }
+
+    fn validate_checked_math_result(value: &MathValue) -> Result<(), NumericArithmeticError> {
+        match value {
+            MathValue::Rational { denominator: 0, .. } => {
+                Err(NumericArithmeticError::InvalidRationalOperand)
+            }
+            MathValue::Rational { numerator, denominator }
+                if !rational_components_are_canonical(*numerator, *denominator) =>
+            {
+                Err(NumericArithmeticError::NonCanonicalRationalOperand)
+            }
+            MathValue::Real(number) if !number.is_finite() => {
+                Err(NumericArithmeticError::NonFiniteResult)
+            }
+            MathValue::Complex { re, im } if !re.is_finite() || !im.is_finite() => {
+                Err(NumericArithmeticError::NonFiniteResult)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn validate_checked_math_value(value: &MathValue) -> Result<(), NumericArithmeticError> {
+        match value {
+            MathValue::Rational { denominator: 0, .. } => {
+                Err(NumericArithmeticError::InvalidRationalOperand)
+            }
+            MathValue::Rational { numerator, denominator }
+                if !rational_components_are_canonical(*numerator, *denominator) =>
+            {
+                Err(NumericArithmeticError::NonCanonicalRationalOperand)
+            }
+            MathValue::Real(number) if !number.is_finite() => {
+                Err(NumericArithmeticError::NonFiniteOperand)
+            }
+            MathValue::Complex { re, im } if !re.is_finite() || !im.is_finite() => {
+                Err(NumericArithmeticError::NonFiniteOperand)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Checked addition. Unlike the compatibility API, this reports exactness and
+    /// rejects malformed rational and non-finite inputs with a typed error.
+    pub fn checked_add(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        self.checked_arithmetic(a, b, "add")
+    }
+
+    /// Checked subtraction. Exactness is preserved separately from MathResult.
+    pub fn checked_subtract(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        self.checked_arithmetic(a, b, "subtract")
+    }
+
+    /// Checked multiplication. Exactness is preserved separately from MathResult.
+    pub fn checked_multiply(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        self.checked_arithmetic(a, b, "multiply")
+    }
+
+    /// Checked division, rejecting exact zero and malformed/non-finite operands.
+    pub fn checked_divide(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        self.checked_arithmetic(a, b, "divide")
+    }
+
+    /// Checked square root with exactness metadata and strict operand validation.
+    ///
+    /// Perfect real-domain squares retain Exact precision; irrational roots and
+    /// complex-domain roots are explicitly Approximate. Unlike the compatibility
+    /// sqrt method, malformed rationals, non-finite inputs, and non-finite results
+    /// return typed errors.
+    pub fn checked_sqrt(
+        &self,
+        a: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        Self::validate_checked_math_value(a)?;
+
+        let is_negative = match a {
+            MathValue::Integer(value) => *value < 0,
+            MathValue::Rational { numerator, denominator } => {
+                *denominator > 0 && *numerator < 0
+            }
+            MathValue::Real(value) => *value < 0.0,
+            _ => false,
+        };
+
+        if a.is_complex() || is_negative {
+            let root = a.to_complex().sqrt();
+            if !root.re.is_finite() || !root.im.is_finite() {
+                return Err(NumericArithmeticError::NonFiniteResult);
+            }
+            return Ok(CheckedMathResult {
+                result: self.from_complex_result_unary(root, a, "sqrt"),
+                precision: ArithmeticPrecision::Approximate,
+            });
+        }
+
+        let number = a.to_tower_number();
+        let root = self.tower.checked_sqrt(&number)?;
+        Ok(CheckedMathResult {
+            result: self.from_tower_result_unary(&root.result, a, "sqrt"),
+            precision: root.precision,
+        })
+    }
+
+    /// Checked natural logarithm with explicit real/complex domain policy.
+    ///
+    /// Positive real inputs use the numeric tower, preserving ln(1) = 0 exactly
+    /// when the input is exact. Negative real values promote to the principal
+    /// complex logarithm. Zero, malformed rationals, and non-finite values fail
+    /// with typed errors instead of producing infinities, NaNs, or panics.
+    pub fn checked_ln(
+        &self,
+        value: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        Self::validate_checked_math_value(value)?;
+        if value.is_zero_exact() {
+            return Err(NumericArithmeticError::NonPositiveLogarithmInput);
+        }
+
+        if value.is_complex() || Self::math_value_is_negative(value) {
+            let logged = value.to_complex().ln();
+            if !logged.re.is_finite() || !logged.im.is_finite() {
+                return Err(NumericArithmeticError::NonFiniteResult);
+            }
+            return Ok(CheckedMathResult {
+                result: self.from_complex_result_unary(logged, value, "ln"),
+                precision: ArithmeticPrecision::Approximate,
+            });
+        }
+
+        let number = value.to_tower_number();
+        let logged = self.tower.checked_ln(&number)?;
+        Ok(CheckedMathResult {
+            result: self.from_tower_result_unary(&logged.result, value, "ln"),
+            precision: logged.precision,
+        })
+    }
+
+    /// Checked exponential with typed overflow and total-underflow handling.
+    ///
+    /// Real exact zero maps to exact one; other real and all complex inputs are
+    /// approximate. Nonzero subnormal outputs are preserved instead of being
+    /// confused with total underflow.
+    pub fn checked_exp(
+        &self,
+        value: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        Self::validate_checked_math_value(value)?;
+
+        if value.is_complex() {
+            let exponentiated = value.to_complex().exp();
+            if !exponentiated.re.is_finite() || !exponentiated.im.is_finite() {
+                return Err(NumericArithmeticError::ExponentialOverflow);
+            }
+            if exponentiated.re == 0.0 && exponentiated.im == 0.0 && !value.is_zero_exact() {
+                return Err(NumericArithmeticError::ExponentialUnderflow);
+            }
+            return Ok(CheckedMathResult {
+                result: self.from_complex_result_unary(exponentiated, value, "exp"),
+                precision: ArithmeticPrecision::Approximate,
+            });
+        }
+
+        let number = value.to_tower_number();
+        let exponentiated = self.tower.checked_exp(&number)?;
+        Ok(CheckedMathResult {
+            result: self.from_tower_result_unary(&exponentiated.result, value, "exp"),
+            precision: exponentiated.precision,
+        })
+    }
+
+    /// Checked general exponentiation, preserving exactness metadata.
+    ///
+    /// Defined domain failures and total underflow are typed errors. Complex-domain
+    /// evaluation and real floating-point results are explicitly marked approximate.
+    pub fn checked_power(
+        &self,
+        base: &MathValue,
+        exponent: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        Self::validate_checked_math_value(base)?;
+        Self::validate_checked_math_value(exponent)?;
+
+        if base.is_zero_exact() && exponent.is_zero_exact() {
+            return Err(NumericArithmeticError::IndeterminatePower);
+        }
+        if base.is_zero_exact() && Self::math_value_is_negative(exponent) {
+            return Err(NumericArithmeticError::ZeroToNegativePower);
+        }
+
+        let base_is_negative = Self::math_value_is_negative(base);
+        let exponent_is_fractional = match exponent {
+            MathValue::Rational { denominator, .. } => *denominator != 1,
+            MathValue::Real(value) => value.fract() != 0.0,
+            _ => false,
+        };
+        let complex_evaluation =
+            Self::needs_complex(base, exponent) || (base_is_negative && exponent_is_fractional);
+
+        let result = self.power(base, exponent);
+        Self::validate_checked_math_result(&result.value)?;
+        if !base.is_zero_exact() && !exponent.is_zero_exact() && result.value.is_zero_exact() {
+            return Err(NumericArithmeticError::UnderflowToZero);
+        }
+
+        let precision = if complex_evaluation
+            || matches!(result.value, MathValue::Real(_) | MathValue::Complex { .. })
+        {
+            ArithmeticPrecision::Approximate
+        } else {
+            ArithmeticPrecision::Exact
+        };
+        Ok(CheckedMathResult { result, precision })
+    }
+
     /// Square root: sqrt(a).
     ///
     /// Negative reals and negative integers auto-promote to Complex:
@@ -586,8 +911,10 @@ impl UnifiedMathEngine {
         // (negative base with non-integer exponent → promote to ℂ)
         let base_f64 = base.to_f64();
         let exp_is_fractional = match exp {
-            MathValue::Rational { .. } => true,
-            MathValue::Real(x) => x.fract().abs() > 1e-12,
+            MathValue::Rational { denominator, .. } => *denominator != 1,
+            // A finite float is an integer exactly when its fractional part is
+            // zero. A tolerance can misclassify a nearby non-integer exponent.
+            MathValue::Real(x) => x.fract() != 0.0,
             _ => false,
         };
 
@@ -630,6 +957,51 @@ mod tests {
     // ====================================================================
     // Domain labeling
     // ====================================================================
+
+    #[test]
+    fn test_checked_math_reports_exact_and_approximate_precision() {
+        let engine = UnifiedMathEngine::new();
+        let exact = engine
+            .checked_add(&MathValue::Natural(2), &MathValue::Natural(3))
+            .expect("valid exact sum");
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.value, MathValue::Natural(5)));
+
+        let approximate = engine
+            .checked_add(&MathValue::Real(0.1), &MathValue::Real(0.2))
+            .expect("finite approximate sum");
+        assert_eq!(approximate.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(approximate.result.value, MathValue::Real(value) if value.is_finite()));
+    }
+
+    #[test]
+    fn test_checked_math_rejects_malformed_rational_and_non_finite_values() {
+        let engine = UnifiedMathEngine::new();
+        let malformed = MathValue::Rational { numerator: 1, denominator: 0 };
+        assert_eq!(
+            engine.checked_add(&malformed, &MathValue::Natural(1)).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+        assert_eq!(
+            engine.checked_multiply(&MathValue::Real(f64::INFINITY), &MathValue::Natural(1)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
+
+    #[test]
+    fn test_checked_math_division_uses_exact_zero() {
+        let engine = UnifiedMathEngine::new();
+        assert_eq!(
+            engine.checked_divide(&MathValue::Natural(1), &MathValue::Real(0.0)).unwrap_err(),
+            NumericArithmeticError::DivisionByZero
+        );
+
+        let quotient = engine
+            .checked_divide(&MathValue::Natural(1), &MathValue::Real(1e-16))
+            .expect("small but nonzero divisor");
+        assert_eq!(quotient.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(quotient.result.value, MathValue::Real(value) if value.is_finite()));
+    }
 
     #[test]
     fn test_domain_labels() {
@@ -973,6 +1345,161 @@ mod tests {
     // ====================================================================
     // sqrt(-1) → Complex
     // ====================================================================
+
+    #[test]
+    fn test_checked_ln_preserves_exact_one_and_promotes_negative_to_complex() {
+        let e = engine();
+        let exact = e.checked_ln(&MathValue::Natural(1)).unwrap();
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.value, MathValue::Natural(0)));
+
+        let negative = e.checked_ln(&MathValue::Integer(-1)).unwrap();
+        assert_eq!(negative.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(negative.result.value, MathValue::Complex { re, im } if re.abs() < 1e-12 && (im - std::f64::consts::PI).abs() < 1e-12));
+    }
+
+    #[test]
+    fn test_checked_ln_rejects_zero_and_invalid_inputs_without_panicking() {
+        let e = engine();
+        assert_eq!(
+            e.checked_ln(&MathValue::Natural(0)).unwrap_err(),
+            NumericArithmeticError::NonPositiveLogarithmInput
+        );
+        assert_eq!(
+            e.checked_ln(&MathValue::Complex { re: 0.0, im: 0.0 }).unwrap_err(),
+            NumericArithmeticError::NonPositiveLogarithmInput
+        );
+        assert_eq!(
+            e.checked_ln(&MathValue::Rational { numerator: 2, denominator: 4 }).unwrap_err(),
+            NumericArithmeticError::NonCanonicalRationalOperand
+        );
+        assert_eq!(
+            e.checked_ln(&MathValue::Complex { re: f64::NAN, im: 0.0 }).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
+
+    #[test]
+    fn test_checked_exp_preserves_exact_zero_and_finite_subnormal() {
+        let e = engine();
+        let exact = e.checked_exp(&MathValue::Natural(0)).unwrap();
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.value, MathValue::Natural(1)));
+
+        let subnormal = e.checked_exp(&MathValue::Real(-744.0)).unwrap();
+        assert_eq!(subnormal.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(subnormal.result.value, MathValue::Real(value) if value > 0.0 && value.is_finite()));
+    }
+
+    #[test]
+    fn test_checked_exp_rejects_overflow_underflow_and_nonfinite_values() {
+        let e = engine();
+        assert_eq!(
+            e.checked_exp(&MathValue::Natural(1000)).unwrap_err(),
+            NumericArithmeticError::ExponentialOverflow
+        );
+        assert_eq!(
+            e.checked_exp(&MathValue::Real(-1000.0)).unwrap_err(),
+            NumericArithmeticError::ExponentialUnderflow
+        );
+        assert_eq!(
+            e.checked_exp(&MathValue::Real(f64::NAN)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+        assert_eq!(
+            e.checked_exp(&MathValue::Complex { re: f64::INFINITY, im: 0.0 }).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
+
+    #[test]
+    fn test_checked_power_keeps_rational_integer_exponents_exact() {
+        let e = engine();
+        let result = e.checked_power(
+            &MathValue::Integer(-2),
+            &MathValue::Rational { numerator: 4, denominator: 1 },
+        ).unwrap();
+        assert_eq!(result.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(result.result.value, MathValue::Natural(16)));
+    }
+
+    #[test]
+    fn test_checked_power_rejects_undefined_zero_and_underflow() {
+        let e = engine();
+        assert_eq!(
+            e.checked_power(&MathValue::Natural(0), &MathValue::Natural(0)).unwrap_err(),
+            NumericArithmeticError::IndeterminatePower
+        );
+        assert_eq!(
+            e.checked_power(&MathValue::Natural(0), &MathValue::Integer(-1)).unwrap_err(),
+            NumericArithmeticError::ZeroToNegativePower
+        );
+        assert_eq!(
+            e.checked_power(&MathValue::Natural(2), &MathValue::Integer(i64::MIN)).unwrap_err(),
+            NumericArithmeticError::UnderflowToZero
+        );
+    }
+
+    #[test]
+    fn test_checked_power_preserves_complex_promotion_and_rejects_nonfinite() {
+        let e = engine();
+        let complex = e.checked_power(
+            &MathValue::Integer(-4),
+            &MathValue::Rational { numerator: 1, denominator: 2 },
+        ).unwrap();
+        assert_eq!(complex.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(complex.result.value, MathValue::Complex { re, im } if re.abs() < 1e-10 && (im - 2.0).abs() < 1e-10));
+
+        assert_eq!(
+            e.checked_power(&MathValue::Natural(2), &MathValue::Natural(1024)).unwrap_err(),
+            NumericArithmeticError::NonFiniteResult
+        );
+        assert_eq!(
+            e.checked_power(&MathValue::Rational { numerator: 2, denominator: 4 }, &MathValue::Natural(2)).unwrap_err(),
+            NumericArithmeticError::NonCanonicalRationalOperand
+        );
+        assert_eq!(
+            e.checked_power(&MathValue::Real(f64::NAN), &MathValue::Natural(2)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
+
+    #[test]
+    fn test_checked_sqrt_preserves_exact_and_marks_approximate_roots() {
+        let e = engine();
+        let exact = e.checked_sqrt(&MathValue::Natural(144)).unwrap();
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.value, MathValue::Natural(12)));
+
+        let irrational = e.checked_sqrt(&MathValue::Natural(2)).unwrap();
+        assert_eq!(irrational.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(irrational.result.value, MathValue::Real(value) if value.is_finite()));
+
+        let complex = e.checked_sqrt(&MathValue::Integer(-4)).unwrap();
+        assert_eq!(complex.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(complex.result.value, MathValue::Complex { re, im } if re.abs() < 1e-12 && (im - 2.0).abs() < 1e-12));
+    }
+
+    #[test]
+    fn test_checked_sqrt_rejects_bad_inputs_and_results() {
+        let e = engine();
+        assert_eq!(
+            e.checked_sqrt(&MathValue::Rational { numerator: 1, denominator: 0 }).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+        assert_eq!(
+            e.checked_sqrt(&MathValue::Rational { numerator: 2, denominator: 4 }).unwrap_err(),
+            NumericArithmeticError::NonCanonicalRationalOperand
+        );
+        assert_eq!(
+            e.checked_sqrt(&MathValue::Real(f64::NAN)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+        assert_eq!(
+            e.checked_sqrt(&MathValue::Complex { re: f64::INFINITY, im: 0.0 }).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
 
     #[test]
     fn test_sqrt_negative_one_is_i() {

@@ -4,6 +4,8 @@
 
 use std::fmt;
 
+use crate::hdc::interval_arithmetic::{Interval, IntervalError};
+
 /// A symbolic expression tree for regression.
 ///
 /// Kept simple and self-contained (no PrimitiveSystem dependency) for fast
@@ -18,7 +20,7 @@ pub enum Expr {
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     /// Unary function
     Func(UnaryFn, Box<Expr>),
-    /// Summation: Σ_{k=1}^{n} body(k)
+    /// Inclusive finite summation: Σ_{k=0}^{n} body(k)
     Sum(Box<Expr>, String),
 }
 
@@ -42,50 +44,276 @@ pub enum UnaryFn {
     Floor,
 }
 
+/// Hard cap on the inclusive upper bound of a symbolic finite sum.
+pub const MAX_SUMMATION_UPPER_BOUND: u64 = 100;
+
+/// Typed failures from strict evaluation of a symbolic-regression expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExprEvalError {
+    MissingVariable(String),
+    DuplicateVariableBinding(String),
+    NonFiniteVariableBinding(String),
+    DivisionByZero,
+    IndeterminatePower,
+    DomainError(&'static str),
+    InvalidSummationBound,
+    SummationLimitExceeded { bound: u64, max: u64 },
+    NonFiniteResult,
+}
+
+impl fmt::Display for ExprEvalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingVariable(name) => write!(f, "missing variable binding: {name}"),
+            Self::DuplicateVariableBinding(name) => write!(f, "duplicate variable binding: {name}"),
+            Self::NonFiniteVariableBinding(name) => {
+                write!(f, "non-finite variable binding: {name}")
+            },
+            Self::DivisionByZero => write!(f, "division by zero"),
+            Self::IndeterminatePower => write!(f, "zero raised to zero is indeterminate"),
+            Self::DomainError(reason) => write!(f, "expression domain error: {reason}"),
+            Self::InvalidSummationBound => {
+                write!(f, "summation bound n must be a finite nonnegative integer")
+            }
+            Self::SummationLimitExceeded { bound, max } => {
+                write!(f, "summation upper bound {bound} exceeds configured maximum {max}")
+            }
+            Self::NonFiniteResult => write!(f, "expression produced a non-finite result"),
+        }
+    }
+}
+
+
+impl std::error::Error for ExprEvalError {}
+
+/// Failures from interval evaluation of a symbolic-regression expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExprIntervalError {
+    Interval(IntervalError),
+    MissingVariable(String),
+    DuplicateVariableBinding(String),
+    InvalidSummationBound,
+    NonSingletonSummationBound,
+    SummationLimitExceeded { bound: u64, max: u64 },
+    NonSingletonExponent,
+    NonIntegerExponent,
+    ExponentOutOfRange,
+    UnsupportedFunction(UnaryFn),
+}
+
+impl fmt::Display for ExprIntervalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Interval(error) => write!(f, "{error}"),
+            Self::MissingVariable(name) => write!(f, "missing interval variable binding: {name}"),
+            Self::DuplicateVariableBinding(name) => {
+                write!(f, "duplicate interval variable binding: {name}")
+            },
+            Self::InvalidSummationBound => {
+                write!(f, "summation bound n must be a finite nonnegative integer")
+            },
+            Self::NonSingletonSummationBound => {
+                write!(f, "interval summation bound n must be a singleton")
+            },
+            Self::SummationLimitExceeded { bound, max } => {
+                write!(f, "summation upper bound {bound} exceeds configured maximum {max}")
+            }
+            Self::NonSingletonExponent => write!(f, "interval exponent must be a singleton"),
+            Self::NonIntegerExponent => {
+                write!(f, "interval evaluator only supports integer exponents")
+            },
+            Self::ExponentOutOfRange => {
+                write!(f, "integer exponent is outside the supported i32 range")
+            },
+            Self::UnsupportedFunction(function) => {
+                write!(f, "interval evaluation has no certified rule for {function:?}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ExprIntervalError {}
+
+impl From<IntervalError> for ExprIntervalError {
+    fn from(value: IntervalError) -> Self {
+        Self::Interval(value)
+    }
+}
+
 impl Expr {
-    /// Evaluate the expression with variable bindings.
-    pub fn eval(&self, vars: &[(&str, f64)]) -> f64 {
+    /// Evaluate with strict mathematical-domain and environment checks.
+    ///
+    /// Finite sums use the inclusive convention Σ_{k=0}^{n}; n must be a
+    /// supplied nonnegative integer no greater than MAX_SUMMATION_UPPER_BOUND.
+    /// A sum's bound variable lexically shadows an outer binding of the same name.
+    pub fn eval_checked(&self, vars: &[(&str, f64)]) -> Result<f64, ExprEvalError> {
+        for (index, (name, value)) in vars.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(ExprEvalError::NonFiniteVariableBinding((*name).to_string()));
+            }
+            if vars[index + 1..].iter().any(|(other, _)| *other == *name) {
+                return Err(ExprEvalError::DuplicateVariableBinding((*name).to_string()));
+            }
+        }
+        self.eval_in_environment(vars)
+    }
+
+    /// Evaluate using interval inputs and outward-rounded arithmetic.
+    ///
+    /// The enclosure evaluator supports arithmetic, integer powers, square
+    /// root, natural logarithm, exponential, bounded sine/cosine, absolute value,
+    /// floor, and finite sums. Sine/cosine use series on [-1/2, 1/2] and the
+    /// conservative [-1, 1] enclosure outside that range.
+    pub fn eval_interval(
+        &self,
+        vars: &[(&str, Interval)],
+    ) -> Result<Interval, ExprIntervalError> {
+        for (index, (name, _)) in vars.iter().enumerate() {
+            if vars[index + 1..].iter().any(|(other, _)| *other == *name) {
+                return Err(ExprIntervalError::DuplicateVariableBinding((*name).to_string()));
+            }
+        }
+        self.eval_interval_in_environment(vars)
+    }
+
+    fn eval_interval_in_environment(
+        &self,
+        vars: &[(&str, Interval)],
+    ) -> Result<Interval, ExprIntervalError> {
         match self {
             Expr::Var(name) => vars
                 .iter()
-                .find(|(n, _)| *n == name.as_str())
-                .map(|(_, v)| *v)
-                .unwrap_or(f64::NAN),
-            Expr::Const(c) => *c,
+                .find(|(candidate, _)| *candidate == name.as_str())
+                .map(|(_, value)| *value)
+                .ok_or_else(|| ExprIntervalError::MissingVariable(name.clone())),
+            Expr::Const(value) => Ok(Interval::point(*value)?),
             Expr::BinOp(op, left, right) => {
-                let l = left.eval(vars);
-                let r = right.eval(vars);
+                let lhs = left.eval_interval_in_environment(vars)?;
+                let rhs = right.eval_interval_in_environment(vars)?;
                 match op {
-                    BinOp::Add => l + r,
-                    BinOp::Sub => l - r,
-                    BinOp::Mul => l * r,
-                    BinOp::Div => {
-                        if r.abs() > 1e-15 {
-                            l / r
-                        } else {
-                            f64::NAN
+                    BinOp::Add => Ok(lhs.checked_add(rhs)),
+                    BinOp::Sub => Ok(lhs.checked_subtract(rhs)),
+                    BinOp::Mul => Ok(lhs.checked_multiply(rhs)),
+                    BinOp::Div => Ok(lhs.checked_divide(rhs)?),
+                    BinOp::Pow => {
+                        if rhs.lower() != rhs.upper() {
+                            return Err(ExprIntervalError::NonSingletonExponent);
                         }
+                        let exponent = rhs.lower();
+                        if !exponent.is_finite() {
+                            return Err(ExprIntervalError::NonIntegerExponent);
+                        }
+                        if exponent.fract() != 0.0 {
+                            return Err(ExprIntervalError::NonIntegerExponent);
+                        }
+                        if exponent < i32::MIN as f64 || exponent > i32::MAX as f64 {
+                            return Err(ExprIntervalError::ExponentOutOfRange);
+                        }
+                        Ok(lhs.checked_powi(exponent as i32)?)
                     }
-                    BinOp::Pow => l.powf(r),
                 }
             }
-            Expr::Func(f, arg) => {
-                let x = arg.eval(vars);
-                match f {
-                    UnaryFn::Sqrt => {
-                        if x >= 0.0 {
-                            x.sqrt()
-                        } else {
-                            f64::NAN
-                        }
+            Expr::Func(function, argument) => {
+                let value = argument.eval_interval_in_environment(vars)?;
+                match function {
+                    UnaryFn::Sqrt => Ok(value.checked_sqrt()?),
+                    UnaryFn::Log => Ok(value.checked_ln()?),
+                    UnaryFn::Exp => Ok(value.checked_exp()?),
+                    UnaryFn::Sin => Ok(value.checked_sin()?),
+                    UnaryFn::Cos => Ok(value.checked_cos()?),
+                    UnaryFn::Abs => Ok(value.absolute()),
+                    UnaryFn::Floor => Ok(Interval::new(
+                        value.lower().floor(),
+                        value.upper().floor(),
+                    )?),
+                    unsupported => Err(ExprIntervalError::UnsupportedFunction(*unsupported)),
+                }
+            }
+            Expr::Sum(body, var_name) => {
+                let upper = vars
+                    .iter()
+                    .find(|(name, _)| *name == "n")
+                    .map(|(_, value)| *value)
+                    .ok_or_else(|| ExprIntervalError::MissingVariable("n".to_string()))?;
+                if upper.lower() != upper.upper() {
+                    return Err(ExprIntervalError::NonSingletonSummationBound);
+                }
+                let bound = upper.lower();
+                if !bound.is_finite() || bound < 0.0 || bound.fract() != 0.0 {
+                    return Err(ExprIntervalError::InvalidSummationBound);
+                }
+                if bound > MAX_SUMMATION_UPPER_BOUND as f64 {
+                    return Err(ExprIntervalError::SummationLimitExceeded {
+                        bound: bound as u64,
+                        max: MAX_SUMMATION_UPPER_BOUND,
+                    });
+                }
+
+                let mut sum = Interval::point(0.0)?;
+                for k in 0..=(bound as u64) {
+                    // A summation binder shadows an outer variable with the
+                    // same name, just as it does in ordinary evaluation.
+                    let mut inner_vars: Vec<(&str, Interval)> = vars
+                        .iter()
+                        .copied()
+                        .filter(|(name, _)| *name != var_name.as_str())
+                        .collect();
+                    inner_vars.push((var_name.as_str(), Interval::point(k as f64)?));
+                    let term = body.eval_interval_in_environment(&inner_vars)?;
+                    sum = sum.checked_add(term);
+                }
+                Ok(sum)
+            }
+        }
+    }
+
+    /// Compatibility evaluator. Invalid or undefined expressions return NaN;
+    /// evidence-producing callers should use eval_checked to retain the reason.
+    pub fn eval(&self, vars: &[(&str, f64)]) -> f64 {
+        self.eval_checked(vars).unwrap_or(f64::NAN)
+    }
+
+    fn eval_in_environment(&self, vars: &[(&str, f64)]) -> Result<f64, ExprEvalError> {
+        let value = match self {
+            Expr::Var(name) => {
+                let mut matches = vars.iter().filter(|(candidate, _)| *candidate == name.as_str());
+                let (_, value) = matches
+                    .next()
+                    .ok_or_else(|| ExprEvalError::MissingVariable(name.clone()))?;
+                if matches.next().is_some() {
+                    return Err(ExprEvalError::DuplicateVariableBinding(name.clone()));
+                }
+                *value
+            }
+            Expr::Const(value) => *value,
+            Expr::BinOp(op, left, right) => {
+                let lhs = left.eval_in_environment(vars)?;
+                let rhs = right.eval_in_environment(vars)?;
+                match op {
+                    BinOp::Add => lhs + rhs,
+                    BinOp::Sub => lhs - rhs,
+                    BinOp::Mul => lhs * rhs,
+                    BinOp::Div if rhs == 0.0 => return Err(ExprEvalError::DivisionByZero),
+                    BinOp::Div => lhs / rhs,
+                    BinOp::Pow if lhs == 0.0 && rhs == 0.0 => {
+                        return Err(ExprEvalError::IndeterminatePower);
                     }
-                    UnaryFn::Log => {
-                        if x > 0.0 {
-                            x.ln()
-                        } else {
-                            f64::NAN
-                        }
+                    BinOp::Pow => lhs.powf(rhs),
+                }
+            }
+            Expr::Func(function, argument) => {
+                let x = argument.eval_in_environment(vars)?;
+                match function {
+                    UnaryFn::Sqrt if x < 0.0 => {
+                        return Err(ExprEvalError::DomainError(
+                            "sqrt requires a nonnegative argument",
+                        ));
                     }
+                    UnaryFn::Sqrt => x.sqrt(),
+                    UnaryFn::Log if x <= 0.0 => {
+                        return Err(ExprEvalError::DomainError("log requires a positive argument"));
+                    }
+                    UnaryFn::Log => x.ln(),
                     UnaryFn::Exp => x.exp(),
                     UnaryFn::Sin => x.sin(),
                     UnaryFn::Cos => x.cos(),
@@ -94,23 +322,55 @@ impl Expr {
                 }
             }
             Expr::Sum(body, var_name) => {
-                let n = vars
+                let upper = vars
                     .iter()
                     .find(|(name, _)| *name == "n")
-                    .map(|(_, v)| *v as usize)
-                    .unwrap_or(0)
-                    .min(100);
+                    .map(|(_, value)| *value)
+                    .ok_or_else(|| ExprEvalError::MissingVariable("n".to_string()))?;
+                if upper < 0.0 || upper.fract() != 0.0 {
+                    return Err(ExprEvalError::InvalidSummationBound);
+                }
+                if upper > MAX_SUMMATION_UPPER_BOUND as f64 {
+                    return Err(ExprEvalError::SummationLimitExceeded {
+                        bound: upper as u64,
+                        max: MAX_SUMMATION_UPPER_BOUND,
+                    });
+                }
+                let upper = upper as u64;
+
+                // Neumaier compensated summation reduces loss of low-order terms
+                // when the summand mixes values with very different magnitudes.
                 let mut sum = 0.0f64;
-                for k in 0..=n {
-                    let mut inner_vars: Vec<(&str, f64)> = vars.to_vec();
+                let mut compensation = 0.0f64;
+                for k in 0..=upper {
+                    // A bound variable shadows, rather than duplicates, any
+                    // outer variable with the same name.
+                    let mut inner_vars: Vec<(&str, f64)> = vars
+                        .iter()
+                        .copied()
+                        .filter(|(name, _)| *name != var_name.as_str())
+                        .collect();
                     inner_vars.push((var_name.as_str(), k as f64));
-                    sum += body.eval(&inner_vars);
-                    if !sum.is_finite() {
-                        return f64::NAN;
+                    let term = body.eval_in_environment(&inner_vars)?;
+                    let next = sum + term;
+                    if sum.abs() >= term.abs() {
+                        compensation += (sum - next) + term;
+                    } else {
+                        compensation += (term - next) + sum;
+                    }
+                    sum = next;
+                    if !sum.is_finite() || !compensation.is_finite() {
+                        return Err(ExprEvalError::NonFiniteResult);
                     }
                 }
-                sum
+                sum + compensation
             }
+        };
+
+        if value.is_finite() {
+            Ok(value)
+        } else {
+            Err(ExprEvalError::NonFiniteResult)
         }
     }
 
@@ -398,6 +658,47 @@ pub fn random_expr(rng: &mut u64, max_depth: usize) -> Expr {
     }
 }
 
+/// Conservative domain analysis used to avoid rewriting away undefined subexpressions.
+fn expr_is_total_over_reals(expr: &Expr) -> bool {
+    match expr {
+        Expr::Var(_) => true,
+        Expr::Const(value) => value.is_finite(),
+        Expr::BinOp(BinOp::Add | BinOp::Sub | BinOp::Mul, left, right) => {
+            expr_is_total_over_reals(left) && expr_is_total_over_reals(right)
+        }
+        Expr::BinOp(BinOp::Div, numerator, denominator) => {
+            expr_is_total_over_reals(numerator)
+                && matches!(
+                    denominator.as_ref(),
+                    Expr::Const(value) if value.is_finite() && *value != 0.0
+                )
+        }
+        Expr::BinOp(BinOp::Pow, base, exponent) => {
+            matches!(
+                exponent.as_ref(),
+                Expr::Const(value)
+                    if value.is_finite() && *value >= 1.0 && value.fract() == 0.0
+            ) && expr_is_total_over_reals(base)
+        }
+        Expr::Func(UnaryFn::Sqrt, arg) => matches!(
+            arg.as_ref(),
+            Expr::Const(value) if value.is_finite() && *value >= 0.0
+        ),
+        Expr::Func(UnaryFn::Log, arg) => matches!(
+            arg.as_ref(),
+            Expr::Const(value) if value.is_finite() && *value > 0.0
+        ),
+        Expr::Func(_, arg) => expr_is_total_over_reals(arg),
+        // Keep sums out of totality-based erasure: although bounds are checked,
+        // floating-point term evaluation and accumulation can still overflow.
+        Expr::Sum(_, _) => false,
+    }
+}
+
+fn expr_is_provably_nonzero(expr: &Expr) -> bool {
+    matches!(expr, Expr::Const(value) if value.is_finite() && *value != 0.0)
+}
+
 /// Simplify an expression tree by applying algebraic rewriting rules.
 pub fn simplify(expr: &Expr) -> Expr {
     match expr {
@@ -419,16 +720,32 @@ pub fn simplify(expr: &Expr) -> Expr {
                 (BinOp::Sub, _, Expr::Const(c)) if *c == 0.0 => sl,
                 (BinOp::Mul, _, Expr::Const(c)) if *c == 1.0 => sl,
                 (BinOp::Mul, Expr::Const(c), _) if *c == 1.0 => sr,
-                (BinOp::Mul, _, Expr::Const(c)) if *c == 0.0 => Expr::Const(0.0),
-                (BinOp::Mul, Expr::Const(c), _) if *c == 0.0 => Expr::Const(0.0),
+                (BinOp::Mul, _, Expr::Const(c))
+                    if *c == 0.0 && expr_is_total_over_reals(&sl) =>
+                {
+                    Expr::Const(0.0)
+                }
+                (BinOp::Mul, Expr::Const(c), _)
+                    if *c == 0.0 && expr_is_total_over_reals(&sr) =>
+                {
+                    Expr::Const(0.0)
+                }
                 (BinOp::Div, _, Expr::Const(c)) if *c == 1.0 => sl,
                 (BinOp::Pow, _, Expr::Const(c)) if *c == 1.0 => sl,
-                (BinOp::Pow, _, Expr::Const(c)) if *c == 0.0 => Expr::Const(1.0),
-                (BinOp::Div, _, Expr::BinOp(BinOp::Div, b, c)) => simplify(&Expr::BinOp(
-                    BinOp::Div,
-                    Box::new(Expr::BinOp(BinOp::Mul, Box::new(sl), c.clone())),
-                    b.clone(),
-                )),
+                (BinOp::Pow, _, Expr::Const(c))
+                    if *c == 0.0 && expr_is_provably_nonzero(&sl) =>
+                {
+                    Expr::Const(1.0)
+                }
+                (BinOp::Div, _, Expr::BinOp(BinOp::Div, b, c))
+                    if expr_is_provably_nonzero(b) && expr_is_provably_nonzero(c) =>
+                {
+                    simplify(&Expr::BinOp(
+                        BinOp::Div,
+                        Box::new(Expr::BinOp(BinOp::Mul, Box::new(sl), c.clone())),
+                        b.clone(),
+                    ))
+                }
                 _ => Expr::BinOp(*op, Box::new(sl), Box::new(sr)),
             }
         }
@@ -659,4 +976,331 @@ fn lcg_step(state: u64) -> u64 {
     state
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1442695040888963407)
+}
+
+#[cfg(test)]
+mod domain_safe_simplification_tests {
+    use super::*;
+
+    #[test]
+    fn eval_divides_by_small_nonzero_denominator() {
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Const(1e-16)),
+        );
+        assert_eq!(expr.eval(&[]), 1e16);
+    }
+
+    #[test]
+    fn zero_product_does_not_erase_log_domain() {
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(0.0)),
+            Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var("x".into())))),
+        );
+        let simplified = simplify(&expr);
+        assert!(matches!(simplified, Expr::BinOp(BinOp::Mul, _, _)));
+        assert!(simplified.eval(&[("x", -1.0)]).is_nan());
+    }
+
+    #[test]
+    fn zero_exponent_does_not_erase_zero_base_domain() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(0.0)),
+        );
+        let simplified = simplify(&expr);
+        assert!(matches!(simplified, Expr::BinOp(BinOp::Pow, _, _)));
+        assert!(simplified.eval(&[("x", 0.0)]).is_nan());
+    }
+
+    #[test]
+    fn zero_to_zero_constant_does_not_fold_to_one() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Const(0.0)),
+            Box::new(Expr::Const(0.0)),
+        );
+        let simplified = simplify(&expr);
+        assert!(matches!(simplified, Expr::BinOp(BinOp::Pow, _, _)));
+        assert!(simplified.eval(&[]).is_nan());
+    }
+
+    #[test]
+    fn nested_division_rewrite_preserves_inner_denominator_domain() {
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Var("a".into())),
+            Box::new(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Var("b".into())),
+                Box::new(Expr::Var("c".into())),
+            )),
+        );
+        let simplified = simplify(&expr);
+        assert!(matches!(
+            simplified,
+            Expr::BinOp(BinOp::Div, _, ref right)
+                if matches!(right.as_ref(), Expr::BinOp(BinOp::Div, _, _))
+        ));
+        assert!(simplified.eval(&[("a", 1.0), ("b", 1.0), ("c", 0.0)]).is_nan());
+    }
+    #[test]
+    fn checked_sum_uses_lexical_binding_and_rejects_invalid_bounds() {
+        let sum_k = Expr::Sum(Box::new(Expr::Var("k".into())), "k".into());
+        assert_eq!(sum_k.eval_checked(&[("n", 5.0)]).unwrap(), 15.0);
+        // Closed-form triangular-number identity over the entire allowed bound grid.
+        for n in 0..=MAX_SUMMATION_UPPER_BOUND {
+            let expected = (n * (n + 1) / 2) as f64;
+            assert_eq!(
+                sum_k.eval_checked(&[("n", n as f64)]).unwrap(),
+                expected,
+                "sum(k=0..={n}) should equal n(n+1)/2",
+            );
+        }
+        // The summation binder must shadow, not append behind, an outer k binding.
+        assert_eq!(sum_k.eval_checked(&[("n", 5.0), ("k", 99.0)]).unwrap(), 15.0);
+
+        assert_eq!(
+            sum_k.eval_checked(&[("n", -1.0)]),
+            Err(ExprEvalError::InvalidSummationBound)
+        );
+        assert_eq!(
+            sum_k.eval_checked(&[("n", 1.5)]),
+            Err(ExprEvalError::InvalidSummationBound)
+        );
+        assert_eq!(
+            sum_k.eval_checked(&[("n", 101.0)]),
+            Err(ExprEvalError::SummationLimitExceeded {
+                bound: 101,
+                max: MAX_SUMMATION_UPPER_BOUND,
+            })
+        );
+        assert!(matches!(
+            sum_k.eval_checked(&[]),
+            Err(ExprEvalError::MissingVariable(name)) if name == "n"
+        ));
+    }
+
+    #[test]
+    fn nested_finite_sums_respect_inner_binder_scope() {
+        let nested = Expr::Sum(
+            Box::new(Expr::Sum(
+                Box::new(Expr::Var("k".into())),
+                "k".into(),
+            )),
+            "k".into(),
+        );
+        // For every outer k in 0..=2, the inner sum independently evaluates to 0+1+2.
+        assert_eq!(nested.eval_checked(&[("n", 2.0)]).unwrap(), 9.0);
+    }
+
+    #[test]
+    fn finite_sum_uses_compensated_accumulation_for_cancellation() {
+        // At k = 0, 1, 2 this polynomial evaluates to 1e16, 1, -1e16.
+        // Naive accumulation loses the unit term and returns 0; Neumaier
+        // compensation preserves the mathematically expected floating result 1.
+        let coefficient = -10_000_000_000_000_000.0_f64 + 2.0;
+        let term = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::Const(10_000_000_000_000_000.0)),
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Const(coefficient)),
+                    Box::new(Expr::Var("k".into())),
+                )),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("k".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let sum = Expr::Sum(Box::new(term), "k".into());
+        assert!((sum.eval_checked(&[("n", 2.0)]).unwrap() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn interval_evaluation_encloses_polynomial_over_a_variable_range() {
+        let x_squared_minus_one = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::Const(1.0)),
+        );
+        let result = x_squared_minus_one
+            .eval_interval(&[("x", Interval::new(-2.0, 3.0).unwrap())])
+            .unwrap();
+        assert!(result.lower() <= -1.0);
+        assert!(result.upper() >= 8.0);
+        // The dedicated square operation preserves the nonnegative invariant
+        // before the subtraction, rather than reporting an impossible negative square.
+        let square = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(2.0)),
+        )
+        .eval_interval(&[("x", Interval::new(-2.0, 3.0).unwrap())])
+        .unwrap();
+        assert!(square.lower() >= 0.0);
+        assert!(square.upper() >= 9.0);
+    }
+
+    #[test]
+    fn interval_evaluation_checks_sum_scope_and_integer_exponents() {
+        let sum_k = Expr::Sum(Box::new(Expr::Var("k".into())), "k".into());
+        let result = sum_k
+            .eval_interval(&[
+                ("n", Interval::point(5.0).unwrap()),
+                ("k", Interval::point(99.0).unwrap()),
+            ])
+            .unwrap();
+        assert!(result.lower() <= 15.0 && result.upper() >= 15.0);
+
+        let fractional_power = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(0.5)),
+        );
+        assert_eq!(
+            fractional_power.eval_interval(&[("x", Interval::new(1.0, 4.0).unwrap())]),
+            Err(ExprIntervalError::NonIntegerExponent),
+        );
+
+        let zero_divisor = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Var("x".into())),
+        );
+        assert_eq!(
+            zero_divisor.eval_interval(&[("x", Interval::new(-1.0, 1.0).unwrap())]),
+            Err(ExprIntervalError::Interval(
+                IntervalError::DivisionByIntervalContainingZero
+            )),
+        );
+    }
+
+    #[test]
+    fn interval_evaluation_encloses_square_root_and_checks_domain() {
+        let expression = Expr::Func(UnaryFn::Sqrt, Box::new(Expr::Var("x".into())));
+        let result = expression
+            .eval_interval(&[("x", Interval::new(4.0, 9.0).unwrap())])
+            .unwrap();
+        assert!(result.lower() <= 2.0);
+        assert!(result.upper() >= 3.0);
+        assert!(result.lower() >= 0.0);
+
+        assert_eq!(
+            expression.eval_interval(&[("x", Interval::new(-1.0, 4.0).unwrap())]),
+            Err(ExprIntervalError::Interval(
+                IntervalError::SquareRootOfNegativeInterval
+            ))
+        );
+    }
+
+    #[test]
+    fn interval_evaluation_encloses_exponential_and_unbounded_inputs() {
+        let expression = Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".into())));
+        let result = expression
+            .eval_interval(&[("x", Interval::new(-1.0, 2.0).unwrap())])
+            .unwrap();
+        assert!(result.lower() <= (-1.0_f64).exp());
+        assert!(result.upper() >= 2.0_f64.exp());
+        assert!(result.lower() >= 0.0);
+
+        let tiny = expression
+            .eval_interval(&[("x", Interval::new(f64::NEG_INFINITY, -745.0).unwrap())])
+            .unwrap();
+        assert_eq!(tiny.lower(), 0.0);
+        assert!(tiny.upper() >= f64::from_bits(1));
+    }
+
+    #[test]
+    fn interval_evaluation_encloses_natural_logarithm_and_checks_domain() {
+        let expression = Expr::Func(UnaryFn::Log, Box::new(Expr::Var("x".into())));
+        let result = expression
+            .eval_interval(&[("x", Interval::new(1.0, 4.0).unwrap())])
+            .unwrap();
+        assert!(result.lower() <= 0.0);
+        assert!(result.upper() >= 4.0_f64.ln());
+        assert!(result.contains(2.0_f64.ln()));
+
+        assert_eq!(
+            expression.eval_interval(&[("x", Interval::new(0.0, 4.0).unwrap())]),
+            Err(ExprIntervalError::Interval(
+                IntervalError::LogarithmOfNonPositiveInterval
+            ))
+        );
+    }
+
+    #[test]
+    fn interval_evaluation_encloses_bounded_sine_and_cosine() {
+        let sine = Expr::Func(UnaryFn::Sin, Box::new(Expr::Var("x".into())));
+        let cosine = Expr::Func(UnaryFn::Cos, Box::new(Expr::Var("x".into())));
+        let input = Interval::new(-2.0, 2.0).unwrap();
+
+        let sin_range = sine.eval_interval(&[("x", input)]).unwrap();
+        assert_eq!(sin_range, Interval::new(-1.0, 1.0).unwrap());
+
+        let cos_range = cosine.eval_interval(&[("x", input)]).unwrap();
+        assert!(cos_range.lower() <= -0.4161468365471424);
+        assert_eq!(cos_range.upper(), 1.0);
+
+        // The extremum-aware endpoint hull is useful even when the argument
+        // interval lies to one side of zero, without guessing argument reduction.
+        let narrow = Interval::new(1.6, 1.8).unwrap();
+        let sin_narrow = sine.eval_interval(&[("x", narrow)]).unwrap();
+        assert!(sin_narrow.lower() > 0.9);
+        assert!(sin_narrow.upper() < 1.0);
+        let crosses_maximum = Interval::new(1.55, 1.6).unwrap();
+        assert_eq!(
+            sine.eval_interval(&[("x", crosses_maximum)]).unwrap().upper(),
+            1.0
+        );
+        let cos_narrow = cosine.eval_interval(&[("x", narrow)]).unwrap();
+        assert!(cos_narrow.lower() > -0.5);
+        assert!(cos_narrow.upper() < 0.0);
+
+        let beyond = Interval::new(2.0, 2.1).unwrap();
+        assert_eq!(
+            sine.eval_interval(&[("x", beyond)]).unwrap(),
+            Interval::new(-1.0, 1.0).unwrap()
+        );
+    }
+
+    #[test]
+    fn checked_evaluator_reports_domains_and_nonfinite_values() {
+        let division = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Const(0.0)),
+        );
+        assert_eq!(division.eval_checked(&[]), Err(ExprEvalError::DivisionByZero));
+
+        let log_zero = Expr::Func(UnaryFn::Log, Box::new(Expr::Const(0.0)));
+        assert!(matches!(
+            log_zero.eval_checked(&[]),
+            Err(ExprEvalError::DomainError(_))
+        ));
+
+        let overflow = Expr::Func(UnaryFn::Exp, Box::new(Expr::Const(10_000.0)));
+        assert_eq!(overflow.eval_checked(&[]), Err(ExprEvalError::NonFiniteResult));
+
+        assert!(matches!(
+            Expr::Var("x".into()).eval_checked(&[("x", f64::NAN)]),
+            Err(ExprEvalError::NonFiniteVariableBinding(name)) if name == "x"
+        ));
+        assert!(matches!(
+            Expr::Var("x".into()).eval_checked(&[("x", 1.0), ("x", 2.0)]),
+            Err(ExprEvalError::DuplicateVariableBinding(name)) if name == "x"
+        ));
+    }
+
 }

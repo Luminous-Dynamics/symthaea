@@ -1,0 +1,49 @@
+name: Math Certificate Verifier
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/verify_math_certificate.py"
+      - "tools/math_certificate_golden_vectors.py"
+      - "tests/test_verify_math_certificate.py"
+      - "PRIMALITY_CERTIFICATES.md"
+      - "crates/core/symthaea-core/src/hdc/number_theory.rs"
+      - ".github/workflows/math-certificate-verifier.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/verify_math_certificate.py"
+      - "tools/math_certificate_golden_vectors.py"
+      - "tests/test_verify_math_certificate.py"
+      - "PRIMALITY_CERTIFICATES.md"
+      - "crates/core/symthaea-core/src/hdc/number_theory.rs"
+      - ".github/workflows/math-certificate-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact event revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Record Python version
+        run: python3 --version
+
+      - name: Compile verifier and tests
+        run: python3 -m py_compile tools/verify_math_certificate.py tests/test_verify_math_certificate.py
+
+      - name: Run independent verifier regressions
+        run: python3 -m unittest discover -s tests -p 'test_verify_math_certificate.py' -v
+
+      - name: Check command-line entry point
+        run: python3 tools/verify_math_certificate.py --help
