@@ -109,6 +109,13 @@ class VoiceDatasetIntakeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "archive must be an existing regular file"):
             self.audit(archive=alias)
 
+    def test_symlinked_clips_root_is_rejected(self):
+        external = self.base / "external-clips"
+        (self.root / "clips").rename(external)
+        (self.root / "clips").symlink_to(external, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "root must not be a symlink"):
+            self.audit()
+
     def test_non_mozilla_url_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Mozilla Data Collective URL"):
             self.audit(source_url="https://example.com/dataset")
