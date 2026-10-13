@@ -1492,9 +1492,9 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ Φ TRAJECTORY                                                             ║
 ║   Velocity:     {:>7} Φ/s   (rate of change)                           ║
-║   Acceleration: {:>9} Φ/s²  (change of change)                         ║
-║   Stability:    {:>7}       (inverse variance)                          ║
-║   Trend:        {:>9}                                                      ║
+║   Acceleration: {:>7} Φ/s²  (change of change)                         ║
+║   Stability:    {:>6}       (inverse variance)                          ║
+║   Trend:        {}                                                       ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ CONSCIOUSNESS CONTINUITY                                                 ║
 ║   Continuity Score:  {:>6}                                              ║
@@ -1728,11 +1728,21 @@ mod tests {
         let rendered = report.to_string();
         assert!(rendered.contains("Present↔Future:       N/A"));
         assert!(rendered.contains("Past↔Future:          N/A"));
-        assert!(rendered.contains("Velocity:         N/A Φ/s"));
-        assert!(rendered.contains("Continuity Score:   N/A"));
-        assert!(rendered.contains("Known-pair score:   N/A"));
-        assert!(rendered.contains("Binding Strength:   N/A"));
-        assert!(rendered.contains("Gamma Sync:         N/A"));
+        assert!(rendered.contains("Velocity:") && rendered.lines().any(|line| line.contains("Velocity:") && line.contains("N/A")));
+        for label in [
+            "Continuity Score:",
+            "Known-pair score:",
+            "Binding Strength:",
+            "Gamma Sync:",
+            "Stability:",
+            "Trend:",
+        ] {
+            let line = rendered
+                .lines()
+                .find(|line| line.contains(label))
+                .unwrap_or_else(|| panic!("missing report row {label}"));
+            assert!(line.contains("N/A"), "expected unavailable value in {label}: {line}");
+        }
     }
 
     #[test]
