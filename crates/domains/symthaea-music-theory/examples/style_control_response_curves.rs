@@ -405,9 +405,14 @@ const TONIC_CANDIDATE_INVARIANT_LAYERS: &[&str] = &[
 /// Evaluate only source-grounded candidate invariants while a single control varies.
 /// These are diagnostics, not quality scores; the controlled target channel is excluded.
 fn non_target_invariance_diagnostics(
+    style: Style,
     control: &str,
     observations: &[Observation],
 ) -> serde_json::Value {
+    let family = style.grammar_profile().family;
+    let valence_tonality_is_controlled = control == "valence"
+        && style.spec().mode.is_none()
+        && family != symthaea_music_theory::grammar::GrammarFamily::RagaModalArc;
     let baseline_seed = observations.first().map(|observation| observation.input.seed);
     let baseline = baseline_seed.and_then(|seed| {
         observations.iter().find(|observation| {
@@ -472,7 +477,7 @@ fn non_target_invariance_diagnostics(
             },
         ));
     }
-    if control != "valence" {
+    if !valence_tonality_is_controlled {
         checked_channels.push(channel(
             "key_tonality",
             baseline,
@@ -539,7 +544,7 @@ fn control_target_evaluation(
                     "pinned_mode": format!("{mode:?}"),
                     "reason": "The style preset pins mode; valence-to-major/minor adherence is not scored.",
                 },
-                "non_target_invariance": non_target_invariance_diagnostics(control, observations),
+                "non_target_invariance": non_target_invariance_diagnostics(style, control, observations),
             });
         }
         if family == symthaea_music_theory::grammar::GrammarFamily::RagaModalArc {
@@ -549,7 +554,7 @@ fn control_target_evaluation(
                     "status": "engine_owned_default",
                     "reason": "RagaModalArc defaults to minor when no mode override exists; valence is not its tonality target.",
                 },
-                "non_target_invariance": non_target_invariance_diagnostics(control, observations),
+                "non_target_invariance": non_target_invariance_diagnostics(style, control, observations),
             });
         }
 
@@ -604,7 +609,7 @@ fn control_target_evaluation(
                 "interpretation": "Directional tonal proxy only; this is not a perceptual-valence measurement.",
                 "points": points,
             },
-            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
+            "non_target_invariance": non_target_invariance_diagnostics(style, control, observations),
         });
     }
 
@@ -661,7 +666,7 @@ fn control_target_evaluation(
                 "points": points,
             },
             "interpretation": "This is fidelity to the source-declared tempo mapping, not a perceptual-arousal measurement.",
-            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
+            "non_target_invariance": non_target_invariance_diagnostics(style, control, observations),
         });
     }
 
@@ -704,7 +709,7 @@ fn control_target_evaluation(
                 "points": points,
             },
             "interpretation": "This checks the PeriodSentence threshold policy, not perceived musical energy.",
-            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
+            "non_target_invariance": non_target_invariance_diagnostics(style, control, observations),
         });
     }
 
@@ -721,7 +726,7 @@ fn control_target_evaluation(
                     "status": "not_predeclared",
                     "reason": "This grammar route does not yet expose a typed requested-to-realized bar quantization contract.",
                 },
-                "non_target_invariance": non_target_invariance_diagnostics(control, observations),
+                "non_target_invariance": non_target_invariance_diagnostics(style, control, observations),
             });
         }
 
@@ -775,7 +780,7 @@ fn control_target_evaluation(
                 "adherence_fraction": matched as f64 / count.max(1) as f64,
                 "points": points,
             },
-            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
+            "non_target_invariance": non_target_invariance_diagnostics(style, control, observations),
         });
     }
 
@@ -786,7 +791,7 @@ fn control_target_evaluation(
                 "status": "not_predeclared",
                 "reason": "No style-valid target metric is yet declared for this control and grammar route.",
             },
-            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
+            "non_target_invariance": non_target_invariance_diagnostics(style, control, observations),
         });
     }
 
@@ -1730,6 +1735,14 @@ mod tests {
             target["status"].as_str(),
             Some("preset_mode_override" | "engine_owned_default")
         ));
+        let invariance = &curve["control_target_evaluation"]["non_target_invariance"];
+        let mode = invariance["checked_channels"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|channel| channel["channel"] == "key_tonality")
+            .expect("a preset/fixed modal route should keep tonality invariant");
+        assert_eq!(mode["changed_point_count"].as_u64(), Some(0));
     }
 
     #[test]
