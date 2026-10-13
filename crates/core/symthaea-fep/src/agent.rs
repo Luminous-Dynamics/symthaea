@@ -355,7 +355,10 @@ impl ActiveInferenceAgent {
         }
     }
 
-    /// Execute action and observe outcome
+    /// Commit an action to the local inference loop and predict its outcome.
+    ///
+    /// This compatibility method records novelty history, but does not prove that an
+    /// external action was physically executed; callers own external execution and observation.
     pub fn act(&mut self, action: usize) -> ActionOutcome {
         // `act()` is currently the compatibility commitment boundary for generic
         // FEP bookkeeping. #606 will split commitment from pure prediction.
@@ -367,8 +370,8 @@ impl ActiveInferenceAgent {
         let predicted_state = self.model.predict_next_state(&self.belief, action);
         let expected_obs = self.model.predict_observation(&predicted_state);
 
-        // In a real system, the action would be executed and observation received
-        // Here we just predict what would happen
+        // This compatibility layer predicts the outcome; external execution and observation
+        // are separate events owned by the caller.
         ActionOutcome {
             action,
             predicted_next_state: predicted_state,
