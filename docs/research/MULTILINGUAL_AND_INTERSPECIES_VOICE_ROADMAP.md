@@ -137,6 +137,7 @@ cargo run --release -p symthaea-communication --bin symthaea-comm-eval -- pilot 
   --worker "$PYTHON_BIN" \
   --provider-id buzzasr-afrikaans-transformers \
   --output "$PRIVATE_DIR/af-transformers-outcomes.jsonl" \
+  --worker-timeout-seconds 600 \
   --worker-arg="$TRANSFORMERS_WORKER" \
   --worker-arg=--model-dir --worker-arg="$UPSTREAM_MODEL_SNAPSHOT" \
   --worker-arg=--provider-id --worker-arg=buzzasr-afrikaans-transformers \
