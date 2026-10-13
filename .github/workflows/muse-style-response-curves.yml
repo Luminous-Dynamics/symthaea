@@ -246,6 +246,49 @@ jobs:
                   )
               stream.write("\n")
 
+              stream.write("## Rank-based response shape by style/control\n\n")
+              stream.write(
+                  "Per-seed Spearman rho ranges are descriptive association measures, not target-fidelity or quality scores. "
+                  "Only numeric control axes are summarized; tonic and seed are deliberately non-ordinal.\n\n"
+              )
+              stream.write(
+                  "| Style | Control | Tempo rho range | Duration rho range | Note-count rho range | Mean-velocity rho range |\n"
+              )
+              stream.write("|---|---|---|---|---|---|\n")
+              for profile in report["profiles"]:
+                  for control in ["valence", "arousal", "energy", "bars"]:
+                      matching_curves = [
+                          curve for curve in profile["curves"]
+                          if curve["control"] == control
+                      ]
+
+                      def rank_summary(key):
+                          rows = [
+                              curve.get("response_rank", {}).get(key, {})
+                              for curve in matching_curves
+                          ]
+                          measured = [
+                              row["rho"] for row in rows
+                              if row.get("status") == "measured"
+                              and isinstance(row.get("rho"), (int, float))
+                          ]
+                          flat = sum(row.get("status") == "constant_output" for row in rows)
+                          if not measured:
+                              return f"0/4 measured; flat {flat}"
+                          return (
+                              f"{len(measured)}/4; {min(measured):+.2f}..{max(measured):+.2f}; "
+                              f"flat {flat}"
+                          )
+
+                      stream.write(
+                          f"| {profile['style']} | {control} | "
+                          f"{rank_summary('tempo_bpm_vs_control')} | "
+                          f"{rank_summary('total_duration_beats_vs_control')} | "
+                          f"{rank_summary('score_note_count_vs_control')} | "
+                          f"{rank_summary('mean_velocity_vs_control')} |\n"
+                      )
+              stream.write("\n")
+
               stream.write("## Candidate non-target invariance by style/control\n\n")
               stream.write(
                   "Channel-level candidates are reported as measured diagnostics, not quality scores. "
