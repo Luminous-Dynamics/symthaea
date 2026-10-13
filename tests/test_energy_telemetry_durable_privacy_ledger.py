@@ -1,7 +1,7 @@
 """Restart-safe privacy budget and immutable-output contract tests."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import os
 import sqlite3
 import tempfile
@@ -78,8 +78,13 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         reopened = self.reopen()
         self.assertEqual(reopened.reservation_count, 1)
         self.assertEqual(reopened.participant_spend(people()[0]), (0.5, 0.0, 1))
-        raw_db = Path(self.database).read_bytes()
-        self.assertNotIn(people()[0].encode(), raw_db)
+        backing_files = [Path(self.database)]
+        backing_files.extend(
+            Path(path) for path in (self.database + "-wal", self.database + "-shm")
+            if Path(path).exists()
+        )
+        raw_storage = b"".join(path.read_bytes() for path in backing_files)
+        self.assertNotIn(people()[0].encode(), raw_storage)
         self.assertEqual(reopened.integrity_check(), "ok")
 
     def test_exact_reservation_retry_is_idempotent_and_spends_budget_once(self):
@@ -251,6 +256,59 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         self.assertEqual(len({r.receipt_sha256 for r in results}), 1)
         self.assertEqual(self.ledger.reservation_count, 1)
         self.assertEqual(self.ledger.participant_spend(people()[0]), (0.5, 0.0, 1))
+
+    def test_concurrent_distinct_releases_cannot_overspend_shared_participant_budget(self):
+        workers = 5
+        barrier = threading.Barrier(workers)
+        results = []
+        rejected = []
+        errors = []
+        lock = threading.Lock()
+        base = datetime(2026, 10, 13, 4, 0, tzinfo=timezone.utc)
+
+        def worker(index):
+            try:
+                ledger = self.reopen()
+                start = base + timedelta(minutes=10 * index)
+                end = start + timedelta(minutes=5)
+                barrier.wait(timeout=5)
+                result = self.reserve(
+                    release="abcde"[index],
+                    query="vwxyz"[index],
+                    participants=people(),
+                    start=start,
+                    end=end,
+                    epsilon=0.5,
+                    delta=0.0,
+                    mechanism="discrete_laplace",
+                    ledger=ledger,
+                )
+                with lock:
+                    results.append(result)
+            except DurablePrivacyPolicyError as exc:
+                with lock:
+                    rejected.append(str(exc))
+            except Exception as exc:
+                with lock:
+                    errors.append(exc)
+
+        threads = [threading.Thread(target=worker, args=(index,)) for index in range(workers)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=15)
+        self.assertTrue(all(not thread.is_alive() for thread in threads), "thread did not terminate")
+        self.assertEqual(errors, [])
+        self.assertEqual(len(results), 4)
+        self.assertEqual(len(rejected), 1)
+        self.assertIn("cumulative epsilon budget exceeded", rejected[0])
+        self.assertEqual(self.ledger.reservation_count, 4)
+        self.assertEqual(self.ledger.participant_spend(people()[0]), (2.0, 0.0, 4))
+
+    def test_participant_tokens_cannot_be_passed_as_one_string(self):
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "iterable of local tokens"):
+            self.reserve(participants="this-is-not-a-participant-list")
+        self.assertEqual(self.ledger.reservation_count, 0)
 
     def test_nonfinite_and_extreme_budget_configurations_fail_closed(self):
         for value in (float("inf"), float("nan"), float("-inf")):
