@@ -658,18 +658,19 @@ class DurablePrivacyLedger:
             cohort_size=row[12],
         )
 
-    def commit_output(
+    def _commit_output_after_attestation(
         self,
         *,
         release_id: str,
         output_bytes: bytes,
         committed_at_utc: datetime,
     ) -> CommittedPrivacyOutput:
-        """Atomically bind one exact already-noised output to its reservation.
+        """Internal storage primitive: bind bytes after trusted attestation verification.
 
-        This operation does not generate or validate DP noise. The caller must
-        apply a reviewed mechanism with the declared contribution policy, then
-        publish only the exact bytes returned by this method.
+        Production callers must use QualifiedOutputVerifier.verify_and_commit.
+        This low-level method checks reservation timing and immutability only;
+        it does NOT authenticate a mechanism receipt and must never be used as a
+        public-release authorization path.
         """
         committed_text = self._timestamp(committed_at_utc, "committed_at_utc")
         if not isinstance(release_id, str) or not RELEASE_ID_RE.fullmatch(release_id):
