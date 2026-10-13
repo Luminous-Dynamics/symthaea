@@ -238,7 +238,6 @@ class AuthenticatedEnvelopeTests(unittest.TestCase):
             verify_ack(ack_bytes, verification_keys={})
 
     def test_modified_ack_digest_is_rejected_by_signature(self):
-        import base64
         import json
 
         ack_bytes, receiver_key = self.make_ack()
@@ -259,7 +258,7 @@ class AuthenticatedEnvelopeTests(unittest.TestCase):
         with self.assertRaisesRegex(EnvelopeError, "unknown or missing fields"):
             verify_ack(canonical(value), verification_keys={"receiver-epoch-4": receiver_key.public_key()})
 
-    def test_ack_creation_rejects_invalid_digest_and_disallows_negative_disposition(self):
+    def test_ack_creation_rejects_invalid_digest(self):
         with self.assertRaises(EnvelopeError):
             create_ack(
                 receiver_key_id="receiver-epoch-4",
