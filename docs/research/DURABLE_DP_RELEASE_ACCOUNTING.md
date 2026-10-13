@@ -14,11 +14,11 @@ This ledger is separate from sender delivery accounting. Network retries and rep
 
 `reserve_release` requires:
 - a random 128-bit-looking release ID (32 lowercase hex characters), query-descriptor SHA-256, UTC time window, recipient class and privacy-policy identifier;
-- a unique local participant-token set with at least 20 members under the default floor;
+- a unique local participant-token set of 20–10,000 members under the default floor and hard resource ceiling;
 - a named contribution-bound policy, an integer Wh contribution cap, adjacency definition and mechanism ID;
 - epsilon and delta values within the prototype's per-release caps.
 
-Only `approved_research` and `public_reporting` recipients can reserve through this DP ledger. Operational aggregates for trusted grid operations remain a separate, explicitly authorized flow.
+Only `approved_research` and `public_reporting` recipients can reserve through this DP ledger. Operational aggregates for trusted grid operations remain a separate, explicitly authorized flow. The 10,000-participant ceiling bounds caller-controlled iterable materialization and per-participant SQLite work; oversized input fails before participant hashing and before a reservation transaction. It is a resource limit, not a privacy threshold. Do not bypass it by splitting one intended query into smaller public releases; large-cohort support needs a reviewed bounded/streaming design and composition analysis.
 
 Within a `BEGIN IMMEDIATE` transaction, the ledger:
 1. Checks whether the release ID already exists. An exact reservation retry is idempotent and does not spend the budget again. Reusing the release ID with any different query or policy field fails closed.
@@ -74,6 +74,6 @@ A production system still needs:
 
 ## Deterministic test coverage
 
-The test suite has 23 cases using synthetic tokens, fixed test-only keys, fixed timestamps and small synthetic output blobs. It covers restart recovery, idempotent reservation, release-ID conflicts, overlap suppression, disjoint cohorts, cumulative epsilon/delta exhaustion, cohort floor, policy-field validation, immutable output commit/replay, output digest checks, HMAC-key mismatch, record limits, concurrent duplicate reservations, extreme numeric configuration and commit timestamp ordering.
+The test suite has 24 cases using synthetic tokens, fixed test-only keys, fixed timestamps and small synthetic output blobs. It covers restart recovery, idempotent reservation, release-ID conflicts, overlap suppression, disjoint cohorts, cumulative epsilon/delta exhaustion, cohort floor, policy-field validation, immutable output commit/replay, output digest checks, HMAC-key mismatch, record limits, concurrent duplicate reservations, extreme numeric configuration, commit timestamp ordering and bounded rejection of unbounded participant iterables.
 
 These tests are added to the telemetry GitHub Actions workflow. They must not be described as passing until a completed exact-head run succeeds.
