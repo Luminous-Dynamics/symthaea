@@ -51,10 +51,30 @@ def parse_request(line: str) -> dict[str, Any]:
     operation = value.get("operation")
     if not isinstance(request_id, str) or not request_id.strip():
         raise ValueError("request_id must be a non-empty string")
-    if not isinstance(operation, str) or operation not in {
-        "capabilities", "identify_language", "transcribe", "translate", "translate_speech"
-    }:
+    request_fields = {
+        "capabilities": {"operation", "request_id"},
+        "identify_language": {"operation", "request_id", "observation"},
+        "transcribe": {"operation", "request_id", "observation"},
+        "translate": {"operation", "request_id", "input", "target_language"},
+        "translate_speech": {"operation", "request_id", "observation", "target_language"},
+    }
+    if not isinstance(operation, str) or operation not in request_fields:
         raise ValueError("unknown human-provider operation")
+    if set(value) != request_fields[operation]:
+        raise ValueError(
+            f"{operation} request fields mismatch; expected={sorted(request_fields[operation])}, "
+            f"actual={sorted(value)}"
+        )
+    if operation in {"identify_language", "transcribe", "translate_speech"}:
+        if not isinstance(value["observation"], dict):
+            raise ValueError(f"{operation} requires an observation object")
+    if operation == "translate":
+        if not isinstance(value["input"], dict):
+            raise ValueError("translate requires a preserved-text input object")
+    if operation in {"translate", "translate_speech"}:
+        target_language = value["target_language"]
+        if not isinstance(target_language, str) or not target_language.strip():
+            raise ValueError(f"{operation} target_language must be a non-empty string")
     return value
 
 
