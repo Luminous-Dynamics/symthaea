@@ -33,7 +33,17 @@ pub struct PilotOutcome {
     pub translation_en: Option<String>,
     pub translation_chrf: Option<f64>,
     pub response_language_correct: Option<bool>,
+    /// End-to-end elapsed time: observation parsing plus all requested provider operations.
     pub latency_ms: f64,
+    /// Time for the provider's language-preflight request; a monolingual worker's first call can include model cold start.
+    #[serde(default)]
+    pub preflight_latency_ms: Option<f64>,
+    /// Time spent in the ASR transcription operation alone.
+    #[serde(default)]
+    pub transcription_latency_ms: Option<f64>,
+    /// Time spent in the speech-translation operation, if requested.
+    #[serde(default)]
+    pub translation_latency_ms: Option<f64>,
     pub error: Option<String>,
 }
 
@@ -125,17 +135,32 @@ pub fn summarize(outcomes: &[PilotOutcome]) -> Vec<PilotLanguageSummary> {
 
 pub fn evaluate_sample(provider: &mut LocalJsonlProvider, sample: &PilotSample) -> PilotOutcome {
     let start = Instant::now();
-    match observation(sample).and_then(|observation| {
-        let languages = provider.identify_language(&observation)?;
+    let mut preflight_latency_ms = None;
+    let mut transcription_latency_ms = None;
+    let mut translation_latency_ms = None;
+    let evaluated = observation(sample).and_then(|observation| {
+        let phase_start = Instant::now();
+        let languages_result = provider.identify_language(&observation);
+        preflight_latency_ms = Some(phase_start.elapsed().as_secs_f64() * 1000.0);
+        let languages = languages_result?;
         let best = languages.first().cloned();
-        let transcript = provider.transcribe(&observation)?;
+
+        let phase_start = Instant::now();
+        let transcript_result = provider.transcribe(&observation);
+        transcription_latency_ms = Some(phase_start.elapsed().as_secs_f64() * 1000.0);
+        let transcript = transcript_result?;
+
         let translation = if sample.translation_reference_en.is_some() && sample.language != "en" {
-            Some(provider.translate_speech(&observation, "en")?)
+            let phase_start = Instant::now();
+            let translation_result = provider.translate_speech(&observation, "en");
+            translation_latency_ms = Some(phase_start.elapsed().as_secs_f64() * 1000.0);
+            Some(translation_result?)
         } else {
             None
         };
         Ok((best, transcript, translation))
-    }) {
+    });
+    match evaluated {
         Ok((best, transcript, translation)) => PilotOutcome {
             id: sample.id.clone(),
             language: sample.language.clone(),
@@ -164,6 +189,9 @@ pub fn evaluate_sample(provider: &mut LocalJsonlProvider, sample: &PilotSample) 
             translation_en: translation.map(|value| value.original),
             transcript: Some(transcript.original),
             latency_ms: start.elapsed().as_secs_f64() * 1000.0,
+            preflight_latency_ms,
+            transcription_latency_ms,
+            translation_latency_ms,
             error: None,
         },
         Err(error) => PilotOutcome {
@@ -179,6 +207,9 @@ pub fn evaluate_sample(provider: &mut LocalJsonlProvider, sample: &PilotSample) 
             translation_chrf: None,
             response_language_correct: None,
             latency_ms: start.elapsed().as_secs_f64() * 1000.0,
+            preflight_latency_ms,
+            transcription_latency_ms,
+            translation_latency_ms,
             error: Some(error),
         },
     }
