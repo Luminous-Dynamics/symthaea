@@ -467,10 +467,19 @@ impl ConsciousnessContinuity {
 
     /// Add a new consciousness state using the host monotonic clock for expiry.
     ///
-    /// This compatibility entry point discards the admission result. A continuity
+    /// Compatibility entry point that discards the admission result. A continuity
     /// instance already operating on replay offsets rejects host-clock observations.
+    /// Use try_observe when the caller needs to know whether the sample was admitted.
     pub fn observe(&mut self, state: &BinaryHV, phi: f64, phi_prev: f64) {
-        let _ = self.observe_with_elapsed(state, phi, phi_prev, None);
+        let _ = self.try_observe(state, phi, phi_prev);
+    }
+
+    /// Add a host-clock observation and report admission.
+    ///
+    /// Returns false without mutation for non-finite Φ values or when this instance
+    /// is already bound to replay-elapsed time.
+    pub fn try_observe(&mut self, state: &BinaryHV, phi: f64, phi_prev: f64) -> bool {
+        self.observe_with_elapsed(state, phi, phi_prev, None)
     }
 
     /// Add a state in a deterministic replay timeline.
@@ -2118,7 +2127,8 @@ mod tests {
         let mut replay_clock = ConsciousnessContinuity::new(10, 1.0);
         assert!(replay_clock.observe_at(&first, 0.5, 0.5, Duration::ZERO));
         let replay_state_count = replay_clock.recent_states.len();
-        replay_clock.observe(&second, 0.5, 0.5);
+        assert!(!replay_clock.try_observe(&second, 0.5, 0.5));
+        assert!(!replay_clock.try_observe(&second, f64::NAN, 0.5));
         assert_eq!(replay_clock.recent_states.len(), replay_state_count);
 
         let mut host_clock = ConsciousnessContinuity::new(10, 1.0);
