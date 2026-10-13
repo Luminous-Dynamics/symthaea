@@ -251,6 +251,7 @@ def score_predictions(
     archive: Path,
     model_root: Path,
     predictions_path: Path,
+    outcomes_path: Path,
     model_id: str,
     model_revision: str,
     model_license: str,
@@ -268,6 +269,8 @@ def score_predictions(
     _need(isinstance(model_license, str) and model_license.strip(), "model_license must be explicitly declared")
     _need(isinstance(predictions_path, Path) and predictions_path.is_file() and not predictions_path.is_symlink(),
           "predictions_path must be a regular non-symlink file")
+    _need(isinstance(outcomes_path, Path) and outcomes_path.is_file() and not outcomes_path.is_symlink(),
+          "outcomes_path must be a regular non-symlink file")
     _need(isinstance(intake_report_path, Path) and intake_report_path.is_file() and not intake_report_path.is_symlink(),
           "intake_report_path must be a regular non-symlink file")
     _need(isinstance(runtime_binary_path, Path) and runtime_binary_path.is_file() and not runtime_binary_path.is_symlink(),
@@ -284,6 +287,9 @@ def score_predictions(
     outcomes_sha = prediction_doc["outcomes_sha256"]
     _need(isinstance(outcomes_sha, str) and SHA256_RE.fullmatch(outcomes_sha) is not None,
           "outcomes_sha256 must be a 64-hex SHA-256 digest")
+    actual_outcomes_sha = sha256_file(outcomes_path)
+    _need(actual_outcomes_sha == outcomes_sha,
+          "raw pilot outcomes SHA-256 differs from prediction provenance")
     runtime = prediction_doc["runtime"]
     _need(isinstance(runtime, dict) and set(runtime) == RUNTIME_KEYS,
           f"runtime keys mismatch; missing={sorted(RUNTIME_KEYS-set(runtime) if isinstance(runtime, dict) else RUNTIME_KEYS)}, extra={sorted(set(runtime)-RUNTIME_KEYS) if isinstance(runtime, dict) else []}")
@@ -428,7 +434,7 @@ def score_predictions(
         },
         "inputs": {
             "prediction_file_sha256": prediction_sha,
-            "outcomes_sha256": outcomes_sha,
+            "outcomes_sha256": actual_outcomes_sha,
             "intake_report_sha256": sha256_file(intake_report_path),
         },
         "metrics": aggregate(per_clip),
@@ -491,6 +497,7 @@ def main() -> int:
     parser.add_argument("--archive", required=True, type=Path)
     parser.add_argument("--intake-report", required=True, type=Path)
     parser.add_argument("--predictions", required=True, type=Path)
+    parser.add_argument("--outcomes", required=True, type=Path, help="exact private outcomes JSONL hashed by the prediction pack")
     parser.add_argument("--model-root", required=True, type=Path, help="regular-file export of the exact offline model snapshot")
     parser.add_argument("--locale", required=True)
     parser.add_argument("--model-id", required=True)
@@ -513,6 +520,7 @@ def main() -> int:
             archive=args.archive,
             model_root=args.model_root,
             predictions_path=args.predictions,
+            outcomes_path=args.outcomes,
             model_id=args.model_id,
             model_revision=args.model_revision,
             model_license=args.model_license,
