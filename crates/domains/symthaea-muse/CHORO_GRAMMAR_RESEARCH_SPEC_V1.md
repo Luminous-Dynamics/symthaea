@@ -15,7 +15,7 @@ Mário Sève's article on Choro phrasing and rhythmic/melodic considerations dis
 3. **Historical modification:** For reliably dated works, test the reported direction of relation between composition year and chord-modification frequency, publishing missing-year coverage and subgenre/songbook sensitivity.
 4. **Rhythmic phrasing:** Not testable from chord/form labels alone. It requires separate rights-cleared score/onset evidence, source-defined subtype labels, and expert review.
 
-The machine-readable JSON defines operationalization, candidate fields, null models, falsification conditions, and route gates. Numeric thresholds are intentionally not fabricated; they must be fixed before analysis after an eligibility and power review.
+The machine-readable JSON defines operationalization, candidate fields, null models, falsification conditions, and route gates. A deterministic synthetic-fixture harness checks three metric directions and malformed-input behavior without using the restricted corpus; these tests validate measurement machinery only, not Choro hypotheses. Numeric thresholds are intentionally not fabricated; they must be fixed before analysis after an eligibility and power review.
 
 ## Corpus licensing and boundaries
 
@@ -31,3 +31,6 @@ The research repository is [DCMLab/choro, pinned to commit fe409c62deed50fc7f4b0
 - Any eventual generator route is implemented and tested through the actual user composition path; symbolic results and renderer/instrument support are reported separately.
 
 Passing the research contract does not itself create a composer route or justify a claim of authenticity.
+
+
+The synthetic harness is run by `scripts/muse_choro_synthetic_harness.py --check` and tested by `tests/python/test_muse_choro_synthetic_harness.py`. Its report is explicitly labelled non-empirical; no corpus rows, audio or transcriptions are used.

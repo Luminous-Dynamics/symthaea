@@ -234,5 +234,26 @@
       "metric output digest",
       "expert review record where applicable"
     ]
+  },
+  "synthetic_fixture_harness": {
+    "path": "scripts/muse_choro_synthetic_harness.py",
+    "test_path": "tests/python/test_muse_choro_synthetic_harness.py",
+    "schema": "muse-choro-synthetic-harness-report-v1",
+    "status": "synthetic_metric_validation_only_not_empirical_evidence",
+    "source_data_used": false,
+    "corpus_data_ingested": false,
+    "empirical_results": null,
+    "deterministic_seed": 90210,
+    "checks": [
+      "phrase-position metric distinguishes authored aligned fixture from a counterexample and balanced phase rotation null",
+      "conditional transition entropy distinguishes a deterministic authored cycle from a seeded shuffle while preserving symbol counts",
+      "trend metric detects a monotone synthetic series and its reversed counterexample",
+      "invalid or degenerate input fails closed"
+    ],
+    "limits": [
+      "synthetic fixtures do not validate Choro-specific claims",
+      "no third-party corpus data or musical excerpts are used",
+      "commercial corpus use still requires appropriate rights clearance"
+    ]
   }
 }

@@ -12,7 +12,9 @@ on:
       - "scripts/muse_style_capability_inventory.py"
       - "tests/python/test_muse_style_capability_inventory.py"
       - "scripts/muse_genre_completion_roadmap.py"
+      - "scripts/muse_choro_synthetic_harness.py"
       - "tests/python/test_muse_genre_completion_roadmap.py"
+      - "tests/python/test_muse_choro_synthetic_harness.py"
       - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
       - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
       - "crates/domains/symthaea-muse/MUSE_GLOBAL_GENRE_COVERAGE_RESEARCH_V1.md"
@@ -35,7 +37,9 @@ on:
       - "scripts/muse_style_capability_inventory.py"
       - "tests/python/test_muse_style_capability_inventory.py"
       - "scripts/muse_genre_completion_roadmap.py"
+      - "scripts/muse_choro_synthetic_harness.py"
       - "tests/python/test_muse_genre_completion_roadmap.py"
+      - "tests/python/test_muse_choro_synthetic_harness.py"
       - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
       - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
       - "crates/domains/symthaea-muse/MUSE_GLOBAL_GENRE_COVERAGE_RESEARCH_V1.md"
@@ -142,6 +146,31 @@ jobs:
 
       - name: Test runtime capability inventory parser and fail-closed guards
         run: python3 tests/python/test_muse_style_capability_inventory.py -v
+
+      - name: Validate deterministic Choro metrics on synthetic fixtures only
+        run: python3 scripts/muse_choro_synthetic_harness.py --check --output /tmp/muse-choro-synthetic-report.json
+
+      - name: Test Choro synthetic metric harness and fail-closed inputs
+        run: python3 tests/python/test_muse_choro_synthetic_harness.py -v
+
+      - name: Publish synthetic harness boundary to job summary
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/muse-choro-synthetic-report.json").read_text())
+          print("## Choro synthetic metric harness")
+          print()
+          print(f"Checks passed: {sum(report['checks'].values())}/{len(report['checks'])}")
+          print()
+          print("| Check | Result |")
+          print("|---|---:|")
+          for name, passed in report["checks"].items():
+              print(f"| {name} | {'PASS' if passed else 'FAIL'} |")
+          print()
+          print("**Evidence boundary:** synthetic fixtures only; no Choro corpus or third-party music data was used. This is not empirical genre validation.")
+          PY
 
       - name: Verify all-genre completion roadmap against source
         run: python3 scripts/muse_genre_completion_roadmap.py --check

@@ -71,3 +71,6 @@ The rhythm question is deliberately marked not testable from the chord/form corp
 
 The only work committed now is the research specification and its integrity test. Choro remains outside the catalog, has no composer route, and is not represented as implemented or culturally validated.
 
+## Choro synthetic harness boundary
+
+The Choro pilot now has a deterministic source-data-free harness for metric direction. It checks a synthetic phrase-alignment fixture against a counterexample and balanced circular shifts, conditional transition entropy on an authored cycle vs. a seeded shuffle with identical symbol counts, and a synthetic temporal trend vs. its reversal. These are code-path/metric sanity checks only—not empirical Choro results. The harness emits `source_data_used=false`, `corpus_data_ingested=false`, `empirical_results=null` and must not be cited as evidence of style fidelity.
