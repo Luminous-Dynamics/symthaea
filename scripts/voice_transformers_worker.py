@@ -50,7 +50,9 @@ def parse_request(line: str) -> dict[str, Any]:
     operation = value.get("operation")
     if not isinstance(request_id, str) or not request_id.strip():
         raise ValueError("request_id must be a non-empty string")
-    if operation not in {"capabilities", "identify_language", "transcribe", "translate", "translate_speech"}:
+    if not isinstance(operation, str) or operation not in {
+        "capabilities", "identify_language", "transcribe", "translate", "translate_speech"
+    }:
         raise ValueError("unknown human-provider operation")
     return value
 
@@ -70,6 +72,8 @@ def validate_observation(
     if not isinstance(modality, dict) or set(modality) != {"Audio"} or not isinstance(modality["Audio"], dict):
         raise ValueError("Transformers worker only accepts Audio observations")
     audio = modality["Audio"]
+    if set(audio) != {"sample_rate_hz", "channels"}:
+        raise ValueError("Audio modality fields do not match the protocol")
     sample_rate_hz = audio.get("sample_rate_hz")
     channels = audio.get("channels")
     if isinstance(sample_rate_hz, bool) or not isinstance(sample_rate_hz, int) or sample_rate_hz != 16000:
@@ -192,20 +196,39 @@ def handle_request(
         return response_envelope(provider_id, request_id, error=f"{type(error).__name__}: {error}")
 
 
+def validate_local_model_snapshot(model_dir: str) -> str:
+    if os.path.islink(model_dir) or not os.path.isdir(model_dir):
+        raise ValueError("model-dir must be an existing real local model directory, not a symlink")
+    root = os.path.realpath(model_dir)
+    file_count = 0
+    for current, directories, files in os.walk(root, topdown=True, followlinks=False):
+        for name in list(directories):
+            candidate = os.path.join(current, name)
+            if os.path.islink(candidate):
+                raise ValueError("model snapshot contains a symlinked directory")
+        directories[:] = [name for name in directories if not os.path.islink(os.path.join(current, name))]
+        for name in files:
+            candidate = os.path.join(current, name)
+            if os.path.islink(candidate) or not os.path.isfile(candidate):
+                raise ValueError("model snapshot contains a symlink or non-regular file")
+            file_count += 1
+    if file_count == 0:
+        raise ValueError("model snapshot contains no regular files")
+    return root
+
+
 def load_runtime(model_dir: str, device_choice: str, dtype_choice: str) -> tuple[Any, Any, Any, Any, str, Any, dict[str, str]]:
     # Set offline flags before importing libraries which may consult the Hub.
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
     os.environ["HF_DATASETS_OFFLINE"] = "1"
 
+    model_dir = validate_local_model_snapshot(model_dir)
+
     import numpy as np
     import torch
     import transformers
     from transformers import WhisperForConditionalGeneration, WhisperProcessor
-
-    if os.path.islink(model_dir) or not os.path.isdir(model_dir):
-        raise ValueError("model-dir must be an existing real local model directory, not a symlink")
-    model_dir = os.path.realpath(model_dir)
     if device_choice == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
     else:
