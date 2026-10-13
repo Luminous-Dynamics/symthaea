@@ -39,7 +39,7 @@ This is a reasoned local persistence configuration, not proof against all hardwa
 ## Security boundaries that remain outside the prototype
 
 1. **Authenticity:** the queue validates shapes and state only. The network adapter must authenticate the sender and bind a canonical envelope (including the metadata, digest, expiry and policy/version context) to a vetted signature or MAC.
-2. **ACK authenticity:** protected queue records must use `acknowledge_protected`, which verifies a canonical Ed25519 receiver-signed positive ACK against an explicitly supplied trusted-key map. The legacy unsigned ACK path refuses protected records. The signature proves the mapped key-holder asserted acceptance; a receiver-side durable deduplication/commit-before-ACK transaction is still needed to establish the delivery contract.
+2. **ACK authenticity:** protected queue records must use `acknowledge_protected`, which verifies a canonical Ed25519 receiver-signed positive ACK against an explicitly supplied trusted-key map. The legacy unsigned ACK path refuses protected records. The new `ReceiverInbox` commits exact ciphertext and the event-ID/digest replay record before generating its signed ACK, so a retry after a commit-but-lost-ACK is idempotent. This prototype-level receiver flow is not yet proof of target-filesystem crash/power-loss behavior or downstream processing transaction atomicity.
 3. **Payload protection:** the protected API persists AEAD-encrypted envelope bytes, validates their SHA-256 digest/size binding, and replays the exact bytes. The queue itself does not encrypt or verify signatures; the caller must use the envelope adapter and the receiver must verify. The database is not encrypted by this module, so event metadata remains readable at rest.
 4. **Schema migration:** schema migration advances version 1/2 to version 3 with PRAGMA user_version and adds an optional `envelope_bytes` BLOB; unsupported future versions fail closed. Future changes need versioned, transactional migrations and downgrade/upgrade tests.
 5. **Privacy budgeting:** delivery retries must not double-charge a retransmission of an identical private release. The separate DP accountant must transactionally reserve unique release identity, participant contribution bounds, mechanism, adjacency definition, and cumulative privacy spend. It is still a separate, not-yet-production component.
@@ -59,7 +59,7 @@ The accompanying test module, tests/test_energy_telemetry_durable_queue.py, uses
 - protected envelope persistence/reopen, exact-byte retransmission, hash/size mismatch rejection and separation of metadata-only rows from protected-envelope delivery;
 - requirement for receiver-signed ACKs on protected rows, rejection of forged/unknown/future-dated ACKs, and rejection of a signed ACK for the wrong envelope digest.
 
-The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 22 test cases covering AEAD/signature tampering, canonical encoding, key lookup, size bounds and receiver-signed ACK validation. These and the queue tests have been added to the dedicated GitHub Actions workflow. At the time this document was authored, the exact-head CI run was queued/pending; these tests are not declared passed until that specific run concludes successfully.
+The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 22 test cases, and `tests/test_energy_telemetry_receiver_inbox.py` adds 17 receiver-inbox cases covering signature/decryption failures, expiry/future timestamps, duplicate replay, concurrent acceptance and injected commit failure. These and the queue tests have been added to the dedicated GitHub Actions workflow. At the time this document was authored, the exact-head CI run was queued/pending; these tests are not declared passed until that specific run concludes successfully.
 
 ## Standards and security research
 
@@ -73,7 +73,7 @@ The companion `tests/test_energy_telemetry_authenticated_envelope.py` has 22 tes
 - Execute the exact-head CI suite and preserve the successful run link and commit SHA.
 - Run multi-process contention and deterministic kill/reopen tests against a temporary DB; assert transaction atomicity for selected batch attempts and ACK transitions.
 - Test database full, read-only path, locked DB, malformed DB, unsupported schema version, backup and restore.
-- Implement the receiver-side durable acceptance and anti-replay transaction; verify it commits the accepted event before signing an ACK, and validate the trusted receiver-key registry.
+- Validate the new receiver inbox with exact-head CI, target-filesystem crash/power-loss and backup/restore tests; bind sender and receiver key IDs to authorized identities using a reviewed trust registry.
 - Define and review a bounded terminal-record archive policy before field operation.
 - Benchmark CPU, flash write amplification, energy use and queue throughput on target edge hardware.
 - Keep event payloads out of Mycelix evidence records; pass only authorized, minimized receipts or aggregate envelopes.
