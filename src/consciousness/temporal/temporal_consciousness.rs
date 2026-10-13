@@ -321,7 +321,28 @@ impl PhiTrajectory {
         self.history.iter().map(|(_, p)| *p).collect()
     }
 
-    /// Check if trajectory is healthy
+    /// Number of retained observations.
+    pub fn sample_count(&self) -> usize {
+        self.history.len()
+    }
+
+    /// Maximum number of retained observations.
+    pub fn sample_capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Whether there is enough retained evidence for trajectory qualification.
+    ///
+    /// A zero configured minimum is treated as one; a minimum larger than the
+    /// retention capacity is impossible to satisfy and therefore remains false.
+    pub fn has_minimum_samples(&self, minimum: usize) -> bool {
+        let minimum = minimum.max(1);
+        self.capacity >= minimum && self.history.len() >= minimum
+    }
+
+    /// Check the measured trajectory's signal-level health.
+    ///
+    /// This is not an evidence-sufficiency check; use `has_minimum_samples` too.
     pub fn is_healthy(&self) -> bool {
         self.stability > 0.5 && self.ema > 0.3 && self.trend >= 0
     }
@@ -878,8 +899,11 @@ pub struct TemporalConsciousnessStats {
     /// Accepted observations lacking one or more of the three pairwise identity alignments.
     pub identity_evidence_gaps: usize,
 
-    /// Φ trajectory anomalies
+    /// Qualified observations whose measured Φ trajectory failed health thresholds.
     pub trajectory_anomalies: usize,
+
+    /// Accepted observations recorded before the configured trajectory sample minimum.
+    pub trajectory_evidence_gaps: usize,
 
     /// Average temporal coherence
     pub avg_temporal_coherence: f64,
@@ -1001,8 +1025,15 @@ impl TemporalConsciousnessAnalyzer {
             self.stats.identity_evidence_gaps += 1;
         }
 
-        if !self.phi_trajectory.is_healthy() {
-            self.stats.trajectory_anomalies += 1;
+        if self
+            .phi_trajectory
+            .has_minimum_samples(self.config.min_samples_for_trajectory)
+        {
+            if !self.phi_trajectory.is_healthy() {
+                self.stats.trajectory_anomalies += 1;
+            }
+        } else {
+            self.stats.trajectory_evidence_gaps += 1;
         }
 
         // Update average temporal coherence
@@ -1018,41 +1049,69 @@ impl TemporalConsciousnessAnalyzer {
         self.husserlian.update_protentions(predictions);
     }
 
-    /// Compute overall temporal coherence
+    /// Compute overall temporal coherence from metrics with sufficient evidence.
+    ///
+    /// The score is normalized over measured components only. Call
+    /// `overall_evidence_coverage` alongside it: a high score over sparse evidence
+    /// is not equivalent to a fully observed system.
     pub fn overall_temporal_coherence(&self) -> f64 {
-        // Weighted combination of all temporal metrics
-        let phi_health = if self.phi_trajectory.is_healthy() {
-            1.0
-        } else {
-            0.5
-        };
-        let continuity = self.continuity.score;
-        let identity = self.identity_coherence.coherence;
-        let husserlian = self.husserlian.coherence();
-        let binding = self.binding.binding_strength;
-
-        // Reduce the identity contribution in proportion to the number of measured
-        // pairwise relationships. Missing future-projection evidence must not count
-        // as a complete identity metric; normalize by the weight actually included.
-        let identity_coverage = self.identity_coherence.alignment_coverage() as f64 / 3.0;
-        let identity_weight = 0.25 * identity_coverage;
-        let weighted_sum = 0.2 * phi_health
-            + 0.2 * continuity
-            + identity_weight * identity
-            + 0.2 * husserlian
-            + 0.15 * binding;
-        let total_weight = 0.2 + 0.2 + identity_weight + 0.2 + 0.15;
-
-        if total_weight > 0.0 {
-            weighted_sum / total_weight
+        let (weighted_sum, measured_weight) = self.weighted_temporal_evidence();
+        if measured_weight > 0.0 {
+            weighted_sum / measured_weight
         } else {
             0.0
         }
     }
 
+    /// Fraction of nominal overall-metric weight backed by sufficient evidence.
+    /// The configured full score's nominal weight sums to 1.0.
+    pub fn overall_evidence_coverage(&self) -> f64 {
+        self.weighted_temporal_evidence().1.clamp(0.0, 1.0)
+    }
+
+    fn weighted_temporal_evidence(&self) -> (f64, f64) {
+        let mut weighted_sum = 0.0;
+        let mut measured_weight = 0.0;
+
+        if self
+            .phi_trajectory
+            .has_minimum_samples(self.config.min_samples_for_trajectory)
+        {
+            let score = if self.phi_trajectory.is_healthy() { 1.0 } else { 0.5 };
+            weighted_sum += 0.2 * score;
+            measured_weight += 0.2;
+        }
+
+        if self.continuity.recent_states.len() >= 2 {
+            weighted_sum += 0.2 * self.continuity.score;
+            measured_weight += 0.2;
+        }
+
+        let identity_weight =
+            0.25 * self.identity_coherence.alignment_coverage() as f64 / 3.0;
+        if identity_weight > 0.0 {
+            weighted_sum += identity_weight * self.identity_coherence.coherence;
+            measured_weight += identity_weight;
+        }
+
+        if self.husserlian.primal_impression.is_some() {
+            weighted_sum += 0.2 * self.husserlian.coherence();
+            measured_weight += 0.2;
+        }
+
+        if !self.binding.bindings.is_empty() {
+            weighted_sum += 0.15 * self.binding.binding_strength;
+            measured_weight += 0.15;
+        }
+
+        (weighted_sum, measured_weight)
+    }
+
     /// Check if temporal consciousness is healthy
     pub fn is_temporally_healthy(&self) -> bool {
-        self.phi_trajectory.is_healthy()
+        self.phi_trajectory
+            .has_minimum_samples(self.config.min_samples_for_trajectory)
+            && self.phi_trajectory.is_healthy()
             && self.continuity.is_continuous()
             && self.identity_coherence.is_coherent()
             && self.husserlian.coherence() > 0.6
@@ -1063,6 +1122,15 @@ impl TemporalConsciousnessAnalyzer {
     pub fn report(&self) -> TemporalConsciousnessReport {
         TemporalConsciousnessReport {
             overall_coherence: self.overall_temporal_coherence(),
+            overall_evidence_coverage: self.overall_evidence_coverage(),
+            trajectory_sample_count: self.phi_trajectory.sample_count(),
+            trajectory_sample_capacity: self.phi_trajectory.sample_capacity(),
+            trajectory_minimum_samples: self.config.min_samples_for_trajectory.max(1),
+            trajectory_evidence_sufficient: self
+                .phi_trajectory
+                .has_minimum_samples(self.config.min_samples_for_trajectory),
+            trajectory_qualification_possible: self.phi_trajectory.sample_capacity()
+                >= self.config.min_samples_for_trajectory.max(1),
             phi_velocity: self.phi_trajectory.velocity,
             phi_acceleration: self.phi_trajectory.acceleration,
             phi_stability: self.phi_trajectory.stability,
@@ -1097,7 +1165,20 @@ impl TemporalConsciousnessAnalyzer {
     fn generate_recommendations(&self) -> Vec<String> {
         let mut recs = Vec::new();
 
-        if !self.phi_trajectory.is_healthy() {
+        let required_samples = self.config.min_samples_for_trajectory.max(1);
+        if self.phi_trajectory.sample_capacity() < required_samples {
+            recs.push(format!(
+                "Trajectory cannot qualify: history capacity {} is below required sample count {}",
+                self.phi_trajectory.sample_capacity(),
+                required_samples,
+            ));
+        } else if !self.phi_trajectory.has_minimum_samples(required_samples) {
+            recs.push(format!(
+                "Trajectory evidence pending: {} of {} required samples",
+                self.phi_trajectory.sample_count(),
+                required_samples,
+            ));
+        } else if !self.phi_trajectory.is_healthy() {
             if self.phi_trajectory.trend < 0 {
                 recs.push("Φ trajectory declining - consider attention restoration".to_string());
             }
@@ -1159,8 +1240,20 @@ impl TemporalConsciousnessAnalyzer {
 /// Comprehensive temporal consciousness report
 #[derive(Debug, Clone)]
 pub struct TemporalConsciousnessReport {
-    /// Overall temporal coherence (0-1)
+    /// Overall temporal coherence across sufficiently measured components (0-1).
     pub overall_coherence: f64,
+    /// Nominal metric weight backed by sufficient evidence (0-1).
+    pub overall_evidence_coverage: f64,
+    /// Retained Φ observations.
+    pub trajectory_sample_count: usize,
+    /// Maximum retained Φ observations.
+    pub trajectory_sample_capacity: usize,
+    /// Configured minimum Φ observations required for qualification.
+    pub trajectory_minimum_samples: usize,
+    /// Whether the retained trajectory currently meets the sample minimum.
+    pub trajectory_evidence_sufficient: bool,
+    /// Whether the configured minimum can be met within the history capacity.
+    pub trajectory_qualification_possible: bool,
 
     // Φ Trajectory
     pub phi_velocity: f64,
@@ -1215,6 +1308,8 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ║     TEMPORAL CONSCIOUSNESS REPORT (#75) - Consciousness Through Time     ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ OVERALL TEMPORAL COHERENCE: {:.1}%  {}                                  ║
+║ EVIDENCE COVERAGE:          {:.1}%                                       ║
+║ Φ SAMPLES:                  {}/{} (minimum {}) {}                       ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║ Φ TRAJECTORY                                                             ║
 ║   Velocity:     {:>+.4} Φ/s   (rate of change)                           ║
@@ -1252,6 +1347,17 @@ impl std::fmt::Display for TemporalConsciousnessReport {
                 "✓ HEALTHY"
             } else {
                 "⚠ ATTENTION"
+            },
+            self.overall_evidence_coverage * 100.0,
+            self.trajectory_sample_count,
+            self.trajectory_sample_capacity,
+            self.trajectory_minimum_samples,
+            if self.trajectory_evidence_sufficient {
+                "QUALIFIED"
+            } else if self.trajectory_qualification_possible {
+                "PENDING"
+            } else {
+                "IMPOSSIBLE"
             },
             self.phi_velocity,
             self.phi_acceleration,
@@ -1432,6 +1538,67 @@ mod tests {
         assert_eq!(analyzer.continuity.recent_states.len(), 1);
         assert_eq!(analyzer.husserlian.retention_depth, 0);
         assert!(analyzer.husserlian.primal_impression.is_some());
+    }
+
+    #[test]
+    fn trajectory_qualification_requires_configured_samples_and_reports_coverage() {
+        let mut config = TemporalConsciousnessConfig::default();
+        config.min_samples_for_trajectory = 3;
+        config.phi_history_depth = 4;
+        let mut analyzer = TemporalConsciousnessAnalyzer::new(config);
+
+        let initial = analyzer.report();
+        assert_eq!(initial.trajectory_sample_count, 0);
+        assert!(!initial.trajectory_evidence_sufficient);
+        assert!(initial.trajectory_qualification_possible);
+        assert_eq!(initial.overall_evidence_coverage, 0.0);
+        assert_eq!(initial.overall_coherence, 0.0);
+        assert!(!initial.is_healthy);
+
+        assert!(analyzer.observe_at(&BinaryHV::random(91), 0.4, Duration::ZERO));
+        assert!(analyzer.observe_at(
+            &BinaryHV::random(92),
+            0.5,
+            Duration::from_secs(1),
+        ));
+        let pending = analyzer.report();
+        assert_eq!(pending.trajectory_sample_count, 2);
+        assert!(!pending.trajectory_evidence_sufficient);
+        assert_eq!(analyzer.stats.trajectory_evidence_gaps, 2);
+        assert_eq!(analyzer.stats.trajectory_anomalies, 0);
+
+        assert!(analyzer.observe_at(
+            &BinaryHV::random(93),
+            0.6,
+            Duration::from_secs(2),
+        ));
+        let qualified = analyzer.report();
+        assert_eq!(qualified.trajectory_sample_count, 3);
+        assert!(qualified.trajectory_evidence_sufficient);
+        assert!(qualified.overall_evidence_coverage > pending.overall_evidence_coverage);
+    }
+
+    #[test]
+    fn trajectory_qualification_is_impossible_when_history_is_too_shallow() {
+        let mut config = TemporalConsciousnessConfig::default();
+        config.min_samples_for_trajectory = 5;
+        config.phi_history_depth = 2;
+        let mut analyzer = TemporalConsciousnessAnalyzer::new(config);
+
+        for i in 0..4 {
+            assert!(analyzer.observe_at(
+                &BinaryHV::random(100 + i),
+                0.5,
+                Duration::from_secs(i as u64),
+            ));
+        }
+
+        let report = analyzer.report();
+        assert_eq!(report.trajectory_sample_count, 2);
+        assert!(!report.trajectory_evidence_sufficient);
+        assert!(!report.trajectory_qualification_possible);
+        assert!(!report.is_healthy);
+        assert!(report.recommendations.iter().any(|r| r.contains("cannot qualify")));
     }
 
     #[test]
