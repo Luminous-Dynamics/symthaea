@@ -886,6 +886,38 @@ mod native_cdp_tests {
                 );
             }
         }
+
+        // Keep direct CdpSession access confined to the executor module itself.
+        // These maintained perception clients should only use BrowserExecutor.
+        let raw_api_callers = [
+            ("web_agent.rs", include_str!("web_agent.rs")),
+            ("embodiment.rs", include_str!("embodiment.rs")),
+            (
+                "examples/praxis_journey.rs",
+                include_str!("../examples/praxis_journey.rs"),
+            ),
+        ];
+        let forbidden_session_calls = [
+            "session.observe()",
+            "session.get_accessibility_tree()",
+            "session.get_page_state_js()",
+            "session.screenshot()",
+            "session.navigate(",
+            "session.click(",
+            "session.type_text(",
+            "session.scroll_to(",
+            "session.extract_text(",
+            "session.go_back_with_url_policy(",
+            "session.go_forward_with_url_policy(",
+        ];
+        for (path, source) in raw_api_callers {
+            for token in forbidden_session_calls {
+                assert!(
+                    !source.contains(token),
+                    "maintained caller {path} bypasses BrowserExecutor with {token}"
+                );
+            }
+        }
     }
 }
 
