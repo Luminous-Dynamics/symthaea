@@ -227,3 +227,7 @@ Run deterministic structural probes and audio-capture comparisons, then owner/us
 - A style's status cannot imply cultural authenticity, rendering fidelity, or distinctness unless the corresponding evidence axis supports that claim.
 - The routing inventory reports source-declared coverage without presenting route counts as musical capability evidence.
 - The subsequent runtime-capability inventory cites source/tests/captures for actual grammar and layer behavior, rather than inferring implementation from names or labels.
+
+## Follow-up: source-grounded control targets
+
+The routed response-curve probe now has a separate, versioned contract for target fidelity, observed response, non-target invariance, and evidence boundaries: [Muse Control-Target Contracts v0.1](MUSE_CONTROL_TARGET_CONTRACTS_V0_1.md). It treats zero valence as neutral/unscored for the directional major/minor proxy and scores requested-bar fidelity only on the Blues and Jazz chorus routes whose plans expose an explicit quantization contract and can be checked against the emitted note span. These are evaluation changes, not composer behavior changes; the exact-head Actions artifact remains the authority for runtime outcomes.
