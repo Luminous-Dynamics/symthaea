@@ -189,7 +189,13 @@ Use predeclared tolerances with a justified source. Preserve per-case tails and 
 - Thermal-spallation hard-rock field test: https://doi.org/10.1016/j.petrol.2020.107005
 - OpenGeoSys THMC and geomechanics: https://www.opengeosys.org/stable/
 - OpenGeoSys phase-field fracture benchmarks: https://www.opengeosys.org/stable/docs/benchmarks/phase-field/
+- Rust-native acoustic FEM candidate (Helmholtz/frequency-domain and room-acoustics scope): https://docs.rs/math-fem/latest/math_fem/
+- Rust-native acoustic BEM candidate (acoustic scattering/room-acoustics scope): https://docs.rs/math-bem/latest/math_bem/
+- Elmer FEM multiphysics (structural mechanics, fluids, heat transfer, electromagnetics): https://github.com/ElmerCSC/elmerfem
+- MOOSE physics modules (electromagnetics, heat transfer, solid mechanics, phase field, porous flow): https://mooseframework.inl.gov/modules/
 - Symtropy multi-physics digital-twin world contract (proposal): https://github.com/Luminous-Dynamics/symtropy/blob/research/subterranean-rock-physics-contract-v1/docs/canon/ROBOTICS_MULTIPHYSICS_DIGITAL_TWIN_WORLD_CONTRACT_V0_1.md
+
+The Rust acoustic crates are candidates for bounded prototypes, not validated fracture solvers. A room-acoustics Helmholtz/BEM benchmark does not by itself establish performance for waves through fractured rock or acoustic-emission detection. Model fit must be decided by the exact validated observable.
 
 The literature demonstrates research activity and selected experiments, not universal benefits or an operationally validated model. Data/license access and the match between each reference and our target use case must be evaluated independently.
 
