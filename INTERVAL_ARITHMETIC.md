@@ -28,11 +28,11 @@ crate::hdc::interval_arithmetic::{Interval, IntervalError}.
   absolute, and checked_powi provide conservative range operations. Square root
   rejects intervals containing negative reals and expands nonzero endpoints
   outward. Natural logarithm and exponential use interval series, range reduction,
-  and explicit remainder bounds. Sine/cosine use Taylor series only when the full
-  interval lies within [-2, 2]; elsewhere they return the always-sound but
-  coarse enclosure [-1, 1] until a validated argument-reduction path exists. The
-  integer-power path is logarithmic in the exponent and rejects zero-to-zero and
-  negative powers over intervals containing zero.
+  and explicit remainder bounds. Sine/cosine use local Taylor enclosures plus a
+  checked quadrant-reduction path capped at a quadrant index of 1e12; unbounded,
+  excessive, or otherwise unusable reductions conservatively return [-1, 1].
+  The integer-power path is logarithmic in the exponent and rejects zero-to-zero
+  and negative powers over intervals containing zero.
 - Expr::eval_interval evaluates symbolic arithmetic and finite sums over
   interval-valued variable bindings. It supports integer powers, square root,
   natural logarithm, exponential, sine/cosine, absolute value, floor, and finite
@@ -102,6 +102,28 @@ identity `pi/2 = 8 atan(1/5) - 2 atan(1/239)`, using 25 and 8 alternating-series
 terms with symmetric `2^-120` remainder allowances; if construction fails, sine
 returns `[-1, 1]`. Cosine uses its endpoint hull and the exact maximum 1 when the
 input contains zero. For intervals extending outside [-2, 2], a checked quadrant-reduction path is attempted. It encloses the quotient by pi/2 and uses its midpoint only to choose a candidate integer `k`; it does not require a unique nearest-integer cell because the shift identities are exact for every integer `k`. It computes an interval for `r = x - k*pi/2` and accepts that choice only if the complete reduced interval remains inside [-2, 2]. Sine/cosine are mapped through the corresponding quadrant identity using local series enclosures. The quadrant index is capped at 1,000,000,000,000; non-finite, excessive, or otherwise unusable reductions return `[-1, 1]`. This extends tight enclosures to many moderate and large finite values without claiming all-binary64 coverage. No platform `f64::sin` or `f64::cos` result is used to form an enclosure.
+
+### Extending argument-reduction coverage
+
+The 1e12 quadrant cap is a deliberate bound on both integer conversion and
+error growth: the width of the cached pi/2 enclosure propagates when multiplied
+by the selected quadrant index. Increasing the cap alone is not a validated
+route to full-binary64 coverage. The next custom-algorithm milestone should use
+a Payne–Hanek-style fixed-point reduction based on a sufficiently long enclosure
+of 2/pi, return an explicit enclosure for the residual phase, and be tested
+against an independent high-precision oracle across exponent bands and
+quadrant-boundary cases. The proof obligation includes table truncation,
+fixed-point multiplication, and the complete residual error budget.
+
+A separate implementation candidate is the Rust `crlibm` binding, which
+exposes directed-rounding `sin_rd`/`sin_ru` and
+`cos_rd`/`cos_ru` functions
+([API documentation](https://docs.rs/crlibm/latest/crlibm/)). That could simplify
+point-function enclosures, but it introduces a bundled native C implementation
+and requires a portability, maintenance, licensing, and build-matrix review;
+it is not adopted by this module. Either route still needs interval-range
+handling for interior extrema, reproducible high-precision tests, and successful
+verification on the exact PR head before broadening the guarantee.
 
 A wider interval is conservative, not proof of a desired property. For example,
 an interval whose lower bound is negative does not prove the true result is
