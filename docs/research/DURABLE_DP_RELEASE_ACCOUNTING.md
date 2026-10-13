@@ -1,0 +1,79 @@
+# Durable Differential-Privacy Release Accounting: Reservation and Output Binding
+
+**Status:** Research prototype for persistent privacy-budget accounting. It is not a noise generator and does not by itself establish that any output is differentially private. New tests are committed but remain unverified until exact-head CI completes.  
+**Implementation:** `tools/energy_telemetry/durable_privacy_ledger.py`  
+**Tests:** `tests/test_energy_telemetry_durable_privacy_ledger.py`
+
+## Why persist the privacy budget?
+
+The earlier `ReleasePolicyGuard` kept participant-level budget and overlap state in memory. A process restart would lose it, potentially allowing the same participant to contribute to additional research/public releases after the previous budget appeared to reset. The new `DurablePrivacyLedger` persists each reservation and cumulative participant spend in SQLite transactions.
+
+This ledger is separate from sender delivery accounting. Network retries and repeated ACKs must not spend privacy budget twice, while a semantically new statistic or release must make a new reservation even if its values happen to resemble an earlier output.
+
+## Reservation contract
+
+`reserve_release` requires:
+- a random 128-bit-looking release ID (32 lowercase hex characters), query-descriptor SHA-256, UTC time window, recipient class and privacy-policy identifier;
+- a unique local participant-token set with at least 20 members under the default floor;
+- a named contribution-bound policy, an integer Wh contribution cap, adjacency definition and mechanism ID;
+- epsilon and delta values within the prototype's per-release caps.
+
+Only `approved_research` and `public_reporting` recipients can reserve through this DP ledger. Operational aggregates for trusted grid operations remain a separate, explicitly authorized flow.
+
+Within a `BEGIN IMMEDIATE` transaction, the ledger:
+1. Checks whether the release ID already exists. An exact reservation retry is idempotent and does not spend the budget again. Reusing the release ID with any different query or policy field fails closed.
+2. Rejects any overlapping UTC release window for a participant already present in another reservation. This conservative policy reduces simple time-window differencing; it is not a complete defence against arbitrary correlated queries or collusion.
+3. Checks each participant's remaining epsilon/delta budget.
+4. Writes the reservation, participant membership tags and cumulative spend atomically.
+
+The default cumulative per-participant budgets are epsilon 2.0 and delta 2e-6. The prototype caps a single release at epsilon 1.0 and delta 1e-6. Epsilon is stored as integer nano-epsilon units and delta as integer pico-delta units, rounding each reservation upward to avoid under-accounting caused by floating-point arithmetic.
+
+## Participant privacy in the ledger
+
+Raw participant tokens are not stored. The caller provides a stable, secret 32-byte-or-longer HMAC key; participant tags are HMAC-SHA-256 of a domain-separated local token. The ledger stores only these tags and a digest of the participant-tag set in each receipt. The key itself is not persisted. A derived key-check value is stored so a different key cannot silently reopen the same database and create a fresh apparent budget namespace.
+
+Important limits:
+- Tags remain linkable within this ledger, so the database still contains sensitive pseudonymous membership data.
+- Losing, rotating or replacing the HMAC key without a reviewed migration must fail closed; changing the key changes participant tags and could otherwise reset budgets.
+- The database file and WAL are not encrypted by this module. Use a private parent directory, restrictive file permissions and appropriate local storage/backup encryption.
+- Participant-token canonicalization and mapping to actual subjects must be consistent and controlled by the caller.
+
+## Immutable output binding
+
+Reserving a release consumes its budget immediately, even if the process crashes before output generation. This is intentionally conservative.
+
+After a reviewed mechanism has generated the noisy output, the caller passes the exact output bytes to `commit_output`. The transaction binds one SHA-256 digest and exact byte string to the reservation. Repeating the same commit is idempotent; attempting to bind different bytes to the same release ID is rejected. `committed_output` rechecks the stored digest and returns the already committed bytes.
+
+The caller must **not publish or use a newly generated output until its exact bytes have been committed**, and retries must publish only the committed bytes. This ensures that a crash/retry cannot accidentally expose several independently noised outputs for a single reservation while spending budget only once. The ledger cannot technically prevent an external caller from violating this ordering; that trust boundary must be enforced in the release service.
+
+The ledger's `receipt_sha256` is a stable hash of reservation metadata and participant-set commitment, not a digital signature. Mycelix could later attach an authenticated, purpose-bound receipt if key ownership and signer policy are specified.
+
+## What this does not prove
+
+This code does **not**:
+- generate Laplace/Gaussian noise or verify a mechanism implementation;
+- prove the upstream data contributions are clipped to `contribution_limit_wh`;
+- verify that the declared adjacency definition correctly describes the dataset;
+- compute global sensitivity, select noise scale, verify utility or issue a formal DP theorem;
+- provide secure aggregation or prevent inference from external side information;
+- prove anonymity or POPIA compliance.
+
+The `mechanism`, `adjacency`, contribution cap, contribution-policy ID, privacy-policy ID and query hash are recorded as policy context. A trusted aggregator must enforce the actual bound and a reviewed implementation must compute the correct noise for that bound/adjacency before output can be committed. A correct accountant cannot repair an incorrectly implemented DP mechanism.
+
+## Durability and capacity
+
+The ledger uses SQLite WAL, `synchronous=FULL`, explicit write transactions, a database application ID and a persisted configuration record. Changing the budget limits, cohort floor or HMAC key fails closed. The configured maximum reservation count includes completed and reserved entries; when it is reached, the ledger rejects new reservations instead of implicitly deleting history.
+
+A production system still needs:
+- target-filesystem crash/power-loss and backup/restore testing;
+- a reviewed retention/archive design that preserves budget history and release IDs;
+- authenticated authorization that binds query purpose and policy to the requesting service;
+- tamper-evident or signed receipts if the database operator is in the threat model;
+- an output service that enforces commit-before-publish;
+- a migration plan for HMAC key rotation without resetting subject budgets.
+
+## Deterministic test coverage
+
+The test suite uses synthetic tokens, fixed test-only keys, fixed timestamps and small synthetic output blobs. It covers restart recovery, idempotent reservation, release-ID conflicts, overlap suppression, disjoint cohorts, cumulative epsilon/delta exhaustion, cohort floor, policy-field validation, immutable output commit/replay, output digest checks, HMAC-key mismatch, record limits and concurrent duplicate reservations.
+
+These tests are added to the telemetry GitHub Actions workflow. They must not be described as passing until a completed exact-head run succeeds.
