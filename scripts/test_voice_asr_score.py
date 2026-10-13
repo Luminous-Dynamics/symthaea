@@ -156,7 +156,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertEqual(report["model"]["snapshot_file_count"], 2)
         self.assertEqual(report["runtime"]["kind"], "whisper.cpp")
         self.assertEqual(report["runtime"]["quantization"], "f16")
-        self.assertEqual(report["inputs"]["outcomes_sha256"], "f" * 64)
+        self.assertEqual(report["inputs"]["outcomes_sha256"], sha256_file(self.outcomes_path))
         self.assertEqual(report["mode"], "smoke")
         self.assertIn("exploratory smoke metric only", report["interpretation"])
         self.assertEqual(report["training_data_overlap_status"], "not_assessed")
