@@ -113,6 +113,10 @@ struct Observation {
     section_intensity_standard_deviation: f64,
     emphasis_counts: [usize; 4],
     form_section_count: Option<usize>,
+    plan_requested_bars: Option<usize>,
+    plan_realized_bars: Option<usize>,
+    plan_bars_per_chorus: Option<usize>,
+    observed_score_span_bars: f64,
 }
 
 fn control_points(control: &str, base_seed: u64) -> Vec<ControlPoint> {
@@ -188,7 +192,30 @@ fn observe(
         }
         _ => None,
     };
+    // Only these dedicated engines currently publish an explicit request-to-
+    // realized-bar quantization contract. Do not infer such a contract from
+    // a style name or from section count.
+    let (plan_requested_bars, plan_realized_bars, plan_bars_per_chorus) =
+        match &realization.plan {
+            symthaea_music_theory::grammar::GrammarPlanEvidence::CallResponse(plan) => (
+                Some(plan.requested_bars),
+                Some(plan.realized_bars),
+                Some(plan.bars_per_chorus),
+            ),
+            symthaea_music_theory::grammar::GrammarPlanEvidence::JazzChorus(plan) => (
+                Some(plan.requested_bars),
+                Some(plan.realized_bars),
+                Some(plan.bars_per_chorus),
+            ),
+            _ => (None, None, None),
+        };
     let score = realization.score;
+    let note_span_beats = score
+        .notes
+        .iter()
+        .map(|note| (note.onset + note.duration).beats())
+        .fold(0.0_f64, f64::max);
+    let observed_score_span_bars = note_span_beats / f64::from(score.meter.max(1));
     let structural = fingerprint::structural_fingerprint(&score, &realization.form);
     let exact_hash = fingerprint::exact_fingerprint(&score);
     let layer_distances = fingerprint::layer_dists(base_structure, &structural);
@@ -285,6 +312,10 @@ fn observe(
         section_intensity_standard_deviation,
         emphasis_counts,
         form_section_count: realization.form.as_ref().map(|form| form.sections.len()),
+        plan_requested_bars,
+        plan_realized_bars,
+        plan_bars_per_chorus,
+        observed_score_span_bars,
     }
 }
 
@@ -351,6 +382,10 @@ fn observation_json(observation: &Observation, base_hash: u64) -> serde_json::Va
             },
             "form_available": observation.form_section_count.is_some(),
             "form_section_count": observation.form_section_count,
+            "plan_requested_bars": observation.plan_requested_bars,
+            "plan_realized_bars": observation.plan_realized_bars,
+            "plan_bars_per_chorus": observation.plan_bars_per_chorus,
+            "observed_score_span_bars": observation.observed_score_span_bars,
         },
     })
 }
@@ -367,9 +402,9 @@ const TONIC_CANDIDATE_INVARIANT_LAYERS: &[&str] = &[
     "motif",
 ];
 
-/// Reports a justified target metric separately from displacement. Only tonic
-/// has a direct, source-grounded target contract here; other controls remain
-/// explicitly unscored until their per-style semantics are specified.
+/// Reports target fidelity separately from observed displacement. A control
+/// is scored only when the active grammar path exposes a source-grounded
+/// target contract; unknown target semantics remain explicitly unscored.
 fn control_target_evaluation(
     style: Style,
     control: &str,
@@ -410,16 +445,28 @@ fn control_target_evaluation(
         let points: Vec<serde_json::Value> = observations
             .iter()
             .map(|observation| {
-                let expected_tonality = if observation.input.valence >= 0.0 {
-                    "Major"
+                // Zero is neutral, not a positive-valence target. Major/minor
+                // is only a tonal proxy for directional valence, not a claim
+                // that key mode determines perceived emotion.
+                let expected_tonality = if observation.input.valence > 0.0 {
+                    Some("Major")
+                } else if observation.input.valence < 0.0 {
+                    Some("Minor")
                 } else {
-                    "Minor"
+                    None
                 };
+                let matches_target = expected_tonality
+                    .map(|expected| observation.score_key_tonality == expected);
                 serde_json::json!({
                     "control_value": observation.value_label,
+                    "target_applicability": if expected_tonality.is_some() {
+                        "directional_tonal_proxy"
+                    } else {
+                        "neutral_unscored"
+                    },
                     "expected_tonality": expected_tonality,
                     "realized_tonality": observation.score_key_tonality,
-                    "matches_target": observation.score_key_tonality == expected_tonality,
+                    "matches_target": matches_target,
                 })
             })
             .collect();
@@ -427,16 +474,23 @@ fn control_target_evaluation(
             .iter()
             .filter(|point| point["matches_target"].as_bool() == Some(true))
             .count();
+        let scored_count = points
+            .iter()
+            .filter(|point| point["target_applicability"] == "directional_tonal_proxy")
+            .count();
         let count = points.len();
         return serde_json::json!({
             "control": control,
             "target_fidelity": {
                 "status": "measured",
-                "target_metric": "major_for_nonnegative_valence_minor_for_negative_valence",
+                "target_metric": "negative_valence_minor_positive_valence_major_exact_zero_neutral_unscored",
                 "tested_point_count": count,
+                "scored_point_count": scored_count,
+                "unscored_neutral_point_count": count - scored_count,
                 "matching_point_count": matched,
-                "mismatching_point_count": count - matched,
-                "adherence_fraction": matched as f64 / count.max(1) as f64,
+                "mismatching_point_count": scored_count - matched,
+                "adherence_fraction": matched as f64 / scored_count.max(1) as f64,
+                "interpretation": "Directional tonal proxy only; this is not a perceptual-valence measurement.",
                 "points": points,
             },
             "non_target_invariance": {
@@ -498,6 +552,7 @@ fn control_target_evaluation(
                 "max_absolute_error_bpm": max_error,
                 "points": points,
             },
+            "interpretation": "This is fidelity to the source-declared tempo mapping, not a perceptual-arousal measurement.",
             "non_target_invariance": {
                 "status": "not_predeclared",
                 "reason": "Changing arousal also selects motif tiers and can change phrase rhetoric; no universal invariant set is declared.",
@@ -543,9 +598,87 @@ fn control_target_evaluation(
                 "adherence_fraction": matched as f64 / count.max(1) as f64,
                 "points": points,
             },
+            "interpretation": "This checks the PeriodSentence threshold policy, not perceived musical energy.",
             "non_target_invariance": {
                 "status": "not_predeclared",
                 "reason": "The energy-triggered phrase model is an intended structural effect; other structural invariants need their own contract.",
+            },
+        });
+    }
+
+    if control == "bars" {
+        let has_plan_contract = observations.iter().all(|observation| {
+            observation.plan_requested_bars.is_some()
+                && observation.plan_realized_bars.is_some()
+                && observation.plan_bars_per_chorus.is_some()
+        });
+        if !has_plan_contract {
+            return serde_json::json!({
+                "control": control,
+                "target_fidelity": {
+                    "status": "not_predeclared",
+                    "reason": "This grammar route does not yet expose a typed requested-to-realized bar quantization contract.",
+                },
+                "non_target_invariance": {
+                    "status": "not_predeclared",
+                    "reason": "Duration is the target; family-specific non-target invariants remain undeclared.",
+                },
+            });
+        }
+
+        let points: Vec<serde_json::Value> = observations
+            .iter()
+            .map(|observation| {
+                let plan_requested_bars = observation.plan_requested_bars.unwrap();
+                let plan_realized_bars = observation.plan_realized_bars.unwrap();
+                let bars_per_chorus = observation.plan_bars_per_chorus.unwrap();
+                let expected_realized_bars =
+                    observation.input.bars.max(1).div_ceil(bars_per_chorus) * bars_per_chorus;
+                let plan_request_matches_input = plan_requested_bars == observation.input.bars;
+                let plan_quantization_matches_policy =
+                    plan_realized_bars == expected_realized_bars;
+                let score_span_matches_plan =
+                    (observation.observed_score_span_bars - plan_realized_bars as f64).abs()
+                        <= 0.001;
+                serde_json::json!({
+                    "control_value": observation.value_label,
+                    "requested_bars": observation.input.bars,
+                    "plan_requested_bars": plan_requested_bars,
+                    "bars_per_chorus": bars_per_chorus,
+                    "expected_realized_bars": expected_realized_bars,
+                    "plan_realized_bars": plan_realized_bars,
+                    "observed_score_span_bars": observation.observed_score_span_bars,
+                    "plan_request_matches_input": plan_request_matches_input,
+                    "plan_quantization_matches_policy": plan_quantization_matches_policy,
+                    "score_span_matches_plan": score_span_matches_plan,
+                    "matches_target": plan_request_matches_input
+                        && plan_quantization_matches_policy
+                        && score_span_matches_plan,
+                })
+            })
+            .collect();
+        let matched = points
+            .iter()
+            .filter(|point| point["matches_target"].as_bool() == Some(true))
+            .count();
+        let count = points.len();
+        return serde_json::json!({
+            "control": control,
+            "target_fidelity": {
+                "status": "measured",
+                "target_metric": "chorus_quantized_plan_and_observed_score_span_match_requested_bars",
+                "quantization_policy": "round_up_to_whole_declared_chorus",
+                "observed_span_metric": "max(note.onset + note.duration) / meter",
+                "tolerance_bars": 0.001,
+                "tested_point_count": count,
+                "matching_point_count": matched,
+                "mismatching_point_count": count - matched,
+                "adherence_fraction": matched as f64 / count.max(1) as f64,
+                "points": points,
+            },
+            "non_target_invariance": {
+                "status": "not_predeclared",
+                "reason": "No non-target invariant set is yet justified for requested-length changes within these chorus grammars.",
             },
         });
     }
@@ -1342,8 +1475,8 @@ mod tests {
     }
 
     #[test]
-    fn unscored_controls_are_explicitly_not_predeclared() {
-        let curve = curve_json(Style::Classical, "arousal", BASE_SEED);
+    fn seed_control_target_is_explicitly_not_predeclared() {
+        let curve = curve_json(Style::Classical, "seed", BASE_SEED);
         assert_eq!(
             curve["control_target_evaluation"]["target_fidelity"]["status"].as_str(),
             Some("not_predeclared")
@@ -1385,9 +1518,11 @@ mod tests {
         } else {
             assert_eq!(target["status"].as_str(), Some("measured"));
             assert_eq!(target["tested_point_count"].as_u64(), Some(5));
+            assert_eq!(target["scored_point_count"].as_u64(), Some(4));
+            assert_eq!(target["unscored_neutral_point_count"].as_u64(), Some(1));
             assert_eq!(
                 target["matching_point_count"].as_u64(),
-                Some(5),
+                Some(4),
                 "{:?}",
                 target["points"]
             );
@@ -1396,10 +1531,40 @@ mod tests {
             assert!(points.iter().any(|point| {
                 point["control_value"] == "-1.00"
                     && point["expected_tonality"] == "Minor"
+                    && point["matches_target"] == true
             }));
             assert!(points.iter().any(|point| {
                 point["control_value"] == "0.00"
+                    && point["target_applicability"] == "neutral_unscored"
+                    && point["expected_tonality"].is_null()
+                    && point["matches_target"].is_null()
+            }));
+            assert!(points.iter().any(|point| {
+                point["control_value"] == "1.00"
                     && point["expected_tonality"] == "Major"
+                    && point["matches_target"] == true
+            }));
+        }
+    }
+
+    #[test]
+    fn chorus_bar_targets_check_plan_quantization_and_observed_score_span() {
+        for style in [Style::Blues, Style::JazzBallad] {
+            let curve = curve_json(style, "bars", BASE_SEED);
+            let target = &curve["control_target_evaluation"]["target_fidelity"];
+            assert_eq!(target["status"].as_str(), Some("measured"), "{style:?}");
+            assert_eq!(target["tested_point_count"].as_u64(), Some(5), "{style:?}");
+            assert_eq!(
+                target["matching_point_count"].as_u64(),
+                Some(5),
+                "{style:?}: {:?}",
+                target["points"]
+            );
+            assert_eq!(target["mismatching_point_count"].as_u64(), Some(0), "{style:?}");
+            assert!(target["points"].as_array().unwrap().iter().all(|point| {
+                point["plan_request_matches_input"].as_bool() == Some(true)
+                    && point["plan_quantization_matches_policy"].as_bool() == Some(true)
+                    && point["score_span_matches_plan"].as_bool() == Some(true)
             }));
         }
     }
