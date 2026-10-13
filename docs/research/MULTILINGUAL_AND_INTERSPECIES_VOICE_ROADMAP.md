@@ -80,6 +80,7 @@ python3 scripts/voice_pilot_outcomes_to_predictions.py \\
   --intake-report "$PRIVATE_DIR/af-dataset-intake.json" \\
   --dataset-root "$CV_ROOT/af" --archive "$CV_ARCHIVE" \\
   --model-root "$MODEL_EXPORT" \\
+  --source-model-root "$UPSTREAM_MODEL_SNAPSHOT" \\
   --runtime-binary "$WHISPER_CPP_DIR/build/bin/whisper-cli" \\
   --locale af --model-id BuzzASR/afrikaans \\
   --model-revision "$MODEL_REVISION_40_HEX" --model-license MIT \\
@@ -89,7 +90,7 @@ python3 scripts/voice_pilot_outcomes_to_predictions.py \\
   --output "$PRIVATE_DIR/af-predictions.json"
 ```
 
-6. Score it. The scorer independently checks the archive, test.tsv, raw pilot outcome JSONL digest, runtime executable hash, converted artifact hash, and full model-export file-manifest hash; it refuses schema and metadata drift.
+6. Score it. The scorer independently checks the archive, test.tsv, raw pilot outcome JSONL digest, runtime executable hash, converted artifact hash, complete converted-export file-manifest hash, and complete original upstream model snapshot manifest hash; it refuses schema and metadata drift. The declared model revision is still an operator-supplied upstream commit, while the local snapshot digest proves exactly which exported files were evaluated.
 
 ```sh
 python3 scripts/voice_asr_score.py \\
@@ -98,6 +99,7 @@ python3 scripts/voice_asr_score.py \\
   --predictions "$PRIVATE_DIR/af-predictions.json" \\
   --outcomes "$PRIVATE_DIR/af-outcomes.jsonl" \\
   --model-root "$MODEL_EXPORT" \\
+  --source-model-root "$UPSTREAM_MODEL_SNAPSHOT" \\
   --runtime-binary "$WHISPER_CPP_DIR/build/bin/whisper-cli" \\
   --locale af --model-id BuzzASR/afrikaans \\
   --model-revision "$MODEL_REVISION_40_HEX" --model-license MIT \\
