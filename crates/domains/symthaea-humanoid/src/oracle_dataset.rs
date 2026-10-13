@@ -19,7 +19,7 @@ use crate::dynamics_oracle::{
 use crate::floating_base::FloatingBaseDynamicsSnapshot;
 use crate::morphology::HumanoidMorphology;
 
-pub const DYNAMICS_ORACLE_DATASET_SCHEMA_VERSION: u32 = 1;
+pub const DYNAMICS_ORACLE_DATASET_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DynamicsOracleDatasetManifest {
@@ -27,6 +27,8 @@ pub struct DynamicsOracleDatasetManifest {
     pub dataset_id: String,
     pub generator_id: String,
     pub generator_build_id: String,
+    /// SHA-256 of the external worker executable bytes, pinned by the protected manifest.
+    pub generator_executable_sha256: String,
     pub engine_id: String,
     pub model_artifact_sha256: String,
     pub morphology: HumanoidMorphology,
@@ -41,6 +43,7 @@ impl DynamicsOracleDatasetManifest {
             && !self.dataset_id.trim().is_empty()
             && !self.generator_id.trim().is_empty()
             && !self.generator_build_id.trim().is_empty()
+            && is_lower_hex_sha256(&self.generator_executable_sha256)
             && !self.engine_id.trim().is_empty()
             && is_lower_hex_sha256(&self.model_artifact_sha256)
             && self.generalized_coordinate_order.len() == 6 + self.morphology.num_actuators()

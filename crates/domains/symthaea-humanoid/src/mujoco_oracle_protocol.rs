@@ -7,11 +7,17 @@
 //! generalized state, and independently revalidates the returned structure and
 //! state fingerprint before dataset admission.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::sync::mpsc;
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::floating_base::FloatingBaseDynamicsSnapshot;
 use crate::morphology::HumanoidMorphology;
@@ -132,6 +138,9 @@ pub struct ProcessMujocoOracleGenerator {
     executable: PathBuf,
     arguments: Vec<String>,
     maximum_response_bytes: usize,
+    /// Expected executable bytes, provisioned from a protected build manifest.
+    expected_executable_sha256: Option<String>,
+    maximum_execution_time: Duration,
 }
 
 impl ProcessMujocoOracleGenerator {
@@ -140,6 +149,8 @@ impl ProcessMujocoOracleGenerator {
             executable: executable.into(),
             arguments: Vec::new(),
             maximum_response_bytes: 64 * 1024 * 1024,
+            expected_executable_sha256: None,
+            maximum_execution_time: Duration::from_secs(5),
         }
     }
 
@@ -150,6 +161,26 @@ impl ProcessMujocoOracleGenerator {
 
     pub fn with_maximum_response_bytes(mut self, maximum_response_bytes: usize) -> Self {
         self.maximum_response_bytes = maximum_response_bytes.max(1024);
+        self
+    }
+
+    /// Pin the worker binary to an externally trusted SHA-256 digest.
+    ///
+    /// The digest should come from a protected build/qualification manifest.
+    /// This path-level check detects persistent artifact drift before or after
+    /// invocation; it is not OS-level process-image attestation or sandboxing.
+    pub fn with_expected_executable_sha256(mut self, digest: impl Into<String>) -> Self {
+        self.expected_executable_sha256 = Some(digest.into());
+        self
+    }
+
+    pub fn expected_executable_sha256(&self) -> Option<&str> {
+        self.expected_executable_sha256.as_deref()
+    }
+
+    /// Limit wall time for each oracle process. Values below 1 ms are clamped.
+    pub fn with_maximum_execution_time(mut self, maximum_execution_time: Duration) -> Self {
+        self.maximum_execution_time = maximum_execution_time.max(Duration::from_millis(1));
         self
     }
 
@@ -164,29 +195,166 @@ impl ProcessMujocoOracleGenerator {
         if self.executable.as_os_str().is_empty() || !request.validate() {
             return None;
         }
-        let payload = serde_json::to_vec(request).ok()?;
-        let mut child = Command::new(&self.executable)
-            .args(&self.arguments)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .ok()?;
-        {
-            let mut stdin = child.stdin.take()?;
-            stdin.write_all(&payload).ok()?;
-            stdin.write_all(b"\n").ok()?;
-        }
-        let output = child.wait_with_output().ok()?;
-        if !output.status.success()
-            || output.stdout.is_empty()
-            || output.stdout.len() > self.maximum_response_bytes
+        let expected_digest = self.expected_executable_sha256.as_deref()?;
+        if !is_lower_hex_sha256(expected_digest)
+            || executable_file_sha256(&self.executable).as_deref() != Some(expected_digest)
         {
             return None;
         }
-        let response: MujocoOracleWorkerResponse = serde_json::from_slice(&output.stdout).ok()?;
+        let payload = serde_json::to_vec(request).ok()?;
+        let deadline = Instant::now().checked_add(self.maximum_execution_time)?;
+        let mut command = Command::new(&self.executable);
+        command
+            .args(&self.arguments)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+        let mut child = command.spawn().ok()?;
+        {
+            let Some(mut stdin) = child.stdin.take() else {
+                terminate_worker_process_group(&mut child);
+                let _ = child.wait();
+                return None;
+            };
+            if stdin.write_all(&payload).is_err() || stdin.write_all(b"\n").is_err() {
+                terminate_worker_process_group(&mut child);
+                let _ = child.wait();
+                return None;
+            }
+        }
+
+        // Drain stdout concurrently so the child cannot deadlock on a full pipe.
+        // Retain at most maximum_response_bytes, and signal overflow immediately.
+        let Some(stdout) = child.stdout.take() else {
+            terminate_worker_process_group(&mut child);
+            let _ = child.wait();
+            return None;
+        };
+        let response_limit = self.maximum_response_bytes;
+        let overflow = Arc::new(AtomicBool::new(false));
+        let reader_overflow = Arc::clone(&overflow);
+        let reader_done = Arc::new(AtomicBool::new(false));
+        let reader_done_flag = Arc::clone(&reader_done);
+        let (reader_tx, reader_rx) = mpsc::channel();
+        let _reader = thread::spawn(move || {
+            let result = (|| -> std::io::Result<Vec<u8>> {
+                let mut stream = stdout;
+                let mut bytes = Vec::with_capacity(response_limit.min(64 * 1024));
+                let mut buffer = [0u8; 8192];
+                loop {
+                    let read = stream.read(&mut buffer)?;
+                    if read == 0 {
+                        break;
+                    }
+                    let remaining = response_limit.saturating_sub(bytes.len());
+                    if read > remaining {
+                        bytes.extend_from_slice(&buffer[..remaining]);
+                        reader_overflow.store(true, Ordering::Release);
+                        return Ok(bytes);
+                    }
+                    bytes.extend_from_slice(&buffer[..read]);
+                }
+                Ok(bytes)
+            })();
+            let _ = reader_tx.send(result);
+            reader_done_flag.store(true, Ordering::Release);
+        });
+
+        let mut timed_out = false;
+        let mut wait_failed = false;
+        let mut status: Option<ExitStatus> = None;
+        loop {
+            if overflow.load(Ordering::Acquire) {
+                terminate_worker_process_group(&mut child);
+                status = child.wait().ok();
+                break;
+            }
+            if status.is_none() {
+                match child.try_wait() {
+                    Ok(Some(exit_status)) => status = Some(exit_status),
+                    Ok(None) => {}
+                    Err(_) => {
+                        wait_failed = true;
+                        terminate_worker_process_group(&mut child);
+                        status = child.wait().ok();
+                        break;
+                    }
+                }
+            }
+            // Fail closed at the deadline before accepting a result. Because
+            // process status is polled, this can reject a completion observed
+            // just after the deadline even if it exited moments earlier.
+            if Instant::now() >= deadline {
+                timed_out = true;
+                terminate_worker_process_group(&mut child);
+                if status.is_none() {
+                    status = child.wait().ok();
+                }
+                break;
+            }
+            // Process exit is insufficient: a forked descendant may still hold
+            // stdout open. Wait for EOF as well, under the same hard deadline.
+            if status.is_some() && reader_done.load(Ordering::Acquire) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+
+        let status = status?;
+        // Never block forever waiting for EOF from a descendant that inherited
+        // stdout. On platforms without process-group termination, a malicious
+        // descendant may leave this bounded reader thread alive until it exits.
+        let stdout_bytes = reader_rx
+            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+            .ok()?
+            .ok()?;
+        if timed_out
+            || wait_failed
+            || overflow.load(Ordering::Acquire)
+            || !status.success()
+            || stdout_bytes.is_empty()
+            || stdout_bytes.len() > self.maximum_response_bytes
+            || executable_file_sha256(&self.executable).as_deref() != Some(expected_digest)
+        {
+            return None;
+        }
+        let response: MujocoOracleWorkerResponse = serde_json::from_slice(&stdout_bytes).ok()?;
         response.validate_against(request).then_some(response)
     }
+}
+
+fn terminate_worker_process_group(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        let process_group_id = child.id() as libc::pid_t;
+        // The child was launched as leader of a fresh process group. Killing
+        // the group also closes inherited stdout handles held by worker children.
+        unsafe {
+            let _ = libc::kill(-process_group_id, libc::SIGKILL);
+        }
+    }
+    let _ = child.kill();
+}
+
+fn executable_file_sha256(path: &Path) -> Option<String> {
+    let metadata = std::fs::symlink_metadata(path).ok()?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return None;
+    }
+    let bytes = std::fs::read(path).ok()?;
+    Some(format!("{:x}", Sha256::digest(&bytes)))
+}
+
+fn is_lower_hex_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn root_quaternion_is_unit(position: &[f64]) -> bool {
@@ -229,6 +397,123 @@ mod tests {
             actuator_command,
             state_fingerprint,
         }
+    }
+
+    #[test]
+    fn executable_digest_must_be_explicit_and_match_file_bytes() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-oracle-worker-{}-digest-test",
+            std::process::id()
+        ));
+        std::fs::write(&path, b"not an executable").unwrap();
+
+        let unpinned = ProcessMujocoOracleGenerator::new(&path);
+        assert!(unpinned.generate(&request()).is_none());
+
+        let mismatched = ProcessMujocoOracleGenerator::new(&path)
+            .with_expected_executable_sha256("a".repeat(64));
+        assert!(mismatched.generate(&request()).is_none());
+
+        let expected = format!("{:x}", Sha256::digest(b"not an executable"));
+        let pinned = ProcessMujocoOracleGenerator::new(&path)
+            .with_expected_executable_sha256(expected.clone());
+        assert_eq!(pinned.expected_executable_sha256(), Some(expected.as_str()));
+        assert_eq!(executable_file_sha256(&path).as_deref(), Some(expected.as_str()));
+
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn oracle_worker_timeout_terminates_the_process() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-oracle-worker-{}-timeout-test",
+            std::process::id()
+        ));
+        std::fs::write(&path, b"#!/bin/sh\nsleep 10 &\nwait\n").unwrap();
+        let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&path, permissions).unwrap();
+        let digest = executable_file_sha256(&path).unwrap();
+
+        let worker = ProcessMujocoOracleGenerator::new(&path)
+            .with_expected_executable_sha256(digest)
+            .with_maximum_execution_time(Duration::from_millis(25));
+        let started = Instant::now();
+        assert!(worker.generate(&request()).is_none());
+        assert!(started.elapsed() < Duration::from_secs(2));
+
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn worker_parent_exit_does_not_bypass_deadline_while_descendant_holds_stdout() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-oracle-worker-{}-orphan-pipe-test",
+            std::process::id()
+        ));
+        std::fs::write(&path, b"#!/bin/sh\nsleep 10 &\nprintf 'not-json\\n'\nexit 0\n")
+            .unwrap();
+        let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&path, permissions).unwrap();
+        let digest = executable_file_sha256(&path).unwrap();
+
+        let worker = ProcessMujocoOracleGenerator::new(&path)
+            .with_expected_executable_sha256(digest)
+            .with_maximum_execution_time(Duration::from_millis(40));
+        let started = Instant::now();
+        assert!(worker.generate(&request()).is_none());
+        assert!(started.elapsed() < Duration::from_secs(2));
+
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn oracle_worker_output_is_bounded_during_read() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-oracle-worker-{}-output-limit-test",
+            std::process::id()
+        ));
+        std::fs::write(&path, b"#!/bin/sh\nprintf '%2048s' x\n").unwrap();
+        let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&path, permissions).unwrap();
+        let digest = executable_file_sha256(&path).unwrap();
+
+        let worker = ProcessMujocoOracleGenerator::new(&path)
+            .with_expected_executable_sha256(digest)
+            .with_maximum_response_bytes(1024)
+            .with_maximum_execution_time(Duration::from_secs(1));
+        assert!(worker.generate(&request()).is_none());
+
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn executable_digest_rejects_symlink_paths() {
+        use std::os::unix::fs::symlink;
+
+        let base = std::env::temp_dir().join(format!(
+            "symthaea-oracle-worker-{}-symlink-test",
+            std::process::id()
+        ));
+        let target = base.with_extension("target");
+        let alias = base.with_extension("alias");
+        std::fs::write(&target, b"oracle bytes").unwrap();
+        symlink(&target, &alias).unwrap();
+        assert!(executable_file_sha256(&alias).is_none());
+        std::fs::remove_file(alias).unwrap();
+        std::fs::remove_file(target).unwrap();
     }
 
     #[test]

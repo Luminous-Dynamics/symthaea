@@ -24,6 +24,30 @@ impl FloatingBaseQpCase {
                 .as_ref()
                 .map(|value| !value.trim().is_empty())
                 .unwrap_or(false)
+            && self
+                .report
+                .maximum_dynamics_residual
+                .is_finite()
+            && self.report.maximum_dynamics_residual >= 0.0
+            && self
+                .report
+                .maximum_contact_acceleration_residual
+                .is_finite()
+            && self.report.maximum_contact_acceleration_residual >= 0.0
+            && self.report.maximum_friction_utilization.is_finite()
+            && self.report.maximum_friction_utilization >= 0.0
+            && self.report.objective.is_finite()
+            && self.report.budget.admitted
+            && self.report.budget.elapsed_micros > 0
+            && self.report.budget.estimated_operations > 0
+            && self.report.budget.variables > 0
+            && self.report.budget.constraints > 0
+            && self
+                .report
+                .model_id
+                .as_ref()
+                .map(|value| !value.trim().is_empty())
+                .unwrap_or(false)
     }
 }
 
@@ -104,6 +128,11 @@ pub fn certify_floating_base_qp(
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
+    let distinct_case_ids = valid
+        .iter()
+        .map(|case| case.case_id.as_str())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
 
     let mut failures = Vec::new();
     if criteria.minimum_cases == 0
@@ -122,6 +151,16 @@ pub fn certify_floating_base_qp(
             valid.len(),
             criteria.minimum_cases
         ));
+    }
+    if converged_cases != valid.len() {
+        failures.push(format!(
+            "{} of {} valid QP cases did not converge",
+            valid.len().saturating_sub(converged_cases),
+            valid.len()
+        ));
+    }
+    if distinct_case_ids != valid.len() {
+        failures.push("QP certification contains duplicate case IDs".to_string());
     }
     if warm_started_cases < criteria.minimum_warm_started_cases {
         failures.push(format!(
@@ -200,6 +239,43 @@ mod tests {
             },
             model_id: Some("test-model".to_string()),
         }
+    }
+
+    #[test]
+    fn nonconvergence_nonfinite_residuals_and_duplicate_ids_fail_closed() {
+        let criteria = FloatingBaseQpCriteria {
+            minimum_cases: 2,
+            minimum_warm_started_cases: 2,
+            maximum_fallback_fraction: 0.0,
+            maximum_deadline_miss_fraction: 0.0,
+            maximum_dynamics_residual: 1.0e-4,
+        };
+        let base_cases = || {
+            (1..=2)
+                .map(|id| FloatingBaseQpCase {
+                    case_id: format!("case-{id}"),
+                    state_fingerprint: id,
+                    report: report(),
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let mut unconverged = base_cases();
+        unconverged[1].report.converged = false;
+        let certificate = certify_floating_base_qp(&unconverged, criteria);
+        assert!(!certificate.passed);
+        assert!(certificate.failures.iter().any(|failure| failure.contains("did not converge")));
+
+        let mut nonfinite = base_cases();
+        nonfinite[1].report.maximum_dynamics_residual = f64::NAN;
+        let certificate = certify_floating_base_qp(&nonfinite, criteria);
+        assert!(!certificate.passed);
+
+        let mut duplicate_ids = base_cases();
+        duplicate_ids[1].case_id = duplicate_ids[0].case_id.clone();
+        let certificate = certify_floating_base_qp(&duplicate_ids, criteria);
+        assert!(!certificate.passed);
+        assert!(certificate.failures.iter().any(|failure| failure.contains("duplicate case IDs")));
     }
 
     #[test]

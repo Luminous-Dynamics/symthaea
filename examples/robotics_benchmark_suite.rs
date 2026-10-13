@@ -1,21 +1,23 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Robotics Benchmark Suite — comprehensive platform comparison.
+//! Robotics Benchmark Suite — five-platform simulator smoke benchmark.
 //!
-//! Runs all 10 Symthaea robotics platforms through a standard test protocol
-//! and reports comparative statistics: stability, control effort, safety
-//! cascade response, and consciousness-gated behavior.
+//! Runs the five platform simulators implemented below and reports state-finiteness
+//! and step throughput. This smoke benchmark is not a safety, robustness, or
+//! controller-quality certification.
 //!
-//! This is the single command that demonstrates what Symthaea's robotics
-//! ecosystem can do in its entirety.
+//! The example intentionally reports only the platform implementations it executes;
+//! it does not claim full coverage of the wider robotics ecosystem.
 //!
 //! Run with:
 //! ```
 //! cargo run --release --example robotics_benchmark_suite \
-//!   --features humanoid,helicopter,multirotor,vehicle,auv,manipulator,exoskeleton,surgical,orbital,quadruped
+//!   --features manipulator,helicopter,multirotor,vehicle,auv
 //! ```
 
 #![allow(clippy::needless_late_init)]
+
+use std::time::Instant;
 
 /// Per-platform benchmark result.
 #[derive(Debug, Clone, Default)]
@@ -26,20 +28,18 @@ struct PlatformResult {
     steps_executed: usize,
     elapsed_ms: f64,
     steps_per_sec: f64,
-    final_phi_finite: bool,
-    tests_passed: usize,
-    feature_gated: bool,
+    final_state_finite: bool,
 }
 
 fn main() {
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║  SYMTHAEA ROBOTICS BENCHMARK SUITE                                 ║");
-    println!("║  10 Platforms × Standard Protocol × Consciousness Cascade         ║");
+    println!("║  SYMTHAEA ROBOTICS SMOKE BENCHMARK                                 ║");
+    println!("║  5 Simulators × Finite-State Smoke Checks                         ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
-    let results: Vec<PlatformResult> = Vec::new();
+    let mut results: Vec<PlatformResult> = Vec::new();
 
     // ──────────────────────────────────────────────────────────────
     // Manipulator (7 joints, industrial arm)
@@ -70,9 +70,7 @@ fn main() {
             steps_executed: steps,
             elapsed_ms: elapsed,
             steps_per_sec: steps as f64 / (elapsed / 1000.0),
-            final_phi_finite: sim.state().is_finite(),
-            tests_passed: 1,
-            feature_gated: true,
+            final_state_finite: sim.state().is_finite(),
         });
     }
 
@@ -102,16 +100,14 @@ fn main() {
             steps_executed: steps,
             elapsed_ms: elapsed,
             steps_per_sec: steps as f64 / (elapsed / 1000.0),
-            final_phi_finite: sim.state().is_finite(),
-            tests_passed: 1,
-            feature_gated: true,
+            final_state_finite: sim.state().is_finite(),
         });
     }
 
     // ──────────────────────────────────────────────────────────────
     // Flight / Quadrotor (4 rotors)
     // ──────────────────────────────────────────────────────────────
-    #[cfg(feature = "flight")]
+    #[cfg(feature = "multirotor")]
     {
         let start = Instant::now();
         use symthaea_multirotor::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
@@ -132,9 +128,7 @@ fn main() {
             steps_executed: steps,
             elapsed_ms: elapsed,
             steps_per_sec: steps as f64 / (elapsed / 1000.0),
-            final_phi_finite: sim.state().is_finite(),
-            tests_passed: 1,
-            feature_gated: true,
+            final_state_finite: sim.state().is_finite(),
         });
     }
 
@@ -162,9 +156,7 @@ fn main() {
             steps_executed: steps,
             elapsed_ms: elapsed,
             steps_per_sec: steps as f64 / (elapsed / 1000.0),
-            final_phi_finite: sim.state().is_finite(),
-            tests_passed: 1,
-            feature_gated: true,
+            final_state_finite: sim.state().is_finite(),
         });
     }
 
@@ -192,9 +184,7 @@ fn main() {
             steps_executed: steps,
             elapsed_ms: elapsed,
             steps_per_sec: steps as f64 / (elapsed / 1000.0),
-            final_phi_finite: sim.state().is_finite(),
-            tests_passed: 1,
-            feature_gated: true,
+            final_state_finite: sim.state().is_finite(),
         });
     }
 
@@ -203,7 +193,7 @@ fn main() {
     // ──────────────────────────────────────────────────────────────
     println!();
     println!("┌─────────────────────┬────────┬─────────┬───────┬──────────┬──────────┬────────┐");
-    println!("│ Platform            │ Actuat │ State D │ Steps │ Elapsed  │ Steps/s  │ Stable │");
+    println!("│ Platform            │ Actuat │ State D │ Steps │ Elapsed  │ Steps/s  │ Finite │");
     println!("├─────────────────────┼────────┼─────────┼───────┼──────────┼──────────┼────────┤");
     for r in &results {
         println!(
@@ -214,7 +204,7 @@ fn main() {
             r.steps_executed,
             r.elapsed_ms,
             r.steps_per_sec,
-            if r.final_phi_finite { "✓" } else { "✗" }
+            if r.final_state_finite { "✓" } else { "✗" }
         );
     }
     println!("└─────────────────────┴────────┴─────────┴───────┴──────────┴──────────┴────────┘");
@@ -225,11 +215,11 @@ fn main() {
     // ──────────────────────────────────────────────────────────────
     let total_steps: usize = results.iter().map(|r| r.steps_executed).sum();
     let total_time_ms: f64 = results.iter().map(|r| r.elapsed_ms).sum();
-    let all_stable = results.iter().all(|r| r.final_phi_finite);
+    let all_finite = !results.is_empty() && results.iter().all(|r| r.final_state_finite);
     let active_platforms = results.len();
 
     println!("📊 Summary:");
-    println!("  Active platforms:  {}/10", active_platforms);
+    println!("  Active simulators: {}/5", active_platforms);
     println!("  Total steps:       {}", total_steps);
     println!("  Total elapsed:     {:.1}ms", total_time_ms);
     if total_time_ms > 0.0 {
@@ -240,19 +230,25 @@ fn main() {
     }
     println!(
         "  All finite:        {}",
-        if all_stable { "✓" } else { "✗" }
+        if all_finite { "✓" } else { "✗" }
     );
     println!();
 
     if active_platforms == 0 {
         println!("⚠️  No platforms enabled. Build with:");
         println!(
-            "   cargo run --release --example robotics_benchmark_suite --features humanoid,helicopter,multirotor,vehicle,auv,manipulator"
+            concat!(
+                "   cargo run --release --example robotics_benchmark_suite --features ",
+                "manipulator,helicopter,multirotor,vehicle,auv"
+            )
         );
         println!();
     }
 
+    println!(
+        "Note: finite state and throughput are smoke metrics only; this is not a safety or robustness certification."
+    );
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║  BENCHMARK COMPLETE                                                ║");
+    println!("║  SMOKE BENCHMARK COMPLETE                                          ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
 }
