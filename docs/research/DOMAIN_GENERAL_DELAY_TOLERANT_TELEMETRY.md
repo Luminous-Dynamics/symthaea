@@ -40,14 +40,14 @@ These are proposed responsibilities and interface boundaries, not claims that th
 
 ## Shared event contract implemented by the current prototype
 
-The tools/energy_telemetry/store_forward.py module is a deterministic in-memory reference policy model. The tools/energy_telemetry/durable_queue.py module adds a SQLite-backed restart-recovery prototype for metadata, attempts, expiry and ACK state. Each event carries:
+The tools/energy_telemetry/store_forward.py module is a deterministic in-memory reference policy model. The tools/energy_telemetry/authenticated_envelope.py module adds ChaCha20-Poly1305 encryption of metadata plus payload and Ed25519 signatures over a canonical outer envelope. The tools/energy_telemetry/durable_queue.py module adds a SQLite-backed restart-recovery prototype for metadata, exact protected-envelope bytes, attempts, expiry and ACK state. Each event carries:
 
 - Random per-event ID (format checked; randomness is not established by the module).
 - Domain label: energy, water, agriculture, infrastructure or spacecraft.
 - Source sequence number with an explicitly local source scope.
 - Observation time and expiry in UTC; these are distinct from receiver time.
 - Maximum actionable age, priority and one of validated / partial / estimated / unknown quality.
-- Payload digest and estimated wire size. This prototype carries **no payload**; a digest is not encryption, authentication, or anonymization.
+- Payload digest and estimated wire size. Metadata-only events carry no application payload; protected events persist only the signed, encrypted envelope bytes. A digest is not encryption, authentication or anonymization.
 
 The queue's now_utc argument is injected by the caller for reproducibility. It does not consult wall-clock time.
 
@@ -71,7 +71,7 @@ The queue's now_utc argument is injected by the caller for reproducibility. It d
 - Do not publish hashes of low-entropy private values as if they anonymize them. In this prototype the payload digest is only an idempotency binding; a production envelope should authenticate canonical metadata and payload together (for example with a signed canonical-envelope digest). No digest scheme is anonymization, and privacy-sensitive values must not be inferable from published material.
 - Keep differential-privacy accounting separate from delivery idempotency. At-least-once transmission must not spend a privacy budget twice for the same exact release, while a semantically new release must be accounted for even if it has similar values.
 
-The policy model does not implement a durable DP accountant, secure aggregation, encryption, key rotation, signatures or storage encryption. Those are mandatory production design tasks, not implied by these tests.
+The policy model does not implement a durable DP accountant or secure aggregation. The separate envelope prototype uses a maintained AEAD/signature library, but does not implement key provisioning, rotation/revocation, per-key nonce usage enforcement, authenticated ACKs, receiver-side anti-replay state or database encryption. Those remain production design tasks, not implied by these tests.
 
 ## Reference standards and research anchors
 
@@ -83,11 +83,12 @@ The policy model does not implement a durable DP accountant, secure aggregation,
 
 The accompanying unittest suite uses synthetic timestamps, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
 
-Local verification recorded in the previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed ledger now has 23 additional deterministic tests added; those tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
+Local verification recorded in the previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed ledger now has 28 deterministic tests and the authenticated envelope has 17 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
 
 ## Required next steps before deployment
 
 - Harden the SQLite prototype with multi-process contention, crash/reopen, database-full, read-only path, backup/restore and target-filesystem power-loss tests before deployment.
+- Implement a key lifecycle/nonce-use policy, receiver-side durable anti-replay checks and cryptographically authenticated ACKs; the current queue ACK only checks the expected envelope digest and state.
 - Specify canonical serialization and authenticate message, ACK, source identity, policy version and freshness metadata end to end.
 - Define retention ceilings and bounds for terminal receipts, replay windows and participant-level privacy accounting.
 - Add deterministic chaos simulation for link loss, reordering, duplication, clock drift, key expiry, reboot/recovery, storage-full and compromised-sensor cases.
