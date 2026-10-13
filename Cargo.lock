@@ -18369,6 +18369,7 @@ dependencies = [
  "approx",
  "chromiumoxide",
  "futures",
+ "scraper",
  "serde",
  "serde_json",
  "symthaea-core",

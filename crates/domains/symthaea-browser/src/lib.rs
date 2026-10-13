@@ -20,7 +20,7 @@
 //!                      │ accessibility tree + DOM events
 //! ┌────────────────────▼────────────────────────────────┐
 //! │  CdpSession                                         │
-//! │  navigate / click / type / screenshot               │
+//! │  crate-private typed CDP operations                 │
 //! └────────────────────┬────────────────────────────────┘
 //!                      │ PageObservation
 //! ┌────────────────────▼────────────────────────────────┐
