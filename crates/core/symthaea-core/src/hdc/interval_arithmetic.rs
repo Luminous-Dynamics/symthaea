@@ -6,8 +6,9 @@
 //! Basic arithmetic widens one representable f64 step outward. Square root uses
 //! its documented IEEE-754 correctly rounded contract; natural logarithm and
 //! exponential use range reduction, interval series arithmetic and explicit
-//! remainder bounds. Sine/cosine use bounded small-argument series; outside that
-//! region their valid but coarse enclosure is [-1, 1].
+//! remainder bounds. Sine/cosine use bounded local Taylor enclosures, plus a
+//! checked quadrant-reduction path for finite inputs through a bounded magnitude.
+//! Unbounded, excessive, or unreducible inputs fall back to [-1, 1].
 //!
 //! The enclosure guarantee assumes ordinary IEEE-754 binary64 round-to-nearest
 //! operations and compilation without unsafe fast-math reassociation.
