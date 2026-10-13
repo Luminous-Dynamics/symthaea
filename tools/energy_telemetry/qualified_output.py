@@ -282,4 +282,28 @@ class QualifiedOutputVerifier:
             release_id=release_id,
             output_bytes=output_bytes,
             committed_at_utc=committed_at_utc,
+            attestation_bytes=attestation_bytes,
+            signature=signature,
+            signer_key_sha256=self.signer_key_sha256,
+        )
+
+    def load_committed_output(
+        self, ledger: DurablePrivacyLedger, *, release_id: str
+    ) -> CommittedPrivacyOutput:
+        """Reload a prior result only after verifying its retained signed attestation."""
+        stored = ledger._committed_output_storage(release_id)
+        attestation_bytes, signature, signer_key_sha256, committed_at_utc = ledger._stored_attestation(
+            release_id
+        )
+        if signer_key_sha256 != self.signer_key_sha256:
+            raise MechanismAttestationError(
+                "stored attestation signer fingerprint differs from deployment-pinned key"
+            )
+        return self.verify_and_commit(
+            ledger,
+            release_id=release_id,
+            output_bytes=stored.output_bytes,
+            attestation_bytes=attestation_bytes,
+            signature=signature,
+            committed_at_utc=committed_at_utc,
         )
