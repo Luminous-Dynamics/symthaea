@@ -52,6 +52,8 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.locale = "af"
         self.intake_path = self.base / "intake.json"
         self.predictions_path = self.base / "predictions.json"
+        self.outcomes_path = self.base / "outcomes.jsonl"
+        self.outcomes_path.write_text("synthetic fixture outcomes\\n",encoding="utf-8")
         self.report_path = self.base / "report.json"
         self._write_dataset(
             [{"client_id":"train-speaker","path":"train.mp3","sentence":"Opleiding."}],
@@ -114,7 +116,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
             "model_id": self.model_id,
             "model_revision": self.model_revision,
             "model_license": self.model_license,
-            "outcomes_sha256": "f" * 64,
+            "outcomes_sha256": sha256_file(self.outcomes_path),
             "runtime": copy.deepcopy(self.runtime),
             "predictions": hypotheses,
         }
@@ -132,6 +134,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
             archive=kwargs.pop("archive", self.archive),
             model_root=kwargs.pop("model_root", self.model_root),
             predictions_path=kwargs.pop("predictions_path", self.predictions_path),
+            outcomes_path=kwargs.pop("outcomes_path", self.outcomes_path),
             model_id=kwargs.pop("model_id", self.model_id),
             model_revision=kwargs.pop("model_revision", self.model_revision),
             model_license=kwargs.pop("model_license", self.model_license),
@@ -205,6 +208,11 @@ class VoiceAsrScoreTests(unittest.TestCase):
     def test_model_identity_drift_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "model_revision mismatch"):
             self.score(model_revision="b" * 40)
+
+    def test_raw_pilot_outcome_drift_fails_closed(self):
+        self.outcomes_path.write_text("different outcomes\\n",encoding="utf-8")
+        with self.assertRaisesRegex(ValueError,"raw pilot outcomes SHA-256 differs"):
+            self.score()
 
     def test_runtime_binary_drift_fails_closed(self):
         self.runtime_binary.write_bytes(b"updated runtime binary")
