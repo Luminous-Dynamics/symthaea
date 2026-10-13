@@ -26,9 +26,13 @@ jobs:
 
       - name: Capture execution environment
         shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          echo "qualifier_head=$(git rev-parse HEAD)"
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          echo "qualifier_head=$ACTUAL_HEAD"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
           echo "python_path=$(command -v python3)"
           python3 --version
           PYTHON_REAL="$(realpath "$(command -v python3)")"
