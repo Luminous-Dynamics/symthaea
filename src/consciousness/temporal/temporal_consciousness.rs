@@ -603,6 +603,15 @@ impl TemporalIdentityCoherence {
             + self.past_future_alignment_available as usize
     }
 
+    /// Whether any available pairwise alignment is at or below the warning threshold.
+    ///
+    /// Unknown relationships are not treated as low alignment.
+    fn has_low_measured_alignment(&self) -> bool {
+        (self.past_present_alignment_available && self.past_present_alignment <= 0.5)
+            || (self.present_future_alignment_available && self.present_future_alignment <= 0.5)
+            || (self.past_future_alignment_available && self.past_future_alignment <= 0.5)
+    }
+
     /// Check if identity is temporally coherent.
     ///
     /// Missing past/present/future evidence is not interpreted as perfect alignment.
@@ -863,8 +872,11 @@ pub struct TemporalConsciousnessStats {
     /// Discontinuities detected
     pub discontinuities_detected: usize,
 
-    /// Identity coherence warnings
+    /// Accepted observations with at least one measured alignment at or below threshold.
     pub identity_warnings: usize,
+
+    /// Accepted observations lacking one or more of the three pairwise identity alignments.
+    pub identity_evidence_gaps: usize,
 
     /// Φ trajectory anomalies
     pub trajectory_anomalies: usize,
@@ -982,8 +994,11 @@ impl TemporalConsciousnessAnalyzer {
         self.stats.observations += 1;
         self.stats.discontinuities_detected = self.continuity.discontinuities.len();
 
-        if !self.identity_coherence.is_coherent() {
+        if self.identity_coherence.has_low_measured_alignment() {
             self.stats.identity_warnings += 1;
+        }
+        if self.identity_coherence.alignment_coverage() < 3 {
+            self.stats.identity_evidence_gaps += 1;
         }
 
         if !self.phi_trajectory.is_healthy() {
@@ -1363,6 +1378,20 @@ mod tests {
         assert!(coherence.future_self.is_none());
         assert_eq!(coherence.alignment_coverage(), 0);
         assert!(!coherence.past_present_alignment_available);
+    }
+
+    #[test]
+    fn missing_identity_evidence_is_not_counted_as_a_low_alignment_warning() {
+        let mut analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        assert!(analyzer.observe_at(
+            &BinaryHV::random(82),
+            0.4,
+            Duration::ZERO,
+        ));
+
+        assert_eq!(analyzer.stats.identity_warnings, 0);
+        assert_eq!(analyzer.stats.identity_evidence_gaps, 1);
     }
 
     #[test]
