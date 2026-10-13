@@ -1243,9 +1243,18 @@ impl std::fmt::Display for TemporalConsciousnessReport {
             self.discontinuities,
             self.identity_coherence * 100.0,
             self.identity_alignment_coverage,
-            format_alignment(self.past_present_alignment, self.past_present_alignment_available),
-            format_alignment(self.present_future_alignment, self.present_future_alignment_available),
-            format_alignment(self.past_future_alignment, self.past_future_alignment_available),
+            format_alignment(
+                self.past_present_alignment,
+                self.past_present_alignment_available,
+            ),
+            format_alignment(
+                self.present_future_alignment,
+                self.present_future_alignment_available,
+            ),
+            format_alignment(
+                self.past_future_alignment,
+                self.past_future_alignment_available,
+            ),
             self.husserlian_coherence * 100.0,
             self.retention_depth,
             self.protention_depth,
@@ -1323,7 +1332,8 @@ mod tests {
 
     #[test]
     fn missing_future_projection_is_unknown_not_perfect_alignment() {
-        let mut coherence = TemporalIdentityCoherence::new(TemporalConsciousnessConfig::default());
+        let mut coherence =
+            TemporalIdentityCoherence::new(TemporalConsciousnessConfig::default());
         coherence.past_self = Some(BinaryHV::random(41));
         coherence.present_self = Some(BinaryHV::random(42));
         coherence.future_self = None;
@@ -1369,11 +1379,11 @@ mod tests {
         let rejected_state = BinaryHV::random(71);
         let first_time = Duration::from_secs(1);
 
-        assert!(analyzer.try_observe_at(&first_state, 0.4, first_time, None, None,));
+        assert!(analyzer.try_observe_at(&first_state, 0.4, first_time, None, None));
         assert_eq!(analyzer.stats.observations, 1);
         assert_eq!(analyzer.continuity.recent_states.len(), 1);
 
-        assert!(!analyzer.try_observe_at(&rejected_state, 0.9, first_time, None, None,));
+        assert!(!analyzer.try_observe_at(&rejected_state, 0.9, first_time, None, None));
         assert!(!analyzer.try_observe_at(
             &rejected_state,
             0.9,
