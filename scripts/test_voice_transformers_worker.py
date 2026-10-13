@@ -7,6 +7,7 @@ from __future__ import annotations
 import math
 import unittest
 
+from voice_asr_score import _hash_tree
 from voice_transformers_worker import (
     LOCALE,
     handle_request,
@@ -149,6 +150,7 @@ class TransformersWorkerTests(unittest.TestCase):
             (root / "config.json").write_text("{}", encoding="utf-8")
             self.assertEqual(validate_local_model_snapshot(str(root)), str(root.resolve()))
             digest, count, total_bytes = hash_local_model_snapshot(str(root))
+            self.assertEqual((digest, count, total_bytes), _hash_tree(root))
             self.assertRegex(digest, r"^[0-9a-f]{64}$")
             self.assertEqual(count, 1)
             self.assertEqual(total_bytes, 2)
