@@ -207,6 +207,24 @@ pub fn rescore(samples: &[PilotSample], outcomes: &[PilotOutcome]) -> Vec<PilotO
         .collect()
 }
 
+/// Normalize signed PCM using the asymmetric two's-complement endpoints.
+fn normalize_integer_sample(sample: i32, bits_per_sample: u16) -> Result<f32, String> {
+    if bits_per_sample == 0 || bits_per_sample > 32 {
+        return Err("unsupported integer WAV bit depth".into());
+    }
+    let negative_scale = (1_i64 << (bits_per_sample - 1)) as f64;
+    let positive_scale = ((1_i64 << (bits_per_sample - 1)) - 1) as f64;
+    let normalized = if sample < 0 {
+        sample as f64 / negative_scale
+    } else {
+        sample as f64 / positive_scale
+    };
+    if !normalized.is_finite() || !(-1.0..=1.0).contains(&normalized) {
+        return Err("integer WAV sample is outside the declared PCM range".into());
+    }
+    Ok(normalized as f32)
+}
+
 fn observation(sample: &PilotSample) -> Result<SignalObservation, String> {
     let mut reader =
         hound::WavReader::open(Path::new(&sample.audio_path)).map_err(|error| error.to_string())?;
@@ -215,19 +233,24 @@ fn observation(sample: &PilotSample) -> Result<SignalObservation, String> {
         return Err("pilot requires mono WAV input".into());
     }
     let samples = match spec.sample_format {
-        hound::SampleFormat::Float => reader.samples::<f32>().collect::<Result<Vec<_>, _>>(),
+        hound::SampleFormat::Float => reader
+            .samples::<f32>()
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| error.to_string())?,
         hound::SampleFormat::Int => {
             if spec.bits_per_sample == 0 || spec.bits_per_sample > 32 {
                 return Err("unsupported integer WAV bit depth".into());
             }
-            let scale = ((1_i64 << (spec.bits_per_sample - 1)) - 1) as f32;
             reader
                 .samples::<i32>()
-                .map(|value| value.map(|sample| sample as f32 / scale))
-                .collect()
+                .map(|value| {
+                    value
+                        .map_err(|error| error.to_string())
+                        .and_then(|sample| normalize_integer_sample(sample, spec.bits_per_sample))
+                })
+                .collect::<Result<Vec<_>, _>>()?
         }
-    }
-    .map_err(|error| error.to_string())?;
+    };
     let duration = samples.len() as f64 / spec.sample_rate as f64;
     let mut observation = SignalObservation {
         id: String::new(),
@@ -256,4 +279,34 @@ fn observation(sample: &PilotSample) -> Result<SignalObservation, String> {
         .refresh_id()
         .map_err(|error| error.to_string())?;
     Ok(observation)
+}
+
+#[cfg(test)]
+mod pcm_normalization_tests {
+    use super::normalize_integer_sample;
+
+    #[test]
+    fn signed_16_bit_pcm_endpoints_map_to_exact_unit_interval() {
+        assert_eq!(normalize_integer_sample(i16::MIN as i32, 16).unwrap(), -1.0);
+        assert_eq!(normalize_integer_sample(0, 16).unwrap(), 0.0);
+        assert_eq!(normalize_integer_sample(i16::MAX as i32, 16).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn signed_32_bit_pcm_endpoints_map_to_unit_interval() {
+        assert_eq!(normalize_integer_sample(i32::MIN, 32).unwrap(), -1.0);
+        assert_eq!(normalize_integer_sample(i32::MAX, 32).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn pcm_normalization_rejects_unsupported_bit_depth() {
+        assert!(normalize_integer_sample(0, 0).is_err());
+        assert!(normalize_integer_sample(0, 33).is_err());
+    }
+
+    #[test]
+    fn pcm_normalization_rejects_samples_outside_declared_range() {
+        assert!(normalize_integer_sample(32_768, 16).is_err());
+        assert!(normalize_integer_sample(-32_769, 16).is_err());
+    }
 }
