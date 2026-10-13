@@ -278,7 +278,7 @@ class QualifiedOutputVerifier:
         if context.mechanism == "gaussian" and context.delta_pico <= 0:
             raise MechanismAttestationError("gaussian reservation must have positive delta")
 
-        return ledger._commit_output_after_attestation(
+        return ledger._commit_output_storage(
             release_id=release_id,
             output_bytes=output_bytes,
             committed_at_utc=committed_at_utc,
