@@ -23,6 +23,8 @@ pub enum IntervalError {
     InvalidBounds,
     /// A point interval must identify a finite real number.
     NonFinitePoint,
+    /// Square root is undefined on an interval containing negative real values.
+    SquareRootOfNegativeInterval,
     /// Division is undefined as a bounded interval when the divisor includes 0.
     DivisionByIntervalContainingZero,
     /// The interval contains zero and the exponent is zero.
@@ -35,6 +37,9 @@ impl fmt::Display for IntervalError {
             Self::NaNBound => write!(f, "interval endpoints must not be NaN"),
             Self::InvalidBounds => write!(f, "interval bounds are reversed or empty"),
             Self::NonFinitePoint => write!(f, "a point interval requires a finite value"),
+            Self::SquareRootOfNegativeInterval => {
+                write!(f, "cannot take square root of an interval containing negative values")
+            }
             Self::DivisionByIntervalContainingZero => {
                 write!(f, "cannot divide by an interval containing zero")
             }
@@ -229,6 +234,36 @@ impl Interval {
         }
     }
 
+    /// Square root with an outward enclosure of the correctly-rounded result.
+    ///
+    /// Rust documents `f64::sqrt` as returning the IEEE-754 correctly rounded
+    /// square root. Taking the adjacent representable values outward therefore
+    /// encloses the real result. Zero is kept exact to preserve the nonnegative
+    /// invariant; positive infinity stays unbounded. Any interval containing a
+    /// negative real input is rejected rather than silently clipping its domain.
+    pub fn checked_sqrt(self) -> Result<Self, IntervalError> {
+        if self.lower < 0.0 {
+            return Err(IntervalError::SquareRootOfNegativeInterval);
+        }
+
+        let lower_root = self.lower.sqrt();
+        let upper_root = self.upper.sqrt();
+        let lower = if self.lower == 0.0 {
+            0.0
+        } else {
+            lower_root.next_down()
+        };
+        let upper = if self.upper == 0.0 {
+            0.0
+        } else {
+            upper_root.next_up()
+        };
+
+        // Monotonicity of sqrt preserves endpoint order, and the branches above
+        // preserve exact zero and valid infinite upper bounds.
+        Ok(Self { lower, upper })
+    }
+
     /// Integer power with a checked domain for zero and negative exponents.
     ///
     /// Exponentiation by squaring limits the number of interval multiplications
@@ -382,6 +417,60 @@ mod tests {
         let negative = interval(-4.0, -2.0).square();
         encloses(negative, 4.0, 16.0);
         assert!(negative.is_strictly_positive());
+    }
+
+    #[test]
+    fn square_root_encloses_correctly_rounded_roots_and_preserves_zero() {
+        let zero = interval(0.0, 0.0).checked_sqrt().unwrap();
+        assert_eq!(zero, interval(0.0, 0.0));
+
+        let exact_range = interval(4.0, 9.0).checked_sqrt().unwrap();
+        assert!(exact_range.lower() <= 2.0);
+        assert!(exact_range.upper() >= 3.0);
+        assert!(exact_range.lower() >= 0.0);
+
+        let irrational = interval(2.0, 2.0).checked_sqrt().unwrap();
+        let rounded = 2.0_f64.sqrt();
+        assert_eq!(irrational.lower(), rounded.next_down());
+        assert_eq!(irrational.upper(), rounded.next_up());
+
+        // Exercise extreme positive inputs, including subnormals and the
+        // largest finite number; the output must remain ordered and nonnegative.
+        for bits in [
+            1_u64,
+            2,
+            (1_u64 << 52) - 1,
+            1_u64 << 52,
+            0x0010_0000_0000_0001,
+            0x3ff0_0000_0000_0001,
+            0x7fef_ffff_ffff_ffff,
+        ] {
+            let value = f64::from_bits(bits);
+            let result = Interval::point(value).unwrap().checked_sqrt().unwrap();
+            let rounded_root = value.sqrt();
+            assert!(result.lower() <= rounded_root);
+            assert!(result.upper() >= rounded_root);
+            assert!(result.lower() >= 0.0);
+            assert!(result.lower() <= result.upper());
+        }
+    }
+
+    #[test]
+    fn square_root_rejects_intervals_with_negative_values() {
+        assert_eq!(
+            interval(-1.0, 4.0).checked_sqrt(),
+            Err(IntervalError::SquareRootOfNegativeInterval)
+        );
+        assert_eq!(
+            Interval::new(f64::NEG_INFINITY, f64::INFINITY)
+                .unwrap()
+                .checked_sqrt(),
+            Err(IntervalError::SquareRootOfNegativeInterval)
+        );
+
+        let unbounded = interval(1.0, f64::INFINITY).checked_sqrt().unwrap();
+        assert!(unbounded.lower() <= 1.0);
+        assert_eq!(unbounded.upper(), f64::INFINITY);
     }
 
     #[test]
