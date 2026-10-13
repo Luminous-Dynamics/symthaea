@@ -916,9 +916,8 @@ impl TemporalConsciousnessAnalyzer {
 
     /// Update temporal analyses only after Φ is admitted by the trajectory.
     ///
-    /// A rejected Φ sample must not contaminate continuity, Husserlian state,
-    /// identity metrics, or accepted-observation counters. Its rejection is counted
-    /// separately so invalid input is not silently presented as an accepted sample.
+    /// Rejected observations update only the rejection counter. All temporal
+    /// metrics and accepted-observation counters remain unchanged.
     pub(crate) fn try_observe(
         &mut self,
         state: &BinaryHV,
@@ -926,10 +925,36 @@ impl TemporalConsciousnessAnalyzer {
         narrative: Option<&NarrativeSelfModel>,
         _predictive: Option<&PredictiveSelfModel>,
     ) -> bool {
+        self.try_observe_with_elapsed(state, phi, None, narrative)
+    }
+
+    /// Deterministic full-analyzer entry point for replay and temporal conformance tests.
+    pub(crate) fn try_observe_at(
+        &mut self,
+        state: &BinaryHV,
+        phi: f64,
+        elapsed: Duration,
+        narrative: Option<&NarrativeSelfModel>,
+        _predictive: Option<&PredictiveSelfModel>,
+    ) -> bool {
+        self.try_observe_with_elapsed(state, phi, Some(elapsed), narrative)
+    }
+
+    fn try_observe_with_elapsed(
+        &mut self,
+        state: &BinaryHV,
+        phi: f64,
+        elapsed: Option<Duration>,
+        narrative: Option<&NarrativeSelfModel>,
+    ) -> bool {
         let phi_prev = self.phi_trajectory.ema;
 
         // Fail closed before mutating any downstream temporal analysis.
-        if !self.phi_trajectory.try_observe(phi) {
+        let accepted = match elapsed {
+            Some(elapsed) => self.phi_trajectory.observe_at(phi, elapsed),
+            None => self.phi_trajectory.try_observe(phi),
+        };
+        if !accepted {
             self.stats.rejected_observations += 1;
             return false;
         }
@@ -1322,6 +1347,47 @@ mod tests {
         let rendered = report.to_string();
         assert!(rendered.contains("Present↔Future:       N/A"));
         assert!(rendered.contains("Past↔Future:          N/A"));
+    }
+
+    #[test]
+    fn analyzer_rejects_duplicate_and_backwards_times_without_downstream_mutation() {
+        let mut analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        let first_state = BinaryHV::random(70);
+        let rejected_state = BinaryHV::random(71);
+        let first_time = Duration::from_secs(1);
+
+        assert!(analyzer.try_observe_at(
+            &first_state,
+            0.4,
+            first_time,
+            None,
+            None,
+        ));
+        assert_eq!(analyzer.stats.observations, 1);
+        assert_eq!(analyzer.continuity.recent_states.len(), 1);
+
+        assert!(!analyzer.try_observe_at(
+            &rejected_state,
+            0.9,
+            first_time,
+            None,
+            None,
+        ));
+        assert!(!analyzer.try_observe_at(
+            &rejected_state,
+            0.9,
+            Duration::from_millis(500),
+            None,
+            None,
+        ));
+
+        assert_eq!(analyzer.stats.observations, 1);
+        assert_eq!(analyzer.stats.rejected_observations, 2);
+        assert_eq!(analyzer.phi_trajectory.history().len(), 1);
+        assert_eq!(analyzer.continuity.recent_states.len(), 1);
+        assert_eq!(analyzer.husserlian.retention_depth, 0);
+        assert!(analyzer.husserlian.primal_impression.is_some());
     }
 
     #[test]
