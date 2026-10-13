@@ -24,6 +24,8 @@ pub enum IntervalError {
     NonFinitePoint,
     /// Division is undefined as a bounded interval when the divisor includes 0.
     DivisionByIntervalContainingZero,
+    /// The interval contains zero and the exponent is zero.
+    IndeterminatePower,
 }
 
 impl fmt::Display for IntervalError {
@@ -35,6 +37,7 @@ impl fmt::Display for IntervalError {
             Self::DivisionByIntervalContainingZero => {
                 write!(f, "cannot divide by an interval containing zero")
             }
+            Self::IndeterminatePower => write!(f, "zero-to-zero is undefined over this interval"),
         }
     }
 }
@@ -222,6 +225,64 @@ impl Interval {
         }
     }
 
+    /// Integer power with a checked domain for zero and negative exponents.
+    ///
+    /// Exponentiation by squaring limits the number of interval multiplications
+    /// to logarithmic time. Repeated use is an enclosure, not an exact symbolic
+    /// simplification; dependency can widen the result.
+    pub fn checked_powi(self, exponent: i32) -> Result<Self, IntervalError> {
+        if exponent == 0 {
+            if self.contains_zero() {
+                return Err(IntervalError::IndeterminatePower);
+            }
+            return Ok(Self { lower: 1.0, upper: 1.0 });
+        }
+        if exponent < 0 {
+            if self.contains_zero() {
+                return Err(IntervalError::DivisionByIntervalContainingZero);
+            }
+            let positive = self.powi_nonnegative(exponent.unsigned_abs());
+            return Self { lower: 1.0, upper: 1.0 }.checked_divide(positive);
+        }
+        Ok(self.powi_nonnegative(exponent as u32))
+    }
+
+    /// Absolute value is exact endpoint reflection and requires no rounding.
+    pub fn absolute(self) -> Self {
+        if self.lower >= 0.0 {
+            self
+        } else if self.upper <= 0.0 {
+            self.negate()
+        } else {
+            Self { lower: 0.0, upper: (-self.lower).max(self.upper) }
+        }
+    }
+
+    fn powi_nonnegative(self, mut exponent: u32) -> Self {
+        if exponent == 0 {
+            return Self { lower: 1.0, upper: 1.0 };
+        }
+        if exponent == 1 {
+            return self;
+        }
+        if exponent == 2 {
+            return self.square();
+        }
+
+        let mut result = Self { lower: 1.0, upper: 1.0 };
+        let mut base = self;
+        while exponent > 0 {
+            if exponent & 1 == 1 {
+                result = result.checked_multiply(base);
+            }
+            exponent >>= 1;
+            if exponent > 0 {
+                base = base.square();
+            }
+        }
+        result
+    }
+
     fn is_exact_point(self, value: f64) -> bool {
         self.lower == value && self.upper == value
     }
@@ -303,6 +364,35 @@ mod tests {
         let negative = interval(-4.0, -2.0).square();
         encloses(negative, 4.0, 16.0);
         assert!(negative.is_strictly_positive());
+    }
+
+    #[test]
+    fn integer_powers_check_domains_and_preserve_even_power_sign() {
+        let crossing = interval(-2.0, 3.0);
+        let squared = crossing.checked_powi(2).unwrap();
+        assert!(squared.lower() >= 0.0);
+        encloses(squared, 0.0, 9.0);
+
+        let cube = crossing.checked_powi(3).unwrap();
+        encloses(cube, -8.0, 27.0);
+        let reciprocal_square = interval(2.0, 4.0).checked_powi(-2).unwrap();
+        encloses(reciprocal_square, 1.0 / 16.0, 1.0 / 4.0);
+
+        assert_eq!(
+            interval(-1.0, 1.0).checked_powi(0),
+            Err(IntervalError::IndeterminatePower)
+        );
+        assert_eq!(
+            interval(-1.0, 1.0).checked_powi(-2),
+            Err(IntervalError::DivisionByIntervalContainingZero)
+        );
+    }
+
+    #[test]
+    fn absolute_value_preserves_nonnegative_sign() {
+        assert_eq!(interval(-4.0, -2.0).absolute(), interval(2.0, 4.0));
+        assert_eq!(interval(-2.0, 3.0).absolute(), interval(0.0, 3.0));
+        assert_eq!(interval(2.0, 4.0).absolute(), interval(2.0, 4.0));
     }
 
     #[test]
