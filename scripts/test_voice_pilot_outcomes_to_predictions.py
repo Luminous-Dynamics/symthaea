@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 from voice_dataset_intake import audit_dataset
-from voice_asr_score import sha256_file
+from voice_asr_score import _hash_tree, sha256_file
 from voice_pilot_outcomes_to_predictions import (
     OUTCOME_KEYS,
     build_predictions,
@@ -32,6 +32,10 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.intake_path = self.base / "intake.json"
         self.model_root = self.base / "model"
         self.model_root.mkdir()
+        self.source_model_root = self.base / "upstream-model"
+        self.source_model_root.mkdir()
+        (self.source_model_root / "config.json").write_text('{"source":true}\n', encoding="utf-8")
+        (self.source_model_root / "weights.safetensors").write_bytes(b"upstream source model fixture")
         self.artifact = self.model_root / "model.bin"
         self.artifact.write_bytes(b"synthetic converted weights")
         self.runtime_binary = self.base / "whisper-cli"
@@ -78,6 +82,7 @@ class OutcomesToPredictionsTests(unittest.TestCase):
             dataset_root=kwargs.pop("dataset_root",self.dataset),
             archive=kwargs.pop("archive",self.archive),
             model_root=kwargs.pop("model_root",self.model_root),
+            source_model_root=kwargs.pop("source_model_root",self.source_model_root),
             runtime_binary=kwargs.pop("runtime_binary",self.runtime_binary),
             locale=kwargs.pop("locale","af"),
             model_id=kwargs.pop("model_id","BuzzASR/afrikaans"),
@@ -96,8 +101,9 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.assertEqual(set(doc),{
             "schema_version","locale","dataset_id","dataset_version","archive_sha256",
             "test_metadata_sha256","model_id","model_revision","model_license",
-            "outcomes_sha256","runtime","predictions",
+            "source_model_snapshot_sha256","outcomes_sha256","runtime","predictions",
         })
+        self.assertEqual(doc["source_model_snapshot_sha256"],_hash_tree(self.source_model_root)[0])
         self.assertEqual(doc["runtime"]["kind"],"whisper.cpp")
         self.assertEqual(doc["runtime"]["artifact_sha256"],sha256_file(self.artifact))
         self.assertEqual(doc["runtime"]["runtime_binary_sha256"],sha256_file(self.runtime_binary))
@@ -149,6 +155,18 @@ class OutcomesToPredictionsTests(unittest.TestCase):
             self.build(model_revision="main")
         with self.assertRaisesRegex(ValueError,"runtime_commit must be a 40-hex"):
             self.build(runtime_commit="main")
+
+    def test_upstream_source_model_root_symlink_is_rejected(self):
+        alias=self.base/"source-model-link"
+        alias.symlink_to(self.source_model_root,target_is_directory=True)
+        with self.assertRaisesRegex(ValueError,"source_model_root must be a real directory"):
+            self.build(source_model_root=alias)
+
+    def test_prediction_private_writer_blocks_source_model_root(self):
+        doc=self.build()
+        inside=self.source_model_root/"predictions.json"
+        with self.assertRaisesRegex(ValueError,"outside dataset, model, and source-outcome trees"):
+            write_private_exclusive(inside,doc,[self.dataset,self.model_root,self.source_model_root])
 
     def test_artifact_path_traversal_is_rejected(self):
         with self.assertRaisesRegex(ValueError,"traversal components"):
