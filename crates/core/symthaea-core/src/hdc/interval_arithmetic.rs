@@ -3,15 +3,22 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Small, fail-closed interval arithmetic for conservative numerical enclosures.
 //!
-//! Arithmetic outputs are widened one representable f64 step outward. This is
-//! not a claim that arbitrary libm functions are correctly rounded; functions
-//! such as sin, exp, and ln need separately reviewed bounds before being added.
+//! Basic arithmetic widens one representable f64 step outward. Square root uses
+//! its documented IEEE-754 correctly rounded contract; natural logarithm uses
+//! range reduction, interval series arithmetic and an explicit remainder bound.
+//! Other platform libm functions remain unsupported as interval enclosures.
 //!
 //! The enclosure guarantee assumes ordinary IEEE-754 binary64 round-to-nearest
 //! operations and compilation without unsafe fast-math reassociation.
 //! See the repository-root INTERVAL_ARITHMETIC.md for the current scope and limits.
 
 use std::fmt;
+
+// For z <= 1/3, the tail after the first 64 terms of
+// ln(m) = 2 * sum(z^(2j+1)/(2j+1)), z=(m-1)/(m+1), is
+// less than 9 / (516 * 3^129) < 2^-134. This is exactly 2^-134.
+const LN_SERIES_TERMS: usize = 64;
+const LN_SERIES_TAIL_BOUND: f64 = f64::from_bits(889_u64 << 52);
 
 /// Errors while constructing or evaluating a real interval.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +32,8 @@ pub enum IntervalError {
     NonFinitePoint,
     /// Square root is undefined on an interval containing negative real values.
     SquareRootOfNegativeInterval,
+    /// Natural logarithm is undefined for intervals that include nonpositive reals.
+    LogarithmOfNonPositiveInterval,
     /// Division is undefined as a bounded interval when the divisor includes 0.
     DivisionByIntervalContainingZero,
     /// The interval contains zero and the exponent is zero.
@@ -39,6 +48,9 @@ impl fmt::Display for IntervalError {
             Self::NonFinitePoint => write!(f, "a point interval requires a finite value"),
             Self::SquareRootOfNegativeInterval => {
                 write!(f, "cannot take square root of an interval containing negative values")
+            }
+            Self::LogarithmOfNonPositiveInterval => {
+                write!(f, "cannot take logarithm of an interval containing nonpositive values")
             }
             Self::DivisionByIntervalContainingZero => {
                 write!(f, "cannot divide by an interval containing zero")
@@ -264,6 +276,34 @@ impl Interval {
         Ok(Self { lower, upper })
     }
 
+    /// Natural logarithm enclosed by range reduction and a bounded atanh series.
+    ///
+    /// Inputs must be strictly positive. The implementation decomposes each
+    /// finite endpoint exactly as m*2^k with 1 <= m < 2, then encloses
+    /// ln(m)=2*atanh((m-1)/(m+1)) using 64 positive series terms and an explicit
+    /// remainder bound. ln(2) itself is enclosed by evaluating the same series
+    /// at m=2. No platform `f64::ln` result is used as a bound.
+    pub fn checked_ln(self) -> Result<Self, IntervalError> {
+        if self.lower <= 0.0 {
+            return Err(IntervalError::LogarithmOfNonPositiveInterval);
+        }
+
+        let ln_two = ln_mantissa_enclosure(2.0)?;
+        let lower_log = ln_positive_point(self.lower, ln_two)?;
+        let upper_bound = if self.upper == f64::INFINITY {
+            f64::INFINITY
+        } else {
+            ln_positive_point(self.upper, ln_two)?.upper
+        };
+
+        // ln is monotone on (0,+infinity); use the lower endpoint's lower
+        // enclosure and upper endpoint's upper enclosure.
+        if lower_log.lower > upper_bound {
+            return Ok(Self::entire());
+        }
+        Self::new(lower_log.lower, upper_bound)
+    }
+
     /// Integer power with a checked domain for zero and negative exponents.
     ///
     /// Exponentiation by squaring limits the number of interval multiplications
@@ -340,6 +380,76 @@ impl Interval {
             Self { lower, upper }
         }
     }
+}
+
+/// Enclose ln(m) for the exact binary64 input 1 <= m <= 2 using
+/// ln(m) = 2 * atanh((m-1)/(m+1)). All series arithmetic uses intervals.
+fn ln_mantissa_enclosure(m: f64) -> Result<Interval, IntervalError> {
+    if !(1.0..=2.0).contains(&m) {
+        return Err(IntervalError::InvalidBounds);
+    }
+    if m == 1.0 {
+        return Interval::point(0.0);
+    }
+
+    let numerator = Interval::point(m)?.checked_subtract(Interval::point(1.0)?);
+    let denominator = Interval::point(m)?.checked_add(Interval::point(1.0)?);
+    let z = numerator.checked_divide(denominator)?;
+    let z_squared = z.checked_multiply(z);
+
+    let mut power = z;
+    let mut series = Interval::point(0.0)?;
+    for index in 0..LN_SERIES_TERMS {
+        let odd = (2 * index + 1) as f64;
+        let term = power.checked_divide(Interval::point(odd)?)?;
+        series = series.checked_add(term);
+        power = power.checked_multiply(z_squared);
+    }
+
+    let twice_series = series.checked_multiply(Interval::point(2.0)?);
+    let tail = Interval::point(LN_SERIES_TAIL_BOUND)?;
+    let widened = twice_series.checked_add(tail);
+
+    // The omitted terms are nonnegative, so retain the partial sum's lower
+    // bound while using the tail-expanded upper bound.
+    Interval::new(twice_series.lower, widened.upper)
+}
+
+/// Enclose ln(value) for a positive finite binary64 value, using its exact
+/// significand and exponent. Scaling never passes through an approximate ln call.
+fn ln_positive_point(value: f64, ln_two: Interval) -> Result<Interval, IntervalError> {
+    debug_assert!(value.is_finite() && value > 0.0);
+    if value == 1.0 {
+        return Interval::point(0.0);
+    }
+
+    const FRACTION_MASK: u64 = (1_u64 << 52) - 1;
+    const EXPONENT_MASK: u64 = 0x7ff;
+
+    let bits = value.to_bits();
+    let exponent_bits = ((bits >> 52) & EXPONENT_MASK) as i32;
+    let fraction = bits & FRACTION_MASK;
+
+    let (mantissa, exponent) = if exponent_bits != 0 {
+        (
+            f64::from_bits((1023_u64 << 52) | fraction),
+            exponent_bits - 1023,
+        )
+    } else {
+        // Normalize subnormals exactly using their integer significand.
+        debug_assert_ne!(fraction, 0);
+        let highest_bit = 63_i32 - fraction.leading_zeros() as i32;
+        let shift = (52_i32 - highest_bit) as u32;
+        let normalized = fraction << shift;
+        (
+            f64::from_bits((1023_u64 << 52) | (normalized & FRACTION_MASK)),
+            highest_bit - 1074,
+        )
+    };
+
+    let log_mantissa = ln_mantissa_enclosure(mantissa)?;
+    let log_scale = ln_two.checked_multiply(Interval::point(exponent as f64)?);
+    Ok(log_mantissa.checked_add(log_scale))
 }
 
 /// Product of interval endpoints. Zero times infinity contributes zero to the
@@ -471,6 +581,73 @@ mod tests {
         let unbounded = interval(1.0, f64::INFINITY).checked_sqrt().unwrap();
         assert!(unbounded.lower() <= 1.0);
         assert_eq!(unbounded.upper(), f64::INFINITY);
+    }
+
+    #[test]
+    fn natural_logarithm_encloses_reference_values_across_binary64_ranges() {
+        let samples = [
+            f64::from_bits(1),                    // smallest subnormal
+            f64::from_bits(2),
+            f64::from_bits((1_u64 << 52) - 1),   // largest subnormal
+            f64::MIN_POSITIVE,
+            f64::from_bits(1.0_f64.to_bits() - 1),
+            1.0,
+            f64::from_bits(1.0_f64.to_bits() + 1),
+            0.5,
+            2.0,
+            3.0,
+            10.0,
+            f64::MAX,
+        ];
+
+        for value in samples {
+            let result = Interval::point(value).unwrap().checked_ln().unwrap();
+            assert!(
+                result.contains(value.ln()),
+                "computed enclosure {result:?} should contain the platform reference for ln({value:?}) = {:?}",
+                value.ln()
+            );
+            assert!(result.lower() <= result.upper());
+        }
+
+        assert_eq!(
+            Interval::point(1.0).unwrap().checked_ln().unwrap(),
+            Interval::point(0.0).unwrap()
+        );
+        assert!(Interval::point(2.0).unwrap().checked_ln().unwrap().contains(std::f64::consts::LN_2));
+        assert!(Interval::point(0.5).unwrap().checked_ln().unwrap().contains(-std::f64::consts::LN_2));
+    }
+
+    #[test]
+    fn natural_logarithm_checks_domain_and_unbounded_upper_endpoint() {
+        assert_eq!(
+            interval(-1.0, 2.0).checked_ln(),
+            Err(IntervalError::LogarithmOfNonPositiveInterval)
+        );
+        assert_eq!(
+            interval(0.0, 2.0).checked_ln(),
+            Err(IntervalError::LogarithmOfNonPositiveInterval)
+        );
+        assert_eq!(
+            interval(f64::NEG_INFINITY, f64::INFINITY).checked_ln(),
+            Err(IntervalError::LogarithmOfNonPositiveInterval)
+        );
+
+        let unbounded = interval(1.0, f64::INFINITY).checked_ln().unwrap();
+        assert_eq!(unbounded.lower(), 0.0);
+        assert_eq!(unbounded.upper(), f64::INFINITY);
+    }
+
+    #[test]
+    fn natural_logarithm_interval_is_monotone_and_contains_sampled_values() {
+        let input = interval(0.25, 16.0);
+        let output = input.checked_ln().unwrap();
+        assert!(output.contains(0.25_f64.ln()));
+        assert!(output.contains(1.0_f64.ln()));
+        assert!(output.contains(2.0_f64.ln()));
+        assert!(output.contains(16.0_f64.ln()));
+        assert!(output.lower() <= 0.0);
+        assert!(output.upper() >= 16.0_f64.ln());
     }
 
     #[test]
