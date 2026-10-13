@@ -309,6 +309,12 @@ def score_predictions(
           "source_model_snapshot_sha256 must be a 64-hex SHA-256 digest")
     _need(source_model_root.is_dir() and not source_model_root.is_symlink(),
           "source_model_root must be a real directory, not a symlink")
+    converted_root_real = model_root.resolve(strict=True)
+    source_root_real = source_model_root.resolve(strict=True)
+    _need(converted_root_real != source_root_real
+          and converted_root_real not in source_root_real.parents
+          and source_root_real not in converted_root_real.parents,
+          "source_model_root and converted model_root must be separate, non-nested directories")
     source_tree_sha, source_file_count, source_bytes = _hash_tree(source_model_root)
     _need(source_tree_sha == source_digest, "source model snapshot SHA-256 differs from prediction provenance")
     outcomes_sha = prediction_doc["outcomes_sha256"]
@@ -583,7 +589,7 @@ def main() -> int:
             mode=args.mode,
             bootstrap_iterations=args.bootstrap_iterations,
         )
-        write_report_exclusive(args.report, report, [args.dataset_root, args.model_root])
+        write_report_exclusive(args.report, report, [args.dataset_root, args.model_root, args.source_model_root])
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
     print(json.dumps({
