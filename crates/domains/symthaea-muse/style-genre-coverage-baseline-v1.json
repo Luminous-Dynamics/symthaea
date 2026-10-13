@@ -4,7 +4,7 @@
   "generated_on": "2026-10-13",
   "source": {
     "catalog_path": "crates/domains/symthaea-muse-protocol/src/catalog.rs",
-    "catalog_blob_sha": "defd5bf676e90dc807957a44f38727d1ece3cd14",
+    "catalog_blob_sha": "8f77be9d1989975ffad298aefc1df8c390604605",
     "executable_style_path": "crates/domains/symthaea-music-theory/src/style.rs",
     "executable_style_blob_sha": "81192045a724823b47107702185b814cb9921cbf",
     "executable_style_variant_count": 29,

@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! The public Muse 152 taxonomy.
+//! The public Muse 160 taxonomy.
 //!
 //! Catalog entries and callable composer presets are deliberately separate.
 //! `composer_style` is present only when the current engine can route the entry;

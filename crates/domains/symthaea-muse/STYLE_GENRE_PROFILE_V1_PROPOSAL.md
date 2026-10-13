@@ -1,7 +1,7 @@
 # Muse Style / Genre Profiles V1 — Architecture Proposal
 
 **Status:** design proposal; no runtime behavior changes yet  
-**Related:** [Issue #7417](https://github.com/Luminous-Dynamics/symthaea/issues/7417), [152-style catalog](./MUSE_152_STYLE_CATALOG_2026-07-18.md), [instrument support #7416](https://github.com/Luminous-Dynamics/symthaea/issues/7416)
+**Related:** [Issue #7417](https://github.com/Luminous-Dynamics/symthaea/issues/7417), [original 152-style catalog (historical)](./MUSE_152_STYLE_CATALOG_2026-07-18.md), [instrument support #7416](https://github.com/Luminous-Dynamics/symthaea/issues/7416)
 
 ## Executive proposal
 
@@ -18,7 +18,7 @@ Those foundations are valuable and should not be replaced. The gap is that the c
 
 ### Measured source baseline (2026-10-12)
 
-The frozen inventory in [style-genre-coverage-baseline-v1.json](./style-genre-coverage-baseline-v1.json) was generated from the explicit main-branch registry source (catalog blob `ad68241b9c826f21f5ce9124a3d1b3cd61a79fd4`) and declared `Style::ALL` length (style source blob `81192045a724823b47107702185b814cb9921cbf`). It contains 152 stable catalog IDs across 19 constellations; 29 entries have distinct composer routes and 123 catalog entries have no direct composer route. Status counts are 24 Developing, 123 Research, and 5 ExpertReviewRequired; none are Foundation. The executable `Style::ALL` declaration contains 29 variants. This is a route/status inventory, **not** evidence that the 29 routes are musically distinct, renderer-backed, or culturally authenticated. The snapshot is intentionally frozen for comparison; future inventory generation should read these sources rather than treating the JSON as a second source of truth.
+The frozen inventory in [style-genre-coverage-baseline-v1.json](./style-genre-coverage-baseline-v1.json) is pinned to the current catalog source and declared `Style::ALL` source. It contains 160 stable catalog IDs across 20 constellations: 29 entries have composer routes and 131 do not. Of the unrouted entries, 123 are Research and eight Southern African additions are explicitly `ResearchExpertReviewRequired`. Status counts are 24 Developing, 123 Research, eight ResearchExpertReviewRequired, and five ExpertReviewRequired; none are Foundation. The executable `Style::ALL` declaration still contains 29 variants. This is a route/status inventory, **not** evidence that the 29 routes are musically distinct, renderer-backed, or culturally authenticated. The snapshot remains frozen for comparison; future inventory generation reads the Rust sources rather than treating JSON as a second source of truth.
 
 ## Design principle: distinguish identity from mechanism
 
@@ -81,7 +81,7 @@ Same resolved inputs + same engine version + same seed should produce the same p
 
 ## Catalog graph, not a single taxonomy tree
 
-Keep the 19 constellations for browsing. Add typed relations to represent the actual web of musical knowledge:
+Keep the constellation model for browsing and add typed relations to represent the actual web of musical knowledge. Add typed relations to represent the actual web of musical knowledge:
 - `substyle_of` / `broader_than`;
 - `historically_related_to`;
 - `shares_form_with`;

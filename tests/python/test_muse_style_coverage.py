@@ -55,7 +55,7 @@ impl Style {
 
 
 class ParseCatalogTests(unittest.TestCase):
-    def test_parses_three_supported_macro_shapes_and_ignores_comments_strings(self) -> None:
+    def test_parses_supported_macro_shapes_and_ignores_comments_strings(self) -> None:
         research_review_fixture = CATALOG_FIXTURE.replace(
             'style!(3, "Research Only", C),',
             'style!(3, "Research Only", C, ResearchExpertReviewRequired),',

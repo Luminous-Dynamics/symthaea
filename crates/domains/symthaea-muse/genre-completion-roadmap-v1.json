@@ -3,11 +3,11 @@
   "kind": "source_bound_implementation_backlog_not_runtime_evidence",
   "source": {
     "catalog_path": "crates/domains/symthaea-muse-protocol/src/catalog.rs",
-    "catalog_blob_sha": "defd5bf676e90dc807957a44f38727d1ece3cd14",
+    "catalog_blob_sha": "8f77be9d1989975ffad298aefc1df8c390604605",
     "executable_style_path": "crates/domains/symthaea-music-theory/src/style.rs",
     "executable_style_blob_sha": "81192045a724823b47107702185b814cb9921cbf",
     "grammar_focus_path": "crates/domains/symthaea-muse-protocol/src/catalog.rs",
-    "grammar_focus_blob_sha": "defd5bf676e90dc807957a44f38727d1ece3cd14",
+    "grammar_focus_blob_sha": "8f77be9d1989975ffad298aefc1df8c390604605",
     "note": "Catalog/focus values are source-derived. Candidate tracks, priorities and expansion entries are proposals, not implementation evidence."
   },
   "summary": {
