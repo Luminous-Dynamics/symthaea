@@ -116,6 +116,63 @@ The scorer computes micro-averaged WER and CER, reference-length buckets, and de
 
 `--mode smoke` is exploratory only. `--mode heldout-evaluation` requires the intake audit's speaker-disjoint mode, at least 100 test clips, and at least 10 test speakers. That is an initial data-volume floor, not a statistically validated release standard. Neither mode promotes the language registry. No Common Voice archive or BuzzASR weights were downloaded, no inference was executed, and no Symthaea WER/CER result is claimed in this PR increment. The tests use synthetic fixtures and a fake `ffmpeg` executable; they demonstrate validation logic, not ASR quality.
 
+### Native Transformers reference worker and runtime-aware scoring
+
+The repo now contains `scripts/voice_transformers_worker.py`, a local-only BuzzASR Afrikaans reference adapter for the same JSON-lines protocol used by `symthaea-comm-eval pilot`. It loads `WhisperProcessor` and `WhisperForConditionalGeneration` only from an existing materialized snapshot with `local_files_only=True`, `trust_remote_code=False`, and Hugging Face offline flags set before library import. It emits a startup diagnostic prefixed `SYMTHEA_TRANSFORMERS_RUNTIME` on stderr containing observed Python, PyTorch, Transformers and NumPy versions, device, dtype and offline mode. Stdout is reserved for protocol JSONL. The model-generated language/task prompt is left intact; the worker does not pass a second language prompt. Language identification and translation remain explicitly unimplemented.
+
+The worker rejects symlinked or empty model snapshots, unsupported modality fields, non-mono/non-16 kHz audio, invalid sample values, duplicate JSON keys and non-standard JSON constants. The Rust `LocalJsonlProvider` now validates each observation's content-address before handing it to any external worker. The adapter has dependency-free contract tests using fake processor/model/tensor objects; these do not import PyTorch and do not load real weights.
+
+The prediction packer and scorer now support two distinct runtime schemas:
+- `whisper.cpp`: pins runtime and converter commits, executable hash, selected converted artifact hash and quantization; the converted export and original model snapshot must be separate directories.
+- `transformers`: pins the Python executable and worker script digests, records runtime library versions/device/dtype, requires `offline=true`, and hashes the exact model snapshot used at runtime. For this mode, `--model-root` and `--source-model-root` must be the same directory; no converted-artifact or converter metadata is invented.
+
+After a legal, pinned model snapshot and the dataset intake/preparation steps above exist, a native Transformers smoke run can be made with a resolved Python executable (the interpreter path must not itself be a symlink) and private output paths. Example variables below are operator-supplied; substitute the actual observed runtime values from the worker's `SYMTHEA_TRANSFORMERS_RUNTIME` stderr line. A CUDA/F16 run is shown as an example, not as a claim that the current host has sufficient VRAM.
+
+```sh
+PYTHON_BIN="$(readlink -f "$(command -v python3)")"
+TRANSFORMERS_WORKER="$REPO_ROOT/scripts/voice_transformers_worker.py"
+
+cargo run --release -p symthaea-communication --bin symthaea-comm-eval -- pilot \
+  --samples "$PRIVATE_DIR/af-prepared-v1/samples.jsonl" \
+  --worker "$PYTHON_BIN" \
+  --provider-id buzzasr-afrikaans-transformers \
+  --output "$PRIVATE_DIR/af-transformers-outcomes.jsonl" \
+  --worker-arg="$TRANSFORMERS_WORKER" \
+  --worker-arg=--model-dir --worker-arg="$UPSTREAM_MODEL_SNAPSHOT" \
+  --worker-arg=--provider-id --worker-arg=buzzasr-afrikaans-transformers \
+  --worker-arg=--device --worker-arg=cuda \
+  --worker-arg=--dtype --worker-arg=float16
+
+python3 scripts/voice_pilot_outcomes_to_predictions.py \
+  --outcomes "$PRIVATE_DIR/af-transformers-outcomes.jsonl" \
+  --intake-report "$PRIVATE_DIR/af-dataset-intake.json" \
+  --dataset-root "$CV_ROOT/af" --archive "$CV_ARCHIVE" \
+  --model-root "$UPSTREAM_MODEL_SNAPSHOT" \
+  --source-model-root "$UPSTREAM_MODEL_SNAPSHOT" \
+  --runtime-binary "$PYTHON_BIN" --runtime-kind transformers \
+  --runtime-worker "$TRANSFORMERS_WORKER" \
+  --locale af --model-id BuzzASR/afrikaans \
+  --model-revision "$MODEL_REVISION_40_HEX" --model-license MIT \
+  --python-version "$PYTHON_VERSION" --torch-version "$TORCH_VERSION" \
+  --transformers-version "$TRANSFORMERS_VERSION" --numpy-version "$NUMPY_VERSION" \
+  --device "$DEVICE" --dtype "$DTYPE" --mode smoke \
+  --output "$PRIVATE_DIR/af-transformers-predictions.json"
+
+python3 scripts/voice_asr_score.py \
+  --dataset-root "$CV_ROOT/af" --archive "$CV_ARCHIVE" \
+  --intake-report "$PRIVATE_DIR/af-dataset-intake.json" \
+  --predictions "$PRIVATE_DIR/af-transformers-predictions.json" \
+  --outcomes "$PRIVATE_DIR/af-transformers-outcomes.jsonl" \
+  --model-root "$UPSTREAM_MODEL_SNAPSHOT" \
+  --source-model-root "$UPSTREAM_MODEL_SNAPSHOT" \
+  --runtime-binary "$PYTHON_BIN" --runtime-worker "$TRANSFORMERS_WORKER" \
+  --locale af --model-id BuzzASR/afrikaans \
+  --model-revision "$MODEL_REVISION_40_HEX" --model-license MIT \
+  --mode smoke --report "$PRIVATE_DIR/af-transformers-score.json"
+```
+
+The runtime version strings in the pack are supplied by the operator from the worker startup diagnostic; the scorer independently checks the Python executable digest, worker script digest, model snapshot, outcomes digest and dataset artifacts, but does not claim a tamper-proof attestation that those version strings were captured automatically. Keep the runtime log and local environment lockfile with the private experiment record. Do not commit prediction packs, outcomes, transcripts or private runtime logs. This native path is now wired into the local packer/scorer schema but remains **unexecuted**: no model weights were downloaded, no model was loaded, and no WER/CER or latency result is claimed. The existing held-out gate still applies; a smoke run does not promote the language registry.
+
 ### First runnable dataset-intake gate: Afrikaans ASR
 
 The first additional-language *pipeline smoke target* is **Afrikaans** (`af`). This is a prioritization choice for a locally relevant Latin-script language and an available public ASR dataset, not a claim that Afrikaans is already supported or that this corpus has sufficient quality for production. Mozilla announced Common Voice Scripted Speech v27.0 on **September 18, 2026**, covering 295 languages overall; that global figure is not a per-language coverage metric ([release announcement](https://discourse.mozilla.org/t/common-voice-scripted-speech-v27-0-and-spontaneous-speech-v5-0-released/149490)). The current dataset index lists Afrikaans as a CC0-1.0 ASR corpus; use the exact locale page and release metadata, not just the index, when pinning a run ([Mozilla Data Collective datasets](https://mozilladatacollective.com/datasets)).
