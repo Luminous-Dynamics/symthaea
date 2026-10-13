@@ -319,6 +319,99 @@ fn observe(
     }
 }
 
+/// Assign average ranks so ties do not receive arbitrary ordering.
+fn average_ranks(values: &[f64]) -> Option<Vec<f64>> {
+    if values.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    let mut order: Vec<usize> = (0..values.len()).collect();
+    order.sort_by(|&left, &right| values[left].total_cmp(&values[right]));
+    let mut ranks = vec![0.0; values.len()];
+    let mut start = 0;
+    while start < order.len() {
+        let mut end = start + 1;
+        while end < order.len() && values[order[end]] == values[order[start]] {
+            end += 1;
+        }
+        // Positions are one-based: [start + 1, end].
+        let average_rank = (start + 1 + end) as f64 / 2.0;
+        for index in start..end {
+            ranks[order[index]] = average_rank;
+        }
+        start = end;
+    }
+    Some(ranks)
+}
+
+/// Rank association is descriptive response evidence, never target fidelity.
+/// Constant outputs and non-numeric control axes produce explicit null metrics.
+fn spearman_rank_response(points: &[(f64, f64)]) -> serde_json::Value {
+    if points.is_empty() {
+        return serde_json::json!({
+            "status": "not_applicable_non_numeric_control",
+            "rho": null,
+            "point_count": 0,
+        });
+    }
+    if points.len() < 3 {
+        return serde_json::json!({
+            "status": "insufficient_points",
+            "rho": null,
+            "point_count": points.len(),
+        });
+    }
+    let x: Vec<f64> = points.iter().map(|(control, _)| *control).collect();
+    let y: Vec<f64> = points.iter().map(|(_, output)| *output).collect();
+    let Some(x_ranks) = average_ranks(&x) else {
+        return serde_json::json!({
+            "status": "invalid_values",
+            "rho": null,
+            "point_count": points.len(),
+        });
+    };
+    let Some(y_ranks) = average_ranks(&y) else {
+        return serde_json::json!({
+            "status": "invalid_values",
+            "rho": null,
+            "point_count": points.len(),
+        });
+    };
+    let x_mean = x_ranks.iter().sum::<f64>() / x_ranks.len() as f64;
+    let y_mean = y_ranks.iter().sum::<f64>() / y_ranks.len() as f64;
+    let mut covariance = 0.0;
+    let mut x_variance = 0.0;
+    let mut y_variance = 0.0;
+    for (x_rank, y_rank) in x_ranks.iter().zip(y_ranks.iter()) {
+        let x_delta = x_rank - x_mean;
+        let y_delta = y_rank - y_mean;
+        covariance += x_delta * y_delta;
+        x_variance += x_delta * x_delta;
+        y_variance += y_delta * y_delta;
+    }
+    if x_variance <= f64::EPSILON {
+        return serde_json::json!({
+            "status": "constant_control",
+            "rho": null,
+            "point_count": points.len(),
+        });
+    }
+    if y_variance <= f64::EPSILON {
+        return serde_json::json!({
+            "status": "constant_output",
+            "rho": null,
+            "point_count": points.len(),
+        });
+    }
+    let rho = (covariance / (x_variance * y_variance).sqrt()).clamp(-1.0, 1.0);
+    serde_json::json!({
+        "status": "measured",
+        "method": "spearman_rho_average_ranks_for_ties",
+        "rho": rho,
+        "point_count": points.len(),
+        "interpretation": "Rank association describes response ordering, not target correctness, causality beyond this intervention, perceived affect, or quality.",
+    })
+}
+
 fn monotonicity(values: &[(f64, f64)]) -> &'static str {
     if values.len() < 2 {
         return "insufficient_points";
@@ -1084,6 +1177,18 @@ fn curve_json(style: Style, control: &str, base_seed: u64) -> serde_json::Value 
             "form_availability_or_section_count": form_availability_changed,
             "no_observed_change_at_tested_points": no_observed_change_at_tested_points,
         },
+        "response_rank": {
+            "method": "spearman_rho_average_ranks_for_ties",
+            "tempo_bpm_vs_control": spearman_rank_response(&tempo_points),
+            "total_duration_beats_vs_control": spearman_rank_response(&duration_points),
+            "score_note_count_vs_control": spearman_rank_response(&note_count_points),
+            "mean_velocity_vs_control": spearman_rank_response(&velocity_points),
+            "mean_note_duration_beats_vs_control": spearman_rank_response(&duration_mean_points),
+            "mean_section_intensity_vs_control": spearman_rank_response(&intensity_points),
+            "velocity_spread_vs_control": spearman_rank_response(&velocity_spread_points),
+            "section_intensity_spread_vs_control": spearman_rank_response(&intensity_spread_points),
+            "note": "Rank associations are reported independently from monotonicity labels and target-fidelity contracts.",
+        },
         "response_shape": {
             "tempo_bpm_vs_control": monotonicity(&tempo_points),
             "total_duration_beats_vs_control": monotonicity(&duration_points),
@@ -1357,6 +1462,44 @@ mod tests {
                 .collect();
             assert!(values.windows(2).all(|pair| pair[0] < pair[1]), "{control}: {values:?}");
         }
+    }
+
+    #[test]
+    fn spearman_rank_response_handles_direction_ties_and_flat_outputs() {
+        let increasing = spearman_rank_response(&[(1.0, 10.0), (2.0, 20.0), (3.0, 30.0)]);
+        assert_eq!(increasing["status"].as_str(), Some("measured"));
+        assert!((increasing["rho"].as_f64().unwrap() - 1.0).abs() < 1.0e-12);
+
+        let decreasing = spearman_rank_response(&[(1.0, 30.0), (2.0, 20.0), (3.0, 10.0)]);
+        assert!((decreasing["rho"].as_f64().unwrap() + 1.0).abs() < 1.0e-12);
+
+        let tied = spearman_rank_response(&[(1.0, 2.0), (2.0, 2.0), (3.0, 4.0)]);
+        assert!((tied["rho"].as_f64().unwrap() - 0.866_025_403_784_438_6).abs() < 1.0e-9);
+
+        let flat = spearman_rank_response(&[(1.0, 4.0), (2.0, 4.0), (3.0, 4.0)]);
+        assert_eq!(flat["status"].as_str(), Some("constant_output"));
+        assert!(flat["rho"].is_null());
+
+        let non_numeric = spearman_rank_response(&[]);
+        assert_eq!(non_numeric["status"].as_str(), Some("not_applicable_non_numeric_control"));
+        assert!(non_numeric["rho"].is_null());
+    }
+
+    #[test]
+    fn response_rank_is_available_for_numeric_control_but_not_tonic_labels() {
+        let arousal = curve_json(Style::Classical, "arousal", BASE_SEED);
+        let tempo_rank = &arousal["response_rank"]["tempo_bpm_vs_control"];
+        assert_eq!(tempo_rank["status"].as_str(), Some("measured"));
+        assert_eq!(tempo_rank["point_count"].as_u64(), Some(5));
+        assert!(tempo_rank["rho"].as_f64().is_some());
+
+        let tonic = curve_json(Style::Classical, "tonic", BASE_SEED);
+        let tonic_tempo_rank = &tonic["response_rank"]["tempo_bpm_vs_control"];
+        assert_eq!(
+            tonic_tempo_rank["status"].as_str(),
+            Some("not_applicable_non_numeric_control")
+        );
+        assert!(tonic_tempo_rank["rho"].is_null());
     }
 
     #[test]
