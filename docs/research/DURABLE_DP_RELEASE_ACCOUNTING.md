@@ -42,7 +42,7 @@ Important limits:
 
 Reserving a release consumes its budget immediately, even if the process crashes before output generation. This is intentionally conservative.
 
-After a reviewed mechanism has generated the noisy output, the caller passes the exact output bytes to `commit_output`. The transaction binds one SHA-256 digest and exact byte string to the reservation. Repeating the same commit is idempotent; attempting to bind different bytes to the same release ID is rejected. `committed_output` rechecks the stored digest and returns the already committed bytes.
+After a reviewed mechanism has generated the noisy output, and only once its declared UTC release window has ended, the caller passes the exact output bytes to `commit_output`. The ledger rejects commits dated before the reservation or before the release window end. The transaction binds one SHA-256 digest and exact byte string to the reservation. Repeating the same commit is idempotent; attempting to bind different bytes to the same release ID is rejected. `committed_output` rechecks the stored digest and returns the already committed bytes.
 
 The caller must **not publish or use a newly generated output until its exact bytes have been committed**, and retries must publish only the committed bytes. This ensures that a crash/retry cannot accidentally expose several independently noised outputs for a single reservation while spending budget only once. The ledger cannot technically prevent an external caller from violating this ordering; that trust boundary must be enforced in the release service.
 
@@ -74,6 +74,6 @@ A production system still needs:
 
 ## Deterministic test coverage
 
-The test suite has 18 cases using synthetic tokens, fixed test-only keys, fixed timestamps and small synthetic output blobs. It covers restart recovery, idempotent reservation, release-ID conflicts, overlap suppression, disjoint cohorts, cumulative epsilon/delta exhaustion, cohort floor, policy-field validation, immutable output commit/replay, output digest checks, HMAC-key mismatch, record limits, concurrent duplicate reservations, extreme numeric configuration and commit timestamp ordering.
+The test suite has 23 cases using synthetic tokens, fixed test-only keys, fixed timestamps and small synthetic output blobs. It covers restart recovery, idempotent reservation, release-ID conflicts, overlap suppression, disjoint cohorts, cumulative epsilon/delta exhaustion, cohort floor, policy-field validation, immutable output commit/replay, output digest checks, HMAC-key mismatch, record limits, concurrent duplicate reservations, extreme numeric configuration and commit timestamp ordering.
 
 These tests are added to the telemetry GitHub Actions workflow. They must not be described as passing until a completed exact-head run succeeds.
