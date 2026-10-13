@@ -1,0 +1,271 @@
+"""Restart-safe privacy budget and immutable-output contract tests."""
+from __future__ import annotations
+
+from datetime import datetime
+import os
+import sqlite3
+import tempfile
+import threading
+import unittest
+from pathlib import Path
+
+from tools.energy_telemetry.durable_privacy_ledger import (
+    DurablePrivacyLedger,
+    DurablePrivacyPolicyError,
+    EventIdentityConflict,
+)
+from tools.energy_telemetry.store_forward import QueueCapacityError, TelemetryQueueError
+
+
+def dt(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def people(start=0, count=20):
+    return [f"local-only-participant-{i:04d}" for i in range(start, start + count)]
+
+
+class DurablePrivacyLedgerTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.database = str(Path(self.temp.name) / "privacy.sqlite3")
+        self.key = b"private-tokenization-key-for-tests-32bytes!"
+        self.now = dt("2026-10-13T06:00:00Z")
+        self.ledger = DurablePrivacyLedger(
+            self.database, participant_hmac_key=self.key,
+        )
+        self.a = dt("2026-10-13T05:00:00Z")
+        self.b = dt("2026-10-13T05:15:00Z")
+        self.c = dt("2026-10-13T05:30:00Z")
+        self.d = dt("2026-10-13T05:45:00Z")
+        self.e = dt("2026-10-13T06:00:00Z")
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def reopen(self, **kwargs):
+        kwargs.setdefault("participant_hmac_key", self.key)
+        return DurablePrivacyLedger(self.database, **kwargs)
+
+    def reserve(self, release="a", *, query="b", participants=None, start=None, end=None,
+                reserved=None, recipient="approved_research", mechanism="discrete_laplace",
+                epsilon=0.5, delta=0.0, adjacency="add_remove_one_participant",
+                contribution_limit=1000, contribution_policy="energy-cap-v1",
+                privacy_policy="dp-policy-v1", floor=None, ledger=None):
+        target = self.ledger if ledger is None else ledger
+        return target.reserve_release(
+            release_id=release * 32,
+            query_sha256=query * 64,
+            participant_tokens=people() if participants is None else participants,
+            window_start_utc=self.a if start is None else start,
+            window_end_utc=self.b if end is None else end,
+            reserved_at_utc=self.now if reserved is None else reserved,
+            recipient_class=recipient,
+            mechanism=mechanism,
+            epsilon=epsilon,
+            delta=delta,
+            adjacency=adjacency,
+            contribution_limit_wh=contribution_limit,
+            contribution_policy_id=contribution_policy,
+            privacy_policy_id=privacy_policy,
+            minimum_cohort_size=floor,
+        )
+
+    def test_reservation_survives_restart_and_raw_participant_tokens_are_not_stored(self):
+        result = self.reserve()
+        self.assertEqual(result.status, "reserved")
+        self.assertEqual(result.cohort_size, 20)
+        reopened = self.reopen()
+        self.assertEqual(reopened.reservation_count, 1)
+        self.assertEqual(reopened.participant_spend(people()[0]), (0.5, 0.0, 1))
+        raw_db = Path(self.database).read_bytes()
+        self.assertNotIn(people()[0].encode(), raw_db)
+        self.assertEqual(reopened.integrity_check(), "ok")
+
+    def test_exact_reservation_retry_is_idempotent_and_spends_budget_once(self):
+        first = self.reserve()
+        second = self.reserve(ledger=self.reopen())
+        self.assertEqual(first.receipt_sha256, second.receipt_sha256)
+        self.assertEqual(second.status, "reserved")
+        self.assertEqual(self.ledger.reservation_count, 1)
+        self.assertEqual(self.ledger.participant_spend(people()[0]), (0.5, 0.0, 1))
+
+    def test_reused_release_id_with_different_query_fails_closed(self):
+        self.reserve()
+        with self.assertRaises(EventIdentityConflict):
+            self.reserve(query="c")
+        self.assertEqual(self.ledger.reservation_count, 1)
+
+    def test_overlapping_windows_for_shared_participant_are_rejected(self):
+        self.reserve()
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "overlapping release window"):
+            self.reserve(
+                release="c", query="d",
+                start=dt("2026-10-13T05:10:00Z"),
+                end=dt("2026-10-13T05:20:00Z"),
+            )
+        self.assertEqual(self.ledger.reservation_count, 1)
+
+    def test_disjoint_cohorts_can_use_overlapping_windows(self):
+        self.reserve(participants=people(0, 20))
+        second = self.reserve(
+            release="c", query="d", participants=people(20, 20),
+            start=dt("2026-10-13T05:05:00Z"),
+            end=dt("2026-10-13T05:20:00Z"),
+        )
+        self.assertEqual(second.status, "reserved")
+        self.assertEqual(self.ledger.reservation_count, 2)
+
+    def test_cumulative_epsilon_budget_is_enforced(self):
+        self.reserve(epsilon=1.0)
+        self.reserve(release="c", query="d", start=self.b, end=self.c, epsilon=1.0)
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "cumulative epsilon"):
+            self.reserve(release="e", query="f", start=self.c, end=self.d, epsilon=0.01)
+        self.assertEqual(self.ledger.participant_spend(people()[0]), (2.0, 0.0, 2))
+
+    def test_cumulative_delta_budget_is_enforced(self):
+        self.reserve(epsilon=0.5, delta=1e-6)
+        self.reserve(release="c", query="d", start=self.b, end=self.c, epsilon=0.5, delta=1e-6)
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "cumulative delta"):
+            self.reserve(release="e", query="f", start=self.c, end=self.d, epsilon=0.5, delta=1e-7)
+        self.assertEqual(self.ledger.participant_spend(people()[0]), (1.0, 2e-6, 2))
+
+    def test_small_cohort_is_suppressed(self):
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "below the required minimum"):
+            self.reserve(participants=people(count=19))
+        self.assertEqual(self.ledger.reservation_count, 0)
+
+    def test_research_ledger_rejects_unsupported_recipient_and_mechanism(self):
+        for kwargs in (
+            {"recipient": "grid_operations"},
+            {"mechanism": "made_up_mechanism"},
+            {"adjacency": "undefined_adjacency"},
+            {"contribution_policy": ""},
+            {"privacy_policy": ""},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(DurablePrivacyPolicyError):
+                    self.reserve(**kwargs)
+        self.assertEqual(self.ledger.reservation_count, 0)
+
+    def test_commit_output_is_immutable_and_survives_restart(self):
+        reservation = self.reserve()
+        output = b'{"cohort_energy_wh_noisy":4200,"schema":"v1"}'
+        committed = self.ledger.commit_output(
+            release_id=reservation.release_id, output_bytes=output, committed_at_utc=self.now
+        )
+        self.assertFalse(committed.duplicate)
+        retry = self.reopen().commit_output(
+            release_id=reservation.release_id, output_bytes=output, committed_at_utc=self.now
+        )
+        self.assertTrue(retry.duplicate)
+        self.assertEqual(retry.output_sha256, committed.output_sha256)
+        self.assertEqual(self.reopen().committed_output(reservation.release_id).output_bytes, output)
+        reservation_retry = self.reopen().reserve_release(
+            release_id="a" * 32,
+            query_sha256="b" * 64,
+            participant_tokens=people(),
+            window_start_utc=self.a,
+            window_end_utc=self.b,
+            reserved_at_utc=self.now,
+            recipient_class="approved_research",
+            mechanism="discrete_laplace",
+            epsilon=0.5,
+            delta=0.0,
+            adjacency="add_remove_one_participant",
+            contribution_limit_wh=1000,
+            contribution_policy_id="energy-cap-v1",
+            privacy_policy_id="dp-policy-v1",
+        )
+        self.assertEqual(reservation_retry.status, "output_committed")
+        self.assertEqual(self.ledger.participant_spend(people()[0]), (0.5, 0.0, 1))
+
+    def test_second_output_for_same_reservation_is_rejected(self):
+        result = self.reserve()
+        self.ledger.commit_output(
+            release_id=result.release_id, output_bytes=b'{"noisy":1}', committed_at_utc=self.now
+        )
+        with self.assertRaises(EventIdentityConflict):
+            self.ledger.commit_output(
+                release_id=result.release_id, output_bytes=b'{"noisy":2}', committed_at_utc=self.now
+            )
+
+    def test_output_cannot_be_committed_without_budget_reservation(self):
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "without a reservation"):
+            self.ledger.commit_output(
+                release_id="f" * 32, output_bytes=b'{"noisy":1}', committed_at_utc=self.now
+            )
+
+    def test_committed_output_digest_is_rechecked(self):
+        result = self.reserve()
+        self.ledger.commit_output(
+            release_id=result.release_id, output_bytes=b'{"noisy":1}', committed_at_utc=self.now
+        )
+        with sqlite3.connect(self.database) as db:
+            db.execute(
+                "UPDATE privacy_releases SET output_sha256 = ? WHERE release_id = ?",
+                ("0" * 64, result.release_id),
+            )
+        with self.assertRaisesRegex(TelemetryQueueError, "digest mismatch"):
+            self.ledger.committed_output(result.release_id)
+
+    def test_changed_participant_hmac_key_is_rejected_after_restart(self):
+        self.reserve()
+        with self.assertRaisesRegex(TelemetryQueueError, "participant-key configuration mismatch"):
+            self.reopen(participant_hmac_key=b"different-secret-key-with-at-least-32-bytes")
+
+    def test_record_limit_fails_closed(self):
+        path = str(Path(self.temp.name) / "limited.sqlite3")
+        small = DurablePrivacyLedger(path, participant_hmac_key=self.key, max_reservations=1)
+        self.reserve(ledger=small)
+        with self.assertRaises(QueueCapacityError):
+            self.reserve(release="c", query="d", start=self.b, end=self.c, ledger=small)
+        self.assertEqual(small.reservation_count, 1)
+
+    def test_concurrent_duplicate_reservations_spend_budget_once(self):
+        workers = 8
+        barrier = threading.Barrier(workers)
+        results = []
+        errors = []
+        lock = threading.Lock()
+
+        def reserve_worker():
+            try:
+                ledger = self.reopen()
+                barrier.wait(timeout=5)
+                result = self.reserve(ledger=ledger)
+                with lock:
+                    results.append(result)
+            except Exception as exc:
+                with lock:
+                    errors.append(exc)
+
+        threads = [threading.Thread(target=reserve_worker) for _ in range(workers)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=15)
+        self.assertTrue(all(not thread.is_alive() for thread in threads), "thread did not terminate")
+        self.assertEqual(errors, [])
+        self.assertEqual(len(results), workers)
+        self.assertEqual(len({r.receipt_sha256 for r in results}), 1)
+        self.assertEqual(self.ledger.reservation_count, 1)
+        self.assertEqual(self.ledger.participant_spend(people()[0]), (0.5, 0.0, 1))
+
+    def test_infinite_numeric_budget_configuration_is_rejected(self):
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "finite numeric"):
+            DurablePrivacyLedger(
+                str(Path(self.temp.name) / "bad-budget.sqlite3"),
+                participant_hmac_key=self.key,
+                max_epsilon_per_participant=float("inf"),
+            )
+        with self.assertRaisesRegex(ValueError, "positive SQLite integer"):
+            DurablePrivacyLedger(
+                str(Path(self.temp.name) / "bad-record-limit.sqlite3"),
+                participant_hmac_key=self.key,
+                max_reservations=1 << 100,
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()
