@@ -129,8 +129,36 @@ class VoiceAsrScoreTests(unittest.TestCase):
             "predictions": hypotheses,
         }
 
+    def _write_outcomes(self, predictions) -> None:
+        rows = []
+        for index, prediction in enumerate(predictions):
+            rows.append({
+                "id": prediction["path"],
+                "language": self.locale,
+                "detected_language": None,
+                "language_confidence": 0.0,
+                "transcript": prediction["text"],
+                "word_error_rate": 0.0,
+                "character_error_rate": 0.0,
+                "entity_preservation": 1.0,
+                "translation_en": None,
+                "translation_chrf": None,
+                "response_language_correct": None,
+                "latency_ms": 12.5 + index,
+                "preflight_latency_ms": 1.5 if index == 0 else 0.25,
+                "transcription_latency_ms": 10.0 + index,
+                "translation_latency_ms": None,
+                "error": None,
+            })
+        self.outcomes_path.write_text(
+            "".join(json.dumps(row, ensure_ascii=False) + "\\n" for row in rows),
+            encoding="utf-8",
+        )
+
     def _write_predictions(self, rows=None) -> dict:
         self.pred_doc = self._prediction_doc(rows)
+        self._write_outcomes(self.pred_doc["predictions"])
+        self.pred_doc["outcomes_sha256"] = sha256_file(self.outcomes_path)
         self.predictions_path.write_text(json.dumps(self.pred_doc, ensure_ascii=False), encoding="utf-8")
         return self.pred_doc
 
@@ -171,6 +199,11 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertEqual(report["runtime"]["kind"], "whisper.cpp")
         self.assertEqual(report["runtime"]["quantization"], "f16")
         self.assertEqual(report["inputs"]["outcomes_sha256"], sha256_file(self.outcomes_path))
+        self.assertEqual(report["latency"]["end_to_end_ms"]["sample_count"], 3)
+        self.assertAlmostEqual(report["latency"]["transcription_ms"]["mean_ms"], 11.0)
+        self.assertEqual(report["latency"]["first_sample_preflight_ms"], 1.5)
+        self.assertEqual(report["latency"]["translation_ms"]["sample_count"], 0)
+        self.assertIn("may include first-use model startup", report["latency"]["interpretation"])
         self.assertEqual(report["confidence_intervals_95"]["resampling_unit"], "pseudonymous speaker clusters")
         self.assertEqual(report["confidence_intervals_95"]["speaker_cluster_count"], 3)
         self.assertEqual(report["mode"], "smoke")
@@ -275,6 +308,20 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self._write_predictions(rows)
         report = self.score()
         self.assertGreater(report["metrics"]["wer"], 0.2)
+
+    def test_prediction_text_must_match_raw_outcome_transcript(self):
+        doc = copy.deepcopy(self.pred_doc)
+        doc["predictions"][0]["text"] = "tampered transcript"
+        with self.assertRaisesRegex(ValueError, "differs from raw pilot outcome transcript"):
+            self.score(prediction_doc=doc)
+
+    def test_latency_phase_summary_excludes_private_identifiers(self):
+        report = self.score()
+        encoded = json.dumps(report, ensure_ascii=False)
+        self.assertNotIn("clip-001.mp3", encoded)
+        self.assertNotIn("speaker-a", encoded)
+        self.assertEqual(report["latency"]["preflight_request_ms"]["sample_count"], 3)
+        self.assertEqual(report["latency"]["transcription_ms"]["p50_ms"], 11.0)
 
     def test_missing_prediction_fails_closed(self):
         doc = copy.deepcopy(self.pred_doc)
