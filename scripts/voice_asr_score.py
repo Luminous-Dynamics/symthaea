@@ -21,6 +21,7 @@ import math
 import os
 import random
 import re
+import sys
 import unicodedata
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -450,6 +451,20 @@ def score_predictions(
         bootstrap_iterations,
     )
 
+    # Macro averages give every speaker equal weight, complementing micro WER/CER
+    # where speakers with more clips naturally contribute more reference units.
+    speaker_word_rates = []
+    speaker_char_rates = []
+    for speaker_token in word_speaker_clusters:
+        word_items = word_speaker_clusters[speaker_token]
+        char_items = char_speaker_clusters[speaker_token]
+        word_denominator = sum(item["ref_words"] for item in word_items)
+        char_denominator = sum(item["ref_chars"] for item in char_items)
+        if word_denominator:
+            speaker_word_rates.append(sum(item["err_words"] for item in word_items) / word_denominator)
+        if char_denominator:
+            speaker_char_rates.append(sum(item["err_chars"] for item in char_items) / char_denominator)
+
     archive_sha = dataset["archive_sha256"]
     test_meta_sha = test_sha
     prediction_sha = sha256_file(predictions_path)
@@ -465,6 +480,11 @@ def score_predictions(
         "training_data_overlap_status": "not_assessed",
         "locale": locale,
         "normalization": NORMALIZATION_ID,
+        "scorer": {
+            "script_sha256": sha256_file(Path(__file__).resolve(strict=True)),
+            "python_version": sys.version.split()[0],
+            "implementation": "stdlib deterministic edit-distance and speaker-cluster bootstrap",
+        },
         "model": {
             "id": model_id, "revision_claimed": model_revision, "license_declared": model_license,
             "source_snapshot_manifest_sha256": source_tree_sha,
@@ -493,6 +513,12 @@ def score_predictions(
             "intake_report_sha256": sha256_file(intake_report_path),
         },
         "metrics": aggregate(per_clip),
+        "speaker_macro_metrics": {
+            "speaker_count": len(speaker_word_clusters),
+            "mean_speaker_wer": sum(speaker_word_rates) / len(speaker_word_rates) if speaker_word_rates else None,
+            "mean_speaker_cer": sum(speaker_char_rates) / len(speaker_char_rates) if speaker_char_rates else None,
+            "interpretation": "each pseudonymous speaker contributes one equally weighted score; no speaker tokens are emitted",
+        },
         "confidence_intervals_95": {
             "wer": word_ci,
             "cer": char_ci,
