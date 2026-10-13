@@ -124,10 +124,10 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
         self.assertEqual(self.ledger.participant_spend(people()[0]), (2.0, 0.0, 2))
 
     def test_cumulative_delta_budget_is_enforced(self):
-        self.reserve(epsilon=0.5, delta=1e-6)
-        self.reserve(release="c", query="d", start=self.b, end=self.c, epsilon=0.5, delta=1e-6)
+        self.reserve(epsilon=0.5, delta=1e-6, mechanism="gaussian")
+        self.reserve(release="c", query="d", start=self.b, end=self.c, epsilon=0.5, delta=1e-6, mechanism="gaussian")
         with self.assertRaisesRegex(DurablePrivacyPolicyError, "cumulative delta"):
-            self.reserve(release="e", query="f", start=self.c, end=self.d, epsilon=0.5, delta=1e-7)
+            self.reserve(release="e", query="f", start=self.c, end=self.d, epsilon=0.5, delta=1e-7, mechanism="gaussian")
         self.assertEqual(self.ledger.participant_spend(people()[0]), (1.0, 2e-6, 2))
 
     def test_small_cohort_is_suppressed(self):
@@ -273,6 +273,41 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
                 participant_hmac_key=self.key,
                 max_reservations=1 << 100,
             )
+
+    def test_mechanism_and_delta_must_be_consistent(self):
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "discrete_laplace requires delta=0"):
+            self.reserve(delta=1e-6)
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "gaussian mechanism requires positive delta"):
+            self.reserve(mechanism="gaussian", delta=0.0)
+        self.assertEqual(self.ledger.reservation_count, 0)
+
+    def test_malformed_recipient_mechanism_and_adjacency_types_fail_closed(self):
+        for kwargs in (
+            {"recipient": []},
+            {"mechanism": []},
+            {"adjacency": {}},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(DurablePrivacyPolicyError):
+                    self.reserve(**kwargs)
+        self.assertEqual(self.ledger.reservation_count, 0)
+
+    def test_output_cannot_be_committed_before_release_window_ends(self):
+        reservation = self.reserve(
+            release="c", query="d",
+            start=dt("2026-10-13T05:45:00Z"),
+            end=dt("2026-10-13T06:02:00Z"),
+            reserved=self.now,
+        )
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "before its release window ends"):
+            self.ledger.commit_output(
+                release_id=reservation.release_id,
+                output_bytes=b'{"noisy":4200}',
+                committed_at_utc=dt("2026-10-13T06:01:00Z"),
+            )
+        self.assertEqual(self.ledger.reservation_count, 1)
+        with self.assertRaisesRegex(DurablePrivacyPolicyError, "no committed output"):
+            self.ledger.committed_output(reservation.release_id)
 
     def test_output_commit_time_cannot_precede_reservation(self):
         reservation = self.reserve()
