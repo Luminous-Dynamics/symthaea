@@ -13,6 +13,7 @@ from pathlib import Path
 
 from voice_asr_score import (
     NORMALIZATION_ID,
+    _hash_tree,
     _read_json,
     normalize_text,
     score_predictions,
@@ -34,6 +35,10 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.model_root = self.base / "model-export"
         self.model_root.mkdir()
         (self.model_root / "config.json").write_text('{"synthetic": true}\n', encoding="utf-8")
+        self.source_model_root = self.base / "upstream-model-snapshot"
+        self.source_model_root.mkdir()
+        (self.source_model_root / "config.json").write_text('{"synthetic-source": true}\n', encoding="utf-8")
+        (self.source_model_root / "weights.safetensors").write_bytes(b"synthetic upstream weights")
         (self.model_root / "model.bin").write_bytes(b"synthetic converted model artifact")
         self.runtime_binary = self.base / "whisper-cli"
         self.runtime_binary.write_bytes(b"synthetic whisper runtime executable")
@@ -116,6 +121,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
             "model_id": self.model_id,
             "model_revision": self.model_revision,
             "model_license": self.model_license,
+            "source_model_snapshot_sha256": _hash_tree(self.source_model_root)[0],
             "outcomes_sha256": sha256_file(self.outcomes_path),
             "runtime": copy.deepcopy(self.runtime),
             "predictions": hypotheses,
@@ -133,6 +139,7 @@ class VoiceAsrScoreTests(unittest.TestCase):
             dataset_root=kwargs.pop("dataset_root", self.root),
             archive=kwargs.pop("archive", self.archive),
             model_root=kwargs.pop("model_root", self.model_root),
+            source_model_root=kwargs.pop("source_model_root", self.source_model_root),
             predictions_path=kwargs.pop("predictions_path", self.predictions_path),
             outcomes_path=kwargs.pop("outcomes_path", self.outcomes_path),
             model_id=kwargs.pop("model_id", self.model_id),
@@ -153,7 +160,8 @@ class VoiceAsrScoreTests(unittest.TestCase):
         self.assertAlmostEqual(report["metrics"]["wer"], 2 / 10)
         self.assertLessEqual(report["confidence_intervals_95"]["wer"]["low_95"],
                              report["confidence_intervals_95"]["wer"]["high_95"])
-        self.assertEqual(report["model"]["snapshot_file_count"], 2)
+        self.assertEqual(report["model"]["converted_export_file_count"], 2)
+        self.assertEqual(report["model"]["source_snapshot_file_count"], 2)
         self.assertEqual(report["runtime"]["kind"], "whisper.cpp")
         self.assertEqual(report["runtime"]["quantization"], "f16")
         self.assertEqual(report["inputs"]["outcomes_sha256"], sha256_file(self.outcomes_path))
@@ -247,6 +255,17 @@ class VoiceAsrScoreTests(unittest.TestCase):
         (self.model_root / "model.bin").write_bytes(b"updated converted model")
         with self.assertRaisesRegex(ValueError, "runtime model artifact SHA-256 differs"):
             self.score()
+
+    def test_upstream_source_snapshot_drift_fails_closed(self):
+        (self.source_model_root / "weights.safetensors").write_bytes(b"changed source weights")
+        with self.assertRaisesRegex(ValueError, "source model snapshot SHA-256 differs"):
+            self.score()
+
+    def test_source_model_root_symlink_is_rejected(self):
+        alias = self.base / "source-model-link"
+        alias.symlink_to(self.source_model_root, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "source_model_root must be a real directory"):
+            self.score(source_model_root=alias)
 
     def test_runtime_commit_must_be_pinned(self):
         doc = copy.deepcopy(self.pred_doc)
