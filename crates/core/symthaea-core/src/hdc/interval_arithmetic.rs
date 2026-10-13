@@ -1231,6 +1231,54 @@ mod tests {
     }
 
     #[test]
+    fn quadrant_reduction_rejects_half_integer_boundary_overlap() {
+        let half_pi = half_pi_enclosure().expect("Machin series should enclose pi/2");
+        // This input interval intentionally touches the q=3.5 nearest-quadrant
+        // boundary. The quotient enclosure must not guess which quadrant wins.
+        let boundary = half_pi.checked_multiply(Interval::point(3.5).unwrap());
+        assert!(try_reduce_quadrant(boundary).is_none());
+    }
+
+    #[test]
+    fn reduced_trigonometry_encloses_fixed_high_precision_reference_brackets() {
+        // Bounds below were generated with a 230-digit Decimal oracle after
+        // reducing the exact binary64 input. They intentionally avoid using
+        // Rust's platform-dependent sin/cos as the enclosure reference.
+        let cases = [
+            (10.0, -0.54402111088938, -0.54402111088936,
+                    -0.83907152907646, -0.83907152907644),
+            (-10.0, 0.54402111088936, 0.54402111088938,
+                     -0.83907152907646, -0.83907152907644),
+            (1000.0, 0.8268795405319, 0.8268795405321,
+                      0.5623790762906, 0.5623790762908),
+            (-1000.0, -0.8268795405321, -0.8268795405319,
+                       0.5623790762906, 0.5623790762908),
+            (1.0e6, -0.34999350218, -0.34999350216,
+                    0.93675212752, 0.93675212755),
+            (-1.0e6, 0.34999350216, 0.34999350218,
+                     0.93675212752, 0.93675212755),
+            (1.0e9, 0.5458434494, 0.5458434495,
+                    0.8378871813, 0.8378871815),
+            (-1.0e9, -0.5458434495, -0.5458434494,
+                     0.8378871813, 0.8378871815),
+        ];
+
+        for (x, sin_lower, sin_upper, cos_lower, cos_upper) in cases {
+            let input = Interval::point(x).unwrap();
+            let sine = input.checked_sin().unwrap();
+            let cosine = input.checked_cos().unwrap();
+            assert!(
+                sine.lower() <= sin_lower && sine.upper() >= sin_upper,
+                "sine enclosure {sine:?} missed high-precision bracket at {x}"
+            );
+            assert!(
+                cosine.lower() <= cos_lower && cosine.upper() >= cos_upper,
+                "cosine enclosure {cosine:?} missed high-precision bracket at {x}"
+            );
+        }
+    }
+
+    #[test]
     fn bounded_trigonometric_series_cross_check_representable_points() {
         for step in -200_i32..=200 {
             let value = step as f64 / 100.0;
