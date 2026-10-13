@@ -142,7 +142,8 @@ cargo run --release -p symthaea-communication --bin symthaea-comm-eval -- pilot 
   --worker-arg=--model-dir --worker-arg="$UPSTREAM_MODEL_SNAPSHOT" \
   --worker-arg=--provider-id --worker-arg=buzzasr-afrikaans-transformers \
   --worker-arg=--device --worker-arg=cuda \
-  --worker-arg=--dtype --worker-arg=float16
+  --worker-arg=--dtype --worker-arg=float16 \
+  2> "$PRIVATE_DIR/af-transformers-worker-stderr.log"
 
 python3 scripts/voice_pilot_outcomes_to_predictions.py \
   --outcomes "$PRIVATE_DIR/af-transformers-outcomes.jsonl" \
@@ -154,13 +155,8 @@ python3 scripts/voice_pilot_outcomes_to_predictions.py \
   --runtime-worker "$TRANSFORMERS_WORKER" \
   --locale af --model-id BuzzASR/afrikaans \
   --model-revision "$MODEL_REVISION_40_HEX" --model-license MIT \
-  --python-version "$PYTHON_VERSION" --torch-version "$TORCH_VERSION" \
-  --transformers-version "$TRANSFORMERS_VERSION" --numpy-version "$NUMPY_VERSION" \
-  --device "$DEVICE" --dtype "$DTYPE" \
-  --runtime-model-snapshot-sha256 "$MODEL_SNAPSHOT_SHA256" \
-  --runtime-python-executable-sha256 "$PYTHON_EXECUTABLE_SHA256" \
-  --runtime-worker-sha256 "$WORKER_SCRIPT_SHA256" --mode smoke \
-  --output "$PRIVATE_DIR/af-transformers-predictions.json"
+  --runtime-metadata-log "$PRIVATE_DIR/af-transformers-worker-stderr.log" \
+  --mode smoke --output "$PRIVATE_DIR/af-transformers-predictions.json"
 
 python3 scripts/voice_asr_score.py \
   --dataset-root "$CV_ROOT/af" --archive "$CV_ARCHIVE" \
@@ -170,12 +166,13 @@ python3 scripts/voice_asr_score.py \
   --model-root "$UPSTREAM_MODEL_SNAPSHOT" \
   --source-model-root "$UPSTREAM_MODEL_SNAPSHOT" \
   --runtime-binary "$PYTHON_BIN" --runtime-worker "$TRANSFORMERS_WORKER" \
+  --runtime-metadata-log "$PRIVATE_DIR/af-transformers-worker-stderr.log" \
   --locale af --model-id BuzzASR/afrikaans \
   --model-revision "$MODEL_REVISION_40_HEX" --model-license MIT \
   --mode smoke --report "$PRIVATE_DIR/af-transformers-score.json"
 ```
 
-The runtime version strings and three observed digests in the pack are supplied by the operator from the worker startup diagnostic. The packer fails if the model snapshot, Python executable, or worker script no longer matches those observed hashes; the scorer rechecks the same hashes alongside outcomes and dataset artifacts. Version strings themselves remain operator-supplied fields rather than a cryptographically attested environment lock. Keep the complete startup line, runtime log and local environment lockfile with the private experiment record. Do not commit prediction packs, outcomes, transcripts or private runtime logs. This native path is now wired into the local packer/scorer schema but remains **unexecuted**: no model weights were downloaded, no model was loaded, and no WER/CER or latency result is claimed. The existing held-out gate still applies; a smoke run does not promote the language registry.
+The packer parses the unique `SYMTHEA_TRANSFORMERS_RUNTIME` record directly from the private stderr log, pins the log's SHA-256, and rejects mismatched model inventory, Python executable, worker script, or explicitly supplied runtime fields. The scorer rechecks the log digest and compares the logged versions/device/dtype and file hashes with the supplied runtime and model snapshot. This is reproducible provenance, not a cryptographic attestation of every transitive library or GPU driver. Keep the startup log and local environment lockfile with the private experiment record. Do not commit prediction packs, outcomes, transcripts or private runtime logs. This native path is now wired into the local packer/scorer schema but remains **unexecuted**: no model weights were downloaded, no model was loaded, and no WER/CER or latency result is claimed. The existing held-out gate still applies; a smoke run does not promote the language registry.
 
 ### First runnable dataset-intake gate: Afrikaans ASR
 
