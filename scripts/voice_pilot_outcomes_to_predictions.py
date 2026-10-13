@@ -119,6 +119,12 @@ def build_predictions(
           "model_root must be a real directory, not a symlink")
     _need(source_model_root.is_dir() and not source_model_root.is_symlink(),
           "source_model_root must be a real directory, not a symlink")
+    converted_root_real = model_root.resolve(strict=True)
+    source_root_real = source_model_root.resolve(strict=True)
+    _need(converted_root_real != source_root_real
+          and converted_root_real not in source_root_real.parents
+          and source_root_real not in converted_root_real.parents,
+          "source_model_root and converted model_root must be separate, non-nested directories")
     source_snapshot_sha, _source_file_count, _source_bytes = _hash_tree(source_model_root)
     _need(runtime_binary.is_file() and not runtime_binary.is_symlink(),
           "runtime_binary must be a regular non-symlink file")
