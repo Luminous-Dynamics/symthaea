@@ -29,7 +29,7 @@ crate::hdc::interval_arithmetic::{Interval, IntervalError}.
   rejects intervals containing negative reals and expands nonzero endpoints
   outward. Natural logarithm and exponential use interval series, range reduction,
   and explicit remainder bounds. Sine/cosine use Taylor series only when the full
-  interval lies within [-3/2, 3/2]; elsewhere they return the always-sound but
+  interval lies within [-2, 2]; elsewhere they return the always-sound but
   coarse enclosure [-1, 1] until a validated argument-reduction path exists. The
   integer-power path is logarithmic in the exponent and rejects zero-to-zero and
   negative powers over intervals containing zero.
@@ -91,14 +91,15 @@ well-resolved reduction range it returns broad but conservative enclosures
 instead of relying on the platform exponential.
 
 Sine and cosine now have a deliberately bounded contract. For a complete input
-interval inside [-3/2, 3/2], the implementation evaluates sine endpoint series
+interval inside [-2, 2], the implementation evaluates sine endpoint series
 through degree 39 and cosine endpoint series through degree 38, using interval
-arithmetic at every step. At the limit 3/2, the first omitted alternating terms
-are bounded by `(3/2)^41 / 41! < 2^-140` for sine and `(3/2)^40 / 40! < 2^-135`
-for cosine; the implementation adds the wider, exactly represented `2^-80`
-symmetric allowance. Monotonicity of sine and the single maximum of cosine on
-this region determine the image range, with cosine's maximum set to exactly 1
-when zero is included. For any interval extending outside [-3/2, 3/2]—including unbounded and very large
+arithmetic at every step. On this domain, the first omitted alternating terms
+are bounded by `2^41 / 41! < 2^-123` for sine and `2^40 / 40! < 2^-119` for
+cosine; the implementation adds the wider, exactly represented `2^-80`
+symmetric allowance. The sine range uses the endpoint hull and conservatively
+includes -1 or +1 when entering the corresponding outer band where a critical
+point may occur. Cosine uses its endpoint hull and the exact maximum 1 when the
+input contains zero. For any interval extending outside [-2, 2]—including unbounded and very large
 arguments—the result is the conservative `[-1, 1]`. This intentionally sacrifices
 precision rather than implement unvalidated argument reduction. No platform
 `f64::sin` or `f64::cos` result is used to form an enclosure.
@@ -114,7 +115,7 @@ Unit tests cover invalid endpoints, outward enclosures for each arithmetic
 operator, division-by-zero ranges, overflow, underflow, unbounded indeterminate
 quotients, square-root/logarithm domains, logarithm enclosure over subnormal,
 normal, near-one and extreme finite inputs, exponential enclosure from subnormal
-underflow through large finite inputs, trigonometric series across [-3/2, 3/2],
+underflow through large finite inputs, trigonometric series across [-2, 2],
 conservative fallback for large/unbounded trigonometric inputs, integer-power
 domains, and a deterministic grid of small integer intervals. Expression tests
 cover polynomial enclosure, square-root/logarithm/exponential/sine/cosine
