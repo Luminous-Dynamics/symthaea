@@ -143,7 +143,7 @@ The aggregate validator checks exact keys, UTC/time-window consistency, cohort f
 2. Data-flow test proves no individual reading or identifying field leaves the local boundary in aggregate mode.
 3. Cohort size, geography precision, output cadence and overlapping-query controls are validated adversarially.
 4. Differential-privacy accountant composes budgets across releases and records auditable receipts.
-5. The prototype has contract tests for signature and AEAD tampering, protected-envelope persistence/replay, receiver commit-before-ACK, duplicate acceptance, offline queue behavior and stale-data gating. Production key rotation, durable nonce/key usage state, crash/power-loss proof, and production receiver anti-replay operations remain open implementation and verification gates.
+5. The prototype has contract tests for signature and AEAD tampering, protected-envelope persistence/replay, receiver commit-before-ACK, duplicate acceptance, lost-ACK retries, tampered transmissions, offline queue behavior and stale-data gating. Production key rotation, durable nonce/key usage state, crash/power-loss proof, and production receiver anti-replay operations remain open implementation and verification gates.
 6. Meter measurement accuracy, clock uncertainty, calibration and dropout rates are reported separately from privacy.
 7. Link budget, coverage, unit economics and alternative terrestrial channels are assessed at the actual site.
 8. Local legal review, participant notice/consent where applicable, retention schedule and incident procedure are approved.
