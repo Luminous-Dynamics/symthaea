@@ -23,6 +23,7 @@ from tools.energy_telemetry.qualified_output import (
 )
 from tools.energy_telemetry.durable_privacy_ledger import (
     MAX_COHORT_PARTICIPANTS,
+    MAX_DP_OUTPUT_BYTES,
     DurablePrivacyLedger,
     DurablePrivacyPolicyError,
     EventIdentityConflict,
@@ -473,6 +474,36 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
             signature=signature,
             committed_at_utc=self.now,
         )
+
+    def test_verifier_rejects_malformed_deployment_policy_types(self):
+        base = {
+            "trusted_public_key": self.attestation_public_key,
+            "qualification_reference": "test-qualification-v1",
+            "library_name": "test-reviewed-library",
+            "library_version": "1.2.3",
+            "mechanism": "discrete_laplace",
+            "mechanism_id": "integer-energy-sum-v1",
+            "privacy_unit": "household",
+            "expected_feature_flags": (),
+        }
+        for change in ({"mechanism": []}, {"privacy_unit": []}, {"expected_feature_flags": ["contrib"]}):
+            with self.subTest(change=change):
+                candidate = dict(base)
+                candidate.update(change)
+                with self.assertRaises(MechanismAttestationError):
+                    QualifiedOutputVerifier(MechanismAttestationPolicy(**candidate))
+
+    def test_verifier_rejects_oversized_output_before_hashing_or_commit(self):
+        with self.assertRaisesRegex(MechanismAttestationError, "at most 1 MiB"):
+            self.attestation_verifier.verify_and_commit(
+                self.ledger,
+                release_id="a" * 32,
+                output_bytes=b"x" * (MAX_DP_OUTPUT_BYTES + 1),
+                attestation_bytes=b"{}",
+                signature=b"x" * 64,
+                committed_at_utc=self.now,
+            )
+        self.assertEqual(self.ledger.reservation_count, 0)
 
     def test_no_public_unqualified_output_commit_api_is_exposed(self):
         self.assertFalse(hasattr(self.ledger, "commit_output"))
