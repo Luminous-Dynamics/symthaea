@@ -8,6 +8,10 @@ Do not implement an ad-hoc noise sampler in the telemetry code and do not set a 
 
 The current ledger's discrete_laplace and gaussian strings are **policy declarations**, not evidence that those mechanisms ran. A reservation and immutable output digest are useful accounting artifacts, not a mathematical proof or proof that a caller used the claimed sampler.
 
+A signed-attestation verification path is now implemented in `tools/energy_telemetry/qualified_output.py`. It validates canonical JSON, rejects duplicate keys, verifies Ed25519 using a public key pinned by deployment configuration, binds the receipt to the exact durable reservation and output digest, and checks the approved library/version, mechanism identifier, feature flags, privacy unit and qualification reference. The low-level output-storage operation is marked internal; ordinary release code should use `QualifiedOutputVerifier.verify_and_commit`. This follows the maintained cryptography library's documented Ed25519 sign/verify interface: https://cryptography.io/en/50.0.2/hazmat/primitives/asymmetric/ed25519/
+
+**This is a trust-boundary improvement, not a DP mechanism qualification.** The signature proves only that the corresponding signing key approved the receipt bytes. It does not prove the signer witnessed actual execution, that the clipper ran, or that the mathematical privacy map is sound. The tests use a fixed test-only signing key. No production key, qualified noise engine, trusted clipper, attester service or production release service is configured. Python's underscore-prefixed storage method is not a sandbox; the surrounding service still has to expose only the verifier-backed publication route.
+
 ## Dependency research
 
 Research checked on 2026-10-13:
@@ -32,17 +36,18 @@ For a single aggregate sum of energy, the proposed input contract is:
 7. **Qualification receipt:** record exact library/version, constructor or mechanism ID, feature flags, policy/query version, adjacency, privacy unit, contribution bound, derived sensitivity, epsilon/delta, output digest and verifier/qualification reference. Sign or externally anchor this receipt if a malicious database operator is in scope.
 8. **Fail closed:** if the selected library constructor requires an unqualified feature, the clipping step is missing, sensitivity is unknown, the budget ledger is unavailable, or the receipt does not match the reservation, do not release a research/public DP output.
 
-## Required interface before implementation
+## Implemented verification interface and remaining work
 
-The future mechanism adapter should consume a validated vector of one value per privacy unit, not arbitrary meter intervals, and return a typed result:
+The current verifier requires a signed canonical receipt that binds:
 
-- canonical noised output bytes;
-- mechanism execution receipt with the exact bound and privacy parameters;
-- qualification reference tied to the exact library version and constructor;
-- sensitivity/privacy-map evidence from the selected library or an independently reviewed proof;
-- an output digest matching those exact bytes.
+- reservation receipt/query hashes, release ID, UTC window, recipient and exact output digest;
+- declared mechanism, adjacency, integer contribution cap, sensitivity, epsilon/delta, cohort size and policy IDs;
+- library name/version, constructor/mechanism ID, feature flags, privacy unit and qualification reference;
+- execution ID and signer-key fingerprint.
 
-Only after independent receipt validation should the release service call the durable output-binding operation. The published output must be exactly the stored output returned by committed_output; it must not be regenerated after a restart.
+It rejects unknown or missing fields, duplicate JSON keys, non-canonical JSON, invalid signatures, an unpinned signer, disallowed library/version/constructor/feature flags, mismatched reservation fields, mismatched output bytes and an energy-sum sensitivity not equal to the configured `[0, L]` contribution cap. The latter check is valid only for this narrow bounded integer sum profile under the recorded add/remove or replace-one-participant adjacency; other aggregation profiles require another reviewed contract.
+
+The signed receipt is an attester assertion, not independently verified execution evidence by itself. Remaining work before a production DP claim includes a qualified noise/aggregation adapter; an independently verified clipper and privacy map; a service that generates and signs attestations only after checking those facts; protected signer provisioning/rotation/revocation; externally auditable qualification policy; fault-injection across reserve/sample/sign/commit/publish; and a deployment boundary that prevents ordinary callers from using the internal raw storage primitive. The published output must be exactly the committed bytes and must never be regenerated after restart.
 
 ## Adversarial qualification tests
 
@@ -52,6 +57,8 @@ Before any DP claim, add tests proving that:
 - overlapping/correlated queries are accounted for by composition even if the extra interval-overlap rule is bypassed;
 - the claimed adjacency and sensitivity correspond to the actual aggregator;
 - an output with the wrong mechanism ID, bound, epsilon/delta, reservation, or output digest is rejected;
+- malformed, duplicate-key, non-canonical and incorrectly signed attestations are rejected, including signatures from a key other than the deployment-pinned trust root;
+- library version, mechanism ID, privacy unit, qualification reference and feature flags match deployment policy exactly;
 - a reservation whose budget is exhausted or unavailable cannot publish a newly sampled value;
 - a process crash between reserve, sample, output commit and publish never exposes an uncommitted output or resamples an existing reservation;
 - no raw participant identifiers or fine-grained readings are copied into the public receipt.
