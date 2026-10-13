@@ -83,7 +83,7 @@ The new DurablePrivacyLedger transactionally reserves cumulative epsilon/delta b
 
 The accompanying unittest suites use synthetic timestamps, fixed test-only keys, synthetic payloads, domain labels and digest strings only. It covers five domain profiles; duplicate/id conflicts; UTC and future-clock validation; freshness/quality gating; deterministic priority ordering; byte limits; queue capacity; explicit expiry; and digest-checked, repeatable acknowledgements.
 
-Local verification recorded in a previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed sender ledger has 32 deterministic tests, the authenticated-envelope/ACK suite has 22, the receiver inbox has 17, the end-to-end pipeline has 3 and the durable privacy ledger has 17 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
+Local verification recorded in a previous increment: **18 in-memory store-forward tests passed** under Python's unittest runner. The SQLite-backed sender ledger has 32 deterministic tests, the authenticated-envelope/ACK suite has 22, the receiver inbox has 17, the end-to-end pipeline has 3 and the durable privacy ledger has 18 deterministic tests added; these new tests have not yet been verified by a completed exact-head CI run. These facts are not a run of the full repository test suite and are not field evidence.
 
 ## Required next steps before deployment
 
