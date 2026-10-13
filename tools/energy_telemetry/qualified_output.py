@@ -10,6 +10,7 @@ qualified mechanism/clipper behind the trusted attester.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import hashlib
 import json
 import re
@@ -174,7 +175,7 @@ class QualifiedOutputVerifier:
         output_bytes: bytes,
         attestation_bytes: bytes,
         signature: bytes,
-        committed_at_utc,
+        committed_at_utc: datetime,
     ) -> CommittedPrivacyOutput:
         """Verify the exact receipt/output binding, then durably commit those bytes.
 
