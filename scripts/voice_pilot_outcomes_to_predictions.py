@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -41,7 +42,7 @@ OUTCOME_KEYS = {
     "id", "language", "detected_language", "language_confidence", "transcript",
     "word_error_rate", "character_error_rate", "entity_preservation",
     "translation_en", "translation_chrf", "response_language_correct",
-    "latency_ms", "error",
+    "latency_ms", "preflight_latency_ms", "transcription_latency_ms", "translation_latency_ms", "error",
 }
 
 
@@ -66,6 +67,15 @@ def read_outcomes(path: Path) -> tuple[list[dict[str, Any]], str]:
                     raise ValueError(f"malformed outcome JSON on line {line_number}: {exc}") from exc
                 _need(isinstance(row, dict) and set(row) == OUTCOME_KEYS,
                       f"outcome line {line_number} has unexpected fields")
+                for field in ("latency_ms", "preflight_latency_ms", "transcription_latency_ms", "translation_latency_ms"):
+                    metric = row[field]
+                    if metric is None and field != "latency_ms":
+                        continue
+                    _need(isinstance(metric, (int, float)) and not isinstance(metric, bool)
+                          and math.isfinite(metric) and metric >= 0,
+                          f"outcome line {line_number} {field} must be a finite non-negative number"
+                          if field == "latency_ms" else
+                          f"outcome line {line_number} {field} must be null or a finite non-negative number")
                 outcomes.append(row)
     except (OSError, UnicodeError) as exc:
         raise ValueError(f"cannot read pilot outcomes: {exc}") from exc
