@@ -103,10 +103,17 @@ impl<'a> BrowserExecutor<'a> {
             bail!("browser observation denied by current URL policy: {reason:?}");
         }
 
-        self.session
+        let mut observation = self
+            .session
             .observe()
             .await
-            .context("Policy-checked accessibility observation failed")
+            .context("Policy-checked accessibility observation failed")?;
+
+        // Return only the redacted URL to external callers; a permitted host
+        // can still place credentials or secret-bearing query parameters in the
+        // landed URL. Keep the raw URL inside the CDP session for policy checks.
+        observation.url = observation.redacted_url();
+        Ok(observation)
     }
 
     /// Dispatch an action after evaluating capability, Phi, and URL policy.
