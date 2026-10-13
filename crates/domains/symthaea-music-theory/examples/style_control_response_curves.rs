@@ -402,6 +402,123 @@ const TONIC_CANDIDATE_INVARIANT_LAYERS: &[&str] = &[
     "motif",
 ];
 
+/// Evaluate only source-grounded candidate invariants while a single control varies.
+/// These are diagnostics, not quality scores; the controlled target channel is excluded.
+fn non_target_invariance_diagnostics(
+    control: &str,
+    observations: &[Observation],
+) -> serde_json::Value {
+    let baseline_seed = observations.first().map(|observation| observation.input.seed);
+    let baseline = baseline_seed.and_then(|seed| {
+        observations.iter().find(|observation| {
+            observation.input
+                == InputConfig {
+                    seed,
+                    ..InputConfig::BASE
+                }
+        })
+    });
+    let Some(baseline) = baseline else {
+        return serde_json::json!({
+            "status": "incomplete",
+            "reason": "The unchanged seeded baseline is missing; candidate invariance cannot be evaluated.",
+            "checked_channels": [],
+            "coverage_complete": false,
+        });
+    };
+
+    let points: Vec<&Observation> = observations
+        .iter()
+        .filter(|observation| observation.input != baseline.input)
+        .collect();
+
+    fn channel(
+        name: &str,
+        baseline: &Observation,
+        points: &[&Observation],
+        value: impl Fn(&Observation) -> serde_json::Value,
+        changed: impl Fn(&Observation, &Observation) -> bool,
+    ) -> serde_json::Value {
+        let baseline_value = value(baseline);
+        let mut changes = Vec::new();
+        for point in points {
+            if changed(point, baseline) {
+                changes.push(serde_json::json!({
+                    "control_value": point.value_label,
+                    "baseline_value": baseline_value,
+                    "observed_value": value(point),
+                }));
+            }
+        }
+        serde_json::json!({
+            "channel": name,
+            "baseline_value": baseline_value,
+            "checked_point_count": points.len(),
+            "changed_point_count": changes.len(),
+            "changes": changes,
+        })
+    }
+
+    let mut checked_channels = Vec::new();
+    if control != "tonic" {
+        checked_channels.push(channel(
+            "absolute_key_tonic_pc",
+            baseline,
+            &points,
+            |observation| serde_json::json!(observation.score_key_tonic_pc.rem_euclid(12)),
+            |observation, baseline| {
+                observation.score_key_tonic_pc.rem_euclid(12)
+                    != baseline.score_key_tonic_pc.rem_euclid(12)
+            },
+        ));
+    }
+    if control != "valence" {
+        checked_channels.push(channel(
+            "key_tonality",
+            baseline,
+            &points,
+            |observation| serde_json::json!(observation.score_key_tonality),
+            |observation, baseline| observation.score_key_tonality != baseline.score_key_tonality,
+        ));
+    }
+    checked_channels.push(channel(
+        "meter_beats",
+        baseline,
+        &points,
+        |observation| serde_json::json!(observation.meter_beats),
+        |observation, baseline| observation.meter_beats != baseline.meter_beats,
+    ));
+    if control != "arousal" {
+        checked_channels.push(channel(
+            "tempo_bpm",
+            baseline,
+            &points,
+            |observation| serde_json::json!(observation.tempo_bpm),
+            |observation, baseline| {
+                (observation.tempo_bpm - baseline.tempo_bpm).abs() > 0.001
+            },
+        ));
+    }
+
+    serde_json::json!({
+        "status": "diagnostic",
+        "declaration_basis": "single_factor_intervention_and_source_declared_key_meter_tempo_roles",
+        "controlled_target_excluded": match control {
+            "tonic" => "absolute_key_tonic_pc",
+            "valence" => "key_tonality",
+            "arousal" => "tempo_bpm",
+            "energy" => "phrase_model_and_other_energy_sensitive_structure",
+            "bars" => "observed_score_span_bars",
+            "seed" => "seed_dependent_surface_and_structure",
+            _ => "unknown",
+        },
+        "baseline_included_in_grid": true,
+        "nonbaseline_point_count": points.len(),
+        "checked_channels": checked_channels,
+        "interpretation": "Candidate non-target invariants only. Deviations are surfaced for investigation and are not automatically interpreted as quality failures.",
+    })
+}
+
 /// Reports target fidelity separately from observed displacement. A control
 /// is scored only when the active grammar path exposes a source-grounded
 /// target contract; unknown target semantics remain explicitly unscored.
@@ -422,10 +539,7 @@ fn control_target_evaluation(
                     "pinned_mode": format!("{mode:?}"),
                     "reason": "The style preset pins mode; valence-to-major/minor adherence is not scored.",
                 },
-                "non_target_invariance": {
-                    "status": "not_predeclared",
-                    "reason": "No valence-specific invariant set is declared for this style.",
-                },
+                "non_target_invariance": non_target_invariance_diagnostics(control, observations),
             });
         }
         if family == symthaea_music_theory::grammar::GrammarFamily::RagaModalArc {
@@ -435,10 +549,7 @@ fn control_target_evaluation(
                     "status": "engine_owned_default",
                     "reason": "RagaModalArc defaults to minor when no mode override exists; valence is not its tonality target.",
                 },
-                "non_target_invariance": {
-                    "status": "not_predeclared",
-                    "reason": "No valence-specific invariant set is declared for this style.",
-                },
+                "non_target_invariance": non_target_invariance_diagnostics(control, observations),
             });
         }
 
@@ -493,10 +604,7 @@ fn control_target_evaluation(
                 "interpretation": "Directional tonal proxy only; this is not a perceptual-valence measurement.",
                 "points": points,
             },
-            "non_target_invariance": {
-                "status": "not_predeclared",
-                "reason": "Valence can change tonality and downstream harmony; other target invariants need a style-aware contract.",
-            },
+            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
         });
     }
 
@@ -553,10 +661,7 @@ fn control_target_evaluation(
                 "points": points,
             },
             "interpretation": "This is fidelity to the source-declared tempo mapping, not a perceptual-arousal measurement.",
-            "non_target_invariance": {
-                "status": "not_predeclared",
-                "reason": "Changing arousal also selects motif tiers and can change phrase rhetoric; no universal invariant set is declared.",
-            },
+            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
         });
     }
 
@@ -599,10 +704,7 @@ fn control_target_evaluation(
                 "points": points,
             },
             "interpretation": "This checks the PeriodSentence threshold policy, not perceived musical energy.",
-            "non_target_invariance": {
-                "status": "not_predeclared",
-                "reason": "The energy-triggered phrase model is an intended structural effect; other structural invariants need their own contract.",
-            },
+            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
         });
     }
 
@@ -619,10 +721,7 @@ fn control_target_evaluation(
                     "status": "not_predeclared",
                     "reason": "This grammar route does not yet expose a typed requested-to-realized bar quantization contract.",
                 },
-                "non_target_invariance": {
-                    "status": "not_predeclared",
-                    "reason": "Duration is the target; family-specific non-target invariants remain undeclared.",
-                },
+                "non_target_invariance": non_target_invariance_diagnostics(control, observations),
             });
         }
 
@@ -676,10 +775,7 @@ fn control_target_evaluation(
                 "adherence_fraction": matched as f64 / count.max(1) as f64,
                 "points": points,
             },
-            "non_target_invariance": {
-                "status": "not_predeclared",
-                "reason": "No non-target invariant set is yet justified for requested-length changes within these chorus grammars.",
-            },
+            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
         });
     }
 
@@ -690,10 +786,7 @@ fn control_target_evaluation(
                 "status": "not_predeclared",
                 "reason": "No style-valid target metric is yet declared for this control and grammar route.",
             },
-            "non_target_invariance": {
-                "status": "not_predeclared",
-                "reason": "No non-target invariant set is currently declared for this axis.",
-            },
+            "non_target_invariance": non_target_invariance_diagnostics(control, observations),
         });
     }
 
@@ -1483,8 +1576,40 @@ mod tests {
         );
         assert_eq!(
             curve["control_target_evaluation"]["non_target_invariance"]["status"].as_str(),
-            Some("not_predeclared")
+            Some("diagnostic")
         );
+        let checked_channels = curve["control_target_evaluation"]["non_target_invariance"]
+            ["checked_channels"]
+            .as_array()
+            .unwrap();
+        assert!(checked_channels.iter().any(|item| item["channel"] == "absolute_key_tonic_pc"));
+        assert!(checked_channels.iter().any(|item| item["channel"] == "meter_beats"));
+        assert!(checked_channels.iter().any(|item| item["channel"] == "tempo_bpm"));
+        assert!(!checked_channels.iter().any(|item| item["channel"] == "key_tonality"));
+    }
+
+    #[test]
+    fn non_target_invariants_exclude_the_controlled_channel_and_report_deviations() {
+        let valence_curve = curve_json(Style::Classical, "valence", BASE_SEED);
+        let valence = &valence_curve["control_target_evaluation"]["non_target_invariance"];
+        let valence_channels = valence["checked_channels"].as_array().unwrap();
+        assert!(valence_channels.iter().any(|item| item["channel"] == "absolute_key_tonic_pc"));
+        assert!(valence_channels.iter().any(|item| item["channel"] == "meter_beats"));
+        assert!(valence_channels.iter().any(|item| item["channel"] == "tempo_bpm"));
+        assert!(!valence_channels.iter().any(|item| item["channel"] == "key_tonality"));
+
+        let arousal_curve = curve_json(Style::Classical, "arousal", BASE_SEED);
+        let arousal = &arousal_curve["control_target_evaluation"]["non_target_invariance"];
+        let arousal_channels = arousal["checked_channels"].as_array().unwrap();
+        assert!(arousal_channels.iter().any(|item| item["channel"] == "absolute_key_tonic_pc"));
+        assert!(arousal_channels.iter().any(|item| item["channel"] == "key_tonality"));
+        assert!(arousal_channels.iter().any(|item| item["channel"] == "meter_beats"));
+        assert!(!arousal_channels.iter().any(|item| item["channel"] == "tempo_bpm"));
+
+        let tempo_channel = arousal_curve["control_target_evaluation"]["target_fidelity"]["points"]
+            .as_array()
+            .unwrap();
+        assert_eq!(tempo_channel.len(), 5);
     }
 
     #[test]
