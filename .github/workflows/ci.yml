@@ -243,6 +243,8 @@ jobs:
         run: python3 scripts/test_voice_language_registry.py
       - name: Test voice dataset intake and split integrity
         run: python3 scripts/test_voice_dataset_intake.py
+      - name: Test provenance-checked ASR scoring
+        run: python3 scripts/test_voice_asr_score.py
       - name: Test spoken-passage comprehension pack
         run: python3 scripts/test_voice_comprehension_gate.py
 
