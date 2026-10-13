@@ -41,7 +41,9 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.artifact.write_bytes(b"synthetic converted weights")
         self.runtime_binary = self.base / "whisper-cli"
         self.runtime_binary.write_bytes(b"synthetic whisper executable")
-        self.runtime_worker = self.base / "voice_transformers_worker.py"
+        self.worker_root = self.base / "worker-source"
+        self.worker_root.mkdir()
+        self.runtime_worker = self.worker_root / "voice_transformers_worker.py"
         self.runtime_worker.write_text("# synthetic test worker\\n", encoding="utf-8")
         self.outcomes_path = self.base / "outcomes.jsonl"
         self.output = self.base / "private-predictions.json"
@@ -250,6 +252,31 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         alias.symlink_to(self.source_model_root,target_is_directory=True)
         with self.assertRaisesRegex(ValueError,"source_model_root must be a real directory"):
             self.build(source_model_root=alias)
+
+    def test_prediction_private_writer_blocks_worker_source_tree(self):
+        doc = self.build(
+            model_root=self.source_model_root,
+            source_model_root=self.source_model_root,
+            runtime_kind="transformers",
+            runtime_worker_path=self.runtime_worker,
+            runtime_commit=None,
+            converter_commit=None,
+            artifact_path=None,
+            quantization=None,
+            python_version="3.12.1",
+            torch_version="2.8.0",
+            transformers_version="4.56.0",
+            numpy_version="2.1.0",
+            device="cpu",
+            dtype="float32",
+            runtime_model_snapshot_sha256=_hash_tree(self.source_model_root)[0],
+            runtime_python_executable_sha256=sha256_file(self.runtime_binary),
+            runtime_worker_sha256=sha256_file(self.runtime_worker),
+        )
+        with self.assertRaisesRegex(ValueError, "outside dataset, model, and source-outcome trees"):
+            write_private_exclusive(self.worker_root / "predictions.json", doc, [
+                self.dataset, self.source_model_root, self.worker_root
+            ])
 
     def test_prediction_private_writer_blocks_source_model_root(self):
         doc=self.build()
