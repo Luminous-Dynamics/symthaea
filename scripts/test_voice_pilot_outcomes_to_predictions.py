@@ -141,6 +141,28 @@ class OutcomesToPredictionsTests(unittest.TestCase):
         self.assertTrue(doc["runtime"]["offline"])
         self.assertNotIn("converter_commit", doc["runtime"])
 
+    def test_transformers_pack_rejects_startup_snapshot_digest_drift(self):
+        with self.assertRaisesRegex(ValueError, "model snapshot digest differs"):
+            self.build(
+                model_root=self.source_model_root,
+                source_model_root=self.source_model_root,
+                runtime_kind="transformers",
+                runtime_worker_path=self.runtime_worker,
+                runtime_commit=None,
+                converter_commit=None,
+                artifact_path=None,
+                quantization=None,
+                python_version="3.12.1",
+                torch_version="2.8.0",
+                transformers_version="4.56.0",
+                numpy_version="2.1.0",
+                device="cpu",
+                dtype="float32",
+                runtime_model_snapshot_sha256="0" * 64,
+                runtime_python_executable_sha256=sha256_file(self.runtime_binary),
+                runtime_worker_sha256=sha256_file(self.runtime_worker),
+            )
+
     def test_transformers_pack_rejects_symlinked_worker_script(self):
         alias = self.base / "worker-link.py"
         alias.symlink_to(self.runtime_worker)
