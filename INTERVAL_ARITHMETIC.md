@@ -113,5 +113,10 @@ integer exponent requirements, division-domain rejection, and fail-closed
 handling of unsupported trigonometric functions.
 
 These tests are regression evidence, not a proof of the implementation for every
-possible binary64 input. The repository CI result for the exact current PR head
-must be observed before treating the change as qualified.
+possible binary64 input. A separate deterministic Python translation cross-check
+compared 304 logarithm inputs and 513 exponential inputs against 150-digit
+`Decimal` reference results and observed no enclosure failures. That validates
+the translated algorithm on those samples only; it does not execute this Rust
+source, prove the implementation, or replace exact-head CI. The repository CI
+result for the exact current PR head must be observed before treating the change
+as qualified.
