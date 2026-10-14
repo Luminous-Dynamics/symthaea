@@ -6,12 +6,14 @@ on:
       - ".github/workflows/life-civic-reference-scenarios.yml"
       - "docs/research/LIFE_CIVIC_DOMAIN_MASTERY_PLAN.md"
       - "docs/research/life-civic/reference-scenarios.json"
+      - "docs/research/life-civic/reference-scenarios.manifest.json"
   push:
     branches: [main]
     paths:
       - ".github/workflows/life-civic-reference-scenarios.yml"
       - "docs/research/LIFE_CIVIC_DOMAIN_MASTERY_PLAN.md"
       - "docs/research/life-civic/reference-scenarios.json"
+      - "docs/research/life-civic/reference-scenarios.manifest.json"
   workflow_dispatch:
 
 permissions:
@@ -24,11 +26,22 @@ jobs:
       - uses: actions/checkout@v4
       - name: Parse scenario JSON
         run: jq empty docs/research/life-civic/reference-scenarios.json
+      - name: Verify pinned Git blob identity
+        shell: bash
+        run: |
+          manifest="docs/research/life-civic/reference-scenarios.manifest.json"
+          scenario_file="$(jq -r '.scenario_file' "$manifest")"
+          expected="$(jq -r '.scenario_git_blob_sha1' "$manifest")"
+          test "$scenario_file" = "docs/research/life-civic/reference-scenarios.json"
+          actual="$({ printf 'blob %s\0' "$(wc -c < "$scenario_file" | tr -d '[:space:]')"; cat "$scenario_file"; } | sha1sum | cut -d' ' -f1)"
+          test "$actual" = "$expected"
+
       - name: Check suite identity and safety invariants
         run: |
           jq -e '
             .suite_id == "SYM-LIFE-CIVIC-REFERENCE-001" and
             .status == "research_fixture" and
+            .version == "0.1.0" and
             (.cases | length) >= 6 and
             ([.cases[].case_id] | unique | length) == (.cases | length) and
             all(.cases[];
