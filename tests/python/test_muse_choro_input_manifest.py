@@ -110,6 +110,15 @@ class ChoroInputManifestTests(unittest.TestCase):
             report = evaluate_manifest(manifest_path, approval_path, intake_path, root)
             self.assertTrue(report["authorized"], report["blockers"])
             self.assertEqual(report["source_ids"], ["imslp-choro-mineiro-rocha-2022"])
+            self.assertEqual(
+                report["artifacts"][0]["artifact_sha256"],
+                manifest["sources"][0]["artifact_sha256"],
+            )
+            self.assertEqual(report["artifacts"][0]["artifact_bytes"], len(ARTIFACT_BYTES))
+            self.assertEqual(
+                report["artifacts"][0]["artifact_path"],
+                "synthetic-score-artifact.bin",
+            )
 
             # Any change to manifest bytes invalidates the detached approval receipt.
             manifest_path.write_bytes(manifest_bytes + b" ")
