@@ -453,6 +453,21 @@ mod tests {
     }
 
     #[test]
+    fn empty_provenance_locator_and_method_are_rejected() {
+        let mut item = evidence("lab-1");
+        item.source_locator = "  ".to_string();
+        item.method_id.clear();
+
+        let errors = item.validate();
+        assert!(errors.contains(&ValidationError::EmptyField {
+            field: "source_locator"
+        }));
+        assert!(errors.contains(&ValidationError::EmptyField {
+            field: "method_id"
+        }));
+    }
+
+    #[test]
     fn zero_timestamp_and_blank_identity_are_rejected() {
         let mut sample = valid_rail();
         sample.observed_at_unix_ms = 0;
