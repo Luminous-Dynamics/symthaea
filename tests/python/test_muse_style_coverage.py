@@ -158,6 +158,9 @@ class CoverageReportTests(unittest.TestCase):
             ).replace(
                 "        Style::Other,\n",
                 "        Style::Other,\n        Style::NotCataloged,\n",
+            ).replace(
+                "pub const ALL: [Style; 2]",
+                "pub const ALL: [Style; 3]",
             )
             style_path.write_text(source, encoding="utf-8")
 
@@ -268,8 +271,8 @@ class CoverageReportTests(unittest.TestCase):
             catalog_path = root / CATALOG_RELATIVE
             catalog_path.write_text(
                 catalog_path.read_text(encoding="utf-8").replace(
-                    '"Default", Developing',
-                    '"Default Renamed", Developing',
+                    '"Display Label", "Display Name"',
+                    '"Display Label Revised", "Display Name"',
                 ),
                 encoding="utf-8",
             )
