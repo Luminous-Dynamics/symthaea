@@ -111,7 +111,7 @@ Store identifiers and public metadata where licensing permits. Never republish p
 The branch now contains an isolated, dependency-free Rust crate at `tools/crime-economics-sim/`. It is a model-mechanics prototype, not an empirically calibrated criminology model.
 
 The frozen initial design is:
-- 1,000 synthetic population-equivalents represented only as five aggregate access cohorts;
+- 1,000 synthetic household-equivalents represented only as five aggregate access cohorts;
 - 52 weekly steps per replication;
 - 32 deterministic random seeds per cell;
 - five policy arms: baseline, essentials, quality work, robot protection, and combined support;
