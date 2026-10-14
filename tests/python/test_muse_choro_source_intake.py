@@ -43,6 +43,43 @@ class ChoroSourceIntakeTests(unittest.TestCase):
             with self.subTest(field=key):
                 self.assertEqual(declared[key], summary[key])
 
+    def test_research_spec_records_composer_dependence_guardrails(self) -> None:
+        source = next(
+            s for s in self.spec["sources"]
+            if s["id"] == "choro-corpus-study-2020"
+        )
+        expected_scale = {
+            "pieces": 295,
+            "chord_tokens": 44067,
+            "unique_chord_types": 682,
+            "composers": 180,
+            "subgenres": 19,
+            "most_represented_composer_counts": {
+                "Pixinguinha": 32,
+                "Jacob do Bandolim": 31,
+            },
+        }
+        self.assertEqual(source["reported_study_scope"], expected_scale)
+
+        protocol = self.spec["sampling_and_dependence"]
+        self.assertEqual(protocol["status"], "preanalysis_constraints_not_results")
+        self.assertIn("composition", protocol["unit_of_observation"])
+        self.assertIn("never randomly split chord tokens", protocol["primary_split_rule"])
+        self.assertIn("composer-held-out", protocol["generalization_sensitivity"])
+        self.assertEqual(
+            protocol["dominant_composer_sensitivity"],
+            [
+                "Report results with all eligible works.",
+                "Repeat the primary estimate excluding Pixinguinha works.",
+                "Repeat the primary estimate excluding Jacob do Bandolim works.",
+                "Report whether either exclusion changes effect direction, uncertainty, eligible-work count or qualitative conclusion.",
+            ],
+        )
+        self.assertTrue(
+            any("non-identifiable" in rule for rule in protocol["dependence_and_weighting"])
+        )
+        self.assertFalse(self.spec["reproducibility"]["corpus_data_ingested"])
+
     def test_source_leads_remain_unapproved_and_content_free(self) -> None:
         summary = self.intake["summary"]
         self.assertEqual(summary["files_downloaded"], 0)
