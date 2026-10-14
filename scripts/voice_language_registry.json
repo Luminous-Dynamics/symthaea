@@ -1,0 +1,370 @@
+{
+  "schema_version": 1,
+  "capabilities": [
+    "text_normalization",
+    "asr",
+    "translation",
+    "g2p",
+    "tts",
+    "singing",
+    "code_switching",
+    "streaming"
+  ],
+  "languages": [
+    {
+      "tag": "en",
+      "display_name": "English",
+      "script": "Latn",
+      "capabilities": {
+        "text_normalization": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "asr": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "translation": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "g2p": {
+          "status": "implementation_present",
+          "backend": "bounded English IPA-to-phone mapping",
+          "source_refs": [
+            "scripts/diffsinger_phonemes.py",
+            "src/voice/functional_singing.rs"
+          ],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "tts": {
+          "status": "implementation_present",
+          "backend": "DiffSinger bridge with English-only phone mapping",
+          "source_refs": [
+            "scripts/diffsinger_phonemes.py"
+          ],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "singing": {
+          "status": "implementation_present",
+          "backend": "Functional singing tract adapter",
+          "source_refs": [
+            "src/voice/functional_singing.rs"
+          ],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "code_switching": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "streaming": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        }
+      }
+    },
+    {
+      "tag": "af",
+      "display_name": "Afrikaans",
+      "script": "Latn",
+      "capabilities": {
+        "text_normalization": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "asr": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "translation": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "g2p": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "tts": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "singing": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "code_switching": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "streaming": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        }
+      }
+    },
+    {
+      "tag": "zu",
+      "display_name": "isiZulu",
+      "script": "Latn",
+      "capabilities": {
+        "text_normalization": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "asr": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "translation": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "g2p": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "tts": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "singing": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "code_switching": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "streaming": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        }
+      }
+    },
+    {
+      "tag": "xh",
+      "display_name": "isiXhosa",
+      "script": "Latn",
+      "capabilities": {
+        "text_normalization": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "asr": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "translation": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "g2p": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "tts": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "singing": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "code_switching": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        },
+        "streaming": {
+          "status": "unverified",
+          "backend": null,
+          "source_refs": [],
+          "model": null,
+          "dataset": null,
+          "verification": null,
+          "evaluation": null,
+          "speaker_review": null
+        }
+      }
+    }
+  ]
+}

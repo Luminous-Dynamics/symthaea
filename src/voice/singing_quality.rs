@@ -12,6 +12,16 @@ pub struct VocalQualityMetrics {
     pub voiced_unvoiced_error_rate: f32,
     pub median_pitch_error_cents: f32,
     pub p95_pitch_error_cents: f32,
+    /// Broad-range autocorrelation diagnostic that does not use the target pitch
+    /// as a search prior. This is a cross-check, not a calibrated release gate.
+    /// These metrics are None when their denominator/sample set is empty.
+    pub score_blind_voiced_frame_fraction: Option<f32>,
+    pub score_blind_voiced_unvoiced_error_rate: Option<f32>,
+    pub score_blind_median_pitch_error_cents: Option<f32>,
+    pub score_blind_p95_pitch_error_cents: Option<f32>,
+    /// Number of eligible voiced frames contributing to score-blind pitch errors.
+    /// None only when reading a report written before this field existed.
+    pub score_blind_pitch_error_frame_count: Option<usize>,
     pub stable_pitch_p95_cents: f32,
     pub transition_pitch_p95_cents: f32,
     pub median_onset_error_ms: f32,
@@ -72,7 +82,12 @@ pub fn analyze_render_cleanliness(samples: &[f32], sample_rate: u32) -> RenderCl
         .sqrt();
     let normalized_peak_sample_delta = peak_sample_delta / rms.max(1e-9);
     let normalized_first_difference_rms = difference_rms / rms.max(1e-9);
-    let render_cleanliness_pass = finite
+    // Empty/degenerate stems and invalid rates have no meaningful
+    // continuity evidence. Do not let vacuous finite()/zero-delta metrics
+    // turn absent audio into a clean render.
+    let valid_signal = samples.len() >= 2 && sample_rate >= 8_000;
+    let render_cleanliness_pass = valid_signal
+        && finite
         && peak_sample_delta <= 0.12
         && contextual_click_events == 0
         && normalized_first_difference_rms <= 0.75;
@@ -98,6 +113,10 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     let mut attempted = 0usize;
     let mut vuv_errors = 0usize;
     let mut all_frames = 0usize;
+    let mut score_blind_errors = Vec::new();
+    let mut score_blind_expected_voiced_frames = 0usize;
+    let mut score_blind_detected_voiced_frames = 0usize;
+    let mut score_blind_vuv_errors = 0usize;
     if stem.samples.len() >= frame {
         for start in (0..=stem.samples.len() - frame).step_by(hop.max(1)) {
             let time = (start + frame / 2) as f32 / rate as f32;
@@ -107,6 +126,24 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
                 .flat_map(|s| s.notes())
                 .any(|note| time >= note.start_time && time < note.start_time + note.duration);
             let expected_pitch = expected_pitch_at(performance, time);
+            // This broad-range autocorrelation estimate deliberately does not
+            // use the target pitch. Keep it separate from the score-guided
+            // estimate below so search-window censoring remains visible.
+            let score_blind_actual =
+                estimate_f0_in_range(&stem.samples[start..start + frame], rate, 55.0, 1_000.0);
+            if expected_voiced != score_blind_actual.is_some() {
+                score_blind_vuv_errors += 1;
+            }
+            if expected_voiced {
+                score_blind_expected_voiced_frames += 1;
+                if let Some(actual) = score_blind_actual {
+                    score_blind_detected_voiced_frames += 1;
+                    if let Some(expected) = expected_pitch {
+                        score_blind_errors
+                            .push((1200.0 * (actual / expected).log2()).abs());
+                    }
+                }
+            }
             // Conditional singing evaluation has the score available. Use it
             // as the octave/continuity prior, as production pitch trackers do,
             // while still estimating the actual local autocorrelation peak.
@@ -149,6 +186,17 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
     errors.sort_by(f32::total_cmp);
     let median_pitch_error_cents = percentile(&errors, 0.5);
     let p95_pitch_error_cents = percentile(&errors, 0.95);
+    score_blind_errors.sort_by(f32::total_cmp);
+    let score_blind_pitch_error_frame_count = Some(score_blind_errors.len());
+    let score_blind_voiced_frame_fraction = (score_blind_expected_voiced_frames > 0).then(|| {
+        score_blind_detected_voiced_frames as f32 / score_blind_expected_voiced_frames as f32
+    });
+    let score_blind_voiced_unvoiced_error_rate =
+        (all_frames > 0).then(|| score_blind_vuv_errors as f32 / all_frames as f32);
+    let score_blind_median_pitch_error_cents =
+        (!score_blind_errors.is_empty()).then(|| percentile(&score_blind_errors, 0.5));
+    let score_blind_p95_pitch_error_cents =
+        (!score_blind_errors.is_empty()).then(|| percentile(&score_blind_errors, 0.95));
     stable_errors.sort_by(f32::total_cmp);
     transition_errors.sort_by(f32::total_cmp);
     let stable_pitch_p95_cents = percentile(&stable_errors, 0.95);
@@ -215,6 +263,11 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
         voiced_unvoiced_error_rate,
         median_pitch_error_cents,
         p95_pitch_error_cents,
+        score_blind_voiced_frame_fraction,
+        score_blind_voiced_unvoiced_error_rate,
+        score_blind_median_pitch_error_cents,
+        score_blind_p95_pitch_error_cents,
+        score_blind_pitch_error_frame_count,
         stable_pitch_p95_cents,
         transition_pitch_p95_cents,
         median_onset_error_ms,
@@ -356,12 +409,30 @@ fn onset_error_ms(samples: &[f32], rate: u32, expected_s: f32) -> Option<f32> {
 }
 
 fn estimate_f0(x: &[f32], rate: u32) -> Option<f32> {
+    estimate_f0_in_range(x, rate, 70.0, 500.0)
+}
+
+/// Estimate F0 without a score prior over an explicit frequency band.
+/// A broad band exposes errors hidden by the narrower target-conditioned search.
+fn estimate_f0_in_range(x: &[f32], rate: u32, min_hz: f32, max_hz: f32) -> Option<f32> {
+    if rate == 0
+        || x.len() < 4
+        || !min_hz.is_finite()
+        || !max_hz.is_finite()
+        || min_hz <= 0.0
+        || min_hz >= max_hz
+    {
+        return None;
+    }
     let rms = (x.iter().map(|v| v * v).sum::<f32>() / x.len().max(1) as f32).sqrt();
     if rms < 0.003 {
         return None;
     }
-    let min_lag = rate as usize / 500;
-    let max_lag = (rate as usize / 70).min(x.len() / 2);
+    let min_lag = ((rate as f32 / max_hz).floor().max(1.0)) as usize;
+    let max_lag = ((rate as f32 / min_hz).floor() as usize).min(x.len() / 2);
+    if min_lag > max_lag {
+        return None;
+    }
     let mut scores = Vec::with_capacity(max_lag - min_lag + 1);
     let mut best_score = 0.0f64;
     for lag in min_lag..=max_lag {
@@ -418,6 +489,78 @@ mod tests {
     }
 
     #[test]
+    fn standalone_cleanliness_rejects_empty_degenerate_and_invalid_rate_inputs() {
+        let empty = analyze_render_cleanliness(&[], 48_000);
+        assert!(!empty.render_cleanliness_pass, "{empty:?}");
+
+        let one_sample = analyze_render_cleanliness(&[0.1], 48_000);
+        assert!(!one_sample.render_cleanliness_pass, "{one_sample:?}");
+
+        let invalid_rate = analyze_render_cleanliness(&[0.1, 0.1], 0);
+        assert!(!invalid_rate.render_cleanliness_pass, "{invalid_rate:?}");
+    }
+
+    #[test]
+    fn score_blind_metrics_are_undefined_without_eligible_frames() {
+        let note = symthaea_muse::Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.8,
+        };
+        let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        let stem = VocalStem {
+            // Less than one 50 ms analysis frame at 24 kHz.
+            samples: vec![0.0; 400],
+            sample_rate: 24_000,
+            backend: "short-fixture".into(),
+        };
+
+        let metrics = analyze_vocal_stem(&performance, &stem);
+        assert_eq!(metrics.score_blind_pitch_error_frame_count, Some(0));
+        assert_eq!(metrics.score_blind_voiced_frame_fraction, None);
+        assert_eq!(metrics.score_blind_voiced_unvoiced_error_rate, None);
+        assert_eq!(metrics.score_blind_median_pitch_error_cents, None);
+        assert_eq!(metrics.score_blind_p95_pitch_error_cents, None);
+
+        // The persisted report must preserve undefined evidence as JSON null,
+        // never coerce it to 0.0 (which could be mistaken for perfect pitch).
+        let report = serde_json::to_value(&metrics).unwrap();
+        for field in [
+            "score_blind_voiced_frame_fraction",
+            "score_blind_voiced_unvoiced_error_rate",
+            "score_blind_median_pitch_error_cents",
+            "score_blind_p95_pitch_error_cents",
+        ] {
+            assert_eq!(
+                report[field],
+                serde_json::Value::Null,
+                "undefined diagnostic {field} must serialize as null"
+            );
+        }
+        assert_eq!(report["score_blind_pitch_error_frame_count"], 0);
+
+        // Historical objective reports predate the score-blind fields. Keep
+        // ratings-only review compatible with those saved artifacts.
+        let mut legacy_report = report;
+        for field in [
+            "score_blind_voiced_frame_fraction",
+            "score_blind_voiced_unvoiced_error_rate",
+            "score_blind_median_pitch_error_cents",
+            "score_blind_p95_pitch_error_cents",
+            "score_blind_pitch_error_frame_count",
+        ] {
+            legacy_report.as_object_mut().unwrap().remove(field);
+        }
+        let restored: VocalQualityMetrics = serde_json::from_value(legacy_report).unwrap();
+        assert_eq!(restored.score_blind_voiced_frame_fraction, None);
+        assert_eq!(restored.score_blind_voiced_unvoiced_error_rate, None);
+        assert_eq!(restored.score_blind_median_pitch_error_cents, None);
+        assert_eq!(restored.score_blind_p95_pitch_error_cents, None);
+        assert_eq!(restored.score_blind_pitch_error_frame_count, None);
+    }
+
+    #[test]
     fn perfect_sine_tracks_note() {
         let note = symthaea_muse::Note {
             frequency: 220.0,
@@ -439,17 +582,13 @@ mod tests {
         assert!(metrics.median_pitch_error_cents < 15.0, "{:?}", metrics);
     }
 
-    /// `estimate_f0_near`'s octave-safety window is fixed at +/-300 cents
-    /// (line: `let ratio = 2.0f32.powf(300.0 / 1200.0)`). When the actual
-    /// pitch is further from the expected note than that, the search can
-    /// only find its best match at the window's edge -- so the reported
-    /// error saturates near the window boundary rather than reflecting the
-    /// true (potentially much larger) mistracking. This reproduces that
-    /// saturation with a sine wave synthesized nearly an octave away from
-    /// the note it is meant to represent, and confirms the reported error
-    /// sits near the window edge (~300-320 cents), not the true ~1421 cents.
+    /// `estimate_f0_near` searches only within +/-300 cents of the target.
+    /// For a 500 Hz sine against a 220 Hz target, that excludes the true F0
+    /// but includes the correlated 250 Hz subharmonic (two periods per lag).
+    /// The score-guided error is therefore substantially smaller than the
+    /// true ~1421-cent mismatch; the broad score-blind diagnostic must expose it.
     #[test]
-    fn pitch_error_saturates_at_octave_safety_window_edge() {
+    fn score_guided_pitch_error_is_censored_and_score_blind_exposes_mismatch() {
         let note = symthaea_muse::Note {
             frequency: 220.0,
             start_time: 0.0,
@@ -472,9 +611,17 @@ mod tests {
         assert!(
             metrics.median_pitch_error_cents < 400.0
                 && metrics.median_pitch_error_cents < true_error_cents as f32 - 500.0,
-            "expected the reported error to saturate well below the true \
+            "expected the score-guided metric to saturate below the true \
              {true_error_cents:.1} cent mistracking, got {:?}",
             metrics
         );
+        assert!(
+            metrics
+                .score_blind_median_pitch_error_cents
+                .is_some_and(|error| error > 1_000.0),
+            "score-blind diagnostic should expose the large pitch mismatch: {:?}",
+            metrics
+        );
+        assert!(metrics.score_blind_pitch_error_frame_count > 0);
     }
 }
