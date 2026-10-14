@@ -4,9 +4,9 @@
   "date": "2026-10-14",
   "purpose": "Identify candidate score sources for a future rights-reviewed Choro research subset without importing, transcribing, or analyzing the score contents.",
   "summary": {
-    "source_records": 5,
+    "source_records": 6,
     "records_rights_cleared": 0,
-    "records_pending_rights_review": 5,
+    "records_pending_rights_review": 6,
     "files_downloaded": 0,
     "score_content_transcribed": 0,
     "empirical_analysis_performed": 0
@@ -100,6 +100,26 @@
         "Verify that the stated rights cover the exact edition and digitized file, and identify any third-party editorial material.",
         "Review the underlying compositions, edition, and scan separately for every intended jurisdiction and use.",
         "Treat the named Chôrinho as one movement in a pedagogical collection; do not treat the whole collection as an ensemble Choro sample.",
+        "No score content has been downloaded, copied, transcribed, or analyzed."
+      ]
+    },
+    {
+      "id": "imslp-choro-pra-portinari-macedo-1982",
+      "title": "Choro p'ra Portinari",
+      "composer": "Norberto Macedo",
+      "composition_year": 1982,
+      "scope": "modern guitar solo; score typeset by Musica Brasilis in 2025; editor George Svetlichny",
+      "source_url": "https://imslp.org/wiki/Choro_p%27ra_Portinari_%28Macedo%2C_Norberto%29",
+      "source_stated_rights": "IMSLP lists the 2025 Musica Brasilis typesetting as Creative Commons Attribution-ShareAlike 4.0 and names an editor. This catalog notice does not independently establish that every underlying and edition right is held by the licensor.",
+      "source_evidence_kind": "editor_typeset_score_catalog_record",
+      "fit": "Adds a distinct contemporary composer and guitar-only notation context for studying whether score-analysis procedures generalize beyond piano or one composer. A solo guitar score is not representative of ensemble Choro.",
+      "status": "candidate_not_rights_cleared",
+      "commercial_use_status": "not_approved",
+      "unresolved": [
+        "Verify the exact downloaded file's CC BY-SA 4.0 notice, licensor authority and attribution requirements.",
+        "Identify and review the rights status of the underlying composition, editor contribution, digital typesetting and scan separately.",
+        "Document any ShareAlike obligations for adaptations and the intended commercial/non-commercial outputs before use.",
+        "Confirm territorial rights for each intended jurisdiction.",
         "No score content has been downloaded, copied, transcribed, or analyzed."
       ]
     }
