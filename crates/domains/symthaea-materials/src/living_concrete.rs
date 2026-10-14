@@ -165,6 +165,8 @@ pub enum LivingConcreteValidationError {
     MissingStrainIdentity,
     /// A biological candidate lacks a biosafety assessment evidence record.
     MissingBiosafetyAssessment,
+    /// Microbial mineralization was declared without a viable organism.
+    BiologicalMechanismRequiresOrganism,
     /// Declared evidence stage is not supported by the supplied record types.
     StageEvidenceMissing,
     /// Predicted outcome lacks a model ID or does not reference simulation evidence.
@@ -240,6 +242,12 @@ impl LivingConcreteCandidate {
             if !evidence_ids.insert(item.evidence_id.as_str()) {
                 errors.push(LivingConcreteValidationError::DuplicateEvidenceId);
             }
+        }
+
+        if self.mechanism == ConcreteHealingMechanism::MicrobialMineralization
+            && self.biological_status == ConcreteBiologicalStatus::NonLiving
+        {
+            errors.push(LivingConcreteValidationError::BiologicalMechanismRequiresOrganism);
         }
 
         match self.biological_status {
@@ -385,14 +393,23 @@ impl LivingConcreteCandidate {
                 }
             }
             ConcreteEvidenceStage::FieldMonitored => {
-                if !self.evidence.iter().any(|item| item.kind == EvidenceKind::FieldMeasurement)
-                    || !self.outcomes.iter().any(|outcome| {
-                        outcome.origin == ConcreteOutcomeOrigin::Measured
-                            && self.evidence.iter().any(|item| {
-                                item.evidence_id == outcome.evidence_id
-                                    && item.kind == EvidenceKind::FieldMeasurement
-                            })
-                    })
+                let lab_sources: HashSet<&str> = self
+                    .evidence
+                    .iter()
+                    .filter(|item| item.kind == EvidenceKind::LaboratoryTest)
+                    .map(|item| item.source_locator.as_str())
+                    .collect();
+                let has_field_outcome = self.outcomes.iter().any(|outcome| {
+                    outcome.origin == ConcreteOutcomeOrigin::Measured
+                        && self.evidence.iter().any(|item| {
+                            item.evidence_id == outcome.evidence_id
+                                && item.kind == EvidenceKind::FieldMeasurement
+                        })
+                });
+                if lab_sources.len() < 2
+                    || !self.evidence.iter().any(|item| item.kind == EvidenceKind::IndependentReview)
+                    || !self.evidence.iter().any(|item| item.kind == EvidenceKind::FieldMeasurement)
+                    || !has_field_outcome
                 {
                     errors.push(LivingConcreteValidationError::StageEvidenceMissing);
                 }
