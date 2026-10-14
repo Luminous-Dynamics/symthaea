@@ -8,12 +8,16 @@ on:
       - "tools/water_leak_satellite/**"
       - "tests/test_water_leak_satellite_*.py"
       - "docs/research/water_leak_ground_truth.schema.json"
+      - "docs/research/WATER_LEAK_001_JOHANNESBURG_TRANSFER.md"
+      - "docs/research/WATER_LEAK_001_DATA_ACQUISITION_PLAYBOOK.md"
       - ".github/workflows/water-leak-catalog-tests.yml"
   pull_request:
     paths:
       - "tools/water_leak_satellite/**"
       - "tests/test_water_leak_satellite_*.py"
       - "docs/research/water_leak_ground_truth.schema.json"
+      - "docs/research/WATER_LEAK_001_JOHANNESBURG_TRANSFER.md"
+      - "docs/research/WATER_LEAK_001_DATA_ACQUISITION_PLAYBOOK.md"
       - ".github/workflows/water-leak-catalog-tests.yml"
   workflow_dispatch:
 
