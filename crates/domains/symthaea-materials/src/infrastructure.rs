@@ -27,6 +27,8 @@ pub enum EvidenceKind {
     FieldMeasurement,
     /// Review performed by a declared independent reviewer.
     IndependentReview,
+    /// Biosafety assessment record for a candidate containing viable organisms.
+    BiosafetyAssessment,
 }
 
 /// A source record supporting an engineering observation.
