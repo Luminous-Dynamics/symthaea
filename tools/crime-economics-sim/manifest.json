@@ -1,0 +1,93 @@
+{
+  "manifest_id": "SYMTHAEA-CRIME-ECONOMICS-SIM-001",
+  "schema_version": 1,
+  "version": "0.1.0",
+  "status": "research_fixture",
+  "generated_on": "2026-10-14",
+  "purpose": "Pin the exact source bytes for an effects-disabled aggregate synthetic evaluator and its independent output verifier.",
+  "model_dimensions": {
+    "population_equivalents": 1000,
+    "weeks": 52,
+    "replications_per_scenario_policy_cell": 32,
+    "scenario_count": 6,
+    "policy_count": 5,
+    "expected_data_rows": 960,
+    "expected_tsv_lines_including_header": 961,
+    "uses_person_level_records": false,
+    "network_access": false,
+    "external_effects": false
+  },
+  "files": [
+    {
+      "path": "tools/crime-economics-sim/Cargo.toml",
+      "git_blob_sha1": "8d5b9d11a85d76becfbebf38cce53106a8b250e6"
+    },
+    {
+      "path": "tools/crime-economics-sim/Cargo.lock",
+      "git_blob_sha1": "c5598e573d7969e0e1c4cef95e7b76634147a964"
+    },
+    {
+      "path": "tools/crime-economics-sim/src/lib.rs",
+      "git_blob_sha1": "84297658f2173634bb2b7ea5936858ca8343fa84"
+    },
+    {
+      "path": "tools/crime-economics-sim/src/bin/simulate.rs",
+      "git_blob_sha1": "50ecbee795befeeb4d91c71b188b1feb1aec6848"
+    },
+    {
+      "path": "tools/crime-economics-sim/src/bin/verify.rs",
+      "git_blob_sha1": "0e07d05872523f003103a79f533a8877317033a3"
+    },
+    {
+      "path": "tools/crime-economics-sim/README.md",
+      "git_blob_sha1": "555947dc36a2d2ac8054d3c2939fce93e352cdee"
+    },
+    {
+      "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
+      "git_blob_sha1": "be7cbd5da33020c6b37bdd45f90ae504234592d5"
+    }
+  ],
+  "scenario_ids": [
+    "reference",
+    "high_displacement",
+    "reporting_suppression",
+    "concentrated_automation",
+    "high_robot_compromise",
+    "unequal_essential_access"
+  ],
+  "policy_ids": [
+    "baseline",
+    "essentials",
+    "quality_work",
+    "robot_protection",
+    "combined"
+  ],
+  "output_schema": [
+    "schema_version",
+    "scenario_id",
+    "seed",
+    "policy_id",
+    "population",
+    "model_weeks",
+    "need_property_events_local",
+    "opportunity_property_events_local",
+    "non_economic_harm_events",
+    "displaced_property_events",
+    "true_crime_events_total",
+    "reported_crime_reports",
+    "false_alarms",
+    "robot_compromise_weeks",
+    "robot_safety_incidents",
+    "annualized_cost_units",
+    "essential_access_gain_bps",
+    "essential_access_gap_bps",
+    "privacy_burden_points",
+    "benefit_concentration_bps"
+  ],
+  "claim_ceiling": [
+    "Source blob pinning detects unreviewed byte drift only; it is not a signature or source-authenticity proof.",
+    "Rust tests verify selected implementation invariants only.",
+    "The independent verifier validates artifact structure and specific cross-scenario relationships only.",
+    "No causal crime-reduction effect, model calibration, real-world validity, robot safety qualification, or jurisdictional generalization is established."
+  ]
+}
