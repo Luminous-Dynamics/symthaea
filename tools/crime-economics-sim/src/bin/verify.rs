@@ -3,7 +3,7 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-const EXPECTED_HEADER: &str = "schema_version\tscenario_id\tseed\tpolicy_id\tpopulation\tmodel_weeks\tneed_property_events_local\topportunity_property_events_local\tnon_economic_harm_events\tdisplaced_property_events\ttrue_crime_events_total\treported_crime_reports\tfalse_alarms\trobot_compromise_weeks\trobot_safety_incidents\tannualized_cost_units\tessential_access_gain_bps\tessential_access_gap_bps\tprivacy_burden_points\tbenefit_concentration_bps";
+const EXPECTED_HEADER: &str = "schema_version\tscenario_id\tseed\tpolicy_id\tpopulation\tmodel_weeks\tneed_property_events_local\topportunity_property_events_local\tnon_economic_harm_events\tdisplaced_property_events\tsimulated_harm_events_total\treported_harm_events\tfalse_alarms\trobot_compromise_weeks\trobot_safety_incidents\tannualized_cost_units\tessential_access_gain_bps\tessential_access_gap_bps\tprivacy_burden_points\tbenefit_concentration_bps";
 const EXPECTED_SCENARIOS: [&str; 7] = [
     "reference",
     "high_displacement",
@@ -331,7 +331,7 @@ fn run(path: &str) -> Result<(), String> {
     println!("POLICIES={}", EXPECTED_POLICIES.len());
     println!("REPLICATIONS_PER_CELL={REPLICATIONS}");
     println!("NEGATIVE_CONTROLS=reporting_suppression,high_displacement,non_economic_harm,unequal_access,concentrated_automation,high_robot_compromise,low_robot_effectiveness");
-    println!("SUMMARY_FIELDS=scenario,policy,mean_true_crime_events,mean_reported_crime_reports,mean_displaced_property_events,mean_robot_safety_incidents,cost_units,access_gap_bps");
+    println!("SUMMARY_FIELDS=scenario,policy,mean_simulated_harm_events,mean_reported_harm_events,mean_displaced_property_events,mean_robot_safety_incidents,cost_units,access_gap_bps");
     for scenario in EXPECTED_SCENARIOS {
         for policy in EXPECTED_POLICIES {
             let group: Vec<&Row> = (0..REPLICATIONS)
@@ -342,7 +342,7 @@ fn run(path: &str) -> Result<(), String> {
             };
             let first = group[0];
             println!(
-                "SYNTHETIC_SUMMARY scenario={scenario} policy={policy} mean_true_crime_events={:.3} mean_reported_crime_reports={:.3} mean_displaced_property_events={:.3} mean_robot_safety_incidents={:.3} annualized_cost_units={} access_gap_bps={} note=ASSUMPTION_DRIVEN_NOT_CAUSAL",
+                "SYNTHETIC_SUMMARY scenario={scenario} policy={policy} mean_simulated_harm_events={:.3} mean_reported_harm_events={:.3} mean_displaced_property_events={:.3} mean_robot_safety_incidents={:.3} annualized_cost_units={} access_gap_bps={} note=ASSUMPTION_DRIVEN_NOT_CAUSAL",
                 mean(|row| row.true_crime),
                 mean(|row| row.reports),
                 mean(|row| row.displaced),
