@@ -6,10 +6,10 @@ This is a small isolated Rust research tool. It is not calibrated to observed cr
 
 From the repository root:
 
-    cargo fmt --manifest-path tools/crime-economics-sim/Cargo.toml
-    cargo test --manifest-path tools/crime-economics-sim/Cargo.toml
-    cargo run --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --bin simulate > crime-economics.tsv
-    cargo run --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --bin verify -- crime-economics.tsv
+    cargo fmt --manifest-path tools/crime-economics-sim/Cargo.toml -- --check
+    cargo test --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked
+    cargo run --offline --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin simulate > crime-economics.tsv
+    cargo run --offline --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin verify -- crime-economics.tsv
 
 The output is a tab-separated artifact with 7 scenarios × 5 policy arms × 32 deterministic Monte Carlo replications (1,120 rows). The verifier separately parses the emitted artifact and checks frozen schema identity, row completeness, event-accounting identities, reporting/displacement negative controls, non-economic-harm preservation, robot-only fields, distributional-access, concentrated-automation, high-robot-compromise, and low-robot-effectiveness adversarial cases.
 
