@@ -220,7 +220,7 @@ The companion scenario file `docs/research/life-civic/reference-scenarios.json` 
 - WCAG 2.2 is a published W3C Recommendation, but local legal applicability must be established separately ([W3C overview](https://www.w3.org/WAI/standards-guidelines/wcag/)).
 - RFC 9943 is a June 2026 IETF Standards Track Proposed Standard. Signed-statement transparency supports auditability, not truth by itself ([IETF Datatracker](https://datatracker.ietf.org/doc/rfc9943/)).
 
-The test suite is not a benchmark result. Its purpose is to make these distinctions inspectable and reproducible before the reasoning or service workflow is connected to consequential effects.
+The test suite is not a benchmark result. Its purpose is to make these distinctions inspectable and reproducible before the reasoning or service workflow is connected to consequential effects. The Mycelix sibling PR adds JSON Schema contracts, a reference corpus, an isolated Rust verifier, and a narrow Actions workflow; it does not validate Symthaea's reasoning engine or qualify a production workflow.
 
 ## 10. Reference material
 
