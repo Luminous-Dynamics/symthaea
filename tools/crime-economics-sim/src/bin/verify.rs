@@ -263,6 +263,46 @@ fn run(path: &str) -> Result<(), String> {
         }
     }
 
+    // Adversarial scenario: concentrated automation worsens the need-linked channel
+    // for robot-enabled arms, while the non-robot comparison arms remain unchanged.
+    for seed in 0..REPLICATIONS {
+        for policy in EXPECTED_POLICIES {
+            let reference = get(&rows, "reference", seed, policy)?;
+            let concentrated = get(&rows, "concentrated_automation", seed, policy)?;
+            if policy == "robot_protection" || policy == "combined" {
+                if concentrated.need < reference.need
+                    || concentrated.concentration_bps <= reference.concentration_bps
+                {
+                    return Err(format!("concentrated automation shock not surfaced: seed={seed}, policy={policy}"));
+                }
+            } else if !reference.same_non_reporting_fields(concentrated)
+                || reference.reports != concentrated.reports
+            {
+                return Err(format!("automation shock leaked into a non-robot arm: seed={seed}, policy={policy}"));
+            }
+        }
+    }
+
+    // Adversarial scenario: higher robot compromise probability increases
+    // compromise exposure and removes protection only from robot-enabled arms.
+    for seed in 0..REPLICATIONS {
+        for policy in EXPECTED_POLICIES {
+            let reference = get(&rows, "reference", seed, policy)?;
+            let high = get(&rows, "high_robot_compromise", seed, policy)?;
+            if policy == "robot_protection" || policy == "combined" {
+                if high.compromise_weeks < reference.compromise_weeks
+                    || high.safety_incidents < reference.safety_incidents
+                    || high.need < reference.need
+                    || high.opportunity < reference.opportunity
+                {
+                    return Err(format!("robot compromise exposure not surfaced: seed={seed}, policy={policy}"));
+                }
+            } else if !reference.same_non_reporting_fields(high) || reference.reports != high.reports {
+                return Err(format!("robot compromise changed a non-robot policy: seed={seed}, policy={policy}"));
+            }
+        }
+    }
+
     println!("VERIFICATION=PASS");
     println!("CLAIM_CEILING=synthetic artifact invariants only; no causal, legal, safety, or real-world claim");
     println!("ROWS={}", rows.len());
