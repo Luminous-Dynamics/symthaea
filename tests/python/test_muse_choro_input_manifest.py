@@ -193,10 +193,10 @@ class ChoroInputManifestTests(unittest.TestCase):
             manifest, approval = approved_fixture()
             mpath = root / "manifest.json"
             apath = root / "approval.json"
-            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
-            apath.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             artifact.write_bytes(b"mutated synthetic fixture")
             report = evaluate_manifest(mpath, apath, INTAKE, root)
             self.assertFalse(report["authorized"])
@@ -302,10 +302,10 @@ class ChoroInputManifestTests(unittest.TestCase):
             manifest["sources"][0]["source_record_url"] = "https://example.org/unrelated-record"
             mpath = root / "manifest.json"
             apath = root / "approval.json"
-            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
-            apath.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             with self.assertRaisesRegex(ManifestError, "does not match the exact intake record"):
                 evaluate_manifest(mpath, apath, INTAKE, root)
 
@@ -318,10 +318,10 @@ class ChoroInputManifestTests(unittest.TestCase):
             manifest["sources"][0]["rights_review"]["reviewed_on"] = "2026-10-14"
             mpath = root / "manifest.json"
             apath = root / "approval.json"
-            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
-            apath.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             report = evaluate_manifest(mpath, apath, INTAKE, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any("predates retrieval" in blocker for blocker in report["blockers"]))
