@@ -1,12 +1,12 @@
 {
   "schema": "muse-choro-source-intake-v1",
   "status": "metadata_only_candidate_inventory_not_rights_cleared",
-  "date": "2026-10-13",
+  "date": "2026-10-14",
   "purpose": "Identify candidate score sources for a future rights-reviewed Choro research subset without importing, transcribing, or analyzing the score contents.",
   "summary": {
-    "source_records": 4,
+    "source_records": 5,
     "records_rights_cleared": 0,
-    "records_pending_rights_review": 4,
+    "records_pending_rights_review": 5,
     "files_downloaded": 0,
     "score_content_transcribed": 0,
     "empirical_analysis_performed": 0
@@ -82,6 +82,25 @@
         "Confirm territorial rights and source provenance.",
         "The title/categorization itself flags overlap with Samba; obtain specialist guidance before classifying it as Choro.",
         "Keep separate from the core candidate set unless an expert-defined scope justifies inclusion."
+      ]
+    },
+    {
+      "id": "imslp-12-exercicios-brasileiros-gallet-1928",
+      "title": "12 Exercícios brasileiros (including Chôrinho)",
+      "composer": "Luciano Gallet",
+      "composition_year": 1928,
+      "scope": "historical pedagogical collection of 12 Brazilian pieces; piano four-hands; one listed movement is titled Chôrinho",
+      "source_url": "https://imslp.org/wiki/12_Exerc%C3%ADcios_brasileiros_%28Gallet%2C_Luciano%29",
+      "source_stated_rights": "IMSLP labels the score Public Domain; the catalog record attributes the scan to Instituto Piano Brasileiro and lists Ricordi publication metadata. This is a catalog signal only, not clearance of the exact edition, scan, or all jurisdictions.",
+      "source_evidence_kind": "collection_score_catalog_record",
+      "fit": "Adds an independent composer and a named Chôrinho movement for a bounded notation-method pilot and selection-robustness check. The pedagogical piano-four-hands setting is not representative of ensemble Choro.",
+      "status": "candidate_not_rights_cleared",
+      "commercial_use_status": "not_approved",
+      "unresolved": [
+        "Verify that the stated rights cover the exact edition and digitized file, and identify any third-party editorial material.",
+        "Review the underlying compositions, edition, and scan separately for every intended jurisdiction and use.",
+        "Treat the named Chôrinho as one movement in a pedagogical collection; do not treat the whole collection as an ensemble Choro sample.",
+        "No score content has been downloaded, copied, transcribed, or analyzed."
       ]
     }
   ],
