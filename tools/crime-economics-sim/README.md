@@ -10,6 +10,8 @@ From the repository root:
     cargo test --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked
     cargo run --offline --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin simulate > crime-economics.tsv
     cargo run --offline --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin verify -- crime-economics.tsv
+    cargo run --offline --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin assess_viability > lawful-alternative-viability.tsv
+    cargo run --offline --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin verify_viability -- lawful-alternative-viability.tsv
 
 The output is a tab-separated artifact with 8 scenarios × 5 policy arms × 32 deterministic Monte Carlo replications (1,280 rows). The verifier separately parses the emitted artifact and checks frozen schema identity, row completeness, event-accounting identities, reporting/displacement negative controls, non-economic-harm preservation, robot-only fields, distributional-access, concentrated-automation, high-robot-compromise, and low-robot-effectiveness adversarial cases.
 
@@ -18,6 +20,28 @@ The output is a tab-separated artifact with 8 scenarios × 5 policy arms × 32 d
 `tools/crime-economics-sim/manifest.json` has a 15-entry parameter register. Every entry is marked `synthetic_assumption` and `not_empirical`, with units and limitations. It records the cohort weights, baseline access levels, event-probability assumptions, work/essentials effects, robot protection/compromise/displacement/reporting assumptions, fictional cost units, and unvalidated governance proxies.
 
 The register is a human-reviewable statement of intended inputs, not a parser-generated export of Rust constants. Changes to model constants and their corresponding registered assumptions must be reviewed together. The CI workflow validates the registry's shape and required claim labels; it does not prove numerical correspondence, empirical validity, or external-source provenance.
+
+## Lawful-alternative viability contract
+
+A separate aggregate-only fixture contract now emits `lawful-alternative-viability.tsv`: **10 scenarios × 5 anonymous cohorts = 50 rows**. Run it with `assess_viability`; validate the artifact with the independent `verify_viability` binary.
+
+It does not calculate crime rates or an “irrationality score.” It asks whether minimum conditions for a viable lawful alternative are met in each aggregate cohort. It keeps seven dimensions distinct: essential-service access, lawful-opportunity coverage, fair-pay adequacy, work safety, work stability, social-protection coverage, and access time. It also checks uncertainty, source freshness/state, and conservative cross-cohort coverage gaps.
+
+The result is non-compensatory:
+- **`fixture_pass`** means every synthetic gate passes for this fixture only.
+- **`fixture_fail`** means at least one required floor/cap/gap clearly fails.
+- **`fixture_indeterminate`** means evidence is missing, stale, conflicted, too uncertain, or straddles a gate.
+
+A high mean cannot hide a cohort below the essentials floor; opportunity coverage cannot compensate for unsafe or inadequately paid work; a service cannot pass when lawful alternatives remain too costly to reach; and wide uncertainty does not silently become success. These labels qualify neither a real service nor a real population.
+
+All thresholds—including 90% essential access, 80% opportunity coverage and pay adequacy, 90% safe work, 75% stability and protection, 60 minutes of access time, 15 percentage-point maximum coverage gap, 20 percentage-point maximum interval width, 20-minute access-time interval width, and a 180-day source-age limit—are **synthetic test thresholds**, not legal rules, scientific constants, or universally valid targets. The independent verifier duplicates the gate logic rather than importing the assessment function.
+
+### Evidence context, kept separate from the fixture values
+
+- Statistics South Africa reported a 33.6% official unemployment rate in Q2 2026. The QLFS provides a current national labour-market context and downloadable metadata/data; it does **not** estimate how unemployment causes crime, and this national statistic is not an input coefficient in the synthetic model. See [Stats SA QLFS Q2 2026](https://www.statssa.gov.za/?PPN=P0211&SCH=74512&page_id=1856).
+- The ILO's decent-work indicator framework covers dimensions such as adequate earnings, safety, stability/security, and social protection. It helps choose what to measure, but it does not supply the synthetic thresholds used here. See [ILO Decent Work Indicators](https://www.ilo.org/publications/decent-work-indicators-concepts-and-definitions) and the [ILO measurement framework](https://www.ilo.org/resource/ilo-framework-measurement-decent-work).
+
+Neither source is used as a crime-effect estimate. The next empirical step would require a service-area baseline, data-governance review, specific local outcomes, measurement uncertainty and a pre-registered evaluation. Avoid person-level profiling; if survey microdata is ever considered, it requires separate permissions and a privacy review.
 
 ## Scenarios
 
