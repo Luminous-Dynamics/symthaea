@@ -40,7 +40,7 @@
     },
     {
       "path": "tools/crime-economics-sim/README.md",
-      "git_blob_sha1": "44f5b640fc44bfad8ff861ea2020dc3f1e594c91"
+      "git_blob_sha1": "8743ff31eda4aac2c9ad5b9b94e341b2138bb427"
     },
     {
       "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
