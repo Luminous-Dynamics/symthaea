@@ -27,6 +27,8 @@ A separate aggregate-only fixture contract now emits `lawful-alternative-viabili
 
 It does not calculate crime rates or an “irrationality score.” It asks whether minimum conditions for a viable lawful alternative are met in each aggregate cohort. It keeps seven dimensions distinct: essential-service access, lawful-opportunity coverage, fair-pay adequacy, work safety, work stability, social-protection coverage, and access time. It also checks uncertainty, source freshness/state, and conservative cross-cohort coverage gaps.
 
+The manifest contains a measurement dictionary for each dimension: its numerator, denominator, required data and a non-substitution rule. Most importantly, lawful-opportunity coverage is defined against the entire pre-registered target population and requires at least one attainable option that already meets declared pay, safety, stability and access criteria; it is not a vacancy count or placement rate. Fair pay, safety, stability and social protection remain separate gates. The low/high fixture bounds are **not statistical confidence intervals**; a real pilot would need to pre-register each source, reference period, denominator, missingness treatment and uncertainty method.
+
 The result is non-compensatory:
 - **`fixture_pass`** means every synthetic gate passes for this fixture only.
 - **`fixture_fail`** means at least one required floor/cap/gap clearly fails.
