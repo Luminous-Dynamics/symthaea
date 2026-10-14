@@ -19,7 +19,7 @@ In parallel, the highest-value near-term railway work is likely **condition-base
 - **Laboratories, operators, licensed engineers and authorities:** choose and interpret methods, qualify materials, approve designs, and authorize field trials or operational changes.
 
 Compose existing work rather than creating duplicate roots:
-- Symthaea [TRANSPORT-ENG-001 #6244](https://github.com/Luminous-Dynamics/symthaea/issues/6244) and [owner coverage PR #6246](https://github.com/Luminous-Dynamics/symthaea/pull/6246).
+- Symthaea [TRANSPORT-ENG-001 #6244](https://github.com/Luminous-Dynamics/symthaea/issues/6244), [owner coverage PR #6246](https://github.com/Luminous-Dynamics/symthaea/pull/6246), and [TRANSPORT-RAIL-001 #6248](https://github.com/Luminous-Dynamics/symthaea/issues/6248) for mode-specific rail dynamics/qualification. The proposed track-geometry forecasting benchmark is a read-only condition-maintenance input and must not duplicate that vehicle/guideway owner.
 - Mycelix [Living-City concept contracts PR #5018](https://github.com/Luminous-Dynamics/mycelix/pull/5018) and [source/evidence contracts PR #5029](https://github.com/Luminous-Dynamics/mycelix/pull/5029).
 - Sol-Atlas [evidence-bounded transport projection PR #111](https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/111).
 - Symtropy [engineering digital-twin boundary #1467](https://github.com/Luminous-Dynamics/symtropy/issues/1467).
