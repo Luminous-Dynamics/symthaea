@@ -12,7 +12,8 @@
     "proposed_steps",
     "human_review_requirement",
     "prohibited_claim_check",
-    "effects_requested"
+    "effects_requested",
+    "source_retrieval_state_and_timestamp"
   ],
   "cases": [
     {
@@ -24,7 +25,8 @@
           "standard publication",
           "legal incorporation",
           "project-specific compliance",
-          "inspection evidence"
+          "inspection evidence",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "repair is compliant based only on catalogue membership"
@@ -41,7 +43,8 @@
           "published ISO 37120:2018",
           "working draft Edition 3",
           "current publication status",
-          "future replacement intent"
+          "future replacement intent",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "Edition 3 is already a published International Standard"
@@ -58,7 +61,8 @@
           "published edition",
           "published amendment",
           "working draft",
-          "replacement not yet published"
+          "replacement not yet published",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "the draft automatically withdraws the published edition"
@@ -74,7 +78,8 @@
         "must_distinguish": [
           "technical conformance",
           "local legal applicability",
-          "human review"
+          "human review",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "published means legally mandatory everywhere"
@@ -91,7 +96,8 @@
           "original publication time",
           "retrieval time",
           "effective date",
-          "currentness horizon"
+          "currentness horizon",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "current deadline asserted without current source evidence"
@@ -109,7 +115,8 @@
           "transparency receipt",
           "statement truth",
           "issuer trust",
-          "action authority"
+          "action authority",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "logged signed statement is necessarily true"
@@ -128,7 +135,8 @@
           "routing conflict about which institution or destination to use",
           "stated turnaround target versus a guaranteed response time",
           "retrieval date and possible source-update divergence",
-          "conflicting evidence versus proof that either source is false"
+          "conflicting evidence versus proof that either source is false",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "the applicable current turnaround target is definitively 12 hours",
@@ -150,7 +158,8 @@
           "provider statement",
           "work reported complete",
           "service independently observed restored",
-          "case closure evidence"
+          "case closure evidence",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "water supply is independently verified as restored",
@@ -168,7 +177,8 @@
           "independent observation",
           "observation location and timestamp",
           "verified local outcome",
-          "area-wide restoration claim"
+          "area-wide restoration claim",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "all affected households have water restored",
