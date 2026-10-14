@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout exact branch head
-        uses: actions/checkout@3d3c42d6f6c64a48a399f04c2e6c9f6177a8c28f # pinned checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # pinned checkout
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
