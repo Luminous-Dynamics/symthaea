@@ -213,7 +213,7 @@ Initial thresholds should be chosen from baseline measurements and harm analysis
 
 ## Point-in-time standards cases and machine-readable scenarios
 
-The companion scenario file `docs/research/life-civic/reference-scenarios.json` is an unexecuted reference suite. It deliberately tests recent lifecycle distinctions as well as reasoning boundaries:
+The companion scenario file `docs/research/life-civic/reference-scenarios.json` is an unexecuted reference suite. Its sibling `reference-scenarios.manifest.json` pins that exact file's Git blob object ID, and the dedicated workflow checks that identity before checking the fixture's safety invariants. This catches unintended scenario drift; it is not a signature or source-authenticity proof. The suite deliberately tests recent lifecycle distinctions as well as reasoning boundaries:
 
 - ISO/WD 37120 Edition 3 is a working draft intended to replace ISO 37120:2018; it is not itself a published edition ([ISO catalogue](https://www.iso.org/standard/90316.html)).
 - ISO 37101:2016 and Amendment 1:2024 remain separate published artifacts in the catalogue, while the replacement ISO/WD 37101 is a distinct working draft ([published edition](https://www.iso.org/standard/61885.html), [amendment](https://www.iso.org/standard/88420.html), [working draft](https://committee.iso.org/standard/91450.html)).
