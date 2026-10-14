@@ -127,38 +127,59 @@ impl CognitiveLoopService {
         let manifold = bridge.manifold_mut();
         let current = manifold.state().clone();
 
-        // Goal: transition toward the last recognized scene, or a random exploration target if none.
-        let goal = if let Some(match_res) = manifold.last_scene_match() {
-            manifold
-                .get_scene_encoding(match_res.scene_id)
-                .unwrap_or_else(|| {
-                    symthaea_core::core::ContinuousHV::random(manifold.hdc_dim(), 777)
-                })
+        // Prefer a recognized scene only when its stored encoding is valid.
+        // Otherwise, seed goal-directed refinement from the endpoint of the
+        // manifold's own forward rollout instead of an arbitrary random vector.
+        let remembered_goal = manifold
+            .last_scene_match()
+            .and_then(|match_res| manifold.get_scene_encoding(match_res.scene_id))
+            .filter(|goal| {
+                !goal.values.is_empty() && goal.values.iter().all(|value| value.is_finite())
+            });
+
+        // Preflight the deterministic work budget before running either rollout.
+        // Keep these rates aligned with dream_ahead (0.008 per step) and
+        // select_best_geodesic (0.012 per step-candidate evaluation).
+        let candidate_count = 4usize;
+        let Some(candidate_evaluations) = steps.checked_mul(candidate_count) else {
+            return Err(ImagineFutureError::ThermodynamicOverload(f32::INFINITY));
+        };
+        let geodesic_cost = candidate_evaluations as f32 * 0.012;
+        let rollout_cost = if remembered_goal.is_some() {
+            0.0
         } else {
-            symthaea_core::core::ContinuousHV::random(
-                manifold.hdc_dim(),
-                self.stats.total_cycles as u64,
-            )
+            steps as f32 * 0.008
+        };
+        let estimated_cost = geodesic_cost + rollout_cost;
+        let projected_load = self.thermodynamic_load + estimated_cost;
+        if !estimated_cost.is_finite() || !projected_load.is_finite() || projected_load > 0.95 {
+            return Err(ImagineFutureError::ThermodynamicOverload(projected_load));
+        }
+
+        let (goal, goal_source) = if let Some(goal) = remembered_goal {
+            (goal, "remembered_scene")
+        } else {
+            let rollout = manifold.dream_ahead(steps, 0.1);
+            let Some(goal) = rollout.into_iter().last().filter(|goal| {
+                goal.dim() == manifold.hdc_dim()
+                    && goal.values.iter().all(|value| value.is_finite())
+            }) else {
+                return Err(ImagineFutureError::NoGeodesic);
+            };
+            (goal, "model_rollout_endpoint")
         };
 
-        // Force a geodesic regardless of surprise level
-        // 4 candidates for robustness (Active Inference foraging)
+        // Refine the selected target over multiple candidate paths.
         let path = manifold.select_best_geodesic(&current, &goal, steps, 4);
+        tracing::debug!(goal_source, steps, "Imagination target selected");
 
         if path.is_empty() {
             return Err(ImagineFutureError::NoGeodesic);
         }
 
-        // Cost accounting (0.025 per step candidate evaluated)
-        // select_best_geodesic already added (steps * candidates) to geodesic_compute_cost.
-        // We just need to sync it to the service's thermodynamic load here.
-        let cost = manifold.telemetry().last_geodesic_cost;
-        if self.thermodynamic_load + cost > 0.95 {
-            return Err(ImagineFutureError::ThermodynamicOverload(
-                self.thermodynamic_load + cost,
-            ));
-        }
-        self.thermodynamic_load = (self.thermodynamic_load + cost).min(1.0);
+        // Charge only this call's deterministic work estimate. Never charge the
+        // manifold's lifetime accumulated telemetry as though it were per-call cost.
+        self.thermodynamic_load = (self.thermodynamic_load + estimated_cost).min(1.0);
 
         // Decode the path into a viewable mental movie
         let frames = manifold.decode_geodesic_to_frames_improved(&path);
