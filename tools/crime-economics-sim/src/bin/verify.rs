@@ -35,8 +35,8 @@ struct Row {
     opportunity: u64,
     non_economic: u64,
     displaced: u64,
-    true_crime: u64,
-    reports: u64,
+    simulated_harm: u64,
+    reported_harm: u64,
     false_alarms: u64,
     compromise_weeks: u64,
     safety_incidents: u64,
@@ -71,8 +71,8 @@ impl Row {
             opportunity: parse_u64(7, "opportunity count")?,
             non_economic: parse_u64(8, "non-economic count")?,
             displaced: parse_u64(9, "displacement count")?,
-            true_crime: parse_u64(10, "true crime count")?,
-            reports: parse_u64(11, "report count")?,
+            simulated_harm: parse_u64(10, "true crime count")?,
+            reported_harm: parse_u64(11, "report count")?,
             false_alarms: parse_u64(12, "false-alarm count")?,
             compromise_weeks: parse_u64(13, "compromise-week count")?,
             safety_incidents: parse_u64(14, "robot-safety incident count")?,
@@ -95,7 +95,7 @@ impl Row {
             && self.opportunity == other.opportunity
             && self.non_economic == other.non_economic
             && self.displaced == other.displaced
-            && self.true_crime == other.true_crime
+            && self.simulated_harm == other.simulated_harm
             && self.false_alarms == other.false_alarms
             && self.compromise_weeks == other.compromise_weeks
             && self.safety_incidents == other.safety_incidents
@@ -144,10 +144,10 @@ fn run(path: &str) -> Result<(), String> {
             return Err(format!("unexpected population/window on line {}", offset + 2));
         }
         let expected_total = row.need + row.opportunity + row.non_economic + row.displaced;
-        if expected_total != row.true_crime {
+        if expected_total != row.simulated_harm {
             return Err(format!("crime event accounting identity failed on line {}", offset + 2));
         }
-        if row.reports > row.true_crime {
+        if row.reported_harm > row.simulated_harm {
             return Err(format!("reported incidents exceed underlying simulated incidents on line {}", offset + 2));
         }
         if row.access_gain_bps > 10_000 || row.access_gap_bps > 10_000 {
@@ -186,7 +186,7 @@ fn run(path: &str) -> Result<(), String> {
             return Err(format!("robot-policy governance fields invalid on line {}", offset + 2));
         }
         if !essentials_policy && row.access_gain_bps != 0 {
-            return Err(format!("policy without an essentials program reports access gains on line {}", offset + 2));
+            return Err(format!("policy without an essentials program reported_harm access gains on line {}", offset + 2));
         }
         let key = row.identity_key();
         if rows.insert(key.clone(), row).is_some() {
@@ -214,8 +214,8 @@ fn run(path: &str) -> Result<(), String> {
             if !reference.same_non_reporting_fields(suppressed) {
                 return Err(format!("reporting-only scenario changed non-report outcomes: seed={seed}, policy={policy}"));
             }
-            if suppressed.reports > reference.reports {
-                return Err(format!("suppressed reporting unexpectedly created more reports: seed={seed}, policy={policy}"));
+            if suppressed.reported_harm > reference.reported_harm {
+                return Err(format!("suppressed reporting unexpectedly created more reported_harm: seed={seed}, policy={policy}"));
             }
         }
     }
@@ -277,7 +277,7 @@ fn run(path: &str) -> Result<(), String> {
                     return Err(format!("concentrated automation shock not surfaced: seed={seed}, policy={policy}"));
                 }
             } else if !reference.same_non_reporting_fields(concentrated)
-                || reference.reports != concentrated.reports
+                || reference.reported_harm != concentrated.reported_harm
             {
                 return Err(format!("automation shock leaked into a non-robot arm: seed={seed}, policy={policy}"));
             }
@@ -294,11 +294,11 @@ fn run(path: &str) -> Result<(), String> {
                 if low.need < reference.need
                     || low.opportunity < reference.opportunity
                     || low.displaced > reference.displaced
-                    || low.true_crime < reference.true_crime
+                    || low.simulated_harm < reference.simulated_harm
                 {
                     return Err(format!("lower robot effectiveness improved outcomes: seed={seed}, policy={policy}"));
                 }
-            } else if !reference.same_non_reporting_fields(low) || reference.reports != low.reports {
+            } else if !reference.same_non_reporting_fields(low) || reference.reported_harm != low.reported_harm {
                 return Err(format!("robot effectiveness sensitivity changed a non-robot arm: seed={seed}, policy={policy}"));
             }
         }
@@ -318,7 +318,7 @@ fn run(path: &str) -> Result<(), String> {
                 {
                     return Err(format!("robot compromise exposure not surfaced: seed={seed}, policy={policy}"));
                 }
-            } else if !reference.same_non_reporting_fields(high) || reference.reports != high.reports {
+            } else if !reference.same_non_reporting_fields(high) || reference.reported_harm != high.reported_harm {
                 return Err(format!("robot compromise changed a non-robot policy: seed={seed}, policy={policy}"));
             }
         }
@@ -343,8 +343,8 @@ fn run(path: &str) -> Result<(), String> {
             let first = group[0];
             println!(
                 "SYNTHETIC_SUMMARY scenario={scenario} policy={policy} mean_simulated_harm_events={:.3} mean_reported_harm_events={:.3} mean_displaced_property_events={:.3} mean_robot_safety_incidents={:.3} annualized_cost_units={} access_gap_bps={} note=ASSUMPTION_DRIVEN_NOT_CAUSAL",
-                mean(|row| row.true_crime),
-                mean(|row| row.reports),
+                mean(|row| row.simulated_harm),
+                mean(|row| row.reported_harm),
                 mean(|row| row.displaced),
                 mean(|row| row.safety_incidents),
                 first.cost,
