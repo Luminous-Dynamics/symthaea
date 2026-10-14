@@ -202,13 +202,12 @@ impl PhiTrajectory {
     /// Create a trajectory analyzer with an explicit elapsed-time EMA constant.
     /// Invalid or non-positive constants fall back to one second.
     pub fn new_with_time_constant(capacity: usize, ema_time_constant_secs: f64) -> Self {
-        let ema_time_constant_secs = if ema_time_constant_secs.is_finite()
-            && ema_time_constant_secs > 0.0
-        {
-            ema_time_constant_secs
-        } else {
-            1.0
-        };
+        let ema_time_constant_secs =
+            if ema_time_constant_secs.is_finite() && ema_time_constant_secs > 0.0 {
+                ema_time_constant_secs
+            } else {
+                1.0
+            };
         let capacity = capacity.max(1);
         Self {
             history: VecDeque::with_capacity(capacity),
@@ -505,12 +504,7 @@ impl ConsciousnessContinuity {
         self.observe_with_elapsed(state, phi, phi_prev, Some(elapsed))
     }
 
-    fn can_accept_observation(
-        &self,
-        phi: f64,
-        phi_prev: f64,
-        elapsed: Option<Duration>,
-    ) -> bool {
+    fn can_accept_observation(&self, phi: f64, phi_prev: f64, elapsed: Option<Duration>) -> bool {
         let requested_basis = if elapsed.is_some() {
             ContinuityTimeBasis::ReplayElapsed
         } else {
@@ -1219,7 +1213,9 @@ impl TemporalConsciousnessAnalyzer {
         let trajectory_elapsed =
             elapsed.unwrap_or_else(|| self.phi_trajectory.started_at.elapsed());
         if !self.phi_trajectory.can_observe_at(phi, trajectory_elapsed)
-            || !self.continuity.can_accept_observation(phi, phi_prev, elapsed)
+            || !self
+                .continuity
+                .can_accept_observation(phi, phi_prev, elapsed)
         {
             self.stats.rejected_observations += 1;
             return false;
@@ -1321,7 +1317,11 @@ impl TemporalConsciousnessAnalyzer {
             .phi_trajectory
             .has_minimum_samples(self.config.min_samples_for_trajectory)
         {
-            let score = if self.phi_trajectory.is_healthy() { 1.0 } else { 0.5 };
+            let score = if self.phi_trajectory.is_healthy() {
+                1.0
+            } else {
+                0.5
+            };
             weighted_sum += 0.2 * score;
             measured_weight += 0.2;
         }
@@ -1331,8 +1331,7 @@ impl TemporalConsciousnessAnalyzer {
             measured_weight += 0.2;
         }
 
-        let identity_weight =
-            0.25 * self.identity_coherence.alignment_coverage() as f64 / 3.0;
+        let identity_weight = 0.25 * self.identity_coherence.alignment_coverage() as f64 / 3.0;
         if identity_weight > 0.0 {
             weighted_sum += identity_weight * self.identity_coherence.coherence;
             measured_weight += identity_weight;
@@ -1494,9 +1493,7 @@ impl TemporalConsciousnessAnalyzer {
                 recs.push("Present-future disconnect - clarify intentions".to_string());
             }
             if !self.identity_coherence.past_future_alignment_available {
-                recs.push(
-                    "Past-future alignment unavailable - stability unknown".to_string(),
-                );
+                recs.push("Past-future alignment unavailable - stability unknown".to_string());
             }
         }
 
@@ -1813,8 +1810,7 @@ mod tests {
 
     #[test]
     fn missing_future_projection_is_unknown_not_perfect_alignment() {
-        let mut coherence =
-            TemporalIdentityCoherence::new(TemporalConsciousnessConfig::default());
+        let mut coherence = TemporalIdentityCoherence::new(TemporalConsciousnessConfig::default());
         coherence.past_self = Some(BinaryHV::random(41));
         coherence.present_self = Some(BinaryHV::random(42));
         coherence.future_self = None;
@@ -1843,11 +1839,7 @@ mod tests {
     fn missing_identity_evidence_is_not_counted_as_a_low_alignment_warning() {
         let mut analyzer =
             TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
-        assert!(analyzer.observe_at(
-            &BinaryHV::random(82),
-            0.4,
-            Duration::ZERO,
-        ));
+        assert!(analyzer.observe_at(&BinaryHV::random(82), 0.4, Duration::ZERO,));
 
         assert_eq!(analyzer.stats.identity_warnings, 0);
         assert_eq!(analyzer.stats.identity_evidence_gaps, 1);
@@ -1855,8 +1847,7 @@ mod tests {
 
     #[test]
     fn temporal_report_labels_unavailable_identity_alignments_as_na() {
-        let analyzer =
-            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        let analyzer = TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
         let report = analyzer.report();
 
         assert_eq!(report.identity_alignment_coverage, 0);
@@ -1887,7 +1878,10 @@ mod tests {
                 .lines()
                 .find(|line| line.contains(label))
                 .unwrap_or_else(|| panic!("missing report row {label}"));
-            assert!(line.contains("N/A"), "expected unavailable value in {label}: {line}");
+            assert!(
+                line.contains("N/A"),
+                "expected unavailable value in {label}: {line}"
+            );
         }
     }
 
@@ -1904,11 +1898,7 @@ mod tests {
         assert_eq!(analyzer.continuity.recent_states.len(), 1);
 
         assert!(!analyzer.observe_at(&rejected_state, 0.9, first_time));
-        assert!(!analyzer.observe_at(
-            &rejected_state,
-            0.9,
-            Duration::from_millis(500),
-        ));
+        assert!(!analyzer.observe_at(&rejected_state, 0.9, Duration::from_millis(500),));
 
         assert_eq!(analyzer.stats.observations, 1);
         assert_eq!(analyzer.stats.rejected_observations, 2);
@@ -1938,22 +1928,14 @@ mod tests {
         );
 
         assert!(analyzer.observe_at(&BinaryHV::random(91), 0.4, Duration::ZERO));
-        assert!(analyzer.observe_at(
-            &BinaryHV::random(92),
-            0.5,
-            Duration::from_secs(1),
-        ));
+        assert!(analyzer.observe_at(&BinaryHV::random(92), 0.5, Duration::from_secs(1),));
         let pending = analyzer.report();
         assert_eq!(pending.trajectory_sample_count, 2);
         assert!(!pending.trajectory_evidence_sufficient);
         assert_eq!(analyzer.stats.trajectory_evidence_gaps, 2);
         assert_eq!(analyzer.stats.trajectory_anomalies, 0);
 
-        assert!(analyzer.observe_at(
-            &BinaryHV::random(93),
-            0.6,
-            Duration::from_secs(2),
-        ));
+        assert!(analyzer.observe_at(&BinaryHV::random(93), 0.6, Duration::from_secs(2),));
         let qualified = analyzer.report();
         assert_eq!(qualified.trajectory_sample_count, 3);
         assert!(qualified.trajectory_evidence_sufficient);
@@ -1967,17 +1949,15 @@ mod tests {
 
         // The analyzer's fields are public; a caller can use the continuity tracker
         // directly before using the analyzer's deterministic replay API.
-        assert!(analyzer
-            .continuity
-            .try_observe(&BinaryHV::random(4301), 0.5, 0.5));
+        assert!(
+            analyzer
+                .continuity
+                .try_observe(&BinaryHV::random(4301), 0.5, 0.5)
+        );
         let continuity_states = analyzer.continuity.recent_states.len();
         let husserlian_retention = analyzer.husserlian.retention.len();
 
-        assert!(!analyzer.observe_at(
-            &BinaryHV::random(4302),
-            0.6,
-            Duration::ZERO,
-        ));
+        assert!(!analyzer.observe_at(&BinaryHV::random(4302), 0.6, Duration::ZERO,));
         assert_eq!(analyzer.phi_trajectory.sample_count(), 0);
         assert_eq!(analyzer.continuity.recent_states.len(), continuity_states);
         assert_eq!(analyzer.husserlian.retention.len(), husserlian_retention);
@@ -1995,11 +1975,7 @@ mod tests {
         assert_eq!(analyzer.stats.avg_temporal_coherence, 0.0);
         assert_eq!(analyzer.stats.avg_temporal_evidence_coverage, 0.0);
 
-        assert!(analyzer.observe_at(
-            &BinaryHV::random(3102),
-            0.5,
-            Duration::from_secs(1),
-        ));
+        assert!(analyzer.observe_at(&BinaryHV::random(3102), 0.5, Duration::from_secs(1),));
         assert!(analyzer.overall_evidence_coverage() > 0.0);
         assert_eq!(analyzer.stats.coherence_measurements, 1);
         assert!(
@@ -2026,10 +2002,7 @@ mod tests {
         identity.past_future_alignment = 0.55;
         identity.coherence = 0.55;
 
-        assert_eq!(
-            analyzer.health_status(),
-            TemporalHealthStatus::Unhealthy
-        );
+        assert_eq!(analyzer.health_status(), TemporalHealthStatus::Unhealthy);
     }
 
     #[test]
@@ -2074,7 +2047,12 @@ mod tests {
         assert!(!report.trajectory_evidence_sufficient);
         assert!(!report.trajectory_qualification_possible);
         assert!(!report.is_healthy);
-        assert!(report.recommendations.iter().any(|r| r.contains("cannot qualify")));
+        assert!(
+            report
+                .recommendations
+                .iter()
+                .any(|r| r.contains("cannot qualify"))
+        );
     }
 
     #[test]
@@ -2104,8 +2082,7 @@ mod tests {
 
     #[test]
     fn temporal_report_does_not_render_unmeasured_acceleration_as_zero() {
-        let analyzer =
-            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        let analyzer = TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
         let report = analyzer.report();
 
         assert!(!report.phi_acceleration_available);
@@ -2280,7 +2257,10 @@ mod tests {
         assert_eq!(report.husserlian_coherence, 0.0);
         assert!(report.to_string().contains("Coherence:            N/A"));
         assert_eq!(report.overall_evidence_coverage, 0.0);
-        assert_eq!(report.health_status, TemporalHealthStatus::InsufficientEvidence);
+        assert_eq!(
+            report.health_status,
+            TemporalHealthStatus::InsufficientEvidence
+        );
     }
 
     #[test]
@@ -2362,34 +2342,14 @@ mod tests {
             assert_eq!(binding.gamma_sync, 0.8);
         }
 
-        assert!(binding.try_add_binding(
-            "perception",
-            "memory",
-            AllenRelation::Overlaps,
-            0.9,
-        ));
+        assert!(binding.try_add_binding("perception", "memory", AllenRelation::Overlaps, 0.9,));
         assert_eq!(binding.bindings.len(), 1);
         assert!((binding.binding_strength - 0.9).abs() < 1e-12);
 
         // Labels are identifiers, not optional display text.
-        assert!(!binding.try_add_binding(
-            "",
-            "memory",
-            AllenRelation::Overlaps,
-            0.8,
-        ));
-        assert!(!binding.try_add_binding(
-            "   ",
-            "memory",
-            AllenRelation::Overlaps,
-            0.8,
-        ));
-        assert!(!binding.try_add_binding(
-            "perception",
-            "\t",
-            AllenRelation::Overlaps,
-            0.8,
-        ));
+        assert!(!binding.try_add_binding("", "memory", AllenRelation::Overlaps, 0.8,));
+        assert!(!binding.try_add_binding("   ", "memory", AllenRelation::Overlaps, 0.8,));
+        assert!(!binding.try_add_binding("perception", "\t", AllenRelation::Overlaps, 0.8,));
         assert_eq!(binding.bindings.len(), 1);
     }
 
@@ -2399,22 +2359,12 @@ mod tests {
         for i in 0..256 {
             let a = format!("source-{i}");
             let b = format!("target-{i}");
-            assert!(binding.try_add_binding(
-                &a,
-                &b,
-                AllenRelation::Overlaps,
-                i as f64 / 255.0,
-            ));
+            assert!(binding.try_add_binding(&a, &b, AllenRelation::Overlaps, i as f64 / 255.0,));
         }
         assert_eq!(binding.bindings.len(), 256);
         assert_eq!(binding.bindings[0].component_a, "source-0");
 
-        assert!(!binding.try_add_binding(
-            "",
-            "replacement",
-            AllenRelation::Overlaps,
-            1.0,
-        ));
+        assert!(!binding.try_add_binding("", "replacement", AllenRelation::Overlaps, 1.0,));
         assert_eq!(binding.bindings.len(), 256);
         assert_eq!(binding.bindings[0].component_a, "source-0");
     }
