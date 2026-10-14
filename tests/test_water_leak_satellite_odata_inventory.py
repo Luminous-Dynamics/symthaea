@@ -58,13 +58,28 @@ class ODataInventoryTests(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(Exception):
                 parse_bbox(invalid)
 
-    def test_year_partition_uses_half_open_windows_covering_inclusive_dates(self):
+    def test_quarter_partition_uses_half_open_windows_covering_inclusive_dates(self):
         self.assertEqual(
             query_windows(date(2023, 11, 30), date(2025, 1, 2)),
-            [(date(2023, 11, 30), date(2024, 1, 1)),
-             (date(2024, 1, 1), date(2025, 1, 1)),
-             (date(2025, 1, 1), date(2025, 1, 3))]
+            [
+                (date(2023, 11, 30), date(2024, 1, 1)),
+                (date(2024, 1, 1), date(2024, 4, 1)),
+                (date(2024, 4, 1), date(2024, 7, 1)),
+                (date(2024, 7, 1), date(2024, 10, 1)),
+                (date(2024, 10, 1), date(2025, 1, 1)),
+                (date(2025, 1, 1), date(2025, 1, 3)),
+            ],
         )
+        self.assertEqual(
+            query_windows(date(2023, 11, 30), date(2025, 1, 2), window_months=12),
+            [
+                (date(2023, 11, 30), date(2024, 1, 1)),
+                (date(2024, 1, 1), date(2025, 1, 1)),
+                (date(2025, 1, 1), date(2025, 1, 3)),
+            ],
+        )
+        with self.assertRaises(ODataError):
+            query_windows(date(2025, 1, 1), date(2025, 1, 2), window_months=2)
 
     def test_filter_contains_closed_polygon_product_and_half_open_dates(self):
         text = build_filter(self.profile, self.bbox, date(2025, 1, 1), date(2025, 2, 1))
@@ -82,14 +97,77 @@ class ODataInventoryTests(unittest.TestCase):
             )
         self.assertEqual(query["item_count"], 1)
         self.assertEqual(query["page_records"][0]["feature_count"], 1)
+        self.assertEqual(query["page_records"][0]["request_attempts"], 1)
         self.assertEqual(len(query["items"][0]["source_product_sha256"]), 64)
         self.assertEqual(len(query["items"][0]["summary_sha256"]), 64)
         doc = build_document(self.bbox, date(2025, 1, 1), date(2025, 1, 1), [query])
         # The standalone query is a deliberately partial fixture: the full-document
         # verifier requires both product profiles for every partition.
         self.assertEqual(verify_inventory(doc), [
-            "queries: year-partitioned query set does not exactly cover both declared profiles and date scope"
+            "queries: partitioned query set does not exactly cover both declared profiles and date scope"
         ])
+
+    def test_transient_timeout_retries_are_bounded_and_recorded(self):
+        response = {"value": [self.product]}
+        with (
+            patch(
+                "tools.water_leak_satellite.odata_inventory.urlopen",
+                side_effect=[TimeoutError("simulated timeout"), FakeResponse(response)],
+            ) as open_mock,
+            patch("tools.water_leak_satellite.odata_inventory.time.sleep") as sleep_mock,
+        ):
+            query = inventory_query(
+                profile=self.profile,
+                bbox=self.bbox,
+                start=date(2025, 1, 1),
+                end_exclusive=date(2025, 1, 2),
+                limit=100,
+                max_pages=5,
+                timeout=2,
+                max_retries=2,
+            )
+        self.assertEqual(open_mock.call_count, 2)
+        sleep_mock.assert_called_once()
+        self.assertEqual(query["item_count"], 1)
+        self.assertEqual(query["page_records"][0]["request_attempts"], 2)
+
+    def test_transient_timeout_exhaustion_fails_closed_not_as_zero_results(self):
+        with (
+            patch(
+                "tools.water_leak_satellite.odata_inventory.urlopen",
+                side_effect=[
+                    TimeoutError("simulated timeout"),
+                    TimeoutError("simulated timeout"),
+                    TimeoutError("simulated timeout"),
+                ],
+            ) as open_mock,
+            patch("tools.water_leak_satellite.odata_inventory.time.sleep"),
+            self.assertRaisesRegex(ODataError, "after 3 attempt"),
+        ):
+            inventory_query(
+                profile=self.profile,
+                bbox=self.bbox,
+                start=date(2025, 1, 1),
+                end_exclusive=date(2025, 1, 2),
+                limit=100,
+                max_pages=5,
+                timeout=2,
+                max_retries=2,
+            )
+        self.assertEqual(open_mock.call_count, 3)
+
+    def test_retry_count_above_policy_ceiling_is_rejected(self):
+        with self.assertRaises(ODataError):
+            inventory_query(
+                profile=self.profile,
+                bbox=self.bbox,
+                start=date(2025, 1, 1),
+                end_exclusive=date(2025, 1, 2),
+                limit=100,
+                max_pages=5,
+                timeout=2,
+                max_retries=6,
+            )
 
     def test_duplicate_products_are_counted_and_dropped(self):
         response = {"value": [self.product], "@odata.nextLink": DEFAULT_ENDPOINT + "?%24skip=100"}
