@@ -40,6 +40,7 @@ pub struct Scenario {
     pub displacement_probability: f64,
     pub robot_protection_multiplier: f64,
     pub robot_compromise_probability: f64,
+    pub quality_work_effect_multiplier: f64,
     pub automation_livelihood_shock: f64,
     pub access_gain_multipliers: [f64; 5],
     pub benefit_concentration_bps: i64,
@@ -48,6 +49,7 @@ pub struct Scenario {
 pub const SCENARIOS: &[Scenario] = &[
     Scenario {
         id: "reference",
+        quality_work_effect_multiplier: 1.0,
         report_probability: 0.78,
         displacement_probability: 0.30,
         robot_protection_multiplier: 1.0,
@@ -58,6 +60,7 @@ pub const SCENARIOS: &[Scenario] = &[
     },
     Scenario {
         id: "high_displacement",
+        quality_work_effect_multiplier: 1.0,
         report_probability: 0.78,
         displacement_probability: 0.90,
         robot_protection_multiplier: 1.0,
@@ -68,6 +71,7 @@ pub const SCENARIOS: &[Scenario] = &[
     },
     Scenario {
         id: "reporting_suppression",
+        quality_work_effect_multiplier: 1.0,
         report_probability: 0.35,
         displacement_probability: 0.30,
         robot_protection_multiplier: 1.0,
@@ -78,6 +82,7 @@ pub const SCENARIOS: &[Scenario] = &[
     },
     Scenario {
         id: "concentrated_automation",
+        quality_work_effect_multiplier: 1.0,
         report_probability: 0.78,
         displacement_probability: 0.30,
         robot_protection_multiplier: 1.0,
@@ -88,6 +93,7 @@ pub const SCENARIOS: &[Scenario] = &[
     },
     Scenario {
         id: "high_robot_compromise",
+        quality_work_effect_multiplier: 1.0,
         report_probability: 0.78,
         displacement_probability: 0.30,
         robot_protection_multiplier: 1.0,
@@ -98,6 +104,7 @@ pub const SCENARIOS: &[Scenario] = &[
     },
     Scenario {
         id: "unequal_essential_access",
+        quality_work_effect_multiplier: 1.0,
         report_probability: 0.78,
         displacement_probability: 0.30,
         robot_protection_multiplier: 1.0,
@@ -108,9 +115,21 @@ pub const SCENARIOS: &[Scenario] = &[
     },
     Scenario {
         id: "low_robot_effectiveness",
+        quality_work_effect_multiplier: 1.0,
         report_probability: 0.78,
         displacement_probability: 0.30,
         robot_protection_multiplier: 0.25,
+        robot_compromise_probability: 0.01,
+        automation_livelihood_shock: 0.0,
+        access_gain_multipliers: [1.0; 5],
+        benefit_concentration_bps: 4_500,
+    },
+    Scenario {
+        id: "zero_quality_work_effect",
+        quality_work_effect_multiplier: 0.0,
+        report_probability: 0.78,
+        displacement_probability: 0.30,
+        robot_protection_multiplier: 1.0,
         robot_compromise_probability: 0.01,
         automation_livelihood_shock: 0.0,
         access_gain_multipliers: [1.0; 5],
@@ -276,8 +295,16 @@ pub fn run_one(scenario: &Scenario, arm: &PolicyArm, seed: u64) -> ResultRow {
     let mut robot_compromise_weeks = 0_u64;
     let mut robot_safety_incidents = 0_u64;
 
-    let work_need_reduction = if arm.provides_quality_work { 0.12 } else { 0.0 };
-    let work_opportunity_reduction = if arm.provides_quality_work { 0.08 } else { 0.0 };
+    let work_need_reduction = if arm.provides_quality_work {
+        0.12 * scenario.quality_work_effect_multiplier
+    } else {
+        0.0
+    };
+    let work_opportunity_reduction = if arm.provides_quality_work {
+        0.08 * scenario.quality_work_effect_multiplier
+    } else {
+        0.0
+    };
     let protection_probability = if arm.uses_robot_protection {
         (ROBOT_PREVENTION_PROBABILITY * scenario.robot_protection_multiplier).clamp(0.0, 1.0)
     } else {
@@ -312,7 +339,11 @@ pub fn run_one(scenario: &Scenario, arm: &PolicyArm, seed: u64) -> ResultRow {
 
             // The concentrated automation shock is an adverse assumption, applied
             // only to robot-enabled arms; quality-work support partly mitigates it.
-            let work_mitigation = if arm.provides_quality_work { 0.45 } else { 1.0 };
+            let work_mitigation = if arm.provides_quality_work {
+                1.0 - 0.55 * scenario.quality_work_effect_multiplier
+            } else {
+                1.0
+            };
             let livelihood_shock = if arm.uses_robot_protection {
                 scenario.automation_livelihood_shock * work_mitigation
             } else {
@@ -509,7 +540,7 @@ mod tests {
         assert_eq!(COHORT_SIZES.iter().sum::<u32>(), POPULATION);
         assert_eq!(WEEKS, 52);
         assert_eq!(REPLICATIONS, 32);
-        assert_eq!(SCENARIOS.len(), 7);
+        assert_eq!(SCENARIOS.len(), 8);
         assert_eq!(POLICY_ARMS.len(), 5);
         assert_eq!(run_matrix().len(), SCENARIOS.len() * POLICY_ARMS.len() * REPLICATIONS as usize);
     }
@@ -628,6 +659,45 @@ mod tests {
                 } else {
                     assert!(low_effect.same_outcomes_except_scenario_id(&reference));
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn zero_quality_work_effect_is_a_real_null_control() {
+        let null_scenario = scenario("zero_quality_work_effect");
+        let reference_scenario = scenario("reference");
+
+        for seed in 0..REPLICATIONS {
+            let baseline = run_one(null_scenario, arm("baseline"), seed);
+            let quality_work = run_one(null_scenario, arm("quality_work"), seed);
+            assert_eq!(
+                quality_work.need_property_events_local,
+                baseline.need_property_events_local
+            );
+            assert_eq!(
+                quality_work.opportunity_property_events_local,
+                baseline.opportunity_property_events_local
+            );
+            assert_eq!(
+                quality_work.non_economic_harm_events,
+                baseline.non_economic_harm_events
+            );
+            assert_eq!(
+                quality_work.simulated_harm_events_total,
+                baseline.simulated_harm_events_total
+            );
+            assert_eq!(quality_work.reported_harm_events, baseline.reported_harm_events);
+            assert_eq!(quality_work.annualized_cost_units, 60_000);
+            assert_eq!(baseline.annualized_cost_units, 0);
+
+            for policy_id in ["baseline", "essentials", "robot_protection"] {
+                let reference = run_one(reference_scenario, arm(policy_id), seed);
+                let null_row = run_one(null_scenario, arm(policy_id), seed);
+                assert!(
+                    null_row.same_outcomes_except_scenario_id(&reference),
+                    "null quality-work scenario leaked into non-work arm {policy_id}"
+                );
             }
         }
     }
