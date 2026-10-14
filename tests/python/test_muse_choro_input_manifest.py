@@ -14,7 +14,11 @@ MANIFEST_TEMPLATE = ROOT / "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_MA
 APPROVAL_TEMPLATE = ROOT / "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_APPROVAL_V1.json"
 import sys
 sys.path.insert(0, str(ROOT / "scripts"))
-from muse_choro_input_manifest import ManifestError, evaluate_manifest  # noqa: E402
+from muse_choro_input_manifest import (  # noqa: E402
+    ManifestError,
+    evaluate_manifest,
+    review_scope_sha256,
+)
 
 ARTIFACT_BYTES = b"synthetic fixture bytes only; not score content"
 
@@ -46,6 +50,8 @@ def approved_fixture() -> tuple[dict, dict]:
             "artifact_sha256": digest,
             "artifact_bytes": len(ARTIFACT_BYTES),
             "retrieved_on": "2026-10-14",
+            "selected_work_ids": ["synthetic fixture work only"],
+            "selection_basis": "fabricated validator fixture; not a real source selection",
             "rights_review": {
                 "decision": "approved",
                 "reviewer_id": "independent-rights-reviewer",
@@ -54,6 +60,7 @@ def approved_fixture() -> tuple[dict, dict]:
                 "license_or_basis_url": "https://creativecommons.org/licenses/by/4.0/",
                 "attribution_text": "Synthetic fixture attribution; no source content.",
                 "reviewed_artifact_sha256": digest,
+                "reviewed_scope_sha256": None,
                 "permitted_uses": ["empirical_analysis"],
                 "jurisdictions": ["US", "ZA"],
                 "commercial_use_allowed": True,
@@ -73,6 +80,9 @@ def approved_fixture() -> tuple[dict, dict]:
             },
         }],
     }
+    manifest["sources"][0]["rights_review"]["reviewed_scope_sha256"] = review_scope_sha256(
+        manifest, manifest["sources"][0]
+    )
     return manifest, {
         "schema": "muse-choro-input-manifest-approval-v1",
         "status": "approved",
@@ -144,6 +154,14 @@ class ChoroInputManifestTests(unittest.TestCase):
             self.assertEqual(
                 report["artifacts"][0]["artifact_path"],
                 "synthetic-score-artifact.bin",
+            )
+            self.assertEqual(
+                report["artifacts"][0]["selected_work_ids"],
+                ["synthetic fixture work only"],
+            )
+            self.assertEqual(
+                report["artifacts"][0]["review_scope_sha256"],
+                manifest["sources"][0]["rights_review"]["reviewed_scope_sha256"],
             )
             self.assertEqual(
                 report["approval_receipt_sha256"],
@@ -252,6 +270,25 @@ class ChoroInputManifestTests(unittest.TestCase):
                 "The manifest approver must be independent of every source rights reviewer.",
                 report["blockers"],
             )
+
+    def test_selected_work_change_invalidates_rights_review_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture()
+            manifest["sources"][0]["selected_work_ids"] = ["another synthetic work"]
+            mpath = root / "manifest.json"
+            apath = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
+            mpath.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
+            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            self.assertFalse(report["authorized"])
+            self.assertTrue(any(
+                "does not bind selected works and the exact requested scope" in blocker
+                for blocker in report["blockers"]
+            ))
 
     def test_source_record_url_must_match_source_intake_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
