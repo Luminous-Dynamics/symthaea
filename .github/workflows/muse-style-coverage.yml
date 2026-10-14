@@ -16,6 +16,10 @@ on:
       - "tests/python/test_muse_genre_completion_roadmap.py"
       - "tests/python/test_muse_choro_synthetic_harness.py"
       - "tests/python/test_muse_choro_source_intake.py"
+      - "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_MANIFEST_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_APPROVAL_V1.json"
+      - "scripts/muse_choro_input_manifest.py"
+      - "tests/python/test_muse_choro_input_manifest.py"
       - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
       - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
       - "crates/domains/symthaea-muse/MUSE_GLOBAL_GENRE_COVERAGE_RESEARCH_V1.md"
@@ -43,6 +47,10 @@ on:
       - "tests/python/test_muse_genre_completion_roadmap.py"
       - "tests/python/test_muse_choro_synthetic_harness.py"
       - "tests/python/test_muse_choro_source_intake.py"
+      - "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_MANIFEST_V1.json"
+      - "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_APPROVAL_V1.json"
+      - "scripts/muse_choro_input_manifest.py"
+      - "tests/python/test_muse_choro_input_manifest.py"
       - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
       - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
       - "crates/domains/symthaea-muse/MUSE_GLOBAL_GENRE_COVERAGE_RESEARCH_V1.md"
@@ -159,6 +167,12 @@ jobs:
 
       - name: Test Choro source-intake accounting and rights boundaries
         run: python3 tests/python/test_muse_choro_source_intake.py -v
+
+      - name: Validate Choro approved-input manifest stays fail-closed
+        run: python3 scripts/muse_choro_input_manifest.py --check
+
+      - name: Test source-bound Choro input authorization gates
+        run: python3 tests/python/test_muse_choro_input_manifest.py -v
 
       - name: Publish synthetic harness boundary to job summary
         run: |
