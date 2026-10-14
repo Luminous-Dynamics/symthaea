@@ -485,12 +485,13 @@ impl PhiTrajectory {
         self.capacity
     }
 
-    /// Whether there is enough retained evidence for trajectory qualification.
+    /// Whether enough retained evidence exists to qualify the trajectory.
     ///
-    /// A zero configured minimum is treated as one; a minimum larger than the
-    /// retention capacity is impossible to satisfy and therefore remains false.
+    /// The effective minimum is at least three samples because trajectory health
+    /// depends on stability, which is not measured from a one- or two-sample history.
+    /// A minimum larger than retention capacity is impossible to satisfy.
     pub fn has_minimum_samples(&self, minimum: usize) -> bool {
-        let minimum = minimum.max(1);
+        let minimum = minimum.max(3);
         self.capacity >= minimum && self.history.len() >= minimum
     }
 
@@ -1514,12 +1515,12 @@ impl TemporalConsciousnessAnalyzer {
             overall_evidence_coverage: self.overall_evidence_coverage(),
             trajectory_sample_count: self.phi_trajectory.sample_count(),
             trajectory_sample_capacity: self.phi_trajectory.sample_capacity(),
-            trajectory_minimum_samples: self.config.min_samples_for_trajectory.max(1),
+            trajectory_minimum_samples: self.config.min_samples_for_trajectory.max(3),
             trajectory_evidence_sufficient: self
                 .phi_trajectory
                 .has_minimum_samples(self.config.min_samples_for_trajectory),
             trajectory_qualification_possible: self.phi_trajectory.sample_capacity()
-                >= self.config.min_samples_for_trajectory.max(1),
+                >= self.config.min_samples_for_trajectory.max(3),
             health_status: self.health_status(),
             phi_velocity: self.phi_trajectory.velocity,
             phi_velocity_available: self.phi_trajectory.sample_count() >= 2,
@@ -1563,7 +1564,7 @@ impl TemporalConsciousnessAnalyzer {
     fn generate_recommendations(&self) -> Vec<String> {
         let mut recs = Vec::new();
 
-        let required_samples = self.config.min_samples_for_trajectory.max(1);
+        let required_samples = self.config.min_samples_for_trajectory.max(3);
         if self.phi_trajectory.sample_capacity() < required_samples {
             recs.push(format!(
                 "Trajectory cannot qualify: history capacity {} is below required sample count {}",
@@ -1669,7 +1670,7 @@ pub struct TemporalConsciousnessReport {
     pub trajectory_sample_count: usize,
     /// Maximum retained Φ observations.
     pub trajectory_sample_capacity: usize,
-    /// Configured minimum Φ observations required for qualification.
+    /// Effective minimum Φ observations required, including the three-sample stability floor.
     pub trajectory_minimum_samples: usize,
     /// Whether the retained trajectory currently meets the sample minimum.
     pub trajectory_evidence_sufficient: bool,
@@ -2165,6 +2166,30 @@ mod tests {
         assert!(report.trajectory_evidence_sufficient);
         assert_eq!(report.health_status, TemporalHealthStatus::Unhealthy);
         assert!(!report.is_healthy);
+    }
+
+    #[test]
+    fn trajectory_qualification_requires_three_samples_even_when_configured_minimum_is_one() {
+        let mut config = TemporalConsciousnessConfig::default();
+        config.min_samples_for_trajectory = 1;
+        config.phi_history_depth = 4;
+        let mut analyzer = TemporalConsciousnessAnalyzer::new(config);
+        let state = BinaryHV::random(4320);
+
+        assert!(analyzer.observe_at(&state, 0.7, Duration::ZERO));
+        let one_sample = analyzer.report();
+        assert_eq!(one_sample.trajectory_minimum_samples, 3);
+        assert!(!one_sample.trajectory_evidence_sufficient);
+        assert!(one_sample.trajectory_qualification_possible);
+
+        assert!(analyzer.observe_at(&state, 0.7, Duration::from_secs(1)));
+        assert!(!analyzer.report().trajectory_evidence_sufficient);
+
+        assert!(analyzer.observe_at(&state, 0.7, Duration::from_secs(2)));
+        let qualified = analyzer.report();
+        assert!(qualified.trajectory_evidence_sufficient);
+        assert!(qualified.phi_stability_available);
+        assert!(qualified.phi_velocity_available);
     }
 
     #[test]
