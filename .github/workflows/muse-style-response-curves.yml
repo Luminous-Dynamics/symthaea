@@ -2,6 +2,7 @@ name: Muse Style Response Curves
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-music-theory/src/style.rs"
       - "crates/domains/symthaea-music-theory/src/grammar.rs"
@@ -45,6 +46,7 @@ env:
 jobs:
   routed-response-curves:
     name: Generate fixed-grid routed response curves
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
