@@ -1,0 +1,79 @@
+name: Temporary QC Cargo.lock reconciliation capture
+
+on:
+  push:
+    branches:
+      - "feat/qc-checked-dft-propagation-2026-10-11"
+    paths:
+      - ".github/workflows/qc-lockfile-reconcile.trigger"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qc-lockfile-capture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  resolve-lockfile:
+    name: Resolve Cargo.lock from exact QC workspace manifests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@3d3c42d6f6c64a48a399f04c2e6c9f6177a8c28f # pinned checkout
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert source revision
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse --verify 'HEAD^{commit}')"
+          test "$actual" = "$EXPECTED_SHA"
+          printf 'source_commit=%s\n' "$actual"
+          printf 'source_tree=%s\n' "$(git rev-parse --verify 'HEAD^{tree}')"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f
+        with:
+          toolchain: 1.96.0
+
+      - name: Resolve lockfile with Cargo
+        id: resolve
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          cargo check -p symthaea-quantum-chemistry --lib > /tmp/qc-cargo-lock-resolution.log 2>&1
+          status=$?
+          set -e
+          printf 'cargo_check_exit=%s\n' "$status" | tee /tmp/qc-cargo-lock-resolution-status.txt
+          tail -n 80 /tmp/qc-cargo-lock-resolution.log
+          test -s Cargo.lock
+          printf 'lockfile_changed=%s\n' "$(git diff --quiet -- Cargo.lock && echo false || echo true)"
+          printf 'lockfile_sha256='
+          sha256sum Cargo.lock
+          exit "$status"
+
+      - name: Emit exact generated Cargo.lock for controlled application
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s Cargo.lock
+          echo "LOCKFILE_CAPTURE_BEGIN"
+          cat Cargo.lock
+          echo "LOCKFILE_CAPTURE_END"
+          cat /tmp/qc-cargo-lock-resolution-status.txt 2>/dev/null || true
+          sha256sum Cargo.lock
+
+      - name: Keep unresolved compile failures visible
+        if: steps.resolve.outcome != 'success'
+        run: |
+          echo "::error::Cargo lockfile resolution capture ran, but cargo check did not pass. The printed lockfile is a candidate update, not a successful build."
+          exit 1
