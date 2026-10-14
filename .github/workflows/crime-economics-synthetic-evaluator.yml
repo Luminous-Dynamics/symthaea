@@ -42,6 +42,16 @@ jobs:
             .model_dimensions.replications_per_scenario_policy_cell == 32 and
             .model_dimensions.expected_data_rows == 1120 and
             .model_dimensions.expected_tsv_lines_including_header == 1121 and
+            .parameter_registry_version == "0.1.0" and
+            .parameter_registry_status == "all_parameters_are_synthetic_assumptions" and
+            (.parameter_registry | length) == 15 and
+            ([.parameter_registry[].parameter_id] | unique | length) == 15 and
+            all(.parameter_registry[];
+              .source_class == "synthetic_assumption" and
+              .evidence_status == "not_empirical" and
+              (.unit | length) > 0 and
+              (.limitation | length) > 20
+            ) and
             ([.scenario_ids[]] | unique | length) == 7 and
             ([.policy_ids[]] | unique | length) == 5 and
             ([.output_schema[]] | unique | length) == 20 and
@@ -73,6 +83,9 @@ jobs:
           cmp target/crime-economics-evidence/simulation.tsv target/crime-economics-evidence/simulation-repeat.tsv
           rm target/crime-economics-evidence/simulation-repeat.tsv
           test "$(wc -l < target/crime-economics-evidence/simulation.tsv)" -eq 1121
+          expected_header="$(jq -r '.output_schema | @tsv' tools/crime-economics-sim/manifest.json)"
+          actual_header="$(head -n 1 target/crime-economics-evidence/simulation.tsv)"
+          test "$actual_header" = "$expected_header"
           sha256sum target/crime-economics-evidence/simulation.tsv \
             > target/crime-economics-evidence/simulation.tsv.sha256
       - name: Independently verify the emitted artifact
