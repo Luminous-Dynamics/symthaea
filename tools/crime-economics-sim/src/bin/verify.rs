@@ -4,7 +4,7 @@ use std::fs;
 use std::process::ExitCode;
 
 const EXPECTED_HEADER: &str = "schema_version\tscenario_id\tseed\tpolicy_id\tpopulation\tmodel_weeks\tneed_property_events_local\topportunity_property_events_local\tnon_economic_harm_events\tdisplaced_property_events\tsimulated_harm_events_total\treported_harm_events\tfalse_alarms\trobot_compromise_weeks\trobot_safety_incidents\tannualized_cost_units\tessential_access_gain_bps\tessential_access_gap_bps\tprivacy_burden_points\tbenefit_concentration_bps";
-const EXPECTED_SCENARIOS: [&str; 7] = [
+const EXPECTED_SCENARIOS: [&str; 8] = [
     "reference",
     "high_displacement",
     "reporting_suppression",
@@ -12,6 +12,7 @@ const EXPECTED_SCENARIOS: [&str; 7] = [
     "high_robot_compromise",
     "unequal_essential_access",
     "low_robot_effectiveness",
+    "zero_quality_work_effect",
 ];
 const EXPECTED_POLICIES: [&str; 5] = [
     "baseline",
@@ -100,6 +101,24 @@ impl Row {
             && self.compromise_weeks == other.compromise_weeks
             && self.safety_incidents == other.safety_incidents
             && self.cost == other.cost
+            && self.access_gain_bps == other.access_gain_bps
+            && self.access_gap_bps == other.access_gap_bps
+            && self.privacy_points == other.privacy_points
+            && self.concentration_bps == other.concentration_bps
+    }
+
+    fn same_modeled_outcomes_except_cost(&self, other: &Row) -> bool {
+        self.population == other.population
+            && self.weeks == other.weeks
+            && self.need == other.need
+            && self.opportunity == other.opportunity
+            && self.non_economic == other.non_economic
+            && self.displaced == other.displaced
+            && self.simulated_harm == other.simulated_harm
+            && self.reported_harm == other.reported_harm
+            && self.false_alarms == other.false_alarms
+            && self.compromise_weeks == other.compromise_weeks
+            && self.safety_incidents == other.safety_incidents
             && self.access_gain_bps == other.access_gain_bps
             && self.access_gap_bps == other.access_gap_bps
             && self.privacy_points == other.privacy_points
@@ -304,6 +323,30 @@ fn run(path: &str) -> Result<(), String> {
         }
     }
 
+    // Negative control: setting the assumed quality-work effect to zero must
+    // leave the quality-work-only arm's modeled outcomes equal to baseline (cost
+    // aside), and must not perturb policies that do not include quality work.
+    for seed in 0..REPLICATIONS {
+        let null_baseline = get(&rows, "zero_quality_work_effect", seed, "baseline")?;
+        let null_work = get(&rows, "zero_quality_work_effect", seed, "quality_work")?;
+        if !null_work.same_modeled_outcomes_except_cost(null_baseline)
+            || null_baseline.cost != 0
+            || null_work.cost != 60_000
+        {
+            return Err(format!("zero quality-work effect did not reduce to null outcomes: seed={seed}"));
+        }
+
+        for policy in ["baseline", "essentials", "robot_protection"] {
+            let reference = get(&rows, "reference", seed, policy)?;
+            let null = get(&rows, "zero_quality_work_effect", seed, policy)?;
+            if !reference.same_non_reporting_fields(null)
+                || reference.reported_harm != null.reported_harm
+            {
+                return Err(format!("zero quality-work effect changed non-work policy: seed={seed}, policy={policy}"));
+            }
+        }
+    }
+
     // Adversarial scenario: higher robot compromise probability increases
     // compromise exposure and removes protection only from robot-enabled arms.
     for seed in 0..REPLICATIONS {
@@ -330,7 +373,7 @@ fn run(path: &str) -> Result<(), String> {
     println!("SCENARIOS={}", EXPECTED_SCENARIOS.len());
     println!("POLICIES={}", EXPECTED_POLICIES.len());
     println!("REPLICATIONS_PER_CELL={REPLICATIONS}");
-    println!("NEGATIVE_CONTROLS=reporting_suppression,high_displacement,non_economic_harm,unequal_access,concentrated_automation,high_robot_compromise,low_robot_effectiveness");
+    println!("NEGATIVE_CONTROLS=reporting_suppression,high_displacement,non_economic_harm,unequal_access,concentrated_automation,high_robot_compromise,low_robot_effectiveness,zero_quality_work_effect");
     println!("SUMMARY_FIELDS=scenario,policy,mean_simulated_harm_events,mean_reported_harm_events,mean_displaced_property_events,mean_robot_safety_incidents,cost_units,access_gap_bps");
     for scenario in EXPECTED_SCENARIOS {
         for policy in EXPECTED_POLICIES {
