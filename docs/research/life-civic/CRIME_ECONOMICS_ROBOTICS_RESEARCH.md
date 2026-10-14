@@ -134,7 +134,7 @@ The path-scoped workflow runs Rust unit tests, generates the 1,120-row artifact 
 
 ## Immediate model limitations
 
-The implementation intentionally omits a calibrated empirical event process, household/person dynamics, network interactions, offense-specific victimization weights, confidence intervals across real locations, real prices, legal authority, individual identity, and any actual robot control. The current Bernoulli event probabilities, intervention elasticities, reporting rates and compromise rates are synthetic test values selected to exercise invariants. The next scientific increment should be a source-reviewed parameter register with provenance and uncertainty, then local data governance and a pre-registered evaluation design. It should not be an automated individual risk model.
+The implementation intentionally omits a calibrated empirical event process, household/person dynamics, network interactions, offense-specific victimization weights, confidence intervals across real locations, real prices, legal authority, individual identity, and any actual robot control. The 15-entry parameter register in `tools/crime-economics-sim/manifest.json` now explicitly labels those inputs as synthetic assumptions, with units and limitations; it is a reviewed declaration, not a parser-generated export or external-source provenance record. The next scientific increment is to propose source-grounded alternative ranges where credible evidence exists, preserve uncertainty and context limits, and then design local data governance and a pre-registered evaluation. It should not be an automated individual risk model.
 
 ## References
 
