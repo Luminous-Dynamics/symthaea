@@ -115,8 +115,8 @@ The initial design, including the robot-effectiveness sensitivity extension, is:
 - 52 weekly steps per replication;
 - 32 deterministic random seeds per cell;
 - five policy arms: baseline, essentials, quality work, robot protection, and combined support;
-- seven scenarios: reference, high displacement, reporting suppression, concentrated automation, high robot compromise, unequal access, and low robot effectiveness;
-- 1,120 output rows, with no person-level records or scores.
+- eight scenarios: reference, high displacement, reporting suppression, concentrated automation, high robot compromise, unequal access, low robot effectiveness, and zero assumed quality-work effect;
+- 1,280 output rows, with no person-level records or scores.
 
 Event generation separates need-related property events, opportunity-related property events, and non-economic harm. The output uses `simulated_harm_events_total` and `reported_harm_events` labels to avoid implying that generated incidents are observed or adjudicated crimes. Robot protection affects only the modeled property-event channel, can be compromised, can generate false alarms and safety incidents, and may displace events into a neighboring ring. Report probability is a separate scenario parameter. Access gains, distribution concentration, privacy burden and annualized costs are explicit illustrative parameters/proxies, not measured outcomes or monetary valuations.
 
@@ -125,16 +125,16 @@ The standalone verifier reads the simulator's emitted TSV as a separate executab
 - higher displacement leaves focal-site outcomes unchanged and cannot reduce modeled displacement;
 - non-economic harm remains visible across all policy arms;
 - uneven essential-service access worsens the modeled access gap;
-- weakening the robot-effectiveness assumption cannot improve robot-enabled policy outcomes and cannot perturb non-robot arms.
-- higher robot-compromise probability increases compromise exposure without altering non-robot policy arms.
+- weakening the robot-effectiveness assumption cannot improve robot-enabled policy outcomes and cannot perturb non-robot arms;
+- setting the assumed quality-work effect to zero makes the quality-work-only arm match baseline modeled outcomes apart from fictional cost, while non-work arms remain invariant.
 
 These controls validate programmed invariants, not the realism of the assumptions. The simulator uses an explicit seeded pseudorandom generator, common random numbers for paired comparisons, and no third-party dependencies. Its cost units and privacy/concentration proxies are intentionally not combined into a single social-value score. The research must not choose a policy based on the synthetic means.
 
-The path-scoped workflow runs Rust unit tests, generates the 1,120-row artifact twice and byte-compares the outputs, invokes the independent verifier, records the exact source commit and a SHA-256 digest, and uploads the evidence artifact for seven days. Passing this workflow would establish that the prototype and artifact satisfy their coded contracts at that exact head. It would not establish model calibration, a causal effect, a robot safety case, or real-world crime reduction.
+The path-scoped workflow runs Rust unit tests, generates the 1,280-row artifact twice and byte-compares the outputs, invokes the independent verifier, records the exact source commit and a SHA-256 digest, and uploads the evidence artifact for seven days. Passing this workflow would establish that the prototype and artifact satisfy their coded contracts at that exact head. It would not establish model calibration, a causal effect, a robot safety case, or real-world crime reduction.
 
 ## Missing economic-equilibrium layer
 
-Although this crate is named a crime-economics evaluator, version 0.1.0 is only an aggregate intervention-sensitivity prototype. It **does not calculate an offender payoff, a lawful-versus-unlawful utility crossover, or a quantitative threshold for economic irrationality**. Its effects on event rates are explicitly hard-coded test assumptions. The model can check whether software preserves specified relationships; it cannot currently test the main economic thesis on its own terms.
+Although this crate is named a crime-economics evaluator, version 0.2.0 remains an aggregate intervention-sensitivity prototype. It **does not calculate an offender payoff, a lawful-versus-unlawful utility crossover, or a quantitative threshold for economic irrationality**. Its effects on event rates are explicitly hard-coded test assumptions. The model can check whether software preserves specified relationships; it cannot currently test the main economic thesis on its own terms.
 
 A next phase should use a separate aggregate contract for lawful-alternative viability—reliable access to essentials, attainable high-quality work or cooperative production, lawful access time/transaction costs, and uncertainty in those alternatives. It should define observable, behavior-specific outcomes before parameter selection, use literature to establish defensible ranges rather than transplant a single effect size, and preserve subgroup uncertainty without assigning individual propensities. Keep hypothetical illicit payoff variables abstract and non-operational; do not model detailed methods, target selection, or evasion strategies. The result should remain a population/service-level policy model, not a person classifier.
 
@@ -151,6 +151,7 @@ The implementation intentionally omits a calibrated empirical event process, hou
 5. NIST, **SP 800-82 Rev. 4 Initial Public Draft** (published 2026-09-21; comments due 2026-11-30): https://csrc.nist.gov/pubs/sp/800/82/r4/ipd
 6. UNODC, **Crime Prevention & Criminal Justice Module 2: Summary**: https://www.unodc.org/e4j/en/crime-prevention-criminal-justice/module-2/key-issues/summary.html
 7. Weisburd et al., **Can increasing preventive patrol in large geographic areas reduce crime? A systematic review and meta-analysis** (2024): https://doi.org/10.1111/1745-9133.12665. The review found small average reductions for broad-area preventive patrol overall and larger estimated reductions for property and violent crime subsets; only four studies measured displacement, with uncertain/inconsistent results. This is evidence about preventive patrol, not autonomous robots, and should not be transposed as a robot-effect estimate.
+8. Muir, Orlando & Newton, **Impact of summer programmes on the outcomes of disadvantaged or ‘at risk’ young people: A systematic review** (2024): https://doi.org/10.1002/cl2.1406. The review included six summer employment programmes within high-income-country studies; evidence for offending outcomes was limited and heterogeneous, with no clear pooled effect for several criminal-justice outcomes. It does not estimate effects for all quality work, cooperative production, or South African contexts.
 8. ISO, **ISO 10218-1:2025 — Robotics — Safety requirements — Part 1: Industrial robots**: https://www.iso.org/standard/73933.html
 9. ISO, **ISO 10218-2:2025 — Robotics — Safety requirements — Part 2: Industrial robot applications and robot cells**: https://www.iso.org/standard/73934.html. The public catalogue describes industrial robot applications/cells and lists public-access service robots and law-enforcement uses among exclusions. This is why industrial robot standards must not be treated as a universal safety qualification for public-facing service or security robots.
 
