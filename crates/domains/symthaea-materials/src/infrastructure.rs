@@ -1,0 +1,414 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Evidence-bearing observations for road and rail infrastructure research.
+//!
+//! These types validate data integrity and basic physical domains only. They
+//! do not predict service life, establish material suitability, or certify a
+//! road, railway, component, design, or construction process.
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+
+/// A source record supporting an engineering observation.
+///
+/// A locator and optional digest provide traceability hooks; they do not prove
+/// that the source is authentic, independent, current, or relevant. Consumers
+/// must resolve and verify the underlying artifact before relying on it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EngineeringEvidence {
+    /// Stable, non-empty identifier for this evidence record.
+    pub evidence_id: String,
+    /// URI, DOI, repository path, lab record ID, or other source locator.
+    pub source_locator: String,
+    /// Identifier for the test method, survey protocol, dataset method, or report method.
+    pub method_id: String,
+    /// Optional 32-byte digest, represented as 64 hexadecimal characters.
+    ///
+    /// This module validates only the shape of the digest. It does not hash,
+    /// fetch, authenticate, or verify the referenced artifact.
+    pub artifact_digest_hex: Option<String>,
+}
+
+impl EngineeringEvidence {
+    /// Validate required provenance fields and the optional digest's shape.
+    pub fn validate(&self) -> Vec<ValidationError> {
+        let mut errors = Vec::new();
+        require_non_empty(&self.evidence_id, "evidence_id", &mut errors);
+        require_non_empty(&self.source_locator, "source_locator", &mut errors);
+        require_non_empty(&self.method_id, "method_id", &mut errors);
+
+        if let Some(digest) = &self.artifact_digest_hex {
+            if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                errors.push(ValidationError::InvalidDigest);
+            }
+        }
+
+        errors
+    }
+}
+
+/// A data-integrity error found while validating an infrastructure record.
+///
+/// Errors are intentionally descriptive but do not imply engineering failure
+/// or pass/fail against any transport authority's acceptance criteria.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValidationError {
+    /// A required string field is empty or contains only whitespace.
+    EmptyField {
+        /// Name of the invalid field.
+        field: &'static str,
+    },
+    /// A required numeric value is NaN or infinite.
+    NonFinite {
+        /// Name of the invalid field.
+        field: &'static str,
+    },
+    /// A value falls outside a basic physical/data-integrity domain.
+    OutOfRange {
+        /// Name of the invalid field.
+        field: &'static str,
+    },
+    /// An observation has no supporting evidence records.
+    MissingEvidence,
+    /// Two evidence records in one observation share an identifier.
+    DuplicateEvidenceId,
+    /// An optional artifact digest is not 64 hexadecimal characters.
+    InvalidDigest,
+}
+
+/// Measured or surveyed condition data for one road-pavement segment.
+///
+/// All fields are observations, not forecasts. Units are part of field names;
+/// threshold values are deliberately not hard-coded because limits depend on
+/// road class, traffic, test protocol, local standards, and asset-owner policy.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RoadPavementObservation {
+    /// Stable identifier for this observation event.
+    pub observation_id: String,
+    /// Stable identifier for the surveyed road segment.
+    pub segment_id: String,
+    /// Observation time as Unix epoch milliseconds; zero is reserved as invalid.
+    pub observed_at_unix_ms: u64,
+    /// Measured rut depth in millimetres; must be finite and non-negative.
+    pub rut_depth_mm: f64,
+    /// Estimated cracked surface-area fraction from 0.0 to 1.0 inclusive.
+    pub cracked_area_fraction: f64,
+    /// Surface temperature at measurement time in degrees Celsius.
+    pub surface_temperature_c: f64,
+    /// Standing-water depth at the measured location in millimetres.
+    pub standing_water_mm: f64,
+    /// Cumulative heavy-axle passes for the declared observation scope.
+    pub accumulated_heavy_axle_passes: u64,
+    /// Evidence records supporting the measurement and its provenance.
+    pub evidence: Vec<EngineeringEvidence>,
+}
+
+impl RoadPavementObservation {
+    /// Validate data integrity and basic physical domains.
+    ///
+    /// A successful result does not mean the pavement is safe, serviceable,
+    /// compliant, or suitable for any traffic class.
+    pub fn validate(&self) -> Result<(), Vec<ValidationError>> {
+        let mut errors = validate_common(
+            &self.observation_id,
+            &self.segment_id,
+            self.observed_at_unix_ms,
+            &self.evidence,
+        );
+
+        require_finite(self.rut_depth_mm, "rut_depth_mm", &mut errors);
+        require_finite(
+            self.cracked_area_fraction,
+            "cracked_area_fraction",
+            &mut errors,
+        );
+        require_finite(
+            self.surface_temperature_c,
+            "surface_temperature_c",
+            &mut errors,
+        );
+        require_finite(
+            self.standing_water_mm,
+            "standing_water_mm",
+            &mut errors,
+        );
+
+        if self.rut_depth_mm.is_finite() && self.rut_depth_mm < 0.0 {
+            errors.push(ValidationError::OutOfRange {
+                field: "rut_depth_mm",
+            });
+        }
+        if self.cracked_area_fraction.is_finite()
+            && !(0.0..=1.0).contains(&self.cracked_area_fraction)
+        {
+            errors.push(ValidationError::OutOfRange {
+                field: "cracked_area_fraction",
+            });
+        }
+        if self.standing_water_mm.is_finite() && self.standing_water_mm < 0.0 {
+            errors.push(ValidationError::OutOfRange {
+                field: "standing_water_mm",
+            });
+        }
+
+        finish_validation(errors)
+    }
+}
+
+/// Measured or surveyed condition data for one railway-track segment.
+///
+/// Alignment deviation fields are absolute magnitudes (millimetres), not
+/// signed offsets. Gauge limits, wear limits, and other acceptance thresholds
+/// must come from the applicable track class and current owner/regulator rules.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RailTrackObservation {
+    /// Stable identifier for this observation event.
+    pub observation_id: String,
+    /// Stable identifier for the surveyed track segment.
+    pub segment_id: String,
+    /// Observation time as Unix epoch milliseconds; zero is reserved as invalid.
+    pub observed_at_unix_ms: u64,
+    /// Measured track gauge in millimetres; the applicable nominal gauge is context-specific.
+    pub track_gauge_mm: f64,
+    /// Absolute vertical-alignment deviation in millimetres.
+    pub vertical_alignment_deviation_mm: f64,
+    /// Absolute lateral-alignment deviation in millimetres.
+    pub lateral_alignment_deviation_mm: f64,
+    /// Measured rail-head wear in millimetres.
+    pub rail_head_wear_mm: f64,
+    /// Rail temperature at measurement time in degrees Celsius.
+    pub rail_temperature_c: f64,
+    /// Cumulative axle passes for the declared observation scope.
+    pub accumulated_axle_passes: u64,
+    /// Evidence records supporting the measurement and its provenance.
+    pub evidence: Vec<EngineeringEvidence>,
+}
+
+impl RailTrackObservation {
+    /// Validate data integrity and basic physical domains.
+    ///
+    /// A successful result does not establish track geometry compliance,
+    /// rail integrity, operational safety, or fitness for any speed/load.
+    pub fn validate(&self) -> Result<(), Vec<ValidationError>> {
+        let mut errors = validate_common(
+            &self.observation_id,
+            &self.segment_id,
+            self.observed_at_unix_ms,
+            &self.evidence,
+        );
+
+        require_finite(self.track_gauge_mm, "track_gauge_mm", &mut errors);
+        require_finite(
+            self.vertical_alignment_deviation_mm,
+            "vertical_alignment_deviation_mm",
+            &mut errors,
+        );
+        require_finite(
+            self.lateral_alignment_deviation_mm,
+            "lateral_alignment_deviation_mm",
+            &mut errors,
+        );
+        require_finite(self.rail_head_wear_mm, "rail_head_wear_mm", &mut errors);
+        require_finite(self.rail_temperature_c, "rail_temperature_c", &mut errors);
+
+        if self.track_gauge_mm.is_finite() && self.track_gauge_mm <= 0.0 {
+            errors.push(ValidationError::OutOfRange {
+                field: "track_gauge_mm",
+            });
+        }
+        for (value, field) in [
+            (
+                self.vertical_alignment_deviation_mm,
+                "vertical_alignment_deviation_mm",
+            ),
+            (
+                self.lateral_alignment_deviation_mm,
+                "lateral_alignment_deviation_mm",
+            ),
+            (self.rail_head_wear_mm, "rail_head_wear_mm"),
+        ] {
+            if value.is_finite() && value < 0.0 {
+                errors.push(ValidationError::OutOfRange { field });
+            }
+        }
+
+        finish_validation(errors)
+    }
+}
+
+fn validate_common(
+    observation_id: &str,
+    segment_id: &str,
+    observed_at_unix_ms: u64,
+    evidence: &[EngineeringEvidence],
+) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    require_non_empty(observation_id, "observation_id", &mut errors);
+    require_non_empty(segment_id, "segment_id", &mut errors);
+
+    if observed_at_unix_ms == 0 {
+        errors.push(ValidationError::OutOfRange {
+            field: "observed_at_unix_ms",
+        });
+    }
+    if evidence.is_empty() {
+        errors.push(ValidationError::MissingEvidence);
+    }
+
+    let mut identifiers = HashSet::with_capacity(evidence.len());
+    for item in evidence {
+        errors.extend(item.validate());
+        if !identifiers.insert(item.evidence_id.as_str()) {
+            errors.push(ValidationError::DuplicateEvidenceId);
+        }
+    }
+
+    errors
+}
+
+fn require_non_empty(value: &str, field: &'static str, errors: &mut Vec<ValidationError>) {
+    if value.trim().is_empty() {
+        errors.push(ValidationError::EmptyField { field });
+    }
+}
+
+fn require_finite(value: f64, field: &'static str, errors: &mut Vec<ValidationError>) {
+    if !value.is_finite() {
+        errors.push(ValidationError::NonFinite { field });
+    }
+}
+
+fn finish_validation(errors: Vec<ValidationError>) -> Result<(), Vec<ValidationError>> {
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn evidence(id: &str) -> EngineeringEvidence {
+        EngineeringEvidence {
+            evidence_id: id.to_string(),
+            source_locator: "https://example.org/lab-report/17".to_string(),
+            method_id: "declared-laboratory-protocol-v1".to_string(),
+            artifact_digest_hex: Some("a".repeat(64)),
+        }
+    }
+
+    fn valid_road() -> RoadPavementObservation {
+        RoadPavementObservation {
+            observation_id: "obs-road-1".to_string(),
+            segment_id: "road-segment-1".to_string(),
+            observed_at_unix_ms: 1_800_000_000_000,
+            rut_depth_mm: 2.5,
+            cracked_area_fraction: 0.02,
+            surface_temperature_c: 36.0,
+            standing_water_mm: 0.0,
+            accumulated_heavy_axle_passes: 120_000,
+            evidence: vec![evidence("lab-17")],
+        }
+    }
+
+    fn valid_rail() -> RailTrackObservation {
+        RailTrackObservation {
+            observation_id: "obs-rail-1".to_string(),
+            segment_id: "rail-segment-1".to_string(),
+            observed_at_unix_ms: 1_800_000_000_000,
+            track_gauge_mm: 1_067.0,
+            vertical_alignment_deviation_mm: 1.2,
+            lateral_alignment_deviation_mm: 0.8,
+            rail_head_wear_mm: 0.3,
+            rail_temperature_c: 41.0,
+            accumulated_axle_passes: 800_000,
+            evidence: vec![evidence("inspection-22")],
+        }
+    }
+
+    #[test]
+    fn valid_observations_pass_integrity_checks_only() {
+        assert!(valid_road().validate().is_ok());
+        assert!(valid_rail().validate().is_ok());
+    }
+
+    #[test]
+    fn pavement_rejects_non_finite_and_out_of_domain_values() {
+        let mut sample = valid_road();
+        sample.rut_depth_mm = f64::NAN;
+        sample.cracked_area_fraction = 1.2;
+        sample.standing_water_mm = -0.1;
+
+        let errors = sample.validate().expect_err("invalid sample must be rejected");
+        assert!(errors.contains(&ValidationError::NonFinite {
+            field: "rut_depth_mm"
+        }));
+        assert!(errors.contains(&ValidationError::OutOfRange {
+            field: "cracked_area_fraction"
+        }));
+        assert!(errors.contains(&ValidationError::OutOfRange {
+            field: "standing_water_mm"
+        }));
+    }
+
+    #[test]
+    fn rail_rejects_invalid_gauge_wear_and_temperature() {
+        let mut sample = valid_rail();
+        sample.track_gauge_mm = 0.0;
+        sample.rail_head_wear_mm = -1.0;
+        sample.rail_temperature_c = f64::INFINITY;
+
+        let errors = sample.validate().expect_err("invalid sample must be rejected");
+        assert!(errors.contains(&ValidationError::OutOfRange {
+            field: "track_gauge_mm"
+        }));
+        assert!(errors.contains(&ValidationError::OutOfRange {
+            field: "rail_head_wear_mm"
+        }));
+        assert!(errors.contains(&ValidationError::NonFinite {
+            field: "rail_temperature_c"
+        }));
+    }
+
+    #[test]
+    fn observations_require_evidence_and_unique_evidence_ids() {
+        let mut sample = valid_road();
+        sample.evidence.clear();
+        assert!(sample
+            .validate()
+            .expect_err("evidence must be required")
+            .contains(&ValidationError::MissingEvidence));
+
+        sample.evidence = vec![evidence("duplicate"), evidence("duplicate")];
+        assert!(sample
+            .validate()
+            .expect_err("duplicate IDs must be rejected")
+            .contains(&ValidationError::DuplicateEvidenceId));
+    }
+
+    #[test]
+    fn evidence_digest_must_have_sha256_hex_shape() {
+        let mut item = evidence("lab-1");
+        item.artifact_digest_hex = Some("not-a-digest".to_string());
+
+        assert!(item.validate().contains(&ValidationError::InvalidDigest));
+    }
+
+    #[test]
+    fn zero_timestamp_and_blank_identity_are_rejected() {
+        let mut sample = valid_rail();
+        sample.observed_at_unix_ms = 0;
+        sample.segment_id = "  ".to_string();
+
+        let errors = sample.validate().expect_err("invalid identity/time must fail");
+        assert!(errors.contains(&ValidationError::OutOfRange {
+            field: "observed_at_unix_ms"
+        }));
+        assert!(errors.contains(&ValidationError::EmptyField {
+            field: "segment_id"
+        }));
+    }
+}
