@@ -1,0 +1,21 @@
+{
+  "suite_id": "SYM-LIFE-CIVIC-CRIME-ECONOMICS-001",
+  "version": "0.1.0",
+  "status": "research_fixture",
+  "scenario_file": "docs/research/life-civic/crime-prevention-reference-scenarios.json",
+  "scenario_git_blob_sha1": "fb7ad6c965a442a0813fc65e8a6f1237f46ac838",
+  "digest_semantics": "Git blob SHA-1 binds exact repository object bytes for fixture drift detection. It is not a cryptographic signature, source-authenticity proof, or independent collision-resistant trust claim.",
+  "claim_ceiling": [
+    "The scenario document is a synthetic research fixture, not empirical evidence.",
+    "Shape, uniqueness, and boundary checks do not measure Symthaea reasoning accuracy or causal validity.",
+    "No real-world crime reduction, legal applicability, robot safety, or production readiness is established."
+  ],
+  "prohibited_inferences": [
+    "crime reduced in the real world",
+    "Symthaea reasoning qualified",
+    "individual criminal propensity established",
+    "external action authorized",
+    "robot safety or cybersecurity qualified",
+    "economic irrationality of most crime established"
+  ]
+}
