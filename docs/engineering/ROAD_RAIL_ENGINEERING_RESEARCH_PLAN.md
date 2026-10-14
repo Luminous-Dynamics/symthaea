@@ -88,9 +88,11 @@ Return a Pareto set of feasible trade-offs after mandatory safety and compliance
 
 - Add typed road-pavement and rail-track observation records in Rust.
 - Require stable observation/segment identifiers and at least one provenance record.
+- Distinguish literature, synthetic simulation, laboratory test, field measurement and independent review as declared evidence modalities.
+- Require a declared field-measurement evidence record for asset-condition observations, so simulation-only output cannot masquerade as a physical observation. This is a data-integrity check, not authentication that the source is truthful.
 - Reject non-finite, physically out-of-domain and duplicate-evidence inputs.
 - Keep unit-specific fields and explicitly state that structural thresholds are not encoded.
-- Test ordinary inputs and adversarial/failure-path records.
+- Test ordinary inputs and adversarial/failure-path records, including a simulation-only negative control.
 
 **Exit:** source-reviewed tests execute on the exact PR head; malformed evidence is rejected, and valid input is described only as *well-formed*, not safe or qualified.
 
