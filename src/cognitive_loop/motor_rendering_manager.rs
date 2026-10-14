@@ -36,6 +36,10 @@ pub struct MotorRenderingManager {
     #[cfg(feature = "canvas")]
     pub(crate) last_canvas_svg: Option<String>,
 
+    /// Most recent bounded renderer-neutral canvas scene.
+    #[cfg(feature = "canvas")]
+    pub(crate) last_canvas_scene: Option<symthaea_canvas::RemoteScene>,
+
     /// Creative pipeline manager: generative art + music + synesthesia + gallery.
     #[cfg(feature = "creative")]
     pub(crate) creative_manager: Option<super::creative_bridge::CreativeManager>,
@@ -107,6 +111,8 @@ impl MotorRenderingManager {
             canvas_manager: Some(super::canvas_bridge::CanvasManager::new()),
             #[cfg(feature = "canvas")]
             last_canvas_svg: None,
+            #[cfg(feature = "canvas")]
+            last_canvas_scene: None,
             #[cfg(feature = "creative")]
             creative_manager: Some(super::creative_bridge::CreativeManager::new_with_path(
                 aesthetic_path,

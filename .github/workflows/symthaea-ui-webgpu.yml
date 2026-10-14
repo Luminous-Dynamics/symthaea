@@ -1,0 +1,101 @@
+name: Symthaea UI WebGPU qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/bridges/symthaea-ui/**"
+      - "crates/bridges/symthaea-web/test-webgpu-qualification.mjs"
+      - "crates/bridges/symthaea-web/package.json"
+      - "crates/bridges/symthaea-web/package-lock.json"
+      - "crates/domains/symthaea-canvas/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/symthaea-ui-webgpu.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  webgpu-qualification:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert qualification checkout identity
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "EXPECTED_CHECKED_OUT_SHA=$actual" >> "$GITHUB_ENV"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+
+      - name: Install Trunk and wasm-bindgen CLI
+        uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7
+        with:
+          tool: trunk@0.21.14,wasm-bindgen-cli@0.2.125
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+
+      - name: Install browser-test dependencies
+        working-directory: crates/bridges/symthaea-web
+        run: npm ci
+
+      - name: Install Chromium + Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium xvfb xauth libvulkan1 mesa-vulkan-drivers
+
+      - name: Validate qualification harness syntax
+        working-directory: crates/bridges/symthaea-web
+        run: node --check test-webgpu-qualification.mjs
+
+      - name: Run semantic wire validation tests
+        run: cargo test -p symthaea-canvas --lib scene_wire::tests
+
+      - name: Build qualification fixture
+        working-directory: crates/bridges/symthaea-ui
+        run: trunk build --release --features browser-qualification --dist dist
+
+      - name: Run SwiftShader WebGPU + fallback qualification
+        working-directory: crates/bridges/symthaea-ui
+        env:
+          CHROMIUM_PATH: /usr/bin/chromium
+          WEBGPU_HEADLESS: "false"
+          WEBGPU_ARTIFACT: webgpu-qualification.json
+          WEBGPU_SCREENSHOTS: webgpu-qualification-screenshots
+        run: xvfb-run -a node ../symthaea-web/test-webgpu-qualification.mjs
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: symthaea-ui-webgpu-qualification
+          path: |
+            ${{ github.workspace }}/crates/bridges/symthaea-ui/webgpu-qualification.json
+            ${{ github.workspace }}/crates/bridges/symthaea-ui/webgpu-qualification-screenshots/
+          if-no-files-found: warn
+          # The harness may fail before producing evidence (for example, node --check).
+          # Missing artifacts are therefore secondary to the authoritative step failure.
