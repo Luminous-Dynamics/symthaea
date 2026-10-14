@@ -31,4 +31,7 @@ pub mod xc;
 pub use grid::{DftGrid, GridPoint};
 pub use lda::{SlaterExchange, VwnCorrelation, lda_exchange_correlation};
 pub use pbe::PbeExchange;
-pub use xc::{DftConfig, DftResult, XcFunctional, kohn_sham_dft, pbe_exchange_energy_posthoc};
+pub use xc::{
+    DftConfig, DftResult, XcFunctional, kohn_sham_dft, pbe_exchange_energy_posthoc,
+    try_kohn_sham_dft,
+};

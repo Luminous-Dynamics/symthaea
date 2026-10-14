@@ -1,0 +1,96 @@
+name: QC DFT Eigensolver Propagation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-quantum-chemistry/src/dft/**"
+      - "crates/domains/symthaea-quantum-chemistry/src/scf/generalized_eigen.rs"
+      - "crates/domains/symthaea-quantum-chemistry/src/lib.rs"
+      - "crates/core/symthaea-observation-attestation/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/qc-dft-eigensolver-propagation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qc-dft-eigensolver-propagation-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checked-dft-contract:
+    name: Checked LDA DFT numerical contract
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact PR head or dispatched source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert checkout matches requested source head
+        shell: bash
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse --verify 'HEAD^{commit}')"
+          if [[ "$actual" != "$EXPECTED_SOURCE_SHA" ]]; then
+            printf 'source HEAD mismatch: expected=%s actual=%s\n' "$EXPECTED_SOURCE_SHA" "$actual" >&2
+            exit 1
+          fi
+
+      - name: Record exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse --verify 'HEAD^{commit}')"
+          source_tree="$(git rev-parse --verify 'HEAD^{tree}')"
+          manifest="crates/core/symthaea-observation-attestation/Cargo.toml"
+          {
+            echo "## QC DFT exact-source validation"
+            echo
+            printf -- '- Source commit: `%s`\n' "$source_commit"
+            printf -- '- Source tree: `%s`\n' "$source_tree"
+            printf -- '- Workspace manifest: `%s`\n' "$manifest"
+            printf -- '- Cargo.lock blob: `%s`\n' "$(git rev-parse HEAD:Cargo.lock)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # pinned upstream revision
+        with:
+          toolchain: 1.96.0
+
+      - name: Check formatting of changed Rust files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --check --edition 2024 --config skip_children=true \
+            crates/domains/symthaea-quantum-chemistry/src/dft/xc.rs \
+            crates/domains/symthaea-quantum-chemistry/src/dft/mod.rs \
+            crates/domains/symthaea-quantum-chemistry/src/lib.rs \
+            crates/domains/symthaea-quantum-chemistry/src/scf/generalized_eigen.rs
+
+      - name: Preflight required Cargo workspace manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="crates/core/symthaea-observation-attestation/Cargo.toml"
+          if [[ ! -f "$manifest" ]]; then
+            {
+              echo
+              printf -- '\n**Blocked before compilation.** No DFT, Rust compilation, or numerical test ran because this exact source tree lacks `%s`.\n' "$manifest"
+              echo "The focused rustfmt check above is separate source-format evidence, not a compile or scientific test."
+              echo "Integrate the workspace-manifest prerequisite into this source branch and rerun at the resulting exact HEAD."
+            } >> "$GITHUB_STEP_SUMMARY"
+            printf 'BLOCKED BEFORE SCIENTIFIC TESTING: exact HEAD lacks %s\n' "$manifest" >&2
+            exit 1
+          fi
+
+      - name: Run checked DFT, grid, and fail-closed regression tests
+        run: cargo test --locked -p symthaea-quantum-chemistry --lib 'dft::'

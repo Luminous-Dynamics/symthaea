@@ -2,6 +2,7 @@ name: QC Eigensolver Contract
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-quantum-chemistry/src/scf/generalized_eigen.rs"
       - "crates/domains/symthaea-quantum-chemistry/examples/qc_eigen_reference_fixtures.rs"
@@ -27,6 +28,7 @@ concurrency:
 jobs:
   eigensolver-contract:
     name: Checked Jacobi and canonical-orthogonalization tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

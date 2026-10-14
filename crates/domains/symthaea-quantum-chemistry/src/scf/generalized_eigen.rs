@@ -308,8 +308,22 @@ pub enum ScfSolveError {
         nuclear_charge: i64,
     },
     NoElectrons,
+    EmptyIntegrationGrid,
     CanonicalOrthogonalization(CanonicalOrthogonalizationError),
     GeneralizedEigen(CheckedGeneralizedEigenError),
+    NonFiniteNumericValue {
+        stage: &'static str,
+        index: usize,
+    },
+    InvalidNumericInput {
+        stage: &'static str,
+        index: usize,
+        value: f64,
+    },
+    InsufficientBasisForOccupiedOrbitals {
+        occupied_orbitals: usize,
+        independent_basis_functions: usize,
+    },
     NonFiniteEnergy {
         stage: &'static str,
     },
@@ -341,12 +355,28 @@ impl std::fmt::Display for ScfSolveError {
             Self::NoElectrons => {
                 write!(f, "zero-electron systems are unsupported by the molecular SCF solver")
             }
+            Self::EmptyIntegrationGrid => {
+                write!(f, "DFT integration grid contains no usable points")
+            }
             Self::CanonicalOrthogonalization(error) => {
                 write!(f, "checked canonical orthogonalization failed: {error}")
             }
             Self::GeneralizedEigen(error) => {
                 write!(f, "checked generalized eigensolve failed: {error}")
             }
+            Self::NonFiniteNumericValue { stage, index } => {
+                write!(f, "SCF numeric value {stage}[{index}] is non-finite")
+            }
+            Self::InvalidNumericInput { stage, index, value } => {
+                write!(f, "SCF numeric input {stage}[{index}] has invalid value {value}")
+            }
+            Self::InsufficientBasisForOccupiedOrbitals {
+                occupied_orbitals,
+                independent_basis_functions,
+            } => write!(
+                f,
+                "{occupied_orbitals} occupied orbitals exceed {independent_basis_functions} independent basis functions"
+            ),
             Self::NonFiniteEnergy { stage } => {
                 write!(f, "SCF energy became non-finite at {stage}")
             }
