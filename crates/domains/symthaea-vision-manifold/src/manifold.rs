@@ -2890,6 +2890,7 @@ impl VisionManifold {
             sample_counts: vec![0; errors.len()],
             mean_lateness_seconds: vec![0.0; errors.len()],
             dropped_forecasts: vec![0; errors.len()],
+            rejected_forecasts: vec![0; errors.len()],
             expired_forecasts: vec![0; errors.len()],
             errors,
             frame_sequence: self.frame_count,
@@ -4560,6 +4561,9 @@ pub struct HorizonAccuracy {
     /// Forecasts skipped because the bounded pending queue was full.
     #[serde(default)]
     pub dropped_forecasts: Vec<u64>,
+    /// Invalid predictions or matured forecasts excluded from scoring.
+    #[serde(default)]
+    pub rejected_forecasts: Vec<u64>,
     /// Forecasts discarded because the scoring observation arrived too late.
     #[serde(default)]
     pub expired_forecasts: Vec<u64>,
@@ -4584,6 +4588,7 @@ struct HorizonAccumulator {
     lateness_sum: f64,
     samples: u64,
     dropped_forecasts: u64,
+    rejected_forecasts: u64,
     expired_forecasts: u64,
 }
 
@@ -4675,6 +4680,10 @@ impl DelayedHorizonEvaluator {
         if !actual.as_slice().iter().all(|value| value.is_finite()) {
             return Err("encoded frame contains non-finite values".to_string());
         }
+        let next_elapsed = self.elapsed_seconds + dt as f64;
+        if !next_elapsed.is_finite() || next_elapsed <= self.elapsed_seconds {
+            return Err("horizon evaluator clock cannot advance by timestep".to_string());
+        }
         match self.hdc_dim {
             Some(expected) if expected != actual.dim() => {
                 return Err(format!(
@@ -4685,7 +4694,7 @@ impl DelayedHorizonEvaluator {
             None => self.hdc_dim = Some(actual.dim()),
             _ => {}
         }
-        self.elapsed_seconds += dt as f64;
+        self.elapsed_seconds = next_elapsed;
 
         let mut scored = 0usize;
         let now = self.elapsed_seconds;
@@ -4703,8 +4712,22 @@ impl DelayedHorizonEvaluator {
                 accumulator.expired_forecasts = accumulator.expired_forecasts.saturating_add(1);
                 continue;
             }
+            let vectors_are_valid = forecast.predicted.dim() == actual.dim()
+                && forecast.persistence.dim() == actual.dim()
+                && forecast.predicted.as_slice().iter().all(|value| value.is_finite())
+                && forecast.persistence.as_slice().iter().all(|value| value.is_finite());
+            if !vectors_are_valid {
+                accumulator.rejected_forecasts =
+                    accumulator.rejected_forecasts.saturating_add(1);
+                continue;
+            }
             let prediction_error = 1.0 - actual.similarity(&forecast.predicted).clamp(-1.0, 1.0);
             let persistence_error = 1.0 - actual.similarity(&forecast.persistence).clamp(-1.0, 1.0);
+            if !prediction_error.is_finite() || !persistence_error.is_finite() {
+                accumulator.rejected_forecasts =
+                    accumulator.rejected_forecasts.saturating_add(1);
+                continue;
+            }
             let prediction_error = prediction_error as f64;
             let persistence_error = persistence_error as f64;
             accumulator.prediction_error_sum += prediction_error;
@@ -4724,13 +4747,27 @@ impl DelayedHorizonEvaluator {
                 .filter(|forecast| forecast.horizon_index == horizon_index)
                 .count();
             if queued >= self.max_pending_per_horizon {
-                self.accumulators[horizon_index].dropped_forecasts += 1;
+                self.accumulators[horizon_index].dropped_forecasts =
+                    self.accumulators[horizon_index].dropped_forecasts.saturating_add(1);
                 continue;
             }
+
+            let predicted = manifold.predict_horizon(actual, horizon);
+            let due_time = now + horizon as f64;
+            let valid_prediction = predicted.dim() == actual.dim()
+                && predicted.as_slice().iter().all(|value| value.is_finite())
+                && due_time.is_finite()
+                && due_time > now;
+            if !valid_prediction {
+                self.accumulators[horizon_index].rejected_forecasts =
+                    self.accumulators[horizon_index].rejected_forecasts.saturating_add(1);
+                continue;
+            }
+
             self.pending.push(PendingHorizonForecast {
                 horizon_index,
-                due_time: now + horizon as f64,
-                predicted: manifold.predict_horizon(actual, horizon),
+                due_time,
+                predicted,
                 persistence: actual.clone(),
             });
         }
@@ -4747,6 +4784,7 @@ impl DelayedHorizonEvaluator {
         let mut sample_counts = Vec::with_capacity(self.accumulators.len());
         let mut mean_lateness_seconds = Vec::with_capacity(self.accumulators.len());
         let mut dropped_forecasts = Vec::with_capacity(self.accumulators.len());
+        let mut rejected_forecasts = Vec::with_capacity(self.accumulators.len());
         let mut expired_forecasts = Vec::with_capacity(self.accumulators.len());
         for accumulator in &self.accumulators {
             if accumulator.samples == 0 {
@@ -4758,6 +4796,7 @@ impl DelayedHorizonEvaluator {
                 sample_counts.push(0);
                 mean_lateness_seconds.push(0.0);
                 dropped_forecasts.push(accumulator.dropped_forecasts);
+                rejected_forecasts.push(accumulator.rejected_forecasts);
                 expired_forecasts.push(accumulator.expired_forecasts);
                 continue;
             }
@@ -4787,6 +4826,7 @@ impl DelayedHorizonEvaluator {
             sample_counts.push(accumulator.samples);
             mean_lateness_seconds.push((accumulator.lateness_sum / n) as f32);
             dropped_forecasts.push(accumulator.dropped_forecasts);
+            rejected_forecasts.push(accumulator.rejected_forecasts);
             expired_forecasts.push(accumulator.expired_forecasts);
         }
         HorizonAccuracy {
@@ -4800,6 +4840,7 @@ impl DelayedHorizonEvaluator {
             sample_counts,
             mean_lateness_seconds,
             dropped_forecasts,
+            rejected_forecasts,
             expired_forecasts,
             frame_sequence,
         }
@@ -4861,6 +4902,7 @@ impl DelayedHorizonEvaluator {
                     lateness_sum: accumulator.lateness_sum,
                     samples: accumulator.samples,
                     dropped_forecasts: accumulator.dropped_forecasts,
+                    rejected_forecasts: accumulator.rejected_forecasts,
                     expired_forecasts: accumulator.expired_forecasts,
                 })
                 .collect(),
@@ -5034,6 +5076,7 @@ impl DelayedHorizonEvaluator {
                     lateness_sum: accumulator.lateness_sum,
                     samples: accumulator.samples,
                     dropped_forecasts: accumulator.dropped_forecasts,
+                    rejected_forecasts: accumulator.rejected_forecasts,
                     expired_forecasts: accumulator.expired_forecasts,
                 }
             })
@@ -6848,6 +6891,102 @@ mod tests {
     }
 
     #[test]
+    fn test_delayed_horizon_rejects_unrepresentable_clock_advance_atomically() {
+        let mut config = VisionConfig::default();
+        config.hdc_dim = 256;
+        let mut manifold = VisionManifold::new(config, 8, 8);
+        manifold
+            .observe_frame_checked(&vec![10; 64], 8, 8, 1, 0.01)
+            .unwrap();
+        let mut evaluator = DelayedHorizonEvaluator::default();
+        let mut checkpoint = evaluator.save_state();
+        checkpoint.elapsed_seconds = f64::MAX;
+        evaluator.load_state(&checkpoint).unwrap();
+        let before = evaluator.save_state();
+
+        assert!(evaluator.observe(&manifold, 0.01).is_err());
+        assert_eq!(evaluator.save_state(), before);
+    }
+
+    #[test]
+    fn test_delayed_horizon_v3_checkpoint_defaults_new_rejection_counter() {
+        let evaluator = DelayedHorizonEvaluator::default();
+        let mut encoded = serde_json::to_value(evaluator.save_state()).unwrap();
+        encoded["schema_version"] = serde_json::json!(3);
+        for accumulator in encoded["accumulators"].as_array_mut().unwrap() {
+            accumulator
+                .as_object_mut()
+                .unwrap()
+                .remove("rejected_forecasts");
+        }
+
+        let legacy: DelayedHorizonEvaluatorState = serde_json::from_value(encoded).unwrap();
+        let mut restored = DelayedHorizonEvaluator::default();
+        restored.load_state(&legacy).unwrap();
+        let migrated = restored.save_state();
+
+        assert_eq!(
+            migrated.schema_version,
+            DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION
+        );
+        assert!(migrated
+            .accumulators
+            .iter()
+            .all(|accumulator| accumulator.rejected_forecasts == 0));
+    }
+
+    #[test]
+    fn test_delayed_horizon_rejects_non_finite_new_predictions_without_corrupting_metrics() {
+        let mut config = VisionConfig::default();
+        config.hdc_dim = 256;
+        let mut manifold = VisionManifold::new(config, 8, 8);
+        manifold
+            .observe_frame_checked(&vec![10; 64], 8, 8, 1, 0.01)
+            .unwrap();
+        // Deliberately corrupt the internal predictive state after a valid observation.
+        manifold.state.values[0] = f32::NAN;
+        let mut evaluator =
+            DelayedHorizonEvaluator::new(vec![(0.05, "near".to_string())]).unwrap();
+
+        assert_eq!(evaluator.observe(&manifold, 0.01).unwrap(), 0);
+        assert!(evaluator.pending.is_empty());
+        let accuracy = evaluator.accuracy(manifold.frame_count());
+        assert_eq!(accuracy.rejected_forecasts, vec![1]);
+        assert_eq!(accuracy.dropped_forecasts, vec![0]);
+        assert_eq!(accuracy.sample_counts, vec![0]);
+        assert!(accuracy.errors.iter().all(|value| value.is_finite()));
+        assert!(accuracy.persistence_errors.iter().all(|value| value.is_finite()));
+        assert!(DelayedHorizonEvaluator::validate_state(&evaluator.save_state()).is_ok());
+    }
+
+    #[test]
+    fn test_delayed_horizon_rejects_corrupt_matured_forecast_and_keeps_scoring_finite() {
+        let mut config = VisionConfig::default();
+        config.hdc_dim = 256;
+        let mut manifold = VisionManifold::new(config, 8, 8);
+        let mut evaluator =
+            DelayedHorizonEvaluator::new(vec![(0.05, "near".to_string())]).unwrap();
+
+        manifold
+            .observe_frame_checked(&vec![10; 64], 8, 8, 1, 0.01)
+            .unwrap();
+        evaluator.observe(&manifold, 0.01).unwrap();
+        assert_eq!(evaluator.pending.len(), 1);
+        evaluator.pending[0].predicted.values[0] = f32::NAN;
+
+        manifold
+            .observe_frame_checked(&vec![20; 64], 8, 8, 1, 0.06)
+            .unwrap();
+        assert_eq!(evaluator.observe(&manifold, 0.06).unwrap(), 0);
+        let accuracy = evaluator.accuracy(manifold.frame_count());
+
+        assert_eq!(accuracy.rejected_forecasts, vec![1]);
+        assert_eq!(accuracy.sample_counts, vec![0]);
+        assert!(accuracy.errors.iter().all(|value| value.is_finite()));
+        assert!(accuracy.persistence_errors.iter().all(|value| value.is_finite()));
+    }
+
+    #[test]
     fn test_delayed_horizon_evaluator_scores_only_matured_forecasts() {
         let mut config = VisionConfig::default();
         config.hdc_dim = 256;
@@ -6918,6 +7057,7 @@ mod tests {
             lateness_sum: 0.02,
             samples: 2,
             dropped_forecasts: 0,
+            rejected_forecasts: 0,
             expired_forecasts: 0,
         };
 
