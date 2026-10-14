@@ -108,7 +108,10 @@
     "The viability fixture evaluates synthetic gates only; it is not evidence that a real population has viable lawful alternatives.",
     "Viability status is not a criminal-risk, individual eligibility, legal compliance, or causal crime-reduction score.",
     "Stats SA QLFS descriptive statistics and ILO measurement frameworks are not used as crime-effect coefficients or as justification for synthetic numeric gates.",
-    "One cohort failing a floor or a group-gap gate cannot be compensated by a high aggregate mean."
+    "One cohort failing a floor or a group-gap gate cannot be compensated by a high aggregate mean.",
+    "The viability measurement dictionary defines a proposed operationalization; it is not a validated instrument until reviewed with affected communities, labour/statistical experts, and jurisdiction-specific specialists.",
+    "Low/high fixture bounds are not statistical confidence intervals.",
+    "Opportunity coverage must not be operationalized as vacancy count alone; quality criteria and its target-population denominator must be pre-registered."
   ],
   "parameter_registry_version": "0.2.0",
   "parameter_registry_status": "all_parameters_are_synthetic_assumptions",
@@ -507,5 +510,86 @@
       "relevance": "Context for structuring labour and decent-work indicators.",
       "limitation": "Used for construct coverage only; not an empirical parameter source for the simulation."
     }
+  ],
+  "viability_measure_definitions": [
+    {
+      "measure_id": "ESSENTIALS_ACCESS",
+      "unit": "fraction of the pre-registered eligible cohort",
+      "numerator": "Eligible households whose locally specified essential basket is actually available, affordable under the declared affordability rule, and reliably delivered over the reference period.",
+      "denominator": "All eligible household-equivalents observed or represented in the same cohort and reference period, including people who did not successfully use an inaccessible service.",
+      "required_data": "Defined essentials basket; service availability and interruption; local price/cost burden; eligible population and reference period.",
+      "non_substitution_rule": "Nominal enrollment, benefit eligibility, or a nearby facility does not by itself establish actual access.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "LAWFUL_OPPORTUNITY_COVERAGE",
+      "unit": "fraction of the pre-registered target population",
+      "numerator": "Members for whom at least one attainable lawful work or productive-participation option satisfies the predeclared access, fair-pay, safety, stability, and skills/accessibility criteria.",
+      "denominator": "The full pre-registered target population for the service-area study, not merely the number of posted vacancies or people who succeeded in applying.",
+      "required_data": "Opportunity inventory; eligibility/access rules; pay, safety, stability and accessibility characteristics; transport/time barrier; reference period.",
+      "non_substitution_rule": "Vacancy totals or job-placement counts cannot substitute for attainable, quality-qualified options.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "FAIR_PAY_ADEQUACY",
+      "unit": "fraction of relevant opportunities meeting predeclared pay criteria",
+      "numerator": "Relevant lawful opportunities that meet applicable legal pay obligations and a locally defined, publicly reviewable adequacy benchmark for the reference context.",
+      "denominator": "All relevant opportunities in the pre-registered opportunity inventory with sufficient pay and hours information; missing pay data must be reported rather than assumed adequate.",
+      "required_data": "Applicable legal pay rules; transparent adequacy benchmark; gross/net treatment; paid hours; deductions and documented uncertainty.",
+      "non_substitution_rule": "Employment counts or median pay alone do not establish that the available opportunities meet the declared adequacy floor.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "SAFE_WORK",
+      "unit": "fraction of relevant opportunities meeting applicable safety criteria",
+      "numerator": "Relevant opportunities with evidence of satisfying applicable workplace safety duties and the study's declared worker-protection criteria.",
+      "denominator": "All relevant opportunities assessed, with unassessed or missing safety information retained as unknown rather than passed.",
+      "required_data": "Applicable jurisdiction-specific requirements; documented hazard controls; complaint/incident and inspection coverage; review period.",
+      "non_substitution_rule": "An employer certificate or standards reference alone does not prove the work is safe in practice.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "WORK_STABILITY",
+      "unit": "fraction of relevant opportunities meeting predeclared stability criteria",
+      "numerator": "Opportunities meeting the study's explicit thresholds for predictable hours/earnings and a declared minimum duration or continuity measure.",
+      "denominator": "All relevant opportunities in the target inventory with sufficient contract, hours and duration data.",
+      "required_data": "Declared stability definition; job tenure/contract type; volatility in hours and earnings; seasonal/temporary treatment; missing-data rate.",
+      "non_substitution_rule": "A single snapshot of employment status cannot establish secure or stable work.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "SOCIAL_PROTECTION_COVERAGE",
+      "unit": "fraction of eligible workers or opportunities with actual protection access",
+      "numerator": "Eligible workers/opportunities for which the applicable protection exists and can practically be accessed under the declared scheme definition.",
+      "denominator": "The population eligible for those protections under the applicable rules, with ineligible cases and unobserved eligibility reported separately.",
+      "required_data": "Applicable scheme/rules; eligibility; registration and contribution status; claimability/access barriers; reference period.",
+      "non_substitution_rule": "Formal entitlement or a registry entry alone does not establish effective access to benefits.",
+      "person_level_scoring_allowed": false
+    },
+    {
+      "measure_id": "LAWFUL_ACCESS_TIME",
+      "unit": "minutes, with travel mode and statistic specified",
+      "numerator": "A travel-time estimate to at least one opportunity that already satisfies the defined lawful-opportunity quality criteria.",
+      "denominator": "The pre-registered target-area aggregate and reference period, with routes/options inaccessible to relevant participants excluded or separately flagged.",
+      "required_data": "Travel mode; origin/accessibility assumptions; cost as well as time; p50/p90 or other declared statistic; temporal variability and safety/accessibility constraints.",
+      "non_substitution_rule": "Fast access to a poor-quality, unsafe or unattainable vacancy cannot make lawful alternatives viable.",
+      "person_level_scoring_allowed": false
+    }
+  ],
+  "viability_uncertainty_semantics": {
+    "low_high_values": "Illustrative fixture bounds for sensitivity and gate testing, not estimated sampling confidence intervals, statistical credible intervals, or uncertainty calibrated to South African data.",
+    "real_data_requirement": "For an empirical pilot, pre-register the source, denominator, reference period, missingness and uncertainty method for each measure; distinguish sampling error, measurement error, model uncertainty and disagreement between sources."
+  },
+  "viability_status_semantics": {
+    "fixture_pass": "Every synthetic gate is satisfied for a fixture; this is not a finding about a real population or a legal determination.",
+    "fixture_fail": "At least one synthetic minimum, cap or cross-cohort coverage-gap rule is clearly violated.",
+    "fixture_indeterminate": "Missing, stale, conflicted or overly broad/threshold-straddling evidence prevents a pass/fail finding."
+  },
+  "non_compensatory_rules": [
+    "Any clearly failed cohort floor vetoes scenario-level pass regardless of the cohort or population mean.",
+    "Fair pay, safe work, stability, and social protection are separate gates; opportunity count cannot compensate for a failure in any of them.",
+    "Conservative cohort coverage-gap rules are evaluated after per-cohort gate checks and cannot be averaged away.",
+    "Unusable evidence, source age above the declared synthetic limit, missing measurements, or a threshold-straddling interval never defaults to pass.",
+    "No person-level risk score, eligibility action, criminal propensity inference, or enforcement decision is generated."
   ]
 }
