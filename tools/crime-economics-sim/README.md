@@ -11,7 +11,7 @@ From the repository root:
     cargo run --offline --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin simulate > crime-economics.tsv
     cargo run --offline --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin verify -- crime-economics.tsv
 
-The output is a tab-separated artifact with 7 scenarios × 5 policy arms × 32 deterministic Monte Carlo replications (1,120 rows). The verifier separately parses the emitted artifact and checks frozen schema identity, row completeness, event-accounting identities, reporting/displacement negative controls, non-economic-harm preservation, robot-only fields, distributional-access, concentrated-automation, high-robot-compromise, and low-robot-effectiveness adversarial cases.
+The output is a tab-separated artifact with 8 scenarios × 5 policy arms × 32 deterministic Monte Carlo replications (1,280 rows). The verifier separately parses the emitted artifact and checks frozen schema identity, row completeness, event-accounting identities, reporting/displacement negative controls, non-economic-harm preservation, robot-only fields, distributional-access, concentrated-automation, high-robot-compromise, and low-robot-effectiveness adversarial cases.
 
 ## Parameter register
 
@@ -28,6 +28,7 @@ The register is a human-reviewable statement of intended inputs, not a parser-ge
 - high_robot_compromise: compromised robot weeks are more common; the verifier checks that exposure increases without altering non-robot arms.
 - unequal_essential_access: the same essentials program is delivered unevenly; the verifier must detect the worsening access gap.
 - low_robot_effectiveness: the robot protection-effect assumption is scaled to one quarter of the reference scenario; the verifier checks that weaker assumed protection cannot improve the modeled protection outcomes.
+- zero_quality_work_effect: the assumed crime-channel effects of quality-work support are set to zero. The verifier requires the quality-work-only arm to match baseline outcomes aside from the fictional cost ledger, and requires non-work arms to remain invariant.
 
 Policy arms are baseline, essentials, quality_work, robot_protection, and combined.
 
@@ -44,7 +45,9 @@ Policy arms are baseline, essentials, quality_work, robot_protection, and combin
 
 ## What this prototype does not model
 
-The current version does **not** calculate offender expected utility, an economic-payoff equilibrium, or a threshold at which crime becomes economically irrational. It directly applies synthetic changes to aggregate event probabilities to exercise evaluation controls. It therefore cannot answer the original question quantitatively and should not be used to rank policies by simulated means.
+The current version does **not** calculate offender expected utility, an economic-payoff equilibrium, or a threshold at which crime becomes economically irrational. It directly applies synthetic changes to aggregate event probabilities to exercise evaluation controls.
+
+The quality-work assumption is explicitly stress-tested at zero. A 2024 systematic review found the offending-outcome evidence for summer employment programmes limited and heterogeneous, with no clear pooled impact on several criminal-justice outcomes; those high-income-country findings do not estimate the effect of year-round quality work or cooperative production in South Africa. See [Muir et al. (2024), Campbell Systematic Reviews](https://doi.org/10.1002/cl2.1406). It therefore cannot answer the original question quantitatively and should not be used to rank policies by simulated means.
 
 A later model increment should first define an **aggregate lawful-alternative viability** measure: reliable access to essentials, quality and accessibility of lawful work/production, time and transaction costs for lawful alternatives, and the uncertainty of those options. It should estimate only population- or service-level relationships supported by transparent evidence, with ranges and sensitivity analysis—not infer criminal propensity about individuals or optimize methods for committing or evading crime.
 
