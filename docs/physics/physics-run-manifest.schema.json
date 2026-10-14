@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/physics/physics-run-manifest.schema.json",
+  "title": "Luminous Dynamics Physical Run Manifest",
+  "description": "Versioned run provenance and verification evidence. This schema validates the manifest's structure; it does not certify the physics model or the completeness of the modeled energy pathways.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "source",
+    "inputs_sha256",
+    "outputs_sha256",
+    "assumptions",
+    "quantities",
+    "gates",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "$ref": "#/$defs/modelSource"
+    },
+    "inputs_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "outputs_sha256": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "quantities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/quantityUnit"
+      }
+    },
+    "discretization": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/discretization"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "energy_balance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/energyBalance"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/verificationGate"
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "commitSha": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{40}$",
+      "description": "Full immutable Git commit SHA."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$",
+      "description": "SHA-256 digest encoded as 64 hexadecimal characters."
+    },
+    "httpsUrl": {
+      "type": "string",
+      "pattern": "^https://\\S+$"
+    },
+    "modelSource": {
+      "type": "object",
+      "required": [
+        "project",
+        "repository_url",
+        "commit_sha",
+        "model_id",
+        "model_version"
+      ],
+      "properties": {
+        "project": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository_url": {
+          "$ref": "#/$defs/httpsUrl"
+        },
+        "commit_sha": {
+          "$ref": "#/$defs/commitSha"
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "quantityUnit": {
+      "type": "object",
+      "required": [
+        "quantity",
+        "unit"
+      ],
+      "properties": {
+        "quantity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "discretization": {
+      "type": "object",
+      "properties": {
+        "cell_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "characteristic_length_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "time_step_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "duration_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "energyBalance": {
+      "type": "object",
+      "required": [
+        "energy_in_j",
+        "energy_out_j",
+        "stored_energy_change_j",
+        "residual_j",
+        "tolerance_j"
+      ],
+      "properties": {
+        "energy_in_j": {
+          "type": "number",
+          "minimum": 0
+        },
+        "energy_out_j": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stored_energy_change_j": {
+          "type": "number"
+        },
+        "residual_j": {
+          "type": "number"
+        },
+        "tolerance_j": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "description": "The producer must ensure residual_j equals energy_in_j - energy_out_j - stored_energy_change_j within the Rust validator's scale-aware floating-point tolerance. Numeric bounds alone do not express that cross-field constraint."
+    },
+    "verificationGate": {
+      "type": "object",
+      "required": [
+        "gate",
+        "outcome"
+      ],
+      "properties": {
+        "gate": {
+          "enum": [
+            "input_validation",
+            "single_physics_reference",
+            "energy_conservation",
+            "grid_time_refinement",
+            "reference_comparison",
+            "coupling_stability",
+            "external_review"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "not_run",
+            "queued",
+            "skipped",
+            "failed",
+            "passed"
+          ]
+        },
+        "tested_commit_sha": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/commitSha"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_url": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/httpsUrl"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "required": [
+              "tested_commit_sha",
+              "evidence_url"
+            ],
+            "properties": {
+              "tested_commit_sha": {
+                "$ref": "#/$defs/commitSha"
+              },
+              "evidence_url": {
+                "$ref": "#/$defs/httpsUrl"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
