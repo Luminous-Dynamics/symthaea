@@ -4,6 +4,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod passive_boundary_observation;
 use symthaea_sim_bridge::{
     CommandSolver, EngineeringDomain, SimulationBackend, SimulationError, SimulationRequest,
     SimulationResult, SolverKind,
@@ -110,3 +111,8 @@ mod tests {
         assert!(backend.run(&request).unwrap().converged);
     }
 }
+
+pub use passive_boundary_observation::{
+    observe_openfoam_boundary_patch, OpenFoamBoundaryObservationError,
+    OpenFoamBoundaryPatchRecord,
+};

@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-passive-diversity"
+version = "0.1.0"
+edition = "2024"
+description = "Structural novelty metrics for passive engineering candidate search"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-passive-design-search = { path = "../symthaea-passive-design-search" }

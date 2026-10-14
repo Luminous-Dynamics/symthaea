@@ -12,7 +12,10 @@ use symthaea_digital_twin::TwinState;
 use symthaea_fabrication_kernel::autonomy_loop::{AutonomyEvent, AutonomyLoop};
 use symthaea_fabrication_kernel::cincinnati_live::{AnomalyAlert, CincinnatiMonitor};
 use symthaea_fabrication_kernel::csg::CSGNode;
-use symthaea_fabrication_kernel::{GeometricThought, TriangleMesh};
+use symthaea_fabrication_kernel::{
+    GeometricThought, PassiveDesignEvidence, PassiveFunctionContract,
+    PassiveObjectiveObservation, PassiveObjectiveWeights, PassiveValidationReport, TriangleMesh,
+};
 use symthaea_formal_safety::{EvidenceKind, ProofObligation, SafetyCase};
 use symthaea_harmonies::{AlignmentResult, EightHarmonies};
 use symthaea_materials::{MaterialAgingModel, MaterialProperty};
@@ -404,6 +407,69 @@ impl EngineeringManager {
         }
     }
 
+    /// Evaluate a geometric thought under a passive-function contract.
+    ///
+    /// This is intentionally separate from ordinary fabrication preparation:
+    /// a candidate must supply structured evidence for passivity rather than
+    /// having passivity guessed from mesh geometry.
+    pub fn evaluate_passive_candidate(
+        &self,
+        thought: &GeometricThought,
+        contract: &PassiveFunctionContract,
+        evidence: PassiveDesignEvidence,
+        target_triangle_count: usize,
+        transverse_force: f64,
+    ) -> Option<(PassiveObjectiveObservation, PassiveValidationReport)> {
+        symthaea_fabrication_kernel::generative::passive_objective_observation(
+            &thought.operation_tree,
+            target_triangle_count,
+            transverse_force,
+            contract,
+            evidence,
+        )
+    }
+
+    /// Prepare a design for fabrication only when its declared passive
+    /// contract is satisfied.
+    ///
+    /// This is a separate gate from prepare_fabrication so existing workflows
+    /// retain their semantics. Safety and moral checks still remain
+    /// authoritative.
+    pub fn prepare_passive_fabrication(
+        &mut self,
+        thought: &GeometricThought,
+        design_intent: &str,
+        contract: &PassiveFunctionContract,
+        evidence: PassiveDesignEvidence,
+        target_triangle_count: usize,
+        transverse_force: f64,
+        weights: PassiveObjectiveWeights,
+    ) -> Result<f64, String> {
+        let (observation, passive_report) = self
+            .evaluate_passive_candidate(
+                thought,
+                contract,
+                evidence,
+                target_triangle_count,
+                transverse_force,
+            )
+            .ok_or_else(|| "Passive candidate could not be evaluated.".to_string())?;
+
+        if !passive_report.compliant {
+            return Err(format!(
+                "Passive contract rejected: {:?}",
+                passive_report.violations
+            ));
+        }
+
+        let score = observation.weighted_score(weights);
+        if !score.is_finite() || score <= 0.0 {
+            return Err("Passive objective score is invalid.".to_string());
+        }
+
+        self.prepare_fabrication(thought, design_intent)?;
+        Ok(score)
+    }
     pub fn prepare_fabrication(
         &mut self,
         thought: &GeometricThought,
