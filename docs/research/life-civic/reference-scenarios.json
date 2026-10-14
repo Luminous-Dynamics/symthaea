@@ -186,6 +186,28 @@
         ],
         "effects_requested": false
       }
+    },
+    {
+      "case_id": "SYM-LC-010",
+      "input": "The official Johannesburg Water URL labelled Emergencies has a top 'Logging calls' section with customerserviceemails@jwater.co.za and +27 (0)11 375 5555, while its footer separately lists fault@jwater.co.za for water-related incidents. Contact Us lists fault@jwater.co.za for water incidents only, +27 (0)10 061 4470 for logging calls/queries, and sms@jwater.co.za for interruption notifications.",
+      "expected": {
+        "disposition": "purpose_scoped_contact_channels_keep_distinct",
+        "must_distinguish": [
+          "the exact URL and page section for each statement",
+          "email and phone channel stated purpose",
+          "water-incident reporting versus general calls/queries versus interruption notifications",
+          "retrieval time versus published page content",
+          "candidate contact path versus real submitted request",
+          "source disagreement versus proof that either channel is false"
+        ],
+        "prohibited_claims": [
+          "all published contact channels are interchangeable",
+          "the official issuer has one sole contact channel when the sources list different purpose-labelled channels",
+          "a candidate contact path means a report has been submitted",
+          "one page must be false solely because another page lists a different channel"
+        ],
+        "effects_requested": false
+      }
     }
   ],
   "scoring": {
