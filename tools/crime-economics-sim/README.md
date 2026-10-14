@@ -1,6 +1,6 @@
 # Symthaea Crime-Economics Synthetic Evaluator
 
-This is a small isolated Rust research tool. It is not calibrated to observed crime data and is not an individual-risk model. It emits aggregate simulated counts only.
+This is a small isolated Rust research tool. It is not calibrated to observed crime data and is not an individual-risk model. It emits aggregate simulated counts only. Event labels describe model categories; they are not observed or adjudicated crimes, and no person-level risk is estimated.
 
 ## Reproduce locally
 
@@ -31,8 +31,8 @@ Policy arms are baseline, essentials, quality_work, robot_protection, and combin
 - annualized_cost_units are fictional accounting units, not dollars or a cost-effectiveness finding.
 - privacy_burden_points and benefit_concentration_bps are explicit proxies, not validated privacy or inequality measures.
 - Need-related and opportunity-related property events are modeled separately from non-economic harm. The model does not assume economic interventions remove non-economic harm.
-- displaced_property_events are included in total synthetic crime events but are separate from incidents remaining at the protected site.
-- reported_crime_reports depend on the scenario's reporting probability. A decline in reports does not necessarily indicate a decline in underlying harm.
+- displaced_property_events are included in total simulated harm events but are separate from incidents remaining at the protected site.
+- reported_harm_events depend on the scenario's reporting probability. A decline in reports does not necessarily indicate a decline in underlying harm.
 - false_alarms and robot_safety_incidents are separate from crime-event and report counts.
 - Seeds provide deterministic reproducibility and common random numbers across comparable scenario arms. They do not create empirical validity.
 
