@@ -26,6 +26,7 @@ const MIN_SOCIAL_PROTECTION: f64 = 0.75;
 const MAX_ACCESS_MINUTES: f64 = 60.0;
 const MAX_GROUP_GAP: f64 = 0.15;
 const MAX_INTERVAL_WIDTH: f64 = 0.20;
+const MAX_TIME_INTERVAL_WIDTH_MINUTES: f64 = 20.0;
 const MAX_EVIDENCE_AGE_DAYS: u32 = 180;
 
 #[derive(Clone, Debug)]
@@ -144,7 +145,7 @@ fn lower_is_better(range: &Range, ceiling: f64) -> &'static str {
     };
     if low > ceiling {
         "fail"
-    } else if high <= ceiling && high - low <= MAX_INTERVAL_WIDTH * 100.0 {
+    } else if high <= ceiling && high - low <= MAX_TIME_INTERVAL_WIDTH_MINUTES {
         "pass"
     } else {
         "uncertain"
