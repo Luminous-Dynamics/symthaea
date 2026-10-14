@@ -1077,7 +1077,7 @@ fn curve_json(style: Style, control: &str, base_seed: u64) -> serde_json::Value 
     let tempo_changed = observations
         .iter()
         .any(|point| {
-            (point.tempo_bpm - baseline_observation.tempo_bpm).abs() > MONOTONIC_EPSILON
+            (point.tempo_bpm - baseline_observation.tempo_bpm).abs() > MONOTONIC_EPSILON as f32
         });
     let meter_changed = observations
         .iter()
@@ -1322,9 +1322,9 @@ fn seed_robustness_summary(curves: &[serde_json::Value]) -> Vec<serde_json::Valu
             "all_seeds_changed_at_least_one_recorded_channel":
                 coverage_complete && changed_count == expected_seed_count,
             "per_channel_seed_counts": channel_seed_counts,
-            "interpretation": (
-                "Coverage is complete only when there is exactly one valid record for each "
-                "expected baseline seed. Counts describe measured output changes, not "
+            "interpretation": concat!(
+                "Coverage is complete only when there is exactly one valid record for each ",
+                "expected baseline seed. Counts describe measured output changes, not ",
                 "target-correctness, quality, or authenticity scores."
             ),
         }));
