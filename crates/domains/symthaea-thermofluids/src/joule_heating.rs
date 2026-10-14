@@ -265,8 +265,9 @@ impl JouleHeatingModel {
         let decay = (-decay_exponent).exp();
         // exp_m1 keeps (1 - exp(-x)) accurate when x is very small.
         let one_minus_decay = -(-decay_exponent).exp_m1();
-        let integral_decay_s = if rate_per_s == 0.0 {
-            // Limit (1 - exp(-r dt))/r -> dt as r -> 0.
+        let integral_decay_s = if rate_per_s == 0.0 || decay_exponent == 0.0 {
+            // Limit (1 - exp(-r dt))/r -> dt as r -> 0, including underflow
+            // in r * dt where the ratio cannot be recovered from exp_m1.
             time_step_s
         } else {
             one_minus_decay / rate_per_s
@@ -452,6 +453,21 @@ mod tests {
 
         assert_eq!(actual, expected);
         assert_eq!(zero_convection.temperature_k(), adiabatic.temperature_k());
+    }
+
+    #[test]
+    fn tiny_conductance_uses_the_adiabatic_limit_without_losing_heating() {
+        let mut adiabatic = reference_model();
+        let mut nearly_adiabatic = reference_model();
+        let expected = adiabatic.step(3.0, 10.0).unwrap();
+        let actual = nearly_adiabatic
+            .step_with_convection(3.0, 10.0, 300.0, f64::from_bits(1))
+            .unwrap();
+
+        assert!(
+            (actual.final_temperature_k - expected.final_temperature_k).abs() < 1e-12
+        );
+        assert!(actual.energy_balance_residual_j.abs() < 1e-9);
     }
 
     #[test]
