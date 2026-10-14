@@ -138,6 +138,26 @@ class ChoroInputManifestTests(unittest.TestCase):
                 report["blockers"],
             )
 
+    def test_on_disk_artifact_mismatch_blocks_authorization(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            artifact = root / "synthetic-score-artifact.bin"
+            artifact.write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture()
+            mpath = root / "manifest.json"
+            apath = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            mpath.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            apath.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            artifact.write_bytes(b"mutated synthetic fixture")
+            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            self.assertFalse(report["authorized"])
+            self.assertTrue(any("on-disk artifact SHA-256 does not match manifest" in b
+                                for b in report["blockers"]))
+            self.assertTrue(any("byte count does not match manifest" in b
+                                for b in report["blockers"]))
+
     def test_unreviewed_artifact_hash_cannot_authorize(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
