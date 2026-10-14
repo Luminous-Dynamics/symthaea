@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Fail-closed structural gate for a source-bound Choro input manifest.
+"""Fail-closed gate for source artifacts, rights scope, and registered Choro analysis plans.
 
-This script validates recorded rights decisions and manifest integrity; it does
-not make legal determinations. An empty template is valid but never authorized.
+This script validates recorded evidence and exact byte digests; it does not make
+legal determinations or independently verify the truth of an external registration.
+An empty template is valid but never authorized.
 """
 from __future__ import annotations
 
@@ -179,8 +180,9 @@ def review_scope_sha256(
     """Hash exact selected works plus artifact and requested study scope.
 
     The rights reviewer records this digest only after reviewing the selected
-    works, exact artifact, intended uses, commercial status, jurisdictions and
-    planned outputs together. Canonical JSON makes the digest reproducible.
+    works, exact artifact, exact frozen analysis plan, intended uses, commercial
+    status, jurisdictions and planned outputs together. Canonical JSON makes
+    the digest reproducible.
     """
     scope = require_object(manifest.get("scope"), "scope")
     analysis_plan = validate_analysis_plan(scope, analysis_plan_root)
@@ -518,9 +520,9 @@ def evaluate_manifest(
         },
         "blockers": blockers,
         "interpretation": (
-            "A successful authorization status means the recorded scope, artifact hashes, "
-            "rights-layer decisions and independent receipt are internally consistent. "
-            "It is not legal advice and does not override the rights holders' terms."
+            "A successful authorization status means the recorded scope, source/plan artifact hashes, "
+            "registered-plan fields, rights-layer decisions and independent receipt are internally consistent. "
+            "It is not legal advice and does not prove an external registration record is truthful or current."
         ),
     }
 
