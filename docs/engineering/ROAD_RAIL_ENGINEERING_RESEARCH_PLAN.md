@@ -25,7 +25,7 @@ Therefore:
 3. Every result must name its target quantity, units, conditioning assumptions, calibration population, uncertainty, and qualification state.
 4. If target-specific evidence is missing or outside the training/calibration domain, return **insufficient evidence** rather than a numeric prediction presented as qualified.
 
-The new `infrastructure.rs` module establishes evidence-bearing road/rail observation records. Its validators check basic field integrity and physical domains only; they intentionally define no acceptance thresholds.
+Do not add a second generic observation/provenance ontology for this work. The implementation should reuse canonical owners: SE-SEM-001 (#4861) for physical quantities, units, frames and time; FIELD/FIELD-001A/SE-OBS (#3589/#3633/#3695) for physical observations, calibration and provenance; ENG-EVID-INDEP (#4918) for dependency, common-mode and replication semantics; ENG-EVID-CLAIM (#5771) for evidence-bound claims; and MAT-007/008/013 for materials identity, conditioned measurements and physical-sample lineage. Road/rail-specific work should remain a thin domain profile or adapter unless the transport owner audit demonstrates a concrete semantic gap that existing owners cannot represent losslessly. See the dedicated ownership gates at [BIO-CEM-001 #5751](https://github.com/Luminous-Dynamics/symthaea/issues/5751), [literature benchmark #5753](https://github.com/Luminous-Dynamics/symthaea/issues/5753), [observation-contract preregistration #5767](https://github.com/Luminous-Dynamics/symthaea/issues/5767), and [zero-new-type gate #5768](https://github.com/Luminous-Dynamics/symthaea/issues/5768).
 
 ## First research targets
 
@@ -158,4 +158,4 @@ A pilot should be selected for evidence quality and manageable consequences, not
 
 ## Current claim ceiling
 
-This work establishes **well-formed, evidence-linked observation inputs and a research plan** only. It does not yet discover a new road/rail material, predict service life, outperform industry methods, prove compliance, establish cost savings, or authorize construction. The new Rust tests have been authored but must still execute successfully at the exact PR head before any test-pass claim is made.
+This document establishes a research plan only. It does not introduce a new production observation ontology, discover a new road/rail material, predict service life, outperform industry methods, prove compliance, establish cost savings, or authorize construction. Any future code change must be justified against the canonical owner matrix first, then pass exact-head tests before qualification claims.
