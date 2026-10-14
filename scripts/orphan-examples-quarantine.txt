@@ -58,7 +58,6 @@ circadian_homeostasis_demo
 clinical_validation
 cmaes_standing
 cmaes_walking
-coding_agent_benchmark
 cognitive_cycle
 combined_arc
 conscious_nap_demo
