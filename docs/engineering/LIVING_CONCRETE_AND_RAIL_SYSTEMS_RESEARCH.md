@@ -59,11 +59,13 @@ Reviews published in 2024–2025 identify promising laboratory results but also 
 - Use a predeclared factorial or other justified design to test interactions instead of multiplying the best result from separate studies.
 - Treat fungal systems and novel engineered living materials as research hypotheses until material-level and biosafety evidence justify further investment.
 
-### A3. Candidate data contract
+### A3. Candidate data contract (reference composition, not a duplicate ontology)
 
-Each candidate record must contain:
+This is a requirements checklist for composing existing owners, not permission to add a parallel Rust candidate/material/evidence ontology. Before implementation, complete the field-by-field zero-duplication audit required by [BIO-CEM-001A1 #5767](https://github.com/Luminous-Dynamics/symthaea/issues/5767) and [MFG-FOUNDATION zero-new-type gate #5768](https://github.com/Luminous-Dynamics/symthaea/issues/5768). Reuse MAT-007/008/009/010/013/014, MAT-HYPOTHESIS #5254, FIELD/SE-OBS, ENG-EVID-INDEP #4918, ENG-EVID-CLAIM #5771, and Mycelix BIO-MFG/lifecycle references where they own the corresponding facts. If a canonical owner represents a field, reference it instead of copying the value into a new type. The existing BIO-CEM campaign #5751 and literature corpus #5753 are the canonical research workstreams.
 
-- Stable candidate/formulation ID and version.
+Each candidate/evidence projection should resolve, where applicable, to:
+
+- Stable candidate/formulation subject and version through the canonical material subject owner.
 - Material scope: mortar, cast concrete, precast, repair mortar, road slab, bridge deck, sleeper, culvert or another explicitly defined use.
 - Full composition/source/batch provenance and component reuse rights.
 - Healing class: autogenous, internal curing, non-living encapsulated, microbial, fiber/mineral hybrid, or other named mechanism.
