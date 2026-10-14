@@ -110,13 +110,13 @@ Store identifiers and public metadata where licensing permits. Never republish p
 
 The branch now contains an isolated, dependency-free Rust crate at `tools/crime-economics-sim/`. It is a model-mechanics prototype, not an empirically calibrated criminology model.
 
-The frozen initial design is:
+The initial design, including the robot-effectiveness sensitivity extension, is:
 - 1,000 synthetic household-equivalents represented only as five aggregate access cohorts;
 - 52 weekly steps per replication;
 - 32 deterministic random seeds per cell;
 - five policy arms: baseline, essentials, quality work, robot protection, and combined support;
-- six scenarios: reference, high displacement, reporting suppression, concentrated automation, high robot compromise, and unequal access;
-- 960 output rows, with no person-level records or scores.
+- seven scenarios: reference, high displacement, reporting suppression, concentrated automation, high robot compromise, unequal access, and low robot effectiveness;
+- 1,120 output rows, with no person-level records or scores.
 
 Event generation separates need-related property events, opportunity-related property events, and non-economic harm. Robot protection affects only the modeled property-event channel, can be compromised, can generate false alarms and safety incidents, and may displace events into a neighboring ring. Report probability is a separate scenario parameter. Access gains, distribution concentration, privacy burden and annualized costs are explicit illustrative parameters/proxies, not measured outcomes or monetary valuations.
 
@@ -125,11 +125,12 @@ The standalone verifier reads the simulator's emitted TSV as a separate executab
 - higher displacement leaves focal-site outcomes unchanged and cannot reduce modeled displacement;
 - non-economic harm remains visible across all policy arms;
 - uneven essential-service access worsens the modeled access gap;
+- weakening the robot-effectiveness assumption cannot improve robot-enabled policy outcomes and cannot perturb non-robot arms.
 - higher robot-compromise probability increases compromise exposure without altering non-robot policy arms.
 
 These controls validate programmed invariants, not the realism of the assumptions. The simulator uses an explicit seeded pseudorandom generator, common random numbers for paired comparisons, and no third-party dependencies. Its cost units and privacy/concentration proxies are intentionally not combined into a single social-value score. The research must not choose a policy based on the synthetic means.
 
-The path-scoped workflow runs Rust unit tests, generates the 960-row artifact, invokes the independent verifier, records the exact source commit and a SHA-256 digest, and uploads the evidence artifact for seven days. Passing this workflow would establish that the prototype and artifact satisfy their coded contracts at that exact head. It would not establish model calibration, a causal effect, a robot safety case, or real-world crime reduction.
+The path-scoped workflow runs Rust unit tests, generates the 1,120-row artifact twice and byte-compares the outputs, invokes the independent verifier, records the exact source commit and a SHA-256 digest, and uploads the evidence artifact for seven days. Passing this workflow would establish that the prototype and artifact satisfy their coded contracts at that exact head. It would not establish model calibration, a causal effect, a robot safety case, or real-world crime reduction.
 
 ## Immediate model limitations
 
