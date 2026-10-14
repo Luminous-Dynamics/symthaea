@@ -44,7 +44,7 @@
     },
     {
       "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
-      "git_blob_sha1": "d0d8120714f8bfe97efef47b43eed34e6afec31b"
+      "git_blob_sha1": "398c24e3d62381fff67042402d3f0a0f2d63fab5"
     },
     {
       "path": "tools/crime-economics-sim/src/viability.rs",
