@@ -515,6 +515,17 @@ mod tests {
     }
 
     #[test]
+    fn scenario_policy_seed_results_are_reproducible() {
+        for scenario in SCENARIOS {
+            for policy in POLICY_ARMS {
+                let first = run_one(scenario, policy, 17);
+                let second = run_one(scenario, policy, 17);
+                assert_eq!(first, second, "non-deterministic result for {}/{}", scenario.id, policy.id);
+            }
+        }
+    }
+
+    #[test]
     fn reporting_suppression_changes_reports_not_underlying_harm() {
         for policy in POLICY_ARMS {
             for seed in 0..REPLICATIONS {
