@@ -11,7 +11,14 @@
     "planned_outputs": [
       "aggregate_metrics"
     ],
-    "retention_policy": "Specify before any source retrieval; do not retain source files beyond the approved scope."
+    "retention_policy": "Specify before any source retrieval; do not retain source files beyond the approved scope.",
+    "analysis_plan": {
+      "plan_id": "CHORO-EMPIRICAL-ANALYSIS-PLAN-TEMPLATE-001",
+      "path": "crates/domains/symthaea-muse/CHORO_PRE_REGISTERED_ANALYSIS_PLAN_V1.json",
+      "sha256": null,
+      "registered_on": null,
+      "registration_record_url": null
+    }
   },
   "required_rights_dimensions": [
     "underlying_composition",
@@ -59,6 +66,14 @@
       "third_party_materials"
     ],
     "selection_rule": "Name exact work or movement identifiers within each artifact; collections must not be treated as a single undifferentiated work. State the predeclared selection basis.",
-    "review_scope_digest": "reviewed_scope_sha256 is SHA-256 over canonical JSON computed by scripts/muse_choro_input_manifest.py::review_scope_sha256; it binds the source record, exact artifact metadata, selected work IDs, selection basis, and declared intended-use/commercial/jurisdiction/output/retention scope."
+    "review_scope_digest": "reviewed_scope_sha256 is SHA-256 over canonical JSON computed by scripts/muse_choro_input_manifest.py::review_scope_sha256; it binds the source record, exact artifact metadata, selected work IDs, selection basis, and declared intended-use/commercial/jurisdiction/output/retention scope.",
+    "scope_analysis_plan_required_fields": [
+      "plan_id",
+      "path",
+      "sha256",
+      "registered_on",
+      "registration_record_url"
+    ],
+    "analysis_plan_contract": "For any non-empty source list, scope.analysis_plan must identify an exact repository-relative JSON plan whose on-disk SHA-256 matches the manifest. The plan file must have pre_registration.status=registered, hypotheses_frozen=true, null_models_frozen=true, thresholds_frozen=true, an ISO registered_on date, and an HTTPS registration_record_url. Date and URL must match the manifest. Rights-review scope digests bind this exact plan identity and digest; rights review and independent approval must not predate plan registration. The checked-in analysis-plan template is intentionally not registered and cannot authorize analysis."
   }
 }
