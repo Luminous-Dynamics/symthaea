@@ -143,5 +143,8 @@ The implementation intentionally omits a calibrated empirical event process, hou
 4. World Bank, **What are we learning about the impacts of public works programs on employment and violence?**: https://blogs.worldbank.org/en/impactevaluations/what-are-we-learning-about-impacts-public-works-programs-employment-and-violence-early-findings
 5. NIST, **SP 800-82 Rev. 4 Initial Public Draft** (published 2026-09-21; comments due 2026-11-30): https://csrc.nist.gov/pubs/sp/800/82/r4/ipd
 6. UNODC, **Crime Prevention & Criminal Justice Module 2: Summary**: https://www.unodc.org/e4j/en/crime-prevention-criminal-justice/module-2/key-issues/summary.html
+7. ISO, **ISO 10218-1:2025 — Robotics — Safety requirements — Part 1: Industrial robots**: https://www.iso.org/standard/73933.html
+8. ISO, **ISO 10218-2:2025 — Robotics — Safety requirements — Part 2: Industrial robot applications and robot cells**: https://www.iso.org/standard/73934.html. The public catalogue describes industrial robot applications/cells and lists public-access service robots and law-enforcement uses among exclusions. This is why industrial robot standards must not be treated as a universal safety qualification for public-facing service or security robots.
+
 
 **Evidence claim ceiling:** these sources support a research agenda and bounded hypotheses, not a claim that robotics makes most crime economically irrational. No pilot result, causal effect size, or Symthaea reasoning score is asserted.
