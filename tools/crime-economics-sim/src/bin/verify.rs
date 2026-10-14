@@ -4,13 +4,14 @@ use std::fs;
 use std::process::ExitCode;
 
 const EXPECTED_HEADER: &str = "schema_version\tscenario_id\tseed\tpolicy_id\tpopulation\tmodel_weeks\tneed_property_events_local\topportunity_property_events_local\tnon_economic_harm_events\tdisplaced_property_events\ttrue_crime_events_total\treported_crime_reports\tfalse_alarms\trobot_compromise_weeks\trobot_safety_incidents\tannualized_cost_units\tessential_access_gain_bps\tessential_access_gap_bps\tprivacy_burden_points\tbenefit_concentration_bps";
-const EXPECTED_SCENARIOS: [&str; 6] = [
+const EXPECTED_SCENARIOS: [&str; 7] = [
     "reference",
     "high_displacement",
     "reporting_suppression",
     "concentrated_automation",
     "high_robot_compromise",
     "unequal_essential_access",
+    "low_robot_effectiveness",
 ];
 const EXPECTED_POLICIES: [&str; 5] = [
     "baseline",
@@ -283,6 +284,26 @@ fn run(path: &str) -> Result<(), String> {
         }
     }
 
+    // Adversarial scenario: lower robot effectiveness cannot improve a robot-enabled
+    // policy; non-robot arms must remain bit-for-bit equivalent to the reference.
+    for seed in 0..REPLICATIONS {
+        for policy in EXPECTED_POLICIES {
+            let reference = get(&rows, "reference", seed, policy)?;
+            let low = get(&rows, "low_robot_effectiveness", seed, policy)?;
+            if policy == "robot_protection" || policy == "combined" {
+                if low.need < reference.need
+                    || low.opportunity < reference.opportunity
+                    || low.displaced > reference.displaced
+                    || low.true_crime < reference.true_crime
+                {
+                    return Err(format!("lower robot effectiveness improved outcomes: seed={seed}, policy={policy}"));
+                }
+            } else if !reference.same_non_reporting_fields(low) || reference.reports != low.reports {
+                return Err(format!("robot effectiveness sensitivity changed a non-robot arm: seed={seed}, policy={policy}"));
+            }
+        }
+    }
+
     // Adversarial scenario: higher robot compromise probability increases
     // compromise exposure and removes protection only from robot-enabled arms.
     for seed in 0..REPLICATIONS {
@@ -309,7 +330,7 @@ fn run(path: &str) -> Result<(), String> {
     println!("SCENARIOS={}", EXPECTED_SCENARIOS.len());
     println!("POLICIES={}", EXPECTED_POLICIES.len());
     println!("REPLICATIONS_PER_CELL={REPLICATIONS}");
-    println!("NEGATIVE_CONTROLS=reporting_suppression,high_displacement,non_economic_harm,unequal_access,concentrated_automation,high_robot_compromise");
+    println!("NEGATIVE_CONTROLS=reporting_suppression,high_displacement,non_economic_harm,unequal_access,concentrated_automation,high_robot_compromise,low_robot_effectiveness");
     println!("SUMMARY_FIELDS=scenario,policy,mean_true_crime_events,mean_reported_crime_reports,mean_displaced_property_events,mean_robot_safety_incidents,cost_units,access_gap_bps");
     for scenario in EXPECTED_SCENARIOS {
         for policy in EXPECTED_POLICIES {
