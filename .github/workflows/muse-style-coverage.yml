@@ -15,6 +15,7 @@ on:
       - "scripts/muse_choro_synthetic_harness.py"
       - "tests/python/test_muse_genre_completion_roadmap.py"
       - "tests/python/test_muse_choro_synthetic_harness.py"
+      - "tests/python/test_muse_choro_source_intake.py"
       - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
       - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
       - "crates/domains/symthaea-muse/MUSE_GLOBAL_GENRE_COVERAGE_RESEARCH_V1.md"
@@ -41,6 +42,7 @@ on:
       - "scripts/muse_choro_synthetic_harness.py"
       - "tests/python/test_muse_genre_completion_roadmap.py"
       - "tests/python/test_muse_choro_synthetic_harness.py"
+      - "tests/python/test_muse_choro_source_intake.py"
       - "crates/domains/symthaea-muse/genre-completion-roadmap-v1.json"
       - "crates/domains/symthaea-muse/SOUTHERN_AFRICAN_GENRE_RESEARCH_BRIEF_V1.md"
       - "crates/domains/symthaea-muse/MUSE_GLOBAL_GENRE_COVERAGE_RESEARCH_V1.md"
@@ -154,6 +156,9 @@ jobs:
 
       - name: Test Choro synthetic metric harness and fail-closed inputs
         run: python3 tests/python/test_muse_choro_synthetic_harness.py -v
+
+      - name: Test Choro source-intake accounting and rights boundaries
+        run: python3 tests/python/test_muse_choro_source_intake.py -v
 
       - name: Publish synthetic harness boundary to job summary
         run: |
