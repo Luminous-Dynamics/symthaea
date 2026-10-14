@@ -23,13 +23,36 @@ from muse_choro_input_manifest import (  # noqa: E402
 ARTIFACT_BYTES = b"synthetic fixture bytes only; not score content"
 
 
-def approved_fixture() -> tuple[dict, dict]:
+def approved_fixture(analysis_plan_root: Path) -> tuple[dict, dict]:
     digest = hashlib.sha256(ARTIFACT_BYTES).hexdigest()
+    registration_url = "https://example.org/synthetic-preregistration"
+    registered_on = "2026-10-14"
+    plan_document = {
+        "schema": "muse-choro-preregistered-analysis-plan-v1",
+        "plan_id": "TEST-CHORO-ANALYSIS-PLAN",
+        "pre_registration": {
+            "status": "registered",
+            "registered_on": registered_on,
+            "registration_record_url": registration_url,
+            "hypotheses_frozen": True,
+            "null_models_frozen": True,
+            "thresholds_frozen": True,
+        },
+    }
+    plan_bytes = (json.dumps(plan_document, indent=2, sort_keys=True) + "\n").encode()
+    (analysis_plan_root / "synthetic-analysis-plan.json").write_bytes(plan_bytes)
     manifest = {
         "schema": "muse-choro-approved-input-manifest-v1",
         "manifest_id": "TEST-CHORO-MANIFEST",
         "scope": {
             "purpose": "synthetic validator fixture only",
+            "analysis_plan": {
+                "plan_id": "TEST-CHORO-ANALYSIS-PLAN",
+                "path": "synthetic-analysis-plan.json",
+                "sha256": hashlib.sha256(plan_bytes).hexdigest(),
+                "registered_on": registered_on,
+                "registration_record_url": registration_url,
+            },
             "requested_uses": ["empirical_analysis"],
             "commercial_use": True,
             "jurisdictions": ["US", "ZA"],
@@ -81,7 +104,7 @@ def approved_fixture() -> tuple[dict, dict]:
         }],
     }
     manifest["sources"][0]["rights_review"]["reviewed_scope_sha256"] = review_scope_sha256(
-        manifest, manifest["sources"][0]
+        manifest, manifest["sources"][0], analysis_plan_root
     )
     return manifest, {
         "schema": "muse-choro-input-manifest-approval-v1",
@@ -127,6 +150,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             "No exact source artifacts are in the approved-input manifest.",
             report["blockers"],
         )
+        self.assertIn("No hash-bound pre-registered analysis plan is declared.", report["blockers"])
         self.assertTrue(any("Commercial/non-commercial purpose is unresolved" in b
                             for b in report["blockers"]))
         self.assertTrue(any("No intended jurisdiction" in b for b in report["blockers"]))
@@ -135,11 +159,74 @@ class ChoroInputManifestTests(unittest.TestCase):
         self.assertIn("reviewed_scope_sha256", contract["rights_review_required_fields"])
         self.assertIn("review_scope_digest", contract)
 
+    def test_analysis_plan_digest_rejects_on_disk_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture(root)
+            plan_path = root / "synthetic-analysis-plan.json"
+            plan_path.write_bytes(plan_path.read_bytes() + b" ")
+            manifest_path = root / "manifest.json"
+            approval_path = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
+            manifest_path.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            approval_path.write_text(
+                json.dumps(approval, indent=2) + "\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ManifestError, "analysis plan SHA-256 does not match the exact on-disk plan bytes"
+            ):
+                evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
+
+    def test_unfrozen_analysis_plan_cannot_authorize(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture(root)
+            plan_path = root / "synthetic-analysis-plan.json"
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["pre_registration"]["thresholds_frozen"] = False
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode()
+            plan_path.write_bytes(plan_bytes)
+            manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
+            manifest_path = root / "manifest.json"
+            approval_path = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
+            manifest_path.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            approval_path.write_text(
+                json.dumps(approval, indent=2) + "\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ManifestError, "analysis plan requires pre_registration.thresholds_frozen == true"
+            ):
+                evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
+
+    def test_analysis_plan_path_cannot_escape_its_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture(root)
+            manifest["scope"]["analysis_plan"]["path"] = "../synthetic-analysis-plan.json"
+            manifest_path = root / "manifest.json"
+            approval_path = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
+            manifest_path.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            approval_path.write_text(
+                json.dumps(approval, indent=2) + "\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                ManifestError, "analysis_plan.path must be a relative path without traversal"
+            ):
+                evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
+
     def test_explicit_approval_binds_exact_manifest_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             manifest_path = root / "manifest.json"
             approval_path = root / "approval.json"
             intake_path = INTAKE
@@ -147,12 +234,16 @@ class ChoroInputManifestTests(unittest.TestCase):
             manifest_path.write_bytes(manifest_bytes)
             approval["manifest_sha256"] = hashlib.sha256(manifest_bytes).hexdigest()
             approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(manifest_path, approval_path, intake_path, root)
+            report = evaluate_manifest(manifest_path, approval_path, intake_path, root, root)
             self.assertTrue(report["authorized"], report["blockers"])
             self.assertEqual(report["source_ids"], ["imslp-choro-mineiro-rocha-2022"])
             self.assertEqual(
                 report["artifacts"][0]["artifact_sha256"],
                 manifest["sources"][0]["artifact_sha256"],
+            )
+            self.assertEqual(
+                report["scope"]["analysis_plan"]["sha256"],
+                manifest["scope"]["analysis_plan"]["sha256"],
             )
             self.assertEqual(report["artifacts"][0]["artifact_bytes"], len(ARTIFACT_BYTES))
             self.assertEqual(
@@ -178,7 +269,7 @@ class ChoroInputManifestTests(unittest.TestCase):
 
             # Any change to manifest bytes invalidates the detached approval receipt.
             manifest_path.write_bytes(manifest_bytes + b" ")
-            report = evaluate_manifest(manifest_path, approval_path, intake_path, root)
+            report = evaluate_manifest(manifest_path, approval_path, intake_path, root, root)
             self.assertFalse(report["authorized"])
             self.assertIn(
                 "Approval receipt SHA-256 does not match the exact manifest bytes.",
@@ -190,7 +281,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             root = Path(temp)
             artifact = root / "synthetic-score-artifact.bin"
             artifact.write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             mpath = root / "manifest.json"
             apath = root / "approval.json"
             raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
@@ -198,7 +289,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             artifact.write_bytes(b"mutated synthetic fixture")
-            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            report = evaluate_manifest(mpath, apath, INTAKE, root, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any("on-disk artifact SHA-256 does not match manifest" in b
                                 for b in report["blockers"]))
@@ -209,7 +300,7 @@ class ChoroInputManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             manifest["sources"][0]["rights_review"]["reviewed_artifact_sha256"] = "b" * 64
             mpath = root / "manifest.json"
             apath = root / "approval.json"
@@ -217,7 +308,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            report = evaluate_manifest(mpath, apath, INTAKE, root, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any("does not bind the exact artifact SHA-256" in b
                                 for b in report["blockers"]))
@@ -226,7 +317,7 @@ class ChoroInputManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             manifest["sources"][0]["rights_review"]["rights_dimensions"]["scan_or_digital_file"]["decision"] = "unclear"
             mpath = root / "manifest.json"
             apath = root / "approval.json"
@@ -234,7 +325,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            report = evaluate_manifest(mpath, apath, INTAKE, root, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any("scan_or_digital_file is 'unclear'" in b
                                 for b in report["blockers"]))
@@ -243,7 +334,7 @@ class ChoroInputManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             manifest["scope"]["requested_uses"] = ["model_training"]
             manifest["scope"]["commercial_use"] = False
             mpath = root / "manifest.json"
@@ -252,7 +343,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            report = evaluate_manifest(mpath, apath, INTAKE, root, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any("does not permit requested uses" in b for b in report["blockers"]))
 
@@ -260,7 +351,7 @@ class ChoroInputManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             approval["approver_id"] = "independent-rights-reviewer"
             mpath = root / "manifest.json"
             apath = root / "approval.json"
@@ -268,7 +359,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            report = evaluate_manifest(mpath, apath, INTAKE, root, root)
             self.assertFalse(report["authorized"])
             self.assertIn(
                 "The manifest approver must be independent of every source rights reviewer.",
@@ -279,7 +370,7 @@ class ChoroInputManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             manifest["sources"][0]["selected_work_ids"] = ["another synthetic work"]
             mpath = root / "manifest.json"
             apath = root / "approval.json"
@@ -287,7 +378,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            report = evaluate_manifest(mpath, apath, INTAKE, root, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any(
                 "does not bind selected works and the exact requested scope" in blocker
@@ -298,7 +389,7 @@ class ChoroInputManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             manifest["sources"][0]["source_record_url"] = "https://example.org/unrelated-record"
             mpath = root / "manifest.json"
             apath = root / "approval.json"
@@ -307,13 +398,13 @@ class ChoroInputManifestTests(unittest.TestCase):
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             with self.assertRaisesRegex(ManifestError, "does not match the exact intake record"):
-                evaluate_manifest(mpath, apath, INTAKE, root)
+                evaluate_manifest(mpath, apath, INTAKE, root, root)
 
     def test_review_cannot_predate_artifact_retrieval(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             manifest["sources"][0]["retrieved_on"] = "2026-10-15"
             manifest["sources"][0]["rights_review"]["reviewed_on"] = "2026-10-14"
             mpath = root / "manifest.json"
@@ -322,7 +413,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            report = evaluate_manifest(mpath, apath, INTAKE, root, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any("predates retrieval" in blocker for blocker in report["blockers"]))
 
@@ -330,7 +421,7 @@ class ChoroInputManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
-            manifest, approval = approved_fixture()
+            manifest, approval = approved_fixture(root)
             manifest["sources"][0]["intake_source_id"] = "not-in-source-intake"
             mpath = root / "manifest.json"
             apath = root / "approval.json"
@@ -339,7 +430,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             with self.assertRaisesRegex(ManifestError, "absent from CHORO_SOURCE_INTAKE_V1"):
-                evaluate_manifest(mpath, apath, INTAKE, root)
+                evaluate_manifest(mpath, apath, INTAKE, root, root)
 
 
 if __name__ == "__main__":
