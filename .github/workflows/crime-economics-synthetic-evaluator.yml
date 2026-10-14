@@ -56,7 +56,11 @@ jobs:
           mkdir -p target/crime-economics-evidence
           cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin simulate \
             > target/crime-economics-evidence/simulation.tsv
-          test "$(wc -l < target/crime-economics-evidence/simulation.tsv)" -eq 961
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin simulate \
+            > target/crime-economics-evidence/simulation-repeat.tsv
+          cmp target/crime-economics-evidence/simulation.tsv target/crime-economics-evidence/simulation-repeat.tsv
+          rm target/crime-economics-evidence/simulation-repeat.tsv
+          test "$(wc -l < target/crime-economics-evidence/simulation.tsv)" -eq 1121
           sha256sum target/crime-economics-evidence/simulation.tsv \
             > target/crime-economics-evidence/simulation.tsv.sha256
       - name: Independently verify the emitted artifact
