@@ -42,6 +42,12 @@ The separate [Choro source-intake inventory](CHORO_SOURCE_INTAKE_V1.json) record
 
 **None is rights-cleared in this inventory.** These catalog pages are research leads, not legal opinions. Rights in the composition, score edition, digitization, performance recording, lyrics and annotations may differ. Verify the exact source file, attribution/license, territorial scope and intended use before acquisition, transcription or analysis. The historical piano score and contemporary single-composer collection are not representative samples by themselves. The inventory confirms zero downloads, zero transcriptions, and zero empirical analysis.
 
+## Source-bound approved-input gate
+
+`CHORO_APPROVED_INPUT_MANIFEST_V1.json` is intentionally empty and `CHORO_APPROVED_INPUT_APPROVAL_V1.json` is explicitly unapproved. The checker `scripts/muse_choro_input_manifest.py --check` reports the current blocked state; it does not authorize any work. A future source-bound experiment must require `--require-authorized --artifact-root <private-reviewed-files-dir>` before analysis. Authorization requires exact on-disk SHA-256 and byte-count checks, a rights review bound to that artifact digest, explicit use/commercial/jurisdiction scope, separate decisions for the composition, edition/arrangement, digital file/scan and third-party material, plus an independent approval receipt hashing the exact manifest bytes.
+
+This is a structural evidence gate, not a legal opinion: complete fields do not independently prove that a license is valid or that a reviewer reached the correct conclusion. Synthetic tests use only fabricated bytes and fixture evidence URLs. No downloaded score, transcription, restricted corpus row or empirical Choro measurement is included. Any future empirical runner must call this gate as a precondition; the current synthetic-only harness remains separate and does not ingest score sources.
+
 
 ## Clarification on the archived corpus's rights metadata
 
