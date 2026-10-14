@@ -66,7 +66,7 @@
       "third_party_materials"
     ],
     "selection_rule": "Name exact work or movement identifiers within each artifact; collections must not be treated as a single undifferentiated work. State the predeclared selection basis.",
-    "review_scope_digest": "reviewed_scope_sha256 is SHA-256 over canonical JSON computed by scripts/muse_choro_input_manifest.py::review_scope_sha256; it binds the source record, exact artifact metadata, selected work IDs, selection basis, and declared intended-use/commercial/jurisdiction/output/retention scope.",
+    "review_scope_digest": "rights_review.reviewed_scope_sha256 is SHA-256 over canonical JSON computed by scripts/muse_choro_input_manifest.py::review_scope_sha256. It binds the source record, exact source artifact, selected work/movement IDs, selection basis, four rights layers, declared use/commercial/jurisdiction/output/retention scope, and the exact frozen analysis-plan ID/path/SHA-256/registration date/registration URL. Any change invalidates the review-scope digest.",
     "scope_analysis_plan_required_fields": [
       "plan_id",
       "path",
