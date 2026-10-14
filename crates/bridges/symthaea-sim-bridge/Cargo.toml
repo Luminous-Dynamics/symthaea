@@ -15,6 +15,7 @@ categories = ["science", "simulation"]
 iceoryx2.workspace = true
 
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-types = { path = "../../core/symthaea-types" }
 serde = { workspace = true }
 thiserror = { workspace = true }
 # Non-blocking-mode (O_NONBLOCK) for CommandSolver::execute's subprocess
