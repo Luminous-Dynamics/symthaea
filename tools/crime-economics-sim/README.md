@@ -26,7 +26,7 @@ Policy arms are baseline, essentials, quality_work, robot_protection, and combin
 
 ## Important units and assumptions
 
-- The 1,000-person-equivalent population, 52-week window, cohort weights, event rates, program effects, reporting probabilities, robot protection rate, false-alarm rate, compromise rates, and scenario shocks are synthetic assumptions, not estimated parameters.
+- The 1,000 synthetic household-equivalents, 52-week window, cohort weights, event rates, program effects, reporting probabilities, robot protection rate, false-alarm rate, compromise rates, and scenario shocks are synthetic assumptions, not estimated parameters.
 - annualized_cost_units are fictional accounting units, not dollars or a cost-effectiveness finding.
 - privacy_burden_points and benefit_concentration_bps are explicit proxies, not validated privacy or inequality measures.
 - Need-related and opportunity-related property events are modeled separately from non-economic harm. The model does not assume economic interventions remove non-economic harm.
