@@ -26,6 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
       - name: Verify pinned runtime and workflow source bytes
         shell: bash
         run: |
@@ -55,6 +57,8 @@ jobs:
             actual="$(git hash-object "$path")"
             test "$actual" = "$expected"
           done < <(jq -r '.files[] | [.path, .git_blob_sha1] | @tsv' "$manifest")
+      - name: Check isolated crate formatting
+        run: cargo fmt --manifest-path tools/crime-economics-sim/Cargo.toml -- --check
       - name: Run isolated Rust unit and adversarial tests
         run: cargo test --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked
       - name: Generate deterministic-seed synthetic matrix
