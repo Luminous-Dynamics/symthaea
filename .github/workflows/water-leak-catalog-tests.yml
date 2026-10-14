@@ -11,6 +11,7 @@ on:
       - "docs/research/WATER_LEAK_001_JOHANNESBURG_TRANSFER.md"
       - "docs/research/WATER_LEAK_001_DATA_ACQUISITION_PLAYBOOK.md"
       - ".github/workflows/water-leak-catalog-tests.yml"
+      - ".github/workflows/water-leak-satellite-inventory.trigger"
   pull_request:
     paths:
       - "tools/water_leak_satellite/**"
@@ -19,6 +20,7 @@ on:
       - "docs/research/WATER_LEAK_001_JOHANNESBURG_TRANSFER.md"
       - "docs/research/WATER_LEAK_001_DATA_ACQUISITION_PLAYBOOK.md"
       - ".github/workflows/water-leak-catalog-tests.yml"
+      - ".github/workflows/water-leak-satellite-inventory.trigger"
   workflow_dispatch:
 
 permissions:
