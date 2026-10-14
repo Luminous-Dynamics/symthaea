@@ -557,7 +557,7 @@ def verify_inventory(document: Any) -> list[str]:
     actual_keys = sorted(actual_keys, key=lambda v: (v[0], v[1], v[2]))
     expected_keys = sorted([(p["profile_id"], s, e) for p, s, e in expected], key=lambda v: (v[0], v[1], v[2]))
     if actual_keys != expected_keys:
-        errors.append("queries: year-partitioned query set does not exactly cover both declared profiles and date scope")
+        errors.append("queries: partitioned query set does not exactly cover both declared profiles and date scope")
     return errors
 
 
