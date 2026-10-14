@@ -75,7 +75,7 @@ def require_https(value: Any, label: str) -> str:
 
 def require_date(value: Any, label: str) -> str:
     text = require_text(value, label)
-    if not re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}", text):
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
         raise ManifestError(f"{label} must be an ISO date (YYYY-MM-DD)")
     try:
         date.fromisoformat(text)
