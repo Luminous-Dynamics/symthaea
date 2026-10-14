@@ -24,6 +24,32 @@ Compose existing work rather than creating duplicate roots:
 - Sol-Atlas [evidence-bounded transport projection PR #111](https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/111).
 - Symtropy [engineering digital-twin boundary #1467](https://github.com/Luminous-Dynamics/symtropy/issues/1467).
 
+## Canonical field-ownership map
+
+This table is an adapter/research checklist, not a proposal to instantiate parallel Rust types. Verify each interface against the current qualified successor before coding; some historical MAT/split implementations are explicitly not current qualified dependencies.
+
+| Fact needed | Existing owner to compose | Contribution of this research | Must not duplicate |
+|---|---|---|---|
+| Material/formulation identity | MAT-007 (#4336) and its repaired/current successor | State which candidate/material the experiment concerns | Material identity type |
+| Conditioned property, unit, method and uncertainty | MAT-008 (#4339), SE-SEM-001 (#4861), FIELD/SE-OBS | Name application-specific outcome planes and measurements | Quantity/unit/measurement system |
+| Campaign/objective and trade space | MAT-009 (#4340), qualified MAT-OPPORTUNITY/MAT-PORTFOLIO successors | State baselines, objectives and Pareto trade-offs | Campaign or generic optimizer |
+| Null/failure/OOD results | MAT-010 (#4341) | Keep unsuccessful, contradictory and out-of-domain evidence visible | Search-memory store |
+| Physical specimen/process lineage | MAT-013 (#4344) | Require sample, batch, precursor, protocol and scale identity for physical work | Physical lineage from literature rows |
+| Human-authorized experiment proposals | MAT-014 (#4345) | Restrict active-learning output to reviewable proposals | Physical authorization from model confidence |
+| BIO-CEM observations, biological state, output planes, controls, extraction and comparability | BIO-CEM #5751, corpus #5753, contract/fixture owner #5767 | Define the experiments and adversarial cases that matter | Second living-concrete candidate ontology |
+| Materials mechanism hypotheses | MAT-HYPOTHESIS #5254 | Define falsifiable candidates and competing explanations | Common-mechanism claims from similarity |
+| Evidence derivation and replication | ENG-EVID-INDEP #4918, ENG-EVID-CLAIM #5771, BIO-CEM profile #5757 | Preserve controls, lineage, competing explanations and claim ceilings | Local evidence graph or scalar “healing score” |
+| Study/dependency split groups | ENG-EVID-INDEP #4918 and a current qualified split-contract successor consumed through #5756 | Require whole-study/lineage holdouts and disclose common modes | Local split engine; distinct IDs do not prove independence |
+| Actual living-material lot/custody/lifecycle | Mycelix BIO-MFG #3113 plus manufacturing/circularity owners when available | Identify future operational provenance needs | Mycelix batch/lifecycle records |
+| Road/rail field inspection and calibration | FIELD / FIELD-001A / SE-OBS (#3589/#3633/#3695) | Treat track geometry as a distinct physical observation plane | Generic infrastructure-observation ontology |
+| Units, time and spatial frames | SE-SEM-001 #4861 and relevant geospatial/frame owners | Declare units, temporal coverage and coordinate semantics | Ad hoc unit/time/frame system |
+| Rail dynamics, braking and qualification | TRANSPORT-RAIL-001 #6248 composed under #6244/#6246 | Keep track-condition forecasting as read-only maintenance input | Rail dynamics solver, signaling system or approval authority |
+| Maintenance/work-order history | Mycelix transport operations #3395 and canonical maintenance owners | Use verified maintenance events as forecast covariates | Operational event ledger |
+| Spatial projection | Sol-Atlas transport projection PR #111 / SOL-ATLAS-009 #106 | Show condition, source freshness, uncertainty and dependencies | Competing logistics database |
+| Counterfactual simulation | Symtropy ENG-SYNTH-TWIN #1467 and its credibility gates | Compare bounded hypothetical cases after model-suitability review | Synthetic trajectory as field observation or qualification |
+
+The ownership gate #5768 requires a demonstrated semantic gap before adding any new common production type. This research PR is documentation-only and deliberately follows that rule.
+
 ## A. Living concrete / bioactive cementitious materials
 
 ### A1. Why it is plausible
