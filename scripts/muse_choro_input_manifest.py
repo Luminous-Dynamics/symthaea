@@ -99,6 +99,7 @@ def evaluate_manifest(
     manifest_path: Path,
     approval_path: Path,
     intake_path: Path = DEFAULT_INTAKE,
+    artifact_root: Path | None = None,
 ) -> dict[str, Any]:
     manifest, manifest_bytes = read_json(manifest_path)
     approval, _approval_bytes = read_json(approval_path)
@@ -167,6 +168,9 @@ def evaluate_manifest(
         intake_ids_seen.add(source_id)
 
         require_https(entry.get("source_file_url"), f"{label}.source_file_url")
+        relative_artifact = Path(require_text(entry.get("artifact_path"), f"{label}.artifact_path"))
+        if relative_artifact.is_absolute() or ".." in relative_artifact.parts:
+            raise ManifestError(f"{label}.artifact_path must be a relative path without traversal")
         artifact_sha = require_text(entry.get("artifact_sha256"), f"{label}.artifact_sha256")
         if not SHA256_RE.fullmatch(artifact_sha):
             raise ManifestError(f"{label}.artifact_sha256 must be a lowercase 64-character SHA-256")
@@ -177,6 +181,24 @@ def evaluate_manifest(
         artifact_bytes = entry.get("artifact_bytes")
         if type(artifact_bytes) is not int or artifact_bytes <= 0:
             raise ManifestError(f"{label}.artifact_bytes must be a positive integer")
+        if artifact_root is None:
+            blockers.append(f"{source_id}: provide --artifact-root to verify the exact artifact bytes.")
+        else:
+            root_resolved = artifact_root.resolve()
+            artifact_file = (root_resolved / relative_artifact).resolve()
+            try:
+                artifact_file.relative_to(root_resolved)
+            except ValueError as exc:
+                raise ManifestError(f"{label}.artifact_path escapes --artifact-root") from exc
+            if not artifact_file.is_file():
+                blockers.append(f"{source_id}: exact artifact is missing under --artifact-root.")
+            else:
+                artifact_content = artifact_file.read_bytes()
+                actual_hash = hashlib.sha256(artifact_content).hexdigest()
+                if actual_hash != artifact_sha:
+                    blockers.append(f"{source_id}: on-disk artifact SHA-256 does not match manifest.")
+                if len(artifact_content) != artifact_bytes:
+                    blockers.append(f"{source_id}: on-disk artifact byte count does not match manifest.")
         require_date(entry.get("retrieved_on"), f"{label}.retrieved_on")
 
         review = require_object(entry.get("rights_review"), f"{label}.rights_review")
@@ -297,6 +319,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--approval", type=Path, default=DEFAULT_APPROVAL)
     parser.add_argument("--intake", type=Path, default=DEFAULT_INTAKE)
     parser.add_argument(
+        "--artifact-root", type=Path,
+        help="directory containing the exact reviewed files (the script hashes bytes only; it does not parse score content)",
+    )
+    parser.add_argument(
         "--require-authorized",
         action="store_true",
         help="exit non-zero unless the manifest is authorized for its exact declared scope",
@@ -308,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        report = evaluate_manifest(args.manifest, args.approval, args.intake)
+        report = evaluate_manifest(args.manifest, args.approval, args.intake, args.artifact_root)
     except ManifestError as exc:
         print(f"INVALID MANIFEST: {exc}", file=sys.stderr)
         return 2
