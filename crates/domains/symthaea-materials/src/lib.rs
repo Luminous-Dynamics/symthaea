@@ -16,8 +16,6 @@ pub mod compound_stability;
 pub mod database;
 pub mod encoder;
 pub mod haptic_prober;
-pub mod infrastructure;
-pub mod living_concrete;
 pub mod mining;
 pub mod properties;
 pub mod strategic;
