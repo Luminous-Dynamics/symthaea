@@ -276,9 +276,9 @@
   "alternative_source_intake": {
     "path": "crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json",
     "schema": "muse-choro-source-intake-v1",
-    "source_records": 4,
+    "source_records": 6,
     "records_rights_cleared": 0,
-    "records_pending_rights_review": 4,
+    "records_pending_rights_review": 6,
     "files_downloaded": 0,
     "score_content_transcribed": 0,
     "empirical_analysis_performed": 0,
