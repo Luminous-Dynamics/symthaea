@@ -119,10 +119,11 @@
     },
     {
       "case_id": "SYM-LC-007",
-      "input": "Two official Johannesburg Water pages list different water-outage turnaround targets: the emergencies page lists 12 hours, while daily water notices lists 24 hours. A third official contact page is available but does not resolve that discrepancy.",
+      "input": "The Johannesburg Water URL labelled /emergencies/ renders a “Daily water Notices” heading and lists 12 hours for a water outage, while /daily-water-notices/ lists 24 hours. An official contact page exists but does not settle that discrepancy.",
       "expected": {
         "disposition": "official_source_conflict_requires_review",
         "must_distinguish": [
+          "URL path label versus rendered page heading and actual content",
           "official source-claim conflict",
           "routing conflict about which institution or destination to use",
           "stated turnaround target versus a guaranteed response time",
@@ -134,7 +135,8 @@
           "the applicable current turnaround target is definitively 24 hours",
           "one official page may silently override the conflicting official page",
           "the route itself is necessarily conflicted because turnaround targets disagree",
-          "one official page must be false solely because another official page differs"
+          "one official page must be false solely because another official page differs",
+          "the URL labelled emergencies proves a distinct emergency-specific target policy"
         ],
         "effects_requested": false
       }
