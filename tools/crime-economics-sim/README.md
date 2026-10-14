@@ -13,6 +13,12 @@ From the repository root:
 
 The output is a tab-separated artifact with 7 scenarios × 5 policy arms × 32 deterministic Monte Carlo replications (1,120 rows). The verifier separately parses the emitted artifact and checks frozen schema identity, row completeness, event-accounting identities, reporting/displacement negative controls, non-economic-harm preservation, robot-only fields, distributional-access, concentrated-automation, high-robot-compromise, and low-robot-effectiveness adversarial cases.
 
+## Parameter register
+
+`tools/crime-economics-sim/manifest.json` has a 15-entry parameter register. Every entry is marked `synthetic_assumption` and `not_empirical`, with units and limitations. It records the cohort weights, baseline access levels, event-probability assumptions, work/essentials effects, robot protection/compromise/displacement/reporting assumptions, fictional cost units, and unvalidated governance proxies.
+
+The register is a human-reviewable statement of intended inputs, not a parser-generated export of Rust constants. Changes to model constants and their corresponding registered assumptions must be reviewed together. The CI workflow validates the registry's shape and required claim labels; it does not prove numerical correspondence, empirical validity, or external-source provenance.
+
 ## Scenarios
 
 - reference: ordinary illustrative assumptions.
