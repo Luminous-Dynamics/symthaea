@@ -156,6 +156,7 @@ def evaluate_manifest(
     artifact_hashes_seen: set[str] = set()
     reviewed_by: set[str] = set()
     analyzed_ids: list[str] = []
+    verified_artifacts: list[dict[str, Any]] = []
 
     for index, raw_entry in enumerate(sources):
         label = f"sources[{index}]"
@@ -200,6 +201,12 @@ def evaluate_manifest(
                 if len(artifact_content) != artifact_bytes:
                     blockers.append(f"{source_id}: on-disk artifact byte count does not match manifest.")
         require_date(entry.get("retrieved_on"), f"{label}.retrieved_on")
+        verified_artifacts.append({
+            "source_id": source_id,
+            "artifact_path": relative_artifact.as_posix(),
+            "artifact_sha256": artifact_sha,
+            "artifact_bytes": artifact_bytes,
+        })
 
         review = require_object(entry.get("rights_review"), f"{label}.rights_review")
         decision = require_text(review.get("decision"), f"{label}.rights_review.decision")
@@ -296,6 +303,7 @@ def evaluate_manifest(
         "authorized": authorized,
         "source_count": len(sources),
         "source_ids": analyzed_ids,
+        "artifacts": verified_artifacts,
         "scope": {
             "purpose": purpose,
             "requested_uses": requested_uses,
