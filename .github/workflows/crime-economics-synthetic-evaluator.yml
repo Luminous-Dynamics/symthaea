@@ -66,6 +66,17 @@ jobs:
             ([.viability_output_schema[]] | unique | length) == 22 and
             (.viability_gate_registry | length) == 11 and
             ([.viability_gate_registry[].gate_id] | unique | length) == 11 and
+            (.viability_measure_definitions | length) == 7 and
+            ([.viability_measure_definitions[].measure_id] | unique | length) == 7 and
+            all(.viability_measure_definitions[];
+              .person_level_scoring_allowed == false and
+              (.denominator | length) > 25 and
+              (.required_data | length) > 20 and
+              (.non_substitution_rule | length) > 20
+            ) and
+            (.viability_uncertainty_semantics.low_high_values | length) > 40 and
+            (.viability_status_semantics | keys | length) == 3 and
+            (.non_compensatory_rules | length) >= 5 and
             all(.viability_gate_registry[];
               .source_class == "synthetic_policy_gate" and
               .evidence_status == "not_empirical" and
