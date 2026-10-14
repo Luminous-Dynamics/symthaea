@@ -11,7 +11,7 @@ From the repository root:
     cargo run --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --bin simulate > crime-economics.tsv
     cargo run --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --bin verify -- crime-economics.tsv
 
-The output is a tab-separated artifact with 6 scenarios × 5 policy arms × 32 deterministic Monte Carlo replications (960 rows). The verifier separately parses the emitted artifact and checks frozen schema identity, row completeness, event-accounting identities, reporting/displacement negative controls, non-economic-harm preservation, robot-only fields, distributional-access, concentrated-automation, and high-robot-compromise adversarial cases.
+The output is a tab-separated artifact with 7 scenarios × 5 policy arms × 32 deterministic Monte Carlo replications (1,120 rows). The verifier separately parses the emitted artifact and checks frozen schema identity, row completeness, event-accounting identities, reporting/displacement negative controls, non-economic-harm preservation, robot-only fields, distributional-access, concentrated-automation, high-robot-compromise, and low-robot-effectiveness adversarial cases.
 
 ## Scenarios
 
@@ -21,6 +21,7 @@ The output is a tab-separated artifact with 6 scenarios × 5 policy arms × 32 d
 - concentrated_automation: a deliberately adverse livelihood shock is applied to robot-enabled arms; combined support partly mitigates the shock.
 - high_robot_compromise: compromised robot weeks are more common; the verifier checks that exposure increases without altering non-robot arms.
 - unequal_essential_access: the same essentials program is delivered unevenly; the verifier must detect the worsening access gap.
+- low_robot_effectiveness: the robot protection-effect assumption is scaled to one quarter of the reference scenario; the verifier checks that weaker assumed protection cannot improve the modeled protection outcomes.
 
 Policy arms are baseline, essentials, quality_work, robot_protection, and combined.
 
