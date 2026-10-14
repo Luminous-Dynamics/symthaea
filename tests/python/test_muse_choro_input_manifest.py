@@ -15,9 +15,11 @@ import sys
 sys.path.insert(0, str(ROOT / "scripts"))
 from muse_choro_input_manifest import ManifestError, evaluate_manifest  # noqa: E402
 
+ARTIFACT_BYTES = b"synthetic fixture bytes only; not score content"
+
 
 def approved_fixture() -> tuple[dict, dict]:
-    digest = "a" * 64
+    digest = hashlib.sha256(ARTIFACT_BYTES).hexdigest()
     manifest = {
         "schema": "muse-choro-approved-input-manifest-v1",
         "manifest_id": "TEST-CHORO-MANIFEST",
@@ -38,8 +40,9 @@ def approved_fixture() -> tuple[dict, dict]:
         "sources": [{
             "intake_source_id": "imslp-choro-mineiro-rocha-2022",
             "source_file_url": "https://example.org/synthetic-score-artifact.pdf",
+            "artifact_path": "synthetic-score-artifact.bin",
             "artifact_sha256": digest,
-            "artifact_bytes": 1234,
+            "artifact_bytes": len(ARTIFACT_BYTES),
             "retrieved_on": "2026-10-14",
             "rights_review": {
                 "decision": "approved",
@@ -95,6 +98,7 @@ class ChoroInputManifestTests(unittest.TestCase):
     def test_explicit_approval_binds_exact_manifest_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
             manifest, approval = approved_fixture()
             manifest_path = root / "manifest.json"
             approval_path = root / "approval.json"
@@ -103,13 +107,13 @@ class ChoroInputManifestTests(unittest.TestCase):
             manifest_path.write_bytes(manifest_bytes)
             approval["manifest_sha256"] = hashlib.sha256(manifest_bytes).hexdigest()
             approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(manifest_path, approval_path, intake_path)
+            report = evaluate_manifest(manifest_path, approval_path, intake_path, root)
             self.assertTrue(report["authorized"], report["blockers"])
             self.assertEqual(report["source_ids"], ["imslp-choro-mineiro-rocha-2022"])
 
             # Any change to manifest bytes invalidates the detached approval receipt.
             manifest_path.write_bytes(manifest_bytes + b" ")
-            report = evaluate_manifest(manifest_path, approval_path, intake_path)
+            report = evaluate_manifest(manifest_path, approval_path, intake_path, root)
             self.assertFalse(report["authorized"])
             self.assertIn(
                 "Approval receipt SHA-256 does not match the exact manifest bytes.",
@@ -119,6 +123,7 @@ class ChoroInputManifestTests(unittest.TestCase):
     def test_unreviewed_artifact_hash_cannot_authorize(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
             manifest, approval = approved_fixture()
             manifest["sources"][0]["rights_review"]["reviewed_artifact_sha256"] = "b" * 64
             mpath = root / "manifest.json"
@@ -127,7 +132,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE)
+            report = evaluate_manifest(mpath, apath, INTAKE, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any("does not bind the exact artifact SHA-256" in b
                                 for b in report["blockers"]))
@@ -135,6 +140,7 @@ class ChoroInputManifestTests(unittest.TestCase):
     def test_unclear_rights_layer_blocks_authorization(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
             manifest, approval = approved_fixture()
             manifest["sources"][0]["rights_review"]["rights_dimensions"]["scan_or_digital_file"]["decision"] = "unclear"
             mpath = root / "manifest.json"
@@ -143,7 +149,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE)
+            report = evaluate_manifest(mpath, apath, INTAKE, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any("scan_or_digital_file is 'unclear'" in b
                                 for b in report["blockers"]))
@@ -151,6 +157,7 @@ class ChoroInputManifestTests(unittest.TestCase):
     def test_scope_mismatch_blocks_use(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
             manifest, approval = approved_fixture()
             manifest["scope"]["requested_uses"] = ["model_training"]
             manifest["scope"]["commercial_use"] = False
@@ -160,13 +167,14 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE)
+            report = evaluate_manifest(mpath, apath, INTAKE, root)
             self.assertFalse(report["authorized"])
             self.assertTrue(any("does not permit requested uses" in b for b in report["blockers"]))
 
     def test_approver_must_be_independent_of_rights_reviewers(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
             manifest, approval = approved_fixture()
             approval["approver_id"] = "independent-rights-reviewer"
             mpath = root / "manifest.json"
@@ -175,7 +183,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             mpath.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
-            report = evaluate_manifest(mpath, apath, INTAKE)
+            report = evaluate_manifest(mpath, apath, INTAKE, root)
             self.assertFalse(report["authorized"])
             self.assertIn(
                 "The manifest approver must be independent of every source rights reviewer.",
@@ -185,6 +193,7 @@ class ChoroInputManifestTests(unittest.TestCase):
     def test_unknown_intake_source_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
             manifest, approval = approved_fixture()
             manifest["sources"][0]["intake_source_id"] = "not-in-source-intake"
             mpath = root / "manifest.json"
@@ -194,7 +203,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             apath.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             with self.assertRaisesRegex(ManifestError, "absent from CHORO_SOURCE_INTAKE_V1"):
-                evaluate_manifest(mpath, apath, INTAKE)
+                evaluate_manifest(mpath, apath, INTAKE, root)
 
 
 if __name__ == "__main__":
