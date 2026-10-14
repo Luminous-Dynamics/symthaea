@@ -31,9 +31,16 @@ jobs:
         run: |
           manifest="docs/research/life-civic/reference-scenarios.manifest.json"
           scenario_file="$(jq -r '.scenario_file' "$manifest")"
+          jq -e '
+            .suite_id == "SYM-LIFE-CIVIC-REFERENCE-001" and
+            .version == "0.1.0" and
+            .status == "research_fixture" and
+            .scenario_file == "docs/research/life-civic/reference-scenarios.json" and
+            (.scenario_git_blob_sha1 | test("^[0-9a-f]{40}$"))
+          ' "$manifest"
           expected="$(jq -r '.scenario_git_blob_sha1' "$manifest")"
           test "$scenario_file" = "docs/research/life-civic/reference-scenarios.json"
-          actual="$({ printf 'blob %s\0' "$(wc -c < "$scenario_file" | tr -d '[:space:]')"; cat "$scenario_file"; } | sha1sum | cut -d' ' -f1)"
+          actual="$(git hash-object "$scenario_file")"
           test "$actual" = "$expected"
 
       - name: Check suite identity and safety invariants
