@@ -20,7 +20,6 @@ permissions:
 
 jobs:
   synthetic-evaluation:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -42,6 +41,13 @@ jobs:
             .model_dimensions.replications_per_scenario_policy_cell == 32 and
             .model_dimensions.expected_data_rows == 1280 and
             .model_dimensions.expected_tsv_lines_including_header == 1281 and
+            .viability_dimensions.schema_version == 1 and
+            .viability_dimensions.scenario_count == 10 and
+            .viability_dimensions.cohort_count == 5 and
+            .viability_dimensions.expected_data_rows == 50 and
+            .viability_dimensions.expected_tsv_lines_including_header == 51 and
+            .viability_dimensions.uses_person_level_records == false and
+            .viability_dimensions.feeds_crime_rate_model == false and
             .parameter_registry_version == "0.2.0" and
             .parameter_registry_status == "all_parameters_are_synthetic_assumptions" and
             (.parameter_registry | length) == 15 and
@@ -55,7 +61,19 @@ jobs:
             ([.scenario_ids[]] | unique | length) == 8 and
             ([.policy_ids[]] | unique | length) == 5 and
             ([.output_schema[]] | unique | length) == 20 and
-            (.files | length) == 7 and
+            ([.viability_scenario_ids[]] | unique | length) == 10 and
+            ([.viability_cohort_ids[]] | unique | length) == 5 and
+            ([.viability_output_schema[]] | unique | length) == 22 and
+            (.viability_gate_registry | length) == 11 and
+            ([.viability_gate_registry[].gate_id] | unique | length) == 11 and
+            all(.viability_gate_registry[];
+              .source_class == "synthetic_policy_gate" and
+              .evidence_status == "not_empirical" and
+              (.limitation | length) > 20
+            ) and
+            (.evidence_context_sources | length) == 3 and
+            all(.evidence_context_sources[]; .used_as_crime_effect_parameter == false) and
+            (.files | length) == 10 and
             ([.files[].path] | unique | length) == (.files | length) and
             all(.files[];
               (.path | (startswith("tools/crime-economics-sim/") or . == ".github/workflows/crime-economics-synthetic-evaluator.yml")) and
@@ -88,6 +106,18 @@ jobs:
           test "$actual_header" = "$expected_header"
           sha256sum target/crime-economics-evidence/simulation.tsv \
             > target/crime-economics-evidence/simulation.tsv.sha256
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin assess_viability \
+            > target/crime-economics-evidence/lawful-alternative-viability.tsv
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin assess_viability \
+            > target/crime-economics-evidence/lawful-alternative-viability-repeat.tsv
+          cmp target/crime-economics-evidence/lawful-alternative-viability.tsv target/crime-economics-evidence/lawful-alternative-viability-repeat.tsv
+          rm target/crime-economics-evidence/lawful-alternative-viability-repeat.tsv
+          test "$(wc -l < target/crime-economics-evidence/lawful-alternative-viability.tsv)" -eq 51
+          expected_viability_header="$(jq -r '.viability_output_schema | @tsv' tools/crime-economics-sim/manifest.json)"
+          actual_viability_header="$(head -n 1 target/crime-economics-evidence/lawful-alternative-viability.tsv)"
+          test "$actual_viability_header" = "$expected_viability_header"
+          sha256sum target/crime-economics-evidence/lawful-alternative-viability.tsv \
+            > target/crime-economics-evidence/lawful-alternative-viability.tsv.sha256
       - name: Independently verify the emitted artifact
         shell: bash
         run: |
@@ -106,6 +136,24 @@ jobs:
             echo "Artifact SHA-256:"
             cat target/crime-economics-evidence/simulation.tsv.sha256
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Independently verify lawful-alternative viability gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin verify_viability -- \
+            target/crime-economics-evidence/lawful-alternative-viability.tsv \
+            | tee target/crime-economics-evidence/viability-verification.txt
+          {
+            echo ""
+            echo "### Lawful-alternative viability fixture"
+            echo ""
+            echo "The following results apply only to synthetic reference profiles and illustrative gates; they are not population findings."
+            echo ""
+            cat target/crime-economics-evidence/viability-verification.txt
+            echo ""
+            echo "Artifact SHA-256:"
+            cat target/crime-economics-evidence/lawful-alternative-viability.tsv.sha256
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Record exact source identity
         shell: bash
         run: |
@@ -113,9 +161,12 @@ jobs:
           {
             echo "commit_sha=$(git rev-parse HEAD)"
             echo "tool=tools/crime-economics-sim"
-            echo "model_version=0.2.0"
+            echo "model_version=0.3.0"
             echo "claim_ceiling=synthetic invariant checks only; no causal or real-world claim"
             echo "simulator_has_external_effects=false"
+            echo "lawful_alternative_viability_schema_version=1"
+            echo "lawful_alternative_viability_uses_person_records=false"
+            echo "lawful_alternative_viability_feeds_crime_model=false"
           } > target/crime-economics-evidence/source-identity.txt
       - uses: actions/upload-artifact@v4
         with:
