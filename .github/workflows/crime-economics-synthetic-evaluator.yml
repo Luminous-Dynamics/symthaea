@@ -6,7 +6,6 @@ on:
     paths:
       - ".github/workflows/crime-economics-synthetic-evaluator.yml"
       - "tools/crime-economics-sim/**"
-      - "tools/crime-economics-sim/manifest.json"
       - "docs/research/life-civic/CRIME_ECONOMICS_ROBOTICS_RESEARCH.md"
   push:
     branches: [main]
@@ -43,54 +42,7 @@ jobs:
               (.git_blob_sha1 | test("^[0-9a-f]{40}$"))
             )
           ' "$manifest"
-          while IFS=      - name: Run isolated Rust unit and adversarial tests
-        run: cargo test --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked
-      - name: Generate deterministic-seed synthetic matrix
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p target/crime-economics-evidence
-          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin simulate \
-            > target/crime-economics-evidence/simulation.tsv
-          test "$(wc -l < target/crime-economics-evidence/simulation.tsv)" -eq 961
-          sha256sum target/crime-economics-evidence/simulation.tsv \
-            > target/crime-economics-evidence/simulation.tsv.sha256
-      - name: Independently verify the emitted artifact
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run --offline --manifest-path tools/crime-economics-sim/Cargo.toml --locked --bin verify -- \
-            target/crime-economics-evidence/simulation.tsv \
-            | tee target/crime-economics-evidence/verification.txt
-          {
-            echo ""
-            echo "### Crime-economics synthetic evaluator"
-            echo ""
-            echo "This is a synthetic model and verifier result, not an empirical crime-reduction result."
-            echo ""
-            cat target/crime-economics-evidence/verification.txt
-            echo ""
-            echo "Artifact SHA-256:"
-            cat target/crime-economics-evidence/simulation.tsv.sha256
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Record exact source identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          {
-            echo "commit_sha=$(git rev-parse HEAD)"
-            echo "tool=tools/crime-economics-sim"
-            echo "model_version=0.1.0"
-            echo "claim_ceiling=synthetic invariant checks only; no causal or real-world claim"
-            echo "simulator_has_external_effects=false"
-          } > target/crime-economics-evidence/source-identity.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: crime-economics-synthetic-evidence
-          path: target/crime-economics-evidence/
-          if-no-files-found: error
-          retention-days: 7
-\t' read -r path expected; do
+          while IFS="$(printf '\t')" read -r path expected; do
             test -f "$path"
             actual="$(git hash-object "$path")"
             test "$actual" = "$expected"
