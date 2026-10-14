@@ -2,6 +2,7 @@ name: Muse Style Coverage
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-muse-protocol/src/catalog.rs"
       - "crates/domains/symthaea-music-theory/src/style.rs"
@@ -73,6 +74,7 @@ concurrency:
 jobs:
   style-coverage:
     name: Catalog and runtime style capability checks
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
