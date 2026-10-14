@@ -28,7 +28,7 @@
     },
     {
       "path": "tools/crime-economics-sim/src/lib.rs",
-      "git_blob_sha1": "fbda5e68c40f1a328f4a1c88bf6022efd5dc1598"
+      "git_blob_sha1": "eb22923ba2e5a33cbe285865ab38bd0378831b60"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/simulate.rs",
