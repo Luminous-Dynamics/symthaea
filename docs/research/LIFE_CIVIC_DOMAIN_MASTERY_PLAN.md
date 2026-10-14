@@ -211,6 +211,17 @@ Initial thresholds should be chosen from baseline measurements and harm analysis
 
 **Stage E — Cross-jurisdiction expansion:** implement United States profiles independently, then test explicit crosswalks and unmapped areas rather than generalizing rules across jurisdictions.
 
+## Point-in-time standards cases and machine-readable scenarios
+
+The companion scenario file `docs/research/life-civic/reference-scenarios.json` is an unexecuted reference suite. It deliberately tests recent lifecycle distinctions as well as reasoning boundaries:
+
+- ISO/WD 37120 Edition 3 is a working draft intended to replace ISO 37120:2018; it is not itself a published edition ([ISO catalogue](https://www.iso.org/standard/90316.html)).
+- ISO 37101:2016 and Amendment 1:2024 remain separate published artifacts in the catalogue, while the replacement ISO/WD 37101 is a distinct working draft ([published edition](https://www.iso.org/standard/61885.html), [amendment](https://www.iso.org/standard/88420.html), [working draft](https://committee.iso.org/standard/91450.html)).
+- WCAG 2.2 is a published W3C Recommendation, but local legal applicability must be established separately ([W3C overview](https://www.w3.org/WAI/standards-guidelines/wcag/)).
+- RFC 9943 is a June 2026 IETF Standards Track Proposed Standard. Signed-statement transparency supports auditability, not truth by itself ([IETF Datatracker](https://datatracker.ietf.org/doc/rfc9943/)).
+
+The test suite is not a benchmark result. Its purpose is to make these distinctions inspectable and reproducible before the reasoning or service workflow is connected to consequential effects.
+
 ## 10. Reference material
 
 - Symthaea's existing comprehensive benchmarking strategy: https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/planning/BENCHMARKING_STRATEGY.md
