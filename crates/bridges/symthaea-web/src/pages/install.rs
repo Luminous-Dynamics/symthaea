@@ -14,7 +14,7 @@ use crate::pages::remote_install::{MAX_RELAY_MESSAGE_BYTES, RemoteInstallPanel};
 use crate::worker::EngineWorker;
 use symthaea_app_db::config_gen;
 use symthaea_app_db::validation;
-use symthaea_app_db::{AppCategory, AppDatabase, AppEntry, MatchQuality};
+use symthaea_app_db::{AppCategory, AppDatabase, AppEntry, InstallSource, MatchQuality};
 
 // ═══════════════════════════════════════════════════════
 // LocalStorage persistence helpers
@@ -859,19 +859,27 @@ fn AppSelectionGrid(
                             let emoji = emoji_for_category(entry.category);
                             let quality = entry.primary.quality;
                             let nix_name = entry.primary.display_name;
-                            let status_class = match quality {
-                                MatchQuality::Native | MatchQuality::OfficialLinux => "status-native",
-                                MatchQuality::StrongAlternative => "status-alt",
-                                MatchQuality::PartialAlternative | MatchQuality::WineCompatible | MatchQuality::WebApp => "status-partial",
-                                MatchQuality::NoEquivalent => "status-none",
-                            };
-                            let status_label = match quality {
-                                MatchQuality::Native | MatchQuality::OfficialLinux => "Available",
-                                MatchQuality::StrongAlternative => "Alternative",
-                                MatchQuality::PartialAlternative => "Partial",
-                                MatchQuality::WineCompatible => "Wine/Proton",
-                                MatchQuality::WebApp => "Web App",
-                                MatchQuality::NoEquivalent => "No Equivalent",
+                            // App source qualification is distinct from replacement quality.
+                            // PhotoCraft is digest-pinned, but its generated Nix wrapper remains unqualified.
+                            let (status_class, status_label) = match entry.install_source {
+                                InstallSource::AppImage { .. } => ("status-partial", "Pinned / unverified"),
+                                InstallSource::Nixpkgs => {
+                                    let status_class = match quality {
+                                        MatchQuality::Native | MatchQuality::OfficialLinux => "status-native",
+                                        MatchQuality::StrongAlternative => "status-alt",
+                                        MatchQuality::PartialAlternative | MatchQuality::WineCompatible | MatchQuality::WebApp => "status-partial",
+                                        MatchQuality::NoEquivalent => "status-none",
+                                    };
+                                    let status_label = match quality {
+                                        MatchQuality::Native | MatchQuality::OfficialLinux => "Available",
+                                        MatchQuality::StrongAlternative => "Alternative",
+                                        MatchQuality::PartialAlternative => "Partial",
+                                        MatchQuality::WineCompatible => "Wine/Proton",
+                                        MatchQuality::WebApp => "Web App",
+                                        MatchQuality::NoEquivalent => "No Equivalent",
+                                    };
+                                    (status_class, status_label)
+                                }
                             };
                             let name_owned = name.to_string();
                             let n1 = name_owned.clone();
