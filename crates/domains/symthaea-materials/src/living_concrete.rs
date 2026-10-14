@@ -399,6 +399,13 @@ impl LivingConcreteCandidate {
                     .filter(|item| item.kind == EvidenceKind::LaboratoryTest)
                     .map(|item| item.source_locator.as_str())
                     .collect();
+                let has_lab_outcome = self.outcomes.iter().any(|outcome| {
+                    outcome.origin == ConcreteOutcomeOrigin::Measured
+                        && self.evidence.iter().any(|item| {
+                            item.evidence_id == outcome.evidence_id
+                                && item.kind == EvidenceKind::LaboratoryTest
+                        })
+                });
                 let has_field_outcome = self.outcomes.iter().any(|outcome| {
                     outcome.origin == ConcreteOutcomeOrigin::Measured
                         && self.evidence.iter().any(|item| {
@@ -409,6 +416,7 @@ impl LivingConcreteCandidate {
                 if lab_sources.len() < 2
                     || !self.evidence.iter().any(|item| item.kind == EvidenceKind::IndependentReview)
                     || !self.evidence.iter().any(|item| item.kind == EvidenceKind::FieldMeasurement)
+                    || !has_lab_outcome
                     || !has_field_outcome
                 {
                     errors.push(LivingConcreteValidationError::StageEvidenceMissing);
