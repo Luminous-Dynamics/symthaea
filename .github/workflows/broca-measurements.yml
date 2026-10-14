@@ -58,29 +58,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
 
-      - name: Diagnose Cargo.lock drift without weakening locked measurements
-        run: |
-          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
-          restore_lock() { cp "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock; }
-          trap restore_lock EXIT
-          source scripts/broca_runtime_crust.sh
-          broca_resolve_runtime
-          set +e
-          cargo tree -p symthaea-broca --features "$BROCA_DECODER_FEATURES" >/dev/null
-          resolver_status=$?
-          set -e
-          if [[ "$resolver_status" -ne 0 ]]; then
-            echo "Diagnostic cargo tree exited with status $resolver_status"
-          fi
-          if cmp -s "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock; then
-            echo "Cargo tree did not produce a lockfile delta for the Broca feature set."
-          else
-            echo "Cargo-generated Cargo.lock delta for the Broca feature set follows."
-            diff -u "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock || true
-          fi
-          restore_lock
-          trap - EXIT
-
       - name: Generate Broca measurement artifacts
         run: scripts/broca_measurement_artifacts.sh target/broca-measurements
 
