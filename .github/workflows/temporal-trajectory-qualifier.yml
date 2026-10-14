@@ -73,11 +73,11 @@ jobs:
           cp Cargo.lock "$evidence/Cargo.lock.committed"
           sha256sum Cargo.lock > "$evidence/lockfile-committed.sha256"
 
-          # Offline resolution exposes manifest/lock drift without downloading newer
-          # crates. Preserve the generated lock and diff as evidence so any required
-          # lock change can be reviewed and committed rather than silently discarded.
+          # Resolve against the current registry index because fresh runners do not carry a
+          # complete local sparse index. Preserve the generated lock and diff as evidence
+          # so any required lock change can be reviewed and committed, not discarded.
           set +e
-          cargo metadata --offline --format-version 1 > /dev/null 2> "$evidence/lock-resolution.log"
+          cargo metadata --format-version 1 > /dev/null 2> "$evidence/lock-resolution.log"
           result=$?
           set -e
           cp Cargo.lock "$evidence/Cargo.lock.resolved"
