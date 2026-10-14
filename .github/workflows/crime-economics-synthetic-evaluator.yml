@@ -116,6 +116,14 @@ jobs:
           MAX_TIME_INTERVAL_WIDTH_MINUTES|20.0|f64
           MAX_EVIDENCE_AGE_DAYS|180|u32
           THRESHOLDS
+          while IFS= read -r scenario; do
+            grep -Fq "id: \"$scenario\"" tools/crime-economics-sim/src/viability.rs
+            grep -Fq "\"$scenario\"" tools/crime-economics-sim/src/bin/verify_viability.rs
+          done < <(jq -r '.viability_scenario_ids[]' "$manifest")
+          while IFS= read -r cohort; do
+            grep -Fq "\"$cohort\"" tools/crime-economics-sim/src/viability.rs
+            grep -Fq "\"$cohort\"" tools/crime-economics-sim/src/bin/verify_viability.rs
+          done < <(jq -r '.viability_cohort_ids[]' "$manifest")
       - name: Check isolated crate formatting
         run: cargo fmt --manifest-path tools/crime-economics-sim/Cargo.toml -- --check
       - name: Run isolated Rust unit and adversarial tests
