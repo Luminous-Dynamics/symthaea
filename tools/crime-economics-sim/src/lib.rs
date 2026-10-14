@@ -38,6 +38,7 @@ pub struct Scenario {
     pub id: &'static str,
     pub report_probability: f64,
     pub displacement_probability: f64,
+    pub robot_protection_multiplier: f64,
     pub robot_compromise_probability: f64,
     pub automation_livelihood_shock: f64,
     pub access_gain_multipliers: [f64; 5],
@@ -49,6 +50,7 @@ pub const SCENARIOS: &[Scenario] = &[
         id: "reference",
         report_probability: 0.78,
         displacement_probability: 0.30,
+        robot_protection_multiplier: 1.0,
         robot_compromise_probability: 0.01,
         automation_livelihood_shock: 0.0,
         access_gain_multipliers: [1.0; 5],
@@ -58,6 +60,7 @@ pub const SCENARIOS: &[Scenario] = &[
         id: "high_displacement",
         report_probability: 0.78,
         displacement_probability: 0.90,
+        robot_protection_multiplier: 1.0,
         robot_compromise_probability: 0.01,
         automation_livelihood_shock: 0.0,
         access_gain_multipliers: [1.0; 5],
@@ -67,6 +70,7 @@ pub const SCENARIOS: &[Scenario] = &[
         id: "reporting_suppression",
         report_probability: 0.35,
         displacement_probability: 0.30,
+        robot_protection_multiplier: 1.0,
         robot_compromise_probability: 0.01,
         automation_livelihood_shock: 0.0,
         access_gain_multipliers: [1.0; 5],
@@ -76,6 +80,7 @@ pub const SCENARIOS: &[Scenario] = &[
         id: "concentrated_automation",
         report_probability: 0.78,
         displacement_probability: 0.30,
+        robot_protection_multiplier: 1.0,
         robot_compromise_probability: 0.01,
         automation_livelihood_shock: 0.35,
         access_gain_multipliers: [1.0; 5],
@@ -85,6 +90,7 @@ pub const SCENARIOS: &[Scenario] = &[
         id: "high_robot_compromise",
         report_probability: 0.78,
         displacement_probability: 0.30,
+        robot_protection_multiplier: 1.0,
         robot_compromise_probability: 0.18,
         automation_livelihood_shock: 0.0,
         access_gain_multipliers: [1.0; 5],
@@ -94,9 +100,20 @@ pub const SCENARIOS: &[Scenario] = &[
         id: "unequal_essential_access",
         report_probability: 0.78,
         displacement_probability: 0.30,
+        robot_protection_multiplier: 1.0,
         robot_compromise_probability: 0.01,
         automation_livelihood_shock: 0.0,
         access_gain_multipliers: [0.15, 0.40, 0.80, 1.20, 1.50],
+        benefit_concentration_bps: 4_500,
+    },
+    Scenario {
+        id: "low_robot_effectiveness",
+        report_probability: 0.78,
+        displacement_probability: 0.30,
+        robot_protection_multiplier: 0.25,
+        robot_compromise_probability: 0.01,
+        automation_livelihood_shock: 0.0,
+        access_gain_multipliers: [1.0; 5],
         benefit_concentration_bps: 4_500,
     },
 ];
@@ -241,7 +258,7 @@ pub fn run_one(scenario: &Scenario, arm: &PolicyArm, seed: u64) -> ResultRow {
     let work_need_reduction = if arm.provides_quality_work { 0.12 } else { 0.0 };
     let work_opportunity_reduction = if arm.provides_quality_work { 0.08 } else { 0.0 };
     let protection_probability = if arm.uses_robot_protection {
-        ROBOT_PREVENTION_PROBABILITY
+        (ROBOT_PREVENTION_PROBABILITY * scenario.robot_protection_multiplier).clamp(0.0, 1.0)
     } else {
         0.0
     };
@@ -471,7 +488,7 @@ mod tests {
         assert_eq!(COHORT_SIZES.iter().sum::<u32>(), POPULATION);
         assert_eq!(WEEKS, 52);
         assert_eq!(REPLICATIONS, 32);
-        assert_eq!(SCENARIOS.len(), 6);
+        assert_eq!(SCENARIOS.len(), 7);
         assert_eq!(POLICY_ARMS.len(), 5);
         assert_eq!(run_matrix().len(), SCENARIOS.len() * POLICY_ARMS.len() * REPLICATIONS as usize);
     }
@@ -559,6 +576,26 @@ mod tests {
                 let unequal = run_one(scenario("unequal_essential_access"), policy, seed);
                 assert!(unequal.essential_access_gap_bps > reference.essential_access_gap_bps);
                 assert!(unequal.essential_access_gain_bps < reference.essential_access_gain_bps);
+            }
+        }
+    }
+
+    #[test]
+    fn lower_robot_effectiveness_worsens_protection_outcomes_without_affecting_other_arms() {
+        let reference_scenario = scenario("reference");
+        let low_effect_scenario = scenario("low_robot_effectiveness");
+        for seed in 0..REPLICATIONS {
+            for policy in POLICY_ARMS {
+                let reference = run_one(reference_scenario, policy, seed);
+                let low_effect = run_one(low_effect_scenario, policy, seed);
+                if policy.uses_robot_protection {
+                    assert!(low_effect.need_property_events_local >= reference.need_property_events_local);
+                    assert!(low_effect.opportunity_property_events_local >= reference.opportunity_property_events_local);
+                    assert!(low_effect.displaced_property_events <= reference.displaced_property_events);
+                    assert!(low_effect.true_crime_events_total >= reference.true_crime_events_total);
+                } else {
+                    assert_eq!(low_effect, reference);
+                }
             }
         }
     }
