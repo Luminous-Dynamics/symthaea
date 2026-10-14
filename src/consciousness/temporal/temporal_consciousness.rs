@@ -194,6 +194,23 @@ pub struct PhiTrajectory {
     capacity: usize,
 }
 
+fn elapsed_ema(phi: f64, previous: f64, decay: f64) -> Option<f64> {
+    if !phi.is_finite() || !previous.is_finite() || !decay.is_finite() || !(0.0..=1.0).contains(&decay) {
+        return None;
+    }
+
+    let alpha = 1.0 - decay;
+    // Same-sign interpolation is safely expressed as a delta from the previous
+    // value. Opposite-sign interpolation uses the convex weighted sum, whose
+    // terms cannot add magnitudes in the overflow direction.
+    let ema = if phi.is_sign_negative() == previous.is_sign_negative() {
+        previous + alpha * (phi - previous)
+    } else {
+        alpha * phi + decay * previous
+    };
+    ema.is_finite().then_some(ema)
+}
+
 fn finite_rate(current: f64, previous: f64, dt_secs: f64) -> Option<f64> {
     if !current.is_finite() || !previous.is_finite() || !dt_secs.is_finite() || dt_secs <= 0.0 {
         return None;
@@ -355,7 +372,7 @@ impl PhiTrajectory {
             return false;
         }
         let decay = (-dt / self.ema_time_constant_secs).exp();
-        ((1.0 - decay) * phi + decay * self.ema).is_finite()
+        elapsed_ema(phi, self.ema, decay).is_some()
     }
 
     pub fn observe_at(&mut self, phi: f64, elapsed: Duration) -> bool {
@@ -365,7 +382,10 @@ impl PhiTrajectory {
         if let Some((previous_time, _)) = self.history.back() {
             let dt = elapsed.saturating_sub(*previous_time).as_secs_f64();
             let decay = (-dt / self.ema_time_constant_secs).exp();
-            self.ema = (1.0 - decay) * phi + decay * self.ema;
+            let Some(next_ema) = elapsed_ema(phi, self.ema, decay) else {
+                return false;
+            };
+            self.ema = next_ema;
         } else {
             self.ema = phi;
         }
@@ -2207,6 +2227,20 @@ mod tests {
 
         assert!(!report.phi_acceleration_available);
         assert!(report.to_string().contains("N/A Φ/s²"));
+    }
+
+    #[test]
+    fn same_sign_extreme_ema_does_not_false_reject_due_to_rounding() {
+        let mut trajectory = PhiTrajectory::new_with_time_constant(8, 1.0);
+        assert!(trajectory.observe_at(f64::MAX, Duration::ZERO));
+
+        // exp(-40) is nonzero but too small for 1 - decay to differ from 1.
+        // A naïve weighted sum rounds the first term to MAX then overflows while
+        // adding the tiny positive second term. The true convex result is MAX.
+        assert!(trajectory.observe_at(f64::MAX, Duration::from_secs(40)));
+        assert_eq!(trajectory.ema, f64::MAX);
+        assert_eq!(trajectory.history(), vec![f64::MAX, f64::MAX]);
+        assert!(trajectory.velocity.is_finite());
     }
 
     #[test]
