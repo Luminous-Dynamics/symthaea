@@ -176,8 +176,8 @@ pub struct ResultRow {
     pub opportunity_property_events_local: u64,
     pub non_economic_harm_events: u64,
     pub displaced_property_events: u64,
-    pub true_crime_events_total: u64,
-    pub reported_crime_reports: u64,
+    pub simulated_harm_events_total: u64,
+    pub reported_harm_events: u64,
     pub false_alarms: u64,
     pub robot_compromise_weeks: u64,
     pub robot_safety_incidents: u64,
@@ -189,6 +189,27 @@ pub struct ResultRow {
 }
 
 impl ResultRow {
+    fn same_outcomes_except_scenario_id(&self, other: &Self) -> bool {
+        self.seed == other.seed
+            && self.policy_id == other.policy_id
+            && self.population == other.population
+            && self.model_weeks == other.model_weeks
+            && self.need_property_events_local == other.need_property_events_local
+            && self.opportunity_property_events_local == other.opportunity_property_events_local
+            && self.non_economic_harm_events == other.non_economic_harm_events
+            && self.displaced_property_events == other.displaced_property_events
+            && self.simulated_harm_events_total == other.simulated_harm_events_total
+            && self.reported_harm_events == other.reported_harm_events
+            && self.false_alarms == other.false_alarms
+            && self.robot_compromise_weeks == other.robot_compromise_weeks
+            && self.robot_safety_incidents == other.robot_safety_incidents
+            && self.annualized_cost_units == other.annualized_cost_units
+            && self.essential_access_gain_bps == other.essential_access_gain_bps
+            && self.essential_access_gap_bps == other.essential_access_gap_bps
+            && self.privacy_burden_points == other.privacy_burden_points
+            && self.benefit_concentration_bps == other.benefit_concentration_bps
+    }
+
     pub fn to_tsv(&self) -> String {
         format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
@@ -202,8 +223,8 @@ impl ResultRow {
             self.opportunity_property_events_local,
             self.non_economic_harm_events,
             self.displaced_property_events,
-            self.true_crime_events_total,
-            self.reported_crime_reports,
+            self.simulated_harm_events_total,
+            self.reported_harm_events,
             self.false_alarms,
             self.robot_compromise_weeks,
             self.robot_safety_incidents,
@@ -216,7 +237,7 @@ impl ResultRow {
     }
 }
 
-pub const TSV_HEADER: &str = "schema_version\tscenario_id\tseed\tpolicy_id\tpopulation\tmodel_weeks\tneed_property_events_local\topportunity_property_events_local\tnon_economic_harm_events\tdisplaced_property_events\ttrue_crime_events_total\treported_crime_reports\tfalse_alarms\trobot_compromise_weeks\trobot_safety_incidents\tannualized_cost_units\tessential_access_gain_bps\tessential_access_gap_bps\tprivacy_burden_points\tbenefit_concentration_bps";
+pub const TSV_HEADER: &str = "schema_version\tscenario_id\tseed\tpolicy_id\tpopulation\tmodel_weeks\tneed_property_events_local\topportunity_property_events_local\tnon_economic_harm_events\tdisplaced_property_events\tsimulated_harm_events_total\treported_harm_events\tfalse_alarms\trobot_compromise_weeks\trobot_safety_incidents\tannualized_cost_units\tessential_access_gain_bps\tessential_access_gap_bps\tprivacy_burden_points\tbenefit_concentration_bps";
 
 #[derive(Clone, Copy)]
 struct AccessSummary {
@@ -361,13 +382,13 @@ pub fn run_one(scenario: &Scenario, arm: &PolicyArm, seed: u64) -> ResultRow {
         }
     }
 
-    let true_crime_events_total = need_events_local
+    let simulated_harm_events_total = need_events_local
         + opportunity_events_local
         + non_economic_harm_events
         + displaced_property_events;
 
-    let reported_crime_reports = u64::from(binomial(
-        true_crime_events_total as u32,
+    let reported_harm_events = u64::from(binomial(
+        simulated_harm_events_total as u32,
         scenario.report_probability,
         mix64(seed ^ REPORT_STREAM),
     ));
@@ -400,8 +421,8 @@ pub fn run_one(scenario: &Scenario, arm: &PolicyArm, seed: u64) -> ResultRow {
         opportunity_property_events_local: opportunity_events_local,
         non_economic_harm_events,
         displaced_property_events,
-        true_crime_events_total,
-        reported_crime_reports,
+        simulated_harm_events_total,
+        reported_harm_events,
         false_alarms,
         robot_compromise_weeks,
         robot_safety_incidents,
@@ -499,11 +520,11 @@ mod tests {
             for seed in 0..REPLICATIONS {
                 let reference = run_one(scenario("reference"), policy, seed);
                 let suppressed = run_one(scenario("reporting_suppression"), policy, seed);
-                assert_eq!(reference.true_crime_events_total, suppressed.true_crime_events_total);
+                assert_eq!(reference.simulated_harm_events_total, suppressed.simulated_harm_events_total);
                 assert_eq!(reference.need_property_events_local, suppressed.need_property_events_local);
                 assert_eq!(reference.opportunity_property_events_local, suppressed.opportunity_property_events_local);
                 assert_eq!(reference.non_economic_harm_events, suppressed.non_economic_harm_events);
-                assert!(suppressed.reported_crime_reports <= reference.reported_crime_reports);
+                assert!(suppressed.reported_harm_events <= reference.reported_harm_events);
             }
         }
     }
@@ -561,8 +582,8 @@ mod tests {
             for policy in POLICY_ARMS.iter().filter(|policy| !policy.uses_robot_protection) {
                 let reference = run_one(scenario("reference"), policy, seed);
                 let compromised = run_one(scenario("high_robot_compromise"), policy, seed);
-                assert_eq!(reference.true_crime_events_total, compromised.true_crime_events_total);
-                assert_eq!(reference.reported_crime_reports, compromised.reported_crime_reports);
+                assert_eq!(reference.simulated_harm_events_total, compromised.simulated_harm_events_total);
+                assert_eq!(reference.reported_harm_events, compromised.reported_harm_events);
             }
         }
     }
@@ -592,9 +613,9 @@ mod tests {
                     assert!(low_effect.need_property_events_local >= reference.need_property_events_local);
                     assert!(low_effect.opportunity_property_events_local >= reference.opportunity_property_events_local);
                     assert!(low_effect.displaced_property_events <= reference.displaced_property_events);
-                    assert!(low_effect.true_crime_events_total >= reference.true_crime_events_total);
+                    assert!(low_effect.simulated_harm_events_total >= reference.simulated_harm_events_total);
                 } else {
-                    assert_eq!(low_effect, reference);
+                    assert!(low_effect.same_outcomes_except_scenario_id(&reference));
                 }
             }
         }
@@ -607,13 +628,13 @@ mod tests {
             let robot = run_one(scenario("reference"), arm("robot_protection"), seed);
             assert_eq!(baseline.false_alarms, 0);
             assert_eq!(
-                robot.true_crime_events_total,
+                robot.simulated_harm_events_total,
                 robot.need_property_events_local
                     + robot.opportunity_property_events_local
                     + robot.non_economic_harm_events
                     + robot.displaced_property_events
             );
-            assert!(robot.reported_crime_reports <= robot.true_crime_events_total);
+            assert!(robot.reported_harm_events <= robot.simulated_harm_events_total);
         }
     }
 }
