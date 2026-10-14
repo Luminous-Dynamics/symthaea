@@ -75,6 +75,8 @@ def require_https(value: Any, label: str) -> str:
 
 def require_date(value: Any, label: str) -> str:
     text = require_text(value, label)
+    if not re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}", text):
+        raise ManifestError(f"{label} must be an ISO date (YYYY-MM-DD)")
     try:
         date.fromisoformat(text)
     except ValueError as exc:
@@ -113,11 +115,14 @@ def evaluate_manifest(
     intake_sources = intake.get("sources")
     if not isinstance(intake_sources, list):
         raise ManifestError("source intake must contain a sources list")
-    known_intake_ids = {
-        require_text(source.get("id"), "source intake id")
+    intake_source_urls = {
+        require_text(source.get("id"), "source intake id"): require_https(
+            source.get("source_url"), "source intake source_url"
+        )
         for source in intake_sources
         if isinstance(source, dict)
     }
+    known_intake_ids = set(intake_source_urls)
     if len(known_intake_ids) != len(intake_sources):
         raise ManifestError("source intake contains malformed or duplicate source ids")
 
@@ -168,6 +173,13 @@ def evaluate_manifest(
             raise ManifestError(f"duplicate intake_source_id: {source_id}")
         intake_ids_seen.add(source_id)
 
+        source_record_url = require_https(
+            entry.get("source_record_url"), f"{label}.source_record_url"
+        )
+        if source_record_url != intake_source_urls[source_id]:
+            raise ManifestError(
+                f"{label}.source_record_url does not match the exact intake record for {source_id}"
+            )
         require_https(entry.get("source_file_url"), f"{label}.source_file_url")
         relative_artifact = Path(require_text(entry.get("artifact_path"), f"{label}.artifact_path"))
         if relative_artifact.is_absolute() or ".." in relative_artifact.parts:
@@ -200,7 +212,7 @@ def evaluate_manifest(
                     blockers.append(f"{source_id}: on-disk artifact SHA-256 does not match manifest.")
                 if len(artifact_content) != artifact_bytes:
                     blockers.append(f"{source_id}: on-disk artifact byte count does not match manifest.")
-        require_date(entry.get("retrieved_on"), f"{label}.retrieved_on")
+        retrieved_on = require_date(entry.get("retrieved_on"), f"{label}.retrieved_on")
         verified_artifacts.append({
             "source_id": source_id,
             "artifact_path": relative_artifact.as_posix(),
@@ -215,7 +227,11 @@ def evaluate_manifest(
 
         reviewer = require_text(review.get("reviewer_id"), f"{label}.rights_review.reviewer_id")
         reviewed_by.add(reviewer)
-        require_date(review.get("reviewed_on"), f"{label}.rights_review.reviewed_on")
+        reviewed_on = require_date(review.get("reviewed_on"), f"{label}.rights_review.reviewed_on")
+        if reviewed_on < retrieved_on:
+            blockers.append(
+                f"{source_id}: rights review date predates retrieval of the exact artifact."
+            )
         require_https(review.get("review_evidence_url"), f"{label}.rights_review.review_evidence_url")
         require_https(review.get("license_or_basis_url"), f"{label}.rights_review.license_or_basis_url")
         require_text(review.get("attribution_text"), f"{label}.rights_review.attribution_text")
@@ -288,8 +304,15 @@ def evaluate_manifest(
         blockers.append("Approval receipt SHA-256 does not match the exact manifest bytes.")
     if approval.get("status") == "approved":
         approver = require_text(approval.get("approver_id"), "approval.approver_id")
-        require_date(approval.get("approved_on"), "approval.approved_on")
+        approved_on = require_date(approval.get("approved_on"), "approval.approved_on")
         require_text(approval.get("scope_statement"), "approval.scope_statement")
+        latest_review_date = max(
+            (require_date(entry["rights_review"].get("reviewed_on"), "rights_review.reviewed_on")
+             for entry in sources),
+            default=approved_on,
+        )
+        if approved_on < latest_review_date:
+            blockers.append("Independent manifest approval predates one or more source rights reviews.")
         if approver in reviewed_by:
             blockers.append("The manifest approver must be independent of every source rights reviewer.")
 
