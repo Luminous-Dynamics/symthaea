@@ -1,0 +1,122 @@
+name: QC VWN5 PySCF Reference
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-quantum-chemistry/src/dft/lda.rs"
+      - "scripts/qc/check_vwn5_pyscf_reference.py"
+      - ".github/workflows/qc-vwn5-pyscf-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qc-vwn5-pyscf-reference-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  vwn5-pyscf-reference:
+    name: VWN5 density and potential versus Libxc
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head or dispatched source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact source checkout
+        shell: bash
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse --verify 'HEAD^{commit}')"
+          if [[ "$actual" != "$EXPECTED_SOURCE_SHA" ]]; then
+            printf 'source HEAD mismatch: expected=%s actual=%s\n' "$EXPECTED_SOURCE_SHA" "$actual" >&2
+            exit 1
+          fi
+          {
+            echo "## VWN5 pointwise reference check"
+            echo
+            printf -- '- Source commit: `%s`\n' "$actual"
+            printf -- '- Source tree: `%s`\n' "$(git rev-parse --verify 'HEAD^{tree}')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install pinned Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Check Python reference harness syntax
+        run: |
+          python -m py_compile scripts/qc/check_vwn5_pyscf_reference.py
+
+      - name: Install pinned PySCF and numerical dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            "numpy==2.2.6" \
+            "scipy==1.15.3" \
+            "h5py==3.14.0" \
+            "pyscf==2.14.0"
+
+      - name: Compare VWN5 energy and potential with PySCF Libxc
+        run: |
+          set -euo pipefail
+          python scripts/qc/check_vwn5_pyscf_reference.py \
+            --output /tmp/vwn5-pyscf-reference.json
+
+      - name: Summarize independent reference evidence
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path("/tmp/vwn5-pyscf-reference.json")
+          summary_path = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          lines = ["", "### Independent Libxc evidence", ""]
+          if not report_path.is_file():
+              lines.append("No JSON evidence was emitted; the reference check did not complete.")
+          else:
+              report = json.loads(report_path.read_text(encoding="utf-8"))
+              ids = report.get("functional_ids", {})
+              lines += [
+                  f"- PySCF: `{report.get('pyscf_version')}`",
+                  f"- NumPy / SciPy: `{report.get('numpy_version')}` / `{report.get('scipy_version')}`",
+                  f"- Libxc IDs: `{ids}`",
+                  f"- Result: **{'PASS' if report.get('pass') else 'FAIL'}**",
+                  "",
+                  "| Density (a.u.) | εc absolute error | vc absolute error | Full LDA ε absolute error | Full LDA v absolute error |",
+                  "|---:|---:|---:|---:|---:|",
+              ]
+              for item in report.get("records", []):
+                  lines.append(
+                      f"| {item['rho']:.3g} | {item['epsilon_abs_error']:.3e} "
+                      f"| {item['potential_abs_error']:.3e} "
+                      f"| {item['full_lda_epsilon_abs_error']:.3e} "
+                      f"| {item['full_lda_potential_abs_error']:.3e} |"
+                  )
+              lines += [
+                  "",
+                  "Pointwise functional verification only. This does not establish molecular energy convergence or chemical accuracy.",
+                  "A failed numerical comparison leaves the workflow failed; this summary does not override it.",
+              ]
+          with summary_path.open("a", encoding="utf-8") as output:
+              output.write("\n".join(lines) + "\n")
+          PY
+
+      - name: Upload numerical evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qc-vwn5-pyscf-reference-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/vwn5-pyscf-reference.json
+          if-no-files-found: warn
+          retention-days: 30
