@@ -155,7 +155,8 @@ test_boot() {
 
     # Check relay via WebSocket probe (lightweight — just connect and close)
     if python3 -c "
-import asyncio, websockets
+import asyncio
+import uuid, websockets
 async def check():
     try:
         async with websockets.connect('ws://127.0.0.1:${RELAY_PORT}', close_timeout=3, open_timeout=5):
@@ -168,7 +169,8 @@ exit(0 if asyncio.run(check()) else 1)
         # Relay may not be up yet — wait and retry
         sleep 15
         if python3 -c "
-import asyncio, websockets
+import asyncio
+import uuid, websockets
 async def check():
     try:
         async with websockets.connect('ws://127.0.0.1:${RELAY_PORT}', close_timeout=3, open_timeout=5):
@@ -200,7 +202,8 @@ test_hardware_probe() {
 
     sleep 20  # wait for relay
     if ws_test <<'PYEOF'
-import asyncio, json, sys, os
+import asyncio
+import uuid, json, sys, os
 async def test():
     import websockets
     token = os.environ.get("AUTH_TOKEN", "sovereign")
@@ -253,7 +256,8 @@ test_disk_discovery() {
 
     sleep 20  # wait for relay
     if ws_test <<'PYEOF'
-import asyncio, json, sys, os
+import asyncio
+import uuid, json, sys, os
 async def test():
     import websockets
     token = os.environ.get("AUTH_TOKEN", "sovereign")
@@ -276,6 +280,7 @@ async def test():
 
         await ws.send(json.dumps({
             "action": "install",
+            "request_id": uuid.uuid4().hex,
             "disk": "/dev/vda",
             "layout": "single-luks",
             "hostname": "identity-negative",
@@ -321,7 +326,8 @@ test_single_install() {
 
     sleep 20  # wait for relay
     if ws_test <<'PYEOF'
-import asyncio, json, sys, os
+import asyncio
+import uuid, json, sys, os
 async def test():
     import websockets
     token = os.environ.get("AUTH_TOKEN", "sovereign")
@@ -348,6 +354,7 @@ async def test():
         # A mismatched target identity must be rejected before any install work.
         await ws.send(json.dumps({
             "action": "install",
+            "request_id": uuid.uuid4().hex,
             "disk": "/dev/vda",
             "layout": "single",
             "hostname": "identity-negative",
@@ -367,6 +374,7 @@ async def test():
         # Install
         await ws.send(json.dumps({
             "action": "install",
+            "request_id": uuid.uuid4().hex,
             "disk": target,
             "layout": "single",
             "hostname": "test-nixos",
@@ -461,7 +469,8 @@ test_luks_install() {
 
     sleep 20  # wait for relay
     if ws_test <<'PYEOF'
-import asyncio, json, sys, os
+import asyncio
+import uuid, json, sys, os
 async def test():
     import websockets
     token = os.environ.get("AUTH_TOKEN", "sovereign")
@@ -482,6 +491,7 @@ async def test():
 
         await ws.send(json.dumps({
             "action": "install",
+            "request_id": uuid.uuid4().hex,
             "disk": target,
             "layout": "single-luks",
             "hostname": "test-luks",
@@ -546,7 +556,8 @@ test_combined_install() {
     sleep 25  # wait for relay service
 
     if ws_test <<'PYEOF'
-import asyncio, json, sys, os
+import asyncio
+import uuid, json, sys, os
 async def test():
     import websockets
     token = os.environ.get("AUTH_TOKEN", "sovereign")
@@ -589,6 +600,7 @@ async def test():
         print(f"  [install] Starting on {target} with browser config...")
         await ws.send(json.dumps({
             "action": "install",
+            "request_id": uuid.uuid4().hex,
             "disk": target,
             "layout": "single",
             "hostname": "test-nixos",

@@ -41,6 +41,7 @@ GOVERNANCE_DRAFT_GUARD = (
 )
 
 DIRECT_GENERIC = {
+    "nixforhumanity-relay",
     "fmt",
     "cls-field-count",
     "workspace-targets",

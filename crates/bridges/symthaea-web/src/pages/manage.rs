@@ -4,7 +4,7 @@
 //! Generations, services, storage, config editing — all from the browser.
 
 use leptos::prelude::*;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 
 use crate::pages::remote_install::MAX_RELAY_MESSAGE_BYTES;
 
@@ -54,6 +54,36 @@ enum Tab {
 // ═══════════════════════════════════════════════════════
 // WebSocket helpers
 // ═══════════════════════════════════════════════════════
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = ["globalThis", "crypto"], js_name = getRandomValues, catch)]
+    fn crypto_get_random_values(buf: &mut [u8]) -> Result<(), JsValue>;
+}
+
+fn new_request_id() -> Option<String> {
+    let mut bytes = [0u8; 16];
+    crypto_get_random_values(&mut bytes).ok()?;
+    Some(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn action_requires_request_id(action: &str) -> bool {
+    matches!(
+        action,
+        "install"
+            | "rollback"
+            | "switch_generation"
+            | "service_action"
+            | "gc_collect"
+            | "write_config"
+            | "create_image"
+            | "restore_image"
+            | "preserve_data"
+            | "connect_wifi"
+    )
+}
+
+
 
 fn send_ws(ws: &web_sys::WebSocket, msg: &serde_json::Value) {
     let _ = ws.send_with_str(&msg.to_string());
@@ -214,6 +244,22 @@ pub fn ManagePage() -> impl IntoView {
                             action_status.set(format!("Error: {}", m));
                         }
                     }
+                    "transaction_replay" => {
+                        action_status.set(
+                            msg["message"]
+                                .as_str()
+                                .unwrap_or("Request already completed; effect not repeated.")
+                                .into(),
+                        );
+                    }
+                    "transaction_indeterminate" => {
+                        action_status.set(
+                            msg["message"]
+                                .as_str()
+                                .unwrap_or("Prior request outcome is uncertain; effect refused.")
+                                .into(),
+                        );
+                    }
                     _ => {}
                 }
             },
@@ -234,7 +280,15 @@ pub fn ManagePage() -> impl IntoView {
     let send_action = move |action: &str| {
         WS.with(|cell| {
             if let Some(ws) = cell.borrow().as_ref() {
-                send_ws(ws, &serde_json::json!({"action": action}));
+                let mut msg = serde_json::json!({"action": action});
+                if action_requires_request_id(action) {
+                    let Some(request_id) = new_request_id() else {
+                        action_status.set("Unable to obtain cryptographic request identity".into());
+                        return;
+                    };
+                    msg["request_id"] = serde_json::json!(request_id);
+                }
+                send_ws(ws, &msg);
                 action_status.set(format!("Running {}...", action));
             }
         });
@@ -245,6 +299,13 @@ pub fn ManagePage() -> impl IntoView {
             if let Some(ws) = cell.borrow().as_ref() {
                 let mut msg = extra;
                 msg["action"] = serde_json::json!(action);
+                if action_requires_request_id(action) {
+                    let Some(request_id) = new_request_id() else {
+                        action_status.set("Unable to obtain cryptographic request identity".into());
+                        return;
+                    };
+                    msg["request_id"] = serde_json::json!(request_id);
+                }
                 send_ws(ws, &msg);
                 action_status.set(format!("Running {}...", action));
             }

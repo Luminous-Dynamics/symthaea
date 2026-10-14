@@ -616,6 +616,17 @@
       ];
       var ws = null;
 
+function newRequestId() {
+  var bytes = new Uint8Array(16);
+  if (!window.crypto || !window.crypto.getRandomValues) {
+    throw new Error('Web Crypto getRandomValues is unavailable');
+  }
+  window.crypto.getRandomValues(bytes);
+  return Array.prototype.map.call(bytes, function (byte) {
+    return byte.toString(16).padStart(2, '0');
+  }).join('');
+}
+
       for (var i = 0; i < relayUrls.length; i++) {
         try {
           sshStatus.textContent = 'Connecting to relay at ' + relayUrls[i] + '...';
@@ -780,7 +791,7 @@
                 if (preserveFirst) {
                   appendTerminal('Preserving data...', 'var(--teal)');
                   sshStatus.textContent = 'Backing up data before install...';
-                  ws.send(JSON.stringify({ action: 'preserve_data' }));
+                  ws.send(JSON.stringify({ action: 'preserve_data', request_id: newRequestId() }));
                   // Wait for data_preserved response before continuing
                 }
                 if (!confirm('SERVER WARNING\n\n' + safety.message + '\n\nRisk factors:\n' +
@@ -1516,6 +1527,7 @@
       hostname = (cfgHostname && cfgHostname.value.trim()) || hostname || 'guardian';
       ws.send(JSON.stringify({
         action: 'install',
+        request_id: newRequestId(),
         disk: diskName,
         layout: layout,
         fast_disk: fastDisk,
