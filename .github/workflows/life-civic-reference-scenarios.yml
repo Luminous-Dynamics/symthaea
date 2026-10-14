@@ -57,5 +57,8 @@ jobs:
             ) and
             ([.cases[].case_id] | index("SYM-LC-002") != null) and
             ([.cases[].case_id] | index("SYM-LC-003") != null) and
-            ([.cases[].case_id] | index("SYM-LC-006") != null)
+            ([.cases[].case_id] | index("SYM-LC-006") != null) and
+            ([.cases[].case_id] | index("SYM-LC-007") != null) and
+            ([.cases[].case_id] | index("SYM-LC-008") != null) and
+            ([.cases[].case_id] | index("SYM-LC-009") != null)
           ' docs/research/life-civic/reference-scenarios.json
