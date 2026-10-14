@@ -97,6 +97,59 @@ def require_string_list(value: Any, label: str, allowed: set[str] | None = None)
     return items
 
 
+def review_scope_sha256(manifest: dict[str, Any], entry: dict[str, Any]) -> str:
+    """Hash exact selected works plus artifact and requested study scope.
+
+    The rights reviewer records this digest only after reviewing the selected
+    works, exact artifact, intended uses, commercial status, jurisdictions and
+    planned outputs together. Canonical JSON makes the digest reproducible.
+    """
+    scope = require_object(manifest.get("scope"), "scope")
+    selected_work_ids = require_string_list(
+        entry.get("selected_work_ids"), "selected_work_ids"
+    )
+    if not selected_work_ids:
+        raise ManifestError("selected_work_ids must name at least one work or movement")
+    payload = {
+        "manifest_id": require_text(manifest.get("manifest_id"), "manifest_id"),
+        "intake_source_id": require_text(entry.get("intake_source_id"), "intake_source_id"),
+        "source_record_url": require_https(entry.get("source_record_url"), "source_record_url"),
+        "source_file_url": require_https(entry.get("source_file_url"), "source_file_url"),
+        "artifact_path": Path(require_text(entry.get("artifact_path"), "artifact_path")).as_posix(),
+        "artifact_sha256": require_text(entry.get("artifact_sha256"), "artifact_sha256"),
+        "artifact_bytes": entry.get("artifact_bytes"),
+        "retrieved_on": require_date(entry.get("retrieved_on"), "retrieved_on"),
+        "selected_work_ids": selected_work_ids,
+        "selection_basis": require_text(entry.get("selection_basis"), "selection_basis"),
+        "required_rights_dimensions": sorted(
+            require_string_list(
+                manifest.get("required_rights_dimensions"),
+                "required_rights_dimensions",
+            )
+        ),
+        "scope": {
+            "purpose": require_text(scope.get("purpose"), "scope.purpose"),
+            "requested_uses": sorted(
+                require_string_list(scope.get("requested_uses"), "scope.requested_uses", USES)
+            ),
+            "commercial_use": scope.get("commercial_use"),
+            "jurisdictions": sorted(
+                require_string_list(scope.get("jurisdictions"), "scope.jurisdictions")
+            ),
+            "planned_outputs": sorted(
+                require_string_list(scope.get("planned_outputs"), "scope.planned_outputs")
+            ),
+            "retention_policy": require_text(
+                scope.get("retention_policy"), "scope.retention_policy"
+            ),
+        },
+    }
+    canonical = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def evaluate_manifest(
     manifest_path: Path,
     approval_path: Path,
@@ -181,6 +234,12 @@ def evaluate_manifest(
                 f"{label}.source_record_url does not match the exact intake record for {source_id}"
             )
         require_https(entry.get("source_file_url"), f"{label}.source_file_url")
+        selected_work_ids = require_string_list(
+            entry.get("selected_work_ids"), f"{label}.selected_work_ids"
+        )
+        if not selected_work_ids:
+            raise ManifestError(f"{label}.selected_work_ids must name at least one work or movement")
+        selection_basis = require_text(entry.get("selection_basis"), f"{label}.selection_basis")
         relative_artifact = Path(require_text(entry.get("artifact_path"), f"{label}.artifact_path"))
         if relative_artifact.is_absolute() or ".." in relative_artifact.parts:
             raise ManifestError(f"{label}.artifact_path must be a relative path without traversal")
@@ -213,11 +272,15 @@ def evaluate_manifest(
                 if len(artifact_content) != artifact_bytes:
                     blockers.append(f"{source_id}: on-disk artifact byte count does not match manifest.")
         retrieved_on = require_date(entry.get("retrieved_on"), f"{label}.retrieved_on")
+        expected_review_scope_sha256 = review_scope_sha256(manifest, entry)
         verified_artifacts.append({
             "source_id": source_id,
             "artifact_path": relative_artifact.as_posix(),
             "artifact_sha256": artifact_sha,
             "artifact_bytes": artifact_bytes,
+            "selected_work_ids": selected_work_ids,
+            "selection_basis": selection_basis,
+            "review_scope_sha256": expected_review_scope_sha256,
         })
 
         review = require_object(entry.get("rights_review"), f"{label}.rights_review")
@@ -235,6 +298,19 @@ def evaluate_manifest(
         require_https(review.get("review_evidence_url"), f"{label}.rights_review.review_evidence_url")
         require_https(review.get("license_or_basis_url"), f"{label}.rights_review.license_or_basis_url")
         require_text(review.get("attribution_text"), f"{label}.rights_review.attribution_text")
+
+        reviewed_scope_hash = require_text(
+            review.get("reviewed_scope_sha256"),
+            f"{label}.rights_review.reviewed_scope_sha256",
+        )
+        if not SHA256_RE.fullmatch(reviewed_scope_hash):
+            raise ManifestError(
+                f"{label}.rights_review.reviewed_scope_sha256 must be a lowercase 64-character SHA-256"
+            )
+        if reviewed_scope_hash != expected_review_scope_sha256:
+            blockers.append(
+                f"{source_id}: rights review does not bind selected works and the exact requested scope."
+            )
 
         reviewed_hash = require_text(
             review.get("reviewed_artifact_sha256"),
