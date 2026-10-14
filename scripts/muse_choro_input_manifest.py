@@ -97,7 +97,85 @@ def require_string_list(value: Any, label: str, allowed: set[str] | None = None)
     return items
 
 
-def review_scope_sha256(manifest: dict[str, Any], entry: dict[str, Any]) -> str:
+def validate_analysis_plan(
+    scope: dict[str, Any],
+    analysis_plan_root: Path = ROOT,
+) -> dict[str, str]:
+    """Verify a separately frozen, externally registered analysis-plan artifact."""
+    plan = require_object(scope.get("analysis_plan"), "scope.analysis_plan")
+    plan_id = require_text(plan.get("plan_id"), "scope.analysis_plan.plan_id")
+    raw_path = require_text(plan.get("path"), "scope.analysis_plan.path")
+    relative_path = Path(raw_path)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ManifestError("scope.analysis_plan.path must be a relative path without traversal")
+
+    root_resolved = analysis_plan_root.resolve()
+    plan_file = (root_resolved / relative_path).resolve()
+    try:
+        plan_file.relative_to(root_resolved)
+    except ValueError as exc:
+        raise ManifestError("scope.analysis_plan.path escapes --analysis-plan-root") from exc
+    try:
+        plan_bytes = plan_file.read_bytes()
+    except OSError as exc:
+        raise ManifestError(f"cannot read analysis plan at {plan_file}: {exc}") from exc
+
+    expected_hash = require_text(plan.get("sha256"), "scope.analysis_plan.sha256")
+    if not SHA256_RE.fullmatch(expected_hash):
+        raise ManifestError("scope.analysis_plan.sha256 must be a lowercase 64-character SHA-256")
+    actual_hash = hashlib.sha256(plan_bytes).hexdigest()
+    if actual_hash != expected_hash:
+        raise ManifestError("analysis plan SHA-256 does not match the exact on-disk plan bytes")
+
+    try:
+        plan_document = json.loads(plan_bytes)
+    except json.JSONDecodeError as exc:
+        raise ManifestError(f"analysis plan is not valid JSON: {exc}") from exc
+    if not isinstance(plan_document, dict):
+        raise ManifestError("analysis plan JSON root must be an object")
+    if require_text(plan_document.get("plan_id"), "analysis-plan file plan_id") != plan_id:
+        raise ManifestError("scope.analysis_plan.plan_id does not match the plan file")
+
+    preregistration = require_object(
+        plan_document.get("pre_registration"),
+        "analysis-plan file pre_registration",
+    )
+    if require_text(preregistration.get("status"), "pre_registration.status") != "registered":
+        raise ManifestError("analysis plan is not externally registered")
+    for frozen_field in ("hypotheses_frozen", "null_models_frozen", "thresholds_frozen"):
+        if preregistration.get(frozen_field) is not True:
+            raise ManifestError(f"analysis plan requires pre_registration.{frozen_field} == true")
+
+    registered_on = require_date(
+        preregistration.get("registered_on"),
+        "analysis-plan file pre_registration.registered_on",
+    )
+    registration_url = require_https(
+        preregistration.get("registration_record_url"),
+        "analysis-plan file pre_registration.registration_record_url",
+    )
+    if require_date(plan.get("registered_on"), "scope.analysis_plan.registered_on") != registered_on:
+        raise ManifestError("manifest analysis-plan registration date does not match the plan file")
+    if require_https(
+        plan.get("registration_record_url"),
+        "scope.analysis_plan.registration_record_url",
+    ) != registration_url:
+        raise ManifestError("manifest analysis-plan registration URL does not match the plan file")
+
+    return {
+        "plan_id": plan_id,
+        "path": relative_path.as_posix(),
+        "sha256": actual_hash,
+        "registered_on": registered_on,
+        "registration_record_url": registration_url,
+    }
+
+
+def review_scope_sha256(
+    manifest: dict[str, Any],
+    entry: dict[str, Any],
+    analysis_plan_root: Path = ROOT,
+) -> str:
     """Hash exact selected works plus artifact and requested study scope.
 
     The rights reviewer records this digest only after reviewing the selected
@@ -105,6 +183,7 @@ def review_scope_sha256(manifest: dict[str, Any], entry: dict[str, Any]) -> str:
     planned outputs together. Canonical JSON makes the digest reproducible.
     """
     scope = require_object(manifest.get("scope"), "scope")
+    analysis_plan = validate_analysis_plan(scope, analysis_plan_root)
     selected_work_ids = require_string_list(
         entry.get("selected_work_ids"), "selected_work_ids"
     )
@@ -127,6 +206,7 @@ def review_scope_sha256(manifest: dict[str, Any], entry: dict[str, Any]) -> str:
                 "required_rights_dimensions",
             )
         ),
+        "analysis_plan": analysis_plan,
         "scope": {
             "purpose": require_text(scope.get("purpose"), "scope.purpose"),
             "requested_uses": sorted(
@@ -155,6 +235,7 @@ def evaluate_manifest(
     approval_path: Path,
     intake_path: Path = DEFAULT_INTAKE,
     artifact_root: Path | None = None,
+    analysis_plan_root: Path = ROOT,
 ) -> dict[str, Any]:
     manifest, manifest_bytes = read_json(manifest_path)
     approval, approval_bytes = read_json(approval_path)
@@ -207,8 +288,23 @@ def evaluate_manifest(
     sources = manifest.get("sources")
     if not isinstance(sources, list):
         raise ManifestError("sources must be a list")
+    analysis_plan_summary: dict[str, str] | None = None
     if not sources:
         blockers.append("No exact source artifacts are in the approved-input manifest.")
+        raw_plan = scope.get("analysis_plan")
+        plan_fields = ("plan_id", "path", "sha256", "registered_on", "registration_record_url")
+        if isinstance(raw_plan, dict) and all(
+            isinstance(raw_plan.get(field), str) and raw_plan[field].strip()
+            for field in plan_fields
+        ):
+            try:
+                analysis_plan_summary = validate_analysis_plan(scope, analysis_plan_root)
+            except ManifestError as exc:
+                blockers.append(f"Analysis plan is blocked: {exc}")
+        else:
+            blockers.append("No hash-bound pre-registered analysis plan is declared.")
+    else:
+        analysis_plan_summary = validate_analysis_plan(scope, analysis_plan_root)
 
     intake_ids_seen: set[str] = set()
     artifact_hashes_seen: set[str] = set()
@@ -272,7 +368,7 @@ def evaluate_manifest(
                 if len(artifact_content) != artifact_bytes:
                     blockers.append(f"{source_id}: on-disk artifact byte count does not match manifest.")
         retrieved_on = require_date(entry.get("retrieved_on"), f"{label}.retrieved_on")
-        expected_review_scope_sha256 = review_scope_sha256(manifest, entry)
+        expected_review_scope_sha256 = review_scope_sha256(manifest, entry, analysis_plan_root)
         verified_artifacts.append({
             "source_id": source_id,
             "artifact_path": relative_artifact.as_posix(),
@@ -294,6 +390,10 @@ def evaluate_manifest(
         if reviewed_on < retrieved_on:
             blockers.append(
                 f"{source_id}: rights review date predates retrieval of the exact artifact."
+            )
+        if analysis_plan_summary and reviewed_on < analysis_plan_summary["registered_on"]:
+            blockers.append(
+                f"{source_id}: rights review predates registration of the frozen analysis plan."
             )
         require_https(review.get("review_evidence_url"), f"{label}.rights_review.review_evidence_url")
         require_https(review.get("license_or_basis_url"), f"{label}.rights_review.license_or_basis_url")
@@ -389,6 +489,8 @@ def evaluate_manifest(
         )
         if approved_on < latest_review_date:
             blockers.append("Independent manifest approval predates one or more source rights reviews.")
+        if analysis_plan_summary and approved_on < analysis_plan_summary["registered_on"]:
+            blockers.append("Independent manifest approval predates registration of the frozen analysis plan.")
         if approver in reviewed_by:
             blockers.append("The manifest approver must be independent of every source rights reviewer.")
 
@@ -412,6 +514,7 @@ def evaluate_manifest(
             "jurisdictions": jurisdictions,
             "planned_outputs": planned_outputs,
             "retention_policy": retention_policy,
+            "analysis_plan": analysis_plan_summary,
         },
         "blockers": blockers,
         "interpretation": (
@@ -432,6 +535,12 @@ def main(argv: list[str] | None = None) -> int:
         help="directory containing the exact reviewed files (the script hashes bytes only; it does not parse score content)",
     )
     parser.add_argument(
+        "--analysis-plan-root",
+        type=Path,
+        default=ROOT,
+        help="repository-relative root containing the exact frozen analysis-plan JSON",
+    )
+    parser.add_argument(
         "--require-authorized",
         action="store_true",
         help="exit non-zero unless the manifest is authorized for its exact declared scope",
@@ -443,7 +552,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        report = evaluate_manifest(args.manifest, args.approval, args.intake, args.artifact_root)
+        report = evaluate_manifest(
+            args.manifest, args.approval, args.intake, args.artifact_root, args.analysis_plan_root
+        )
     except ManifestError as exc:
         print(f"INVALID MANIFEST: {exc}", file=sys.stderr)
         return 2
