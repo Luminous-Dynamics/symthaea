@@ -29,6 +29,7 @@ pub const MIN_SOCIAL_PROTECTION: f64 = 0.75;
 pub const MAX_LAWFUL_ACCESS_TIME_MINUTES: f64 = 60.0;
 pub const MAX_COHORT_COVERAGE_GAP: f64 = 0.15;
 pub const MAX_INTERVAL_WIDTH: f64 = 0.20;
+pub const MAX_TIME_INTERVAL_WIDTH_MINUTES: f64 = 20.0;
 pub const MAX_EVIDENCE_AGE_DAYS: u32 = 180;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -216,7 +217,7 @@ fn lower_is_better_pass_or_uncertain(interval: Option<Interval>, ceiling: f64) -
         None => "missing",
         Some(value) if !valid_time(value) => "invalid",
         Some(value) if value.low > ceiling => "fail",
-        Some(value) if value.high <= ceiling && value.high - value.low <= MAX_INTERVAL_WIDTH * 100.0 => "pass",
+        Some(value) if value.high <= ceiling && value.high - value.low <= MAX_TIME_INTERVAL_WIDTH_MINUTES => "pass",
         Some(_) => "uncertain",
     }
 }
