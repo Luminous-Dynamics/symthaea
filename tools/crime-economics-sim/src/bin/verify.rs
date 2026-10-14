@@ -309,7 +309,7 @@ fn run(path: &str) -> Result<(), String> {
     println!("SCENARIOS={}", EXPECTED_SCENARIOS.len());
     println!("POLICIES={}", EXPECTED_POLICIES.len());
     println!("REPLICATIONS_PER_CELL={REPLICATIONS}");
-    println!("NEGATIVE_CONTROLS=reporting_suppression,high_displacement,non_economic_harm,unequal_access");
+    println!("NEGATIVE_CONTROLS=reporting_suppression,high_displacement,non_economic_harm,unequal_access,concentrated_automation,high_robot_compromise");
     println!("SUMMARY_FIELDS=scenario,policy,mean_true_crime_events,mean_reported_crime_reports,mean_displaced_property_events,mean_robot_safety_incidents,cost_units,access_gap_bps");
     for scenario in EXPECTED_SCENARIOS {
         for policy in EXPECTED_POLICIES {
