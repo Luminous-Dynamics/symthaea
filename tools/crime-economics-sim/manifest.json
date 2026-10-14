@@ -89,6 +89,217 @@
     "Source blob pinning detects unreviewed byte drift only; it is not a signature or source-authenticity proof.",
     "Rust tests verify selected implementation invariants only.",
     "The independent verifier validates artifact structure and specific cross-scenario relationships only.",
-    "No causal crime-reduction effect, model calibration, real-world validity, robot safety qualification, or jurisdictional generalization is established."
+    "No causal crime-reduction effect, model calibration, real-world validity, robot safety qualification, or jurisdictional generalization is established.",
+    "All outcome-generating parameters have explicit synthetic-assumption labels; no parameter in the register is an empirically estimated local coefficient."
+  ],
+  "parameter_registry_version": "0.1.0",
+  "parameter_registry_status": "all_parameters_are_synthetic_assumptions",
+  "parameter_registry": [
+    {
+      "parameter_id": "POPULATION_AND_TIME",
+      "values": {
+        "household_equivalents": 1000,
+        "weeks": 52,
+        "replications_per_cell": 32
+      },
+      "unit": "synthetic model dimensions",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Defines simulation size and observation window only; not a claim about any real community."
+    },
+    {
+      "parameter_id": "COHORT_ALLOCATION",
+      "values": {
+        "cohort_sizes": [
+          100,
+          200,
+          300,
+          250,
+          150
+        ]
+      },
+      "unit": "synthetic household-equivalents per aggregate cohort",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Cohorts are anonymous aggregate cells with no person records or inferred individual attributes."
+    },
+    {
+      "parameter_id": "BASE_ACCESS_RATES",
+      "values": {
+        "by_cohort": [
+          0.45,
+          0.58,
+          0.7,
+          0.8,
+          0.9
+        ]
+      },
+      "unit": "fraction between 0 and 1",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Illustrative starting conditions, not local housing, food, utilities, or benefits-access measurements."
+    },
+    {
+      "parameter_id": "BASE_INCIDENT_EVENT_RATES",
+      "values": {
+        "need_related_property": 0.00055,
+        "opportunity_related_property": 0.0011,
+        "non_economic_harm": 0.00065
+      },
+      "unit": "event probability per synthetic household-week",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "The rates are not estimates of actual crime, violence, victimization, or offending."
+    },
+    {
+      "parameter_id": "COHORT_EVENT_MULTIPLIERS",
+      "values": {
+        "need_related_property": [
+          2.4,
+          1.8,
+          1.25,
+          0.8,
+          0.45
+        ],
+        "opportunity_related_property": [
+          1.35,
+          1.2,
+          1,
+          0.85,
+          0.7
+        ],
+        "non_economic_harm": [
+          1.2,
+          1.1,
+          1,
+          0.9,
+          0.8
+        ]
+      },
+      "unit": "dimensionless multiplier by aggregate cohort",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "These multipliers are illustrative heterogeneity controls, not proof that socioeconomic status or group membership predicts individual behavior."
+    },
+    {
+      "parameter_id": "ESSENTIALS_ACCESS_GAIN",
+      "values": {
+        "by_cohort": [
+          0.28,
+          0.24,
+          0.18,
+          0.1,
+          0.04
+        ]
+      },
+      "unit": "fractional-access gain before bounded access calculation",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Assumed programme effects, not a forecast of real service uptake or delivered access."
+    },
+    {
+      "parameter_id": "QUALITY_WORK_EFFECT",
+      "values": {
+        "need_related_property_rate_reduction": 0.12,
+        "opportunity_related_property_rate_reduction": 0.08
+      },
+      "unit": "fractional reduction in modeled event probability",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Fixed toy-model elasticities; not estimated from NIJ research or transferable effect sizes."
+    },
+    {
+      "parameter_id": "ROBOT_PROTECTION_EFFECT",
+      "values": {
+        "reference_effect_probability": 0.24192,
+        "low_effectiveness_scenario_multiplier": 0.25
+      },
+      "unit": "modeled probability per eligible property-event opportunity",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not a tested robot success rate. The low-effectiveness case tests monotonic sensitivity only."
+    },
+    {
+      "parameter_id": "REPORTING_PROBABILITY",
+      "values": {
+        "reference": 0.78,
+        "reporting_suppression": 0.35
+      },
+      "unit": "probability that a simulated harm event is marked reported",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not a real reporting rate. This parameter exists specifically to demonstrate that reports and underlying harm differ."
+    },
+    {
+      "parameter_id": "DISPLACEMENT_PROBABILITY",
+      "values": {
+        "reference": 0.3,
+        "high_displacement": 0.9
+      },
+      "unit": "probability that a modeled prevented local property event reappears in the adjacent ring",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "The adjacent ring is represented by an aggregate counter, not a spatial network or geographic forecast."
+    },
+    {
+      "parameter_id": "ROBOT_COMPROMISE_PROBABILITY",
+      "values": {
+        "reference": 0.01,
+        "high_robot_compromise": 0.18
+      },
+      "unit": "probability of one modeled system compromise per week",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not a vulnerability rate, threat forecast, or robot reliability statistic."
+    },
+    {
+      "parameter_id": "ROBOT_FALSE_ALARM_AND_SAFETY_EFFECTS",
+      "values": {
+        "false_alarm_probability_per_household_week": 0.00002,
+        "safety_harm_probability_given_compromise": 0.1
+      },
+      "unit": "synthetic probabilities",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not human-safety, false-positive, or cybersecurity performance evidence."
+    },
+    {
+      "parameter_id": "AUTOMATION_LIVELIHOOD_SHOCK",
+      "values": {
+        "concentrated_automation_need_event_multiplier": 0.35,
+        "quality_work_mitigation_fraction": 0.45
+      },
+      "unit": "dimensionless toy-model shock and mitigation",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Explicit adverse sensitivity case, not a forecast of automation-driven unemployment or work support efficacy."
+    },
+    {
+      "parameter_id": "POLICY_COST_UNITS",
+      "values": {
+        "baseline": 0,
+        "essentials": 40000,
+        "quality_work": 60000,
+        "robot_protection": 100000,
+        "combined": 190000
+      },
+      "unit": "fictional annualized accounting units",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not US dollars, rand, budget estimates, total-cost-of-ownership analysis, or measured cost-effectiveness."
+    },
+    {
+      "parameter_id": "GOVERNANCE_AND_DISTRIBUTION_PROXIES",
+      "values": {
+        "robot_privacy_burden_points": 120,
+        "reference_benefit_concentration_bps": 4500,
+        "concentrated_automation_benefit_concentration_bps": 8500,
+        "quality_work_concentration_adjustment_bps": -1500
+      },
+      "unit": "unvalidated index points and basis-point proxies",
+      "source_class": "synthetic_assumption",
+      "evidence_status": "not_empirical",
+      "limitation": "Not privacy valuations, inequality measurements, fairness scores, or a single policy-ranking objective."
+    }
   ]
 }
