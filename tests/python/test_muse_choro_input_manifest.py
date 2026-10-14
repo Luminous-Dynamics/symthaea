@@ -39,6 +39,7 @@ def approved_fixture() -> tuple[dict, dict]:
         ],
         "sources": [{
             "intake_source_id": "imslp-choro-mineiro-rocha-2022",
+            "source_record_url": "https://imslp.org/wiki/Choro_mineiro_%28Rocha%2C_Davi%29",
             "source_file_url": "https://example.org/synthetic-score-artifact.pdf",
             "artifact_path": "synthetic-score-artifact.bin",
             "artifact_sha256": digest,
@@ -198,6 +199,38 @@ class ChoroInputManifestTests(unittest.TestCase):
                 "The manifest approver must be independent of every source rights reviewer.",
                 report["blockers"],
             )
+
+    def test_source_record_url_must_match_source_intake_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture()
+            manifest["sources"][0]["source_record_url"] = "https://example.org/unrelated-record"
+            mpath = root / "manifest.json"
+            apath = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            mpath.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            apath.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            with self.assertRaisesRegex(ManifestError, "does not match the exact intake record"):
+                evaluate_manifest(mpath, apath, INTAKE, root)
+
+    def test_review_cannot_predate_artifact_retrieval(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture()
+            manifest["sources"][0]["retrieved_on"] = "2026-10-15"
+            manifest["sources"][0]["rights_review"]["reviewed_on"] = "2026-10-14"
+            mpath = root / "manifest.json"
+            apath = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            mpath.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            apath.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            report = evaluate_manifest(mpath, apath, INTAKE, root)
+            self.assertFalse(report["authorized"])
+            self.assertTrue(any("predates retrieval" in blocker for blocker in report["blockers"]))
 
     def test_unknown_intake_source_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
