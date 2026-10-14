@@ -198,7 +198,8 @@
           "water-incident reporting versus general calls/queries versus interruption notifications",
           "retrieval time versus published page content",
           "candidate contact path versus real submitted request",
-          "source disagreement versus proof that either channel is false"
+          "source disagreement versus proof that either channel is false",
+          "source retrieval time versus publication/event time"
         ],
         "prohibited_claims": [
           "all published contact channels are interchangeable",
