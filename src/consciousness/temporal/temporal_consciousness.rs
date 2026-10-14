@@ -2240,6 +2240,30 @@ mod tests {
     }
 
     #[test]
+    fn extreme_velocity_pair_rejects_overflowing_acceleration_without_mutation() {
+        let mut trajectory = PhiTrajectory::new(8);
+        assert!(trajectory.observe_at(-5.0e304, Duration::ZERO));
+        assert!(trajectory.observe_at(5.0e304, Duration::from_millis(1)));
+        assert!(trajectory.velocity.is_finite());
+
+        let retained_ema = trajectory.ema;
+        let retained_velocity = trajectory.velocity;
+        let retained_history = trajectory.history();
+
+        // Both adjacent velocities are finite (~±1e308), but their difference
+        // divided by the short midpoint interval is not representable as f64.
+        let accepted = trajectory.observe_at(-5.0e304, Duration::from_millis(2));
+        assert!(!accepted);
+        assert_eq!(trajectory.sample_count(), 2);
+        assert_eq!(trajectory.history(), retained_history);
+        assert_eq!(trajectory.ema, retained_ema);
+        assert_eq!(trajectory.velocity, retained_velocity);
+        assert!(!trajectory.acceleration_available);
+        assert!(trajectory.acceleration.is_finite());
+        assert!(trajectory.stability.is_finite());
+    }
+
+    #[test]
     fn test_phi_trajectory() {
         let mut trajectory = PhiTrajectory::new(10);
 
