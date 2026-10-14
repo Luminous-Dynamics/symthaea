@@ -545,6 +545,42 @@ mod tests {
     }
 
     #[test]
+    fn microbial_mechanism_cannot_be_declared_nonliving() {
+        let mut sample = candidate();
+        sample.mechanism = ConcreteHealingMechanism::MicrobialMineralization;
+        assert!(sample
+            .validate()
+            .expect_err("microbial mechanism requires viable organism declaration")
+            .contains(&LivingConcreteValidationError::BiologicalMechanismRequiresOrganism));
+    }
+
+    #[test]
+    fn field_monitored_stage_requires_prior_lab_evidence_and_review() {
+        let mut sample = candidate();
+        sample.evidence_stage = ConcreteEvidenceStage::FieldMonitored;
+        sample.evidence.push(evidence(
+            "field-1",
+            EvidenceKind::FieldMeasurement,
+            "field-record:1",
+        ));
+        sample.outcomes.push(ConcreteOutcome {
+            metric: ConcreteOutcomeMetric::WaterIngressDepthMm,
+            value: 2.0,
+            unit: "mm".to_string(),
+            evidence_id: "field-1".to_string(),
+            origin: ConcreteOutcomeOrigin::Measured,
+            specimen_count: Some(1),
+            model_id: None,
+            absolute_uncertainty: Some(0.2),
+        });
+
+        assert!(sample
+            .validate()
+            .expect_err("field stage should require prior lab/independent review")
+            .contains(&LivingConcreteValidationError::StageEvidenceMissing));
+    }
+
+    #[test]
     fn independent_replication_requires_distinct_lab_sources_and_review() {
         let mut sample = candidate();
         sample.evidence_stage = ConcreteEvidenceStage::IndependentlyReplicated;
