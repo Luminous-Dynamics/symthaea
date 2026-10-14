@@ -29,7 +29,7 @@ class ChoroSourceIntakeTests(unittest.TestCase):
         self.assertEqual(summary["files_downloaded"], 0)
         self.assertEqual(summary["score_content_transcribed"], 0)
         self.assertEqual(summary["empirical_analysis_performed"], 0)
-        self.assertGreaterEqual(len(self.intake["sources"]), 5)
+        self.assertGreaterEqual(len(self.intake["sources"]), 6)
         for source in self.intake["sources"]:
             with self.subTest(source=source["id"]):
                 self.assertEqual(source["status"], "candidate_not_rights_cleared")
@@ -48,7 +48,7 @@ class ChoroSourceIntakeTests(unittest.TestCase):
 
     def test_candidate_pool_covers_multiple_composers(self) -> None:
         composers = {source["composer"] for source in self.intake["sources"]}
-        self.assertGreaterEqual(len(composers), 4)
+        self.assertGreaterEqual(len(composers), 5)
 
     def test_gallet_collection_is_not_misrepresented_as_ensemble_evidence(self) -> None:
         source = next(
@@ -58,6 +58,16 @@ class ChoroSourceIntakeTests(unittest.TestCase):
         self.assertIn("piano four-hands", source["scope"])
         self.assertIn("not representative of ensemble Choro", source["fit"])
         self.assertEqual(source["commercial_use_status"], "not_approved")
+
+    def test_macedo_guitar_score_retains_editor_and_sharealike_caveats(self) -> None:
+        source = next(
+            s for s in self.intake["sources"]
+            if s["id"] == "imslp-choro-pra-portinari-macedo-1982"
+        )
+        self.assertIn("guitar solo", source["scope"])
+        self.assertIn("ShareAlike", source["source_stated_rights"])
+        self.assertEqual(source["commercial_use_status"], "not_approved")
+        self.assertEqual(source["status"], "candidate_not_rights_cleared")
 
     def test_reference_corpus_rights_signals_stay_separate(self) -> None:
         corpus = self.intake["restricted_reference_corpus"]
