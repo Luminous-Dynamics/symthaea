@@ -1,0 +1,41 @@
+name: life-civic-reference-scenarios
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/life-civic-reference-scenarios.yml"
+      - "docs/research/LIFE_CIVIC_DOMAIN_MASTERY_PLAN.md"
+      - "docs/research/life-civic/reference-scenarios.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/life-civic-reference-scenarios.yml"
+      - "docs/research/LIFE_CIVIC_DOMAIN_MASTERY_PLAN.md"
+      - "docs/research/life-civic/reference-scenarios.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-reference-scenarios:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse scenario JSON
+        run: jq empty docs/research/life-civic/reference-scenarios.json
+      - name: Check suite identity and safety invariants
+        run: |
+          jq -e '
+            .suite_id == "SYM-LIFE-CIVIC-REFERENCE-001" and
+            .status == "research_fixture" and
+            (.cases | length) >= 6 and
+            ([.cases[].case_id] | unique | length) == (.cases | length) and
+            all(.cases[];
+              .expected.effects_requested == false and
+              (.expected.prohibited_claims | length) > 0
+            ) and
+            ([.cases[].case_id] | index("SYM-LC-002") != null) and
+            ([.cases[].case_id] | index("SYM-LC-003") != null) and
+            ([.cases[].case_id] | index("SYM-LC-006") != null)
+          ' docs/research/life-civic/reference-scenarios.json
