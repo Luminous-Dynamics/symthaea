@@ -101,16 +101,15 @@ impl VwnCorrelation {
         let atan_term_1 = (2.0 * b / q) * atan_term;
         let atan_term_2 = (2.0 * (b + 2.0 * x0) / q) * atan_term;
 
-        let bracket =
-            log_term_1 + atan_term_1 - reference_factor * (log_term_2 + atan_term_2);
+        let bracket = log_term_1 + atan_term_1 - reference_factor * (log_term_2 + atan_term_2);
 
         // d/dx atan(Q/(2x+b)) = -Q/(2 X(x)).
         let d_log_term_1 = 2.0 / x - (2.0 * x + b) / xx;
         let d_atan_term_1 = -b / xx;
         let d_log_term_2 = 2.0 / (x - x0) - (2.0 * x + b) / xx;
         let d_atan_term_2 = -(b + 2.0 * x0) / xx;
-        let d_bracket = d_log_term_1 + d_atan_term_1
-            - reference_factor * (d_log_term_2 + d_atan_term_2);
+        let d_bracket =
+            d_log_term_1 + d_atan_term_1 - reference_factor * (d_log_term_2 + d_atan_term_2);
 
         (a * bracket, a * d_bracket)
     }

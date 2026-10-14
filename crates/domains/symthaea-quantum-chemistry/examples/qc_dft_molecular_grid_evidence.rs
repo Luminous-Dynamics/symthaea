@@ -76,16 +76,8 @@ fn main() {
             Molecule::new(vec![Atom::new(2, 0.0, 0.0, 0.0)]),
             "single_atom_closed_shell",
         ),
-        (
-            "H2",
-            Molecule::h2(),
-            "symmetric_singlet_r_1_4_bohr",
-        ),
-        (
-            "H2O",
-            Molecule::water(),
-            "water_0_9572_angstrom_104_52_deg",
-        ),
+        ("H2", Molecule::h2(), "symmetric_singlet_r_1_4_bohr"),
+        ("H2O", Molecule::water(), "water_0_9572_angstrom_104_52_deg"),
     ];
 
     let mut records = Vec::new();

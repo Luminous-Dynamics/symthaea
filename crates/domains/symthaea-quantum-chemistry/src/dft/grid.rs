@@ -68,14 +68,8 @@ impl DftGrid {
 
                 // Lebedev angular weights are normalized to sum to 1, so include
                 // the full solid angle here to represent the 3D volume element.
-                let radial_weight = 4.0
-                    * PI
-                    * PI
-                    / (n_radial as f64 + 1.0)
-                    * (1.0 - xi * xi).sqrt()
-                    * r
-                    * r
-                    * dr;
+                let radial_weight =
+                    4.0 * PI * PI / (n_radial as f64 + 1.0) * (1.0 - xi * xi).sqrt() * r * r * dr;
 
                 // Angular grid
                 for &(theta_x, theta_y, theta_z, ang_weight) in &angular_points {
@@ -429,8 +423,18 @@ fn lebedev_302() -> Vec<(f64, f64, f64, f64)> {
         (3, 0.7011766416089545e+0, 0.0, 0.3650045807677255e-2),
         (4, 0.2644152887060663e+0, 0.0, 0.2982344963171804e-2),
         (4, 0.5718955891878961e+0, 0.0, 0.3600820932216460e-2),
-        (5, 0.2510034751770465e+0, 0.8000727494073952e+0, 0.3571540554273387e-2),
-        (5, 0.1233548532583327e+0, 0.4127724083168531e+0, 0.3392312205006170e-2),
+        (
+            5,
+            0.2510034751770465e+0,
+            0.8000727494073952e+0,
+            0.3571540554273387e-2,
+        ),
+        (
+            5,
+            0.1233548532583327e+0,
+            0.4127724083168531e+0,
+            0.3392312205006170e-2,
+        ),
     ];
 
     let mut points = Vec::with_capacity(302);
@@ -539,14 +543,9 @@ mod tests {
     }
 
     /// Integrate a monomial using normalized spherical weights.
-    fn weighted_spherical_moment(
-        pts: &[(f64, f64, f64, f64)],
-        powers: [i32; 3],
-    ) -> f64 {
+    fn weighted_spherical_moment(pts: &[(f64, f64, f64, f64)], powers: [i32; 3]) -> f64 {
         pts.iter()
-            .map(|&(x, y, z, w)| {
-                w * x.powi(powers[0]) * y.powi(powers[1]) * z.powi(powers[2])
-            })
+            .map(|&(x, y, z, w)| w * x.powi(powers[0]) * y.powi(powers[1]) * z.powi(powers[2]))
             .sum()
     }
 
@@ -755,8 +754,7 @@ mod tests {
                     .points
                     .iter()
                     .map(|point| {
-                        let r2 =
-                            point.x * point.x + point.y * point.y + point.z * point.z;
+                        let r2 = point.x * point.x + point.y * point.y + point.z * point.z;
                         point.weight * (-alpha * r2).exp()
                     })
                     .sum();
