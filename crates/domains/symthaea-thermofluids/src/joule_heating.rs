@@ -231,6 +231,28 @@ mod tests {
     }
 
     #[test]
+    fn cumulative_energy_balance_holds_over_multiple_steps() {
+        let mut model = reference_model();
+        let initial_temperature_k = model.temperature_k();
+        let heat_capacity_j_per_k = model.thermal_capacity_j_per_k();
+        let schedule = [(1.0, 0.5), (-2.0, 1.0), (0.0, 2.0), (3.0, 0.25), (-4.0, 0.1)];
+
+        let mut total_electrical_energy_j = 0.0;
+        for (current_a, time_step_s) in schedule {
+            let step = model.step(current_a, time_step_s).unwrap();
+            total_electrical_energy_j += step.electrical_energy_in_j;
+            assert!(step.energy_balance_residual_j.abs() < 1e-10);
+        }
+
+        let total_stored_energy_j =
+            heat_capacity_j_per_k * (model.temperature_k() - initial_temperature_k);
+        assert!(
+            (total_electrical_energy_j - total_stored_energy_j).abs() < 1e-9,
+            "input energy = {total_electrical_energy_j}, stored energy = {total_stored_energy_j}"
+        );
+    }
+
+    #[test]
     fn reversing_current_preserves_resistive_heating() {
         let mut forward = reference_model();
         let mut reverse = reference_model();
