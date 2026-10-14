@@ -41,7 +41,19 @@
         "That every Choro piece has a 16- or 32-bar phrase.",
         "A generator architecture, style route, audible fidelity, or community-recognized authenticity.",
         "A model-ready set of universal numerical thresholds."
-      ]
+      ],
+      "reported_study_scope": {
+        "pieces": 295,
+        "chord_tokens": 44067,
+        "unique_chord_types": 682,
+        "composers": 180,
+        "subgenres": 19,
+        "most_represented_composer_counts": {
+          "Pixinguinha": 32,
+          "Jacob do Bandolim": 31
+        },
+        "concentration_note": "The paper reports these two composers together account for more than one fifth of the pieces."
+      }
     },
     {
       "id": "dcmlab-choro-corpus",
@@ -219,6 +231,47 @@
       "pass_threshold": "Not specified until a licensed and source-defined rhythm corpus is identified."
     }
   ],
+  "sampling_and_dependence": {
+    "status": "preanalysis_constraints_not_results",
+    "scope_note": "The counts below are reported by the cited paper, not recomputed by this repository. The branch has not ingested the corpus. They describe that study's songbook-based sampling frame, not Choro as a whole.",
+    "unit_of_observation": "Treat a composition as the minimum indivisible unit for work-level splits; events, bars, chord tokens, parts and phrases from one composition must never be split across train/test partitions.",
+    "source_reported_counts": {
+      "pieces": 295,
+      "chord_tokens": 44067,
+      "unique_chord_types": 682,
+      "composers": 180,
+      "subgenres": 19,
+      "top_composer_piece_counts": {
+        "Pixinguinha": 32,
+        "Jacob do Bandolim": 31
+      }
+    },
+    "primary_split_rule": "Any predictive or selection evaluation must split by complete composition before feature extraction or tuning; never randomly split chord tokens, measures or repeated representations from the same piece.",
+    "generalization_sensitivity": "Where sample size permits, run a group split that keeps every composition by a composer wholly in one partition. Report composer-held-out performance separately from piece-held-out performance; do not call the former optional evidence of universal authenticity.",
+    "dominant_composer_sensitivity": [
+      "Report results with all eligible works.",
+      "Repeat the primary estimate excluding Pixinguinha works.",
+      "Repeat the primary estimate excluding Jacob do Bandolim works.",
+      "Report whether either exclusion changes effect direction, uncertainty, eligible-work count or qualitative conclusion."
+    ],
+    "dependence_and_weighting": [
+      "Report both piece-weighted and composer-aggregated summaries where the question supports both; do not let chord-token volume silently define the sampling weights.",
+      "Estimate uncertainty at the highest defensible independent unit for each hypothesis and state that unit explicitly; composer clustering is required for inference intended to generalize across composers.",
+      "For historical modification, use composition year only when source provenance supports it; report year missingness and overlap by composer, subgenre and songbook. If period and composer are confounded or have inadequate overlap, report the trend as non-identifiable rather than treating adjustment as a cure.",
+      "If too few independent composers or eligible works remain for a planned sensitivity, label it not estimable; do not silently omit the sensitivity."
+    ],
+    "required_report_fields": [
+      "eligible_piece_count",
+      "eligible_composer_count",
+      "eligible_subgenre_count",
+      "piece_and_composer_exclusion_counts",
+      "dominant_composer_sensitivity_results",
+      "piece_weighted_and_composer_aggregated_estimates",
+      "independent_unit_for_uncertainty",
+      "missingness_and_stratum_overlap",
+      "deviations_from_registered_split_or_null"
+    ]
+  },
   "synthetic_fixture_requirements": [
     "Use independently authored small examples; no transcription, melody, chord sequence, or other excerpt copied from the restricted corpus.",
     "Fixture names and annotations describe the tested property, not a claim of authentic Choro.",
