@@ -1,17 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Energy Efficiency Measurement Benchmark
+//! Energy Throughput and Evidence Benchmark
 //!
-//! Measures the computational cost of the HDC+CfC pipeline and compares
-//! energy-per-inference against published transformer baselines.
+//! Measures HDC+CfC pipeline throughput and optionally observes Linux CPU
+//! package energy. Power × latency comparisons are illustrative scenarios.
 //!
 //! Run: `cargo run -p symthaea-physics --example energy_benchmark --release`
 
 #![deny(unsafe_code)]
 
 use serde::Serialize;
+use std::fs;
 use std::mem;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use symthaea_physics::cmod_adapter::{
@@ -27,29 +29,29 @@ const WARMUP_ITERATIONS: usize = 100;
 const ENCODING_SAMPLES: usize = 10_000;
 const PREDICTION_ITERATIONS: usize = 1000;
 
-// Assumed CPU TDP values (watts)
-const TDP_DESKTOP: f64 = 65.0;
-const TDP_LAPTOP: f64 = 15.0;
+// Illustrative power inputs for scenarios; not measured CPU power.
+const POWER_ASSUMPTION_DESKTOP_W: f64 = 65.0;
+const POWER_ASSUMPTION_LAPTOP_W: f64 = 15.0;
 
-// Published transformer reference points
-struct TransformerRef {
+// Illustrative transformer assumptions; no common measurement protocol.
+struct TransformerAssumption {
     name: &'static str,
     power_watts: f64,
     time_per_inference_ms: f64,
 }
 
-const TRANSFORMER_REFS: &[TransformerRef] = &[
-    TransformerRef {
+const TRANSFORMER_ASSUMPTIONS: &[TransformerAssumption] = &[
+    TransformerAssumption {
         name: "GPT-3 175B",
         power_watts: 355.0,
         time_per_inference_ms: 100.0,
     },
-    TransformerRef {
+    TransformerAssumption {
         name: "Llama 7B",
         power_watts: 50.0,
         time_per_inference_ms: 30.0,
     },
-    TransformerRef {
+    TransformerAssumption {
         name: "Mistral 7B",
         power_watts: 45.0,
         time_per_inference_ms: 25.0,
@@ -79,7 +81,34 @@ struct EnergyComparison {
     power_watts: f64,
     time_per_inference_ms: f64,
     energy_per_inference_joules: f64,
-    ratio_vs_gpt3: f64,
+    modeled_ratio_vs_gpt3: f64,
+    /// Evidence label: all values in this table are power × latency models.
+    basis: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct PackageEnergyMeasurement {
+    counter_domains: Vec<String>,
+    measurement_seconds: f64,
+    package_energy_joules: f64,
+    /// Counts timed calls plus the benchmark's warm-up calls.
+    executed_calls_including_warmup: usize,
+    /// Package energy divided by executed calls; includes background/system energy.
+    package_energy_joules_per_call: f64,
+    limitation: String,
+}
+
+#[derive(Debug, Clone)]
+struct PackageEnergyCounter {
+    name: String,
+    directory: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+struct EnergyCounterReading {
+    name: String,
+    energy_uj: u64,
+    max_energy_range_uj: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -98,6 +127,7 @@ struct EnergyReport {
     hdc_encoding: ThroughputResult,
     cfc_predictions: Vec<PredictionThroughput>,
     full_pipeline: ThroughputResult,
+    package_energy_measurement: Option<PackageEnergyMeasurement>,
     memory_usage: Vec<MemoryResult>,
     energy_comparison_desktop: Vec<EnergyComparison>,
     energy_comparison_laptop: Vec<EnergyComparison>,
@@ -161,41 +191,172 @@ fn measure_with_stats(
     }
 }
 
-fn energy_per_inference(tdp_watts: f64, time_ms: f64) -> f64 {
-    tdp_watts * time_ms / 1000.0 // joules
+fn modeled_energy_per_call(power_assumption_watts: f64, time_ms: f64) -> f64 {
+    power_assumption_watts * time_ms / 1000.0 // modeled joules, not metered
+}
+
+// Linux powercap/RAPL can expose CPU package energy counters. These readings
+// are system-level observations, not perfectly isolated workload attribution.
+fn discover_package_energy_counters() -> Vec<PackageEnergyCounter> {
+    fn collect(path: &Path, depth: usize, found: &mut Vec<PackageEnergyCounter>) {
+        if depth > 3 {
+            return;
+        }
+        if let Ok(name) = fs::read_to_string(path.join("name")) {
+            let name = name.trim().to_string();
+            if name.to_ascii_lowercase().starts_with("package")
+                && path.join("energy_uj").is_file()
+                && path.join("max_energy_range_uj").is_file()
+            {
+                found.push(PackageEnergyCounter {
+                    name,
+                    directory: path.to_path_buf(),
+                });
+            }
+        }
+        if depth == 3 {
+            return;
+        }
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.flatten() {
+                let child = entry.path();
+                if child.is_dir() {
+                    collect(&child, depth + 1, found);
+                }
+            }
+        }
+    }
+
+    let mut found = Vec::new();
+    collect(Path::new("/sys/class/powercap"), 0, &mut found);
+    found.sort_by(|a, b| a.directory.cmp(&b.directory));
+    found.dedup_by(|a, b| a.directory == b.directory);
+    found
+}
+
+fn read_package_energy_counters(
+    counters: &[PackageEnergyCounter],
+) -> Option<Vec<EnergyCounterReading>> {
+    if counters.is_empty() {
+        return None;
+    }
+    counters
+        .iter()
+        .map(|counter| {
+            let energy_uj = fs::read_to_string(counter.directory.join("energy_uj"))
+                .ok()?
+                .trim()
+                .parse::<u64>()
+                .ok()?;
+            let max_energy_range_uj = fs::read_to_string(
+                counter.directory.join("max_energy_range_uj"),
+            )
+            .ok()?
+            .trim()
+            .parse::<u64>()
+            .ok()?;
+            if max_energy_range_uj == 0 || energy_uj > max_energy_range_uj {
+                return None;
+            }
+            Some(EnergyCounterReading {
+                name: counter.name.clone(),
+                energy_uj,
+                max_energy_range_uj,
+            })
+        })
+        .collect()
+}
+
+fn package_energy_delta_uj(
+    before: &[EnergyCounterReading],
+    after: &[EnergyCounterReading],
+) -> Option<u128> {
+    if before.len() != after.len() {
+        return None;
+    }
+    let mut total_delta = 0_u128;
+    for (start, end) in before.iter().zip(after) {
+        if start.name != end.name
+            || start.max_energy_range_uj != end.max_energy_range_uj
+            || start.energy_uj > start.max_energy_range_uj
+            || end.energy_uj > end.max_energy_range_uj
+        {
+            return None;
+        }
+        let delta = if end.energy_uj >= start.energy_uj {
+            end.energy_uj - start.energy_uj
+        } else {
+            // The kernel energy counter wraps at max_energy_range_uj.
+            start.max_energy_range_uj - start.energy_uj + end.energy_uj
+        };
+        total_delta += u128::from(delta);
+    }
+    Some(total_delta)
+}
+
+fn build_package_energy_measurement(
+    before: Option<Vec<EnergyCounterReading>>,
+    after: Option<Vec<EnergyCounterReading>>,
+    measurement_seconds: f64,
+    executed_calls_including_warmup: usize,
+) -> Option<PackageEnergyMeasurement> {
+    if !measurement_seconds.is_finite()
+        || measurement_seconds <= 0.0
+        || executed_calls_including_warmup == 0
+    {
+        return None;
+    }
+    let before = before?;
+    let after = after?;
+    let energy_uj = package_energy_delta_uj(&before, &after)?;
+    let package_energy_joules = energy_uj as f64 / 1_000_000.0;
+    if !package_energy_joules.is_finite() {
+        return None;
+    }
+    Some(PackageEnergyMeasurement {
+        counter_domains: before.iter().map(|reading| reading.name.clone()).collect(),
+        measurement_seconds,
+        package_energy_joules,
+        executed_calls_including_warmup,
+        package_energy_joules_per_call: package_energy_joules
+            / executed_calls_including_warmup as f64,
+        limitation: "Observed CPU package energy during the benchmark window; includes operating-system/background activity and warm-up calls. Not a workload-isolated energy measurement.".into(),
+    })
 }
 
 fn build_energy_comparisons(
     symthaea_pipeline_time_ms: f64,
-    tdp: f64,
-    tdp_label: &str,
+    power_assumption_watts: f64,
+    scenario_label: &str,
 ) -> Vec<EnergyComparison> {
-    let gpt3_energy = energy_per_inference(
-        TRANSFORMER_REFS[0].power_watts,
-        TRANSFORMER_REFS[0].time_per_inference_ms,
+    let gpt3_energy = modeled_energy_per_call(
+        TRANSFORMER_ASSUMPTIONS[0].power_watts,
+        TRANSFORMER_ASSUMPTIONS[0].time_per_inference_ms,
     );
 
     let mut comparisons = Vec::new();
 
     // Symthaea entry
-    let sym_energy = energy_per_inference(tdp, symthaea_pipeline_time_ms);
+    let sym_energy = modeled_energy_per_call(power_assumption_watts, symthaea_pipeline_time_ms);
     comparisons.push(EnergyComparison {
-        system: format!("Symthaea HDC+CfC ({tdp_label})"),
-        power_watts: tdp,
+        system: format!("Symthaea HDC+CfC ({scenario_label})"),
+        power_watts: power_assumption_watts,
         time_per_inference_ms: symthaea_pipeline_time_ms,
         energy_per_inference_joules: sym_energy,
-        ratio_vs_gpt3: sym_energy / gpt3_energy,
+        modeled_ratio_vs_gpt3: sym_energy / gpt3_energy,
+        basis: "Modeled from configured power assumption × measured latency on this host; not a separate hardware measurement.".into(),
     });
 
     // Transformer references
-    for t in TRANSFORMER_REFS {
-        let e = energy_per_inference(t.power_watts, t.time_per_inference_ms);
+    for t in TRANSFORMER_ASSUMPTIONS {
+        let e = modeled_energy_per_call(t.power_watts, t.time_per_inference_ms);
         comparisons.push(EnergyComparison {
             system: t.name.to_string(),
             power_watts: t.power_watts,
             time_per_inference_ms: t.time_per_inference_ms,
             energy_per_inference_joules: e,
-            ratio_vs_gpt3: e / gpt3_energy,
+            modeled_ratio_vs_gpt3: e / gpt3_energy,
+            basis: "Illustrative power/latency assumptions; workload, hardware, and measurement comparability not established.".into(),
         });
     }
 
@@ -204,19 +365,20 @@ fn build_energy_comparisons(
 
 fn print_energy_table(comparisons: &[EnergyComparison]) {
     println!(
-        "  {:<35} {:>10} {:>15} {:>18} {:>14}",
-        "System", "Power (W)", "Time/Inf (ms)", "Energy/Inf (J)", "Ratio vs GPT-3"
+        "  {:<35} {:>10} {:>15} {:>18} {:>20}",
+        "System", "Power (W)", "Time/Inf (ms)", "Modeled J/Inf", "Modeled ratio vs GPT-3"
     );
-    println!("  {}", "-".repeat(96));
+    println!("  {}", "-".repeat(106));
     for c in comparisons {
         println!(
-            "  {:<35} {:>10.1} {:>15.3} {:>18.6} {:>14.6}",
+            "  {:<35} {:>10.1} {:>15.3} {:>18.6} {:>20.6}",
             c.system,
             c.power_watts,
             c.time_per_inference_ms,
             c.energy_per_inference_joules,
-            c.ratio_vs_gpt3,
+            c.modeled_ratio_vs_gpt3,
         );
+        println!("    Basis: {}", c.basis);
     }
 }
 
@@ -224,7 +386,7 @@ fn main() {
     let total_start = Instant::now();
 
     println!("==========================================================");
-    println!("  Energy Efficiency Measurement Benchmark");
+    println!("  Energy Throughput and Evidence Benchmark");
     println!("  HDC Dimension: {}", HDC_DIMENSION);
     println!("==========================================================");
 
@@ -355,12 +517,23 @@ fn main() {
 
     let pipeline_count = samples.len().min(5000);
     let mut reading_idx = 0;
+    let package_energy_counters = discover_package_energy_counters();
+    let package_energy_before = read_package_energy_counters(&package_energy_counters);
+    let package_energy_window_start = Instant::now();
     let pipeline_result =
         measure_with_stats("Full Pipeline (encode+predict+FEP)", pipeline_count, || {
             let readings = &plasma_readings[reading_idx % plasma_readings.len()];
             let _ = twin.step(readings, 0.001);
             reading_idx += 1;
         });
+    let package_energy_window_seconds = package_energy_window_start.elapsed().as_secs_f64();
+    let package_energy_after = read_package_energy_counters(&package_energy_counters);
+    let package_energy_measurement = build_package_energy_measurement(
+        package_energy_before,
+        package_energy_after,
+        package_energy_window_seconds,
+        pipeline_result.total_operations + WARMUP_ITERATIONS,
+    );
 
     println!(
         "  Throughput: {:.0} inferences/sec ({:.2} us/inference)",
@@ -421,51 +594,67 @@ fn main() {
     let pipeline_time_ms = pipeline_result.us_per_op / 1000.0;
 
     println!("\n--- Phase 5: Energy Efficiency Comparison ---");
-    println!("\n  Desktop CPU ({TDP_DESKTOP}W TDP):");
-    let desktop_comparisons = build_energy_comparisons(pipeline_time_ms, TDP_DESKTOP, "desktop");
+    println!("\n  Desktop power scenario ({POWER_ASSUMPTION_DESKTOP_W}W assumed):");
+    let desktop_comparisons = build_energy_comparisons(pipeline_time_ms, POWER_ASSUMPTION_DESKTOP_W, "desktop");
     print_energy_table(&desktop_comparisons);
 
-    println!("\n  Laptop CPU ({TDP_LAPTOP}W TDP):");
-    let laptop_comparisons = build_energy_comparisons(pipeline_time_ms, TDP_LAPTOP, "laptop");
+    println!("\n  Laptop power scenario ({POWER_ASSUMPTION_LAPTOP_W}W assumed):");
+    let laptop_comparisons = build_energy_comparisons(pipeline_time_ms, POWER_ASSUMPTION_LAPTOP_W, "laptop");
     print_energy_table(&laptop_comparisons);
 
-    // Highlight the efficiency gain
-    let gpt3_energy = energy_per_inference(
-        TRANSFORMER_REFS[0].power_watts,
-        TRANSFORMER_REFS[0].time_per_inference_ms,
+    // The power × latency values below are scenarios, not measured energy.
+    let symthaea_desktop_energy = modeled_energy_per_call(
+        POWER_ASSUMPTION_DESKTOP_W,
+        pipeline_time_ms,
     );
-    let symthaea_desktop_energy = energy_per_inference(TDP_DESKTOP, pipeline_time_ms);
-    let symthaea_laptop_energy = energy_per_inference(TDP_LAPTOP, pipeline_time_ms);
+    let symthaea_laptop_energy = modeled_energy_per_call(
+        POWER_ASSUMPTION_LAPTOP_W,
+        pipeline_time_ms,
+    );
 
     println!("\n==========================================================");
     println!("  ENERGY EFFICIENCY SUMMARY");
     println!("==========================================================");
     println!(
-        "  Pipeline time:        {:.3} ms ({:.2} us)",
+        "  Pipeline time:                 {:.3} ms ({:.2} us)",
         pipeline_time_ms, pipeline_result.us_per_op
     );
     println!(
-        "  Desktop energy:       {:.6} J/inference",
-        symthaea_desktop_energy
+        "  Modeled energy @ {:.1} W:       {:.6} J/call (not metered)",
+        POWER_ASSUMPTION_DESKTOP_W, symthaea_desktop_energy
     );
     println!(
-        "  Laptop energy:        {:.6} J/inference",
-        symthaea_laptop_energy
+        "  Modeled energy @ {:.1} W:       {:.6} J/call (not metered)",
+        POWER_ASSUMPTION_LAPTOP_W, symthaea_laptop_energy
+    );
+    match &package_energy_measurement {
+        Some(measurement) => {
+            println!(
+                "  Observed CPU package energy:    {:.6} J total over {:.3} s",
+                measurement.package_energy_joules, measurement.measurement_seconds
+            );
+            println!(
+                "  Package J/executed call:        {:.8} (includes warm-up/background)",
+                measurement.package_energy_joules_per_call
+            );
+            println!(
+                "  Counter domains:                {}",
+                measurement.counter_domains.join(", ")
+            );
+        }
+        None => println!(
+            "  Observed CPU package energy:    unavailable (no readable Linux powercap/RAPL package counter)"
+        ),
+    }
+    println!(
+        "  Transformer comparison rows are illustrative power × latency assumptions, not verified apples-to-apples measurements."
     );
     println!(
-        "  vs GPT-3 (desktop):   {:.0}x more efficient",
-        gpt3_energy / symthaea_desktop_energy
-    );
-    println!(
-        "  vs GPT-3 (laptop):    {:.0}x more efficient",
-        gpt3_energy / symthaea_laptop_energy
-    );
-    println!(
-        "  Encoding throughput:  {:.0} samples/sec",
+        "  Encoding throughput:            {:.0} samples/sec",
         encoding_result.ops_per_second
     );
     println!(
-        "  Pipeline throughput:  {:.0} inferences/sec",
+        "  Pipeline throughput:            {:.0} inferences/sec",
         pipeline_result.ops_per_second
     );
     println!("==========================================================");
@@ -480,6 +669,7 @@ fn main() {
         hdc_encoding: encoding_result,
         cfc_predictions: pred_results,
         full_pipeline: pipeline_result,
+        package_energy_measurement,
         memory_usage: memory_results,
         energy_comparison_desktop: desktop_comparisons,
         energy_comparison_laptop: laptop_comparisons,
@@ -496,4 +686,61 @@ fn main() {
         "\nTotal benchmark wall-clock time: {:.2}s",
         total_elapsed.as_secs_f64()
     );
+}
+
+
+#[cfg(test)]
+mod package_energy_counter_tests {
+    use super::*;
+
+    fn reading(name: &str, energy_uj: u64, max_energy_range_uj: u64) -> EnergyCounterReading {
+        EnergyCounterReading {
+            name: name.into(),
+            energy_uj,
+            max_energy_range_uj,
+        }
+    }
+
+    #[test]
+    fn energy_delta_handles_regular_counter_progress() {
+        assert_eq!(
+            package_energy_delta_uj(&[reading("package-0", 100, 1_000)], &[reading("package-0", 145, 1_000)]),
+            Some(45)
+        );
+    }
+
+    #[test]
+    fn energy_delta_handles_one_counter_wrap() {
+        assert_eq!(
+            package_energy_delta_uj(&[reading("package-0", 990, 1_000)], &[reading("package-0", 20, 1_000)]),
+            Some(30)
+        );
+    }
+
+    #[test]
+    fn energy_delta_rejects_changed_domains_or_ranges() {
+        assert_eq!(
+            package_energy_delta_uj(&[reading("package-0", 100, 1_000)], &[reading("package-1", 145, 1_000)]),
+            None
+        );
+        assert_eq!(
+            package_energy_delta_uj(&[reading("package-0", 100, 1_000)], &[reading("package-0", 145, 2_000)]),
+            None
+        );
+    }
+
+    #[test]
+    fn direct_measurement_is_unavailable_without_counters() {
+        assert!(build_package_energy_measurement(None, None, 1.0, 10).is_none());
+    }
+
+    #[test]
+    fn direct_measurement_reports_package_energy_and_call_count() {
+        let before = Some(vec![reading("package-0", 1_000, 10_000)]);
+        let after = Some(vec![reading("package-0", 3_500, 10_000)]);
+        let measurement = build_package_energy_measurement(before, after, 2.0, 25).unwrap();
+        assert_eq!(measurement.package_energy_joules, 0.0025);
+        assert_eq!(measurement.executed_calls_including_warmup, 25);
+        assert!((measurement.package_energy_joules_per_call - 0.0001).abs() < 1e-12);
+    }
 }
