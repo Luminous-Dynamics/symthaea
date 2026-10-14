@@ -71,6 +71,17 @@ jobs:
               .evidence_status == "not_empirical" and
               (.limitation | length) > 20
             ) and
+                        ([.viability_gate_registry[] | select(.gate_id == "MIN_ESSENTIALS_ACCESS" and .value == 0.9)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_LAWFUL_OPPORTUNITY_COVERAGE" and .value == 0.8)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_FAIR_PAY_ADEQUACY" and .value == 0.8)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_SAFE_WORK" and .value == 0.9)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_WORK_STABILITY" and .value == 0.75)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MIN_SOCIAL_PROTECTION" and .value == 0.75)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_LAWFUL_ACCESS_TIME_MINUTES" and .value == 60)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_COHORT_COVERAGE_GAP" and .value == 0.15)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_INTERVAL_WIDTH" and .value == 0.2)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_TIME_INTERVAL_WIDTH_MINUTES" and .value == 20)] | length) == 1 and
+            ([.viability_gate_registry[] | select(.gate_id == "MAX_EVIDENCE_AGE_DAYS" and .value == 180)] | length) == 1 and
             (.evidence_context_sources | length) == 3 and
             all(.evidence_context_sources[]; .used_as_crime_effect_parameter == false) and
             (.files | length) == 10 and
@@ -85,6 +96,26 @@ jobs:
             actual="$(git hash-object "$path")"
             test "$actual" = "$expected"
           done < <(jq -r '.files[] | [.path, .git_blob_sha1] | @tsv' "$manifest")
+      - name: Verify viability thresholds match manifest and independent verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS='|' read -r name value rust_type; do
+            grep -Fq "pub const $name: $rust_type = $value;" tools/crime-economics-sim/src/viability.rs
+            grep -Fq "const $name: $rust_type = $value;" tools/crime-economics-sim/src/bin/verify_viability.rs
+          done <<'THRESHOLDS'
+          MIN_ESSENTIALS_ACCESS|0.90|f64
+          MIN_LAWFUL_OPPORTUNITY_COVERAGE|0.80|f64
+          MIN_FAIR_PAY_ADEQUACY|0.80|f64
+          MIN_SAFE_WORK|0.90|f64
+          MIN_WORK_STABILITY|0.75|f64
+          MIN_SOCIAL_PROTECTION|0.75|f64
+          MAX_LAWFUL_ACCESS_TIME_MINUTES|60.0|f64
+          MAX_COHORT_COVERAGE_GAP|0.15|f64
+          MAX_INTERVAL_WIDTH|0.20|f64
+          MAX_TIME_INTERVAL_WIDTH_MINUTES|20.0|f64
+          MAX_EVIDENCE_AGE_DAYS|180|u32
+          THRESHOLDS
       - name: Check isolated crate formatting
         run: cargo fmt --manifest-path tools/crime-economics-sim/Cargo.toml -- --check
       - name: Run isolated Rust unit and adversarial tests
