@@ -195,7 +195,11 @@ pub struct PhiTrajectory {
 }
 
 fn elapsed_ema(phi: f64, previous: f64, decay: f64) -> Option<f64> {
-    if !phi.is_finite() || !previous.is_finite() || !decay.is_finite() || !(0.0..=1.0).contains(&decay) {
+    if !phi.is_finite()
+        || !previous.is_finite()
+        || !decay.is_finite()
+        || !(0.0..=1.0).contains(&decay)
+    {
         return None;
     }
 
