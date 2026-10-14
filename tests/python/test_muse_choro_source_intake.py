@@ -7,12 +7,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 INTAKE_PATH = ROOT / "crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json"
+SPEC_PATH = ROOT / "crates/domains/symthaea-muse/CHORO_GRAMMAR_RESEARCH_SPEC_V1.json"
 
 
 class ChoroSourceIntakeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.intake = json.loads(INTAKE_PATH.read_text(encoding="utf-8"))
+        cls.spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
 
     def test_summary_counts_match_source_records(self) -> None:
         sources = self.intake["sources"]
@@ -23,6 +25,23 @@ class ChoroSourceIntakeTests(unittest.TestCase):
             sum(s["status"] == "candidate_not_rights_cleared" for s in sources),
         )
         self.assertEqual(summary["records_rights_cleared"], 0)
+
+    def test_research_spec_intake_snapshot_tracks_inventory(self) -> None:
+        summary = self.intake["summary"]
+        declared = self.spec["alternative_source_intake"]
+        self.assertEqual(declared["path"], "crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json")
+        self.assertEqual(declared["schema"], self.intake["schema"])
+        for key in (
+            "source_records",
+            "records_rights_cleared",
+            "records_pending_rights_review",
+            "files_downloaded",
+            "score_content_transcribed",
+            "empirical_analysis_performed",
+            "status",
+        ):
+            with self.subTest(field=key):
+                self.assertEqual(declared[key], summary[key])
 
     def test_source_leads_remain_unapproved_and_content_free(self) -> None:
         summary = self.intake["summary"]
