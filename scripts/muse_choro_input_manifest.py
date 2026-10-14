@@ -104,8 +104,8 @@ def evaluate_manifest(
     artifact_root: Path | None = None,
 ) -> dict[str, Any]:
     manifest, manifest_bytes = read_json(manifest_path)
-    approval, _approval_bytes = read_json(approval_path)
-    intake, _intake_bytes = read_json(intake_path)
+    approval, approval_bytes = read_json(approval_path)
+    intake, intake_bytes = read_json(intake_path)
 
     if manifest.get("schema") != MANIFEST_SCHEMA:
         raise ManifestError(f"manifest schema must be {MANIFEST_SCHEMA!r}")
@@ -321,6 +321,8 @@ def evaluate_manifest(
     return {
         "schema": "muse-choro-input-manifest-gate-report-v1",
         "manifest_sha256": expected_hash,
+        "approval_receipt_sha256": hashlib.sha256(approval_bytes).hexdigest(),
+        "intake_sha256": hashlib.sha256(intake_bytes).hexdigest(),
         "manifest_id": require_text(manifest.get("manifest_id"), "manifest_id"),
         "authorization_status": "authorized_for_declared_scope" if authorized else "blocked",
         "authorized": authorized,
