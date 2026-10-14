@@ -589,6 +589,42 @@ mod tests {
     }
 
     #[test]
+    fn field_stage_requires_and_accepts_labs_review_and_field_observations() {
+        let mut sample = candidate();
+        sample.evidence_stage = ConcreteEvidenceStage::FieldMonitored;
+        sample.evidence.extend([
+            evidence("lab-1", EvidenceKind::LaboratoryTest, "lab-A:record-1"),
+            evidence("lab-2", EvidenceKind::LaboratoryTest, "lab-B:record-2"),
+            evidence("review-1", EvidenceKind::IndependentReview, "review-record:1"),
+            evidence("field-1", EvidenceKind::FieldMeasurement, "field-record:1"),
+        ]);
+        sample.outcomes.extend([
+            ConcreteOutcome {
+                metric: ConcreteOutcomeMetric::CompressiveStrengthMpa,
+                value: 40.0,
+                unit: "MPa".to_string(),
+                evidence_id: "lab-1".to_string(),
+                origin: ConcreteOutcomeOrigin::Measured,
+                specimen_count: Some(3),
+                model_id: None,
+                absolute_uncertainty: Some(1.0),
+            },
+            ConcreteOutcome {
+                metric: ConcreteOutcomeMetric::WaterIngressDepthMm,
+                value: 2.0,
+                unit: "mm".to_string(),
+                evidence_id: "field-1".to_string(),
+                origin: ConcreteOutcomeOrigin::Measured,
+                specimen_count: Some(1),
+                model_id: None,
+                absolute_uncertainty: Some(0.2),
+            },
+        ]);
+
+        assert!(sample.validate().is_ok());
+    }
+
+    #[test]
     fn independent_replication_requires_distinct_lab_sources_and_review() {
         let mut sample = candidate();
         sample.evidence_stage = ConcreteEvidenceStage::IndependentlyReplicated;
