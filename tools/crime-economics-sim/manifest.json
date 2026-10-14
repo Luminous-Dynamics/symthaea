@@ -1,17 +1,17 @@
 {
   "manifest_id": "SYMTHAEA-CRIME-ECONOMICS-SIM-001",
   "schema_version": 1,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "status": "research_fixture",
   "generated_on": "2026-10-14",
   "purpose": "Pin the exact source bytes for an effects-disabled aggregate synthetic evaluator and its independent output verifier.",
   "model_dimensions": {
     "weeks": 52,
     "replications_per_scenario_policy_cell": 32,
-    "scenario_count": 7,
+    "scenario_count": 8,
     "policy_count": 5,
-    "expected_data_rows": 1120,
-    "expected_tsv_lines_including_header": 1121,
+    "expected_data_rows": 1280,
+    "expected_tsv_lines_including_header": 1281,
     "uses_person_level_records": false,
     "network_access": false,
     "external_effects": false,
@@ -28,7 +28,7 @@
     },
     {
       "path": "tools/crime-economics-sim/src/lib.rs",
-      "git_blob_sha1": "eb22923ba2e5a33cbe285865ab38bd0378831b60"
+      "git_blob_sha1": "02449906b9ad7ac1ae659e07932d41800763051d"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/simulate.rs",
@@ -36,15 +36,15 @@
     },
     {
       "path": "tools/crime-economics-sim/src/bin/verify.rs",
-      "git_blob_sha1": "8184351529be2b9d321b4bb36114b9fc920cc360"
+      "git_blob_sha1": "c77c37c8a571bf2079070ff30bbd9df4c7dc3f5c"
     },
     {
       "path": "tools/crime-economics-sim/README.md",
-      "git_blob_sha1": "8743ff31eda4aac2c9ad5b9b94e341b2138bb427"
+      "git_blob_sha1": "d830d42ad807bfafe1665c3bd247fc7be172c9a9"
     },
     {
       "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
-      "git_blob_sha1": "025cd57a30c697c7504b8ee26fcbf7f17d7568dc"
+      "git_blob_sha1": "40ef222b4be6ca3345f0c5dad15e0437cf62eb4e"
     }
   ],
   "scenario_ids": [
@@ -54,7 +54,8 @@
     "concentrated_automation",
     "high_robot_compromise",
     "unequal_essential_access",
-    "low_robot_effectiveness"
+    "low_robot_effectiveness",
+    "zero_quality_work_effect"
   ],
   "policy_ids": [
     "baseline",
@@ -90,9 +91,10 @@
     "Rust tests verify selected implementation invariants only.",
     "The independent verifier validates artifact structure and specific cross-scenario relationships only.",
     "No causal crime-reduction effect, model calibration, real-world validity, robot safety qualification, or jurisdictional generalization is established.",
-    "All outcome-generating parameters have explicit synthetic-assumption labels; no parameter in the register is an empirically estimated local coefficient."
+    "All outcome-generating parameters have explicit synthetic-assumption labels; no parameter in the register is an empirically estimated local coefficient.",
+    "The zero-quality-work-effect scenario tests behavior when the assumed work effect is disabled; neither setting is an empirical effect estimate."
   ],
-  "parameter_registry_version": "0.1.0",
+  "parameter_registry_version": "0.2.0",
   "parameter_registry_status": "all_parameters_are_synthetic_assumptions",
   "parameter_registry": [
     {
@@ -201,12 +203,13 @@
       "parameter_id": "QUALITY_WORK_EFFECT",
       "values": {
         "need_related_property_rate_reduction": 0.12,
-        "opportunity_related_property_rate_reduction": 0.08
+        "opportunity_related_property_rate_reduction": 0.08,
+        "zero_effect_scenario_multiplier": 0
       },
       "unit": "fractional reduction in modeled event probability",
       "source_class": "synthetic_assumption",
       "evidence_status": "not_empirical",
-      "limitation": "Fixed toy-model elasticities; not estimated from NIJ research or transferable effect sizes."
+      "limitation": "Fixed toy-model elasticities are not estimated from NIJ or review evidence and are not transferable effect sizes. A zero-effect scenario is included as a null sensitivity control; no local or universal effect is established."
     },
     {
       "parameter_id": "ROBOT_PROTECTION_EFFECT",
