@@ -1,0 +1,117 @@
+# Crime-Economics and Robotics: Research-to-Evaluation Plan
+
+**Status:** Research proposal and evaluation design; not an empirical result  
+**Version:** 0.1.0  
+**Relationship:** Life/civic domain mastery and the Symthaea-to-Mycelix boundary  
+**Authority:** Effects disabled; all scenario records are synthetic reference fixtures
+
+## Objective
+
+Test whether combinations of reliable access to necessities, high-quality lawful opportunities, safer environments, accountable property protection, and well-secured service robots can reduce specific forms of preventable harm at acceptable social cost.
+
+The target is not a universal theory that every offense is economically rational. Offenses differ in motivation, setting, victim relationship, opportunity, and situational constraints. An economic model is a bounded lens for selected mechanisms—not a person classifier, a guilt estimator, or a substitute for legal findings.
+
+Operational success should be described as a measured reduction in a clearly defined harm outcome against a credible counterfactual, with the uncertainty and side effects reported. It must not be inferred from a plausible simulation, a lower count of police reports alone, or a robot detecting more events.
+
+## Working hypotheses (not established conclusions)
+
+- **H1 — Need reliability:** Stable, accessible access to essentials may reduce some need-driven property offenses. Test whether the relevant need actually constrained the event; do not infer motive from poverty or neighborhood.
+- **H2 — Quality of lawful opportunity:** Accessible, dignified work and productive participation may change incentives more than nominal job availability alone. Evaluate job quality, stability, autonomy, safety, and future prospects, not only employment counts.
+- **H3 — Opportunity reduction:** Specific environmental and asset-protection changes may reduce selected property offenses. Measure both intended-area outcomes and displacement/diffusion; do not generalize camera or patrol findings to autonomous robots without direct testing.
+- **H4 — Automation distribution:** Robotics may lower costs and expand productive capacity, but badly governed automation may also displace income, concentrate control, or create new barriers. Measure who receives the gains and who bears the transition costs.
+- **H5 — Accountable coordination:** Mycelix can preserve evidence lineage, participant consent, appeals, and service commitments; Symthaea can compare intervention options and uncertainty. Neither registry inclusion nor model confidence establishes truth, legal authority, or guilt.
+- **H6 — Safe robotics:** Service robots may support maintenance, repair, logistics, accessibility, and bounded property protection. Their control systems, remote access, sensors, actuators, and recovery procedures become part of the threat model; physical intervention requires a separately authorized safety case.
+
+These hypotheses should be revised when data contradict them. Do not optimize for the lowest observed offense count if reporting falls, victimization rises, or harms shift to less visible groups.
+
+## Economic model boundary
+
+At the community or intervention level, compare the whole-life costs and outcomes of candidate policies:
+
+- reliable essential-service access;
+- paid, high-quality work, training, and cooperative production;
+- environmental design and proportionate property protection;
+- repair, emergency response, and victim support;
+- robotic capital, maintenance, energy, insurance, security, and decommissioning;
+- displacement, unequal access, privacy loss, and error-correction costs.
+
+A useful intervention accounting identity is:
+
+`Net social value = avoided harm + added lawful opportunity + service gains
+                    - intervention cost - transferred harms - rights/privacy costs`
+
+This is an accounting frame, not a validated numerical law. Monetized benefits must not erase non-monetizable rights, dignity, injury, or distributional harms. Report disaggregated outcomes alongside any aggregate cost-effectiveness estimate.
+
+Do not assign an individual a criminal propensity, risk score, or eligibility decision from economic status, location, associations, reputation, inferred need, or a Symthaea prediction. Use aggregate and opt-in intervention data with privacy safeguards. A specific investigation must rely on incident-specific evidence, applicable law, due process, and human accountability.
+
+## Evidence we have—and do not have
+
+- NIJ-sponsored research reports that the employment–crime relationship depends on context. A 2006 study found a modest relationship in urban young adults, not rural young adults; another study abstract reported that employment quality appeared more influential than income or job stability alone. These findings motivate stratified tests; they do not establish a universal causal effect or predict any person's behavior.
+- A systematic review of CCTV research found modest and setting-dependent effects, with stronger results in some property-crime contexts and where surveillance was actively monitored or paired with other interventions. That evidence is not evidence that autonomous security robots work, nor is it justification for pervasive surveillance.
+- The World Bank has described randomized evaluations of public-works and youth-employment interventions aimed at economic welfare and violence-related outcomes. The reviewed program designs and settings vary; do not represent the whole portfolio as one confirmed effect.
+- NIST's September 2026 SP 800-82 Revision 4 is an **initial public draft**, not a final standard. Its guidance is relevant to OT security principles, but this project must pin status, date, version, scope, and later supersession before claiming requirements.
+
+## Minimum viable research design
+
+### Stage 0 — synthetic mechanism model
+
+Create a deterministic, effects-disabled simulation with explicit assumptions and independent expected-result checks. Vary need reliability, quality of lawful opportunity, local crime opportunity, robot cost, false alarms, reporting rates, displacement, cyber compromise, and benefit distribution. The simulator demonstrates only that the model is implemented as specified.
+
+### Stage 1 — evidence and baseline
+
+For one defined offense category and bounded place/service, document source provenance, jurisdiction, period, operational definitions, reporting channels, missingness, demographic/distributional risks, and baseline costs. Separate reported incidents, victimization surveys, verified losses, response time, and outcomes.
+
+### Stage 2 — comparison and pilot
+
+Pre-register a comparison strategy before collecting outcomes: randomized assignment where ethical and feasible, otherwise a credible quasi-experimental design with explicit confounders and sensitivity analysis. Do not deny anyone essential services or legal protections for an experiment. Use staged deployment and independent review.
+
+### Stage 3 — independent evaluation
+
+Report point estimates and uncertainty; absolute counts and denominators; comparison-group trends; adverse events; false-positive burden; reporting changes; geographic or temporal displacement; accessibility; who receives economic gains; privacy/security incidents; and full lifecycle cost. Publish null and adverse results.
+
+### Stage 4 — conditional scaling
+
+Scale only the intervention and context actually supported by evidence. Any new jurisdiction, offense type, robot model, sensor, autonomy level, data source, or operational authority is a new qualification question.
+
+## Minimum outcome set
+
+- harm: victimization, severity, recurrence, and independently confirmed losses where available;
+- economic pathway: essential-service reliability, quality and accessibility of lawful opportunities, income volatility where lawfully and consensually measured, and distribution of benefits;
+- service quality: response/repair time, successful resolution, downtime, accessibility, and service cost per beneficiary;
+- protection quality: prevention-specific outcomes, false alarms, false accusations, missed events, reversals, and appeal outcomes;
+- system effects: displaced incidents, changed reporting, unequal impacts, coercion, mission creep, and privacy intrusion;
+- robotics assurance: incident logs, maintenance failures, remote-access security, override operation, safe stopping, recovery, and service continuity;
+- evidence quality: denominator completeness, source freshness, provenance independence, uncertainty, model/version identity, and reproducibility.
+
+Do not declare success on arrests, stops, alerts, robot patrol-hours, or dashboard activity alone.
+
+## Red-team cases
+
+The accompanying machine-readable scenario suite tests common overclaiming failures. Every fixture requires human review and keeps external effects disabled. The CI workflow validates document shape and safety invariants only; it does not run a causal model, qualify reasoning accuracy, prove legal compliance, or establish a real-world crime reduction.
+
+Required adversarial controls include:
+1. Need-driven theft is assumed from income or geography without incident evidence.
+2. Any job is counted as a protective intervention despite unsafe or exploitative conditions.
+3. Automation increases output but removes local livelihoods or concentrates ownership.
+4. Security robots appear to reduce losses while incidents move next door or become less likely to be reported.
+5. A false-positive alert is treated as proof or used to deny housing, work, benefits, or movement.
+6. A signed event or reputation receipt is mistaken for truth or guilt.
+7. A compromised robot or remote-control path can endanger people or interrupt essential infrastructure.
+8. Interpersonal, coercive, ideological, or mental-health-related harm is modeled as purely economic.
+9. A small, selected sample or short observation window is presented as universal proof.
+10. A simulation, source citation, queued workflow, or skipped check is called an empirical pass.
+
+## Standards and source treatment
+
+Store identifiers and public metadata where licensing permits. Never republish protected normative text without permission. Distinguish standard publication from legal adoption, operational authorization, and demonstrated conformance. Because this is research rather than a legal profile, jurisdiction-specific human review remains necessary before any deployment.
+
+## References
+
+1. National Institute of Justice, **Labor Force Participation, Labor Markets, and Crime: Final Report** (2006): https://nij.ojp.gov/library/publications/labor-force-participation-labor-markets-and-crime-final-report
+2. National Institute of Justice, **The Meaning of Work: Conceptualizing the Deterrent Effect of Employment on Crime among Young Adults** (2006): https://nij.ojp.gov/index.php/library/publications/meaning-work-conceptualizing-deterrent-effect-employment-crime-among-young
+3. Welsh & Farrington, **CCTV surveillance for crime prevention: A 40-year systematic review with meta-analysis**: https://www.crimrxiv.com/pub/przahuaw/release/1
+4. World Bank, **What are we learning about the impacts of public works programs on employment and violence?**: https://blogs.worldbank.org/en/impactevaluations/what-are-we-learning-about-impacts-public-works-programs-employment-and-violence-early-findings
+5. NIST, **SP 800-82 Rev. 4 Initial Public Draft** (published 2026-09-21; comments due 2026-11-30): https://csrc.nist.gov/pubs/sp/800/82/r4/ipd
+6. UNODC, **Crime Prevention & Criminal Justice Module 2: Summary**: https://www.unodc.org/e4j/en/crime-prevention-criminal-justice/module-2/key-issues/summary.html
+
+**Evidence claim ceiling:** these sources support a research agenda and bounded hypotheses, not a claim that robotics makes most crime economically irrational. No pilot result, causal effect size, or Symthaea reasoning score is asserted.
