@@ -65,6 +65,32 @@ jobs:
             docs/architecture/ANCIENT_WISDOM_TO_ENGINEERING_INVARIANTS_V0_1.md \
             > "$evidence/source-digests.sha256"
 
+      - name: Resolve lockfile against workspace manifests
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence=".temporal-trajectory-evidence"
+          cp Cargo.lock "$evidence/Cargo.lock.committed"
+          sha256sum Cargo.lock > "$evidence/lockfile-committed.sha256"
+
+          # Offline resolution exposes manifest/lock drift without downloading newer
+          # crates. Preserve the generated lock and diff as evidence so any required
+          # lock change can be reviewed and committed rather than silently discarded.
+          set +e
+          cargo metadata --offline --format-version 1 > /dev/null 2> "$evidence/lock-resolution.log"
+          result=$?
+          set -e
+          cp Cargo.lock "$evidence/Cargo.lock.resolved"
+          sha256sum Cargo.lock > "$evidence/lockfile-resolved.sha256"
+          if ! cmp -s "$evidence/Cargo.lock.committed" "$evidence/Cargo.lock.resolved"; then
+            git diff -- Cargo.lock > "$evidence/Cargo.lock.diff" || true
+            echo "lockfile_changed=true" > "$evidence/lock-resolution-result.txt"
+          else
+            echo "lockfile_changed=false" > "$evidence/lock-resolution-result.txt"
+          fi
+          echo "metadata_exit_code=$result" >> "$evidence/lock-resolution-result.txt"
+          exit "$result"
+
       - name: Check temporal module formatting
         shell: bash
         run: |
@@ -95,4 +121,5 @@ jobs:
           name: temporal-trajectory-evidence-${{ github.sha }}
           path: .temporal-trajectory-evidence/**
           if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 14
