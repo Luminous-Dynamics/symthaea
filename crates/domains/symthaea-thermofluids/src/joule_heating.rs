@@ -7,7 +7,10 @@
 //! solver. It assumes constant resistance and specific heat capacity, a
 //! well-mixed conductor, no phase change, and no heat loss to the surroundings.
 //! Under those assumptions, electrical work must equal the increase in stored
-//! sensible heat:
+//! sensible heat. Since this model has no heat-loss term and resistance is
+//! positive, valid steps are monotonic non-decreasing in temperature; adding
+//! cooling or phase change requires extending the energy ledger, not a silent
+//! adjustment to this update:
 //!
 //!     P_J = I² R
 //!     Q_in = P_J Δt
