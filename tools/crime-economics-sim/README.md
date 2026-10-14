@@ -11,7 +11,7 @@ From the repository root:
     cargo run --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --bin simulate > crime-economics.tsv
     cargo run --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --bin verify -- crime-economics.tsv
 
-The output is a tab-separated artifact with 6 scenarios × 5 policy arms × 32 deterministic Monte Carlo replications (960 rows). The verifier separately parses the emitted artifact and checks frozen schema identity, row completeness, event-accounting identities, reporting/displacement negative controls, non-economic-harm preservation, robot-only fields, and distributional-access adversarial cases.
+The output is a tab-separated artifact with 6 scenarios × 5 policy arms × 32 deterministic Monte Carlo replications (960 rows). The verifier separately parses the emitted artifact and checks frozen schema identity, row completeness, event-accounting identities, reporting/displacement negative controls, non-economic-harm preservation, robot-only fields, distributional-access, concentrated-automation, and high-robot-compromise adversarial cases.
 
 ## Scenarios
 
