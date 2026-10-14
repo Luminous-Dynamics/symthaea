@@ -119,6 +119,9 @@ impl Row {
 }
 
 fn higher_is_better(range: &Range, floor: f64) -> &'static str {
+    if range.low.is_none() && range.high.is_none() {
+        return "missing";
+    }
     if !range.valid_fraction() {
         return "invalid";
     }
@@ -136,6 +139,9 @@ fn higher_is_better(range: &Range, floor: f64) -> &'static str {
 }
 
 fn lower_is_better(range: &Range, ceiling: f64) -> &'static str {
+    if range.low.is_none() && range.high.is_none() {
+        return "missing";
+    }
     if !range.valid_time() {
         return "invalid";
     }
