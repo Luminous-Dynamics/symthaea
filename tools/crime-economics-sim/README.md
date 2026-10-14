@@ -6,7 +6,7 @@ This is a small isolated Rust research tool. It is not calibrated to observed cr
 
 From the repository root:
 
-    cargo fmt --manifest-path tools/crime-economics-sim/Cargo.toml -- --check
+    cargo fmt --manifest-path tools/crime-economics-sim/Cargo.toml
     cargo test --manifest-path tools/crime-economics-sim/Cargo.toml
     cargo run --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --bin simulate > crime-economics.tsv
     cargo run --quiet --manifest-path tools/crime-economics-sim/Cargo.toml --bin verify -- crime-economics.tsv
