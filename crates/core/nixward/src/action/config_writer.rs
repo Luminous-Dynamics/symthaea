@@ -288,6 +288,18 @@ impl ConfigWriter {
         Ok(())
     }
 
+    /// Refuse to apply a patch if the target no longer matches its captured original.
+    fn ensure_patch_is_fresh(patch: &ConfigPatch) -> Result<(), std::io::Error> {
+        let current = std::fs::read_to_string(&patch.target)?;
+        if current != patch.original {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::WouldBlock,
+                "configuration changed since patch creation; refusing stale overwrite",
+            ));
+        }
+        Ok(())
+    }
+
     /// Apply a patch: create backup, validate, write atomically.
     pub fn apply_patch(&self, patch: &ConfigPatch) -> Result<WriteResult, std::io::Error> {
         if patch.is_noop() {
@@ -311,6 +323,10 @@ impl ConfigWriter {
             });
         }
 
+        // The patch is an authority-bearing write; require the target to
+        // still equal the exact content from which this patch was built.
+        Self::ensure_patch_is_fresh(patch)?;
+
         // Validate syntax
         if self.validate {
             Self::validate_nix_syntax(&patch.modified)?;
@@ -322,6 +338,11 @@ impl ConfigWriter {
         } else {
             None
         };
+
+        // Re-check immediately before preparing the final replacement. This
+        // narrows (but cannot eliminate) the race between observation and
+        // rename on ordinary filesystems.
+        Self::ensure_patch_is_fresh(patch)?;
 
         // Atomic write: write to temp file, then rename
         let temp_path = patch.target.with_extension("nix.tmp");
@@ -459,6 +480,26 @@ mod tests {
   networking.firewall.enable = true;
 }
 "#;
+
+    #[test]
+    fn test_apply_patch_rejects_stale_original() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("configuration.nix");
+        fs::write(&path, SAMPLE_CONFIG).unwrap();
+
+        let writer = ConfigWriter::new()
+            .with_config_root(dir.path())
+            .with_git_backup(false)
+            .with_dry_run(false);
+        let patch = writer.set_option("services.nginx.enable", "true").unwrap();
+
+        let newer = SAMPLE_CONFIG.replace("services.openssh.enable = true;", "services.openssh.enable = false;");
+        fs::write(&path, &newer).unwrap();
+
+        let err = writer.apply_patch(&patch).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::WouldBlock);
+        assert_eq!(fs::read_to_string(&path).unwrap(), newer);
+    }
 
     #[test]
     fn test_add_package_patch() {
