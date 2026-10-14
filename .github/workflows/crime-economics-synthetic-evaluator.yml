@@ -37,12 +37,12 @@ jobs:
             .manifest_id == "SYMTHAEA-CRIME-ECONOMICS-SIM-001" and
             .schema_version == 1 and
             .status == "research_fixture" and
-            .model_dimensions.scenario_count == 7 and
+            .model_dimensions.scenario_count == 8 and
             .model_dimensions.policy_count == 5 and
             .model_dimensions.replications_per_scenario_policy_cell == 32 and
-            .model_dimensions.expected_data_rows == 1120 and
-            .model_dimensions.expected_tsv_lines_including_header == 1121 and
-            .parameter_registry_version == "0.1.0" and
+            .model_dimensions.expected_data_rows == 1280 and
+            .model_dimensions.expected_tsv_lines_including_header == 1281 and
+            .parameter_registry_version == "0.2.0" and
             .parameter_registry_status == "all_parameters_are_synthetic_assumptions" and
             (.parameter_registry | length) == 15 and
             ([.parameter_registry[].parameter_id] | unique | length) == 15 and
@@ -52,7 +52,7 @@ jobs:
               (.unit | length) > 0 and
               (.limitation | length) > 20
             ) and
-            ([.scenario_ids[]] | unique | length) == 7 and
+            ([.scenario_ids[]] | unique | length) == 8 and
             ([.policy_ids[]] | unique | length) == 5 and
             ([.output_schema[]] | unique | length) == 20 and
             (.files | length) == 7 and
@@ -82,7 +82,7 @@ jobs:
             > target/crime-economics-evidence/simulation-repeat.tsv
           cmp target/crime-economics-evidence/simulation.tsv target/crime-economics-evidence/simulation-repeat.tsv
           rm target/crime-economics-evidence/simulation-repeat.tsv
-          test "$(wc -l < target/crime-economics-evidence/simulation.tsv)" -eq 1121
+          test "$(wc -l < target/crime-economics-evidence/simulation.tsv)" -eq 1281
           expected_header="$(jq -r '.output_schema | @tsv' tools/crime-economics-sim/manifest.json)"
           actual_header="$(head -n 1 target/crime-economics-evidence/simulation.tsv)"
           test "$actual_header" = "$expected_header"
@@ -113,7 +113,7 @@ jobs:
           {
             echo "commit_sha=$(git rev-parse HEAD)"
             echo "tool=tools/crime-economics-sim"
-            echo "model_version=0.1.0"
+            echo "model_version=0.2.0"
             echo "claim_ceiling=synthetic invariant checks only; no causal or real-world claim"
             echo "simulator_has_external_effects=false"
           } > target/crime-economics-evidence/source-identity.txt
