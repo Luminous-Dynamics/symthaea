@@ -1,0 +1,18 @@
+{
+  "suite_id": "SYM-LIFE-CIVIC-REFERENCE-001",
+  "version": "0.1.0",
+  "status": "research_fixture",
+  "scenario_file": "docs/research/life-civic/reference-scenarios.json",
+  "scenario_git_blob_sha1": "aed875de58e6f3c61cae8229c9c9b48095e30c40",
+  "digest_semantics": "Git blob SHA-1 binds exact repository object bytes for drift detection. It is not a signature, source-authenticity proof, or independent collision-resistant trust claim.",
+  "claim_ceiling": [
+    "The scenario document is the pinned reference input for this branch revision.",
+    "Shape and boundary checks do not measure Symthaea reasoning accuracy."
+  ],
+  "prohibited_inferences": [
+    "benchmark passed",
+    "legal applicability established",
+    "external action authorized",
+    "production readiness established"
+  ]
+}
