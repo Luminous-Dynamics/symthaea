@@ -42,6 +42,12 @@ Policy arms are baseline, essentials, quality_work, robot_protection, and combin
 - false_alarms and robot_safety_incidents are separate from crime-event and report counts.
 - Seeds provide deterministic reproducibility and common random numbers across comparable scenario arms. They do not create empirical validity.
 
+## What this prototype does not model
+
+The current version does **not** calculate offender expected utility, an economic-payoff equilibrium, or a threshold at which crime becomes economically irrational. It directly applies synthetic changes to aggregate event probabilities to exercise evaluation controls. It therefore cannot answer the original question quantitatively and should not be used to rank policies by simulated means.
+
+A later model increment should first define an **aggregate lawful-alternative viability** measure: reliable access to essentials, quality and accessibility of lawful work/production, time and transaction costs for lawful alternatives, and the uncertainty of those options. It should estimate only population- or service-level relationships supported by transparent evidence, with ranges and sensitivity analysis—not infer criminal propensity about individuals or optimize methods for committing or evading crime.
+
 ## Claim ceiling
 
 Passing the Rust unit tests establishes only that the implementation satisfies selected coded invariants. Passing the independent artifact verifier establishes only that the emitted TSV satisfies the frozen structural and cross-scenario checks. Neither establishes:
