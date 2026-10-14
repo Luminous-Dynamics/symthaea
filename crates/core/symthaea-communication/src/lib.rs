@@ -14,12 +14,24 @@ pub mod animal;
 pub mod artifact;
 pub mod benchmark;
 pub mod human;
+#[cfg(feature = "hdc-codec")]
+pub mod hdc_codec;
+#[cfg(feature = "hdc-codec")]
+pub mod hdc_interlingua;
+#[cfg(feature = "hdc-codec")]
+pub mod hdc_ontology;
+pub mod interlingua;
 pub mod metrics;
+pub mod neurosemantic;
 pub mod pilot;
 pub mod pipeline;
 pub mod provider;
 pub mod run;
 pub mod unknown;
+
+// Public neurosemantic protocol types are part of the crate-level API used by
+// executable evidence labs and downstream adapters.
+pub use neurosemantic::*;
 
 /// The strongest claim supported by a result, ordered from weakest to strongest.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

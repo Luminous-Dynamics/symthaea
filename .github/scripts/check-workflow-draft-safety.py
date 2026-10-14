@@ -178,21 +178,25 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
     jobs = parse_jobs(text)
     runner_jobs = 0
     draft_guarded = 0
+    pr_capable_runner_jobs = 0
     for job, block in jobs.items():
         if not has_runner_allocation(block):
             continue
         runner_jobs += 1
         expression = job_level_if_expression(block, job)
         if explicitly_excludes_pull_request(expression):
+            # A push/workflow_dispatch-only runner cannot allocate on a PR, so
+            # it does not require a ready_for_review subscription.
             continue
         if not has_draft_guard(expression):
             raise SafetyError(
                 f"{path}: runner-capable job {job!r} lacks a job-level "
-                "pull_request draft == false guard or explicit non-PR event guard"
+                f"pull_request draft == false guard or explicit non-PR event guard"
             )
         draft_guarded += 1
+        pr_capable_runner_jobs += 1
 
-    if runner_jobs:
+    if pr_capable_runner_jobs:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
@@ -308,6 +312,7 @@ jobs:
     assert pr is not None
     # A workflow whose only runner root explicitly excludes PR does not need a
     # ready_for_review event because no PR runner can ever be allocated.
+    assert explicitly_excludes_pull_request("github.event_name == 'workflow_dispatch'")
     assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
 
 
