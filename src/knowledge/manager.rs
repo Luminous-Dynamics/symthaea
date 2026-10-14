@@ -25,7 +25,7 @@ use super::causal_bridge::CausalKnowledgeBridge;
 use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
 use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
-use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord};
+use super::persistence::{CausalEdgeRecord, KnowledgePersistence, KnowledgePersistenceSnapshot, OntologyRecord, ProvenanceRelationRecord};
 use super::reasoning_context::{KnowledgeQueryResult, ReasoningContext};
 use std::collections::VecDeque;
 use symthaea_core::hdc::unified_hv::BinaryHV;
@@ -258,6 +258,8 @@ pub struct KnowledgeManager {
     last_causal_depth: usize,
     /// Optional SQLite persistence layer
     persistence: Option<KnowledgePersistence>,
+    /// Structured health state for the persistence restore.
+    persistence_health: KnowledgePersistenceHealth,
     /// Save interval from config (cycles between persistence snapshots)
     save_interval: u64,
     /// Ontology learning rate multiplier, modulated by prediction error
@@ -279,45 +281,166 @@ impl KnowledgeManager {
         let mut causal_bridge = CausalKnowledgeBridge::new(config.causal_capacity);
         let mut ontology = AdaptiveOntology::new(config.ontology_config.clone());
 
-        // Initialize persistence and load existing knowledge
+        // Initialize persistence and load existing knowledge.
+        // Loading is intentionally best-effort for backwards compatibility, but failures are
+        // retained as explicit health state rather than being observable only through logs.
+        let mut persistence_health = KnowledgePersistenceHealth {
+            configured: config.db_path.is_some(),
+            ..Default::default()
+        };
         let persistence = config.db_path.as_ref().map(|path| {
             let mut p = KnowledgePersistence::new(path);
-            // Load existing facts
-            if let Ok(facts) = p.load_facts() {
-                for record in &facts {
-                    graph.import_fact_record(record);
-                }
-                if !facts.is_empty() {
-                    tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
-                }
-            }
-            // Load existing causal edges
-            if let Ok(edges) = p.load_causal_edges() {
-                let edge_count = edges.len();
-                for record in &edges {
-                    causal_bridge.import_edge(
-                        record.cause.clone(),
-                        record.effect.clone(),
-                        record.strength,
+
+            // Restore all domains from one SQLite read transaction. This prevents
+            // startup from mixing rows committed by different snapshot generations.
+            match p.load_snapshot() {
+                Ok(snapshot) => {
+                    let snapshot_digest = snapshot.canonical_digest_hex();
+                    tracing::debug!(
+                        %snapshot_digest,
+                        "Knowledge: loaded coherent persistence snapshot"
                     );
+
+                    let KnowledgePersistenceSnapshot {
+                        facts,
+                        provenance_relations,
+                        causal_edges,
+                        ontology: ontology_records,
+                    } = snapshot;
+
+                    persistence_health.facts_loaded = true;
+                    for record in &facts {
+                        let outcome = graph.import_fact_record_with_outcome(record);
+                        persistence_health.fact_restore_evictions += outcome.policy_evictions;
+                        if !outcome.accepted {
+                            if outcome.rejected_by_policy {
+                                tracing::debug!(
+                                    memory_id = %record.memory_id,
+                                    "Knowledge: fact restore rejected by graph retention policy"
+                                );
+                            } else {
+                                persistence_health.fact_rejections += 1;
+                                tracing::warn!(
+                                    memory_id = %record.memory_id,
+                                    rejected = persistence_health.fact_rejections,
+                                    "Knowledge: rejected persisted fact during graph restore"
+                                );
+                            }
+                        } else if outcome.policy_evictions > 0 {
+                            tracing::debug!(
+                                memory_id = %record.memory_id,
+                                evicted = outcome.policy_evictions,
+                                "Knowledge: fact restore was limited by graph retention policy"
+                            );
+                        }
+                    }
+                    if !facts.is_empty() {
+                        tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
+                    }
+
+                    persistence_health.provenance_loaded = true;
+                    let mut loaded_relations = 0usize;
+                    for record in provenance_relations {
+                        match graph.import_provenance_relation(record.into()) {
+                            Ok(true) => loaded_relations += 1,
+                            Ok(false) => {}
+                            Err(error) => {
+                                persistence_health.provenance_rejections += 1;
+                                tracing::warn!(
+                                    %error,
+                                    rejected = persistence_health.provenance_rejections,
+                                    "Knowledge: rejected persisted provenance relation"
+                                );
+                            }
+                        }
+                    }
+                    if loaded_relations > 0 {
+                        tracing::info!(
+                            count = loaded_relations,
+                            "Knowledge: loaded provenance relations from SQLite"
+                        );
+                    }
+                    let report = graph.validate_provenance();
+                    persistence_health.provenance_snapshot_conforms = report.conforms;
+                    if report.conforms {
+                        tracing::debug!(
+                            relation_count = report.relation_count,
+                            snapshot_digest = %report.snapshot_digest,
+                            validator_version = %report.validator_version,
+                            "Knowledge: provenance snapshot structurally conforms"
+                        );
+                    } else {
+                        tracing::warn!(
+                            relation_count = report.relation_count,
+                            violation_count = report.violations.len(),
+                            snapshot_digest = %report.snapshot_digest,
+                            "Knowledge: persisted provenance snapshot is structurally non-conforming"
+                        );
+                    }
+
+                    persistence_health.causal_loaded = true;
+                    for record in &causal_edges {
+                        let outcome = causal_bridge.import_edge_with_metadata(
+                            record.cause.clone(),
+                            record.effect.clone(),
+                            record.strength,
+                            record.is_inhibitory,
+                            record.cycle,
+                        );
+                        persistence_health.causal_restore_evictions += outcome.pruned_edges;
+                        if outcome.was_policy_limited() {
+                            tracing::debug!(
+                                cause = %record.cause,
+                                effect = %record.effect,
+                                pruned = outcome.pruned_edges,
+                                "Knowledge: causal restore was limited by retention policy"
+                            );
+                        }
+                    }
+                    if !causal_edges.is_empty() {
+                        tracing::info!(
+                            count = causal_edges.len(),
+                            "Knowledge: loaded causal edges from SQLite"
+                        );
+                    }
+
+                    persistence_health.ontology_loaded = true;
+                    for record in &ontology_records {
+                        let outcome = ontology.import_ontology_record_with_outcome(record);
+                        persistence_health.ontology_restore_evictions += outcome.policy_evictions;
+                        if outcome.rejected_by_policy {
+                            persistence_health.ontology_policy_rejections += 1;
+                            tracing::debug!(
+                                name = %record.name,
+                                rejected = persistence_health.ontology_policy_rejections,
+                                "Knowledge: ontology restore was limited by retention policy"
+                            );
+                        } else if !outcome.accepted {
+                            persistence_health.ontology_rejections += 1;
+                            tracing::warn!(
+                                name = %record.name,
+                                rejected = persistence_health.ontology_rejections,
+                                "Knowledge: rejected malformed persisted ontology record during restore"
+                            );
+                        } else if outcome.policy_evictions > 0 {
+                            tracing::debug!(
+                                name = %record.name,
+                                evicted = outcome.policy_evictions,
+                                "Knowledge: ontology restore evicted an existing primitive by retention policy"
+                            );
+                        }
+                    }
+                    if !ontology_records.is_empty() {
+                        tracing::info!(
+                            count = ontology_records.len(),
+                            "Knowledge: loaded ontology primitives from SQLite"
+                        );
+                    }
                 }
-                if edge_count > 0 {
-                    tracing::info!(
-                        count = edge_count,
-                        "Knowledge: loaded causal edges from SQLite"
-                    );
-                }
-            }
-            // Load existing ontology primitives
-            if let Ok(records) = p.load_ontology() {
-                let onto_count = records.len();
-                for record in &records {
-                    ontology.import_ontology_record(record);
-                }
-                if onto_count > 0 {
-                    tracing::info!(
-                        count = onto_count,
-                        "Knowledge: loaded ontology primitives from SQLite"
+                Err(error) => {
+                    tracing::warn!(
+                        %error,
+                        "Knowledge: failed to load coherent persistence snapshot from SQLite"
                     );
                 }
             }
@@ -341,6 +464,7 @@ impl KnowledgeManager {
             bootstrap_done: false,
             last_causal_depth: 0,
             persistence,
+            persistence_health,
             save_interval,
             ontology_lr_multiplier: 1.0,
             calibration_audit: CalibrationAudit::default(),
@@ -715,6 +839,16 @@ impl KnowledgeManager {
         &self.last_telemetry
     }
 
+    /// Structured result of the startup persistence restore.
+    pub fn persistence_health(&self) -> KnowledgePersistenceHealth {
+        self.persistence_health
+    }
+
+    /// Whether startup encountered a persistence load failure.
+    pub fn persistence_degraded(&self) -> bool {
+        self.persistence_health.is_degraded()
+    }
+
     /// Get last signals
     pub fn signals(&self) -> &KnowledgeSignals {
         &self.last_signals
@@ -746,26 +880,35 @@ impl KnowledgeManager {
     pub fn persist_snapshot(&mut self) {
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
-            let edge_tuples = self.causal_bridge.export_edge_records();
-            let edges: Vec<CausalEdgeRecord> = edge_tuples
+            let edge_records = self.causal_bridge.export_edge_records_with_metadata();
+            let edges: Vec<CausalEdgeRecord> = edge_records
                 .into_iter()
-                .map(|(cause, effect, strength)| CausalEdgeRecord {
-                    cause,
-                    effect,
-                    strength,
-                    is_inhibitory: false,
-                    cycle: 0,
-                })
+                .map(
+                    |(cause, effect, strength, is_inhibitory, cycle)| CausalEdgeRecord {
+                        cause,
+                        effect,
+                        strength,
+                        is_inhibitory,
+                        cycle,
+                    },
+                )
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
-            if let Err(e) = p.save_facts(&facts) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
-            }
-            if let Err(e) = p.save_causal_edges(&edges) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
-            }
-            if let Err(e) = p.save_ontology(&ontology_records) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save ontology");
+            let provenance_relations: Vec<ProvenanceRelationRecord> = self
+                .graph
+                .provenance_relations()
+                .iter()
+                .cloned()
+                .map(Into::into)
+                .collect();
+
+            if let Err(e) = p.save_snapshot(
+                &facts,
+                &provenance_relations,
+                &edges,
+                &ontology_records,
+            ) {
+                tracing::warn!(error = %e, "Knowledge persistence: failed to save atomic snapshot");
             }
         }
     }
@@ -847,12 +990,18 @@ impl KnowledgeManager {
         let facts: Vec<super::reasoning_context::GroundedFact> = self
             .last_search_results
             .iter()
-            .map(|r| super::reasoning_context::GroundedFact {
-                text: format!("fact:{}", r.fact_id),
-                confidence: r.confidence,
-                similarity: r.similarity,
-                domain: None,
-                is_causal: false,
+            .filter_map(|r| {
+                let fact = self.graph.get_fact(r.fact_id)?;
+                Some(super::reasoning_context::GroundedFact {
+                    provenance: self.graph.provenance(r.fact_id),
+                    // Query results must carry the persisted claim itself; FactId is only
+                    // a process-local retrieval handle and must never become claim text.
+                    text: fact.encoding.source_text.clone(),
+                    confidence: r.confidence,
+                    similarity: r.similarity,
+                    domain: fact.domain.clone(),
+                    is_causal: fact.has_causal_relations,
+                })
             })
             .collect();
 
@@ -902,6 +1051,8 @@ impl KnowledgeManager {
                 .confidence
                 .partial_cmp(&a.encoding.confidence)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.memory_id.cmp(&b.memory_id))
+                .then_with(|| a.id.cmp(&b.id))
         });
         facts
             .iter()
@@ -926,7 +1077,12 @@ impl KnowledgeManager {
                 (r.fact_id, combined)
             })
             .collect();
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.1
+                .partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
 
         scored
             .iter()
@@ -949,15 +1105,25 @@ impl KnowledgeManager {
         end_cycle: u64,
         k: usize,
     ) -> Vec<FactSearchResult> {
-        self.graph
+        let mut facts: Vec<_> = self
+            .graph
             .all_facts()
             .filter(|f| f.inserted_at_cycle >= start_cycle && f.inserted_at_cycle <= end_cycle)
+            .collect();
+        facts.sort_by(|a, b| {
+            a.inserted_at_cycle
+                .cmp(&b.inserted_at_cycle)
+                .then_with(|| a.memory_id.cmp(&b.memory_id))
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        facts
+            .into_iter()
+            .take(k)
             .map(|f| FactSearchResult {
                 fact_id: f.id,
                 similarity: 1.0, // No query vector — temporal filter only
                 confidence: f.confidence,
             })
-            .take(k)
             .collect()
     }
 
@@ -989,6 +1155,7 @@ impl KnowledgeManager {
             b.similarity
                 .partial_cmp(&a.similarity)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(k);
         results
@@ -1145,7 +1312,7 @@ impl KnowledgeManager {
         results
             .iter()
             .take(top_k)
-            .map(|r| (format!("fact:{}", r.fact_id), r.similarity))
+            .filter_map(|r| self.graph.get_fact(r.fact_id).map(|f| (f.encoding.source_text.clone(), r.similarity)))
             .collect()
     }
 
@@ -1222,6 +1389,7 @@ impl KnowledgeManager {
                 score_b
                     .partial_cmp(&score_a)
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.fact_id.cmp(&b.fact_id))
             });
             self.last_search_results
                 .truncate(self.config.search_top_k * 2);
@@ -1285,6 +1453,79 @@ impl KnowledgeManager {
     }
 }
 
+/// Structured result of the startup persistence restore.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct KnowledgePersistenceHealth {
+    pub configured: bool,
+    pub facts_loaded: bool,
+    /// Decoded fact rows rejected by graph admission during restore.
+    pub fact_rejections: usize,
+    /// Number of persisted facts admitted only after bounded graph retention evicted
+    /// an existing resident. This is a policy outcome, not a persistence failure.
+    pub fact_restore_evictions: usize,
+    /// SQLite rows were decoded successfully. This does not imply every row was
+    /// admitted into the graph; see the admission rejection counters.
+    pub provenance_loaded: bool,
+    /// Number of decoded provenance rows rejected by graph admission during restore.
+    pub provenance_rejections: usize,
+    /// Whether the post-restore provenance graph satisfies its structural validator.
+    pub provenance_snapshot_conforms: bool,
+    pub causal_loaded: bool,
+    /// Number of persisted causal rows whose restore insertion caused one or more
+    /// previously admitted edges to be evicted by the bridge's configured pruning policy.
+    ///
+    /// This is intentionally not a failed domain: pruning is a runtime retention policy,
+    /// not a decode/admission error. It makes "decoded" versus "retained" observable
+    /// without falsely treating policy-limited capacity as persistence corruption.
+    pub causal_restore_evictions: usize,
+    pub ontology_loaded: bool,
+    /// Decoded ontology rows rejected because the persisted record was malformed or invalid.
+    /// Policy-limited capacity is tracked separately and does not degrade persistence health.
+    pub ontology_rejections: usize,
+    /// Persisted ontology rows rejected because the bounded restore retention policy
+    /// preferred the already-retained set.
+    pub ontology_policy_rejections: usize,
+    /// Number of existing ontology primitives evicted by restore retention policy.
+    pub ontology_restore_evictions: usize,
+}
+
+impl KnowledgePersistenceHealth {
+    pub fn is_degraded(self) -> bool {
+        self.configured
+            && !(self.facts_loaded
+                && self.fact_rejections == 0
+                && self.provenance_loaded
+                && self.provenance_rejections == 0
+                && self.provenance_snapshot_conforms
+                && self.causal_loaded
+                && self.ontology_loaded
+                && self.ontology_rejections == 0)
+    }
+
+    pub fn failed_domains(self) -> Vec<&'static str> {
+        [
+            (
+                "facts",
+                !self.facts_loaded || self.fact_rejections > 0,
+            ),
+            (
+                "provenance",
+                !self.provenance_loaded
+                    || self.provenance_rejections > 0
+                    || !self.provenance_snapshot_conforms,
+            ),
+            ("causal", !self.causal_loaded),
+            (
+                "ontology",
+                !self.ontology_loaded || self.ontology_rejections > 0,
+            ),
+        ]
+        .into_iter()
+        .filter_map(|(name, failed)| failed.then_some(name))
+        .collect()
+    }
+}
+
 /// Infer a domain tag from an extracted fact based on entity types and relations
 fn infer_domain(fact: &super::extraction::ExtractedFact) -> Option<String> {
     for entity in &fact.entities {
@@ -1315,6 +1556,776 @@ fn infer_domain(fact: &super::extraction::ExtractedFact) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_persistence_health_reports_failed_domain() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            fact_rejections: 0,
+            fact_restore_evictions: 0,
+            provenance_loaded: false,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: false,
+            causal_loaded: true,
+            causal_restore_evictions: 0,
+            ontology_loaded: false,
+            ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
+        };
+
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["provenance", "ontology"]);
+    }
+
+    #[test]
+    fn test_persistence_health_reports_fact_rejections_as_degraded() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            fact_rejections: 1,
+            fact_restore_evictions: 0,
+            provenance_loaded: true,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            causal_restore_evictions: 0,
+            ontology_loaded: true,
+            ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
+        };
+
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["facts"]);
+    }
+
+    #[test]
+    fn test_persistence_health_reports_causal_policy_evictions_without_degrading() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            fact_rejections: 0,
+            fact_restore_evictions: 0,
+            provenance_loaded: true,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            causal_restore_evictions: 2,
+            ontology_loaded: true,
+            ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
+        };
+
+        assert!(!health.is_degraded());
+        assert!(health.failed_domains().is_empty());
+        assert_eq!(health.causal_restore_evictions, 2);
+    }
+
+    #[test]
+    fn test_persistence_health_reports_fact_policy_evictions_without_degrading() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            fact_rejections: 0,
+            fact_restore_evictions: 3,
+            provenance_loaded: true,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            causal_restore_evictions: 0,
+            ontology_loaded: true,
+            ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
+        };
+
+        assert!(!health.is_degraded());
+        assert!(health.failed_domains().is_empty());
+        assert_eq!(health.fact_restore_evictions, 3);
+    }
+
+    #[test]
+    fn test_persistence_health_reports_ontology_rejections_as_degraded() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            fact_rejections: 0,
+            fact_restore_evictions: 0,
+            provenance_loaded: true,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            causal_restore_evictions: 0,
+            ontology_loaded: true,
+            ontology_rejections: 1,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
+        };
+
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["ontology"]);
+    }
+
+    #[test]
+    fn test_manager_zero_capacity_fact_restore_remains_healthy() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_zero_capacity_fact_restore_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let mut persistence = KnowledgePersistence::new(&db_path);
+            let record = super::persistence::FactRecord {
+                memory_id: "policy-limited".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "policy limited".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            };
+            assert_eq!(persistence.save_facts(&[record]).unwrap(), 1);
+        }
+
+        let manager = KnowledgeManager::new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            graph_capacity: 0,
+            ..Default::default()
+        });
+        let health = manager.persistence_health();
+        assert!(!health.is_degraded());
+        assert_eq!(health.fact_rejections, 0);
+        assert_eq!(health.fact_restore_evictions, 0);
+        assert!(manager.graph().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
+    fn test_manager_bounded_fact_restore_is_order_invariant_and_healthy() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_bounded_fact_restore_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let mut persistence = KnowledgePersistence::new(&db_path);
+            let records = [
+                super::persistence::FactRecord {
+                    memory_id: "alpha".into(),
+                    canonical_identity: None,
+                    provenance_family: None,
+                    vector_bytes: vec![0u8; 2048],
+                    source_text: "alpha".into(),
+                    confidence: 0.8,
+                    domain: None,
+                    cycle: 3,
+                    is_causal: false,
+                },
+                super::persistence::FactRecord {
+                    memory_id: "beta".into(),
+                    canonical_identity: None,
+                    provenance_family: None,
+                    vector_bytes: vec![1u8; 2048],
+                    source_text: "beta".into(),
+                    confidence: 0.7,
+                    domain: None,
+                    cycle: 2,
+                    is_causal: false,
+                },
+                super::persistence::FactRecord {
+                    memory_id: "gamma".into(),
+                    canonical_identity: None,
+                    provenance_family: None,
+                    vector_bytes: vec![2u8; 2048],
+                    source_text: "gamma".into(),
+                    confidence: 0.1,
+                    domain: None,
+                    cycle: 1,
+                    is_causal: false,
+                },
+            ];
+            assert_eq!(persistence.save_facts(&records).unwrap(), 3);
+        }
+
+        let manager = KnowledgeManager::new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            graph_capacity: 2,
+            ..Default::default()
+        });
+        let health = manager.persistence_health();
+        assert!(!health.is_degraded());
+        assert_eq!(health.fact_rejections, 0);
+        assert_eq!(health.fact_restore_evictions, 0);
+        assert_eq!(
+            manager
+                .graph()
+                .all_facts()
+                .map(|fact| fact.memory_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["alpha", "beta"]
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
+    fn test_manager_persistence_collapses_repeated_causal_observations() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_repeated_causal_persistence_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mut manager = KnowledgeManager::new(config.clone());
+
+        manager.causal_bridge.add_edge(super::causal_bridge::CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.4,
+            is_inhibitory: false,
+            is_negated: false,
+            source_text: "early".into(),
+            discovered_at_cycle: 3,
+        });
+        manager.causal_bridge.add_edge(super::causal_bridge::CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.8,
+            is_inhibitory: true,
+            is_negated: false,
+            source_text: "latest".into(),
+            discovered_at_cycle: 9,
+        });
+
+        manager.persist_snapshot();
+
+        let restored = KnowledgeManager::new(config);
+        assert_eq!(
+            restored
+                .causal_bridge
+                .export_edge_records_with_metadata(),
+            vec![(
+                "policy".to_string(),
+                "growth".to_string(),
+                -0.6,
+                true,
+                9,
+            )]
+        );
+        assert!(!restored.persistence_degraded());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_manager_persistence_round_trip_preserves_canonical_state() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_persistence_round_trip_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mut first = KnowledgeManager::new(config.clone());
+        first.process("Sanctions caused oil shortage.", 1);
+        first.process("Oil shortage caused inflation.", 2);
+        first.process("Ceasefire prevented escalation.", 7);
+        first.persist_snapshot();
+
+        let first_facts = first.graph().export_fact_records();
+        let first_relations: Vec<_> = first.graph().provenance_relations().to_vec();
+        let first_edges = first.causal_bridge().export_edge_records_with_metadata();
+        let first_ontology = first.ontology().export_ontology_records();
+
+        let second = KnowledgeManager::new(config.clone());
+        let second_health = second.persistence_health();
+        assert!(!second_health.is_degraded());
+        assert_eq!(second_health.fact_rejections, 0);
+        assert_eq!(second_health.provenance_rejections, 0);
+        assert_eq!(second_health.ontology_rejections, 0);
+
+        let second_facts = second.graph().export_fact_records();
+        let second_relations: Vec<_> = second.graph().provenance_relations().to_vec();
+        let second_edges = second.causal_bridge().export_edge_records_with_metadata();
+        let second_ontology = second.ontology().export_ontology_records();
+
+        assert_eq!(
+            second_facts
+                .iter()
+                .map(|f| (
+                    f.memory_id.as_str(),
+                    f.canonical_identity.as_deref(),
+                    f.provenance_family.as_deref(),
+                    f.vector_bytes.as_slice(),
+                    f.source_text.as_str(),
+                    f.confidence.to_bits(),
+                    f.domain.as_deref(),
+                    f.cycle,
+                    f.is_causal
+                ))
+                .collect::<Vec<_>>(),
+            first_facts
+                .iter()
+                .map(|f| (
+                    f.memory_id.as_str(),
+                    f.canonical_identity.as_deref(),
+                    f.provenance_family.as_deref(),
+                    f.vector_bytes.as_slice(),
+                    f.source_text.as_str(),
+                    f.confidence.to_bits(),
+                    f.domain.as_deref(),
+                    f.cycle,
+                    f.is_causal
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            second_relations
+                .iter()
+                .map(|r| (
+                    r.source_memory_id.as_str(),
+                    r.target_memory_id.as_str(),
+                    format!("{:?}", r.kind),
+                    r.created_at.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            first_relations
+                .iter()
+                .map(|r| (
+                    r.source_memory_id.as_str(),
+                    r.target_memory_id.as_str(),
+                    format!("{:?}", r.kind),
+                    r.created_at.as_str()
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            second_edges
+                .iter()
+                .map(|(cause, effect, strength, is_inhibitory, cycle)| (
+                    cause.as_str(),
+                    effect.as_str(),
+                    strength.to_bits(),
+                    *is_inhibitory,
+                    *cycle,
+                ))
+                .collect::<Vec<_>>(),
+            first_edges
+                .iter()
+                .map(|(cause, effect, strength, is_inhibitory, cycle)| (
+                    cause.as_str(),
+                    effect.as_str(),
+                    strength.to_bits(),
+                    *is_inhibitory,
+                    *cycle,
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            second_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>(),
+            first_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>()
+        );
+
+        let mut third = second;
+        third.persist_snapshot();
+        let fourth = KnowledgeManager::new(config);
+        assert!(!fourth.persistence_degraded());
+        assert_eq!(
+            fourth.graph().export_fact_records()
+                .iter()
+                .map(|f| (f.memory_id.as_str(), f.vector_bytes.as_slice(), f.confidence.to_bits()))
+                .collect::<Vec<_>>(),
+            first_facts
+                .iter()
+                .map(|f| (f.memory_id.as_str(), f.vector_bytes.as_slice(), f.confidence.to_bits()))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            fourth.causal_bridge().export_edge_records_with_metadata(),
+            first_edges
+        );
+        let fourth_ontology = fourth.ontology().export_ontology_records();
+        assert_eq!(
+            fourth_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>(),
+            first_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>()
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_persistence_restore_does_not_partially_admit_failed_generation() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_atomic_restore_failure_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT,
+                    canonical_identity TEXT,
+                    provenance_family TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE knowledge_causal_edges (
+                    cause TEXT NOT NULL,
+                    effect TEXT NOT NULL,
+                    strength REAL NOT NULL,
+                    is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                    cycle INTEGER NOT NULL,
+                    PRIMARY KEY (cause, effect)
+                );
+                CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );
+                INSERT INTO knowledge_facts
+                    (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+                VALUES ('valid-fact', zeroblob(2048), 'valid', 0.9, 7, 0);
+                INSERT INTO knowledge_ontology
+                    (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
+                VALUES ('corrupt-utility', zeroblob(2048), 1, 'not-a-number', 7, 7);",
+            )
+            .unwrap();
+        }
+
+        let mgr = KnowledgeManager::new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        });
+
+        assert!(mgr.persistence_degraded());
+        assert!(mgr.graph().is_empty());
+        assert!(mgr.causal_bridge().edge_count() == 0);
+        assert!(mgr.ontology().primitives().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_persistence_restore_records_rejected_fact_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_fact_rejection_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT,
+                    canonical_identity TEXT,
+                    provenance_family TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                INSERT INTO knowledge_facts
+                    (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+                VALUES ('bad-vector', X'00', 'bad vector', 0.5, 1, 0);",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+        let health = mgr.persistence_health();
+
+        assert!(health.facts_loaded);
+        assert_eq!(health.fact_rejections, 1);
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["facts"]);
+        assert_eq!(mgr.graph().len(), 0);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_persistence_health_reports_provenance_rejections_as_degraded() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            provenance_loaded: true,
+            provenance_rejections: 1,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            causal_restore_evictions: 0,
+            ontology_loaded: true,
+            ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
+        };
+
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["provenance"]);
+    }
+
+    #[test]
+    fn test_persistence_restore_records_rejected_provenance_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_provenance_rejection_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                INSERT INTO knowledge_provenance_relations
+                    (source_memory_id, target_memory_id, kind, created_at)
+                VALUES ('a', 'b', 'DerivedFrom', 'cycle:1');
+                INSERT INTO knowledge_provenance_relations
+                    (source_memory_id, target_memory_id, kind, created_at)
+                VALUES ('b', 'a', 'DerivedFrom', 'cycle:2');",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+        let health = mgr.persistence_health();
+
+        assert!(health.provenance_loaded);
+        assert_eq!(health.provenance_rejections, 1);
+        assert!(health.provenance_snapshot_conforms);
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["provenance"]);
+        assert_eq!(mgr.graph().provenance_relations().len(), 1);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_persistence_restore_records_rejected_ontology_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_ontology_rejection_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );
+                INSERT INTO knowledge_ontology
+                    (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
+                VALUES ('bad-vector', X'00', 0, 0.0, 1, 1);",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+        let health = mgr.persistence_health();
+
+        assert!(health.ontology_loaded);
+        assert_eq!(health.ontology_rejections, 1);
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["ontology"]);
+        assert!(mgr.ontology().primitives().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_persistence_restore_policy_limited_ontology_is_healthy() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_ontology_policy_restore_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );
+                INSERT INTO knowledge_ontology
+                    (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
+                VALUES ('alpha', zeroblob(2048), 9, 0.9, 1, 1);
+                INSERT INTO knowledge_ontology
+                    (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
+                VALUES ('beta', zeroblob(2048), 1, 0.1, 2, 2);",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ontology_config: AdaptiveOntologyConfig {
+                max_primitives: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+        let health = mgr.persistence_health();
+
+        assert!(health.ontology_loaded);
+        assert_eq!(health.ontology_rejections, 0);
+        assert_eq!(health.ontology_policy_rejections, 1);
+        assert_eq!(health.ontology_restore_evictions, 0);
+        assert!(!health.is_degraded());
+        assert!(health.failed_domains().is_empty());
+        assert_eq!(mgr.ontology().count(), 1);
+        assert!(mgr.ontology().primitives().contains_key("alpha"));
+        assert!(!mgr.ontology().primitives().contains_key("beta"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_persistence_corruption_is_exposed_as_degraded_state() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_persistence_health_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                INSERT INTO knowledge_provenance_relations
+                    (source_memory_id, target_memory_id, kind, created_at)
+                VALUES ('derived', 'source', 'NotAProvenanceKind', 'cycle:2');",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+
+        assert!(mgr.persistence_degraded());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_basic_process() {

@@ -39,6 +39,19 @@ pub struct CausalEdge {
 /// This is separate from symthaea-causal-reasoning's CausalDAG to avoid
 /// a hard dependency. The bridge exports edges that can be imported into
 /// the full do-calculus engine when the `counterfactual` feature is enabled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CausalRestoreOutcome {
+    /// Number of previously admitted edges evicted by the bridge's configured
+    /// capacity/strength pruning policy while restoring this record.
+    pub pruned_edges: usize,
+}
+
+impl CausalRestoreOutcome {
+    pub fn was_policy_limited(self) -> bool {
+        self.pruned_edges > 0
+    }
+}
+
 pub struct CausalKnowledgeBridge {
     /// All discovered causal edges
     edges: Vec<CausalEdge>,
@@ -235,18 +248,42 @@ impl CausalKnowledgeBridge {
 
     /// Import a causal edge directly from persistence (cause, effect, strength).
     ///
-    /// Used during startup to restore edges from SQLite.
-    pub fn import_edge(&mut self, cause: String, effect: String, strength: f32) {
+    /// This legacy entry point infers inhibitory state from a signed strength and
+    /// restores with a non-negative in-memory magnitude. New persistence callers
+    /// should use `import_edge_with_metadata` so cycle and explicit inhibitory
+    /// metadata survive the round trip.
+    pub fn import_edge(&mut self, cause: String, effect: String, strength: f32) -> CausalRestoreOutcome {
+        self.import_edge_with_metadata(cause, effect, strength, strength < 0.0, 0)
+    }
+
+    /// Import a persisted causal edge while preserving its explicit metadata.
+    ///
+    /// Persisted inhibitory strength is represented with a negative sign, while
+    /// the bridge stores causal strength as a non-negative magnitude and keeps
+    /// inhibitory state in `is_inhibitory`. This boundary normalization prevents
+    /// valid inhibitory edges from being removed by the positive prune threshold.
+    pub fn import_edge_with_metadata(
+        &mut self,
+        cause: String,
+        effect: String,
+        strength: f32,
+        is_inhibitory: bool,
+        discovered_at_cycle: u64,
+    ) -> CausalRestoreOutcome {
         let edge = CausalEdge {
             cause,
             effect,
-            strength,
-            is_inhibitory: strength < 0.0,
+            strength: strength.abs(),
+            is_inhibitory,
             is_negated: false,
             source_text: String::new(),
-            discovered_at_cycle: 0,
+            discovered_at_cycle,
         };
+        let before = self.edges.len();
         self.add_edge(edge);
+        CausalRestoreOutcome {
+            pruned_edges: before.saturating_add(1).saturating_sub(self.edges.len()),
+        }
     }
 
     /// Export edges as (cause, effect, strength) triples for persistence.
@@ -256,6 +293,66 @@ impl CausalKnowledgeBridge {
         self.export_edges()
     }
 
+    /// Export the canonical current-state persistence projection.
+    ///
+    /// SQLite identifies a causal relation by (cause, effect), so repeated
+    /// observations of the same relation collapse to one persisted record.
+    /// The persisted strength is the same sequential running-average state used
+    /// by the live adjacency graph; the latest observation supplies polarity and
+    /// discovery metadata. This keeps restart behavior aligned with live state.
+    pub fn export_edge_records_with_metadata(
+        &self,
+    ) -> Vec<(String, String, f32, bool, u64)> {
+        let mut selected: HashMap<(String, String), (&CausalEdge, f32)> = HashMap::new();
+
+        for edge in self.edges.iter().filter(|e| !e.is_negated) {
+            let key = (edge.cause.clone(), edge.effect.clone());
+            match selected.remove(&key) {
+                None => {
+                    selected.insert(key, (edge, edge.strength.abs()));
+                }
+                Some((previous, aggregate)) => {
+                    let aggregate = (aggregate + edge.strength.abs()) / 2.0;
+                    let take_new = edge
+                        .discovered_at_cycle
+                        .cmp(&previous.discovered_at_cycle)
+                        .then_with(|| edge.is_inhibitory.cmp(&previous.is_inhibitory))
+                        .then_with(|| edge.strength.total_cmp(&previous.strength))
+                        .then_with(|| edge.source_text.cmp(&previous.source_text))
+                        .is_gt();
+                    selected.insert(
+                        key,
+                        if take_new {
+                            (edge, aggregate)
+                        } else {
+                            (previous, aggregate)
+                        },
+                    );
+                }
+            }
+        }
+
+        let mut records: Vec<_> = selected
+            .into_iter()
+            .map(|((cause, effect), (edge, strength))| {
+                let signed_strength = if edge.is_inhibitory {
+                    -strength.abs()
+                } else {
+                    strength.abs()
+                };
+                (
+                    cause,
+                    effect,
+                    signed_strength,
+                    edge.is_inhibitory,
+                    edge.discovered_at_cycle,
+                )
+            })
+            .collect();
+
+        records.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        records
+    }
     /// Update the strength of an existing causal edge based on prediction outcome.
     ///
     /// If the predicted effect occurred (`outcome_occurred = true`), strengthen the edge;
@@ -494,6 +591,35 @@ impl CausalKnowledgeBridge {
         let before = self.edges.len();
         self.edges.retain(|e| e.strength >= self.prune_threshold);
 
+        // Capacity is a hard upper bound after pruning. When more qualifying
+        // edges remain than the configured capacity, evict the weakest edge
+        // repeatedly. Ties evict the earliest retained edge, keeping restore
+        // behavior deterministic without relying on an unstable sort.
+        while self.edges.len() > self.capacity {
+            let weakest = self
+                .edges
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| {
+                    a.strength
+                        .partial_cmp(&b.strength)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.cause.cmp(&b.cause))
+                        .then_with(|| a.effect.cmp(&b.effect))
+                        .then_with(|| a.is_inhibitory.cmp(&b.is_inhibitory))
+                        .then_with(|| a.is_negated.cmp(&b.is_negated))
+                        .then_with(|| a.discovered_at_cycle.cmp(&b.discovered_at_cycle))
+                        .then_with(|| a.source_text.cmp(&b.source_text))
+                })
+                .map(|(index, _)| index);
+
+            if let Some(index) = weakest {
+                self.edges.remove(index);
+            } else {
+                break;
+            }
+        }
+
         // Rebuild adjacency from surviving edges
         if self.edges.len() < before {
             self.adjacency.clear();
@@ -559,6 +685,43 @@ mod tests {
         let added = bridge.process_relation(&rel, "sky is blue", 1);
         assert!(!added);
         assert_eq!(bridge.edge_count(), 0);
+    }
+
+    #[test]
+    fn test_capacity_tie_eviction_is_restore_order_invariant() {
+        let make = |order: &[(&str, &str)]| {
+            let mut bridge = CausalKnowledgeBridge::new(2);
+            for &(cause, effect) in order {
+                bridge.add_edge(CausalEdge {
+                    cause: cause.into(),
+                    effect: effect.into(),
+                    strength: 0.8,
+                    is_inhibitory: false,
+                    is_negated: false,
+                    source_text: String::new(),
+                    discovered_at_cycle: 0,
+                });
+            }
+            let mut retained = bridge
+                .export_edges()
+                .into_iter()
+                .map(|(cause, effect, _)| (cause, effect))
+                .collect::<Vec<_>>();
+            retained.sort();
+            retained
+        };
+
+        let forward = make(&[("zeta", "effect"), ("alpha", "effect"), ("middle", "effect")]);
+        let reverse = make(&[("middle", "effect"), ("alpha", "effect"), ("zeta", "effect")]);
+
+        assert_eq!(forward, reverse);
+        assert_eq!(
+            forward,
+            vec![
+                ("middle".to_string(), "effect".to_string()),
+                ("zeta".to_string(), "effect".to_string()),
+            ]
+        );
     }
 
     #[test]
@@ -651,6 +814,178 @@ mod tests {
 
         // Should have 2 raw edges but adjacency should show strengthened weight
         assert_eq!(bridge.node_count(), 2);
+    }
+
+    #[test]
+    fn test_import_edge_reports_policy_pruning() {
+        let mut bridge = CausalKnowledgeBridge::new(1);
+
+        let first = bridge.import_edge("weak".into(), "old".into(), 0.05);
+        assert!(!first.was_policy_limited());
+        assert_eq!(bridge.edge_count(), 1);
+
+        let second = bridge.import_edge("strong".into(), "new".into(), 0.8);
+        assert!(second.was_policy_limited());
+        assert_eq!(second.pruned_edges, 1);
+        assert_eq!(bridge.edge_count(), 1);
+        assert_eq!(bridge.effects_of("weak").len(), 0);
+        assert_eq!(bridge.effects_of("strong").len(), 1);
+    }
+
+    #[test]
+    fn test_persistence_projection_collapses_duplicate_endpoints_deterministically() {
+        let mut bridge = CausalKnowledgeBridge::new(100);
+
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.4,
+            is_inhibitory: false,
+            is_negated: false,
+            source_text: "early".into(),
+            discovered_at_cycle: 3,
+        });
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.8,
+            is_inhibitory: true,
+            is_negated: false,
+            source_text: "latest".into(),
+            discovered_at_cycle: 9,
+        });
+
+        assert_eq!(
+            bridge.export_edge_records_with_metadata(),
+            vec![(
+                "policy".to_string(),
+                "growth".to_string(),
+                -0.6,
+                true,
+                9
+            )]
+        );
+    }
+    #[test]
+    fn test_import_preserves_inhibitory_metadata_and_normalizes_strength() {
+        let mut bridge = CausalKnowledgeBridge::new(100);
+
+        let outcome = bridge.import_edge_with_metadata(
+            "ceasefire".into(),
+            "escalation".into(),
+            -0.6,
+            true,
+            42,
+        );
+
+        assert_eq!(outcome.pruned_edges, 0);
+        let edge = &bridge.effects_of("ceasefire")[0];
+        assert!((edge.strength - 0.6).abs() < f32::EPSILON);
+        assert!(edge.is_inhibitory);
+        assert_eq!(edge.discovered_at_cycle, 42);
+
+        let exported = bridge.export_edge_records_with_metadata();
+        assert_eq!(
+            exported,
+            vec![(
+                "ceasefire".to_string(),
+                "escalation".to_string(),
+                -0.6,
+                true,
+                42
+            )]
+        );
+    }
+
+    #[test]
+    fn test_persistence_projection_matches_running_average_state() {
+        let mut bridge = CausalKnowledgeBridge::new(100);
+
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.25,
+            is_inhibitory: false,
+            is_negated: false,
+            source_text: "first".into(),
+            discovered_at_cycle: 1,
+        });
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.75,
+            is_inhibitory: false,
+            is_negated: false,
+            source_text: "second".into(),
+            discovered_at_cycle: 2,
+        });
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.25,
+            is_inhibitory: true,
+            is_negated: false,
+            source_text: "latest".into(),
+            discovered_at_cycle: 3,
+        });
+
+        let exported = bridge.export_edge_records_with_metadata();
+        assert_eq!(
+            exported,
+            vec![(
+                "policy".to_string(),
+                "growth".to_string(),
+                -0.5,
+                true,
+                3,
+            )]
+        );
+
+        let mut restored = CausalKnowledgeBridge::new(100);
+        restored.import_edge_with_metadata(
+            exported[0].0.clone(),
+            exported[0].1.clone(),
+            exported[0].2,
+            exported[0].3,
+            exported[0].4,
+        );
+        assert_eq!(restored.export_edge_records_with_metadata(), exported);
+    }
+    #[test]
+    fn test_inhibitory_restore_is_not_pruned_by_signed_strength() {
+        let mut bridge = CausalKnowledgeBridge::new(1);
+
+        let outcome = bridge.import_edge_with_metadata(
+            "blockade".into(),
+            "trade".into(),
+            -0.8,
+            true,
+            7,
+        );
+
+        assert!(!outcome.was_policy_limited());
+        assert_eq!(bridge.edge_count(), 1);
+        let edge = &bridge.effects_of("blockade")[0];
+        assert!((edge.strength - 0.8).abs() < f32::EPSILON);
+        assert!(edge.is_inhibitory);
+    }
+
+    #[test]
+    fn test_capacity_remains_hard_bound_when_all_edges_clear_threshold() {
+        let mut bridge = CausalKnowledgeBridge::new(2);
+
+        let first = bridge.import_edge("A".into(), "B".into(), 0.9);
+        let second = bridge.import_edge("B".into(), "C".into(), 0.8);
+        let third = bridge.import_edge("C".into(), "D".into(), 0.7);
+
+        assert!(!first.was_policy_limited());
+        assert!(!second.was_policy_limited());
+        assert!(third.was_policy_limited());
+        assert_eq!(third.pruned_edges, 1);
+        assert_eq!(bridge.edge_count(), 2);
+        assert_eq!(bridge.effects_of("A").len(), 0);
+        assert_eq!(bridge.effects_of("B").len(), 1);
+        assert_eq!(bridge.effects_of("C").len(), 1);
     }
 
     #[test]
