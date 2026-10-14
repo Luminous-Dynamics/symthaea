@@ -470,11 +470,14 @@ class DurableQueueTests(unittest.TestCase):
             acknowledged_at_utc=dt("2026-10-12T10:24:30Z"),
             signing_key=receiver_key,
         )
+        # Set the local receive/verification clock just after the signed ACK
+        # timestamp so the test reaches the earlier-than-expiry guard rather
+        # than failing the independent future-clock-skew guard first.
         with self.assertRaisesRegex(TelemetryQueueError, "not before event expiry"):
             self.queue.acknowledge_protected(
                 ack,
                 verification_keys={"receiver-test-epoch": receiver_key.public_key()},
-                now_utc=self.now,
+                now_utc=dt("2026-10-12T10:24:31Z"),
             )
         self.assertEqual(self.queue.pending_count, 1)
 

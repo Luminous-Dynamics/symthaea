@@ -309,7 +309,7 @@ class DurablePrivacyLedgerTests(unittest.TestCase):
                 barrier.wait(timeout=5)
                 result = self.reserve(
                     release="abcde"[index],
-                    query="vwxyz"[index],
+                    query="12345"[index],
                     participants=people(),
                     start=start,
                     end=end,
