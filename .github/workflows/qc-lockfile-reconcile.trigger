@@ -1,1 +1,0 @@
-One-shot capture request: resolve Cargo.lock with Cargo against this exact Symthaea QC stack branch using the pinned Rust toolchain, print the lockfile and its SHA-256 to the read-only workflow log, then remove the capture workflow after the lockfile is applied. A cargo check failure must remain visible and the generated lockfile is not accepted until --locked validation passes.
