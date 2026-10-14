@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "status": "research_fixture",
   "scenario_file": "docs/research/life-civic/reference-scenarios.json",
-  "scenario_git_blob_sha1": "209a9701fab0742a8a87325aaf3f2cc02c9dfb07",
+  "scenario_git_blob_sha1": "40aa73d7a8447d424bb55a4983319eda13bc70ea",
   "digest_semantics": "Git blob SHA-1 binds exact repository object bytes for drift detection. It is not a signature, source-authenticity proof, or independent collision-resistant trust claim.",
   "claim_ceiling": [
     "The scenario document is the pinned reference input for this branch revision.",
