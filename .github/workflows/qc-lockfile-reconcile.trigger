@@ -1,0 +1,1 @@
+Run a read-only lockfile capture from the exact current branch head after excluding the incomplete observation-attestation adapter. Validate the generated Cargo.lock digest and locked builds before accepting it.
