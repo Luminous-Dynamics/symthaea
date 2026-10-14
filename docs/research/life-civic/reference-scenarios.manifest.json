@@ -1,9 +1,9 @@
 {
   "suite_id": "SYM-LIFE-CIVIC-REFERENCE-001",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "status": "research_fixture",
   "scenario_file": "docs/research/life-civic/reference-scenarios.json",
-  "scenario_git_blob_sha1": "40aa73d7a8447d424bb55a4983319eda13bc70ea",
+  "scenario_git_blob_sha1": "df29b96497a4a1dfc0042d9853ee10eb79f962c0",
   "digest_semantics": "Git blob SHA-1 binds exact repository object bytes for drift detection. It is not a signature, source-authenticity proof, or independent collision-resistant trust claim.",
   "claim_ceiling": [
     "The scenario document is the pinned reference input for this branch revision.",
@@ -21,6 +21,9 @@
     "a dated source observation proves when the system retrieved the source",
     "synthetic fixture evidence may be represented as a captured source",
     "purpose-labelled official contact channels are interchangeable without source evidence",
-    "a candidate contact channel proves that a civic request was submitted"
+    "a candidate contact channel proves that a civic request was submitted",
+    "official cross-utility coordination statement proves incident-level causality",
+    "historical public statement proves current service status",
+    "synthetic fixture timestamp is actual retrieval evidence"
   ]
 }
