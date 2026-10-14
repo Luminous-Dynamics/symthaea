@@ -205,7 +205,8 @@ impl InfrastructureEmbodiment {
         EmbodimentResult {
             num_actuators: 8,
             control_effort: self.last_control_effort,
-            success: self.simulator.state().is_finite(),
+            success: self.simulator.last_step_succeeded()
+                && self.simulator.state().is_finite(),
             prediction_error: pe,
             safety_level: self.current_safety,
             epistemic_grounding: GROUNDING_SENSORIMOTOR,
