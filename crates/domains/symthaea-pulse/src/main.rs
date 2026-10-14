@@ -563,6 +563,9 @@ pub struct ReasoningInfo {
     pub gate_blocked: bool,
     #[serde(default)]
     pub meta_reasoning_confidence: f64,
+    /// Historical LR delta that would have been applied; offline qualification telemetry only.
+    #[serde(default)]
+    pub meta_reasoning_counterfactual_lr_boost: f32,
     /// Reasoning reliability EMA (0.0-1.0).
     #[serde(default)]
     pub reliability_ema: f64,
@@ -1601,6 +1604,7 @@ fn build_snapshot(
             plan_confidence: m.reasoning_plan_confidence,
             gate_blocked: m.reasoning_gate_blocked,
             meta_reasoning_confidence: m.meta_reasoning_confidence,
+            meta_reasoning_counterfactual_lr_boost: m.meta_reasoning_counterfactual_lr_boost,
             reliability_ema: m.reasoning_reliability_ema,
             cumulative_quality: m.reasoning_cumulative_quality,
             rising_streak: m.reasoning_rising_streak,
@@ -2324,13 +2328,18 @@ mod tests {
 
     #[test]
     fn test_pulse_snapshot_serialize_roundtrip() {
-        let snap = make_snapshot();
+        let mut snap = make_snapshot();
+        snap.reasoning.meta_reasoning_counterfactual_lr_boost = 0.02;
         let json = serde_json::to_string_pretty(&snap).expect("serialize snapshot");
         let snap2: PulseSnapshot = serde_json::from_str(&json).expect("deserialize snapshot");
         assert_eq!(snap.timestamp, snap2.timestamp);
         assert_eq!(snap.profile, snap2.profile);
         assert!((snap.vitals.consciousness_level - snap2.vitals.consciousness_level).abs() < 1e-12);
         assert_eq!(snap.sparkline.len(), snap2.sparkline.len());
+        assert!(
+            (snap2.reasoning.meta_reasoning_counterfactual_lr_boost - 0.02).abs() < 1e-6,
+            "counterfactual LR telemetry survives JSON round-trip"
+        );
         assert!(snap2.integrity.attestation_passed); // default via serde
     }
 

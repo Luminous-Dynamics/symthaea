@@ -355,6 +355,8 @@ impl CognitiveLoopService {
         metadata.primitive_validation_phi_gain = feedback.evolution.primitive_validation_phi_gain;
         metadata.primitive_validation_p_value = feedback.evolution.primitive_validation_p_value;
         metadata.meta_reasoning_confidence = feedback.reasoning.meta_reasoning_confidence;
+        metadata.meta_reasoning_counterfactual_lr_boost =
+            feedback.reasoning.meta_reasoning_counterfactual_lr_boost;
         metadata.meta_reasoning_insights = feedback.reasoning.meta_reasoning_insights;
         metadata.code_primitives_selected = feedback.reasoning.code_primitives_selected;
         metadata.metacognitive_anomaly = dynamics.reasoning.metacognitive_anomaly;
