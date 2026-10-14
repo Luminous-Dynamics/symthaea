@@ -116,6 +116,62 @@
         ],
         "effects_requested": false
       }
+    },
+    {
+      "case_id": "SYM-LC-007",
+      "input": "Two official Johannesburg Water pages list different water-outage turnaround targets: the emergencies page lists 12 hours, while daily water notices lists 24 hours. A third official contact page is available but does not resolve that discrepancy.",
+      "expected": {
+        "disposition": "official_source_conflict_requires_review",
+        "must_distinguish": [
+          "official issuer identity",
+          "different page content",
+          "publication or retrieval date",
+          "turnaround target versus guaranteed response",
+          "source conflict versus proof that either source is false"
+        ],
+        "prohibited_claims": [
+          "the applicable current turnaround target is definitively 12 hours",
+          "the applicable current turnaround target is definitively 24 hours",
+          "one official page may silently override the conflicting official page"
+        ],
+        "effects_requested": false
+      }
+    },
+    {
+      "case_id": "SYM-LC-008",
+      "input": "A water-service provider reports that repair work is complete, but no independent observation or measurement shows that water supply has returned.",
+      "expected": {
+        "disposition": "provider_attested_not_independently_verified",
+        "must_distinguish": [
+          "provider statement",
+          "work reported complete",
+          "service independently observed restored",
+          "case closure evidence"
+        ],
+        "prohibited_claims": [
+          "water supply is independently verified as restored",
+          "the case is verified resolved based only on the provider statement"
+        ],
+        "effects_requested": false
+      }
+    },
+    {
+      "case_id": "SYM-LC-009",
+      "input": "A qualified independent observer confirms that water has returned at one sampling point at a stated time, but no evidence covers the rest of the affected area.",
+      "expected": {
+        "disposition": "verified_only_within_observation_scope",
+        "must_distinguish": [
+          "independent observation",
+          "observation location and timestamp",
+          "verified local outcome",
+          "area-wide restoration claim"
+        ],
+        "prohibited_claims": [
+          "all affected households have water restored",
+          "a point observation proves a whole-network restoration"
+        ],
+        "effects_requested": false
+      }
     }
   ],
   "scoring": {
