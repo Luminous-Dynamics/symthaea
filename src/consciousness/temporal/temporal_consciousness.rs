@@ -194,6 +194,54 @@ pub struct PhiTrajectory {
     capacity: usize,
 }
 
+fn finite_rate(current: f64, previous: f64, dt_secs: f64) -> Option<f64> {
+    if !current.is_finite() || !previous.is_finite() || !dt_secs.is_finite() || dt_secs <= 0.0 {
+        return None;
+    }
+
+    // Halve numerator and denominator before division. This avoids overflow in
+    // the difference when a large but representable rate exists.
+    let rate = (current * 0.5 - previous * 0.5) / (dt_secs * 0.5);
+    rate.is_finite().then_some(rate)
+}
+
+fn finite_history_stability(history: &VecDeque<(Duration, f64)>) -> f64 {
+    let count = history.len();
+    if count < 3 {
+        return 1.0;
+    }
+
+    // Normalize before computing mean and variance to avoid overflowing
+    // intermediate sums and squared deviations for large finite observations.
+    let scale = history
+        .iter()
+        .map(|(_, value)| value.abs())
+        .fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return 1_000.0;
+    }
+
+    let n = count as f64;
+    let mean = history
+        .iter()
+        .map(|(_, value)| (*value / scale) / n)
+        .sum::<f64>();
+    let normalized_variance = history
+        .iter()
+        .map(|(_, value)| ((*value / scale) - mean).powi(2))
+        .sum::<f64>()
+        / n;
+    let standard_deviation = scale * normalized_variance.sqrt();
+
+    // When the variance itself is outside f64's range, its reciprocal is
+    // effectively zero at this precision. Keep stability finite instead of NaN.
+    if !standard_deviation.is_finite() || standard_deviation > f64::MAX.sqrt() {
+        0.0
+    } else {
+        1.0 / (standard_deviation * standard_deviation + 0.001)
+    }
+}
+
 impl PhiTrajectory {
     pub fn new(capacity: usize) -> Self {
         Self::new_with_time_constant(capacity, 1.0)
@@ -258,10 +306,56 @@ impl PhiTrajectory {
         if !phi.is_finite() {
             return false;
         }
-        match self.history.back() {
-            Some((previous_time, _)) => elapsed > *previous_time,
-            None => true,
+
+        let Some((previous_time, previous_phi)) = self.history.back() else {
+            return true;
+        };
+        if elapsed <= *previous_time {
+            return false;
         }
+
+        let dt = elapsed.saturating_sub(*previous_time).as_secs_f64();
+        if !self.candidate_ema_is_finite(phi, dt) {
+            return false;
+        }
+
+        // Reject inputs whose derived rates cannot be represented as finite f64.
+        // Respect retention capacity: no velocity is measured with one retained slot.
+        if self.capacity >= 2 && finite_rate(phi, *previous_phi, dt).is_none() {
+            return false;
+        }
+
+        // Acceleration requires two velocity intervals and therefore at least three
+        // samples in the configured retention window.
+        if self.capacity >= 3 && self.history.len() >= 2 {
+            let (previous_previous_time, previous_previous_phi) =
+                self.history[self.history.len() - 2];
+            let previous_dt = previous_time
+                .saturating_sub(previous_previous_time)
+                .as_secs_f64();
+            let Some(previous_velocity) =
+                finite_rate(*previous_phi, previous_previous_phi, previous_dt)
+            else {
+                return false;
+            };
+            let Some(current_velocity) = finite_rate(phi, *previous_phi, dt) else {
+                return false;
+            };
+            let midpoint_delta = (previous_dt + dt) / 2.0;
+            if finite_rate(current_velocity, previous_velocity, midpoint_delta).is_none() {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn candidate_ema_is_finite(&self, phi: f64, dt: f64) -> bool {
+        if !phi.is_finite() || !dt.is_finite() || dt <= 0.0 {
+            return false;
+        }
+        let decay = (-dt / self.ema_time_constant_secs).exp();
+        ((1.0 - decay) * phi + decay * self.ema).is_finite()
     }
 
     pub fn observe_at(&mut self, phi: f64, elapsed: Duration) -> bool {
@@ -296,10 +390,12 @@ impl PhiTrajectory {
         let (t2, phi2) = self.history[len - 1];
 
         let dt = t2.saturating_sub(t1).as_secs_f64();
-        if dt <= 0.0 {
+        let Some(new_velocity) = finite_rate(phi2, phi1, dt) else {
+            self.velocity = 0.0;
+            self.acceleration = 0.0;
+            self.acceleration_available = false;
             return;
-        }
-        let new_velocity = (phi2 - phi1) / dt;
+        };
         self.velocity = new_velocity;
 
         // Acceleration requires two velocity estimates, hence three observations.
@@ -312,11 +408,16 @@ impl PhiTrajectory {
             let midpoint_delta = (previous_dt + dt) / 2.0;
 
             if previous_dt > 0.0 && midpoint_delta > 0.0 {
-                let previous_velocity = (phi1 - phi0) / previous_dt;
-                let acceleration = (new_velocity - previous_velocity) / midpoint_delta;
-                if acceleration.is_finite() {
-                    self.acceleration = acceleration;
-                    self.acceleration_available = true;
+                if let Some(previous_velocity) = finite_rate(phi1, phi0, previous_dt) {
+                    if let Some(acceleration) =
+                        finite_rate(new_velocity, previous_velocity, midpoint_delta)
+                    {
+                        self.acceleration = acceleration;
+                        self.acceleration_available = true;
+                    } else {
+                        self.acceleration = 0.0;
+                        self.acceleration_available = false;
+                    }
                 } else {
                     self.acceleration = 0.0;
                     self.acceleration_available = false;
@@ -336,10 +437,7 @@ impl PhiTrajectory {
             // Deliberately sample-weighted variance. It describes the retained
             // sample set, not a time-weighted variance; compare it across runs only
             // when sampling cadence and retained time coverage are comparable.
-            let phis: Vec<f64> = self.history.iter().map(|(_, p)| *p).collect();
-            let mean = phis.iter().sum::<f64>() / phis.len() as f64;
-            let variance = phis.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / phis.len() as f64;
-            self.stability = 1.0 / (variance + 0.001);
+            self.stability = finite_history_stability(&self.history);
         }
 
         // Determine trend
@@ -1966,6 +2064,32 @@ mod tests {
     }
 
     #[test]
+    fn analyzer_rejects_overflowing_derived_phi_sample_without_partial_acceptance() {
+        let mut analyzer =
+            TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
+        assert!(analyzer.observe_at(&BinaryHV::random(4311), f64::MAX, Duration::ZERO));
+
+        let continuity_states = analyzer.continuity.recent_states.len();
+        let husserlian_retention = analyzer.husserlian.retention.len();
+        assert!(!analyzer.observe_at(
+            &BinaryHV::random(4312),
+            -f64::MAX,
+            Duration::from_secs(1),
+        ));
+
+        assert_eq!(analyzer.phi_trajectory.sample_count(), 1);
+        assert_eq!(analyzer.continuity.recent_states.len(), continuity_states);
+        assert_eq!(analyzer.husserlian.retention.len(), husserlian_retention);
+        assert_eq!(analyzer.stats.observations, 1);
+        assert_eq!(analyzer.stats.rejected_observations, 1);
+        let report = analyzer.report();
+        assert!(report.phi_velocity.is_finite());
+        assert!(report.phi_acceleration.is_finite());
+        assert!(report.overall_coherence.is_finite());
+        assert!(report.overall_evidence_coverage.is_finite());
+    }
+
+    #[test]
     fn temporal_average_ignores_observations_with_zero_evidence_coverage() {
         let mut analyzer =
             TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default());
@@ -2087,6 +2211,36 @@ mod tests {
 
         assert!(!report.phi_acceleration_available);
         assert!(report.to_string().contains("N/A Φ/s²"));
+    }
+
+    #[test]
+    fn extreme_finite_phi_rejects_unrepresentable_velocity_without_mutation() {
+        let mut trajectory = PhiTrajectory::new(8);
+        assert!(trajectory.observe_at(f64::MAX, Duration::ZERO));
+        let retained_ema = trajectory.ema;
+
+        // At one second this difference has a rate outside f64's finite range.
+        assert!(!trajectory.observe_at(-f64::MAX, Duration::from_secs(1)));
+        assert_eq!(trajectory.sample_count(), 1);
+        assert_eq!(trajectory.history(), vec![f64::MAX]);
+        assert_eq!(trajectory.ema, retained_ema);
+        assert!(trajectory.velocity.is_finite());
+        assert!(trajectory.acceleration.is_finite());
+        assert!(!trajectory.acceleration_available);
+    }
+
+    #[test]
+    fn extreme_finite_phi_with_representable_rates_keeps_dynamics_finite() {
+        let mut trajectory = PhiTrajectory::new(8);
+        assert!(trajectory.observe_at(f64::MAX, Duration::ZERO));
+        assert!(trajectory.observe_at(-f64::MAX, Duration::from_secs(2)));
+        assert!(trajectory.observe_at(-f64::MAX, Duration::from_secs(4)));
+
+        assert!(trajectory.ema.is_finite());
+        assert!(trajectory.velocity.is_finite());
+        assert!(trajectory.acceleration.is_finite());
+        assert!(trajectory.acceleration_available);
+        assert!(trajectory.stability.is_finite());
     }
 
     #[test]
