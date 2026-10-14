@@ -126,6 +126,8 @@ For CFD practice, use an explicit verification/validation process: code verifica
 
 ## 7. Reproducible run manifest
 
+The versioned JSON contract is defined in [`physics-run-manifest.schema.json`](physics-run-manifest.schema.json). Consumers should reject unsupported schema versions, preserve the exact producer commit, and derive their readiness labels from recorded gate outcomes rather than trusting a producer-supplied summary status. The schema validates structure; the Rust implementation must additionally validate cross-field energy residual arithmetic, uniqueness constraints, and exact-head gate semantics.
+
 Each saved result used outside a local experiment must carry a manifest containing at least:
 
 - repository, immutable source commit, solver/model version, build features, and platform;
