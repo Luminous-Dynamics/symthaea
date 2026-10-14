@@ -148,7 +148,9 @@ jobs:
             --end "$END_DATE" \
             --limit 100 \
             --max-pages 100 \
-            --timeout 45 \
+            --window-months 3 \
+            --timeout 30 \
+            --retries 2 \
             --out artifacts/water-leak/satellite-odata-inventory.json
 
       - name: Verify saved OData inventory independently
@@ -165,6 +167,8 @@ jobs:
           print("bbox_wgs84=" + str(data["scope"]["bbox_wgs84"]))
           print("start_date=" + data["scope"]["start_date_inclusive"])
           print("end_date=" + data["scope"]["end_date_inclusive"])
+          print("window_months=" + str(data["scope"]["window_months"]))
+          print("request_policy=" + str(data["request_policy"]))
           for query in data["queries"]:
               print(f"profile={query['profile_id']} window={query['start_date_inclusive']}..{query['end_date_exclusive']} products={query['item_count']} pages={query['page_count']} duplicates_dropped={query['duplicate_items_dropped']}")
           print("No raster assets downloaded; products/footprints do not establish leak evidence or suitability.")
