@@ -120,6 +120,14 @@ class ChoroInputManifestTests(unittest.TestCase):
                 report["artifacts"][0]["artifact_path"],
                 "synthetic-score-artifact.bin",
             )
+            self.assertEqual(
+                report["approval_receipt_sha256"],
+                hashlib.sha256(approval_path.read_bytes()).hexdigest(),
+            )
+            self.assertEqual(
+                report["intake_sha256"],
+                hashlib.sha256(intake_path.read_bytes()).hexdigest(),
+            )
 
             # Any change to manifest bytes invalidates the detached approval receipt.
             manifest_path.write_bytes(manifest_bytes + b" ")
