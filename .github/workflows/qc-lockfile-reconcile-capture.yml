@@ -5,7 +5,7 @@ on:
     branches:
       - "feat/qc-checked-dft-propagation-2026-10-11"
     paths:
-      - ".github/workflows/qc-lockfile-reconcile-capture.yml"
+      - ".github/workflows/qc-lockfile-reconcile.trigger"
 
 permissions:
   contents: read
