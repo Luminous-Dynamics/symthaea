@@ -24,5 +24,41 @@
     "An empty source list is intentionally blocked and authorizes no acquisition, transcription, analysis, training, publication, or redistribution.",
     "Catalogue labels are leads, not legal determinations; review each exact artifact for the requested use and jurisdiction.",
     "The gate checks recorded evidence and scope consistency. It does not provide legal advice or independently determine copyright status."
-  ]
+  ],
+  "source_entry_contract": {
+    "required_fields": [
+      "intake_source_id",
+      "source_record_url",
+      "source_file_url",
+      "artifact_path",
+      "artifact_sha256",
+      "artifact_bytes",
+      "retrieved_on",
+      "selected_work_ids",
+      "selection_basis",
+      "rights_review"
+    ],
+    "rights_review_required_fields": [
+      "decision",
+      "reviewer_id",
+      "reviewed_on",
+      "review_evidence_url",
+      "license_or_basis_url",
+      "attribution_text",
+      "reviewed_artifact_sha256",
+      "reviewed_scope_sha256",
+      "permitted_uses",
+      "jurisdictions",
+      "commercial_use_allowed",
+      "rights_dimensions"
+    ],
+    "required_rights_layers": [
+      "underlying_composition",
+      "score_edition_or_arrangement",
+      "scan_or_digital_file",
+      "third_party_materials"
+    ],
+    "selection_rule": "Name exact work or movement identifiers within each artifact; collections must not be treated as a single undifferentiated work. State the predeclared selection basis.",
+    "review_scope_digest": "reviewed_scope_sha256 is SHA-256 over canonical JSON computed by scripts/muse_choro_input_manifest.py::review_scope_sha256; it binds the source record, exact artifact metadata, selected work IDs, selection basis, and declared intended-use/commercial/jurisdiction/output/retention scope."
+  }
 }
