@@ -132,6 +132,12 @@ mod tests {
         assert_eq!(movie.width, 64);
         assert_eq!(movie.height, 64);
         assert!(!movie.frames[0].is_empty());
+        assert!(
+            movie.semantic_coherence.is_finite()
+                && (0.0..=1.0).contains(&movie.semantic_coherence)
+                && movie.semantic_coherence > 0.0,
+            "Generated mental movies should expose a measured continuity proxy in [0, 1]"
+        );
     }
 
     #[test]
@@ -166,6 +172,16 @@ mod tests {
 
         assert_eq!(movie.frames.len(), 16);
         assert_eq!(movie.path_length, 16);
+        assert!(
+            movie.semantic_coherence.is_finite()
+                && (0.0..=1.0).contains(&movie.semantic_coherence),
+            "Trajectory continuity must be a finite measured score in [0, 1] (got {})",
+            movie.semantic_coherence
+        );
+        assert!(
+            movie.semantic_coherence > 0.0,
+            "A multi-step imagined path should report a measured continuity score, not a hard-coded zero"
+        );
         assert!(
             service.thermodynamic_load() > initial_thermo,
             "Thermodynamic load should increase after imagination"
