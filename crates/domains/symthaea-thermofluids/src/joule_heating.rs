@@ -3,14 +3,13 @@
 
 //! Lumped electrical-to-thermal reference model for Joule heating.
 //!
-//! This is an intentionally small verification case, not a spatial EM or heat
-//! solver. It assumes constant resistance and specific heat capacity, a
-//! well-mixed conductor, no phase change, and no heat loss to the surroundings.
-//! Under those assumptions, electrical work must equal the increase in stored
-//! sensible heat. Since this model has no heat-loss term and resistance is
-//! positive, valid steps are monotonic non-decreasing in temperature; adding
-//! cooling or phase change requires extending the energy ledger, not a silent
-//! adjustment to this update:
+//! These are intentionally small verification cases, not spatial EM or heat
+//! solvers. Both assume constant resistance and specific heat capacity, a
+//! well-mixed conductor, and no phase change. The adiabatic `step` has no
+//! heat-loss term; `step_with_convection` integrates constant-conductance
+//! exchange with an ambient reservoir in closed form. Resistive heating is
+//! nonnegative for either current direction, but convection can cool or warm
+//! the conductor. Any added pathway must appear explicitly in the energy ledger:
 //!
 //!     P_J = I² R
 //!     Q_in = P_J Δt
@@ -70,12 +69,12 @@ impl fmt::Display for JouleHeatingError {
 
 impl Error for JouleHeatingError {}
 
-/// Energy-accounted result for one adiabatic Joule-heating step.
+/// Energy-accounted result for one adiabatic or convective Joule-heating step.
 ///
-/// The residual is defined as input electrical energy minus the increase in
-/// sensible thermal energy. It should be close to floating-point roundoff for
-/// this lumped model; it is not a general-purpose estimate of discretization
-/// error in spatially resolved simulations.
+/// The residual is electrical input minus signed ambient energy outflow minus
+/// the increase in sensible thermal energy. It should be close to floating-point
+/// roundoff for these lumped models; it is not a general-purpose estimate of
+/// discretization error in spatially resolved simulations.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct JouleHeatingStep {
     /// Current used for this step (A; sign does not affect resistive heating).
@@ -104,7 +103,8 @@ pub struct JouleHeatingStep {
 /// Single lumped conductor with fixed electrical resistance and heat capacity.
 ///
 /// This small model is useful as an analytical reference for later spatially
-/// resolved EM/thermal coupling. It intentionally has no ambient cooling or
+/// resolved EM/thermal coupling. Ambient temperature and thermal conductance
+/// are supplied per step; the model does not persist environment parameters or
 /// temperature-dependent material properties.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct JouleHeatingModel {
@@ -393,6 +393,38 @@ mod tests {
         assert!(step.final_temperature_k < step.initial_temperature_k);
         assert!(step.final_temperature_k > 300.0);
         assert!(step.ambient_energy_out_j > 0.0);
+        assert!(step.energy_balance_residual_j.abs() < 1e-9);
+    }
+
+    #[test]
+    fn convective_heating_matches_closed_form_solution() {
+        let mut model = JouleHeatingModel::new(2.0, 0.5, 900.0, 293.15).unwrap();
+        let ambient_k = 300.0;
+        let conductance_w_per_k = 5.0;
+        let current_a: f64 = 3.0;
+        let time_step_s: f64 = 10.0;
+        let power_w = current_a * current_a * 2.0;
+        let capacity_j_per_k = 0.5 * 900.0;
+        let equilibrium_k = ambient_k + power_w / conductance_w_per_k;
+        let expected_k = equilibrium_k
+            + (model.temperature_k() - equilibrium_k)
+                * (-(conductance_w_per_k / capacity_j_per_k) * time_step_s).exp();
+
+        let step = model
+            .step_with_convection(
+                current_a,
+                time_step_s,
+                ambient_k,
+                conductance_w_per_k,
+            )
+            .unwrap();
+
+        assert!(
+            (step.final_temperature_k - expected_k).abs() < 1e-10,
+            "actual={} K, closed-form reference={} K",
+            step.final_temperature_k,
+            expected_k
+        );
         assert!(step.energy_balance_residual_j.abs() < 1e-9);
     }
 
