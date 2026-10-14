@@ -32,6 +32,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 - `format_summary.py` - Summary formatting
 - `generate_benchmark_report.py` - Report generation
 - `muse_style_coverage.py` - Source-derived Muse route audit in both directions; `--report` emits per-constellation gaps and unreferenced executable styles, `--check` fails on frozen-baseline drift
+- `muse_choro_input_manifest.py` - Fail-closed Choro source gate; checks exact artifact SHA-256/byte counts, review-to-artifact binding, four rights layers, use/jurisdiction scope, and an independent approval receipt. A blocked empty template is not authorization.
 - `muse_style_capability_inventory.py` - Extracts per-style grammar family/dispatch mode, composition spec, meter, tempo range, census-informed intent-axis declarations, and instrument-pool choices from Rust source; pins the census-source digest without executing the census or claiming render/quality evidence
 - `examples/style_control_response_curves.rs` - Records 696 control curves / 3,364 points across 29 styles and four fixed baseline seeds, with exact fingerprints, 11 structural-layer distances, tonic, tempo/meter, duration, velocity/spread, section intensity, emphasis, pitch/range, optional form metadata, and no-change triage flags; symbolic evidence only
   - `.github/workflows/muse-style-response-curves.yml` executes the probe for relevant source changes and uploads a source-bound JSON report plus SHA-256 receipt, including a per-style/control seed-robustness table and exact baseline seeds for no-change triage.
@@ -70,6 +71,10 @@ MUSE_STYLE_RESPONSE_JSON_OUT=/tmp/muse-style-response.json cargo run --release -
 python3 scripts/muse_style_coverage.py --report > /tmp/muse-style-coverage-report.json
 python3 scripts/muse_style_coverage.py --check
 python3 tests/python/test_muse_style_coverage.py -v
+python3 tests/python/test_muse_choro_source_intake.py -v
+python3 scripts/muse_choro_input_manifest.py --check
+python3 tests/python/test_muse_choro_input_manifest.py -v
+# For an empirical run, use --require-authorized --artifact-root <private-reviewed-files-dir>; current template is intentionally blocked.
 python3 scripts/muse_style_capability_inventory.py > /tmp/muse-style-capability-inventory.json
 python3 tests/python/test_muse_style_capability_inventory.py -v
 
