@@ -130,6 +130,10 @@ class ChoroInputManifestTests(unittest.TestCase):
         self.assertTrue(any("Commercial/non-commercial purpose is unresolved" in b
                             for b in report["blockers"]))
         self.assertTrue(any("No intended jurisdiction" in b for b in report["blockers"]))
+        contract = json.loads(MANIFEST_TEMPLATE.read_text(encoding="utf-8"))["source_entry_contract"]
+        self.assertIn("selected_work_ids", contract["required_fields"])
+        self.assertIn("reviewed_scope_sha256", contract["rights_review_required_fields"])
+        self.assertIn("review_scope_digest", contract)
 
     def test_explicit_approval_binds_exact_manifest_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
