@@ -12,6 +12,7 @@ import json
 import math
 import re
 import sys
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -33,6 +34,10 @@ PROFILES = (
 )
 SELECT_FIELDS = "Id,Name,ContentDate,GeoFootprint,Online,ContentLength,Checksum"
 SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
+RETRYABLE_HTTP_STATUSES = (408, 429, 500, 502, 503, 504)
+MAX_RETRIES = 5
+RETRY_AFTER_CAP_SECONDS = 10.0
+SUPPORTED_WINDOW_MONTHS = (1, 3, 12)
 
 
 class ODataError(RuntimeError):
@@ -90,16 +95,26 @@ def parse_date(value: str) -> date:
     return parsed
 
 
-def query_windows(start: date, end_inclusive: date) -> list[tuple[date, date]]:
-    """Partition an inclusive requested period into calendar-year [start,end) windows."""
+def query_windows(
+    start: date,
+    end_inclusive: date,
+    window_months: int = 3,
+) -> list[tuple[date, date]]:
+    """Partition inclusive dates into calendar-aligned half-open month windows."""
     if end_inclusive < start:
         raise ODataError("end date must be on or after start date")
+    if window_months not in SUPPORTED_WINDOW_MONTHS:
+        raise ODataError(f"window_months must be one of {SUPPORTED_WINDOW_MONTHS}")
     end_exclusive = end_inclusive + timedelta(days=1)
     windows: list[tuple[date, date]] = []
     cursor = start
     while cursor < end_exclusive:
-        next_year = date(cursor.year + 1, 1, 1)
-        stop = min(next_year, end_exclusive)
+        next_boundary_month = ((cursor.month - 1) // window_months + 1) * window_months + 1
+        if next_boundary_month > 12:
+            boundary = date(cursor.year + 1, 1, 1)
+        else:
+            boundary = date(cursor.year, next_boundary_month, 1)
+        stop = min(boundary, end_exclusive)
         windows.append((cursor, stop))
         cursor = stop
     return windows
@@ -177,25 +192,66 @@ def _contains_href(value: Any) -> bool:
     return False
 
 
-def request_json(url: str, timeout: float) -> tuple[bytes, dict[str, Any]]:
+def _retry_delay(retry_index: int, headers: Any = None) -> float:
+    """Return bounded Retry-After or exponential backoff delay in seconds."""
+    retry_after = None
+    if headers is not None:
+        try:
+            retry_after = float(headers.get("Retry-After", ""))
+        except (TypeError, ValueError):
+            retry_after = None
+    if retry_after is None or not math.isfinite(retry_after):
+        retry_after = min(0.5 * (2 ** retry_index), 4.0)
+    return min(max(retry_after, 0.0), RETRY_AFTER_CAP_SECONDS)
+
+
+def request_json(
+    url: str,
+    timeout: float,
+    max_retries: int = 2,
+) -> tuple[bytes, dict[str, Any], int]:
+    """Fetch and strictly parse one page, retrying only bounded transient failures."""
     if _redacted_url(url) is None:
         raise ODataError("OData request URL is not on the approved HTTPS host")
-    request = Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT}, method="GET")
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            raw = response.read()
-    except HTTPError as exc:
-        excerpt = exc.read(300).decode("utf-8", errors="replace")
-        raise ODataError(f"OData HTTP {exc.code}; response excerpt: {excerpt}") from exc
-    except (URLError, TimeoutError, OSError) as exc:
-        raise ODataError(f"OData request failed ({type(exc).__name__}): {exc}") from exc
-    try:
-        parsed = strict_json_loads(raw)
-    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
-        raise ODataError("OData returned malformed, ambiguous, or non-standard JSON") from exc
-    if not isinstance(parsed, dict) or not isinstance(parsed.get("value"), list):
-        raise ODataError("OData response must be an object containing a value array")
-    return raw, parsed
+    if type(max_retries) is not int or not 0 <= max_retries <= MAX_RETRIES:
+        raise ODataError(f"max_retries must be an integer from 0 to {MAX_RETRIES}")
+
+    for attempt_index in range(max_retries + 1):
+        request = Request(
+            url,
+            headers={"Accept": "application/json", "User-Agent": USER_AGENT},
+            method="GET",
+        )
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                raw = response.read()
+        except HTTPError as exc:
+            excerpt = exc.read(300).decode("utf-8", errors="replace")
+            if exc.code in RETRYABLE_HTTP_STATUSES and attempt_index < max_retries:
+                time.sleep(_retry_delay(attempt_index, exc.headers))
+                continue
+            raise ODataError(
+                f"OData HTTP {exc.code} after {attempt_index + 1} attempt(s); "
+                f"response excerpt: {excerpt}"
+            ) from exc
+        except (URLError, TimeoutError, OSError) as exc:
+            if attempt_index < max_retries:
+                time.sleep(_retry_delay(attempt_index))
+                continue
+            raise ODataError(
+                f"OData request failed after {attempt_index + 1} attempt(s) "
+                f"({type(exc).__name__}): {exc}"
+            ) from exc
+
+        try:
+            parsed = strict_json_loads(raw)
+        except (UnicodeDecodeError, ValueError, RecursionError) as exc:
+            raise ODataError("OData returned malformed, ambiguous, or non-standard JSON") from exc
+        if not isinstance(parsed, dict) or not isinstance(parsed.get("value"), list):
+            raise ODataError("OData response must be an object containing a value array")
+        return raw, parsed, attempt_index + 1
+
+    raise ODataError("OData request retries exhausted unexpectedly")
 
 
 def summarize_product(product: Any, profile: dict[str, str]) -> dict[str, Any]:
@@ -232,13 +288,16 @@ def inventory_query(
     limit: int,
     max_pages: int,
     timeout: float,
+    max_retries: int = 2,
 ) -> dict[str, Any]:
     if _redacted_url(endpoint) is None or urlparse(endpoint).path.rstrip("/") != "/odata/v1/Products":
         raise ODataError(f"endpoint must be HTTPS on {ALLOWED_HOST}/odata/v1/Products")
     if not 1 <= limit <= 100:
         raise ODataError("page limit must be from 1 to 100")
-    if max_pages < 1 or timeout <= 0:
-        raise ODataError("max_pages and timeout must be positive")
+    if max_pages < 1 or not math.isfinite(timeout) or timeout <= 0:
+        raise ODataError("max_pages and timeout must be positive and finite")
+    if type(max_retries) is not int or not 0 <= max_retries <= MAX_RETRIES:
+        raise ODataError(f"max_retries must be an integer from 0 to {MAX_RETRIES}")
 
     filter_text = build_filter(profile, bbox, start, end_exclusive)
     params = {
@@ -260,13 +319,14 @@ def inventory_query(
         if len(page_records) >= max_pages:
             raise ODataError(f"page limit ({max_pages}) reached while nextLink may remain; query is incomplete")
         seen_urls.add(current_url)
-        raw, response = request_json(current_url, timeout)
+        raw, response, request_attempts = request_json(current_url, timeout, max_retries)
         features = response["value"]
         page_records.append({
             "page": len(page_records) + 1,
             "request_url_redacted": _redacted_url(current_url),
             "request_url_sha256": sha256_bytes(current_url.encode("utf-8")),
             "response_sha256": sha256_bytes(raw),
+            "request_attempts": request_attempts,
             "feature_count": len(features),
         })
         for product in features:
@@ -310,7 +370,7 @@ def verify_inventory(document: Any) -> list[str]:
         return ["inventory: root must be an object"]
     required = {
         "schema_version", "generated_at_utc", "catalogue_endpoint", "scope", "queries",
-        "overall_claim_ceiling", "inventory_manifest_sha256",
+        "request_policy", "overall_claim_ceiling", "inventory_manifest_sha256",
     }
     if set(document) != required:
         errors.append("inventory: root keys do not match the declared OData inventory shape")
@@ -323,7 +383,7 @@ def verify_inventory(document: Any) -> list[str]:
     elif sha256_json(unsigned) != manifest:
         errors.append("inventory_manifest_sha256: digest does not match document")
 
-    if document.get("schema_version") != "water-leak-odata-inventory/v1":
+    if document.get("schema_version") != "water-leak-odata-inventory/v2":
         errors.append("schema_version: unsupported OData inventory schema")
     endpoint = document.get("catalogue_endpoint", "")
     if (
@@ -335,6 +395,33 @@ def verify_inventory(document: Any) -> list[str]:
     if not isinstance(scope, dict):
         errors.append("scope: must be an object")
         return errors
+    window_months = scope.get("window_months")
+    if type(window_months) is not int or window_months not in SUPPORTED_WINDOW_MONTHS:
+        errors.append(f"scope.window_months: must be one of {SUPPORTED_WINDOW_MONTHS}")
+        window_months = 3
+
+    policy = document.get("request_policy")
+    if not isinstance(policy, dict) or set(policy) != {
+        "timeout_seconds", "max_retries", "retryable_http_statuses",
+        "backoff_strategy", "retry_after_cap_seconds",
+    }:
+        errors.append("request_policy: missing or unexpected retry/timeout fields")
+        max_retries = -1
+    else:
+        timeout_seconds = policy.get("timeout_seconds")
+        if not _finite_number(timeout_seconds) or timeout_seconds <= 0:
+            errors.append("request_policy.timeout_seconds: must be finite and positive")
+        max_retries = policy.get("max_retries")
+        if type(max_retries) is not int or not 0 <= max_retries <= MAX_RETRIES:
+            errors.append(f"request_policy.max_retries: must be an integer from 0 to {MAX_RETRIES}")
+            max_retries = -1
+        if policy.get("retryable_http_statuses") != list(RETRYABLE_HTTP_STATUSES):
+            errors.append("request_policy.retryable_http_statuses: does not match the bounded transient status list")
+        if policy.get("backoff_strategy") != "bounded-exponential":
+            errors.append("request_policy.backoff_strategy: unsupported strategy")
+        if policy.get("retry_after_cap_seconds") != RETRY_AFTER_CAP_SECONDS:
+            errors.append("request_policy.retry_after_cap_seconds: does not match the supported cap")
+
     bbox = scope.get("bbox_wgs84")
     bbox_valid = (
         isinstance(bbox, list)
@@ -364,7 +451,7 @@ def verify_inventory(document: Any) -> list[str]:
 
     expected = []
     for profile in PROFILES:
-        for window_start, window_end in query_windows(start, end):
+        for window_start, window_end in query_windows(start, end, window_months):
             expected.append((profile, window_start, window_end))
     actual_keys = []
     for query_index, query in enumerate(queries):
@@ -419,6 +506,9 @@ def verify_inventory(document: Any) -> list[str]:
                     errors.append(f"{pfx}.{digest_name}: invalid SHA-256")
             if _redacted_url_is_safe_redacted(page.get("request_url_redacted")) is False:
                 errors.append(f"{pfx}.request_url_redacted: must be query-free HTTPS URL on the approved host")
+            attempts = page.get("request_attempts")
+            if type(attempts) is not int or not 1 <= attempts <= max_retries + 1:
+                errors.append(f"{pfx}.request_attempts: must be from 1 to max_retries + 1")
             count = page.get("feature_count")
             if type(count) is not int or count < 0:
                 errors.append(f"{pfx}.feature_count: must be non-negative integer")
@@ -481,9 +571,24 @@ def _redacted_url_is_safe_redacted(value: Any) -> bool:
     )
 
 
-def build_document(bbox: list[float], start: date, end: date, queries: list[dict[str, Any]]) -> dict[str, Any]:
+def build_document(
+    bbox: list[float],
+    start: date,
+    end: date,
+    queries: list[dict[str, Any]],
+    *,
+    window_months: int = 3,
+    timeout_seconds: float = 30.0,
+    max_retries: int = 2,
+) -> dict[str, Any]:
+    if window_months not in SUPPORTED_WINDOW_MONTHS:
+        raise ODataError(f"window_months must be one of {SUPPORTED_WINDOW_MONTHS}")
+    if not _finite_number(timeout_seconds) or timeout_seconds <= 0:
+        raise ODataError("timeout_seconds must be finite and positive")
+    if type(max_retries) is not int or not 0 <= max_retries <= MAX_RETRIES:
+        raise ODataError(f"max_retries must be an integer from 0 to {MAX_RETRIES}")
     document: dict[str, Any] = {
-        "schema_version": "water-leak-odata-inventory/v1",
+        "schema_version": "water-leak-odata-inventory/v2",
         "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "catalogue_endpoint": DEFAULT_ENDPOINT,
         "scope": {
@@ -491,8 +596,16 @@ def build_document(bbox: list[float], start: date, end: date, queries: list[dict
             "start_date_inclusive": start.isoformat(),
             "end_date_inclusive": end.isoformat(),
             "study_area_status": "reconnaissance_only_unless_separately_approved",
+            "window_months": window_months,
         },
         "queries": queries,
+        "request_policy": {
+            "timeout_seconds": timeout_seconds,
+            "max_retries": max_retries,
+            "retryable_http_statuses": list(RETRYABLE_HTTP_STATUSES),
+            "backoff_strategy": "bounded-exponential",
+            "retry_after_cap_seconds": RETRY_AFTER_CAP_SECONDS,
+        },
         "overall_claim_ceiling": (
             "OData catalogue discovery only. Product listing/footprint intersection does not establish "
             "raster suitability, continuous coverage, leak evidence, model performance or commercial-use rights."
@@ -509,7 +622,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--end", type=parse_date)
     parser.add_argument("--limit", type=int, default=100)
     parser.add_argument("--max-pages", type=int, default=100)
-    parser.add_argument("--timeout", type=float, default=45.0)
+    parser.add_argument("--timeout", type=float, default=30.0)
+    parser.add_argument("--retries", type=int, default=2, help=f"bounded retries after transient failures (0-{MAX_RETRIES})")
+    parser.add_argument("--window-months", type=int, choices=SUPPORTED_WINDOW_MONTHS, default=3)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--verify", type=Path, help="verify a previously saved OData inventory without network access")
     return parser
@@ -540,14 +655,16 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--limit must be from 1 to 100")
     if args.max_pages < 1:
         parser.error("--max-pages must be >= 1")
-    if args.timeout <= 0:
-        parser.error("--timeout must be positive")
+    if not math.isfinite(args.timeout) or args.timeout <= 0:
+        parser.error("--timeout must be finite and positive")
+    if not 0 <= args.retries <= MAX_RETRIES:
+        parser.error(f"--retries must be from 0 to {MAX_RETRIES}")
     if args.end < args.start:
         parser.error("--end must be on or after --start")
     try:
         queries = []
         for profile in PROFILES:
-            for window_start, window_end in query_windows(args.start, args.end):
+            for window_start, window_end in query_windows(args.start, args.end, args.window_months):
                 queries.append(inventory_query(
                     profile=profile,
                     bbox=args.bbox,
@@ -556,8 +673,17 @@ def main(argv: list[str] | None = None) -> int:
                     limit=args.limit,
                     max_pages=args.max_pages,
                     timeout=args.timeout,
+                    max_retries=args.retries,
                 ))
-        document = build_document(args.bbox, args.start, args.end, queries)
+        document = build_document(
+            args.bbox,
+            args.start,
+            args.end,
+            queries,
+            window_months=args.window_months,
+            timeout_seconds=args.timeout,
+            max_retries=args.retries,
+        )
         atomic_write_text(args.out, json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n")
     except (ODataError, OSError, TypeError, ValueError, RecursionError) as exc:
         print(f"OData inventory failed closed: {exc}", file=sys.stderr)
