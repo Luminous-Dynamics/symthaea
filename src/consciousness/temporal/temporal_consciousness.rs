@@ -2071,11 +2071,7 @@ mod tests {
 
         let continuity_states = analyzer.continuity.recent_states.len();
         let husserlian_retention = analyzer.husserlian.retention.len();
-        assert!(!analyzer.observe_at(
-            &BinaryHV::random(4312),
-            -f64::MAX,
-            Duration::from_secs(1),
-        ));
+        assert!(!analyzer.observe_at(&BinaryHV::random(4312), -f64::MAX, Duration::from_secs(1),));
 
         assert_eq!(analyzer.phi_trajectory.sample_count(), 1);
         assert_eq!(analyzer.continuity.recent_states.len(), continuity_states);
@@ -2536,9 +2532,21 @@ mod tests {
     fn empty_analyzer_recommends_more_continuity_and_binding_evidence() {
         let analyzer = TemporalConsciousnessAnalyzer::default_config();
         let recommendations = analyzer.generate_recommendations();
-        assert!(recommendations.iter().any(|r| r.contains("Continuity evidence pending")));
-        assert!(recommendations.iter().any(|r| r.contains("Temporal binding evidence pending")));
-        assert!(!recommendations.iter().any(|r| r.contains("Temporal consciousness is healthy")));
+        assert!(
+            recommendations
+                .iter()
+                .any(|r| r.contains("Continuity evidence pending"))
+        );
+        assert!(
+            recommendations
+                .iter()
+                .any(|r| r.contains("Temporal binding evidence pending"))
+        );
+        assert!(
+            !recommendations
+                .iter()
+                .any(|r| r.contains("Temporal consciousness is healthy"))
+        );
     }
 
     #[test]
