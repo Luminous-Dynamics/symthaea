@@ -5,7 +5,7 @@
 //!
 //! Uses atom-centered grids with:
 //! - Radial: Gauss-Chebyshev (Becke 1988) mapping [0,∞) → [-1,1]
-//! - Angular: Lebedev quadrature (6, 14, 26, or 50 point grids)
+//! - Angular: normalized Lebedev quadrature (6, 26, 50, or 302 points)
 //! - Partitioning: Becke's fuzzy cell scheme (1988)
 //!
 //! References:
@@ -39,6 +39,9 @@ pub enum GridQuality {
     Medium,
     /// Fine: 50 radial × 50 angular = 2500 points/atom
     Fine,
+    /// High accuracy: 75 radial × 302 angular = 22,650 points/atom.
+    /// Uses the degree-29 Lebedev–Laikov angular rule.
+    HighAccuracy,
 }
 
 impl DftGrid {
@@ -48,6 +51,7 @@ impl DftGrid {
             GridQuality::Coarse => (20, lebedev_6()),
             GridQuality::Medium => (35, lebedev_26()),
             GridQuality::Fine => (50, lebedev_50()),
+            GridQuality::HighAccuracy => (75, lebedev_302()),
         };
 
         let mut points = Vec::new();
@@ -326,6 +330,117 @@ fn lebedev_50() -> Vec<(f64, f64, f64, f64)> {
     pts
 }
 
+/// Expand a symmetry orbit from the Lebedev–Laikov tables.
+/// The orbit code follows PySCF's SphGenOh convention: 0 (axes), 2 (cube
+/// corners), 3 (two equal coordinates), 4 (one zero coordinate), and 5
+/// (three distinct coordinates). We emit normalized weights summing to 1;
+/// the radial quadrature supplies the missing 4π solid-angle factor.
+fn lebedev_orbit(code: u8, a: f64, b: f64, weight: f64) -> Vec<(f64, f64, f64, f64)> {
+    let mut points = Vec::new();
+    let signs = [1.0_f64, -1.0_f64];
+
+    match code {
+        0 => {
+            points.extend([
+                (1.0, 0.0, 0.0, weight),
+                (-1.0, 0.0, 0.0, weight),
+                (0.0, 1.0, 0.0, weight),
+                (0.0, -1.0, 0.0, weight),
+                (0.0, 0.0, 1.0, weight),
+                (0.0, 0.0, -1.0, weight),
+            ]);
+        }
+        2 => {
+            let t = 1.0 / 3.0_f64.sqrt();
+            for &sx in &signs {
+                for &sy in &signs {
+                    for &sz in &signs {
+                        points.push((sx * t, sy * t, sz * t, weight));
+                    }
+                }
+            }
+        }
+        3 => {
+            let c = (1.0 - 2.0 * a * a).sqrt();
+            for &sx in &signs {
+                for &sy in &signs {
+                    for &sz in &signs {
+                        points.push((sx * a, sy * a, sz * c, weight));
+                        points.push((sx * a, sy * c, sz * a, weight));
+                        points.push((sx * c, sy * a, sz * a, weight));
+                    }
+                }
+            }
+        }
+        4 => {
+            let c = (1.0 - a * a).sqrt();
+            for &sa in &signs {
+                for &sb in &signs {
+                    points.extend([
+                        (sa * a, sb * c, 0.0, weight),
+                        (sa * a, 0.0, sb * c, weight),
+                        (0.0, sa * a, sb * c, weight),
+                        (sb * c, sa * a, 0.0, weight),
+                        (sb * c, 0.0, sa * a, weight),
+                        (0.0, sb * c, sa * a, weight),
+                    ]);
+                }
+            }
+        }
+        5 => {
+            let c = (1.0 - a * a - b * b).sqrt();
+            for &sa in &signs {
+                for &sb in &signs {
+                    for &sc in &signs {
+                        points.extend([
+                            (sa * a, sb * b, sc * c, weight),
+                            (sa * a, sb * c, sc * b, weight),
+                            (sa * b, sb * a, sc * c, weight),
+                            (sa * b, sb * c, sc * a, weight),
+                            (sa * c, sb * a, sc * b, weight),
+                            (sa * c, sb * b, sc * a, weight),
+                        ]);
+                    }
+                }
+            }
+        }
+        _ => unreachable!("unsupported Lebedev orbit code"),
+    }
+    points
+}
+
+/// 302-point Lebedev–Laikov degree-29 angular quadrature.
+/// Orbit parameters are tabulated in PySCF's pyscf/dft/LebedevGrid.py
+/// (MakeAngularGrid_302 / SphGenOh) and independently available in
+/// Burkardt's public-domain sphere_lebedev_rule/lebedev_029.txt data.
+/// Angular weights are normalized to sum to 1. This denser rule is opt-in:
+/// it materially increases integration cost compared with the legacy presets.
+fn lebedev_302() -> Vec<(f64, f64, f64, f64)> {
+    // Each tuple is (orbit code, a, b, normalized weight).
+    // Constants are kept at their source-table precision.
+    let orbits: &[(u8, f64, f64, f64)] = &[
+        (0, 0.0, 0.0, 0.8545911725128148e-3),
+        (2, 0.0, 0.0, 0.3599119285025571e-2),
+        (3, 0.3515640345570105e+0, 0.0, 0.3449788424305883e-2),
+        (3, 0.6566329410219612e+0, 0.0, 0.3604822601419882e-2),
+        (3, 0.4729054132581005e+0, 0.0, 0.3576729661743367e-2),
+        (3, 0.9618308522614784e-1, 0.0, 0.2352101413689164e-2),
+        (3, 0.2219645236294178e+0, 0.0, 0.3108953122413675e-2),
+        (3, 0.7011766416089545e+0, 0.0, 0.3650045807677255e-2),
+        (4, 0.2644152887060663e+0, 0.0, 0.2982344963171804e-2),
+        (4, 0.5718955891878961e+0, 0.0, 0.3600820932216460e-2),
+        (5, 0.2510034751770465e+0, 0.8000727494073952e+0, 0.3571540554273387e-2),
+        (5, 0.1233548532583327e+0, 0.4127724083168531e+0, 0.3392312205006170e-2),
+    ];
+
+    let mut points = Vec::with_capacity(302);
+    for &(code, a, b, weight) in orbits {
+        points.extend(lebedev_orbit(code, a, b, weight));
+    }
+    debug_assert_eq!(points.len(), 302);
+    points
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -435,6 +550,28 @@ mod tests {
             .sum()
     }
 
+    fn odd_double_factorial(n: i32) -> f64 {
+        let mut product = 1.0;
+        let mut factor = 1;
+        while factor <= n {
+            product *= factor as f64;
+            factor += 2;
+        }
+        product
+    }
+
+    /// Exact moment under the normalized uniform-sphere measure, for even
+    /// exponents: E[x^(2a)y^(2b)z^(2c)] = ((2a-1)!!(2b-1)!!(2c-1)!!)
+    /// / (2(a+b+c)+1)!!.
+    fn exact_normalized_sphere_moment(powers: [i32; 3]) -> f64 {
+        assert!(powers.iter().all(|power| *power >= 0 && power % 2 == 0));
+        let [a, b, c] = [powers[0] / 2, powers[1] / 2, powers[2] / 2];
+        odd_double_factorial(2 * a - 1)
+            * odd_double_factorial(2 * b - 1)
+            * odd_double_factorial(2 * c - 1)
+            / odd_double_factorial(2 * (a + b + c) + 1)
+    }
+
     fn assert_spherical_moment(
         pts: &[(f64, f64, f64, f64)],
         powers: [i32; 3],
@@ -503,6 +640,67 @@ mod tests {
     }
 
     #[test]
+    fn test_lebedev_302_degree_29_even_moments() {
+        let pts = lebedev_302();
+        assert_eq!(pts.len(), 302, "Lebedev-302 must contain exactly 302 nodes");
+
+        let weight_sum: f64 = pts.iter().map(|point| point.3).sum();
+        assert!(
+            (weight_sum - 1.0).abs() < 1e-12,
+            "normalized Lebedev-302 weights sum to {weight_sum}"
+        );
+        for (index, point) in pts.iter().enumerate() {
+            assert!(
+                point.3.is_finite() && point.3 > 0.0,
+                "Lebedev-302 point {index} has invalid weight {}",
+                point.3
+            );
+        }
+
+        // Exhaust every even monomial through total degree 28 (680 analytic
+        // moments). The published rule is degree-29 exact; all odd moments
+        // vanish by its sign symmetry, so these are the non-trivial moments.
+        for a in 0_i32..=14 {
+            for b in 0_i32..=(14 - a) {
+                for c in 0_i32..=(14 - a - b) {
+                    let powers = [2 * a, 2 * b, 2 * c];
+                    let exact = exact_normalized_sphere_moment(powers);
+                    assert_spherical_moment(&pts, powers, exact, "Lebedev-302 (degree 29)");
+                }
+            }
+        }
+
+        for powers in [[29, 0, 0], [17, 4, 2], [9, 7, 1], [1, 14, 14]] {
+            assert_spherical_moment(&pts, powers, 0.0, "Lebedev-302 odd-parity moment");
+        }
+    }
+
+    #[test]
+    fn test_lebedev_302_points_are_unique_and_on_the_unit_sphere() {
+        let pts = lebedev_302();
+        for (index, &(x, y, z, _)) in pts.iter().enumerate() {
+            let norm_squared = x * x + y * y + z * z;
+            assert!(
+                (norm_squared - 1.0).abs() < 1e-12,
+                "Lebedev-302 point {index} has squared norm {norm_squared}"
+            );
+        }
+
+        for i in 0..pts.len() {
+            for j in (i + 1)..pts.len() {
+                let dx = pts[i].0 - pts[j].0;
+                let dy = pts[i].1 - pts[j].1;
+                let dz = pts[i].2 - pts[j].2;
+                let distance_squared = dx * dx + dy * dy + dz * dz;
+                assert!(
+                    distance_squared > 1e-12,
+                    "Lebedev-302 duplicate points at indices {i} and {j}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_lebedev_6_identities() {
         check_lebedev_identities(&lebedev_6(), "lebedev_6");
     }
@@ -546,6 +744,7 @@ mod tests {
             (GridQuality::Coarse, 5e-4),
             (GridQuality::Medium, 5e-6),
             (GridQuality::Fine, 1e-7),
+            (GridQuality::HighAccuracy, 1e-8),
         ];
         let alphas = [0.25_f64, 0.5, 1.0, 2.0, 4.0];
 
