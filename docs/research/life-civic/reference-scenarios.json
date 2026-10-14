@@ -123,16 +123,18 @@
       "expected": {
         "disposition": "official_source_conflict_requires_review",
         "must_distinguish": [
-          "official issuer identity",
-          "different page content",
-          "publication or retrieval date",
-          "turnaround target versus guaranteed response",
-          "source conflict versus proof that either source is false"
+          "official source-claim conflict",
+          "routing conflict about which institution or destination to use",
+          "stated turnaround target versus a guaranteed response time",
+          "retrieval date and possible source-update divergence",
+          "conflicting evidence versus proof that either source is false"
         ],
         "prohibited_claims": [
           "the applicable current turnaround target is definitively 12 hours",
           "the applicable current turnaround target is definitively 24 hours",
-          "one official page may silently override the conflicting official page"
+          "one official page may silently override the conflicting official page",
+          "the route itself is necessarily conflicted because turnaround targets disagree",
+          "one official page must be false solely because another official page differs"
         ],
         "effects_requested": false
       }
