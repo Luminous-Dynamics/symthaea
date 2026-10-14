@@ -4876,13 +4876,15 @@ mod tests {
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // AUTONOMOUS INVARIANT DISCOVERY (zero human guidance)
+    // AUTONOMOUS INVARIANT DISCOVERY — PRIMED BENCHMARK
     // ════════════════════════════════════════════════════════════════════
 
-    /// THE AUTOMATED PHYSICIST: give it ONLY an ODE. No candidates. No hints.
-    /// Can it discover E = x² + v² from scratch?
+    /// The automated physicist benchmark. This is a PRIMED search because the
+    /// default autonomous discoverer injects built-in invariant templates into
+    /// its initial population. It therefore measures autonomous optimization and
+    /// rediscovery, not a cold no-prior discovery.
     #[test]
-    fn test_autonomous_discovery_harmonic() {
+    fn test_primed_discovery_harmonic() {
         let dynamics = vec![
             ("x", SymExpr::Var("v".into())),
             ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
