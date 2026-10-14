@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "status": "research_fixture",
   "scenario_file": "docs/research/life-civic/reference-scenarios.json",
-  "scenario_git_blob_sha1": "8397393b855a7ae94415188d2031874c85ed2375",
+  "scenario_git_blob_sha1": "209a9701fab0742a8a87325aaf3f2cc02c9dfb07",
   "digest_semantics": "Git blob SHA-1 binds exact repository object bytes for drift detection. It is not a signature, source-authenticity proof, or independent collision-resistant trust claim.",
   "claim_ceiling": [
     "The scenario document is the pinned reference input for this branch revision.",
@@ -19,6 +19,8 @@
     "source-claim conflict necessarily establishes routing conflict",
     "disagreement alone proves an official source false",
     "a dated source observation proves when the system retrieved the source",
-    "synthetic fixture evidence may be represented as a captured source"
+    "synthetic fixture evidence may be represented as a captured source",
+    "purpose-labelled official contact channels are interchangeable without source evidence",
+    "a candidate contact channel proves that a civic request was submitted"
   ]
 }
