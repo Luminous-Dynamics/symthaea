@@ -410,11 +410,11 @@ class ChoroInputManifestTests(unittest.TestCase):
             manifest["sources"][0]["rights_review"]["reviewed_on"] = "2026-10-13"
             manifest_path = root / "manifest.json"
             approval_path = root / "approval.json"
-            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
             manifest_path.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
             approval_path.write_text(
-                json.dumps(approval, indent=2) + "\\n", encoding="utf-8"
+                json.dumps(approval, indent=2) + "\n", encoding="utf-8"
             )
             report = evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
             self.assertFalse(report["authorized"])
