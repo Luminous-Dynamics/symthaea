@@ -34,6 +34,8 @@ jobs:
           jq -e '
             .suite_id == "SYM-LIFE-CIVIC-REFERENCE-001" and
             .version == "0.1.0" and
+            ([.required_outputs[]] | index("source_retrieval_state_and_timestamp") != null) and
+            all(.cases[]; (.expected.must_distinguish | index("source retrieval time versus publication/event time") != null)) and
             .status == "research_fixture" and
             .scenario_file == "docs/research/life-civic/reference-scenarios.json" and
             (.scenario_git_blob_sha1 | test("^[0-9a-f]{40}$"))
