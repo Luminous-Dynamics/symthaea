@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -83,6 +84,30 @@ def approved_fixture() -> tuple[dict, dict]:
 
 
 class ChoroInputManifestTests(unittest.TestCase):
+    def test_cli_requires_authorization_for_source_bound_analysis(self) -> None:
+        script = ROOT / "scripts/muse_choro_input_manifest.py"
+        checked = subprocess.run(
+            [sys.executable, str(script), "--check"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        report = json.loads(checked.stdout)
+        self.assertFalse(report["authorized"])
+        self.assertEqual(report["authorization_status"], "blocked")
+
+        required = subprocess.run(
+            [sys.executable, str(script), "--require-authorized"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(required.returncode, 1)
+        self.assertIn("BLOCKED: no source-bound analysis authorization", required.stderr)
+
     def test_repository_template_is_valid_but_blocked(self) -> None:
         report = evaluate_manifest(MANIFEST_TEMPLATE, APPROVAL_TEMPLATE, INTAKE)
         self.assertFalse(report["authorized"])
