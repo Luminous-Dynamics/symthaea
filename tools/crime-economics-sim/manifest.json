@@ -6,16 +6,16 @@
   "generated_on": "2026-10-14",
   "purpose": "Pin the exact source bytes for an effects-disabled aggregate synthetic evaluator and its independent output verifier.",
   "model_dimensions": {
-    "population_equivalents": 1000,
     "weeks": 52,
     "replications_per_scenario_policy_cell": 32,
-    "scenario_count": 6,
+    "scenario_count": 7,
     "policy_count": 5,
-    "expected_data_rows": 960,
-    "expected_tsv_lines_including_header": 961,
+    "expected_data_rows": 1120,
+    "expected_tsv_lines_including_header": 1121,
     "uses_person_level_records": false,
     "network_access": false,
-    "external_effects": false
+    "external_effects": false,
+    "household_equivalents": 1000
   },
   "files": [
     {
@@ -28,7 +28,7 @@
     },
     {
       "path": "tools/crime-economics-sim/src/lib.rs",
-      "git_blob_sha1": "84297658f2173634bb2b7ea5936858ca8343fa84"
+      "git_blob_sha1": "fbda5e68c40f1a328f4a1c88bf6022efd5dc1598"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/simulate.rs",
@@ -36,15 +36,15 @@
     },
     {
       "path": "tools/crime-economics-sim/src/bin/verify.rs",
-      "git_blob_sha1": "6035324c0b86f8db2283bea7b062bc14ece379e8"
+      "git_blob_sha1": "50835ad73c3b1c8022258c5f9b893985ecfb7eab"
     },
     {
       "path": "tools/crime-economics-sim/README.md",
-      "git_blob_sha1": "a359b8f4705d4fe548e6e598580372b615a3fc6f"
+      "git_blob_sha1": "94efa498560b83b661c06f9fe7435c2cace4d08b"
     },
     {
       "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
-      "git_blob_sha1": "be7cbd5da33020c6b37bdd45f90ae504234592d5"
+      "git_blob_sha1": "034c7674c32c771a715b7891b2d7fde5e2163e45"
     }
   ],
   "scenario_ids": [
@@ -53,7 +53,8 @@
     "reporting_suppression",
     "concentrated_automation",
     "high_robot_compromise",
-    "unequal_essential_access"
+    "unequal_essential_access",
+    "low_robot_effectiveness"
   ],
   "policy_ids": [
     "baseline",
@@ -73,8 +74,8 @@
     "opportunity_property_events_local",
     "non_economic_harm_events",
     "displaced_property_events",
-    "true_crime_events_total",
-    "reported_crime_reports",
+    "simulated_harm_events_total",
+    "reported_harm_events",
     "false_alarms",
     "robot_compromise_weeks",
     "robot_safety_incidents",
