@@ -72,7 +72,7 @@ pub struct ViabilityRow {
     pub scenario_gate_status: String,
 }
 
-pub const SCENARIOS: [Scenario; 10] = [
+pub static SCENARIOS: [Scenario; 10] = [
     Scenario { id: "baseline", evidence_status: "usable", evidence_age_days: 30 },
     Scenario { id: "high_mean_low_floor", evidence_status: "usable", evidence_age_days: 30 },
     Scenario { id: "opportunity_without_quality", evidence_status: "usable", evidence_age_days: 30 },
