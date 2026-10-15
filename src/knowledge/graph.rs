@@ -272,9 +272,11 @@ impl EnhancedKnowledgeGraph {
 
     /// Search using typed role-bound query observations.
     ///
-    /// Each query term can match only one stored observation and each stored
-    /// observation can satisfy only one query term. This preserves same-role
-    /// multiplicity: one stored Agent cannot satisfy two distinct Agent terms.
+    /// A deterministic maximum-cardinality one-to-one matcher ensures each
+    /// query term and stored observation is used at most once. It uses augmenting
+    /// paths so a locally highest-scoring pair cannot reduce overall query coverage.
+    /// This preserves same-role multiplicity: one stored Agent cannot satisfy two
+    /// distinct Agent terms.
     ///
     /// Only same-role pairs with bipolar cosine similarity >= 0.1 are matched.
     /// Similarity is a retrieval signal; confidence remains a separate field
@@ -298,7 +300,7 @@ impl EnhancedKnowledgeGraph {
                 continue;
             }
 
-            let mut candidate_pairs = Vec::new();
+            let mut candidates_by_query = vec![Vec::new(); query.len()];
             for (query_index, query_term) in query.iter().enumerate() {
                 for (observation_index, observation) in observations.iter().enumerate() {
                     if query_term.role != observation.role {
@@ -306,31 +308,35 @@ impl EnhancedKnowledgeGraph {
                     }
                     let similarity = query_term.vector.cosine_similarity(&observation.vector);
                     if similarity >= MIN_ROLE_MATCH_COSINE {
-                        candidate_pairs.push((similarity, query_index, observation_index));
+                        candidates_by_query[query_index].push((observation_index, similarity));
                     }
                 }
             }
 
-            candidate_pairs.sort_by(|a, b| {
-                b.0.partial_cmp(&a.0)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-                    .then_with(|| a.1.cmp(&b.1))
-                    .then_with(|| a.2.cmp(&b.2))
-            });
-
-            let mut query_used = vec![false; query.len()];
-            let mut observation_used = vec![false; observations.len()];
+            // Search high-similarity edges first, but permit reassignment through
+            // augmenting paths so a locally best edge cannot reduce total coverage.
+            for candidates in &mut candidates_by_query {
+                candidates.sort_by(|a, b| {
+                    b.1.partial_cmp(&a.1)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.0.cmp(&b.0))
+                });
+            }
+            let observation_to_query =
+                maximum_cardinality_matching(&candidates_by_query, observations.len());
             let mut matched_query_terms = 0usize;
             let mut total_similarity = 0.0f32;
 
-            for (similarity, query_index, observation_index) in candidate_pairs {
-                if query_used[query_index] || observation_used[observation_index] {
-                    continue;
+            for (observation_index, query_index) in observation_to_query.iter().enumerate() {
+                if let Some(query_index) = query_index {
+                    if let Some((_, similarity)) = candidates_by_query[*query_index]
+                        .iter()
+                        .find(|(candidate_index, _)| *candidate_index == observation_index)
+                    {
+                        matched_query_terms += 1;
+                        total_similarity += similarity;
+                    }
                 }
-                query_used[query_index] = true;
-                observation_used[observation_index] = true;
-                matched_query_terms += 1;
-                total_similarity += similarity;
             }
 
             if matched_query_terms > 0 {
@@ -915,6 +921,54 @@ impl EnhancedKnowledgeGraph {
     }
 }
 
+fn maximum_cardinality_matching(
+    candidates_by_query: &[Vec<(usize, f32)>],
+    observation_count: usize,
+) -> Vec<Option<usize>> {
+    fn augment(
+        query_index: usize,
+        candidates_by_query: &[Vec<(usize, f32)>],
+        observation_to_query: &mut [Option<usize>],
+        seen_observations: &mut [bool],
+    ) -> bool {
+        for &(observation_index, _) in &candidates_by_query[query_index] {
+            if observation_index >= observation_to_query.len()
+                || seen_observations[observation_index]
+            {
+                continue;
+            }
+            seen_observations[observation_index] = true;
+
+            let can_assign = match observation_to_query[observation_index] {
+                None => true,
+                Some(previous_query) => augment(
+                    previous_query,
+                    candidates_by_query,
+                    observation_to_query,
+                    seen_observations,
+                ),
+            };
+            if can_assign {
+                observation_to_query[observation_index] = Some(query_index);
+                return true;
+            }
+        }
+        false
+    }
+
+    let mut observation_to_query = vec![None; observation_count];
+    for query_index in 0..candidates_by_query.len() {
+        let mut seen_observations = vec![false; observation_count];
+        let _ = augment(
+            query_index,
+            candidates_by_query,
+            &mut observation_to_query,
+            &mut seen_observations,
+        );
+    }
+    observation_to_query
+}
+
 fn contains_negation(text: &str) -> bool {
     let markers = [
         "not ",
@@ -1099,6 +1153,17 @@ mod tests {
         assert!((after[0].confidence - before[0].confidence).abs() < f32::EPSILON);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_role_matcher_uses_augmenting_paths_to_maximize_coverage() {
+        // A greedy global-edge walk would take query 0 -> observation 0 (0.9),
+        // leaving query 1 unmatched. Reassignment should find the full solution:
+        // query 0 -> observation 1 and query 1 -> observation 0.
+        let candidates_by_query = vec![vec![(0, 0.9), (1, 0.2)], vec![(0, 0.8)]];
+        let observation_to_query = maximum_cardinality_matching(&candidates_by_query, 2);
+
+        assert_eq!(observation_to_query, vec![Some(1), Some(0)]);
     }
 
     #[test]
