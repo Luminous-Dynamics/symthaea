@@ -233,14 +233,21 @@ impl CausalKnowledgeBridge {
         self.total_edges_discovered
     }
 
-    /// Import a causal edge directly from persistence (cause, effect, strength).
+    /// Import a complete persisted edge observation without reconstructing semantics
+    /// from its strength sign or discarding source/negation/time metadata.
+    pub fn import_edge_record(&mut self, edge: CausalEdge) {
+        self.add_edge(edge);
+    }
+
+    /// Legacy import API for signed-strength triples.
     ///
-    /// Used during startup to restore edges from SQLite.
+    /// New persistence callers should use `import_edge_record` with the complete
+    /// observation record instead.
     pub fn import_edge(&mut self, cause: String, effect: String, strength: f32) {
         let edge = CausalEdge {
             cause,
             effect,
-            strength,
+            strength: strength.abs(),
             is_inhibitory: strength < 0.0,
             is_negated: false,
             source_text: String::new(),
@@ -249,11 +256,12 @@ impl CausalKnowledgeBridge {
         self.add_edge(edge);
     }
 
-    /// Export edges as (cause, effect, strength) triples for persistence.
+    /// Export all edge observations with their original semantic and provenance fields.
     ///
-    /// Alias for `export_edges()` used by the KnowledgeManager persistence snapshot.
-    pub fn export_edge_records(&self) -> Vec<(String, String, f32)> {
-        self.export_edges()
+    /// Unlike `export_edges()`, this does not filter negated relations or encode
+    /// inhibitory polarity by negating the confidence/strength number.
+    pub fn export_edge_records(&self) -> Vec<CausalEdge> {
+        self.edges.clone()
     }
 
     /// Update the strength of an existing causal edge based on prediction outcome.
@@ -636,6 +644,43 @@ mod tests {
         let exported = bridge.export_edges();
         assert_eq!(exported.len(), 1);
         assert!(exported[0].2 < 0.0); // Inhibitory = negative strength
+    }
+
+    #[test]
+    fn test_full_edge_record_round_trip_preserves_semantics() {
+        let original = CausalEdge {
+            cause: "ceasefire".into(),
+            effect: "escalation".into(),
+            strength: 0.7,
+            is_inhibitory: true,
+            is_negated: true,
+            source_text: "The ceasefire did not prevent escalation.".into(),
+            discovered_at_cycle: 41,
+        };
+        let mut source = CausalKnowledgeBridge::new(10);
+        source.add_edge(original.clone());
+
+        let exported = source.export_edge_records();
+        assert_eq!(exported.len(), 1);
+        assert_eq!(exported[0].cause, original.cause);
+        assert_eq!(exported[0].effect, original.effect);
+        assert_eq!(exported[0].strength, 0.7);
+        assert!(exported[0].is_inhibitory);
+        assert!(exported[0].is_negated);
+        assert_eq!(exported[0].source_text, original.source_text);
+        assert_eq!(exported[0].discovered_at_cycle, 41);
+
+        let mut restored = CausalKnowledgeBridge::new(10);
+        for edge in exported {
+            restored.import_edge_record(edge);
+        }
+        let restored_edges = restored.export_edge_records();
+        assert_eq!(restored_edges.len(), 1);
+        assert_eq!(restored_edges[0].strength, 0.7);
+        assert!(restored_edges[0].is_inhibitory);
+        assert!(restored_edges[0].is_negated);
+        assert_eq!(restored_edges[0].source_text, original.source_text);
+        assert_eq!(restored_edges[0].discovered_at_cycle, 41);
     }
 
     #[test]
