@@ -103,6 +103,14 @@ Two candidate families were inspected through their maintainer repositories:
 
 Re-DocRED is the better first *candidate* for an offline relation-extraction evaluation, because its maintainer explicitly targets DocRED false negatives; it is **not** a drop-in role-retrieval benchmark. Relations such as knowledge-base predicates cannot be mapped automatically to the encoder's event-semantic Agent/Patient roles. A defensible adapter must preserve original head/tail direction and type labels, define any role mapping per benchmark task, prevent document leakage across splits, retain source IDs, and distinguish extraction errors from retrieval-ranking errors. Do not vendor the data into this repository until file-level licensing/attribution and data acquisition have been reviewed. This source review has not downloaded, transformed or run either corpus.
 
+## Globally weighted role assignment (2026-10-15)
+
+[PR #7499](https://github.com/Luminous-Dynamics/symthaea/pull/7499), stacked on #7494, replaces the maximum-cardinality-only assignment helper with min-cost max-flow. Its lexicographic objective is explicit: (1) maximize the count of matched query terms, then (2) maximize the sum of pairwise role-bound cosine similarities among assignments with that cardinality. Confidence does not enter the matching objective. Bellman-Ford shortest augmenting paths support negative residual-edge costs; deterministic vertex/edge iteration resolves equal-cost alternatives stably.
+
+Regression coverage contains targeted counterexamples for coverage priority, global weight choice, equal-cost determinism and malformed candidate inputs. It additionally compares the helper with an independently implemented exhaustive oracle over all 512 eligibility graphs for three query terms × three observations, using a deterministic weight matrix. A separate Python prototype of the algorithm matched the brute-force objective on all 512 graphs; this is a prototype check only, not execution of the Rust function or its tests.
+
+At exact PR #7499 head `342626bb964904c45adf01acae2e62481ecfbe8f`, CI [38787045849](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38787045849) and PR Governance [38787045759](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38787045759) are **queued**. Neither is a pass. The PR reports mergeable, but Rust tests have not been run locally. Bellman-Ford min-cost flow costs more than the previous cardinality-only matcher; query/observation-size scaling still needs measurement. This change improves the assignment objective, not semantic accuracy, source provenance or confidence calibration.
+
 ## Mycelix handoff boundary — schema-derived mapping (2026-10-15)
 
 Reviewed the current open contract branches directly:
