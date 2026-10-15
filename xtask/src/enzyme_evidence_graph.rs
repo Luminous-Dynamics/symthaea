@@ -659,6 +659,11 @@ fn validate_parameter_claims(
             "parameter {} assay_context must be a non-empty object; represent missing conditions explicitly as null/status fields",
             claim.parameter_id
         );
+        ensure!(
+            !claim.substrate_ids.is_empty(),
+            "parameter {} must identify at least one substrate; unknown substrate identity must be explicit rather than an empty list",
+            claim.parameter_id
+        );
         ensure_unique_values(&claim.substrate_ids, &format!("parameter {} substrate_ids", claim.parameter_id));
         ensure!(
             UNCERTAINTY_STATUSES.contains(&claim.uncertainty_status.as_str()),
@@ -1176,6 +1181,34 @@ mod tests {
         }]);
         let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
         assert!(error.contains("normalized_value and normalized_unit must be supplied together"));
+    }
+
+    #[test]
+    fn rejects_empty_substrate_list_in_parameter_claim() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["nodes"].as_array_mut().unwrap().push(json!({
+            "node_id": "n_reported",
+            "type": "reported_parameter_claim",
+            "evidence_class": "source_claim",
+            "artifact_ids": []
+        }));
+        graph["parameter_claims"] = json!([{
+            "parameter_id": "p1",
+            "parameter_name": "kcat",
+            "endpoint_definition": "catalytic turnover number",
+            "value": 12.4,
+            "unit": "s^-1",
+            "enzyme_form_basis": "not reported",
+            "reaction_id": "reaction-1",
+            "substrate_ids": [],
+            "assay_context": {"pH": null, "temperature_c": 25.0},
+            "kinetic_equation_id": "michaelis-menten",
+            "source_or_fit_node_id": "n_reported",
+            "uncertainty_status": "reported"
+        }]);
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("must identify at least one substrate"));
     }
 
     #[test]
