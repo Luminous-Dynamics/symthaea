@@ -1743,6 +1743,9 @@ jobs:
         run: |
           "$RUNNER_TEMP/run-receipt-venv/bin/python" -m pip install --disable-pip-version-check --requirement scripts/socioeconomic_run_receipt_requirements.txt
 
+      - name: Test strict JSON parsing
+        run: "$RUNNER_TEMP/run-receipt-venv/bin/python" -m unittest discover -s scripts -p 'test_validate_socioeconomic_run_receipt.py'
+
       - name: Validate positive fixture and reject negative controls
         run: "$RUNNER_TEMP/run-receipt-venv/bin/python" scripts/validate_socioeconomic_run_receipt.py
 
