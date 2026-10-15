@@ -19,8 +19,8 @@ const UPSTREAM_DOCS_URL: &str = "https://github.com/facebookresearch/fairchem/bl
 const UPSTREAM_ARTIFACT_URL: &str = "https://dl.fbaipublicfiles.com/opencatalystproject/data/oc22/is2res_total_train_val_test_lmdbs.tar.gz";
 const UPSTREAM_REPORTED_MD5: &str = "b35dc24e99ef3aeaee6c5c949903de94";
 const MAX_UNCOMPRESSED_ARCHIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-const MAX_TAR_MEMBERS: u64 = 250_000;
-const MAX_MEMBER_PATH_BYTES: usize = 16 * 1024;
+const MAX_TAR_MEMBERS: u64 = 100_000;
+const MAX_MEMBER_PATH_BYTES: usize = 4 * 1024;
 const UPSTREAM_REPORTED_LICENSE: &str = "CC BY 4.0 (as reported by upstream; verify the exact intended use and attribution)";
 
 #[derive(Debug, Parser)]
@@ -122,10 +122,18 @@ fn run() -> Result<ExitCode> {
         .with_context(|| format!("could not hash archive {}", cli.archive.display()))?;
     let upstream_md5_matches = hashes_before.md5.eq_ignore_ascii_case(UPSTREAM_REPORTED_MD5);
 
-    let inventory_result = inventory_tar_gz(&cli.archive);
-    let (archive_inventory, archive_inspection_error) = match inventory_result {
-        Ok(inventory) => (Some(inventory), None),
-        Err(error) => (None, Some(format!("{error:#}"))),
+    // Do not parse an archive that fails the upstream-published checksum. It is
+    // untrusted input until the expected artifact identity matches.
+    let (archive_inventory, archive_inspection_error) = if upstream_md5_matches {
+        match inventory_tar_gz(&cli.archive) {
+            Ok(inventory) => (Some(inventory), None),
+            Err(error) => (None, Some(format!("{error:#}"))),
+        }
+    } else {
+        (
+            None,
+            Some("Archive inspection skipped because the upstream-published MD5 did not match.".to_owned()),
+        )
     };
     // Re-hash after inventory so the receipt cannot silently combine a digest
     // from one version of a file with an inventory from a concurrently replaced file.
@@ -177,7 +185,7 @@ fn run() -> Result<ExitCode> {
             "The receipt status remains pending semantic schema/split review even when local artifact integrity checks pass.",
             "Upstream MD5 is checked for compatibility only; measured SHA-256 and byte size identify the local artifact more strongly.",
             "The archive is hashed before and after inventory; content changes block a clean integrity status.",
-            "Decompressed bytes and tar member counts are bounded to reduce resource-exhaustion risk from malformed archives.",
+            "Decompressed bytes, tar member counts, and member-path lengths are bounded to reduce resource-exhaustion risk from malformed archives. Archives failing the upstream checksum are not parsed.",
         ],
     };
 
