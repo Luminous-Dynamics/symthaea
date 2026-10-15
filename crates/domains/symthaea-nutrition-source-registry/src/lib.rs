@@ -73,15 +73,22 @@ pub struct NutritionSourceManifestV1 {
     pub license_id: String,
     pub permission_reference: Option<String>,
     pub permissions: SourcePermissionsV1,
-    pub intended_commercial_use: bool,
-    pub intended_public_fixture: bool,
-    /// True when the source artifact or extracted source-derived rows are retained.
-    pub artifact_retained: bool,
     /// SHA-256 of the exact upstream artifact bytes, lower-case hexadecimal.
     pub artifact_sha256: Option<String>,
     pub reviewed_on: String,
     pub review_valid_until: String,
     pub lifecycle: SourceLifecycle,
+}
+
+/// Declares how this caller plans to use the source-derived record. It is separate
+/// from source license metadata so a source manifest cannot implicitly grant itself
+/// the uses the caller requests.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceUseRequestV1 {
+    pub retain_source_data: bool,
+    pub transform_record: bool,
+    pub commercial_use: bool,
+    pub public_fixture: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -270,21 +277,26 @@ pub fn assess_nutrition_source(
     manifest: &NutritionSourceManifestV1,
     fact: &NutritionFoodFactV1,
     evaluation_date: &str,
+    use_request: &SourceUseRequestV1,
     artifact_bytes: Option<&[u8]>,
 ) -> NutritionRegistryAssessmentV1 {
     let mut issues = Vec::new();
 
     validate_source_metadata(manifest, evaluation_date, &mut issues);
-    validate_permissions(manifest, fact, &mut issues);
+    validate_permissions(manifest, fact, use_request, &mut issues);
     validate_fact(manifest, fact, &mut issues);
-    let artifact_integrity = validate_artifact_digest(manifest, artifact_bytes, &mut issues);
+    let artifact_integrity =
+        validate_artifact_digest(manifest, use_request, artifact_bytes, &mut issues);
 
     let source_eligibility = if issues.iter().any(|issue| issue.category == IssueCategory::Source) {
         Eligibility::Blocked
     } else {
         Eligibility::Eligible
     };
-    let license_eligibility = if issues.iter().any(|issue| issue.category == IssueCategory::License) {
+    let license_eligibility = if issues
+        .iter()
+        .any(|issue| issue.category == IssueCategory::License)
+    {
         Eligibility::Blocked
     } else {
         Eligibility::Eligible
@@ -334,7 +346,11 @@ fn validate_source_metadata(
     required_source_field(&manifest.source_id, RegistryIssueCode::MissingSourceId, issues);
     required_source_field(&manifest.publisher, RegistryIssueCode::MissingPublisher, issues);
     required_source_field(&manifest.dataset_title, RegistryIssueCode::MissingDatasetTitle, issues);
-    required_source_field(&manifest.dataset_edition, RegistryIssueCode::MissingDatasetEdition, issues);
+    required_source_field(
+        &manifest.dataset_edition,
+        RegistryIssueCode::MissingDatasetEdition,
+        issues,
+    );
     required_source_field(&manifest.license_id, RegistryIssueCode::MissingLicenseId, issues);
     if !valid_http_uri(&manifest.source_uri) {
         push_issue(issues, IssueCategory::Source, RegistryIssueCode::InvalidSourceUri);
@@ -352,13 +368,25 @@ fn validate_source_metadata(
                 push_issue(issues, IssueCategory::Source, RegistryIssueCode::InvalidReviewedOn);
             }
             if until.is_none() {
-                push_issue(issues, IssueCategory::Source, RegistryIssueCode::InvalidReviewValidUntil);
+                push_issue(
+                    issues,
+                    IssueCategory::Source,
+                    RegistryIssueCode::InvalidReviewValidUntil,
+                );
             }
             if let (Some(reviewed), Some(until)) = (reviewed, until) {
                 if until < reviewed {
-                    push_issue(issues, IssueCategory::Source, RegistryIssueCode::ReviewWindowInverted);
+                    push_issue(
+                        issues,
+                        IssueCategory::Source,
+                        RegistryIssueCode::ReviewWindowInverted,
+                    );
                 } else if as_of < reviewed {
-                    push_issue(issues, IssueCategory::Source, RegistryIssueCode::ReviewNotYetEffective);
+                    push_issue(
+                        issues,
+                        IssueCategory::Source,
+                        RegistryIssueCode::ReviewNotYetEffective,
+                    );
                 } else if as_of > until {
                     push_issue(issues, IssueCategory::Source, RegistryIssueCode::ReviewExpired);
                 }
@@ -383,6 +411,7 @@ fn validate_source_metadata(
 fn validate_permissions(
     manifest: &NutritionSourceManifestV1,
     fact: &NutritionFoodFactV1,
+    use_request: &SourceUseRequestV1,
     issues: &mut Vec<RegistryIssueV1>,
 ) {
     let p = &manifest.permissions;
@@ -407,21 +436,30 @@ fn validate_permissions(
     if !p.use_for_assessment.is_granted() {
         push_issue(issues, IssueCategory::License, RegistryIssueCode::AssessmentUseNotPermitted);
     }
-    if manifest.artifact_retained && !p.cache.is_granted() {
+    if use_request.retain_source_data && !p.cache.is_granted() {
         push_issue(issues, IssueCategory::License, RegistryIssueCode::CacheNotPermitted);
     }
-    if fact.transformation_applied && !p.transform.is_granted() {
+    if (fact.transformation_applied || use_request.transform_record)
+        && !p.transform.is_granted() {
         push_issue(issues, IssueCategory::License, RegistryIssueCode::TransformationNotPermitted);
     }
-    if manifest.intended_commercial_use && !p.commercial_use.is_granted() {
+    if use_request.commercial_use && !p.commercial_use.is_granted() {
         push_issue(issues, IssueCategory::License, RegistryIssueCode::CommercialUseNotPermitted);
     }
-    if manifest.intended_public_fixture {
+    if use_request.public_fixture {
         if !p.public_fixture.is_granted() {
-            push_issue(issues, IssueCategory::License, RegistryIssueCode::PublicFixtureNotPermitted);
+            push_issue(
+                issues,
+                IssueCategory::License,
+                RegistryIssueCode::PublicFixtureNotPermitted,
+            );
         }
         if !p.redistribute.is_granted() {
-            push_issue(issues, IssueCategory::License, RegistryIssueCode::RedistributionNotPermitted);
+            push_issue(
+                issues,
+                IssueCategory::License,
+                RegistryIssueCode::RedistributionNotPermitted,
+            );
         }
     }
 }
@@ -438,7 +476,11 @@ fn validate_fact(
         push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::FactSourceMismatch);
     }
     required_fact_field(&fact.source_record_id, RegistryIssueCode::MissingSourceRecordId, issues);
-    required_fact_field(&fact.source_record_citation, RegistryIssueCode::MissingSourceCitation, issues);
+    required_fact_field(
+        &fact.source_record_citation,
+        RegistryIssueCode::MissingSourceCitation,
+        issues,
+    );
     required_fact_field(&fact.food_id, RegistryIssueCode::MissingFoodId, issues);
     required_fact_field(&fact.food_description, RegistryIssueCode::MissingFoodDescription, issues);
     required_fact_field(&fact.food_state_id, RegistryIssueCode::MissingFoodState, issues);
@@ -464,11 +506,12 @@ fn validate_fact(
 
 fn validate_artifact_digest(
     manifest: &NutritionSourceManifestV1,
+    use_request: &SourceUseRequestV1,
     artifact_bytes: Option<&[u8]>,
     issues: &mut Vec<RegistryIssueV1>,
 ) -> ArtifactIntegrity {
     let digest = manifest.artifact_sha256.as_deref();
-    if manifest.artifact_retained && digest.is_none() {
+    if use_request.retain_source_data && digest.is_none() {
         push_issue(issues, IssueCategory::Integrity, RegistryIssueCode::MissingArtifactDigest);
     }
     if let Some(declared) = digest {
@@ -477,9 +520,17 @@ fn validate_artifact_digest(
             return ArtifactIntegrity::Invalid;
         }
         let Some(bytes) = artifact_bytes else {
-            push_issue(issues, IssueCategory::Integrity, RegistryIssueCode::ArtifactDigestUnverified);
-            if manifest.artifact_retained {
-                push_issue(issues, IssueCategory::Integrity, RegistryIssueCode::ArtifactBytesRequired);
+            push_issue(
+                issues,
+                IssueCategory::Integrity,
+                RegistryIssueCode::ArtifactDigestUnverified,
+            );
+            if use_request.retain_source_data {
+                push_issue(
+                    issues,
+                    IssueCategory::Integrity,
+                    RegistryIssueCode::ArtifactBytesRequired,
+                );
             }
             return ArtifactIntegrity::Unverified;
         };
@@ -490,10 +541,10 @@ fn validate_artifact_digest(
         return ArtifactIntegrity::Verified;
     }
 
-    if artifact_bytes.is_some() && manifest.artifact_retained {
+    if artifact_bytes.is_some() && use_request.retain_source_data {
         return ArtifactIntegrity::Invalid;
     }
-    if manifest.artifact_retained {
+    if use_request.retain_source_data {
         ArtifactIntegrity::Invalid
     } else {
         ArtifactIntegrity::NoDigestClaimed
@@ -582,9 +633,6 @@ mod tests {
             license_id: "synthetic-fixture-only".to_owned(),
             permission_reference: None,
             permissions: allowed_permissions(),
-            intended_commercial_use: false,
-            intended_public_fixture: false,
-            artifact_retained: true,
             artifact_sha256: Some(sha256_hex(ARTIFACT)),
             reviewed_on: "2026-01-01".to_owned(),
             review_valid_until: "2027-01-01".to_owned(),
@@ -614,12 +662,21 @@ mod tests {
         }
     }
 
+    fn use_request() -> SourceUseRequestV1 {
+        SourceUseRequestV1 {
+            retain_source_data: true,
+            transform_record: false,
+            commercial_use: false,
+            public_fixture: false,
+        }
+    }
+
     fn assess(
         manifest: &NutritionSourceManifestV1,
         fact: &NutritionFoodFactV1,
         bytes: Option<&[u8]>,
     ) -> NutritionRegistryAssessmentV1 {
-        assess_nutrition_source(manifest, fact, EVALUATION_DATE, bytes)
+        assess_nutrition_source(manifest, fact, EVALUATION_DATE, &use_request(), bytes)
     }
 
     #[test]
@@ -691,10 +748,17 @@ mod tests {
     #[test]
     fn public_fixture_requires_both_public_fixture_and_redistribution_rights() {
         let mut m = manifest();
-        m.intended_public_fixture = true;
         m.permissions.public_fixture = PermissionDecision::AllowedByLicense;
         m.permissions.redistribute = PermissionDecision::Denied;
-        let result = assess(&m, &fact(), Some(ARTIFACT));
+        let mut use_case = use_request();
+        use_case.public_fixture = true;
+        let result = assess_nutrition_source(
+            &m,
+            &fact(),
+            EVALUATION_DATE,
+            &use_case,
+            Some(ARTIFACT),
+        );
         assert_eq!(result.license_eligibility, Eligibility::Blocked);
         assert!(result.issues.iter().any(|issue| {
             issue.code == RegistryIssueCode::RedistributionNotPermitted
@@ -794,9 +858,16 @@ mod tests {
     #[test]
     fn commercial_intent_requires_commercial_permission() {
         let mut m = manifest();
-        m.intended_commercial_use = true;
         m.permissions.commercial_use = PermissionDecision::Unknown;
-        let result = assess(&m, &fact(), Some(ARTIFACT));
+        let mut use_case = use_request();
+        use_case.commercial_use = true;
+        let result = assess_nutrition_source(
+            &m,
+            &fact(),
+            EVALUATION_DATE,
+            &use_case,
+            Some(ARTIFACT),
+        );
         assert_eq!(result.license_eligibility, Eligibility::Blocked);
         assert!(result.issues.iter().any(|issue| {
             issue.code == RegistryIssueCode::CommercialUseNotPermitted
