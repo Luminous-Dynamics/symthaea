@@ -282,6 +282,30 @@ Use mandatory feasibility gates for the intended application. No amount of seali
 
 Cross-mechanism comparator design and lifecycle assumptions are tracked in [BIO-CEM-001A4 #7488](https://github.com/Luminous-Dynamics/symthaea/issues/7488). This literature addition creates no material ontology, carbon-accounting schema or production type; reuse canonical MAT/FIELD/SE-OBS/SE-SEM/ENG-EVID owners and record source-level claims separately from measured data.
 
+### A11. Cross-study comparability matrix: what can and cannot be compared
+
+This matrix is a research triage aid, not a data schema or a claim that the studies share an experimental population. A cell marked **not reported / not verified** means the current source-level audit did not establish it; do not silently impute it.
+
+| Source / system | Crack generation and specimen context | Crack/image endpoint | Transport endpoint | Mechanical / fresh-state endpoints | Data & independent replication | Permitted comparison now |
+|---|---|---|---|---|---|---|
+| Bath BATH-01087 (2022), AEA / bacteria-spore encapsulation | Mortar; cracks targeted around 0.50 mm; induction at 28 days or 9 months; follow-up 56 days | Whole-crack image-binarization healing ratio; crack-healing vs initial width; separate replicate/location structure must be recovered from workbook | Water penetration resistance using RILEM 11.4 | Air content, flowability, compression/flexure; Raman and microbubble characterization for documented subsets | Three workbook files listed CC BY 4.0. Single study; actual workbook not yet inspected | Suitable first licensed within-study reproduction. Do not pool raw effect sizes with other rows until methods and experimental units are reconciled |
+| krkCMd (2025), autogenous high-strength concrete | High-strength concrete; image stacks and later healing stages; full physical-specimen mapping requires documented key audit | 19,098 brightness profiles; manual `MANwidth` reference; DLM/AED outputs | None established in the described profile table | Not in the core 510-column profile table | Current Zenodo record files listed, but rendered license field blank; prior record 11408399 explicitly restricted | Crack-width metrology benchmark only, after explicit dataset-use rights and group keys; not a mechanical-healing benchmark |
+| Wang & Wu (2025), large clinker | Cement paste/specimens; source reports controlled cracking; detailed raw series not provided in the article record | Source reports crack-sealing width and area closure | Not an outcome in the preliminary paper's abstract | Source reports 28-day tensile/compressive strength recovery ratios; definitions must be recovered before interpreting | Data available on request; linked group programme, not independent replication | Literature prior only; request raw tables/methods; do not pool with 2026 paper or Bath |
+| Wang et al. (2026), large clinker | Cement specimens Ø50×30 and Ø100×30 mm; water cure at 75 °C for 14 days; artificial through-going thermal cracks at 150 °C for 2 h | OM surface and XCT internal geometry; distinction between initial crack width, residual width, and the article's “crack-healing width” needs source-defined metric confirmation | Initial/secondary capillary water absorption and gas permeability; separate methods | Microstructural/chemical characterization; a matched mechanical recovery endpoint not established by the abstract alone | Data available on request; same research group as 2025 work | Mechanism/endpoint prior only; not an open raw-data benchmark or independent replication |
+| Van Mullem et al. (2020), polyurethane glass macrocapsules | Mortar and reinforced concrete; differing crack-control approaches; six laboratories | Crack-width preconditioning/measurement plus healing-agent spread | Mortar water permeability; concrete capillary absorption with alternate waterproofing methods | Bending/cracking setup differed between specimen types | Inter-laboratory round robin across six labs | Use to specify protocol sensitivity and metrology quality gates; capsule-specific performance values are not a universal comparator |
+| SARCOS mineral-agent inter-lab study (2021), MgO expansive agents | Concrete prisms/discs; multi-lab cracking and healing over six months | Crack-width evolution; opening variability affected cross-lab comparisons | Sorptivity and water-flow/permeability; application errors mattered for absorption | Compressive strength / hardened density reported by batch; other scope is method-dependent | Multi-lab round robin; exact common dataset availability must be checked separately | Use as method-reproducibility evidence; don't treat reported aggregate outcomes as row-compatible with Bath or clinker data |
+
+**The current compatible overlap is much smaller than “all studies measure self-healing”:**
+- Crack width / closure appears across several sources, but initial crack geometry, imaging method, width statistic, time points, and specimen/independent unit vary. Report per-study, use a shared harmonized endpoint only after protocol-level review.
+- Transport recovery exists in Bath, Wang 2026 and inter-lab studies, but water penetration, initial/secondary sorptivity, water flow/permeability and gas permeability are distinct test methods. Do not collapse them into a generic “impermeability” value.
+- Mechanical evidence is explicit in Bath and Wang 2025's abstract, but the comparator, test timing, denominator and whether it is intact strength or recovery of strength after cracking must match before cross-study use.
+- Fresh-state / air and workability measurements are available in Bath; no common measure is established for the other rows above.
+- Biosafety and lifecycle carbon are not jointly established by any of these datasets. These remain separate qualification/LCA workstreams, not missing values to be filled by a model.
+
+**Metric-definition guard:** the Wang 2026 abstract uses the phrase “crack-healing width” with values 203–225 μm, while its body also discusses initial ~200 μm cracks and residual widths around 20–60 μm at 28 days (depending on mix and whether OM or XCT is used). These are not necessarily contradictory measurements, but the phrase is not self-defining. Do not map 203–225 μm to “remaining open crack width”; recover the figure caption/equation and endpoint meaning before using it in the common matrix.
+
+**Stop rule:** if a study-specific unit, denominator, control, specimen hierarchy, measurement method, or reuse right is unresolved, keep the claim as source-reported literature evidence and mark that cell not comparable. Do not fit a cross-study pooled model merely because rows can be converted to the same numeric unit.
+
 ## B. Better railway systems
 
 ### B1. Highest-value first move: predict deterioration, not just geometry
@@ -483,6 +507,8 @@ This recent review highlights strain persistence, genetic stability, horizontal 
 ### Supplemental rail sensing source (rights pending)
 
 24. Bustamante & Trincado Castán (2025), “Train track environmental data for predictive maintenance,” Zenodo dataset, 65.6 MB 40 Hz onboard inertial/environmental data with GPS-tagged samples; DOI https://doi.org/10.5281/zenodo.17607068. The current record's License field is blank and does not establish reuse rights; source use is gated pending clarification.
+25. Van Mullem et al. (2020), “Addressing the need for standardization of test methods for self-healing concrete: an inter-laboratory study on concrete with macrocapsules,” *Science and Technology of Advanced Materials*, DOI https://doi.org/10.1080/14686996.2020.1814117.
+26. “Evaluation of Methodologies for Assessing Self-Healing Performance of Concrete with Mineral Expansive Agents: An Interlaboratory Study” (2021), *Materials*, DOI https://doi.org/10.3390/ma14082024.
 
 ## Claim ceiling
 
