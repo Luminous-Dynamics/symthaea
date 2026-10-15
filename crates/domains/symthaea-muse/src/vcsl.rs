@@ -2190,6 +2190,140 @@ mod tests {
     }
 
     #[test]
+    fn indexed_sample_content_hash_detects_same_size_audio_changes() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-instrument-inventory-content-hash-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let vcsl_root = root.join("vcsl");
+        let vsco2_root = root.join("vsco2-ce");
+        let harp_dir =
+            vcsl_root.join("Chordophones/Composite Chordophones/Concert Harp");
+        std::fs::create_dir_all(&harp_dir).unwrap();
+        std::fs::create_dir_all(&vsco2_root).unwrap();
+        let sample_path = harp_dir.join("Harp_A4_vl1.wav");
+
+        fn write_wav(path: &Path, amplitude: i16) {
+            let spec = hound::WavSpec {
+                channels: 1,
+                sample_rate: 22050,
+                bits_per_sample: 16,
+                sample_format: hound::SampleFormat::Int,
+            };
+            let mut writer = hound::WavWriter::create(path, spec).unwrap();
+            for index in 0..256 {
+                writer
+                    .write_sample(if index % 2 == 0 {
+                        amplitude
+                    } else {
+                        -amplitude
+                    })
+                    .unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+
+        write_wav(&sample_path, 4000);
+        let first = capability_inventory_with_options(
+            &vcsl_root,
+            &vsco2_root,
+            None,
+            None,
+            true,
+        )
+        .unwrap();
+        let harp = first
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Harp")
+            .unwrap();
+        let first_hash = harp
+            .sustained_samples
+            .as_ref()
+            .unwrap()
+            .indexed_sample_content_manifest_sha256
+            .clone()
+            .expect("explicit content hashing should produce a manifest digest");
+        let layout_hash = first.vcsl_root.path_size_manifest_sha256.clone().unwrap();
+
+        let repeated = capability_inventory_with_options(
+            &vcsl_root,
+            &vsco2_root,
+            None,
+            None,
+            true,
+        )
+        .unwrap();
+        let repeated_harp = repeated
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Harp")
+            .unwrap();
+        assert_eq!(
+            repeated_harp
+                .sustained_samples
+                .as_ref()
+                .unwrap()
+                .indexed_sample_content_manifest_sha256
+                .as_deref(),
+            Some(first_hash.as_str()),
+            "same indexed sample bytes must yield a stable content manifest"
+        );
+
+        // Keep the WAV frame count and byte length fixed while changing audio.
+        write_wav(&sample_path, 9000);
+        assert_eq!(std::fs::metadata(&sample_path).unwrap().len(), 44 + 256 * 2);
+        let changed = capability_inventory_with_options(
+            &vcsl_root,
+            &vsco2_root,
+            None,
+            None,
+            true,
+        )
+        .unwrap();
+        let changed_harp = changed
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Harp")
+            .unwrap();
+        let changed_hash = changed_harp
+            .sustained_samples
+            .as_ref()
+            .unwrap()
+            .indexed_sample_content_manifest_sha256
+            .as_deref()
+            .unwrap();
+        assert_ne!(
+            first_hash, changed_hash,
+            "content manifest must catch same-size audio changes"
+        );
+        assert_eq!(
+            changed.vcsl_root.path_size_manifest_sha256.as_deref(),
+            Some(layout_hash.as_str()),
+            "the legacy path/size manifest is intentionally content-agnostic"
+        );
+
+        let default_inventory = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
+        let default_harp = default_inventory
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Harp")
+            .unwrap();
+        assert!(
+            default_harp
+                .sustained_samples
+                .as_ref()
+                .unwrap()
+                .indexed_sample_content_manifest_sha256
+                .is_none(),
+            "byte hashing stays opt-in for the fast default inventory"
+        );
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn inventory_bounds_and_orders_sample_decode_failure_diagnostics() {
         let root = std::env::temp_dir().join(format!(
             "muse-instrument-inventory-decode-failures-{}",
