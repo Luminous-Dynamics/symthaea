@@ -32,24 +32,22 @@
 //!   mapping isn't honestly possible without a second, drum-number-aware
 //!   indexing scheme this module doesn't have. `Instrument::Timpani`
 //!   therefore stays synthesis-only.
-//! - The wave-2 additions (Harpsichord, Tuba, Trombone, Duduk, ChoirOoh,
-//!   Xylophone) are ALSO deliberately left unmapped, for a different reason
-//!   than Timpani's: at the time these were added, neither
-//!   `data/samples/vcsl` nor `data/samples/vsco2-ce` existed on disk in the
-//!   development environment at all, so nothing could be verified — and
-//!   unlike the Viola/Oboe/Bassoon/French Horn/Vibraphone additions above
-//!   (each checked against a real on-disk path before mapping), this
-//!   module's own doc comments don't already establish that any of these
-//!   six exist in either library. VCSL is broadly reported to include a
-//!   real harpsichord and a range of world/ethnic instruments, and
-//!   VSCO2-CE's brass section is reported to include tuba and trombone, but
-//!   guessing an exact subdirectory path with no way to confirm it would
-//!   risk a confidently-asserted mapping that silently never indexes (wrong
-//!   path -> `InstrumentBank::index` returns `None`) or, worse, quietly
-//!   indexes the wrong content. Per the Timpani precedent, an honest
-//!   "not mapped" beats a guessed mapping — these six stay synthesis-only
-//!   until someone can verify the real directory layout on a machine that
-//!   has these libraries checked out.
+//! - Follow-up source-tree verification added real mappings for four wave-2
+//!   instruments: Harpsichord uses VCSL's
+//!   `Chordophones/Zithers/Harpsichord, English/Sustains/Normal`; Xylophone
+//!   uses VCSL's `Idiophones/Struck Idiophones/Xylophone/Hard Mallets`;
+//!   Tuba uses VSCO2-CE's `Brass/Tuba/sus` and `Brass/Tuba/stac`; and
+//!   Trombone uses `Brass/Tenor Trombone/sus` and `Brass/Tenor Trombone/stac`.
+//!   These paths were confirmed in the upstream Git tree snapshots (VCSL
+//!   `c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e`, VSCO-2-CE
+//!   `440300901dfe9275fd84e0b7763af1f8443ae62e`); they are upstream-path
+//!   evidence, not a claim that a particular machine has downloaded those
+//!   assets or that every file decodes. Duduk and ChoirOoh remain synthesis-only
+//!   because neither inspected upstream tree contains a matching sample set.
+//!   Timpani remains unmapped in this pitched indexer: its published hit
+//!   filenames encode drum numbers rather than scientific pitches, so a
+//!   dedicated drum-number-aware index is required instead of guessing MIDI
+//!   pitches from names. Honest gaps beat false coverage.
 //! - Opt-in: nothing loads unless [`init`] is called or `SYMTHAEA_VCSL_DIR`
 //!   is set. When inactive, rendering is bit-identical to before this module
 //!   existed.
@@ -97,6 +95,14 @@ fn sample_subdir(instrument: Instrument) -> Option<(SampleSource, &'static str)>
             Some((Vcsl, "Chordophones/Zithers/Grand Piano, Steinway B/Sus"))
         }
         Instrument::Harp => Some((Vcsl, "Chordophones/Composite Chordophones/Concert Harp")),
+        Instrument::Harpsichord => Some((
+            Vcsl,
+            "Chordophones/Zithers/Harpsichord, English/Sustains/Normal",
+        )),
+        Instrument::Xylophone => Some((
+            Vcsl,
+            "Idiophones/Struck Idiophones/Xylophone/Hard Mallets",
+        )),
         // Real flute from VSCO2; the breathy baroque recorder stays the
         // honest stand-in for the ney (an end-blown flute).
         Instrument::Flute => Some((Vsco2, "Woodwinds/Flute/susvib")),
@@ -112,6 +118,8 @@ fn sample_subdir(instrument: Instrument) -> Option<(SampleSource, &'static str)>
         Instrument::Bassoon => Some((Vsco2, "Woodwinds/Bassoon/sus")),
         Instrument::Trumpet => Some((Vsco2, "Brass/Trumpet/susvib")),
         Instrument::FrenchHorn => Some((Vsco2, "Brass/F Horn/sus")),
+        Instrument::Tuba => Some((Vsco2, "Brass/Tuba/sus")),
+        Instrument::Trombone => Some((Vsco2, "Brass/Tenor Trombone/sus")),
         Instrument::Saxophone => Some((Vcsl, "Aerophones/Reed Aerophones/Tenor Saxophone/Vibrato")),
         Instrument::Organ => Some((Vcsl, "Aerophones/Edge-blown Aerophones/Pipe Organ/Loud")),
         Instrument::Bell => Some((Vcsl, "Idiophones/Struck Idiophones/Glockenspiel")),
@@ -142,6 +150,8 @@ fn staccato_subdir(instrument: Instrument) -> Option<(SampleSource, &'static str
         Instrument::Bassoon => Some((Vsco2, "Woodwinds/Bassoon/stac")),
         Instrument::Trumpet => Some((Vsco2, "Brass/Trumpet/stac")),
         Instrument::FrenchHorn => Some((Vsco2, "Brass/F Horn/stac")),
+        Instrument::Tuba => Some((Vsco2, "Brass/Tuba/stac")),
+        Instrument::Trombone => Some((Vsco2, "Brass/Tenor Trombone/stac")),
         _ => None,
     }
 }
@@ -422,6 +432,10 @@ impl VcslLibrary {
             Instrument::Piano,
             Instrument::PianoPP,
             Instrument::Harp,
+            Instrument::Harpsichord,
+            Instrument::Xylophone,
+            Instrument::Tuba,
+            Instrument::Trombone,
             Instrument::Flute,
             Instrument::Ney,
             Instrument::Violin,
