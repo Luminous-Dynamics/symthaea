@@ -190,6 +190,103 @@ pub struct ConstrainedRoleAwareSearchResult {
     /// True only when every requested relation constraint has a distinct exact
     /// structural match in the stored fact. It is not a truth/authenticity claim.
     pub constraints_satisfied: bool,
+    /// Policy decision for this candidate. Eligible means only "eligible for
+    /// downstream review", never that the claim is true.
+    pub decision: RelationConstraintDecision,
+    pub abstention_reasons: Vec<RelationConstraintAbstentionReason>,
+}
+
+/// Policy for deciding whether structured retrieval has enough evidence.
+///
+/// These are mechanical coverage gates, not calibrated probabilities. The
+/// default is deliberately strict: require full role coverage and every
+/// requested relation constraint to be satisfied.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RelationConstraintSearchPolicy {
+    min_role_coverage: f32,
+    min_relation_coverage: f32,
+    require_all_relation_constraints: bool,
+}
+
+impl RelationConstraintSearchPolicy {
+    pub fn new(
+        min_role_coverage: f32,
+        min_relation_coverage: f32,
+        require_all_relation_constraints: bool,
+    ) -> Result<Self, String> {
+        if !min_role_coverage.is_finite() || !(0.0..=1.0).contains(&min_role_coverage) {
+            return Err(format!(
+                "Minimum role coverage must be finite and in [0, 1], got {min_role_coverage}"
+            ));
+        }
+        if !min_relation_coverage.is_finite()
+            || !(0.0..=1.0).contains(&min_relation_coverage)
+        {
+            return Err(format!(
+                "Minimum relation coverage must be finite and in [0, 1], got {min_relation_coverage}"
+            ));
+        }
+        Ok(Self {
+            min_role_coverage,
+            min_relation_coverage,
+            require_all_relation_constraints,
+        })
+    }
+
+    pub fn min_role_coverage(&self) -> f32 {
+        self.min_role_coverage
+    }
+
+    pub fn min_relation_coverage(&self) -> f32 {
+        self.min_relation_coverage
+    }
+
+    pub fn require_all_relation_constraints(&self) -> bool {
+        self.require_all_relation_constraints
+    }
+}
+
+impl Default for RelationConstraintSearchPolicy {
+    fn default() -> Self {
+        Self {
+            min_role_coverage: 1.0,
+            min_relation_coverage: 1.0,
+            require_all_relation_constraints: true,
+        }
+    }
+}
+
+/// Mechanical disposition of one candidate under a constraint policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RelationConstraintDecision {
+    /// Meets the configured structural and coverage gates; still requires
+    /// downstream source/evidence review before being asserted as true.
+    EligibleForReview,
+    /// Fails at least one gate. Do not treat it as satisfying the query.
+    Abstain,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RelationConstraintAbstentionReason {
+    IncompleteRoleCoverage,
+    IncompleteRelationCoverage,
+    RequiredRelationConstraintMissing,
+}
+
+/// Query-level result of relation-constrained retrieval.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RelationConstrainedQueryDecision {
+    EligibleCandidatesAvailable,
+    AbstainNoCandidates,
+    AbstainNoCandidateMeetsPolicy,
+}
+
+/// Complete relation-constrained retrieval report, including explicit no-hit
+/// and no-eligible-candidate outcomes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RelationConstrainedSearchReport {
+    pub decision: RelationConstrainedQueryDecision,
+    pub candidates: Vec<ConstrainedRoleAwareSearchResult>,
 }
 
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
@@ -434,9 +531,38 @@ impl EnhancedKnowledgeGraph {
         k: usize,
         current_cycle: u64,
         config: RoleObservationSearchConfig,
-    ) -> Vec<ConstrainedRoleAwareSearchResult> {
+    ) -> RelationConstrainedSearchReport {
+        self.search_role_observations_with_relation_constraints_and_policy(
+            query,
+            relation_constraints,
+            k,
+            current_cycle,
+            config,
+            RelationConstraintSearchPolicy::default(),
+        )
+    }
+
+    /// Retrieve and audit relation constraints using explicit abstention gates.
+    ///
+    /// Candidates are ranked first by policy eligibility, then by full relation
+    /// satisfaction, relation coverage, role coverage, retrieval score, and
+    /// stable fact ID. Unsatisfied candidates remain inspectable. If no
+    /// candidate is eligible (or no candidate exists), the report says so
+    /// explicitly. Eligibility is only a mechanical gate for downstream review.
+    pub fn search_role_observations_with_relation_constraints_and_policy(
+        &mut self,
+        query: &[RoleBoundVector],
+        relation_constraints: &[RelationObservationQuery],
+        k: usize,
+        current_cycle: u64,
+        config: RoleObservationSearchConfig,
+        policy: RelationConstraintSearchPolicy,
+    ) -> RelationConstrainedSearchReport {
         if query.is_empty() || k == 0 {
-            return Vec::new();
+            return RelationConstrainedSearchReport {
+                decision: RelationConstrainedQueryDecision::AbstainNoCandidates,
+                candidates: Vec::new(),
+            };
         }
 
         // Score candidates without changing recency; only the final returned
@@ -457,18 +583,38 @@ impl EnhancedKnowledgeGraph {
                 matched_relation_constraints.len() as f32 / relation_constraints.len() as f32
             };
             let constraints_satisfied = unmatched_relation_constraints.is_empty();
+            let mut abstention_reasons = Vec::new();
+            if retrieval.coverage < policy.min_role_coverage() {
+                abstention_reasons.push(RelationConstraintAbstentionReason::IncompleteRoleCoverage);
+            }
+            if relation_coverage < policy.min_relation_coverage() {
+                abstention_reasons
+                    .push(RelationConstraintAbstentionReason::IncompleteRelationCoverage);
+            }
+            if policy.require_all_relation_constraints() && !constraints_satisfied {
+                abstention_reasons
+                    .push(RelationConstraintAbstentionReason::RequiredRelationConstraintMissing);
+            }
+            let decision = if abstention_reasons.is_empty() {
+                RelationConstraintDecision::EligibleForReview
+            } else {
+                RelationConstraintDecision::Abstain
+            };
             constrained.push(ConstrainedRoleAwareSearchResult {
                 retrieval,
                 matched_relation_constraints,
                 unmatched_relation_constraints,
                 relation_coverage,
                 constraints_satisfied,
+                decision,
+                abstention_reasons,
             });
         }
 
         constrained.sort_by(|a, b| {
-            b.constraints_satisfied
-                .cmp(&a.constraints_satisfied)
+            (b.decision == RelationConstraintDecision::EligibleForReview)
+                .cmp(&(a.decision == RelationConstraintDecision::EligibleForReview))
+                .then_with(|| b.constraints_satisfied.cmp(&a.constraints_satisfied))
                 .then_with(|| {
                     b.relation_coverage
                         .partial_cmp(&a.relation_coverage)
@@ -495,7 +641,22 @@ impl EnhancedKnowledgeGraph {
                 fact.last_accessed_cycle = current_cycle;
             }
         }
-        constrained
+
+        let decision = if constrained.is_empty() {
+            RelationConstrainedQueryDecision::AbstainNoCandidates
+        } else if constrained
+            .iter()
+            .any(|candidate| candidate.decision == RelationConstraintDecision::EligibleForReview)
+        {
+            RelationConstrainedQueryDecision::EligibleCandidatesAvailable
+        } else {
+            RelationConstrainedQueryDecision::AbstainNoCandidateMeetsPolicy
+        };
+
+        RelationConstrainedSearchReport {
+            decision,
+            candidates: constrained,
+        }
     }
 
     fn search_role_observations_untracked(
@@ -2113,17 +2274,26 @@ mod tests {
             RoleObservationSearchConfig::new(0.99).unwrap(),
         );
 
-        assert_eq!(results.len(), 6);
-        assert_eq!(results[0].retrieval.fact_id, ids["positive"]);
-        assert!(results[0].constraints_satisfied);
-        assert_eq!(results[0].relation_coverage, 1.0);
-        assert_eq!(results[0].matched_relation_constraints.len(), 1);
-        assert!(results[0].unmatched_relation_constraints.is_empty());
+        assert_eq!(results.candidates.len(), 6);
+        assert_eq!(
+            results.decision,
+            RelationConstrainedQueryDecision::EligibleCandidatesAvailable
+        );
+        assert_eq!(results.candidates[0].retrieval.fact_id, ids["positive"]);
+        assert!(results.candidates[0].constraints_satisfied);
+        assert_eq!(results.candidates[0].relation_coverage, 1.0);
+        assert_eq!(results.candidates[0].decision, RelationConstraintDecision::EligibleForReview);
+        assert_eq!(results.candidates[0].matched_relation_constraints.len(), 1);
+        assert!(results.candidates[0].unmatched_relation_constraints.is_empty());
 
-        let rejected: Vec<_> = results.iter().filter(|result| !result.constraints_satisfied).collect();
+        let rejected: Vec<_> = results.candidates.iter().filter(|result| !result.constraints_satisfied).collect();
         assert_eq!(rejected.len(), 5);
         for result in rejected {
             assert_eq!(result.relation_coverage, 0.0);
+            assert_eq!(result.decision, RelationConstraintDecision::Abstain);
+            assert!(result.abstention_reasons.contains(
+                &RelationConstraintAbstentionReason::RequiredRelationConstraintMissing
+            ));
             assert_eq!(result.matched_relation_constraints.len(), 0);
             assert_eq!(result.unmatched_relation_constraints.len(), 1);
         }
@@ -2176,17 +2346,102 @@ mod tests {
             RoleObservationSearchConfig::new(0.99).unwrap(),
         );
 
-        assert_eq!(results.len(), 2);
-        let full = results.iter().find(|result| result.retrieval.fact_id == two_id).unwrap();
+        assert_eq!(results.candidates.len(), 2);
+        assert_eq!(
+            results.decision,
+            RelationConstrainedQueryDecision::EligibleCandidatesAvailable
+        );
+        let full = results.candidates.iter().find(|result| result.retrieval.fact_id == two_id).unwrap();
         assert!(full.constraints_satisfied);
         assert_eq!(full.relation_coverage, 1.0);
+        assert_eq!(full.decision, RelationConstraintDecision::EligibleForReview);
         assert_eq!(full.matched_relation_constraints.len(), 2);
 
-        let partial = results.iter().find(|result| result.retrieval.fact_id == one_id).unwrap();
+        let partial = results.candidates.iter().find(|result| result.retrieval.fact_id == one_id).unwrap();
         assert!(!partial.constraints_satisfied);
         assert_eq!(partial.relation_coverage, 0.5);
+        assert_eq!(partial.decision, RelationConstraintDecision::Abstain);
         assert_eq!(partial.matched_relation_constraints.len(), 1);
         assert_eq!(partial.unmatched_relation_constraints.len(), 1);
+    }
+
+    #[test]
+    fn test_relation_constraint_policy_rejects_invalid_coverage_thresholds() {
+        assert!(RelationConstraintSearchPolicy::new(-0.1, 0.5, true).is_err());
+        assert!(RelationConstraintSearchPolicy::new(0.5, 1.1, true).is_err());
+        assert!(RelationConstraintSearchPolicy::new(f32::NAN, 0.5, true).is_err());
+        assert!(RelationConstraintSearchPolicy::new(0.5, f32::INFINITY, true).is_err());
+        assert!(RelationConstraintSearchPolicy::new(0.0, 0.0, false).is_ok());
+    }
+
+    #[test]
+    fn test_relation_constrained_search_explicitly_abstains_without_role_candidates() {
+        let mut graph = EnhancedKnowledgeGraph::new(4);
+        let mut encoder = KnowledgeEncoder::with_seed(11);
+        let query = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "missing entity",
+            EntityType::Organization,
+        )]);
+        let report = graph.search_role_observations_with_relation_constraints(
+            &query,
+            &[],
+            5,
+            1,
+            RoleObservationSearchConfig::new(0.99).unwrap(),
+        );
+        assert_eq!(report.decision, RelationConstrainedQueryDecision::AbstainNoCandidates);
+        assert!(report.candidates.is_empty());
+    }
+
+    #[test]
+    fn test_relation_constrained_search_abstains_when_no_candidate_meets_policy() {
+        use super::super::extraction::{EntityType, ExtractedRelation, SemanticRole};
+
+        let mut graph = EnhancedKnowledgeGraph::new(4);
+        let mut encoder = KnowledgeEncoder::with_seed(12);
+        let query = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "Service A",
+            EntityType::Organization,
+        )]);
+        let mut encoding = make_encoding("no requested predicate", 0.8);
+        encoding.role_vector_observations = query.clone();
+        let wrong = ExtractedRelation {
+            subject: "Service A".into(),
+            predicate: "mentions".into(),
+            object: "Service B".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: false,
+            is_negated: false,
+            confidence: 0.9,
+        };
+        encoding.relations = vec![wrong];
+        graph.insert(encoding, 1, None, false);
+        let required = [RelationObservationQuery {
+            subject: "Service A".into(),
+            predicate: "causes".into(),
+            object: "Service B".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+        }];
+
+        let report = graph.search_role_observations_with_relation_constraints(
+            &query,
+            &required,
+            5,
+            2,
+            RoleObservationSearchConfig::new(0.99).unwrap(),
+        );
+        assert_eq!(
+            report.decision,
+            RelationConstrainedQueryDecision::AbstainNoCandidateMeetsPolicy
+        );
+        assert_eq!(report.candidates.len(), 1);
+        assert_eq!(report.candidates[0].decision, RelationConstraintDecision::Abstain);
     }
 
     #[test]
