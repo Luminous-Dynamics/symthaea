@@ -6,6 +6,7 @@ on:
       - "xtask/src/enzyme_bench.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
+      - "Cargo.toml"
       - ".github/workflows/enzyme-bench-checker.yml"
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - "xtask/src/enzyme_bench.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
+      - "Cargo.toml"
       - ".github/workflows/enzyme-bench-checker.yml"
   workflow_dispatch:
 
