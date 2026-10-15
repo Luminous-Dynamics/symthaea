@@ -14,7 +14,7 @@ The claim being tested is not that Symthaea can ignore physical limits. The clai
 
 The work should compose existing public Symthaea capabilities rather than start a parallel monolith:
 
-- `symthaea-thermofluids`: applied heat-transfer and fluid-flow relations. The `cycles` module provides ideal Carnot, Brayton, Otto, and Diesel efficiency baselines with input validation and analytical reference tests. The `energy_balance` module checks steady-state first-law closure and gross/net efficiency accounting; the `energy_interval` module checks interval-integrated transient energy closure while explicitly including stored-energy change.
+- `symthaea-thermofluids`: applied heat-transfer and fluid-flow relations. The `cycles` module provides ideal Carnot, Brayton, Otto, and Diesel efficiency baselines with input validation and analytical reference tests. The `energy_balance` module checks steady-state first-law closure and gross/net efficiency accounting; `energy_interval` checks transient interval closure and validates each interval before duty-cycle aggregation.
 - `symthaea-materials`, `symthaea-structural`, and `symthaea-fabrication-kernel`: material/structural constraints and eventual geometry/fabrication hand-off.
 - `symthaea-circuits` and `symthaea-control-theory`: electrical conversion, instrumentation, and control models.
 - `symthaea-operations-research`: optimization techniques and constrained trade-offs.
@@ -27,7 +27,7 @@ These components do not by themselves establish a high-fidelity engine-design ca
 
 The new `energy_balance::EnergyBalance` API accepts four mutually exclusive steady-state power flows in watts: input, net useful output, auxiliary consumption, and rejected/other loss. It computes gross output as net useful output plus auxiliary draw, checks that gross output does not exceed input, and rejects a first-law residual that exceeds a caller-supplied relative tolerance. The tolerance must be chosen and justified before examining a candidate's score; do not relax it to make a design pass.
 
-This is intentionally a narrow accounting primitive, not an engine simulation. It assumes steady-state operation and cannot account for changing stored energy, start-up, or transient thermal inventories. For a transient interval, use `energy_interval::EnergyIntervalBalance` with input, net useful output, auxiliaries, rejected/lost energy, and signed change in stored energy. A positive stored-energy change means energy accumulated; a negative value means a store discharged. Its reported throughput includes external input plus released stored energy, and it intentionally does not report a naive output/input efficiency for a storage-discharge interval. All interval values must use the same registered boundary and measurement interval. A balance that fails closure is a failed data-quality gate, not a reason to tune the efficiency calculation.
+This is intentionally a narrow accounting primitive, not an engine simulation. It assumes steady-state operation and cannot account for changing stored energy, start-up, or transient thermal inventories. For a transient interval, use `energy_interval::EnergyIntervalBalance` with input, net useful output, auxiliaries, rejected/lost energy, and signed change in stored energy. A positive stored-energy change means energy accumulated; a negative value means a store discharged. Its reported throughput includes external input plus released stored energy, and it intentionally does not report a naive output/input efficiency for a storage-discharge interval. The `evaluate_duty_cycle` aggregator validates every interval before summing, then checks aggregate closure as a second gate so opposing residual errors cannot hide each other. It reports a net cycle efficiency only when net stored-energy change is within the declared tolerance of total throughput. All interval values must use the same registered boundary and measurement interval. A balance that fails closure is a failed data-quality gate, not a reason to tune the efficiency calculation.
 
 ## Define “better” before searching
 
@@ -41,7 +41,7 @@ Required common fields:
 - **Economic/ecological outcomes:** manufacturing and operating cost, maintainability, supply-chain concentration, critical-material demand, embodied emissions, operational emissions, and end-of-life handling when data exists.
 - **Evidence quality:** record source, units, uncertainty, solver and version, inputs, output artifacts, and whether results are analytical, simulated, calibrated, or measured.
 
-Use a vector of metrics and a Pareto frontier, not a single opaque scalar that can hide severe weaknesses. If a scalar is needed to rank a particular procurement decision, publish the weights and sensitivity analysis.
+Use a vector of metrics and a Pareto frontier, not a single opaque scalar that can hide severe weaknesses. If a scalar is needed to rank a particular procurement decision, publish the weights and sensitivity analysis. A Pareto frontier is not, by itself, a decision rule: preregister how an implementable candidate will be selected (hard constraints, explicit preferences, and tie-breaks) and report whether the recommendation changes under plausible preference and uncertainty variations. Recent reviews identify this last step as commonly under-specified in multi-objective energy-system studies.
 
 ## Candidate architecture families
 
@@ -135,6 +135,8 @@ A candidate cannot advance unless all relevant gates pass:
 - [A review on supercritical CO2 and CO2-based mixtures in power cycles](https://doi.org/10.1016/j.enconman.2024.119295), *Energy Conversion and Management* (2025). Reviews cycle configurations, components, heat-source integration, and limitations.
 - [Review of system design and operation control technology of supercritical CO2 power cycle](https://doi.org/10.1016/j.enconman.2024.119462), *Energy Conversion and Management* (2025). Emphasizes joint system-design and off-design control issues; its review notes the shortcomings of design-point-only optimization.
 - [Machine learning techniques in thermodynamic cycle system design and control for energy harvesting](https://doi.org/10.1016/j.rser.2025.115802), *Renewable and Sustainable Energy Reviews* (2025). Survey of machine-learning work on fluids, configurations, components, dynamics, and control.
+- [Multi-objective stochastic optimization problem: a systematic literature review](https://doi.org/10.1016/j.apenergy.2025.127237), *Applied Energy* (2026). Synthesizes 572 studies published from 2018–2025, emphasizing uncertainty and conflicting objectives in energy and sustainability applications.
+- [From Pareto Front to Preferred Design: Human-in-the-Loop Preference-Guided Decision Making in Multi-Objective Energy Systems Optimization](https://www.mdpi.com/2076-3417/16/10/4966), *Applied Sciences* (2026). Reviews explicit and reproducible ways to select preferred solutions from Pareto sets, including sensitivity to changing preferences.
 
 ## Claim discipline
 
