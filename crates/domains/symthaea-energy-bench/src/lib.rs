@@ -74,6 +74,7 @@ pub struct Solver {
     pub configuration_sha256: Option<String>,
     pub model_fidelity: String,
     pub random_seed: Option<i64>,
+    #[serde(default)]
     pub calibration_dataset_ids: Vec<String>,
 }
 
@@ -1058,6 +1059,19 @@ mod tests {
         run.evaluation_policy.comparison_metric_id = "coefficient_of_performance".into();
         let error = validate_run(&run).unwrap_err();
         assert!(error.issues.iter().any(|issue| issue.contains("only supports comparison_metric_id")));
+    }
+
+    #[test]
+    fn v1_does_not_silently_compare_heat_pump_cop_as_cycle_efficiency() {
+        let (mut candidate, baseline) = comparison_runs();
+        candidate.evaluation_policy.comparison_metric_id =
+            "coefficient_of_performance".into();
+        let error = compare_candidates(&candidate, &baseline).unwrap_err();
+        assert!(
+            error.issues.iter().any(|issue| issue.contains(
+                "only supports comparison_metric_id=net_cycle_efficiency"
+            ))
+        );
     }
 
     #[test]
