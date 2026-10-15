@@ -1786,6 +1786,10 @@ mod tests {
         assert_eq!(violin.procedural_renderer_path, "additive");
         assert!(!first.vcsl_root.root_present);
         assert!(!first.vsco2_root.root_present);
+        assert!(
+            first.fluidsynth_probe.is_none(),
+            "the default inventory must not start external FluidSynth processes"
+        );
         assert_eq!(
             serde_json::to_vec(&first).unwrap(),
             serde_json::to_vec(&second).unwrap(),
