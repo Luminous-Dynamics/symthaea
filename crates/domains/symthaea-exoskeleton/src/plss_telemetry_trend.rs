@@ -834,6 +834,34 @@ mod tests {
     }
 
     #[test]
+    fn changing_a_sample_value_changes_input_and_result_fingerprints() {
+        let revision = "f".repeat(40);
+        let first = [
+            obs(PlssTelemetryMetric::GasTemperatureK, 290.0, 0.0, "a"),
+            obs(PlssTelemetryMetric::GasTemperatureK, 291.0, 30.0, "a"),
+            obs(PlssTelemetryMetric::GasTemperatureK, 292.0, 60.0, "a"),
+        ];
+        let mut changed = first.clone();
+        changed[1].value = 291.5;
+        let (_, first_receipt) =
+            analyze_plss_telemetry_trends_with_receipt(&first, config(), &revision).unwrap();
+        let (_, changed_receipt) =
+            analyze_plss_telemetry_trends_with_receipt(&changed, config(), &revision).unwrap();
+        assert_ne!(
+            first_receipt.input_digest_sha256,
+            changed_receipt.input_digest_sha256
+        );
+        assert_ne!(
+            first_receipt.result_digest_sha256,
+            changed_receipt.result_digest_sha256
+        );
+        assert_ne!(
+            first_receipt.receipt_digest_sha256,
+            changed_receipt.receipt_digest_sha256
+        );
+    }
+
+    #[test]
     fn invalid_config_and_revision_fail_closed() {
         let mut changed = config();
         changed.minimum_samples = 1;
