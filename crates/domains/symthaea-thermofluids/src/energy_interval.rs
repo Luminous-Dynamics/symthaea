@@ -49,7 +49,7 @@ pub enum EnergyIntervalError {
     NonFiniteInput,
     /// External input, output, auxiliary consumption, or rejected/lost energy cannot be negative.
     NegativeEnergyFlow,
-    /// Relative tolerance must be finite and non-negative.
+    /// Relative tolerance must be finite and in the range [0, 1).
     InvalidTolerance,
     /// The interval contains no external input or net discharge from storage.
     NoEnergyThroughput,
@@ -64,7 +64,7 @@ impl std::fmt::Display for EnergyIntervalError {
         match self {
             Self::NonFiniteInput => f.write_str("all energy flows and tolerance must be finite"),
             Self::NegativeEnergyFlow => f.write_str("input, output, auxiliary, and loss energy flows cannot be negative"),
-            Self::InvalidTolerance => f.write_str("relative tolerance must be finite and non-negative"),
+            Self::InvalidTolerance => f.write_str("relative tolerance must be finite and in the range [0, 1)"),
             Self::NoEnergyThroughput => f.write_str("interval must contain external input or net storage discharge"),
             Self::NumericOverflow => f.write_str("summing interval energy flows overflowed"),
             Self::FirstLawImbalance { relative_error, tolerance } => write!(
@@ -108,7 +108,7 @@ impl EnergyIntervalBalance {
         {
             return Err(EnergyIntervalError::NegativeEnergyFlow);
         }
-        if relative_tolerance < 0.0 {
+        if !(0.0..1.0).contains(&relative_tolerance) {
             return Err(EnergyIntervalError::InvalidTolerance);
         }
 
@@ -407,6 +407,10 @@ mod tests {
         );
         assert_eq!(
             no_throughput.evaluate(-1e-6),
+            Err(EnergyIntervalError::InvalidTolerance)
+        );
+        assert_eq!(
+            no_throughput.evaluate(1.0),
             Err(EnergyIntervalError::InvalidTolerance)
         );
     }
