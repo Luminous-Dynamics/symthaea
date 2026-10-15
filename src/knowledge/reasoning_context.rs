@@ -11,7 +11,7 @@
 //! Science: Baddeley (2000) working memory model, Anderson (1983) ACT-R
 //!          spreading activation, Tulving (1972) episodic vs semantic memory
 
-use super::graph::FactSearchResult;
+use super::graph::FactId;
 use super::manager::{KnowledgeManager, KnowledgeSignals};
 use crate::cognitive_loop::thresholds;
 
@@ -29,8 +29,20 @@ pub struct ReasoningContext {
     pub relevant_facts: Vec<GroundedFact>,
     /// Causal chains traced from entities in the query
     pub causal_chains: Vec<CausalChain>,
-    /// Active contradictions that should modulate confidence
+    /// Human-readable direct contradiction and confounder messages.
+    ///
+    /// Retained for compatibility. Prefer `direct_contradictions` and
+    /// `confounder_warnings` when a consumer needs to distinguish their meaning.
     pub contradictions: Vec<String>,
+    /// Typed snapshot of direct knowledge-graph contradiction alerts.
+    ///
+    /// This is a non-destructive snapshot; assembling a context does not drain
+    /// the manager's pending alert queue.
+    pub direct_contradictions: Vec<ContradictionEvidence>,
+    /// Potential confounder warnings inferred from causal-chain roots.
+    ///
+    /// These are not direct knowledge-graph contradiction alerts.
+    pub confounder_warnings: Vec<String>,
     /// Overall epistemic state
     pub epistemic_state: EpistemicState,
     /// Natural language summary of the context (for LLM injection)
@@ -56,6 +68,29 @@ pub struct GroundedFact {
     pub domain: Option<String>,
     /// Whether this fact contains causal claims
     pub is_causal: bool,
+}
+
+/// A direct contradiction alert enriched with source text when the graph retains it.
+///
+/// The source strings are optional because either referenced fact may already have
+/// been evicted or the incoming fact may have corroborated an existing entry rather
+/// than receiving a persistent graph ID.
+#[derive(Debug, Clone)]
+pub struct ContradictionEvidence {
+    /// ID assigned to the fact that triggered the alert, if it remains in the graph.
+    pub new_fact_id: FactId,
+    /// ID of the existing fact that the new fact was judged to contradict.
+    pub existing_fact_id: FactId,
+    /// Source text of the triggering fact when still available.
+    pub new_fact_text: Option<String>,
+    /// Source text of the existing fact when still available.
+    pub existing_fact_text: Option<String>,
+    /// Similarity score recorded by the graph when the alert was created.
+    pub similarity: f32,
+    /// ID of the higher-confidence fact at detection time.
+    pub higher_confidence_fact_id: FactId,
+    /// Graph cycle at which the alert was detected.
+    pub detected_at_cycle: u64,
 }
 
 /// A traced causal chain with named steps
@@ -121,6 +156,8 @@ impl Default for ReasoningContext {
             relevant_facts: Vec::new(),
             causal_chains: Vec::new(),
             contradictions: Vec::new(),
+            direct_contradictions: Vec::new(),
+            confounder_warnings: Vec::new(),
             epistemic_state: EpistemicState {
                 uncertainty: 1.0,
                 novelty: 1.0,
@@ -146,41 +183,63 @@ impl ReasoningContext {
     pub fn from_manager(manager: &KnowledgeManager, query: &str) -> Self {
         let signals = manager.signals();
         let search_results = manager.last_search_results();
-        let alerts: &[(); 0] = &[]; // Alerts are drained separately
 
-        // 1. Convert search results to grounded facts
+        // 1. Resolve search hits to source facts and preserve stored graph metadata.
+        // A stale ID is omitted rather than treated as grounded evidence.
         let relevant_facts: Vec<GroundedFact> = search_results
             .iter()
-            .map(|r| GroundedFact {
-                text: format!("fact:{}", r.fact_id),
-                confidence: r.confidence,
-                similarity: r.similarity,
-                domain: None,
-                is_causal: false,
+            .filter_map(|result| {
+                manager
+                    .graph()
+                    .get_fact(result.fact_id)
+                    .map(|stored| GroundedFact {
+                        text: stored.encoding.source_text.clone(),
+                        confidence: result.confidence,
+                        similarity: result.similarity,
+                        domain: stored.domain.clone(),
+                        is_causal: stored.has_causal_relations,
+                    })
             })
             .collect();
 
-        // 2. Trace causal chains for key terms in the query
+        // 2. Trace causal chains for key terms in the query.
         let causal_chains = trace_query_chains(manager, query);
 
-        // 3. Compute epistemic state
+        // 3. Preserve direct graph contradiction alerts as typed evidence. This is
+        // a read-only snapshot: context assembly does not consume the alert queue.
+        let direct_contradictions: Vec<ContradictionEvidence> = manager
+            .pending_contradiction_alerts()
+            .into_iter()
+            .map(|alert| ContradictionEvidence {
+                new_fact_text: manager
+                    .graph()
+                    .get_fact(alert.new_fact_id)
+                    .map(|fact| fact.encoding.source_text.clone()),
+                existing_fact_text: manager
+                    .graph()
+                    .get_fact(alert.existing_fact_id)
+                    .map(|fact| fact.encoding.source_text.clone()),
+                new_fact_id: alert.new_fact_id,
+                existing_fact_id: alert.existing_fact_id,
+                similarity: alert.similarity,
+                higher_confidence_fact_id: alert.higher_confidence_id,
+                detected_at_cycle: alert.detected_at_cycle,
+            })
+            .collect();
+
+        // 4. Compute epistemic state from grounded retrieval and graph alerts.
         let has_grounding =
-            !relevant_facts.is_empty() && relevant_facts.iter().any(|f| f.similarity > 0.1);
-
+            !relevant_facts.is_empty() && relevant_facts.iter().any(|fact| fact.similarity > 0.1);
         let confidence_multiplier = compute_confidence_multiplier(signals, has_grounding);
-
         let epistemic_state = EpistemicState {
             uncertainty: signals.uncertainty,
             novelty: signals.novelty,
-            contradiction_count: alerts.len(),
+            contradiction_count: direct_contradictions.len(),
             has_grounding,
             confidence_multiplier,
         };
 
-        // 4. Generate natural language summary
-        let summary = generate_summary(&relevant_facts, &causal_chains, &epistemic_state);
-
-        // 5. Counterfactual necessity for causal chain roots
+        // 5. Counterfactual necessity for causal chain roots.
         let counterfactuals: Vec<(String, f32)> = causal_chains
             .iter()
             .take(3)
@@ -191,16 +250,17 @@ impl ReasoningContext {
             })
             .collect();
 
-        // 6. Detect confounders between causal chain roots (Pearl backdoor criterion)
-        let mut contradictions: Vec<String> = Vec::new();
-        let chain_roots: Vec<&str> = causal_chains.iter().map(|c| c.root.as_str()).collect();
+        // 6. Detect confounders separately. These are hypotheses for further
+        // investigation, not direct contradiction alerts from the knowledge graph.
+        let mut confounder_warnings: Vec<String> = Vec::new();
+        let chain_roots: Vec<&str> = causal_chains.iter().map(|chain| chain.root.as_str()).collect();
         for i in 0..chain_roots.len() {
             for j in (i + 1)..chain_roots.len() {
                 let confounders = manager.detect_confounders(chain_roots[i], chain_roots[j]);
                 for (confounder, strength) in &confounders {
                     if *strength > thresholds::KNOWLEDGE_CONFOUNDER_STRENGTH_THRESHOLD {
-                        contradictions.push(format!(
-                            "Confounder: '{}' (strength {:.2}) may cause both '{}' and '{}'",
+                        confounder_warnings.push(format!(
+                            "Potential confounder: '{}' (strength {:.2}) may cause both '{}' and '{}'",
                             confounder, strength, chain_roots[i], chain_roots[j]
                         ));
                     }
@@ -208,13 +268,47 @@ impl ReasoningContext {
             }
         }
 
-        let mut epistemic_state = epistemic_state;
-        epistemic_state.contradiction_count = contradictions.len();
+        // Keep the existing human-readable message field available to consumers,
+        // while exposing typed direct alerts and confounder warnings separately.
+        let mut contradictions: Vec<String> = direct_contradictions
+            .iter()
+            .map(|alert| {
+                let new_text = alert
+                    .new_fact_text
+                    .as_deref()
+                    .unwrap_or("[source text unavailable]");
+                let existing_text = alert
+                    .existing_fact_text
+                    .as_deref()
+                    .unwrap_or("[source text unavailable]");
+                format!(
+                    "Direct contradiction: fact {} ({}) conflicts with fact {} ({}); similarity {:.2}; higher-confidence fact {}; detected at cycle {}.",
+                    alert.new_fact_id,
+                    new_text,
+                    alert.existing_fact_id,
+                    existing_text,
+                    alert.similarity,
+                    alert.higher_confidence_fact_id,
+                    alert.detected_at_cycle,
+                )
+            })
+            .collect();
+        contradictions.extend(confounder_warnings.iter().cloned());
+
+        // 7. Generate a human-readable summary after all evidence classes are known.
+        let summary = generate_summary(
+            &relevant_facts,
+            &causal_chains,
+            &epistemic_state,
+            confounder_warnings.len(),
+        );
 
         Self {
             relevant_facts,
             causal_chains,
             contradictions,
+            direct_contradictions,
+            confounder_warnings,
             epistemic_state,
             summary,
             analogies: Vec::new(), // Populated by cycle.rs analogical transfer
@@ -303,6 +397,7 @@ fn generate_summary(
     facts: &[GroundedFact],
     chains: &[CausalChain],
     epistemic: &EpistemicState,
+    confounder_warning_count: usize,
 ) -> String {
     let mut parts = Vec::new();
 
@@ -333,8 +428,14 @@ fn generate_summary(
     }
     if epistemic.contradiction_count > 0 {
         parts.push(format!(
-            "ALERT: {} active contradiction(s) detected.",
+            "ALERT: {} direct knowledge-graph contradiction(s) detected.",
             epistemic.contradiction_count,
+        ));
+    }
+    if confounder_warning_count > 0 {
+        parts.push(format!(
+            "NOTE: {} potential confounder warning(s); these are not direct contradiction alerts.",
+            confounder_warning_count,
         ));
     }
 
@@ -428,7 +529,7 @@ mod tests {
             confidence_multiplier: 0.8,
         };
 
-        let summary = generate_summary(&facts, &chains, &epistemic);
+        let summary = generate_summary(&facts, &chains, &epistemic, 0);
         assert!(summary.contains("Known facts"));
         assert!(summary.contains("Causal chains"));
         assert!(!summary.contains("WARNING"));
@@ -444,7 +545,7 @@ mod tests {
             confidence_multiplier: 0.3,
         };
 
-        let summary = generate_summary(&[], &[], &epistemic);
+        let summary = generate_summary(&[], &[], &epistemic, 0);
         // High uncertainty + contradictions should produce warnings
         assert!(summary.contains("WARNING") || summary.contains("ALERT"));
     }
