@@ -725,11 +725,41 @@ fn digest_report(report: &MissionConfigurationReport) -> String {
         writer.string(&connection.left_component_id);
         writer.string(&connection.right_component_id);
         writer.boolean(connection.required);
-        writer.string(interop_status_tag(connection.interoperability.status));
-        writer.usize(connection.interoperability.required_interface_count);
-        writer.usize(connection.interoperability.required_compatible_count);
-        writer.usize(connection.interoperability.blocked_required_count);
-        writer.string(&connection.interoperability_receipt.receipt_digest_sha256);
+        let interop = &connection.interoperability;
+        writer.string(match interop.evidence_class {
+            crate::suit_interop::SuitInteropEvidenceClass::DeclaredSoftwareContract => {
+                "declared_software_contract"
+            }
+        });
+        writer.string(&interop.left_component_id);
+        writer.string(&interop.left_hardware_revision);
+        writer.string(&interop.right_component_id);
+        writer.string(&interop.right_hardware_revision);
+        write_policy(&mut writer, &interop.policy);
+        writer.usize(interop.findings.len());
+        for finding in &interop.findings {
+            writer.string(&finding.component_id);
+            writer.string(&finding.endpoint_id);
+            writer.string(&finding.interface_id);
+            writer.string(interface_kind_tag(finding.interface_kind));
+            writer.string(interface_role_tag(finding.role));
+            writer.boolean(finding.required);
+            writer.string(&finding.peer_component_id);
+            writer.option_string(finding.peer_endpoint_id.as_deref());
+            writer.string(interop_finding_status_tag(finding.status));
+        }
+        writer.string(interop_status_tag(interop.status));
+        writer.usize(interop.required_interface_count);
+        writer.usize(interop.required_compatible_count);
+        writer.usize(interop.blocked_required_count);
+        writer.boolean(interop.represents_physical_qualification);
+
+        let pair_receipt = &connection.interoperability_receipt;
+        writer.string(&pair_receipt.left_manifest_digest_sha256);
+        writer.string(&pair_receipt.right_manifest_digest_sha256);
+        writer.string(&pair_receipt.policy_digest_sha256);
+        writer.string(&pair_receipt.result_digest_sha256);
+        writer.string(&pair_receipt.receipt_digest_sha256);
     }
 
     writer.usize(report.component_count);
@@ -901,6 +931,24 @@ fn mission_status_tag(value: MissionConfigurationStatus) -> &'static str {
         MissionConfigurationStatus::MeetsDeclaredMissionConfigurationPolicy => {
             "meets_declared_mission_configuration_policy"
         }
+    }
+}
+
+fn interop_finding_status_tag(
+    value: crate::suit_interop::SuitInteropFindingStatus,
+) -> &'static str {
+    use crate::suit_interop::SuitInteropFindingStatus::*;
+    match value {
+        CompatibleUnderPolicy => "compatible_under_policy",
+        MissingPeerInterface => "missing_peer_interface",
+        AmbiguousPeerInterfaces => "ambiguous_peer_interfaces",
+        InterfaceKindMismatch => "interface_kind_mismatch",
+        InterfaceRoleMismatch => "interface_role_mismatch",
+        ContractRevisionMismatch => "contract_revision_mismatch",
+        SchemaDigestMismatch => "schema_digest_mismatch",
+        ConnectorProfileMismatch => "connector_profile_mismatch",
+        OperatingEnvironmentMismatch => "operating_environment_mismatch",
+        InsufficientEvidence => "insufficient_evidence",
     }
 }
 
@@ -1151,6 +1199,18 @@ mod tests {
         let (report_b, receipt_b) = evaluate_mission_configuration(&permuted).unwrap();
         assert_eq!(report_a, report_b);
         assert_eq!(receipt_a, receipt_b);
+    }
+
+    #[test]
+    fn report_digest_binds_embedded_pairwise_findings() {
+        let configuration = fixture();
+        let (report, _) = evaluate_mission_configuration(&configuration).unwrap();
+        let original_digest = digest_report(&report);
+        let mut tampered = report.clone();
+        tampered.connection_evaluations[0].interoperability.findings[0]
+            .component_id
+            .push_str("-tampered");
+        assert_ne!(digest_report(&tampered), original_digest);
     }
 
     #[test]
