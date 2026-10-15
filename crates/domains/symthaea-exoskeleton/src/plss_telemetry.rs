@@ -271,7 +271,8 @@ pub fn fuse_plss_telemetry(
     let mut rejected_future = 0;
     let mut excluded_stale = 0;
     let mut excluded_low_confidence = 0;
-    let mut fused = Vec::with_capacity(PLSS_TELEMETRY_METRIC_COUNT * PlssTelemetrySourceKind::ALL.len());
+    let capacity = PLSS_TELEMETRY_METRIC_COUNT * PlssTelemetrySourceKind::ALL.len();
+    let mut fused = Vec::with_capacity(capacity);
 
     for metric in PlssTelemetryMetric::ALL {
         for source_kind in PlssTelemetrySourceKind::ALL {
@@ -302,7 +303,9 @@ pub fn fuse_plss_telemetry(
                     saw_stale = true;
                     continue;
                 }
-                if observation.confidence < config.minimum_confidence || observation.confidence <= 0.0 {
+                if observation.confidence < config.minimum_confidence
+                    || observation.confidence <= 0.0
+                {
                     excluded_low_confidence += 1;
                     saw_low_confidence = true;
                     continue;
