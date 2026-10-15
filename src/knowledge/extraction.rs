@@ -57,6 +57,65 @@ pub enum SemanticRole {
     RiskFactor,
 }
 
+/// Stable identifiers for serializing semantic roles to persisted relation records.
+/// These are deliberately explicit rather than derived from Debug formatting.
+impl SemanticRole {
+    pub(crate) fn storage_key(self) -> &'static str {
+        match self {
+            Self::Agent => "agent",
+            Self::Patient => "patient",
+            Self::Instrument => "instrument",
+            Self::Context => "context",
+            Self::Goal => "goal",
+            Self::Source => "source",
+            Self::Destination => "destination",
+            Self::Temporal => "temporal",
+            Self::Location => "location",
+            Self::Cause => "cause",
+            Self::Result => "result",
+            Self::Calls => "calls",
+            Self::Implements => "implements",
+            Self::DependsOn => "depends_on",
+            Self::ReturnsType => "returns_type",
+            Self::FixedBy => "fixed_by",
+            #[cfg(feature = "therapeutic")]
+            Self::TherapeuticTarget => "therapeutic_target",
+            #[cfg(feature = "therapeutic")]
+            Self::ProtectiveFactor => "protective_factor",
+            #[cfg(feature = "therapeutic")]
+            Self::RiskFactor => "risk_factor",
+        }
+    }
+
+    pub(crate) fn from_storage_key(value: &str) -> Option<Self> {
+        Some(match value {
+            "agent" => Self::Agent,
+            "patient" => Self::Patient,
+            "instrument" => Self::Instrument,
+            "context" => Self::Context,
+            "goal" => Self::Goal,
+            "source" => Self::Source,
+            "destination" => Self::Destination,
+            "temporal" => Self::Temporal,
+            "location" => Self::Location,
+            "cause" => Self::Cause,
+            "result" => Self::Result,
+            "calls" => Self::Calls,
+            "implements" => Self::Implements,
+            "depends_on" => Self::DependsOn,
+            "returns_type" => Self::ReturnsType,
+            "fixed_by" => Self::FixedBy,
+            #[cfg(feature = "therapeutic")]
+            "therapeutic_target" => Self::TherapeuticTarget,
+            #[cfg(feature = "therapeutic")]
+            "protective_factor" => Self::ProtectiveFactor,
+            #[cfg(feature = "therapeutic")]
+            "risk_factor" => Self::RiskFactor,
+            _ => return None,
+        })
+    }
+}
+
 /// Entity types for knowledge graph nodes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EntityType {

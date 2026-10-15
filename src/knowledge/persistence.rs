@@ -9,14 +9,18 @@
 //!
 //! Schema:
 //! - knowledge_facts: row id, graph_fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal
+//! - knowledge_fact_relations: per-fact ordered subject/predicate/object records, with semantic roles,
+//!   causal/negation flags, and relation-level confidence
 //! - knowledge_causal_edges: edge_id, cause, effect, strength, inhibition/negation flags,
 //!   source text, and discovery cycle; each row is one edge observation
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
+use std::collections::HashMap;
 use std::path::Path;
 use rusqlite::OptionalExtension;
+use super::extraction::{ExtractedRelation, SemanticRole};
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
 /// Knowledge persistence layer backed by SQLite.
@@ -33,7 +37,8 @@ pub struct KnowledgePersistence {
     total_loaded: u64,
 }
 
-/// A serializable fact record for persistence
+/// A fact record for persistence, including the source relations that were
+/// otherwise lost when the structured extraction was bundled into an HDC vector.
 #[derive(Debug, Clone)]
 pub struct FactRecord {
     /// BinaryHV encoded as raw bytes (2048 bytes for 16,384 bits)
@@ -48,6 +53,8 @@ pub struct FactRecord {
     pub cycle: u64,
     /// Whether the fact contains causal relations
     pub is_causal: bool,
+    /// Structured extracted relations, retained separately from the lossy HDC bundle.
+    pub relations: Vec<ExtractedRelation>,
     /// Stable graph-level identity; absent for rows written before this field existed.
     pub graph_fact_id: Option<u64>,
     /// Confidence assigned at insertion; absent for rows written by older schemas.
@@ -183,6 +190,118 @@ fn next_graph_fact_id_after_records(
         .transpose()
 }
 
+fn decode_semantic_role(value: String, column_index: usize) -> rusqlite::Result<SemanticRole> {
+    SemanticRole::from_storage_key(&value).ok_or_else(|| {
+        invalid_column_data(
+            column_index,
+            rusqlite::types::Type::Text,
+            format!("unknown persisted semantic role key: {value}"),
+        )
+    })
+}
+
+fn validate_fact_relations(relations: &[ExtractedRelation]) -> Result<(), String> {
+    for relation in relations {
+        if !relation.confidence.is_finite() || !(0.0..=1.0).contains(&relation.confidence) {
+            return Err(format!(
+                "Invalid extracted-relation confidence outside [0, 1]: {}",
+                relation.confidence
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn insert_fact_relations(
+    conn: &rusqlite::Connection,
+    fact_row_id: i64,
+    relations: &[ExtractedRelation],
+) -> Result<(), String> {
+    validate_fact_relations(relations)?;
+    for (ordinal, relation) in relations.iter().enumerate() {
+        let ordinal = i64::try_from(ordinal)
+            .map_err(|e| format!("Relation ordinal exceeds SQLite INTEGER range: {e}"))?;
+        conn.execute(
+            "INSERT INTO knowledge_fact_relations
+             (fact_row_id, ordinal, subject, predicate, object, subject_role, object_role,
+              is_causal, is_negated, confidence)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            rusqlite::params![
+                fact_row_id,
+                ordinal,
+                relation.subject,
+                relation.predicate,
+                relation.object,
+                relation.subject_role.storage_key(),
+                relation.object_role.storage_key(),
+                relation.is_causal,
+                relation.is_negated,
+                relation.confidence,
+            ],
+        )
+        .map_err(|e| format!("Insert structured fact relation: {e}"))?;
+    }
+    Ok(())
+}
+
+fn load_fact_relations(
+    conn: &rusqlite::Connection,
+) -> Result<HashMap<i64, Vec<ExtractedRelation>>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT fact_row_id, ordinal, subject, predicate, object, subject_role, object_role,
+                    is_causal, is_negated, confidence
+             FROM knowledge_fact_relations
+             ORDER BY fact_row_id, ordinal",
+        )
+        .map_err(|e| format!("Prepare structured fact relations: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let confidence = decode_confidence(row.get(9)?, 9)?;
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, i64>(1)?,
+                ExtractedRelation {
+                    subject: row.get(2)?,
+                    predicate: row.get(3)?,
+                    object: row.get(4)?,
+                    subject_role: decode_semantic_role(row.get(5)?, 5)?,
+                    object_role: decode_semantic_role(row.get(6)?, 6)?,
+                    is_causal: row.get(7)?,
+                    is_negated: row.get(8)?,
+                    confidence,
+                },
+            ))
+        })
+        .map_err(|e| format!("Query structured fact relations: {e}"))?;
+    let decoded = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Decode structured fact relations: {e}"))?;
+    let mut by_fact: HashMap<i64, Vec<ExtractedRelation>> = HashMap::new();
+    let mut previous: HashMap<i64, i64> = HashMap::new();
+    for (fact_row_id, ordinal, relation) in decoded {
+        if fact_row_id <= 0 || ordinal < 0 {
+            return Err(format!(
+                "Invalid structured-relation key: fact row {fact_row_id}, ordinal {ordinal}"
+            ));
+        }
+        if let Some(previous_ordinal) = previous.insert(fact_row_id, ordinal) {
+            if previous_ordinal.checked_add(1) != Some(ordinal) {
+                return Err(format!(
+                    "Non-contiguous relation ordinal for fact row {fact_row_id}: expected {}, got {ordinal}",
+                    previous_ordinal.saturating_add(1)
+                ));
+            }
+        } else if ordinal != 0 {
+            return Err(format!(
+                "Structured relations for fact row {fact_row_id} begin at ordinal {ordinal}, expected 0"
+            ));
+        }
+        by_fact.entry(fact_row_id).or_default().push(relation);
+    }
+    Ok(by_fact)
+}
+
 fn decode_optional_graph_fact_id(
     value: Option<i64>,
     column_index: usize,
@@ -315,6 +434,9 @@ impl KnowledgePersistence {
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
+        for fact in facts {
+            validate_fact_relations(&fact.relations)?;
+        }
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
@@ -352,6 +474,8 @@ impl KnowledgePersistence {
                 ],
             )
             .map_err(|e| e.to_string())?;
+            let fact_row_id = conn.last_insert_rowid();
+            insert_fact_relations(&conn, fact_row_id, &fact.relations)?;
             count += 1;
         }
 
@@ -372,6 +496,9 @@ impl KnowledgePersistence {
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
+        for fact in facts {
+            validate_fact_relations(&fact.relations)?;
+        }
 
         let mut conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
@@ -379,6 +506,8 @@ impl KnowledgePersistence {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin fact snapshot transaction: {e}"))?;
 
+        tx.execute("DELETE FROM knowledge_fact_relations", [])
+            .map_err(|e| format!("Clear previous fact relation snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_facts", [])
             .map_err(|e| format!("Clear previous fact snapshot: {e}"))?;
 
@@ -413,6 +542,8 @@ impl KnowledgePersistence {
                 ],
             )
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
+            let fact_row_id = tx.last_insert_rowid();
+            insert_fact_relations(&tx, fact_row_id, &fact.relations)?;
             count += 1;
         }
 
@@ -426,12 +557,12 @@ impl KnowledgePersistence {
 
     /// Atomically replace the complete persisted knowledge state.
     ///
-    /// This operation owns snapshot semantics for facts, causal edges, and
-    /// ontology primitives. Unlike the legacy append/upsert methods, it removes
-    /// records that are no longer present in the live state. Every input is
-    /// validated before the transaction begins, and all three collections are
-    /// replaced in one SQLite transaction so a failed write preserves the
-    /// previous committed snapshot.
+    /// This operation owns snapshot semantics for facts (including their
+    /// structured relations), causal edges, and ontology primitives. Unlike the
+    /// legacy append/upsert methods, it removes records that are no longer present
+    /// in the live state. Inputs are validated before mutation, and all related
+    /// tables are replaced in one SQLite transaction so a failed write preserves
+    /// the previous committed snapshot.
     pub fn replace_knowledge_snapshot(
         &mut self,
         facts: &[FactRecord],
@@ -449,6 +580,7 @@ impl KnowledgePersistence {
         let mut prepared_facts = Vec::with_capacity(facts.len());
         let mut max_graph_fact_id = 0_u64;
         for fact in facts {
+            validate_fact_relations(&fact.relations)?;
             validate_hypervector_bytes(&fact.vector_bytes, 0)
                 .map_err(|e| format!("Invalid fact snapshot vector: {e}"))?;
             if !fact.confidence.is_finite() || !(0.0..=1.0).contains(&fact.confidence) {
@@ -528,6 +660,8 @@ impl KnowledgePersistence {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin knowledge snapshot transaction: {e}"))?;
 
+        tx.execute("DELETE FROM knowledge_fact_relations", [])
+            .map_err(|e| format!("Clear fact relation snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_facts", [])
             .map_err(|e| format!("Clear fact snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_causal_edges", [])
@@ -556,6 +690,8 @@ impl KnowledgePersistence {
                 ],
             )
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
+            let fact_row_id = tx.last_insert_rowid();
+            insert_fact_relations(&tx, fact_row_id, &fact.relations)?;
         }
 
         for (edge, cycle, strength, is_inhibitory) in &prepared_edges {
@@ -649,12 +785,12 @@ impl KnowledgePersistence {
             .prepare(
                 "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal,
                         initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count,
-                        graph_fact_id
+                        graph_fact_id, id
                  FROM knowledge_facts ORDER BY cycle DESC",
             )
             .map_err(|e| e.to_string())?;
 
-        let facts: Vec<FactRecord> = stmt
+        let mut facts_with_row_id: Vec<(i64, FactRecord)> = stmt
             .query_map([], |row| {
                 let vector_bytes: Vec<u8> = row.get(0)?;
                 validate_hypervector_bytes(&vector_bytes, 0)?;
@@ -673,24 +809,49 @@ impl KnowledgePersistence {
                 let contradiction_count =
                     decode_nonnegative_u32_counter(row.get(9)?, 9, "fact contradiction count")?;
                 let graph_fact_id = decode_optional_graph_fact_id(row.get(10)?, 10)?;
-                Ok(FactRecord {
-                    vector_bytes,
-                    source_text: row.get(1)?,
-                    confidence,
-                    domain: row.get(3)?,
-                    cycle,
-                    is_causal: row.get(5)?,
-                    graph_fact_id,
-                    initial_confidence,
-                    last_accessed_cycle,
-                    corroboration_count,
-                    contradiction_count,
-                })
+                let fact_row_id: i64 = row.get(11)?;
+                Ok((
+                    fact_row_id,
+                    FactRecord {
+                        vector_bytes,
+                        source_text: row.get(1)?,
+                        confidence,
+                        domain: row.get(3)?,
+                        cycle,
+                        is_causal: row.get(5)?,
+                        relations: Vec::new(),
+                        graph_fact_id,
+                        initial_confidence,
+                        last_accessed_cycle,
+                        corroboration_count,
+                        contradiction_count,
+                    },
+                ))
             })
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| format!("Collect: {e}"))?;
+        drop(stmt);
 
+        let mut relations_by_fact = load_fact_relations(&conn)?;
+        let fact_row_ids: std::collections::HashSet<i64> =
+            facts_with_row_id.iter().map(|(id, _)| *id).collect();
+        if let Some(orphan_id) = relations_by_fact
+            .keys()
+            .find(|id| !fact_row_ids.contains(*id))
+        {
+            return Err(format!(
+                "Structured relation rows refer to missing fact row {orphan_id}"
+            ));
+        }
+        for (fact_row_id, fact) in &mut facts_with_row_id {
+            fact.relations = relations_by_fact.remove(fact_row_id).unwrap_or_default();
+        }
+
+        let facts: Vec<FactRecord> = facts_with_row_id
+            .into_iter()
+            .map(|(_, fact)| fact)
+            .collect();
         self.total_loaded += facts.len() as u64;
         Ok(facts)
     }
@@ -915,6 +1076,20 @@ impl KnowledgePersistence {
                 contradiction_count INTEGER NOT NULL DEFAULT 0,
                 graph_fact_id INTEGER
             );
+            CREATE TABLE IF NOT EXISTS knowledge_fact_relations (
+                fact_row_id INTEGER NOT NULL,
+                ordinal INTEGER NOT NULL,
+                subject TEXT NOT NULL,
+                predicate TEXT NOT NULL,
+                object TEXT NOT NULL,
+                subject_role TEXT NOT NULL,
+                object_role TEXT NOT NULL,
+                is_causal INTEGER NOT NULL,
+                is_negated INTEGER NOT NULL,
+                confidence REAL NOT NULL,
+                PRIMARY KEY (fact_row_id, ordinal),
+                FOREIGN KEY (fact_row_id) REFERENCES knowledge_facts(id) ON DELETE CASCADE
+            );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
                 edge_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cause TEXT NOT NULL,
@@ -1032,6 +1207,279 @@ mod tests {
 
 
     #[test]
+    fn test_fact_relation_round_trip_preserves_negation_roles_and_confidence() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_relation_roundtrip_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let record = FactRecord {
+            vector_bytes: vec![3u8; BinaryHV::BYTES],
+            source_text: "The ceasefire did not prevent escalation.".into(),
+            confidence: 0.81,
+            domain: Some("geopolitics".into()),
+            cycle: 12,
+            is_causal: true,
+            relations: vec![ExtractedRelation {
+                subject: "ceasefire".into(),
+                predicate: "prevented".into(),
+                object: "escalation".into(),
+                subject_role: SemanticRole::Agent,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: true,
+                confidence: 0.73,
+            }],
+            graph_fact_id: Some(17),
+            initial_confidence: Some(0.88),
+            last_accessed_cycle: Some(15),
+            corroboration_count: 2,
+            contradiction_count: 1,
+        };
+
+        assert_eq!(persistence.save_facts(&[record]).unwrap(), 1);
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].relations.len(), 1);
+        let relation = &loaded[0].relations[0];
+        assert_eq!(relation.subject, "ceasefire");
+        assert_eq!(relation.predicate, "prevented");
+        assert_eq!(relation.object, "escalation");
+        assert_eq!(relation.subject_role, SemanticRole::Agent);
+        assert_eq!(relation.object_role, SemanticRole::Patient);
+        assert!(relation.is_causal);
+        assert!(relation.is_negated);
+        assert!((relation.confidence - 0.73).abs() < f32::EPSILON);
+
+        let replacement = FactRecord {
+            source_text: "replacement without structured relations".into(),
+            relations: Vec::new(),
+            ..loaded[0].clone()
+        };
+        persistence.replace_facts_snapshot(&[replacement]).unwrap();
+        let replaced = persistence.load_facts().unwrap();
+        assert_eq!(replaced.len(), 1);
+        assert!(
+            replaced[0].relations.is_empty(),
+            "removed relation rows must not be reattached after fact-only replacement"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_full_snapshot_rejects_invalid_relation_without_replacing_prior_state() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_invalid_relation_snapshot_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let old_fact = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "previous committed fact".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+            relations: Vec::new(),
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.8),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        persistence
+            .replace_knowledge_snapshot(&[old_fact], &[], &[], 2)
+            .unwrap();
+
+        let invalid_fact = FactRecord {
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            source_text: "invalid candidate".into(),
+            confidence: 0.7,
+            domain: None,
+            cycle: 2,
+            is_causal: true,
+            relations: vec![ExtractedRelation {
+                subject: "A".into(),
+                predicate: "caused".into(),
+                object: "B".into(),
+                subject_role: SemanticRole::Agent,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: false,
+                confidence: 1.2,
+            }],
+            graph_fact_id: Some(2),
+            initial_confidence: Some(0.7),
+            last_accessed_cycle: Some(2),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let error = persistence
+            .replace_knowledge_snapshot(&[invalid_fact], &[], &[], 3)
+            .unwrap_err();
+        assert!(error.contains("Invalid extracted-relation confidence"), "{error}");
+
+        let restored = persistence.load_facts().unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].source_text, "previous committed fact");
+        assert_eq!(restored[0].graph_fact_id, Some(1));
+        assert_eq!(restored[0].relations.len(), 0);
+        assert_eq!(persistence.load_next_graph_fact_id().unwrap(), Some(2));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_noncontiguous_relation_ordinals() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_relation_ordinal_gap_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![4u8; BinaryHV::BYTES],
+                source_text: "two relations".into(),
+                confidence: 0.8,
+                domain: None,
+                cycle: 1,
+                is_causal: true,
+                relations: vec![
+                    ExtractedRelation {
+                        subject: "A".into(),
+                        predicate: "caused".into(),
+                        object: "B".into(),
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::Patient,
+                        is_causal: true,
+                        is_negated: false,
+                        confidence: 0.7,
+                    },
+                    ExtractedRelation {
+                        subject: "A".into(),
+                        predicate: "did not cause".into(),
+                        object: "C".into(),
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::Patient,
+                        is_causal: true,
+                        is_negated: true,
+                        confidence: 0.6,
+                    },
+                ],
+                graph_fact_id: Some(1),
+                initial_confidence: Some(0.8),
+                last_accessed_cycle: Some(1),
+                corroboration_count: 0,
+                contradiction_count: 0,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_relations SET ordinal = 2 WHERE ordinal = 1",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("Non-contiguous relation ordinal"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_orphan_relation_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_orphan_relation_row_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence.save_facts(&[]).unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "INSERT INTO knowledge_fact_relations
+             (fact_row_id, ordinal, subject, predicate, object, subject_role, object_role,
+              is_causal, is_negated, confidence)
+             VALUES (999, 0, 'A', 'caused', 'B', 'agent', 'patient', 1, 0, 0.7)",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("Structured relation rows refer to missing fact row 999"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_unknown_persisted_relation_role() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_unknown_relation_role_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![5u8; BinaryHV::BYTES],
+                source_text: "source fact".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+                relations: vec![ExtractedRelation {
+                    subject: "A".into(),
+                    predicate: "blocks".into(),
+                    object: "B".into(),
+                    subject_role: SemanticRole::Agent,
+                    object_role: SemanticRole::Patient,
+                    is_causal: false,
+                    is_negated: false,
+                    confidence: 0.7,
+                }],
+                graph_fact_id: None,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_relations SET subject_role = 'unknown_role'",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("unknown persisted semantic role key"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_load_facts_propagates_row_decode_errors() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_corrupt_facts_test_{}",
@@ -1050,6 +1498,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1093,6 +1542,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1133,6 +1583,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1170,6 +1621,7 @@ mod tests {
                 domain: None,
                 cycle: 1,
                 is_causal: false,
+                relations: Vec::new(),
                 graph_fact_id: Some(1),
                 initial_confidence: Some(0.9),
                 last_accessed_cycle: Some(1),
@@ -1207,6 +1659,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1243,6 +1696,7 @@ mod tests {
                 domain: None,
                 cycle: 3,
                 is_causal: false,
+                relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: Some(0.9),
                 last_accessed_cycle: Some(3),
@@ -1439,6 +1893,7 @@ mod tests {
             domain: Some("test".into()),
             cycle: 7,
             is_causal: true,
+            relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(8),
@@ -1547,6 +2002,7 @@ mod tests {
             domain: None,
             cycle: 1,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: Some(5),
             initial_confidence: Some(0.8),
             last_accessed_cycle: Some(1),
@@ -1564,6 +2020,7 @@ mod tests {
             domain: None,
             cycle: 2,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: Some(7),
             initial_confidence: Some(0.7),
             last_accessed_cycle: Some(2),
@@ -1624,6 +2081,7 @@ mod tests {
             domain: None,
             cycle: 1,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: Some(1),
             initial_confidence: Some(0.8),
             last_accessed_cycle: Some(1),
@@ -1637,6 +2095,7 @@ mod tests {
             domain: None,
             cycle: 2,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: Some(2),
             initial_confidence: Some(0.4),
             last_accessed_cycle: Some(2),
@@ -1688,6 +2147,7 @@ mod tests {
             domain: None,
             cycle: 3,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
@@ -1735,6 +2195,7 @@ mod tests {
             domain: None,
             cycle: 10,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.7),
             last_accessed_cycle: Some(10),
@@ -1800,6 +2261,7 @@ mod tests {
             domain: Some("test".into()),
             cycle: 7,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(8),
@@ -1833,6 +2295,7 @@ mod tests {
             domain: None,
             cycle: 3,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
@@ -1848,6 +2311,7 @@ mod tests {
             domain: None,
             cycle: u64::MAX,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
@@ -1888,6 +2352,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: Some(0.95),
                 last_accessed_cycle: Some(42),
@@ -1901,6 +2366,7 @@ mod tests {
                 domain: None,
                 cycle: 2,
                 is_causal: true,
+                relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: Some(0.85),
                 last_accessed_cycle: Some(44),

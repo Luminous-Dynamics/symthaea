@@ -15,7 +15,7 @@
 //!
 //! Science: Kanerva (2009) HDC, Plate (2003) Holographic Reduced Representations
 
-use super::extraction::{EntityType, ExtractedFact, SemanticRole};
+use super::extraction::{EntityType, ExtractedFact, ExtractedRelation, SemanticRole};
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::{BinaryHV, HDC_DIMENSION};
 
@@ -28,6 +28,11 @@ pub struct FactEncoding {
     pub vector: BinaryHV,
     /// Role-specific sub-vectors for compositional queries
     pub role_vectors: HashMap<SemanticRole, BinaryHV>,
+    /// Structured source relations retained independently of the bundled vector.
+    ///
+    /// HDC bundling is a lossy retrieval representation; predicates, negation and
+    /// per-relation confidence remain available for audit and persistence here.
+    pub relations: Vec<ExtractedRelation>,
     /// Source fact text (for human readability)
     pub source_text: String,
     /// Encoding confidence (extraction confidence × encoding quality)
@@ -192,6 +197,7 @@ impl KnowledgeEncoder {
         FactEncoding {
             vector,
             role_vectors,
+            relations: fact.relations.clone(),
             source_text: fact.source_text.clone(),
             confidence: fact.confidence,
         }
@@ -298,7 +304,11 @@ mod tests {
         // BinaryHV is always HDC_DIMENSION (16,384 bits = 2048 bytes)
         assert!(encoding.confidence > 0.0);
         assert!(!encoding.role_vectors.is_empty());
-        assert!(encoding.confidence > 0.0);
+        assert_eq!(encoding.relations.len(), fact.relations.len());
+        assert_eq!(encoding.relations[0].predicate, "sanctioned");
+        assert!(!encoding.relations[0].is_negated);
+        assert_eq!(encoding.relations[0].subject_role, SemanticRole::Agent);
+        assert_eq!(encoding.relations[0].object_role, SemanticRole::Patient);
     }
 
     #[test]

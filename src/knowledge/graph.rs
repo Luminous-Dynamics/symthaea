@@ -540,6 +540,7 @@ impl EnhancedKnowledgeGraph {
         let encoding = super::encoding::FactEncoding {
             vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
             role_vectors: std::collections::HashMap::new(),
+            relations: record.relations.clone(),
             source_text: record.source_text.clone(),
             confidence: record.confidence,
         };
@@ -600,6 +601,7 @@ impl EnhancedKnowledgeGraph {
             .values()
             .map(|f| super::persistence::FactRecord {
                 vector_bytes: f.encoding.vector.0.to_vec(),
+                relations: f.encoding.relations.clone(),
                 source_text: f.encoding.source_text.clone(),
                 confidence: f.confidence,
                 domain: f.domain.clone(),
@@ -783,12 +785,14 @@ fn contains_negation(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::extraction::{ExtractedRelation, SemanticRole};
     use super::super::persistence::KnowledgePersistence;
 
     fn make_encoding(text: &str, confidence: f32) -> FactEncoding {
         FactEncoding {
             vector: BinaryHV::random(crate::knowledge::encoding::fnv1a_hash(text)),
             role_vectors: HashMap::new(),
+            relations: Vec::new(),
             source_text: text.to_string(),
             confidence,
         }
@@ -891,6 +895,7 @@ mod tests {
             domain: None,
             cycle: 2,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: Some(1),
             initial_confidence: Some(0.8),
             last_accessed_cycle: Some(2),
@@ -904,6 +909,7 @@ mod tests {
             domain: None,
             cycle: 9,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: None,
             last_accessed_cycle: None,
@@ -1012,6 +1018,16 @@ mod tests {
             Some("test".to_string()),
             true,
         );
+        graph.facts.get_mut(&id).unwrap().encoding.relations = vec![ExtractedRelation {
+            subject: "ceasefire".into(),
+            predicate: "prevented".into(),
+            object: "escalation".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: true,
+            confidence: 0.73,
+        }];
         {
             let fact = graph.facts.get_mut(&id).unwrap();
             fact.confidence = 0.61;
@@ -1040,6 +1056,16 @@ mod tests {
         assert_eq!(fact.id, id, "SQLite round trip must preserve graph-level fact IDs");
         assert_eq!(fact.encoding.source_text, "persistent temporal fixture");
         assert_eq!(fact.encoding.vector.0.to_vec(), expected_vector);
+        assert_eq!(fact.encoding.relations.len(), 1);
+        let relation = &fact.encoding.relations[0];
+        assert_eq!(relation.subject, "ceasefire");
+        assert_eq!(relation.predicate, "prevented");
+        assert_eq!(relation.object, "escalation");
+        assert_eq!(relation.subject_role, SemanticRole::Agent);
+        assert_eq!(relation.object_role, SemanticRole::Patient);
+        assert!(relation.is_causal);
+        assert!(relation.is_negated);
+        assert!((relation.confidence - 0.73).abs() < f32::EPSILON);
         assert!((fact.confidence - 0.61).abs() < f32::EPSILON);
         assert!((fact.initial_confidence - 0.94).abs() < f32::EPSILON);
         assert_eq!(fact.inserted_at_cycle, 7);
@@ -1061,6 +1087,7 @@ mod tests {
             domain: None,
             cycle: 11,
             is_causal: false,
+            relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: None,
             last_accessed_cycle: None,
