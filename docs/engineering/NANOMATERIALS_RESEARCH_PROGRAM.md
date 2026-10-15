@@ -112,9 +112,9 @@ Current upstream sources show:
 - The current FairChem repository/model release notes say UMA 1.2 expanded training coverage to include OC22 and OC25. Thus, UMA 1.2 is task-matched for OC22-style oxide calculations in principle, but it has OC22 training exposure. Exact checkpoint and split exposure must still be established before interpreting it as an independent benchmark comparator.
 
 References:
-- [FairChem pretrained models and legacy OC22 S2EF checkpoints](https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/models.md)
-- [FairChem UMA task/domain matrix](https://github.com/facebookresearch/fairchem/blob/main/docs/core/uma.md)
-- [FairChem UMA changelog: OC22 added in UMA 1.2](https://github.com/facebookresearch/fairchem/blob/main/docs/core/uma_changelog.md)
+- [FairChem pretrained models and legacy OC22 S2EF checkpoints](https://github.com/facebookresearch/fairchem/blob/3801dac0cc0458a2f8121259a2ce8b23d4dcc5a1/docs/catalysts/models.md)
+- [FairChem UMA task/domain matrix](https://github.com/facebookresearch/fairchem/blob/c22fb1bedb2b4ca453376749f42999be1589856d/docs/core/uma.md)
+- [FairChem UMA changelog: OC22 added in UMA 1.2](https://github.com/facebookresearch/fairchem/blob/c22fb1bedb2b4ca453376749f42999be1589856d/docs/core/uma_changelog.md)
 - [FairChem current README and supported tasks](https://github.com/facebookresearch/fairchem)
 - [UMA checkpoint model card](https://huggingface.co/facebook/UMA)
 - [UMA license text and acceptable-use policy](https://huggingface.co/facebook/UMA/blob/main/LICENSE)
@@ -124,6 +124,17 @@ Treat this as a training-lineage question requiring resolution for the exact che
 Task match and training exposure are separate gates. The current FairChem pretrained-model page lists legacy OC22 S2EF-Total checkpoints but not a direct OC22 IS2RE checkpoint in that page's released-checkpoint table. S2EF predicts energy/forces for a supplied structure; that is not the same target as relaxed total energy from the initial structure. An OC22 S2EF potential can be used in a relaxation-based comparator only if the entire optimizer/constraints/convergence/failure/units/cost pipeline is frozen and evaluated end-to-end. Report that result as a relaxation-based baseline, not as a direct single-pass IS2RE predictor. UMA 1.2 supports an `oc22` task and is a plausible task/DFT-matched energy/force potential, but an UMA relaxation pipeline still needs a frozen protocol and checkpoint audit.
 
 **Do not use an UMA 1.2 checkpoint with OC22 training exposure as the primary selector/predictor for an OC22 label-efficiency claim.** If the model has already trained on candidate structures or labels that the experiment is supposed to hide, hiding those labels only from the new training loop does not create a genuinely label-blind baseline. UMA may be an external, non-independent task-matched comparator for a strictly separate official held-out evaluation only after its exact training split and benchmark partition independence are established. Label-efficiency experiments should train the same predictor family from scratch for each acquisition arm, or use a pretraining corpus whose non-overlap with the benchmark pool is demonstrable.
+
+#### Current candidate-model disposition (source-document audit)
+
+| Candidate | Appropriate role to evaluate | Current blocker / caveat |
+|---|---|---|
+| UMA 1.2 with `task_name="oc22"` (e.g. UMA-S 1.2.1) | Task-matched energy/force potential; possible relaxation-based comparator | UMA 1.2 includes OC22 training exposure; exact checkpoint, included split/record lineage, license, inference recipe, and memory/runtime on the target GPU must be frozen. Not a label-blind acquisition oracle if the query pool has already been seen. |
+| Legacy `GemNet-OC-S2EFS-OC22` | Energy/force potential for a fully specified relaxation pipeline | The current legacy model table reports validation energy MAE 0.563 eV and force MAE 0.030 eV/Å on its S2EF task; these numbers are not an IS2RE result. Its OC22 training exposure also means exact official held-out partition separation must be checked. |
+| Direct OC22 IS2RE-Total checkpoint | Preferred direct baseline if a verifiable, appropriately licensed checkpoint is located | The current published legacy model table lists OC22 S2EF-Total checkpoints but does not list a direct OC22 IS2RE checkpoint. Do not infer one exists merely because the dataset supports IS2RE. |
+| Same predictor family trained from scratch per acquisition arm | Preferred primary comparison for label-efficiency | Must identify a compatible implementation/task config, fit a bounded model/training recipe to the acquired-label budget, and measure feasibility on the intended hardware. Do not claim this is complete until an exact run reproduces. |
+
+This disposition uses the source documentation only. No checkpoint was downloaded, loaded, or benchmarked in this workstream. The UMA 1.2 `oc22` task is based on PBE+U/VASP with spin polarization; model task selection does not make the underlying total energy interchangeable with energies from another DFT level or task.
 
 A pretrained model may be an external comparator, a frozen feature extractor, a model fine-tuned on a declared acquired-label partition, or an active-learning oracle; these roles are not interchangeable. If training data exposure to a benchmark's evaluation records or acquisition pool is unknown, mark it `exposure_unknown` and do not use it as the primary proof of independent accuracy or label-efficiency improvement. A model trained on hidden labels cannot be described as an independent predictor of those records.
 
