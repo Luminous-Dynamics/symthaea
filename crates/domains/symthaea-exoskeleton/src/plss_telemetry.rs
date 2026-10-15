@@ -1053,8 +1053,12 @@ mod tests {
     #[test]
     fn source_revision_is_bound_into_receipt_digest() {
         let config = PlssTelemetryConfig::simulation_reference();
-        let (_, first) = evaluate_plss_telemetry_with_receipt(&[], 100.0, config, &"a".repeat(40)).unwrap();
-        let (_, second) = evaluate_plss_telemetry_with_receipt(&[], 100.0, config, &"b".repeat(40)).unwrap();
+        let revision_a = "a".repeat(40);
+        let revision_b = "b".repeat(40);
+        let (_, first) =
+            evaluate_plss_telemetry_with_receipt(&[], 100.0, config, &revision_a).unwrap();
+        let (_, second) =
+            evaluate_plss_telemetry_with_receipt(&[], 100.0, config, &revision_b).unwrap();
         assert_eq!(first.input_digest_sha256, second.input_digest_sha256);
         assert_eq!(first.result_digest_sha256, second.result_digest_sha256);
         assert_ne!(first.receipt_digest_sha256, second.receipt_digest_sha256);
