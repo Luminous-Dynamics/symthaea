@@ -359,6 +359,22 @@ The top bookkeeping state is `EvidenceBundleReadyForIndependentAssessment`, deli
 
 This is an assurance-case pattern: preserve each critical claim and its evidence separately, expose explicit blockers, and avoid compensatory scoring across non-substitutable requirements. It also creates a better Symthaea optimisation boundary. Symthaea can rank candidate experiments by expected information gain and explore Pareto trade-offs, but its search score must not override a hard evidence gate or infer physical capacity from HDC similarity. A future robust optimiser should return candidate designs together with their uncertainty envelope, worst-case scenario identifiers, open evidence obligations and next best discriminating test—not just a high score.
 
+### Scale-up must model defect populations, not only geometric similarity
+
+The 2026 kenemostat study is an important new structural result: it treats member and global buckling in an idealized geodesic vacuum-buoyant frame and reports analytical/beam-FEA agreement for its specific model. It also explicitly leaves joint design, manufacturing constraints and dynamic loading as limitations. Its claimed scale law and critical radius should therefore be treated as a hypothesis to stress-test against measured joint mass/stiffness, minimum-gauge skin, assembly tolerances, common-cause manufacturing drift, and a growing number of manufactured features—not as a flight-readiness verdict: [Toli, DOI 10.1016/j.ast.2026.112799](https://doi.org/10.1016/j.ast.2026.112799).
+
+Derveni et al. found, in validated finite-element studies of pressurized hemispherical shells with distributed imperfections, that the most severe defect in the modeled population governed buckling onset. This is a critical scale-up warning: if the number of joints, members or inspected surface regions grows, the tail of the defect population may matter more than the average defect. Their results concern the studied thin shell and do not directly establish the governing defect for a geodesic lattice, so that transfer itself must be tested: [arXiv:2410.08973](https://arxiv.org/abs/2410.08973).
+
+The code now exposes `screen_feature_defect_population(feature_count, per_feature_exceedance_probability)`, which calculates the conditional identical-independent-feature expression
+
+\[
+P(\text{at least one exceedance})=1-(1-p)^N.
+\]
+
+This is a sensitivity tool for a *declared defect criterion*, not a structural failure probability. For example, supplying (p=10^{-4}) gives about 2.664% probability of at least one exceedance across 270 features and about 63.214% across 10,000. These values are illustrative arithmetic only; neither (p) nor the independence assumption is measured for this vehicle. The API deliberately does not convert the result into a safety factor. Real manufacturing populations can be heterogeneous or correlated, inspection misses defects, and one defect does not necessarily cause system failure. Candidate analysis should use representative measurements, explicit correlation/common-cause models, and the topology's actual redistribution/failure mechanics.
+
+The candidate evidence gate now also requires (a) a complete mass ledger reconciled to a measured or build estimate, (b) scale transfer validated over a relevant size range, and (c) defect-tail characterization for the target manufacturing population. Analytical similarity alone and one small specimen are insufficient. These are caller-declared maturity states, not authenticated evidence; the gate reports missing obligations and never promotes a design to “safe.”
+
 ### Require exact scope alignment before comparing capacity evidence
 
 The bounded pressure screen now has a scope-aware wrapper, `assess_scoped_external_pressure_bounds`. A pressure-capacity record is compared only when eight immutable scope identifiers match the requested case:
@@ -415,6 +431,11 @@ The screening code should remain the quick-rejection layer. Candidate search may
 ### Robust design is not just a conservative scalar factor
 
 Probabilistic buckling work and experimentally grounded knockdown approaches show why calibration domain matters. NASA's probabilistic composite-shell study uses specimen geometry, measured imperfections and material data to estimate buckling-load distributions for a selected cylinder population: [NASA NTRS 2003-0062248](https://ntrs.nasa.gov/citations/20030062248). A separate deterministic method for spherical shells under external pressure reports a validation set of roughly 600 experiments: [Wagner, Hühne and Niemann, DOI 10.1016/j.ijmecsci.2018.03.029](https://doi.org/10.1016/j.ijmecsci.2018.03.029). These are valuable examples of calibration and validation discipline, not universal factors for the proposed lattice shell. The candidate's geometry, constituent system, joints, pressure boundary and defect population must fall within a demonstrated applicability domain—or require new validation.
+
+
+### What a credible paradigm shift would look like in practice
+
+Treat each design as a falsifiable, versioned claim bundle: (1) one mass ledger reconciled against component estimates and measured build mass, (2) exact CAD/as-built and mesh/specimen revisions, (3) representative distributions of defects and inspection sensitivity, (4) nonlinear global and local failure analyses, (5) pre-registered test predictions with explicit error metrics, and (6) demonstrated damage tolerance inside a declared operating envelope. Let Symthaea propose candidate geometries and rank the next tests by how sharply they discriminate between competing failure hypotheses; do not let it replace the solver or decide an allowable. Compare vacuum designs to helium and other realistic baselines using identical service requirements. The first outcome can legitimately be a no-go result if reconciled mass, defect tails or scale transfer prevent a credible positive margin. Falsification and early stopping are part of an efficient discovery system, not a failure of the research.
 
 ## Known exclusions
 
