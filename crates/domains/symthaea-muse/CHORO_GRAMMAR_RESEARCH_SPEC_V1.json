@@ -341,5 +341,36 @@
     "empirical_analysis_performed": 0,
     "status": "metadata_only_candidate_inventory_not_rights_cleared",
     "note": "Per-work source leads only. No score data is copied or analyzed; commercial or empirical use remains gated on an appropriate rights review."
+  },
+  "evaluation_methodology_references": {
+    "preregistration": {
+      "title": "Welcome to Registrations & Preregistrations",
+      "organization": "Open Science Framework Support",
+      "url": "https://help.osf.io/article/330-welcome-to-registrations",
+      "supports": [
+        "plan timestamped and read-only before collection or analysis",
+        "explicit hypotheses and variables, statistical tests, decision criteria, exclusions, outcomes, contingencies, and planned deviations"
+      ],
+      "limitation": "This repository validates recorded plan fields and a supplied HTTPS URL; it does not independently verify that an external registration exists or that its contents are immutable."
+    },
+    "music_generation_evaluation": {
+      "title": "Recent advances in music generation: methods, evaluation, and challenges",
+      "authors": [
+        "Wei Duan",
+        "Yi Yu",
+        "Jean-Pierre Briot"
+      ],
+      "published": "2026-06-02",
+      "doi": "10.1007/s10462-026-11582-x",
+      "url": "https://doi.org/10.1007/s10462-026-11582-x",
+      "supports": [
+        "no single objective metric covers every relevant aspect of generated music",
+        "symbolic and audio evaluation emphasize different outcome families, including tonality/rhythm/structure versus timbre/transients/perceptual quality"
+      ],
+      "design_implications": [
+        "report multiple registered metrics with distinct interpretations",
+        "separate source-corpus evidence from runtime response, rendered-audio evidence, and expert/listener evaluation"
+      ]
+    }
   }
 }
