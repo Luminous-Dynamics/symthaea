@@ -42,7 +42,7 @@ Fingerprints reveal input/output changes; they are not signatures and do not aut
 
 Corpus: `crates/domains/symthaea-exoskeleton/tests/fixtures/plss_telemetry_boundary_v1.json`.
 
-It includes upper and lower directions, boundary already beyond current data, a threshold inside the endpoint uncertainty envelope, candidates inside and outside the horizon, and missing-source behavior. Additional unit tests cover rate intervals that include zero, a flat zero-rate control, moving-away trajectories, source conflicts, altered SX-026 reports/receipts, invalid thresholds, and boundary input-order invariance.
+The v1 corpus contains seven boundary cases over three observations: upper and lower directions, boundary already beyond current data, a threshold inside the endpoint uncertainty envelope, candidates inside and outside the horizon, an absent source ID, and an absent metric/source lane. Additional unit tests cover rate intervals that include zero, a flat zero-rate control, moving-away trajectories, source conflicts, altered SX-026 reports/receipts, invalid thresholds, and boundary input-order invariance.
 
 Run on a configured Rust workspace:
 
