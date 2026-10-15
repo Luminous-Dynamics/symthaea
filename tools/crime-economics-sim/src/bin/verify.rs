@@ -264,6 +264,7 @@ fn run(path: &str) -> Result<(), String> {
     }
 
     // Negative control: changing report propensity must not change underlying harm.
+    let mut observed_strict_reporting_reduction = false;
     for seed in 0..REPLICATIONS {
         for policy in EXPECTED_POLICIES {
             let reference = get(&rows, "reference", seed, policy)?;
@@ -278,7 +279,16 @@ fn run(path: &str) -> Result<(), String> {
                     "suppressed reporting unexpectedly created more reported_harm: seed={seed}, policy={policy}"
                 ));
             }
+            if suppressed.reported_harm < reference.reported_harm {
+                observed_strict_reporting_reduction = true;
+            }
         }
+    }
+    if !observed_strict_reporting_reduction {
+        return Err(
+            "reporting_suppression never strictly reduced reported_harm for any matched seed/policy"
+                .to_string(),
+        );
     }
 
     // Negative control: higher displacement leaves focal-area prevention unchanged.

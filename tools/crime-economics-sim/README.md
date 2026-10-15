@@ -50,7 +50,7 @@ Neither source is used as a crime-effect estimate. The next empirical step would
 
 - reference: ordinary illustrative assumptions.
 - high_displacement: a larger share of prevented focal-area property incidents is assumed to move to neighboring areas.
-- reporting_suppression: only reporting probability changes; the verifier requires underlying harm to remain identical.
+- reporting_suppression: only reporting probability changes; the verifier requires underlying harm to remain identical and requires at least one strict reduction in reported incidents across matched seed/policy cells, preventing an inert suppression scenario from passing.
 - concentrated_automation: a deliberately adverse livelihood shock is applied to robot-enabled arms; combined support partly mitigates the shock.
 - high_robot_compromise: compromised robot weeks are more common; the verifier checks that exposure increases without altering non-robot arms.
 - unequal_essential_access: the same essentials program is delivered unevenly; the verifier must detect the worsening access gap.

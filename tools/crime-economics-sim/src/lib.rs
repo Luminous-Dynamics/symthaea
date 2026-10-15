@@ -556,6 +556,7 @@ mod tests {
 
     #[test]
     fn reporting_suppression_changes_reports_not_underlying_harm() {
+        let mut observed_strict_reporting_reduction = false;
         for policy in POLICY_ARMS {
             for seed in 0..REPLICATIONS {
                 let reference = run_one(scenario("reference"), policy, seed);
@@ -577,8 +578,15 @@ mod tests {
                     suppressed.non_economic_harm_events
                 );
                 assert!(suppressed.reported_harm_events <= reference.reported_harm_events);
+                if suppressed.reported_harm_events < reference.reported_harm_events {
+                    observed_strict_reporting_reduction = true;
+                }
             }
         }
+        assert!(
+            observed_strict_reporting_reduction,
+            "reporting suppression must strictly reduce reports for at least one matched seed/policy"
+        );
     }
 
     #[test]
