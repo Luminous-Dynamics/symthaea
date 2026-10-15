@@ -9,7 +9,8 @@
 //!
 //! Schema:
 //! - knowledge_facts: row id, graph_fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal
-//! - knowledge_causal_edges: cause, effect, strength, cycle
+//! - knowledge_causal_edges: edge_id, cause, effect, strength, inhibition/negation flags,
+//!   source text, and discovery cycle; each row is one edge observation
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
@@ -64,8 +65,14 @@ pub struct FactRecord {
 pub struct CausalEdgeRecord {
     pub cause: String,
     pub effect: String,
+    /// Non-negative causal strength; inhibition is represented separately.
     pub strength: f32,
     pub is_inhibitory: bool,
+    /// Whether the source explicitly negated this relation.
+    pub is_negated: bool,
+    /// Text from the source that produced this edge observation.
+    pub source_text: String,
+    /// Cycle when this observation was discovered.
     pub cycle: u64,
 }
 
@@ -483,15 +490,17 @@ impl KnowledgePersistence {
 
         let mut prepared_edges = Vec::with_capacity(edges.len());
         for edge in edges {
-            if !edge.strength.is_finite() {
+            if !edge.strength.is_finite() || edge.strength.abs() > 1.0 {
                 return Err(format!(
-                    "Non-finite causal edge strength for {} -> {}",
-                    edge.cause, edge.effect
+                    "Invalid causal edge strength outside [-1, 1] for {} -> {}: {}",
+                    edge.cause, edge.effect, edge.strength
                 ));
             }
             let cycle = i64::try_from(edge.cycle)
                 .map_err(|e| format!("Causal-edge cycle exceeds SQLite INTEGER range: {e}"))?;
-            prepared_edges.push((edge, cycle));
+            let strength = edge.strength.abs();
+            let is_inhibitory = edge.is_inhibitory || edge.strength < 0.0;
+            prepared_edges.push((edge, cycle, strength, is_inhibitory));
         }
 
         let mut prepared_ontology = Vec::with_capacity(ontology.len());
@@ -549,19 +558,21 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
         }
 
-        for (edge, cycle) in &prepared_edges {
-            // The live bridge can retain multiple observations for the same
-            // (cause, effect) pair, while SQLite stores one row per pair. Match
-            // the legacy upsert contract: the later observation replaces the row.
+        for (edge, cycle, strength, is_inhibitory) in &prepared_edges {
+            // Unlike the legacy save API, a full snapshot preserves every edge
+            // observation, including same-pair observations with distinct source
+            // text, negation, inhibitory polarity, or discovery cycle.
             tx.execute(
-                "INSERT OR REPLACE INTO knowledge_causal_edges
-                 (cause, effect, strength, is_inhibitory, cycle)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO knowledge_causal_edges
+                 (cause, effect, strength, is_inhibitory, is_negated, source_text, cycle)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     edge.cause,
                     edge.effect,
-                    edge.strength,
-                    edge.is_inhibitory,
+                    strength,
+                    is_inhibitory,
+                    edge.is_negated,
+                    edge.source_text,
                     cycle,
                 ],
             )
@@ -698,15 +709,33 @@ impl KnowledgePersistence {
 
         let mut count = 0;
         for edge in edges {
+            if !edge.strength.is_finite() || edge.strength.abs() > 1.0 {
+                return Err(format!(
+                    "Invalid causal edge strength outside [-1, 1] for {} -> {}: {}",
+                    edge.cause, edge.effect, edge.strength
+                ));
+            }
+            let cycle = i64::try_from(edge.cycle)
+                .map_err(|e| format!("Causal-edge cycle exceeds SQLite INTEGER range: {e}"))?;
+            // Preserve the historical upsert-by-pair behavior of this legacy API.
+            // The complete snapshot API below preserves repeated observations.
             conn.execute(
-                "INSERT OR REPLACE INTO knowledge_causal_edges (cause, effect, strength, is_inhibitory, cycle)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "DELETE FROM knowledge_causal_edges WHERE cause = ?1 AND effect = ?2",
+                rusqlite::params![edge.cause, edge.effect],
+            )
+            .map_err(|e| format!("Replace existing causal edge: {e}"))?;
+            conn.execute(
+                "INSERT INTO knowledge_causal_edges
+                 (cause, effect, strength, is_inhibitory, is_negated, source_text, cycle)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     edge.cause,
                     edge.effect,
-                    edge.strength,
-                    edge.is_inhibitory,
-                    edge.cycle as i64,
+                    edge.strength.abs(),
+                    edge.is_inhibitory || edge.strength < 0.0,
+                    edge.is_negated,
+                    edge.source_text,
+                    cycle,
                 ],
             )
             .map_err(|e| e.to_string())?;
@@ -730,19 +759,29 @@ impl KnowledgePersistence {
 
         let mut stmt = conn
             .prepare(
-                "SELECT cause, effect, strength, is_inhibitory, cycle FROM knowledge_causal_edges",
+                "SELECT cause, effect, strength, is_inhibitory, is_negated, source_text, cycle
+                 FROM knowledge_causal_edges ORDER BY edge_id",
             )
             .map_err(|e| e.to_string())?;
 
         let edges: Vec<CausalEdgeRecord> = stmt
             .query_map([], |row| {
                 let strength = decode_finite_f32(row.get(2)?, 2, "causal strength")?;
-                let cycle = decode_nonnegative_counter(row.get(4)?, 4, "causal-edge cycle")?;
+                if strength < 0.0 || strength > 1.0 {
+                    return Err(invalid_column_data(
+                        2,
+                        rusqlite::types::Type::Real,
+                        format!("persisted causal strength outside [0, 1]: {strength}"),
+                    ));
+                }
+                let cycle = decode_nonnegative_counter(row.get(6)?, 6, "causal-edge cycle")?;
                 Ok(CausalEdgeRecord {
                     cause: row.get(0)?,
                     effect: row.get(1)?,
                     strength,
                     is_inhibitory: row.get(3)?,
+                    is_negated: row.get(4)?,
+                    source_text: row.get(5)?,
                     cycle,
                 })
             })
@@ -877,12 +916,14 @@ impl KnowledgePersistence {
                 graph_fact_id INTEGER
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
+                edge_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cause TEXT NOT NULL,
                 effect TEXT NOT NULL,
                 strength REAL NOT NULL,
                 is_inhibitory INTEGER NOT NULL DEFAULT 0,
-                cycle INTEGER NOT NULL,
-                PRIMARY KEY (cause, effect)
+                is_negated INTEGER NOT NULL DEFAULT 0,
+                source_text TEXT NOT NULL DEFAULT '',
+                cycle INTEGER NOT NULL
             );
             CREATE TABLE IF NOT EXISTS knowledge_ontology (
                 name TEXT PRIMARY KEY,
@@ -901,6 +942,51 @@ impl KnowledgePersistence {
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
         )
         .map_err(|e| format!("Schema init: {e}"))?;
+
+        // The legacy causal table has PRIMARY KEY(cause, effect), which collapses
+        // repeated observations and cannot retain negation or source text. Migrate it
+        // once to an observation table with a surrogate key. Legacy signed strengths
+        // encoded inhibition; normalize to non-negative magnitude plus an explicit flag.
+        let edge_columns = {
+            let mut stmt = conn
+                .prepare("PRAGMA table_info(knowledge_causal_edges)")
+                .map_err(|e| format!("Inspect knowledge_causal_edges schema: {e}"))?;
+            let rows = stmt
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(|e| format!("Query knowledge_causal_edges schema: {e}"))?;
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("Collect knowledge_causal_edges schema: {e}"))?
+        };
+        if !edge_columns.iter().any(|column| column == "edge_id") {
+            conn.execute_batch(
+                "BEGIN IMMEDIATE;
+                 ALTER TABLE knowledge_causal_edges RENAME TO knowledge_causal_edges_legacy;
+                 CREATE TABLE knowledge_causal_edges (
+                     edge_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     cause TEXT NOT NULL,
+                     effect TEXT NOT NULL,
+                     strength REAL NOT NULL,
+                     is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                     is_negated INTEGER NOT NULL DEFAULT 0,
+                     source_text TEXT NOT NULL DEFAULT '',
+                     cycle INTEGER NOT NULL
+                 );
+                 INSERT INTO knowledge_causal_edges
+                     (cause, effect, strength, is_inhibitory, is_negated, source_text, cycle)
+                 SELECT cause, effect, ABS(strength),
+                        CASE WHEN is_inhibitory != 0 OR strength < 0 THEN 1 ELSE 0 END,
+                        0, '', cycle
+                 FROM knowledge_causal_edges_legacy;
+                 DROP TABLE knowledge_causal_edges_legacy;
+                 COMMIT;",
+            )
+            .map_err(|e| format!("Migrate causal edge observations: {e}"))?;
+        }
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_causal_edges_pair
+             ON knowledge_causal_edges(cause, effect);",
+        )
+        .map_err(|e| format!("Index causal edge observations: {e}"))?;
 
         // Additive migration preserves pre-existing rows. NULL on initial confidence
         // and last-access cycle means the legacy schema never recorded those values.
@@ -1228,6 +1314,8 @@ mod tests {
                 effect: "fixture effect".into(),
                 strength: -0.4,
                 is_inhibitory: true,
+                is_negated: false,
+                source_text: String::new(),
                 cycle: 1,
             }])
             .unwrap();
@@ -1260,6 +1348,8 @@ mod tests {
                 effect: "fixture effect".into(),
                 strength: 0.8,
                 is_inhibitory: false,
+                is_negated: false,
+                source_text: String::new(),
                 cycle: 1,
             }])
             .unwrap();
@@ -1360,6 +1450,8 @@ mod tests {
             effect: "stale-sentinel-effect".into(),
             strength: 0.7,
             is_inhibitory: false,
+            is_negated: false,
+            source_text: "affirmative source observation".into(),
             cycle: 1,
         };
         let stale_primitive = OntologyRecord {
@@ -1373,8 +1465,11 @@ mod tests {
         };
 
         let duplicate_edge = CausalEdgeRecord {
-            strength: -0.8,
+            strength: 0.8,
             is_inhibitory: true,
+            is_negated: true,
+            source_text: "negated inhibitory source observation".into(),
+            cycle: 2,
             ..stale_edge.clone()
         };
         assert_eq!(
@@ -1388,14 +1483,26 @@ mod tests {
                 .unwrap(),
             (1, 2, 1)
         );
-        let deduplicated_edges = persistence.load_causal_edges().unwrap();
+        let persisted_observations = persistence.load_causal_edges().unwrap();
         assert_eq!(
-            deduplicated_edges.len(),
-            1,
-            "duplicate in-memory cause/effect pairs share one persisted row"
+            persisted_observations.len(),
+            2,
+            "complete snapshots must retain repeated same-pair observations"
         );
-        assert_eq!(deduplicated_edges[0].strength, -0.8);
-        assert!(deduplicated_edges[0].is_inhibitory);
+        assert_eq!(
+            persisted_observations[0].source_text,
+            "affirmative source observation"
+        );
+        assert!(!persisted_observations[0].is_negated);
+        assert!(!persisted_observations[0].is_inhibitory);
+        assert_eq!(persisted_observations[1].strength, 0.8);
+        assert!(persisted_observations[1].is_inhibitory);
+        assert!(persisted_observations[1].is_negated);
+        assert_eq!(
+            persisted_observations[1].source_text,
+            "negated inhibitory source observation"
+        );
+        assert_eq!(persisted_observations[1].cycle, 2);
 
         let replacement_fact = FactRecord {
             source_text: "replacement live fact".into(),
@@ -1592,6 +1699,8 @@ mod tests {
             effect: "old effect".into(),
             strength: 0.5,
             is_inhibitory: false,
+            is_negated: false,
+            source_text: String::new(),
             cycle: 3,
         };
         let old_primitive = OntologyRecord {
@@ -1637,6 +1746,8 @@ mod tests {
             effect: "new effect".into(),
             strength: 0.6,
             is_inhibitory: false,
+            is_negated: false,
+            source_text: String::new(),
             cycle: 10,
         };
         let rejected_primitive = OntologyRecord {
@@ -1833,13 +1944,17 @@ mod tests {
                 effect: "oil shortage".into(),
                 strength: 0.8,
                 is_inhibitory: false,
+                is_negated: false,
+                source_text: String::new(),
                 cycle: 1,
             },
             CausalEdgeRecord {
                 cause: "diplomacy".into(),
                 effect: "war".into(),
-                strength: -0.6,
+                strength: 0.6,
                 is_inhibitory: true,
+                is_negated: false,
+                source_text: "diplomacy prevented war".into(),
                 cycle: 2,
             },
         ];
@@ -1849,6 +1964,87 @@ mod tests {
 
         let loaded = p.load_causal_edges().unwrap();
         assert_eq!(loaded.len(), 2);
+        assert_eq!(loaded[0].cause, "sanctions");
+        assert_eq!(loaded[0].strength, 0.8);
+        assert!(!loaded[0].is_inhibitory);
+        assert_eq!(loaded[0].cycle, 1);
+        assert_eq!(loaded[1].cause, "diplomacy");
+        assert_eq!(loaded[1].strength, 0.6);
+        assert!(loaded[1].is_inhibitory);
+        assert_eq!(loaded[1].source_text, "diplomacy prevented war");
+        assert_eq!(loaded[1].cycle, 2);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_legacy_causal_edge_schema_migrates_without_losing_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_causal_edge_migration_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE knowledge_causal_edges (
+                cause TEXT NOT NULL,
+                effect TEXT NOT NULL,
+                strength REAL NOT NULL,
+                is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                cycle INTEGER NOT NULL,
+                PRIMARY KEY (cause, effect)
+            );
+            INSERT INTO knowledge_causal_edges
+                (cause, effect, strength, is_inhibitory, cycle)
+            VALUES ('ceasefire', 'escalation', -0.7, 0, 9);",
+        )
+        .unwrap();
+        drop(conn);
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let edges = persistence.load_causal_edges().unwrap();
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].cause, "ceasefire");
+        assert_eq!(edges[0].effect, "escalation");
+        assert_eq!(edges[0].strength, 0.7);
+        assert!(edges[0].is_inhibitory);
+        assert!(!edges[0].is_negated);
+        assert!(edges[0].source_text.is_empty());
+        assert_eq!(edges[0].cycle, 9);
+
+        // The new schema can retain repeated observations, but this legacy
+        // save API deliberately keeps its historical upsert-by-pair behavior.
+        persistence
+            .save_causal_edges(&[
+                CausalEdgeRecord {
+                    cause: "ceasefire".into(),
+                    effect: "escalation".into(),
+                    strength: 0.6,
+                    is_inhibitory: false,
+                    is_negated: false,
+                    source_text: "later observation one".into(),
+                    cycle: 10,
+                },
+                CausalEdgeRecord {
+                    cause: "ceasefire".into(),
+                    effect: "escalation".into(),
+                    strength: 0.8,
+                    is_inhibitory: true,
+                    is_negated: true,
+                    source_text: "later observation two".into(),
+                    cycle: 11,
+                },
+            ])
+            .unwrap();
+
+        let after_legacy_upserts = persistence.load_causal_edges().unwrap();
+        assert_eq!(after_legacy_upserts.len(), 1);
+        assert_eq!(after_legacy_upserts[0].source_text, "later observation two");
+        assert!(after_legacy_upserts[0].is_inhibitory);
+        assert!(after_legacy_upserts[0].is_negated);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1866,6 +2062,8 @@ mod tests {
             effect: "b".into(),
             strength: 0.5,
             is_inhibitory: false,
+            is_negated: false,
+            source_text: String::new(),
             cycle: 1,
         };
 

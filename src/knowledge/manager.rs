@@ -21,7 +21,7 @@
 //! ```
 
 use super::adaptive_ontology::{AdaptiveOntology, AdaptiveOntologyConfig};
-use super::causal_bridge::CausalKnowledgeBridge;
+use super::causal_bridge::{CausalEdge, CausalKnowledgeBridge};
 use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
 use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
@@ -339,11 +339,15 @@ impl KnowledgeManager {
             })?;
             let edge_count = edges.len();
             for record in &edges {
-                causal_bridge.import_edge(
-                    record.cause.clone(),
-                    record.effect.clone(),
-                    record.strength,
-                );
+                causal_bridge.import_edge_record(CausalEdge {
+                    cause: record.cause.clone(),
+                    effect: record.effect.clone(),
+                    strength: record.strength,
+                    is_inhibitory: record.is_inhibitory,
+                    is_negated: record.is_negated,
+                    source_text: record.source_text.clone(),
+                    discovered_at_cycle: record.cycle,
+                });
             }
             if edge_count > 0 {
                 tracing::info!(
@@ -794,16 +798,17 @@ impl KnowledgeManager {
     pub fn persist_snapshot(&mut self) {
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
-            let edge_tuples = self.causal_bridge.export_edge_records();
-            let edges: Vec<CausalEdgeRecord> = edge_tuples
+            let edge_observations = self.causal_bridge.export_observations();
+            let edges: Vec<CausalEdgeRecord> = edge_observations
                 .into_iter()
-                .map(|(cause, effect, strength)| CausalEdgeRecord {
-                    cause,
-                    effect,
-                    // The legacy tuple export encodes inhibitory edges as negative strengths.
-                    is_inhibitory: strength < 0.0,
-                    strength,
-                    cycle: 0,
+                .map(|edge| CausalEdgeRecord {
+                    cause: edge.cause,
+                    effect: edge.effect,
+                    strength: edge.strength,
+                    is_inhibitory: edge.is_inhibitory,
+                    is_negated: edge.is_negated,
+                    source_text: edge.source_text,
+                    cycle: edge.discovered_at_cycle,
                 })
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
@@ -1367,6 +1372,51 @@ fn infer_domain(fact: &super::extraction::ExtractedFact) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_manager_snapshot_preserves_complete_causal_edge_observation() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_causal_observation_roundtrip_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..KnowledgeManagerConfig::default()
+        };
+
+        let mut manager = KnowledgeManager::try_new(config.clone()).unwrap();
+        manager.causal_bridge.add_edge(CausalEdge {
+            cause: "ceasefire".into(),
+            effect: "escalation".into(),
+            strength: 0.7,
+            is_inhibitory: true,
+            is_negated: true,
+            source_text: "The ceasefire did not prevent escalation.".into(),
+            discovered_at_cycle: 41,
+        });
+        manager.persist_snapshot();
+        drop(manager);
+
+        let restored = KnowledgeManager::try_new(config).unwrap();
+        let edges = restored.causal_bridge.export_observations();
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].cause, "ceasefire");
+        assert_eq!(edges[0].effect, "escalation");
+        assert_eq!(edges[0].strength, 0.7);
+        assert!(edges[0].is_inhibitory);
+        assert!(edges[0].is_negated);
+        assert_eq!(
+            edges[0].source_text,
+            "The ceasefire did not prevent escalation."
+        );
+        assert_eq!(edges[0].discovered_at_cycle, 41);
+
+        drop(restored);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_try_new_rejects_corrupt_persisted_state() {
