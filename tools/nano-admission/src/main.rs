@@ -621,6 +621,21 @@ mod tests {
     }
 
     #[test]
+    fn gzip_footer_corruption_is_detected_by_full_stream_validation() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("corrupt-footer.tar.gz");
+        write_fixture(&archive_path, &[("train/a.txt", b"payload for gzip trailer")]);
+
+        let mut bytes = fs::read(&archive_path).expect("read fixture archive");
+        assert!(bytes.len() >= 8, "gzip stream has a trailer");
+        let crc_offset = bytes.len() - 8;
+        bytes[crc_offset] ^= 0x01;
+        fs::write(&archive_path, bytes).expect("write corrupted fixture");
+
+        assert!(inventory_tar_gz(&archive_path).is_err());
+    }
+
+    #[test]
     fn invalid_gzip_or_tar_is_reported_as_inspection_failure() {
         let directory = tempfile::tempdir().expect("temporary directory");
         let archive_path = directory.path().join("not-an-archive.tar.gz");
