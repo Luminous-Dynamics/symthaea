@@ -704,6 +704,27 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
         }
     }
 
+    // Every declared artifact must participate in evidence or execution provenance.
+    // This prevents unrelated payloads from being silently included in an otherwise valid graph.
+    let mut referenced_artifact_ids = BTreeSet::<String>::new();
+    for node in &graph.nodes {
+        referenced_artifact_ids.extend(node.artifact_ids.iter().cloned());
+    }
+    for transformation in &graph.transformations {
+        referenced_artifact_ids.extend(transformation.input_artifact_ids.iter().cloned());
+        referenced_artifact_ids.extend(transformation.output_artifact_ids.iter().cloned());
+        referenced_artifact_ids.extend(transformation.code_artifact_id.iter().cloned());
+        referenced_artifact_ids.extend(transformation.configuration_artifact_id.iter().cloned());
+        referenced_artifact_ids.extend(transformation.environment_lock_artifact_id.iter().cloned());
+    }
+    for artifact in &graph.artifacts {
+        ensure!(
+            referenced_artifact_ids.contains(&artifact.artifact_id),
+            "artifact {} is unreferenced by every evidence node and transformation",
+            artifact.artifact_id
+        );
+    }
+
     validate_parameter_claims(&graph.parameter_claims, &nodes_by_id)?;
 
     Ok(Report {
@@ -1049,6 +1070,17 @@ mod tests {
     fn validate_fixture(root: &Path, value: &Value) -> Result<Report> {
         let graph: EvidenceGraph = serde_json::from_value(value.clone())?;
         validate_graph(root, &graph)
+    }
+
+    #[test]
+    fn rejects_unreferenced_artifacts() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        let unreferenced = payload(workspace.root(), "unused.bin", b"unreferenced artifact\n");
+        graph["artifacts"].as_array_mut().unwrap().push(unreferenced);
+
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("unreferenced by every evidence node and transformation"));
     }
 
     #[test]
