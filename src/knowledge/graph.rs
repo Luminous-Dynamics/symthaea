@@ -13,7 +13,8 @@
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
 use super::encoding::FactEncoding;
-use std::collections::HashMap;
+use super::extraction::SemanticRole;
+use std::collections::{HashMap, HashSet};
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -69,6 +70,26 @@ pub struct FactSearchResult {
     /// Similarity to query
     pub similarity: f32,
     /// Current confidence
+    pub confidence: f32,
+}
+
+/**
+ * Exact entity/role lookup result.
+ *
+ * This is symbolic grounding over the persisted observations, not HDC similarity
+ * search. Partial matches are returned and ranked by coverage × current confidence.
+ */
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoleObservationSearchResult {
+    /// Stable graph fact ID.
+    pub fact_id: FactId,
+    /// Requested (role, entity text) pairs that were found, preserving query order.
+    pub matched_terms: Vec<(SemanticRole, String)>,
+    /// Number of distinct, non-empty query terms after normalization.
+    pub total_terms: usize,
+    /// Matched query terms divided by total query terms, in [0, 1].
+    pub coverage: f32,
+    /// Current fact confidence used for relevance weighting.
     pub confidence: f32,
 }
 
@@ -251,6 +272,87 @@ impl EnhancedKnowledgeGraph {
             score_b
                 .partial_cmp(&score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(k);
+        results
+    }
+
+    /// Find facts by exact entity text under its observed semantic role.
+    ///
+    /// Text is trimmed and compared with ASCII case-insensitive equality. This
+    /// deliberately does not claim synonym or embedding-based semantic matching.
+    /// Each distinct requested (role, text) pair contributes at most one to coverage,
+    /// even if a caller repeats a term or the fact contains duplicate observations.
+    /// Partial matches are returned, ranked by coverage × current confidence.
+    pub fn search_role_observations(
+        &self,
+        role_terms: &[(SemanticRole, &str)],
+        k: usize,
+    ) -> Vec<RoleObservationSearchResult> {
+        if k == 0 {
+            return Vec::new();
+        }
+
+        let mut seen = HashSet::new();
+        let requested: Vec<(SemanticRole, String)> = role_terms
+            .iter()
+            .filter_map(|(role, term)| {
+                let trimmed = term.trim();
+                let normalized = trimmed.to_ascii_lowercase();
+                if normalized.is_empty() || !seen.insert((*role, normalized)) {
+                    None
+                } else {
+                    Some((*role, trimmed.to_string()))
+                }
+            })
+            .collect();
+
+        if requested.is_empty() {
+            return Vec::new();
+        }
+
+        let mut results: Vec<RoleObservationSearchResult> = self
+            .facts
+            .values()
+            .filter_map(|fact| {
+                let matched_terms: Vec<(SemanticRole, String)> = requested
+                    .iter()
+                    .filter(|(role, term)| {
+                        fact.encoding.role_vector_observations.iter().any(|observation| {
+                            observation.role == *role
+                                && observation
+                                    .entity_text
+                                    .trim()
+                                    .eq_ignore_ascii_case(term.trim())
+                        })
+                    })
+                    .cloned()
+                    .collect();
+
+                if matched_terms.is_empty() {
+                    return None;
+                }
+
+                let coverage = matched_terms.len() as f32 / requested.len() as f32;
+                Some(RoleObservationSearchResult {
+                    fact_id: fact.id,
+                    matched_terms,
+                    total_terms: requested.len(),
+                    coverage,
+                    confidence: fact.confidence,
+                })
+            })
+            .collect();
+
+        results.sort_by(|a, b| {
+            let score_a = a.coverage * a.confidence;
+            let score_b = b.coverage * b.confidence;
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.coverage.partial_cmp(&a.coverage).unwrap_or(std::cmp::Ordering::Equal))
+                .then_with(|| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal))
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(k);
         results
@@ -860,6 +962,81 @@ mod tests {
         let results = graph.search(&query, 5, 2);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].fact_id, id);
+    }
+
+    #[test]
+    fn test_role_observation_search_handles_repeated_roles_and_partial_matches() {
+        use crate::knowledge::encoding::RoleBoundVector;
+
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let mut multi = make_encoding("two agents and a patient", 0.95);
+        multi.role_vector_observations = vec![
+            RoleBoundVector {
+                role: SemanticRole::Agent,
+                entity_text: "United States".into(),
+                vector: BinaryHV::random(4101),
+            },
+            RoleBoundVector {
+                role: SemanticRole::Agent,
+                entity_text: "European Union".into(),
+                vector: BinaryHV::random(4102),
+            },
+            RoleBoundVector {
+                role: SemanticRole::Patient,
+                entity_text: "Iran".into(),
+                vector: BinaryHV::random(4103),
+            },
+        ];
+        let (multi_id, _) = graph.insert(multi, 1, None, false);
+
+        let mut partial = make_encoding("one agent and a patient", 0.9);
+        partial.role_vector_observations = vec![
+            RoleBoundVector {
+                role: SemanticRole::Agent,
+                entity_text: "United States".into(),
+                vector: BinaryHV::random(4201),
+            },
+            RoleBoundVector {
+                role: SemanticRole::Patient,
+                entity_text: "Iran".into(),
+                vector: BinaryHV::random(4202),
+            },
+        ];
+        let (partial_id, _) = graph.insert(partial, 2, None, false);
+
+        let query = [
+            (SemanticRole::Agent, "United States"),
+            (SemanticRole::Agent, "European Union"),
+            (SemanticRole::Patient, "Iran"),
+            // Repeating a term must not inflate coverage.
+            (SemanticRole::Agent, " european union "),
+        ];
+        let results = graph.search_role_observations(&query, 10);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].fact_id, multi_id);
+        assert_eq!(results[0].coverage, 1.0);
+        assert_eq!(results[0].total_terms, 3);
+        assert_eq!(results[0].matched_terms.len(), 3);
+        let partial_result = results.iter().find(|r| r.fact_id == partial_id).unwrap();
+        assert!((partial_result.coverage - (2.0 / 3.0)).abs() < f32::EPSILON);
+
+        // A matching name under the wrong role is not sufficient evidence.
+        assert!(graph
+            .search_role_observations(&[(SemanticRole::Patient, "European Union")], 10)
+            .is_empty());
+        assert!(graph.search_role_observations(&[], 10).is_empty());
+        assert!(graph.search_role_observations(&query, 0).is_empty());
+
+        // The same matching behavior survives the graph's persistence record
+        // export/import representation, not only in-memory insertion.
+        let records = graph.export_fact_records();
+        let mut restored = EnhancedKnowledgeGraph::new(10);
+        for record in &records {
+            restored.import_fact_record(record);
+        }
+        let restored_results = restored.search_role_observations(&query, 10);
+        assert_eq!(restored_results[0].fact_id, multi_id);
+        assert_eq!(restored_results[0].coverage, 1.0);
     }
 
     #[test]
