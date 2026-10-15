@@ -964,7 +964,12 @@ mod tests {
 
         let mut persistence = KnowledgePersistence::new(&db_path);
         persistence
-            .replace_knowledge_snapshot(&graph.export_fact_records(), &[], &[], graph.next_fact_id())
+            .replace_knowledge_snapshot(
+                &graph.export_fact_records(),
+                &[],
+                &[],
+                graph.next_fact_id(),
+            )
             .unwrap();
 
         let records = persistence.load_facts().unwrap();
