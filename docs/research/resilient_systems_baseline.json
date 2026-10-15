@@ -322,7 +322,7 @@
       }
     ],
     "local_validation_status": {
-      "rust_tests_authored": 15,
+      "rust_tests_authored": 20,
       "rust_tests_executed": false,
       "reason": "Local tool environment did not provide cargo or rustc.",
       "do_not_claim": [
