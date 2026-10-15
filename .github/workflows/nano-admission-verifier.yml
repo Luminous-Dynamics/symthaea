@@ -1,0 +1,37 @@
+name: NANO Admission Verifier
+
+on:
+  pull_request:
+    paths:
+      - "tools/nano-admission/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/nano-admission-verifier.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/nano-admission/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/nano-admission-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tool:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --package nano-admission-verifier -- --check
+      - name: Run fixture tests
+        run: cargo test --locked -p nano-admission-verifier
+      - name: Run Clippy
+        run: cargo clippy --locked -p nano-admission-verifier --all-targets -- -D warnings
