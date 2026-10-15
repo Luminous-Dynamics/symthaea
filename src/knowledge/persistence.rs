@@ -478,7 +478,7 @@ impl KnowledgePersistence {
                 "Next graph fact ID {next_graph_fact_id} must be positive and greater than the highest persisted fact ID {max_graph_fact_id}"
             ));
         }
-        let next_graph_fact_id_sql = i64::try_from(next_graph_fact_id)
+        i64::try_from(next_graph_fact_id)
             .map_err(|e| format!("Next graph fact ID exceeds SQLite INTEGER range: {e}"))?;
 
         let mut prepared_edges = Vec::with_capacity(edges.len());
@@ -1468,8 +1468,10 @@ mod tests {
                 3,
             )
             .unwrap();
+        // Even a stale-but-valid lower candidate must not decrease a committed
+        // allocator high-water mark.
         persistence
-            .replace_knowledge_snapshot(&[retained], &[], &[], 3)
+            .replace_knowledge_snapshot(&[retained], &[], &[], 2)
             .unwrap();
 
         let records = persistence.load_facts().unwrap();
