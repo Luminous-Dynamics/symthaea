@@ -22,6 +22,8 @@ This patch replaces both shortcuts with explicitly dimensioned, finite-capacity 
 - The modeled capture per step is bounded by all three: CO2-equivalent burden available, rate × step duration (and modeled path availability), and remaining cartridge capacity.
 - Scrubber degradation halves the synthetic reference rate; a failed scrubber captures zero. A degraded ventilation path reduces the declared scrubber rate; a failed ventilation path retains the existing mission-abort behavior.
 - No scrubber regeneration, pressure, gas-volume mixing, leakage coupling, sorbent chemistry, breakthrough curve, or temperature/moisture cross-sensitivity is claimed in v0.1.
+- The EVA mission planner uses a conservative no-assist workload to check whether the declared rate and finite capacity can cover an entire planned segment. A failed path, nonzero residual burden, inadequate rate, or insufficient capacity returns a `ReturnToSafeHaven` planning disposition before the next task segment begins.
+- When a resource is exhausted within a step, the segment report escalates to return at the step boundary. This segment-level model does not determine the real partial pressure or a safe accumulated burden; its values must not be interpreted as human exposure limits.
 
 ## Humidity model
 
