@@ -33,6 +33,22 @@ The external repository describes:
 
 The repository currently declares Python >=3.12 and a substantial dependency set (ASE, MACE-Torch, ORB models, Materials Project API, and optional remote experiment/LLM/logging tools among them). We should therefore **reuse it as an isolated research benchmark, not adopt it as a Symthaea production dependency**. Its current moving main branch is not a valid run identity: implementation must freeze an exact upstream commit and all model/data/config identities before the first scored run.
 
+### Initial immutable source pin
+
+The public MADE repository's current main ref was resolved during the source audit to commit **bffda0c9a1fa1904b35c0ef67b455881c975df86** (commit date reported by GitHub: 2026-05-08T15:21:48Z). Treat this as the review snapshot only; confirm the exact upstream commit intended for execution before a scored run.
+
+| Source component | Pinned path/blob |
+|---|---|
+| Code license | [LICENSE](https://github.com/diffractivelabs/MADE/blob/bffda0c9a1fa1904b35c0ef67b455881c975df86/LICENSE), blob `3ba6d9061dbfc90f7ef75751a6e40f79b21feac3` |
+| Dependency metadata | [pyproject.toml](https://github.com/diffractivelabs/MADE/blob/bffda0c9a1fa1904b35c0ef67b455881c975df86/pyproject.toml), blob `527f5fd85e12087eb43ba91fea467abc72c54252` |
+| Main metrics module | [metrics.py](https://github.com/diffractivelabs/MADE/blob/bffda0c9a1fa1904b35c0ef67b455881c975df86/src/made/evaluation/metrics.py), blob `d102ffe14f9bfd85790101dd4f359adadba31d5e` |
+| Random-generator baseline config | [random_generator_baseline.yaml](https://github.com/diffractivelabs/MADE/blob/bffda0c9a1fa1904b35c0ef67b455881c975df86/configs/agent/random_generator_baseline.yaml), blob `bfc0a29324c352d794fbac4723e78b18286bc1ac` |
+| Analytic oracle config | [analytic.yaml](https://github.com/diffractivelabs/MADE/blob/bffda0c9a1fa1904b35c0ef67b455881c975df86/configs/oracle/analytic.yaml), blob `0c77cf0197293f6f20c3ca0c2a803144441d2cdc` |
+
+A source-level review confirms that the metric implementation has code for area under the discovery curve (cumulative discoveries versus query count, integrated trapezoidally), enhancement factor (proposal discoveries relative to baseline at matched query points, with an implementation cap), and acceleration factor (relative queries needed to reach a target discovery count). **Do not assume the README's listed mSUN metric is implemented by the same metrics module**: search the pinned runner/notebooks and record the exact calculation site before using or reporting it.
+
+These are immutable review identifiers, not a declaration that dependencies installed, artifacts downloaded, or any benchmark ran successfully.
+
 ## 3. Hypothesis and null
 
 **H1:** At equal candidate-oracle query budgets, a fixed Symthaea-assisted policy achieves better discovery utility/efficiency than the strongest applicable non-Symthaea baseline over held-out systems, with no invalid queries or hidden-information access.
