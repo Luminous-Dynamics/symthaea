@@ -476,6 +476,8 @@ pub struct PlssTelemetryReceipt {
     pub excluded_low_confidence_observations: usize,
     pub input_digest_sha256: String,
     pub result_digest_sha256: String,
+    /// Binds the revision, both fingerprints, and all receipt counters; not a signature.
+    pub receipt_digest_sha256: String,
 }
 
 /// Evaluate and produce a deterministic receipt tied to a caller-supplied,
@@ -493,7 +495,7 @@ pub fn evaluate_plss_telemetry_with_receipt(
     }
 
     let report = fuse_plss_telemetry(observations, evaluated_at_s, config)?;
-    let receipt = PlssTelemetryReceipt {
+    let mut receipt = PlssTelemetryReceipt {
         source_revision: source_revision.to_ascii_lowercase(),
         input_observation_count: observations.len(),
         accepted_source_metric_pairs: report
@@ -507,7 +509,9 @@ pub fn evaluate_plss_telemetry_with_receipt(
         excluded_low_confidence_observations: report.excluded_low_confidence_observations,
         input_digest_sha256: digest_input_observations(observations),
         result_digest_sha256: digest_fusion_report(&report),
+        receipt_digest_sha256: String::new(),
     };
+    receipt.receipt_digest_sha256 = digest_receipt(&receipt);
     Ok((report, receipt))
 }
 
@@ -620,6 +624,21 @@ fn digest_fusion_report(report: &PlssTelemetryFusionReport) -> String {
             hash.write_str(source_id);
         }
     }
+    hash.finish()
+}
+
+fn digest_receipt(receipt: &PlssTelemetryReceipt) -> String {
+    let mut hash = StableSha256::new();
+    hash.write_str("symthaea.plss.telemetry.receipt.v1");
+    hash.write_str(&receipt.source_revision);
+    hash.write_usize(receipt.input_observation_count);
+    hash.write_usize(receipt.accepted_source_metric_pairs);
+    hash.write_usize(receipt.rejected_invalid_observations);
+    hash.write_usize(receipt.rejected_future_dated_observations);
+    hash.write_usize(receipt.excluded_stale_observations);
+    hash.write_usize(receipt.excluded_low_confidence_observations);
+    hash.write_str(&receipt.input_digest_sha256);
+    hash.write_str(&receipt.result_digest_sha256);
     hash.finish()
 }
 
@@ -961,8 +980,10 @@ mod tests {
         assert_eq!(first.input_observation_count, 2);
         assert_eq!(first.input_digest_sha256, second.input_digest_sha256);
         assert_eq!(first.result_digest_sha256, second.result_digest_sha256);
+        assert_eq!(first.receipt_digest_sha256, second.receipt_digest_sha256);
         assert!(first.input_digest_sha256.starts_with("sha256:"));
         assert!(first.result_digest_sha256.starts_with("sha256:"));
+        assert!(first.receipt_digest_sha256.starts_with("sha256:"));
     }
 
     #[test]
@@ -1002,6 +1023,7 @@ mod tests {
         .unwrap();
         assert_ne!(first.input_digest_sha256, second.input_digest_sha256);
         assert_ne!(first.result_digest_sha256, second.result_digest_sha256);
+        assert_ne!(first.receipt_digest_sha256, second.receipt_digest_sha256);
     }
 
     #[test]
@@ -1025,6 +1047,17 @@ mod tests {
         .unwrap();
         assert_eq!(first.input_digest_sha256, second.input_digest_sha256);
         assert_ne!(first.result_digest_sha256, second.result_digest_sha256);
+        assert_ne!(first.receipt_digest_sha256, second.receipt_digest_sha256);
+    }
+
+    #[test]
+    fn source_revision_is_bound_into_receipt_digest() {
+        let config = PlssTelemetryConfig::simulation_reference();
+        let (_, first) = evaluate_plss_telemetry_with_receipt(&[], 100.0, config, &"a".repeat(40)).unwrap();
+        let (_, second) = evaluate_plss_telemetry_with_receipt(&[], 100.0, config, &"b".repeat(40)).unwrap();
+        assert_eq!(first.input_digest_sha256, second.input_digest_sha256);
+        assert_eq!(first.result_digest_sha256, second.result_digest_sha256);
+        assert_ne!(first.receipt_digest_sha256, second.receipt_digest_sha256);
     }
 
     #[test]
