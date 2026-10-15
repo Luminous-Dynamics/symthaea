@@ -52,6 +52,14 @@ Do not silently merge unlike foods. A local cultivar, wild/underutilized food, f
 
 A source name alone is not provenance. Record its exact edition, record and permitted transformation rather than inventing a citation because a food or nutrient sounds plausible.
 
+### Paradigm shift: from permission flags to resolvable evidence records
+
+An enum saying “allowed” and a string saying “license-clause” are not evidence by themselves. Every affirmative source-right decision must resolve to a typed evidence record carrying its subject source, exact right, grant basis (license terms or written permission), evidence URI, review date, validity end and lifecycle. The validator blocks unresolved or duplicate identifiers, cross-source/cross-right references, basis mismatch, malformed or out-of-window dates, invalid URIs, and revoked/withdrawn/needs-review evidence. Regression controls include these decision boundaries and a positive control for a current, correctly scoped written permission.
+
+This is a *resolvable, proof-carrying data contract*, not a cryptographic legal oracle. References and metadata help reproduce a rights decision but do not authenticate the publisher, fetch/check the underlying text, or establish legal sufficiency. A future verifier of permission-document bytes must receive the bytes separately and clearly distinguish hash matching from legal review; a hash string without corresponding bytes is not verification.
+
+This direction combines general data-stewardship practices—machine-actionable license/access conditions and detailed provenance—with food-composition-specific checks for data quality and food matching ([FAIR principles](https://www.nature.com/articles/sdata201618); [NIST summary](https://www.nist.gov/itl/ssd/information-systems-group/configurable-data-curation-system-cdcs/cdcs-help-and-resources-1); [FAO/INFOODS standards](https://www.fao.org/infoods/infoods/standards-guidelines/en/); [FAO/INFOODS data quality](https://www.fao.org/infoods/infoods/standards-guidelines/data-quality/en/)).
+
 Every affirmative rights decision—whether allowed by a license or granted by written permission—must be backed by a non-empty evidence reference scoped to that right. The source registry stores separate references for assessment, cache/retention, transformation, commercial use, public fixture use and redistribution; one reference cannot silently satisfy a different right's requirement. A reference is only a pointer to a license clause or permission record, not automatic proof of scope, authenticity, legal sufficiency or continued validity.
 
 ### Johannesburg/Highveld candidate-food hypothesis (not yet a planting recommendation)
