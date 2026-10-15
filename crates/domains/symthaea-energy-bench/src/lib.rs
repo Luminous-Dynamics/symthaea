@@ -102,6 +102,7 @@ pub struct EvaluationPolicy {
     pub policy_id: String,
     pub registered_before_search: bool,
     pub preregistered_at: String,
+    pub search_started_at: String,
     pub relative_balance_tolerance: f64,
     pub time_continuity_tolerance_s: f64,
     pub minimum_superiority_margin: f64,
@@ -229,8 +230,18 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
     if !policy.registered_before_search {
         issues.push("evaluation policy was not registered before search".into());
     }
-    if DateTime::parse_from_rfc3339(&policy.preregistered_at).is_err() {
+    let preregistered_at = DateTime::parse_from_rfc3339(&policy.preregistered_at);
+    let search_started_at = DateTime::parse_from_rfc3339(&policy.search_started_at);
+    if preregistered_at.is_err() {
         issues.push("evaluation_policy.preregistered_at must be RFC 3339".into());
+    }
+    if search_started_at.is_err() {
+        issues.push("evaluation_policy.search_started_at must be RFC 3339".into());
+    }
+    if let (Ok(policy_time), Ok(search_time)) = (preregistered_at, search_started_at) {
+        if policy_time >= search_time {
+            issues.push("evaluation policy must be timestamped before search_started_at".into());
+        }
     }
     if !balance_tolerance.is_finite() || !(0.0..1.0).contains(&balance_tolerance) {
         issues.push("relative_balance_tolerance must be finite and in [0, 1)".into());
