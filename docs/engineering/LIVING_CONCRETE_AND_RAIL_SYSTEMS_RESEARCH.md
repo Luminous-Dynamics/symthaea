@@ -364,6 +364,78 @@ Use a small, reviewable status vocabulary in the existing source manifest (no ne
 
 These are sequential audit states, not a new evidence type. Later states do not erase unresolved rights, and a checksum only validates byte identity—not correctness of the original measurement. Do not claim a state from a citation or file listing alone.
 
+### A14. Paradigm shifts: from “self-healing material” to verified adaptive infrastructure (2026-10-15)
+
+The strategic opportunity is not to claim a universally self-healing concrete or a universally superior railway predictor. It is to build a research-to-operations loop that **prevents avoidable damage, senses what cannot be prevented, selects a bounded intervention, and independently verifies whether that intervention improved the asset over its service life**. The following are hypotheses and programme design principles, not demonstrated Symthaea capabilities.
+
+This reframing responds to known limitations in the literature. A six-laboratory study of glass-macrocapsule systems found that crack-preconditioning and waterproofing choices materially influenced measurements; reference flow rates were comparable in only four of six labs, while sealing-efficiency results were more comparable across all six. A separate MgO interlaboratory study reported high variability in crack creation, which complicates comparison across labs. These findings make metrology and protocol reproducibility part of the product, not administrative overhead ([Van Mullem et al., 2020](https://doi.org/10.1080/14686996.2020.1814117); [SARCOS MgO interlaboratory study, 2021](https://doi.org/10.3390/ma14082024)). Research on active-learning materials laboratories similarly emphasizes managing epistemic and stochastic error, reproducibility, reconfigurability and interoperability ([Ren et al., 2023](https://www.nature.com/articles/s41578-023-00588-4)). A 2026 review of rail geometry forecasting identifies local-exceedance under-detection from label scarcity and smoothing, and proposes separating exceedance events from anomalies rather than relying on one aggregated condition score ([Railway track geometry degradation: a review of prediction methods, 2026](https://doi.org/10.1016/j.rineng.2026.109583)).
+
+#### A14.1. Eight design shifts
+
+| Paradigm shift | Old question | Better question | Evidence gate / failure condition |
+|---|---|---|---|
+| **1. Material-first → service-first** | Which ingredient or recipe maximizes crack closure? | Which intervention portfolio delivers required asset function at acceptable safety, repair burden, cost and environmental impact over a declared service period? | Use a declared functional unit, baseline design, exposure/loading, maintenance policy and end-of-life. No universal “best material” claim from a coupon result. |
+| **2. Static leaderboard → causal experiment** | Which formulation has the highest reported healing percentage? | Which component of the intervention caused the outcome relative to matched controls, and under which boundary conditions? | Pre-register control groups, batch/specimen hierarchy and estimand. Where safe and appropriate, distinguish carrier effects, added-agent effects, ordinary autogenous healing and environmental contributions. If the design cannot separate explanations, report association rather than mechanism. |
+| **3. Scalar healing score → property-specific envelope** | How much did the crack “heal”? | For what crack width/depth, moisture, temperature, exposure chemistry, age and cycling regime does each endpoint remain within requirements? | Keep appearance/closure, transport/ingress, mechanical capacity, fatigue, durability, workability, biological viability and biosafety separate. Unknown or out-of-domain conditions return insufficient evidence; no compensatory weighted score may override a hard requirement. |
+| **4. One-lab result → reproducible measurement system** | Can one lab produce an attractive result? | Can independent labs reproduce both the physical treatment and the measurement under a shared protocol? | Freeze crack induction and width-control methods, conditioning, sealing, instrumentation, calibration, endpoint definitions, raw-data shape and analysis. Include reference specimens and report between-lab as well as within-lab variation before claiming transferable performance. |
+| **5. Maximize predicted improvement → maximize useful information** | Which next candidate has the best model-predicted outcome? | Which experiment most reduces uncertainty that could change a real decision, per unit cost/time/risk? | Compare expected information gain or decision value against simple baselines; include feasibility, experiment cost, expected duration, risk and OOD likelihood. The value is in changing a decision, not merely reducing model error. Preserve negative, null and contradictory results. |
+| **6. Embodied-carbon snapshot → whole-life functional comparison** | Is the new mix lower-carbon per cubic metre? | What are emissions, cost and service risks for equivalent accepted function over the same horizon, including construction, repairs, closures, replacements, transport and end-of-life? | State system boundary, functional unit, inventories and service-life assumptions; vary uncertain repair frequency and life extension in sensitivity analysis. A recent SHC LCA reports 30–50% higher embodied carbon for studied concepts while modelling potential maintenance/design benefits—the trade-off is formulation- and assumption-specific, not a general result ([Rengaraju et al., 2025](https://doi.org/10.1016/j.jobe.2025.113105)). |
+| **7. Autonomous repair → repairable, inspectable material** | Can the material repair itself without a human? | Can damage be detected early, remain inspectable, and be repaired or safely taken out of service if healing fails? | Preserve crack/degradation visibility, fallback repairs, inspection intervals, repairability and failure modes. “Autonomous” must never mean “self-certifying” or “inspection not required.” |
+| **8. Model-as-oracle → evidence-bounded digital thread** | Can the model output a confident answer? | Can a reviewer trace every decision to source rights, physical specimens/assets, units, assumptions, calibration domain and independent checks? | Compose existing MAT/FIELD/SE-OBS/SE-SEM/ENG-EVID owners and Mycelix provenance controls. Distinguish literature, lab observation, simulation, field evidence and independent review. A hash proves byte integrity/lineage, not physical truth; governance approval is not engineering validation. |
+
+#### A14.2. The experiment-selection engine should optimize information, not excitement
+
+Once lawful, versioned source bytes can be retrieved, rank candidate experiments by **expected decision value** rather than only expected healing performance. For each proposed experiment record: (i) decision it could change; (ii) competing hypotheses it distinguishes; (iii) outcomes and controls required; (iv) expected uncertainty reduction; (v) equipment, time and financial cost; (vi) safety/biosafety and environmental review; (vii) whether a null result remains interpretable; and (viii) the result that would stop the line of research.
+
+The first use should be human-reviewed batch selection from a pre-registered queue, not an autonomous wet lab. Start with source-data and analysis experiments (file identity, formulas, replicate hierarchy, published-result reproduction), then matched materials experiments, then inter-laboratory replication, and only then a low-consequence pilot. An experiment with modest expected performance but high ability to discriminate between rival explanations may be more valuable than another high-scoring formulation.
+
+Use simple, transparent baselines for acquisition policies and compare decision-relevant outcomes, including experiments needed to reach a reliable decision, calibration, failure-to-reject poor candidates, and replication success. Any active-learning gain should be measured on a frozen candidate pool or prospective protocol; retrospective ranking of known winners is not evidence that the method improves discovery.
+
+#### A14.3. Concrete-specific paradigm: define a “healing envelope” and require witness evidence
+
+Do not define an ingredient as “self-healing” in the abstract. Define a bounded envelope of conditions and endpoints in which a specific material/process has passed independent, repeated tests. Each proposed envelope should name:
+
+- initial crack geometry (width distribution, depth and location), crack-generation method, and load history;
+- mix/batch and specimen lineage, exposure, moisture regime, temperature, relevant chemistry and healing duration;
+- separate endpoints for visual closure, water/ion/other relevant transport, post-healing mechanical behaviour, repeated-load/cycle durability, and fresh-state/constructability;
+- the uncertainty interval, failure fraction, missingness, measurement sensitivity and out-of-domain boundary;
+- controls that distinguish the candidate agent/carrier from crack-width control, substrate effects, autogenous healing, carbonation, environmental organisms or other plausible contributors;
+- the independent replication condition that would falsify transfer to a new mix, lab, exposure or scale.
+
+Use a small, predeclared reference specimen set and calibrated imaging/transport apparatus as **witnesses** for each experimental campaign. A witness confirms measurement setup and process stability; it does not replace structural tests. For any biological candidate, biosafety, environmental persistence, worker exposure and by-product assessment remain independent hard gates controlled by qualified specialists. No deliberate environmental release or engineered-organism field deployment follows from a model ranking.
+
+The most defensible early result may be a **negative design rule**—for example, documenting a condition where crack closure coexists with an unacceptable mechanical, transport or constructability penalty. A reproducible exclusion rule can save more money and risk than a marginal gain in a healing percentage.
+
+#### A14.4. Rail-specific shift: prediction → event detection → intervention-effect evaluation
+
+A more accurate forecast is only useful if it improves inspection and maintenance decisions without hiding localized defects. Keep three tasks separate:
+
+1. **Detection/segmentation:** identify localized exceedance events and anomalies in measured geometry, with location and instrument uncertainty; do not let a segment average smooth away a short, severe defect.
+2. **Forecasting:** estimate future condition using only information available at the declared issue time, with chronological and segment/route holdouts. Future realised maintenance must not leak into an operational forecast.
+3. **Intervention-effect evaluation:** estimate whether a specific intervention (e.g. tamping or grinding) changes subsequent deterioration relative to a defensible comparison. Because interventions are targeted at poor condition, naive before/after comparison is confounded by indication, regression to the mean, weather, traffic and inspection timing. Pre-register suitable matched or quasi-experimental analyses only when the data support their assumptions; disclose residual confounding rather than calling association a causal effect.
+
+Use two distinct reporting layers: (a) local event-level recall and false-negative analysis for safety-relevant exceedances, and (b) segment-level trend/forecast metrics for planning. Report site/route variability, lead time, false-alert burden, data staleness, uncertainty and operational decision consequences. The owner/operator still defines authoritative thresholds and dispatch/inspection decisions.
+
+#### A14.5. Execution sequence and go/no-go gates
+
+1. **Reproduce before predicting.** Retrieve BATH-01087 bytes from the licensed archive; preserve the original, calculate SHA-256, inventory sheets/formulas/units/IDs, reconcile each endpoint to the source paper, and independently recompute a small set of pre-specified published results. If file retrieval remains blocked, request alternate official delivery; do not substitute a screenshot or hand-transcribed chart for specimen data without labeling it as such.
+2. **Pre-register one discriminating test.** Select an outcome where sources overlap meaningfully and write the estimand, independent experimental unit, controls, endpoint, tolerance and analysis before checking confirmatory results. Do not start with a pooled model across incomparable studies.
+3. **Establish metrology repeatability.** Use known/reference specimens, controlled crack widths and repeat measurements; separate instrument, operator, batch, specimen, lab and method variance. If the method cannot distinguish an effect from its measurement variability, improve the measurement protocol before optimizing the mix.
+4. **Replicate across a real domain boundary.** Change one declared factor (such as lab, mix batch, exposure or scale) at a time where feasible. A second paper from the same programme is not automatically independent replication.
+5. **Evaluate decision-level value.** For only candidates passing hard constraints, compare lifecycle cost, carbon, repair/inspection burden and robustness under sensitivity cases. Reject a claimed benefit that depends on an unsupported service-life extension.
+6. **Pilot only with reversible safeguards.** Choose a non-critical, inspectable, owner-approved asset with a conventional fallback, pre-registered monitoring, intervention/withdrawal triggers and a professional sign-off. Keep the model read-only until evidence supports a stronger operational role.
+
+**The first measurable success criterion is not “Symthaea discovered a superior concrete.”** It is a third-party reviewer independently reproducing a published result from the original data, verifying the experimental-unit hierarchy and negative controls, and then seeing a prospective experiment whose decision value is demonstrated against a transparent baseline.
+
+This is a programme hypothesis and test plan only. It does not establish a new concrete recipe, model advantage, railway safety capability, a causal maintenance effect or an approved deployment. It creates no new production type or parallel evidence ontology.
+
+**Additional research anchors for this paradigm section**
+- Ren et al. (2023), [Autonomous experiments using active learning and AI](https://www.nature.com/articles/s41578-023-00588-4), *Nature Reviews Materials*.
+- Wang et al. (2022), NIST, [Benchmarking Active Learning Strategies for Materials Optimization and Discovery](https://www.nist.gov/publications/benchmarking-active-learning-strategies-materials-optimization-and-discovery).
+- Galal, Mourad & Rana (2026), [Challenges and advancements in self-healing concrete: mechanisms, applications, and scalability](https://doi.org/10.1016/j.jobe.2025.115097).
+- Rengaraju et al. (2025), [Environmental life cycle assessment of self-healing concrete with microcapsules and impregnated lightweight aggregates](https://doi.org/10.1016/j.jobe.2025.113105).
+- [Railway track geometry degradation: a review of prediction methods](https://doi.org/10.1016/j.rineng.2026.109583) (2026).
+
 ## B. Better railway systems
 
 ### B1. Highest-value first move: predict deterioration, not just geometry
