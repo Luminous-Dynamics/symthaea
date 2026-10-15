@@ -24,8 +24,9 @@ No SAFOODS values or other real food-composition rows are included in this crate
 The evidence-record lookup goes beyond a non-empty-string check: unknown or duplicate IDs, wrong source/right/basis, invalid URI/date metadata, and non-current evidence block the requested use. It does not fetch or authenticate the referenced document; human review of the underlying license or permission remains necessary.
 
 
-- Every evaluation returns a self-describing decision receipt containing the evaluation date, source/record IDs, schema versions, declared and actually supplied artifact digests, and an input-envelope SHA-256.
-- The input envelope includes the complete manifest, food fact, use request, evaluation date and supplied artifact-byte digest; JSON object keys are recursively sorted before hashing. The digest identifies the exact evaluated inputs for replay and change detection, not truth, authorship or legal validity.
+- Every evaluation returns a self-describing decision receipt containing a separate receipt-schema version, evaluation date, source/record IDs, input schema versions, declared and actually supplied artifact digests, and an input-envelope SHA-256.
+- The input envelope includes the complete manifest, food fact, use request, evaluation date and supplied artifact-byte digest; JSON object keys are recursively sorted before hashing. The fact's `value_scaled`, `value_scale` and `basis_grams` are decimal strings on the JSON wire (missing `value_scaled` is `null`) so `u64` precision is not lost by JSON clients that use IEEE-754 numbers. The digest binds the exact input values for replay and change detection, not truth, authorship or legal validity.
+- This is a versioned deterministic encoding for the current Rust contract, not yet a claim of conformance to RFC 8785/JCS across independently implemented languages. Interoperable external verification should use standard canonicalization test vectors or an RFC 8785-conformant implementation before treating receipts as cross-language signatures.
 
 ## Validation
 
