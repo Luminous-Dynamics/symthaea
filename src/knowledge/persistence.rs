@@ -15,6 +15,7 @@
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
 use std::path::Path;
+use rusqlite::OptionalExtension;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
 /// Knowledge persistence layer backed by SQLite.
@@ -365,6 +366,7 @@ impl KnowledgePersistence {
         facts: &[FactRecord],
         edges: &[CausalEdgeRecord],
         ontology: &[OntologyRecord],
+        next_graph_fact_id: u64,
     ) -> Result<(usize, usize, usize), String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
@@ -374,6 +376,7 @@ impl KnowledgePersistence {
         // touching the database. A caller must never persist state that the
         // strict readers would reject on the next startup.
         let mut prepared_facts = Vec::with_capacity(facts.len());
+        let mut max_graph_fact_id = 0_u64;
         for fact in facts {
             validate_hypervector_bytes(&fact.vector_bytes, 0)
                 .map_err(|e| format!("Invalid fact snapshot vector: {e}"))?;
@@ -400,8 +403,19 @@ impl KnowledgePersistence {
                 .transpose()
                 .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
             let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
+            if let Some(id) = fact.graph_fact_id {
+                max_graph_fact_id = max_graph_fact_id.max(id);
+            }
             prepared_facts.push((fact, cycle, last_accessed_cycle, graph_fact_id));
         }
+
+        if next_graph_fact_id == 0 || next_graph_fact_id <= max_graph_fact_id {
+            return Err(format!(
+                "Next graph fact ID {next_graph_fact_id} must be positive and greater than the highest persisted fact ID {max_graph_fact_id}"
+            ));
+        }
+        let next_graph_fact_id_sql = i64::try_from(next_graph_fact_id)
+            .map_err(|e| format!("Next graph fact ID exceeds SQLite INTEGER range: {e}"))?;
 
         let mut prepared_edges = Vec::with_capacity(edges.len());
         for edge in edges {
@@ -508,10 +522,46 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Insert ontology snapshot row: {e}"))?;
         }
 
+        tx.execute(
+            "INSERT OR REPLACE INTO knowledge_metadata (key, value)
+             VALUES ('next_graph_fact_id', ?1)",
+            rusqlite::params![next_graph_fact_id_sql],
+        )
+        .map_err(|e| format!("Write next graph fact ID: {e}"))?;
+
         tx.commit()
             .map_err(|e| format!("Commit knowledge snapshot: {e}"))?;
         self.total_saved += (facts.len() + edges.len() + ontology.len()) as u64;
         Ok((facts.len(), edges.len(), ontology.len()))
+    }
+
+    /// Load the next graph fact ID reserved by the most recent complete snapshot.
+    ///
+    /// Returns None for legacy databases that predate allocator persistence.
+    pub fn load_next_graph_fact_id(&mut self) -> Result<Option<u64>, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let stored: Option<i64> = conn
+            .query_row(
+                "SELECT value FROM knowledge_metadata WHERE key = 'next_graph_fact_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| format!("Read next graph fact ID: {e}"))?;
+        stored
+            .map(|value| {
+                u64::try_from(value)
+                    .ok()
+                    .filter(|id| *id > 0)
+                    .ok_or_else(|| {
+                        format!("Invalid persisted next graph fact ID: {value}")
+                    })
+            })
+            .transpose()
     }
 
     /// Load all fact records from the database.
@@ -781,6 +831,10 @@ impl KnowledgePersistence {
                 created_at_cycle INTEGER NOT NULL,
                 last_used_cycle INTEGER NOT NULL,
                 is_a_parent TEXT
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_metadata (
+                key TEXT PRIMARY KEY NOT NULL,
+                value INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
