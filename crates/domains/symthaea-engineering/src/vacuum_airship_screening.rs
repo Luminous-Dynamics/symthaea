@@ -1045,10 +1045,14 @@ pub fn screen_load_path_scenario_set(
     let mut maximum_index = 0;
     for index in 1..scenario_results.len() {
         let demand = scenario_results[index].demand.factor_scaled_peak_load_path_demand_n;
-        if demand < scenario_results[minimum_index].demand.factor_scaled_peak_load_path_demand_n {
+        if demand
+            < scenario_results[minimum_index].demand.factor_scaled_peak_load_path_demand_n
+        {
             minimum_index = index;
         }
-        if demand > scenario_results[maximum_index].demand.factor_scaled_peak_load_path_demand_n {
+        if demand
+            > scenario_results[maximum_index].demand.factor_scaled_peak_load_path_demand_n
+        {
             maximum_index = index;
         }
     }
@@ -2648,11 +2652,23 @@ mod tests {
         assert_eq!(result.evaluated_scenario_count, 2);
         assert_eq!(result.scenario_results[0].scenario_id, "geometry-A/imperfection-1");
         assert_eq!(result.scenario_results[0].evidence_record_id, "analysis-record-A");
-        assert_eq!(result.scenario_results[0].demand.factor_scaled_peak_load_path_demand_n, 110.0);
-        assert_eq!(result.scenario_results[1].demand.factor_scaled_peak_load_path_demand_n, 65.0);
-        assert_eq!(result.minimum_factor_scaled_demand_among_scenarios_n, 65.0);
+        assert!(
+            (result.scenario_results[0].demand.factor_scaled_peak_load_path_demand_n - 110.0)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (result.scenario_results[1].demand.factor_scaled_peak_load_path_demand_n - 65.0)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (result.minimum_factor_scaled_demand_among_scenarios_n - 65.0).abs() < 1e-12
+        );
         assert_eq!(result.minimum_scenario_id, "geometry-B/imperfection-2");
-        assert_eq!(result.maximum_factor_scaled_demand_among_scenarios_n, 110.0);
+        assert!(
+            (result.maximum_factor_scaled_demand_among_scenarios_n - 110.0).abs() < 1e-12
+        );
         assert_eq!(result.maximum_scenario_id, "geometry-A/imperfection-1");
     }
 
