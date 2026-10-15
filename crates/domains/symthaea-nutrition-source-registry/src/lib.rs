@@ -50,6 +50,19 @@ pub struct SourcePermissionsV1 {
     pub public_fixture: PermissionDecision,
 }
 
+/// Evidence references are scoped to a particular right. A reference documenting
+/// assessment use must never be reused as evidence for commercial use or
+/// redistribution. The referenced evidence itself still requires human review.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourcePermissionReferencesV1 {
+    pub use_for_assessment: Option<String>,
+    pub cache: Option<String>,
+    pub transform: Option<String>,
+    pub redistribute: Option<String>,
+    pub commercial_use: Option<String>,
+    pub public_fixture: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SourceLifecycle {
@@ -71,7 +84,7 @@ pub struct NutritionSourceManifestV1 {
     pub source_uri: String,
     pub terms_uri: String,
     pub license_id: String,
-    pub permission_reference: Option<String>,
+    pub permission_references: SourcePermissionReferencesV1,
     pub permissions: SourcePermissionsV1,
     /// SHA-256 of the exact upstream artifact bytes, lower-case hexadecimal.
     pub artifact_sha256: Option<String>,
@@ -253,7 +266,12 @@ pub enum RegistryIssueCode {
     SourceNeedsReview,
     SourceRevoked,
     SourceWithdrawn,
-    PermissionReferenceMissing,
+    AssessmentPermissionReferenceMissing,
+    CachePermissionReferenceMissing,
+    TransformationPermissionReferenceMissing,
+    CommercialUsePermissionReferenceMissing,
+    PublicFixturePermissionReferenceMissing,
+    RedistributionPermissionReferenceMissing,
     AssessmentUseNotPermitted,
     CacheNotPermitted,
     TransformationNotPermitted,
@@ -466,6 +484,19 @@ fn validate_source_metadata(
     }
 }
 
+fn validate_permission_reference(
+    decision: PermissionDecision,
+    reference: Option<&str>,
+    missing_code: RegistryIssueCode,
+    issues: &mut Vec<RegistryIssueV1>,
+) {
+    if decision.requires_permission_reference()
+        && reference.unwrap_or_default().trim().is_empty()
+    {
+        push_issue(issues, IssueCategory::License, missing_code);
+    }
+}
+
 fn validate_permissions(
     manifest: &NutritionSourceManifestV1,
     fact: &NutritionFoodFactV1,
@@ -473,34 +504,50 @@ fn validate_permissions(
     issues: &mut Vec<RegistryIssueV1>,
 ) {
     let p = &manifest.permissions;
-    let mut used_permissions = vec![p.use_for_assessment];
+    let r = &manifest.permission_references;
+
+    validate_permission_reference(
+        p.use_for_assessment,
+        r.use_for_assessment.as_deref(),
+        RegistryIssueCode::AssessmentPermissionReferenceMissing,
+        issues,
+    );
     if use_request.retains_source_data() {
-        used_permissions.push(p.cache);
+        validate_permission_reference(
+            p.cache,
+            r.cache.as_deref(),
+            RegistryIssueCode::CachePermissionReferenceMissing,
+            issues,
+        );
     }
     if fact.transformation_applied || use_request.transform_record {
-        used_permissions.push(p.transform);
+        validate_permission_reference(
+            p.transform,
+            r.transform.as_deref(),
+            RegistryIssueCode::TransformationPermissionReferenceMissing,
+            issues,
+        );
     }
     if use_request.commercial_use {
-        used_permissions.push(p.commercial_use);
+        validate_permission_reference(
+            p.commercial_use,
+            r.commercial_use.as_deref(),
+            RegistryIssueCode::CommercialUsePermissionReferenceMissing,
+            issues,
+        );
     }
     if use_request.public_fixture {
-        used_permissions.push(p.public_fixture);
-        used_permissions.push(p.redistribute);
-    }
-    if used_permissions
-        .iter()
-        .any(|decision| decision.requires_permission_reference())
-        && manifest
-            .permission_reference
-            .as_deref()
-            .unwrap_or_default()
-            .trim()
-            .is_empty()
-    {
-        push_issue(
+        validate_permission_reference(
+            p.public_fixture,
+            r.public_fixture.as_deref(),
+            RegistryIssueCode::PublicFixturePermissionReferenceMissing,
             issues,
-            IssueCategory::License,
-            RegistryIssueCode::PermissionReferenceMissing,
+        );
+        validate_permission_reference(
+            p.redistribute,
+            r.redistribute.as_deref(),
+            RegistryIssueCode::RedistributionPermissionReferenceMissing,
+            issues,
         );
     }
     if !p.use_for_assessment.is_granted() {
@@ -790,7 +837,7 @@ mod tests {
             source_uri: "https://example.invalid/food-table".to_owned(),
             terms_uri: "https://example.invalid/terms".to_owned(),
             license_id: "synthetic-fixture-only".to_owned(),
-            permission_reference: None,
+            permission_references: SourcePermissionReferencesV1::default(),
             permissions: allowed_permissions(),
             artifact_sha256: Some(sha256_hex(ARTIFACT)),
             retrieved_on: "2026-01-02".to_owned(),
@@ -920,11 +967,36 @@ mod tests {
     fn written_permission_requires_a_reference() {
         let mut m = manifest();
         m.permissions.use_for_assessment = PermissionDecision::GrantedByWrittenPermission;
-        m.permission_reference = None;
+        m.permission_references.use_for_assessment = None;
         let result = assess(&m, &fact(), Some(ARTIFACT));
         assert_eq!(result.license_eligibility, Eligibility::Blocked);
         assert!(result.issues.iter().any(|issue| {
-            issue.code == RegistryIssueCode::PermissionReferenceMissing
+            issue.code == RegistryIssueCode::AssessmentPermissionReferenceMissing
+        }));
+    }
+
+    #[test]
+    fn a_reference_for_one_right_cannot_authorize_another_right() {
+        let mut m = manifest();
+        m.permissions.commercial_use = PermissionDecision::GrantedByWrittenPermission;
+        // This reference is specifically for assessment; commercial authorization is absent.
+        m.permission_references.use_for_assessment =
+            Some("permission:assessment-only".to_owned());
+        let mut use_case = use_request();
+        use_case.commercial_use = true;
+        let result = assess_nutrition_source(
+            &m,
+            &fact(),
+            EVALUATION_DATE,
+            &use_case,
+            Some(ARTIFACT),
+        );
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::CommercialUsePermissionReferenceMissing
+        }));
+        assert!(!result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::AssessmentPermissionReferenceMissing
         }));
     }
 
