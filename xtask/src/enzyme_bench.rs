@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use url::Url;
 
 const REQUIRED_COLUMNS: &[&str] = &[
     "observation_id",
@@ -137,8 +138,8 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
     ensure!(!manifest.source.source_id.trim().is_empty(), "source.source_id is required");
     ensure!(!manifest.source.release.trim().is_empty(), "source.release is required");
     ensure!(
-        manifest.source.url.starts_with("https://"),
-        "source.url must be an https URL"
+        is_valid_https_url(&manifest.source.url),
+        "source.url must be a valid HTTPS URL with a host and no embedded credentials"
     );
     ensure!(!manifest.source.license_id.trim().is_empty(), "source.license_id is required");
     ensure!(manifest.source.license_accepted, "source license acceptance is not recorded");
@@ -252,8 +253,8 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         }
         let source_record_url = field(&row, &header_index, "source_record_url");
         ensure!(
-            source_record_url.starts_with("https://"),
-            "source_record_url must be HTTPS at CSV record {}",
+            is_valid_https_url(source_record_url),
+            "source_record_url must be a valid HTTPS URL with a host and no embedded credentials at CSV record {}",
             row_index + 2
         );
         ensure!(
@@ -410,6 +411,16 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         cross_split_families,
         cross_split_studies,
     })
+}
+
+fn is_valid_https_url(value: &str) -> bool {
+    let Ok(url) = Url::parse(value) else {
+        return false;
+    };
+    url.scheme() == "https"
+        && url.host_str().is_some_and(|host| !host.trim().is_empty())
+        && url.username().is_empty()
+        && url.password().is_none()
 }
 
 fn field<'a>(row: &'a csv::StringRecord, headers: &BTreeMap<&str, usize>, name: &str) -> &'a str {
@@ -784,6 +795,29 @@ mod tests {
         assert!(!is_date_shape("2026-04-31"));
         assert!(!is_date_shape("2026-13-01"));
         assert!(!is_date_shape("0000-01-01"));
+    }
+
+    #[test]
+    fn rejects_malformed_https_source_url() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        value["source"]["url"] = json!("https://");
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let error = validate(&root, &parsed).unwrap_err().to_string();
+        assert!(error.contains("source.url must be a valid HTTPS URL"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_malformed_https_source_record_url() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        let dataset_bytes = rewrite_csv_field(&root, "obs-a", "source_record_url", "https://");
+        value["dataset_artifact"]["sha256"] = json!(format!("{:x}", Sha256::digest(&dataset_bytes)));
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let error = validate(&root, &parsed).unwrap_err().to_string();
+        assert!(error.contains("source_record_url must be a valid HTTPS URL"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
