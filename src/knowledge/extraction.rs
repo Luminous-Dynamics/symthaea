@@ -55,7 +55,6 @@ pub enum SemanticRole {
     ProtectiveFactor,
     #[cfg(feature = "therapeutic")]
     RiskFactor,
-
 }
 
 /// Stable identifiers for serializing semantic roles to persisted relation records.
