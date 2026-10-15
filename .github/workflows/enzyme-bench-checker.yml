@@ -58,7 +58,7 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
-      - name: Test xtask admission and calibration checkers (synthetic fixtures)
+      - name: Test admission, calibration, evidence-graph, and synthetic falsification fixtures
         run: cargo test -p xtask --bin xtask
 
       - name: Fetch pinned CC BY calibration references (temporary runner workspace only)
