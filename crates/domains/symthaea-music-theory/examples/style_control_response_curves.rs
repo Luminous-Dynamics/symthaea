@@ -530,6 +530,23 @@ fn non_target_invariance_diagnostics(
         .filter(|observation| observation.input != baseline.input)
         .collect();
 
+    // A seed intervention intentionally resamples surface and structure.
+    // Without a registered per-channel stochastic invariance hypothesis,
+    // do not label tonal/meter/tempo outputs as non-target invariants.
+    if control == "seed" {
+        return serde_json::json!({
+            "status": "not_applicable",
+            "reason": "Seed variation is a robustness dimension; musical output channels may vary, and no per-channel invariance target is predeclared.",
+            "declaration_basis": "seed_robustness_summary",
+            "controlled_target_excluded": "seed_dependent_surface_and_structure",
+            "baseline_included_in_grid": true,
+            "nonbaseline_point_count": points.len(),
+            "checked_channels": [],
+            "coverage_complete": true,
+            "interpretation": "Use the fixed-seed coverage and response summaries for robustness; do not score tonal, meter, or tempo invariance under seed variation without a separate registered hypothesis.",
+        });
+    }
+
     fn channel(
         name: &str,
         baseline: &Observation,
@@ -1722,18 +1739,18 @@ mod tests {
             curve["control_target_evaluation"]["target_fidelity"]["status"].as_str(),
             Some("not_predeclared")
         );
+        let invariance = &curve["control_target_evaluation"]["non_target_invariance"];
+        assert_eq!(invariance["status"].as_str(), Some("not_applicable"));
         assert_eq!(
-            curve["control_target_evaluation"]["non_target_invariance"]["status"].as_str(),
-            Some("diagnostic")
+            invariance["controlled_target_excluded"].as_str(),
+            Some("seed_dependent_surface_and_structure")
         );
-        let checked_channels = curve["control_target_evaluation"]["non_target_invariance"]
-            ["checked_channels"]
-            .as_array()
-            .unwrap();
-        assert!(checked_channels.iter().any(|item| item["channel"] == "absolute_key_tonic_pc"));
-        assert!(checked_channels.iter().any(|item| item["channel"] == "meter_beats"));
-        assert!(checked_channels.iter().any(|item| item["channel"] == "tempo_bpm"));
-        assert!(!checked_channels.iter().any(|item| item["channel"] == "key_tonality"));
+        assert_eq!(invariance["nonbaseline_point_count"].as_u64(), Some(3));
+        assert_eq!(invariance["checked_channels"].as_array().unwrap().len(), 0);
+        assert!(invariance["reason"]
+            .as_str()
+            .unwrap()
+            .contains("no per-channel invariance target is predeclared"));
     }
 
     #[test]
