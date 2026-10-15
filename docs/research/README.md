@@ -330,3 +330,9 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+
+## Cross-domain engineering feasibility
+
+- [Resilient Systems Feasibility Portfolio](./RESILIENT_SYSTEMS_FEASIBILITY_PORTFOLIO.md) — seven linked feasibility studies covering self-repairing structures, heavy-cargo transport, a 100-person/two-year settlement, first lunar industry, community microfactories, supply-network disruptions, and minimum viable civilization.
+- [Machine-readable screening baseline](./resilient_systems_baseline.json) — explicit scenario assumptions, computed settlement baselines, shared metrics, and stress-test definitions. Values are screening assumptions, not validated requirements.
