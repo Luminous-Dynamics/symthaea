@@ -21,6 +21,7 @@ const UPSTREAM_REPORTED_MD5: &str = "b35dc24e99ef3aeaee6c5c949903de94";
 const MAX_UNCOMPRESSED_ARCHIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_TAR_MEMBERS: u64 = 100_000;
 const MAX_MEMBER_PATH_BYTES: usize = 4 * 1024;
+const MAX_TOTAL_MEMBER_PATH_BYTES: u64 = 32 * 1024 * 1024;
 const UPSTREAM_REPORTED_LICENSE: &str = "CC BY 4.0 (as reported by upstream; verify the exact intended use and attribution)";
 
 #[derive(Debug, Parser)]
@@ -69,6 +70,7 @@ struct ArchiveInventory {
     regular_file_count: u64,
     directory_count: u64,
     declared_payload_bytes: u64,
+    member_path_bytes_inspected: u64,
     top_level_member_counts: BTreeMap<String, u64>,
     duplicate_member_paths: Vec<String>,
     unsafe_member_paths: Vec<String>,
@@ -340,10 +342,16 @@ fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
             bail!("archive exceeds configured member-count limit of {MAX_TAR_MEMBERS}");
         }
         let mut entry = result.with_context(|| format!("invalid tar entry at index {index}"))?;
-        let entry_path = entry.path()?.into_owned();
-        // Borrow the path rather than cloning attacker-controlled path strings.
-        // Long paths are marked unsafe and only a bounded diagnostic prefix is kept.
+        // Keep the tar crate's Cow<Path> borrowed where possible; do not force
+        // an allocation before checking an attacker-controlled member path length.
+        let entry_path = entry.path()?;
         let path_text = entry_path.to_str();
+        if let Some(path) = path_text {
+            inventory.member_path_bytes_inspected = next_member_path_byte_total(
+                inventory.member_path_bytes_inspected,
+                path.len(),
+            )?;
+        }
         let display_path = path_text
             .map(bounded_member_display)
             .unwrap_or_else(|| format!("<non-utf8-path-{index}>"));
@@ -362,7 +370,7 @@ fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
         }
 
         let top_level = path_text
-            .map(top_level_component)
+            .map(bounded_top_level_component)
             .unwrap_or("<non-utf8>");
         *inventory
             .top_level_member_counts
@@ -432,6 +440,25 @@ fn path_is_unsafe(path: &Path, text: Option<&str>) -> bool {
     normalized.starts_with('/')
         || has_windows_drive_prefix
         || normalized.split('/').any(|component| component == "..")
+}
+
+fn next_member_path_byte_total(current: u64, path_len: usize) -> Result<u64> {
+    let next = current
+        .checked_add(path_len as u64)
+        .ok_or_else(|| anyhow!("member path byte count overflow"))?;
+    if next > MAX_TOTAL_MEMBER_PATH_BYTES {
+        bail!("member path metadata exceeds configured byte limit of {MAX_TOTAL_MEMBER_PATH_BYTES}");
+    }
+    Ok(next)
+}
+
+fn bounded_top_level_component(path: &str) -> &str {
+    let component = top_level_component(path);
+    if component.len() > MAX_MEMBER_PATH_BYTES {
+        "<overlong>"
+    } else {
+        component
+    }
 }
 
 fn bounded_member_display(path: &str) -> String {
@@ -597,6 +624,18 @@ mod tests {
         let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
         assert_eq!(inventory.duplicate_member_paths, vec!["train/repeated.txt"]);
         assert_eq!(status_for(true, Some(&inventory), true), "archive_structure_review_required");
+    }
+
+    #[test]
+    fn cumulative_member_path_metadata_is_bounded() {
+        assert_eq!(next_member_path_byte_total(10, 20).expect("within path budget"), 30);
+        assert!(next_member_path_byte_total(MAX_TOTAL_MEMBER_PATH_BYTES, 1).is_err());
+    }
+
+    #[test]
+    fn overlong_top_level_component_is_not_copied_into_inventory_key() {
+        let long_component = "x".repeat(MAX_MEMBER_PATH_BYTES + 1);
+        assert_eq!(bounded_top_level_component(&long_component), "<overlong>");
     }
 
     #[test]
