@@ -115,7 +115,10 @@ fn validate_hypervector_bytes(bytes: &[u8], column_index: usize) -> rusqlite::Re
     }
 }
 
-fn decode_optional_graph_fact_id(value: Option<i64>, column_index: usize) -> rusqlite::Result<Option<u64>> {
+fn decode_optional_graph_fact_id(
+    value: Option<i64>,
+    column_index: usize,
+) -> rusqlite::Result<Option<u64>> {
     value
         .map(|id| {
             if id > 0 {
@@ -1204,6 +1207,7 @@ mod tests {
         let records = persistence.load_facts().unwrap();
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].source_text, "legacy fact");
+        assert_eq!(records[0].graph_fact_id, None);
         assert_eq!(records[0].initial_confidence, None);
         assert_eq!(records[0].last_accessed_cycle, None);
         assert_eq!(records[0].corroboration_count, 0);
