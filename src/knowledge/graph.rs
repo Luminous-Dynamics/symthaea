@@ -73,18 +73,16 @@ pub struct FactSearchResult {
     pub confidence: f32,
 }
 
-/**
- * Exact entity/role lookup result.
- *
- * This is symbolic grounding over the persisted observations, not HDC similarity
- * search. Partial matches are returned and ranked by coverage × current confidence.
- */
+/// Exact entity/role lookup result.
+///
+/// This is symbolic grounding over the persisted observations, not HDC similarity
+/// search. Partial matches are returned and ranked by coverage × current confidence.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RoleObservationSearchResult {
     /// Stable graph fact ID.
     pub fact_id: FactId,
-    /// Requested (role, entity text) pairs that were found, preserving query order.
-    pub matched_terms: Vec<(SemanticRole, String)>,
+    /// Stored (role, entity text) observations that matched, preserving query order.
+    pub matched_observations: Vec<(SemanticRole, String)>,
     /// Number of distinct, non-empty query terms after normalization.
     pub total_terms: usize,
     /// Matched query terms divided by total query terms, in [0, 1].
@@ -315,28 +313,31 @@ impl EnhancedKnowledgeGraph {
             .facts
             .values()
             .filter_map(|fact| {
-                let matched_terms: Vec<(SemanticRole, String)> = requested
+                let matched_observations: Vec<(SemanticRole, String)> = requested
                     .iter()
-                    .filter(|(role, term)| {
-                        fact.encoding.role_vector_observations.iter().any(|observation| {
-                            observation.role == *role
-                                && observation
-                                    .entity_text
-                                    .trim()
-                                    .eq_ignore_ascii_case(term.trim())
-                        })
+                    .filter_map(|(role, term)| {
+                        fact.encoding
+                            .role_vector_observations
+                            .iter()
+                            .find(|observation| {
+                                observation.role == *role
+                                    && observation
+                                        .entity_text
+                                        .trim()
+                                        .eq_ignore_ascii_case(term.trim())
+                            })
+                            .map(|observation| (*role, observation.entity_text.clone()))
                     })
-                    .cloned()
                     .collect();
 
-                if matched_terms.is_empty() {
+                if matched_observations.is_empty() {
                     return None;
                 }
 
-                let coverage = matched_terms.len() as f32 / requested.len() as f32;
+                let coverage = matched_observations.len() as f32 / requested.len() as f32;
                 Some(RoleObservationSearchResult {
                     fact_id: fact.id,
-                    matched_terms,
+                    matched_observations,
                     total_terms: requested.len(),
                     coverage,
                     confidence: fact.confidence,
@@ -1016,7 +1017,10 @@ mod tests {
         assert_eq!(results[0].fact_id, multi_id);
         assert_eq!(results[0].coverage, 1.0);
         assert_eq!(results[0].total_terms, 3);
-        assert_eq!(results[0].matched_terms.len(), 3);
+        assert_eq!(results[0].matched_observations.len(), 3);
+        assert!(results[0].matched_observations.iter().any(|(role, text)| {
+            *role == SemanticRole::Agent && text == "European Union"
+        }));
         let partial_result = results.iter().find(|r| r.fact_id == partial_id).unwrap();
         assert!((partial_result.coverage - (2.0 / 3.0)).abs() < f32::EPSILON);
 
@@ -1024,6 +1028,13 @@ mod tests {
         assert!(graph
             .search_role_observations(&[(SemanticRole::Patient, "European Union")], 10)
             .is_empty());
+        let normalized_text_result =
+            graph.search_role_observations(&[(SemanticRole::Agent, " european union ")], 10);
+        assert_eq!(
+            normalized_text_result[0].matched_observations,
+            vec![(SemanticRole::Agent, "European Union".to_string())],
+            "results should expose retained entity text, not normalized query spelling"
+        );
         assert!(graph.search_role_observations(&[], 10).is_empty());
         assert!(graph.search_role_observations(&query, 0).is_empty());
 
