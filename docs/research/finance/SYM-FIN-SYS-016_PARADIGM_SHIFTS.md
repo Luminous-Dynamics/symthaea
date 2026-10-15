@@ -72,7 +72,7 @@ The intended architecture is a **capability floor with bounded actions**, not a 
 - Mycelix `SyntheticOnly` status blocks authorization via rights evidence, obligation commitment, and direct verification of delivery; regression tests are authored for all three paths.
 - Delivery claims must name the provider fixed by the request. This checks logical identity in the reference model, not a cryptographic signature.
 - Symthaea receipt loading rejects duplicate JSON object keys and Python's non-standard `NaN` / `Infinity` constants before schema or semantic validation.
-- Five standard-library unit tests cover strict JSON parsing; the schema validator pins all 22 negative-control IDs with a 10/12 schema/semantic split and recomputes the scenario registry SHA-256 from its exact repository bytes and rejects receipt scenario IDs absent from the registry catalogue. Only the scenario-registry digest is bound to source bytes today; other digest-shaped fields remain unverified identifiers.
+- Six standard-library unit tests cover strict JSON parsing, including numeric edge cases; the schema validator pins all 22 negative-control IDs with a 10/12 schema/semantic split and recomputes the scenario registry SHA-256 from its exact repository bytes and rejects receipt scenario IDs absent from the registry catalogue. Only the scenario-registry digest is bound to source bytes today; other digest-shaped fields remain unverified identifiers.
 - Neither track is qualified by this note. Authored tests are not passing tests. CI must run against the exact final head.
 
 ## Acceptance gates before integration
