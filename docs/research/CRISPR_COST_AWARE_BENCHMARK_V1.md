@@ -17,6 +17,8 @@ The near-term deliverable is a Rust-first, reproducible **CRISPR Cost-Aware Evid
 
 Compose the existing [Symthaea biology discovery program (#6271)](https://github.com/Luminous-Dynamics/symthaea/issues/6271), rather than building a second scientific-agent framework. Mycelix's [prospective-evidence federation contract (#3331)](https://github.com/Luminous-Dynamics/mycelix/issues/3331) is the intended evidence-custody boundary.
 
+Machine-readable planning contract and benchmark gates: [`docs/research/data/CRISPR_OFFTARGET_BENCHMARK_CONTRACT_V1.json`](data/CRISPR_OFFTARGET_BENCHMARK_CONTRACT_V1.json). Its validation flags deliberately remain false until the exact data artifacts are retrieved, rights-reviewed, and independently replayed.
+
 ## Why now: research frontier
 
 These publications motivate the research questions. None proves Symthaea is competitive, and none is local qualification evidence.
