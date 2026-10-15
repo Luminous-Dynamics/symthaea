@@ -66,6 +66,48 @@ pub struct SourcePermissionReferencesV1 {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum SourceRightV1 {
+    Assessment,
+    Cache,
+    Transformation,
+    Redistribution,
+    CommercialUse,
+    PublicFixture,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PermissionEvidenceBasisV1 {
+    LicenseTerms,
+    WrittenPermission,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PermissionEvidenceLifecycleV1 {
+    Active,
+    NeedsReview,
+    Revoked,
+    Withdrawn,
+}
+
+/// A reviewable, source-bound record referenced by one affirmative right decision.
+/// These fields support auditability but do not authenticate the publisher or
+/// determine legal sufficiency; reviewers must inspect the underlying evidence.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PermissionEvidenceV1 {
+    pub evidence_id: String,
+    pub source_id: String,
+    pub right: SourceRightV1,
+    pub basis: PermissionEvidenceBasisV1,
+    pub evidence_uri: String,
+    pub reviewed_on: String,
+    pub valid_until: String,
+    pub lifecycle: PermissionEvidenceLifecycleV1,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SourceLifecycle {
     Active,
     NeedsReview,
@@ -86,6 +128,8 @@ pub struct NutritionSourceManifestV1 {
     pub terms_uri: String,
     pub license_id: String,
     pub permission_references: SourcePermissionReferencesV1,
+    /// Evidence records must resolve to the exact source and right they support.
+    pub permission_evidence: Vec<PermissionEvidenceV1>,
     pub permissions: SourcePermissionsV1,
     /// SHA-256 of the exact upstream artifact bytes, lower-case hexadecimal.
     pub artifact_sha256: Option<String>,
@@ -273,6 +317,20 @@ pub enum RegistryIssueCode {
     CommercialUsePermissionReferenceMissing,
     PublicFixturePermissionReferenceMissing,
     RedistributionPermissionReferenceMissing,
+    PermissionEvidenceNotFound,
+    PermissionEvidenceAmbiguous,
+    PermissionEvidenceSourceMismatch,
+    PermissionEvidenceRightMismatch,
+    PermissionEvidenceBasisMismatch,
+    PermissionEvidenceUriInvalid,
+    PermissionEvidenceReviewedDateInvalid,
+    PermissionEvidenceValidityDateInvalid,
+    PermissionEvidenceWindowInverted,
+    PermissionEvidenceNotYetEffective,
+    PermissionEvidenceExpired,
+    PermissionEvidenceNeedsReview,
+    PermissionEvidenceRevoked,
+    PermissionEvidenceWithdrawn,
     AssessmentUseNotPermitted,
     CacheNotPermitted,
     TransformationNotPermitted,
@@ -348,7 +406,7 @@ pub fn assess_nutrition_source(
     let mut issues = Vec::new();
 
     validate_source_metadata(manifest, evaluation_date, &mut issues);
-    validate_permissions(manifest, fact, use_request, &mut issues);
+    validate_permissions(manifest, fact, evaluation_date, use_request, &mut issues);
     validate_fact(manifest, fact, &mut issues);
     let artifact_integrity =
         validate_artifact_digest(manifest, use_request, artifact_bytes, &mut issues);
@@ -486,21 +544,95 @@ fn validate_source_metadata(
 }
 
 fn validate_permission_reference(
+    manifest: &NutritionSourceManifestV1,
     decision: PermissionDecision,
+    right: SourceRightV1,
     reference: Option<&str>,
     missing_code: RegistryIssueCode,
+    evaluation_date: &str,
     issues: &mut Vec<RegistryIssueV1>,
 ) {
-    if decision.requires_evidence_reference()
-        && reference.unwrap_or_default().trim().is_empty()
-    {
+    if !decision.requires_evidence_reference() {
+        return;
+    }
+    let Some(reference) = reference.map(str::trim).filter(|value| !value.is_empty()) else {
         push_issue(issues, IssueCategory::License, missing_code);
+        return;
+    };
+
+    let matches: Vec<_> = manifest.permission_evidence.iter()
+        .filter(|evidence| evidence.evidence_id == reference)
+        .collect();
+    let evidence = match matches.as_slice() {
+        [] => {
+            push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceNotFound);
+            return;
+        }
+        [evidence] => *evidence,
+        _ => {
+            push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceAmbiguous);
+            return;
+        }
+    };
+
+    if evidence.source_id != manifest.source_id {
+        push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceSourceMismatch);
+    }
+    if evidence.right != right {
+        push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceRightMismatch);
+    }
+    let expected_basis = match decision {
+        PermissionDecision::AllowedByLicense => PermissionEvidenceBasisV1::LicenseTerms,
+        PermissionDecision::GrantedByWrittenPermission => PermissionEvidenceBasisV1::WrittenPermission,
+        PermissionDecision::Denied | PermissionDecision::RequiresWrittenPermission | PermissionDecision::Unknown => {
+            return;
+        }
+    };
+    if evidence.basis != expected_basis {
+        push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceBasisMismatch);
+    }
+    if !valid_http_uri(&evidence.evidence_uri) {
+        push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceUriInvalid);
+    }
+
+    let reviewed = parse_date(&evidence.reviewed_on);
+    let until = parse_date(&evidence.valid_until);
+    let as_of = parse_date(evaluation_date);
+    if reviewed.is_none() {
+        push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceReviewedDateInvalid);
+    }
+    if until.is_none() {
+        push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceValidityDateInvalid);
+    }
+    if let (Some(reviewed), Some(until)) = (reviewed, until) {
+        if until < reviewed {
+            push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceWindowInverted);
+        } else if let Some(as_of) = as_of {
+            if as_of < reviewed {
+                push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceNotYetEffective);
+            } else if as_of > until {
+                push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceExpired);
+            }
+        }
+    }
+    match evidence.lifecycle {
+        PermissionEvidenceLifecycleV1::Active => {}
+        PermissionEvidenceLifecycleV1::NeedsReview => push_issue(
+            issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceNeedsReview
+        ),
+        PermissionEvidenceLifecycleV1::Revoked => push_issue(
+            issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceRevoked
+        ),
+        PermissionEvidenceLifecycleV1::Withdrawn => push_issue(
+            issues, IssueCategory::License, RegistryIssueCode::PermissionEvidenceWithdrawn
+        ),
     }
 }
 
 fn validate_permissions(
     manifest: &NutritionSourceManifestV1,
     fact: &NutritionFoodFactV1,
+    evaluation_date: &str,
     use_request: &SourceUseRequestV1,
     issues: &mut Vec<RegistryIssueV1>,
 ) {
@@ -508,47 +640,36 @@ fn validate_permissions(
     let r = &manifest.permission_references;
 
     validate_permission_reference(
-        p.use_for_assessment,
+        manifest, p.use_for_assessment, SourceRightV1::Assessment,
         r.use_for_assessment.as_deref(),
-        RegistryIssueCode::AssessmentPermissionReferenceMissing,
-        issues,
+        RegistryIssueCode::AssessmentPermissionReferenceMissing, evaluation_date, issues,
     );
     if use_request.retains_source_data() {
         validate_permission_reference(
-            p.cache,
-            r.cache.as_deref(),
-            RegistryIssueCode::CachePermissionReferenceMissing,
-            issues,
+            manifest, p.cache, SourceRightV1::Cache, r.cache.as_deref(),
+            RegistryIssueCode::CachePermissionReferenceMissing, evaluation_date, issues,
         );
     }
     if fact.transformation_applied || use_request.transform_record {
         validate_permission_reference(
-            p.transform,
-            r.transform.as_deref(),
-            RegistryIssueCode::TransformationPermissionReferenceMissing,
-            issues,
+            manifest, p.transform, SourceRightV1::Transformation, r.transform.as_deref(),
+            RegistryIssueCode::TransformationPermissionReferenceMissing, evaluation_date, issues,
         );
     }
     if use_request.commercial_use {
         validate_permission_reference(
-            p.commercial_use,
-            r.commercial_use.as_deref(),
-            RegistryIssueCode::CommercialUsePermissionReferenceMissing,
-            issues,
+            manifest, p.commercial_use, SourceRightV1::CommercialUse, r.commercial_use.as_deref(),
+            RegistryIssueCode::CommercialUsePermissionReferenceMissing, evaluation_date, issues,
         );
     }
     if use_request.public_fixture {
         validate_permission_reference(
-            p.public_fixture,
-            r.public_fixture.as_deref(),
-            RegistryIssueCode::PublicFixturePermissionReferenceMissing,
-            issues,
+            manifest, p.public_fixture, SourceRightV1::PublicFixture, r.public_fixture.as_deref(),
+            RegistryIssueCode::PublicFixturePermissionReferenceMissing, evaluation_date, issues,
         );
         validate_permission_reference(
-            p.redistribute,
-            r.redistribute.as_deref(),
-            RegistryIssueCode::RedistributionPermissionReferenceMissing,
-            issues,
+            manifest, p.redistribute, SourceRightV1::Redistribution, r.redistribute.as_deref(),
+            RegistryIssueCode::RedistributionPermissionReferenceMissing, evaluation_date, issues,
         );
     }
     if !p.use_for_assessment.is_granted() {
@@ -828,6 +949,29 @@ mod tests {
         }
     }
 
+    fn permission_evidence() -> Vec<PermissionEvidenceV1> {
+        [
+            ("license:assessment-clause", SourceRightV1::Assessment),
+            ("license:cache-clause", SourceRightV1::Cache),
+            ("license:transformation-clause", SourceRightV1::Transformation),
+            ("license:redistribution-clause", SourceRightV1::Redistribution),
+            ("license:commercial-use-clause", SourceRightV1::CommercialUse),
+            ("license:public-fixture-clause", SourceRightV1::PublicFixture),
+        ]
+        .into_iter()
+        .map(|(evidence_id, right)| PermissionEvidenceV1 {
+            evidence_id: evidence_id.to_owned(),
+            source_id: "fixture:food-table-v1".to_owned(),
+            right,
+            basis: PermissionEvidenceBasisV1::LicenseTerms,
+            evidence_uri: "https://example.invalid/license".to_owned(),
+            reviewed_on: "2026-01-01".to_owned(),
+            valid_until: "2027-01-01".to_owned(),
+            lifecycle: PermissionEvidenceLifecycleV1::Active,
+        })
+        .collect()
+    }
+
     fn manifest() -> NutritionSourceManifestV1 {
         NutritionSourceManifestV1 {
             schema_version: NUTRITION_SOURCE_SCHEMA_VERSION,
@@ -846,6 +990,7 @@ mod tests {
                 commercial_use: Some("license:commercial-use-clause".to_owned()),
                 public_fixture: Some("license:public-fixture-clause".to_owned()),
             },
+            permission_evidence: permission_evidence(),
             permissions: allowed_permissions(),
             artifact_sha256: Some(sha256_hex(ARTIFACT)),
             retrieved_on: "2026-01-02".to_owned(),
@@ -969,6 +1114,68 @@ mod tests {
             NutritionAssessability::SyntheticFixtureOnly
         );
         assert!(result.issues.is_empty());
+    }
+
+    #[test]
+    fn unresolved_nonempty_permission_reference_fails_closed() {
+        let mut m = manifest();
+        m.permission_references.use_for_assessment = Some("license:not-in-manifest".to_owned());
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceNotFound
+        }));
+    }
+
+    #[test]
+    fn permission_evidence_for_another_right_cannot_be_reused() {
+        let mut m = manifest();
+        m.permission_references.commercial_use =
+            Some("license:assessment-clause".to_owned());
+        let mut use_case = use_request();
+        use_case.commercial_use = true;
+        let result = assess_nutrition_source(
+            &m, &fact(), EVALUATION_DATE, &use_case, Some(ARTIFACT),
+        );
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceRightMismatch
+        }));
+    }
+
+    #[test]
+    fn expired_permission_evidence_blocks_the_assessment() {
+        let mut m = manifest();
+        m.permission_evidence[0].valid_until = "2026-10-14".to_owned();
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceExpired
+        }));
+    }
+
+    #[test]
+    fn revoked_permission_evidence_blocks_the_assessment() {
+        let mut m = manifest();
+        m.permission_evidence[0].lifecycle = PermissionEvidenceLifecycleV1::Revoked;
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceRevoked
+        }));
+    }
+
+    #[test]
+    fn written_permission_must_resolve_to_written_permission_evidence() {
+        let mut m = manifest();
+        m.permissions.use_for_assessment = PermissionDecision::GrantedByWrittenPermission;
+        m.permission_references.use_for_assessment =
+            Some("license:assessment-clause".to_owned());
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceBasisMismatch
+        }));
     }
 
     #[test]
