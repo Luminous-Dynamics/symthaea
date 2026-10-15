@@ -334,6 +334,19 @@ The bound propagation assumes independently declared intervals and monotonic use
 
 This fills an arithmetic gap but not the physics gap: actual path count, load concentration, local member forces and global buckling modes still need geometry-specific nonlinear analysis with imperfections and comparison to physical tests. For the geodesic 2026 reference, the paper's approximate analytical load-sharing relationship and its FEA comparison are useful regression targets for an independently implemented checker, but they must remain tied to that paper's geometry and assumptions. [Toli, DOI 10.1016/j.ast.2026.112799](https://doi.org/10.1016/j.ast.2026.112799).
 
+### Preserve dependence with coherent load-path scenarios
+
+The Rust screen now also exposes `screen_load_path_scenario_set`. Use this when the effective path count and peak-to-mean factor change together with geometry, joint stiffness, boundary conditions, or the spatial imperfection field. Each `LoadPathDemandScenario` keeps one resultant, one effective path count, one concentration factor, a unique scenario ID, and an evidence-manifest ID together. The result retains each row and reports the minimum and maximum scaled demand **among the enumerated cases**, including which scenario produced each extreme.
+
+This complements rather than replaces `screen_bounded_load_path_demand`:
+
+- The independent interval API combines declared marginal endpoints. It is useful as a deliberately broad screening envelope when those endpoint combinations are intended to be allowed.
+- The coherent-scenario API evaluates each supplied tuple as a unit. It avoids inventing a combination such as the largest resultant, smallest path count, and largest concentration factor when those values came from mutually exclusive geometries or imperfection cases.
+
+A small synthetic regression example illustrates the distinction: scenario A uses 1,000 N / 10 effective paths / 1.1 concentration, giving 110 N; scenario B uses 2,000 N / 40 paths / 1.3 concentration, giving 65 N. The enumerated scenario envelope is 65–110 N. Combining the separate marginal extrema would produce 2,000 / 10 × 1.3 = 260 N, which is not the demand of either supplied scenario. These values are only an arithmetic test fixture, not an aircraft estimate.
+
+The scenario envelope is **not** a statistical confidence interval, probability estimate, or guarantee over unsupplied cases. It is no more complete than the submitted scenario matrix. Scenario and evidence IDs must be non-empty and scenario IDs unique, but string matching does not verify the underlying model, hash, reviewer, or test receipt. A practical next step is to generate these rows from versioned geometry/imperfection/load manifests and retain full spatial defect fields, solver settings, and independent test evidence for each row. The test matrix should include shapes/locations with similar scalar defect amplitudes as well as measured as-built scans.
+
 ### Require exact scope alignment before comparing capacity evidence
 
 The bounded pressure screen now has a scope-aware wrapper, `assess_scoped_external_pressure_bounds`. A pressure-capacity record is compared only when eight immutable scope identifiers match the requested case:
@@ -362,6 +375,12 @@ This is evidence about cylindrical shells, not direct validation for a spherical
 The next test matrix should therefore include geometrically distinct imperfections with similar maximum amplitude and RMS magnitude. That tests whether shape and location materially change predicted failure, and helps guard against an optimizer learning that an arbitrary scalar defect score is a sufficient safety proxy. Any localized probing or subcritical stability-landscape experiments require an independently reviewed procedure: probing can itself change equilibrium paths and trigger snap-through in sensitive structures.
 
 
+
+### Recent validation-method lead: multi-mode imperfections and a physical dome test
+
+A paper published online on 17 August 2026 reports nonlinear imperfection studies and a full-scale buckling test for an ellipsoidal launch-vehicle propellant-tank dome assembly. In that specific case, a model combining the first through third buckling modes predicted the experimental buckling load within 0.5%: [doi:10.1016/j.ast.2026.113564](https://doi.org/10.1016/j.ast.2026.113564). This is useful as a workflow lead—measure/represent manufacturing defects, compare single-mode and multi-mode imperfections, predict before testing, and publish the comparison—not as a transferable knockdown factor or validation for a vacuum-airship geodesic lattice. The specimen geometry, material, joints, boundary conditions, and loading must remain case-specific.
+
+A separate study on spherical domes under external pressure describes a numerical/analytical method checked against a literature set of more than 800 experimental buckling results, reinforcing that imperfection-aware design methods need a clearly defined calibration population and applicability domain: [doi:10.1016/j.ijpvp.2019.104015](https://doi.org/10.1016/j.ijpvp.2019.104015). Neither study removes the need for candidate-specific subassembly and shell tests. Their value here is procedural: keep the full imperfection basis, prediction, test article, and error metric linked in each evidence record.
 
 ### Expand geometry search beyond a smooth sphere—but keep the loads honest
 
