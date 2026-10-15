@@ -113,6 +113,21 @@ Make the reproducibility receipt portable: a manifest references the rights-clea
 
 EnzymeML should remain the primary exchange-format candidate for experimental data and models; STRENDA should remain the reporting-guidance reference; SBML remains relevant for suitable model representations. Mycelix or another provenance/governance service may record source-rights review and contribution receipts later, but trust scores or community consensus must never be converted into biological validation.
 
+### 8. From fitting one preferred model to actively distinguishing plausible models
+
+A fit can look numerically adequate while competing mechanisms remain observationally indistinguishable. The next scientific question is not only “which parameter values best fit this dataset?” but also “which additional observation would distinguish the remaining explanations?”
+
+Keep two experiment-design objectives separate:
+
+- **Parameter identifiability:** choose a measurement condition that narrows prespecified profile-likelihood intervals or otherwise improves practical identifiability for parameters in a declared model.
+- **Model discrimination:** choose a condition where prespecified competing models make meaningfully different, experimentally resolvable predictions.
+
+These objectives can conflict. An experiment that estimates parameters precisely under one model may do little to distinguish that model from a rival. Never collapse the objectives into one opaque score: report both, their constraints, and why the selected design trades one against the other.
+
+**Proposed implementation path:** begin with synthetic ODE/kinetic fixtures whose parameters and generating model are known. Register candidate models, noise assumptions, feasible measurement conditions, selection objective, budget and stopping rule before scoring designs. Compare the chosen design against random and simple local-sensitivity baselines. Score parameter recovery, profile-likelihood identifiability, model-selection accuracy, robustness to misspecification, and total measurement cost. Preserve cases where no available design can discriminate the candidates. Only later adapt this to a rights-cleared enzyme assay, with expert review before prospective measurements.
+
+This direction is supported by a September 2026 *Mathematical Biosciences* paper on optimal experiment design for practical identifiability and model discrimination. That paper demonstrates the distinction using simple ODE examples, not enzyme-specific prospective validation; this roadmap treats it as a transferable method to test, not evidence that the proposed enzyme workflow already works.
+
 ## Target architecture
 
 1. **Source and rights layer:** source/version ID, rights and attribution review, access path, artifact checksums, publication/record locators.
@@ -193,6 +208,7 @@ The innovation should be judged by measurable outcomes: fewer unreproducible par
 - [CatPred: a comprehensive framework for deep learning in vitro enzyme kinetic parameters](https://www.nature.com/articles/s41467-025-57215-9) (Nature Communications, 2025): established kcat/Km/Ki prediction and query-level uncertainty; baseline for scientific comparison, not novelty to claim.
 - [On Over-Parameterisation and Parameter Estimation of Enzyme Kinetics](https://www.mdpi.com/2673-9623/6/2/25) (AppliedChem, 9 April 2026): warns that added kinetic model parameters can impair practical identifiability and fit noise.
 - [A Practical Identifiability Criterion Leveraging Weak-Form Parameter Estimation](https://link.springer.com/article/10.1007/s11538-026-01639-x) (Bulletin of Mathematical Biology, 31 March 2026): makes identifiability a measurable gate rather than an informal warning.
+- [Optimal experiment design for practical parameter identifiability and model discrimination](https://pubmed.ncbi.nlm.nih.gov/42176891/) (Mathematical Biosciences, September 2026): treats parameter identifiability and choosing between competing models as related but distinct experiment-design objectives; demonstrations use simple ODEs, so enzyme-specific validation remains open.
 
 - [On the reproducibility of enzyme reactions and kinetic modelling](https://pubmed.ncbi.nlm.nih.gov/35357794/) (2022): practical guidance on experiment design, kinetic modelling and reproducible enzyme data.
 - [Benchmarking and Experimental Validation of Machine Learning Strategies for Enzyme Engineering](https://www.biorxiv.org/content/10.64898/2026.03.29.715152v2) (bioRxiv preprint, 2026): a recent, not-yet-definitive argument that heterogeneous assay conditions can confound apparent generalization.
