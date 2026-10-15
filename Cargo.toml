@@ -22,6 +22,10 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # Public export currently contains source files for observation-attestation but no Cargo.toml.
+    # Keep the incomplete, non-package directory out of glob workspace discovery until its
+    # standalone crate manifest and dependency contract are restored and qualified.
+    "crates/core/symthaea-observation-attestation",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
