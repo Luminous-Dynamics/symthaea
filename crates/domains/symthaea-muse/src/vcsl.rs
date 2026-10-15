@@ -1442,6 +1442,7 @@ mod tests {
             vcsl_root.join("Chordophones/Composite Chordophones/Concert Harp");
         std::fs::create_dir_all(&harp_dir).unwrap();
         std::fs::write(harp_dir.join("Harp_A4_vl1.wav"), []).unwrap();
+        std::fs::write(harp_dir.join("Harp_C3_vl2.wav"), []).unwrap();
         std::fs::write(harp_dir.join("not-a-pitch-file.wav"), []).unwrap();
         std::fs::create_dir_all(&vsco2_root).unwrap();
         let soundfont = root.join("fixture.sf2");
@@ -1455,7 +1456,7 @@ mod tests {
 
         let inventory = capability_inventory(&vcsl_root, &vsco2_root, Some(&soundfont)).unwrap();
         assert!(inventory.vcsl_root.root_present);
-        assert_eq!(inventory.vcsl_root.wav_file_count, 2);
+        assert_eq!(inventory.vcsl_root.wav_file_count, 3);
         assert!(inventory.vcsl_root.path_size_manifest_sha256.is_some());
         assert!(inventory.vsco2_root.root_present);
         assert_eq!(inventory.vsco2_root.wav_file_count, 0);
@@ -1467,11 +1468,11 @@ mod tests {
             .unwrap();
         let mapping = harp.sustained_samples.as_ref().unwrap();
         assert!(mapping.directory_present);
-        assert_eq!(mapping.indexed_sample_count, 1);
-        assert_eq!(mapping.min_midi, Some(69));
+        assert_eq!(mapping.indexed_sample_count, 2);
+        assert_eq!(mapping.min_midi, Some(48));
         assert_eq!(mapping.max_midi, Some(69));
-        assert_eq!(mapping.distinct_pitch_count, 1);
-        assert_eq!(mapping.distinct_dynamic_strength_count, 1);
+        assert_eq!(mapping.distinct_pitch_count, 2);
+        assert_eq!(mapping.distinct_dynamic_strength_count, 2);
 
         let soundfont_evidence = inventory.soundfont.as_ref().unwrap();
         assert_eq!(soundfont_evidence.file_name, "fixture.sf2");
