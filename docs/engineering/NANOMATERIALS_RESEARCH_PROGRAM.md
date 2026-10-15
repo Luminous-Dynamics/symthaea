@@ -240,6 +240,31 @@ Treat ColabFit as a separate potential source/conversion path, not a substitute 
 
 No ColabFit rows or labels have been downloaded or independently verified in this workstream. This finding changes the retrieval options, not the admission state.
 
+### ColabFit schema and lineage evidence (source audit, 2026-10-15)
+
+A follow-up review of the visible ColabFit Hugging Face Dataset Viewer makes this alternate route more concrete, but also creates explicit lineage work:
+
+- The viewer schema exposes `configuration_metadata`, `configuration_metadata_id`, `configuration_labels`, `configuration_dataset_ids`, `configuration_id`, `configuration_hash`, and `structure_hash`.
+- Example out-of-domain validation rows expose configuration metadata fields including `lmdb-system-id`, `traj-id`, and `num-adsorbates`. The examples use the original OC22 system identifier/trajectory lineage, which gives us a candidate join key to verify against the upstream OC22 mapping.
+- Visible OOD records include configuration labels such as `is2re_val_ood_182` and `s2ef_val_ood_182`, and dataset-ID lists spanning both IS2RE and S2EF datasets. This confirms that at least some configurations are intentionally represented in more than one task-specific collection. If multiple collections are ever combined, cross-task membership and duplicate structures must be reconciled instead of counted as independent candidates.
+- Counts are not currently a frozen contract. The IS2RE train card states 7,861,269 unique molecular configurations while the viewer estimates about 7,236,212 rows; the OOD validation card states 521,827 configurations and the viewer reports approximately 521,308 rows. The OOD validation file-size figure has also differed between surfaced page snapshots (about 2.04 GB versus 2.44 GB). Treat these as page-snapshot differences to explain by pinning metadata and file revisions, not as evidence of new or missing scientific data.
+
+Sources inspected:
+- [ColabFit OC22 collection](https://huggingface.co/collections/colabfit/oc22-open-catalyst-2022-colabfit)
+- [OC22 IS2RE train card and viewer](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Train)
+- [OC22 IS2RE OOD validation schema and examples](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Validation-out-of-domain)
+- [Canonical FairChem OC22 mapping and task definition](https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/datasets/oc22.md)
+
+Preregister these mapping outcomes before any ColabFit-based metric:
+1. Exact column type/schema and revision for every file/shard; exact byte sizes and SHA-256.
+2. Whether `lmdb-system-id` agrees with official `sid` for a deterministic comparison sample and then for every record.
+3. Number of configurations, unique `lmdb-system-id` values, unique `traj-id` values, and duplicated structure/configuration hashes—reported separately.
+4. `configuration_labels` and `configuration_dataset_ids` intersections between train, validation-ID, validation-OOD and the parallel S2EF collections.
+5. Target property identity/units and evidence that each IS2RE row stores the initial-structure input and relaxed-total-energy target expected by the official task.
+6. The absence/presence of official test membership. The surfaced collection lists six train/validation datasets (three IS2RE and three S2EF) and no IS2RE test dataset. Do not invent or substitute a test partition.
+
+No raw Parquet records have been downloaded, no sample crosswalk has been run, and the count/size differences remain unresolved. This is additional source-level evidence, not data admission.
+
 ### Selector comparison
 
 Keep downstream predictor family, structure representation, training protocol, available label budget, compute budget, and evaluation sets fixed while comparing:
