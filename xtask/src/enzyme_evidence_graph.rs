@@ -567,6 +567,17 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
                 "successful transformation {} has one or more unavailable or unverified input artifacts",
                 transformation.transformation_id
             );
+            for artifact_id in transformation.input_artifact_ids.iter().chain(&transformation.output_artifact_ids) {
+                let artifact = artifacts_by_id[artifact_id.as_str()];
+                let rights = rights_by_id[artifact.rights_record_id.as_str()];
+                ensure!(
+                    rights.status == "approved_for_this_use",
+                    "successful transformation {} cannot consume or publish artifact {} with rights status '{}'; preserve the run as blocked until its source-specific use is reviewed",
+                    transformation.transformation_id,
+                    artifact_id,
+                    rights.status
+                );
+            }
         }
         if transformation.terminal_status == "null_result" {
             ensure!(
@@ -968,6 +979,15 @@ mod tests {
         graph["transformations"][0]["input_artifact_ids"] = json!(["a_input.bin", "a_remote"]);
         let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
         assert!(error.contains("unavailable or unverified input artifacts") || error.contains("not linked from its input nodes"));
+    }
+
+    #[test]
+    fn refuses_successful_transform_with_unreviewed_rights_even_when_bytes_match() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["rights_records"][0]["status"] = json!("review_pending");
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("rights status 'review_pending'"));
     }
 
     #[test]
