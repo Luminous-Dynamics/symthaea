@@ -650,6 +650,9 @@ pub struct SampleDirectoryEvidenceV1 {
     pub reported_sample_decode_failures: Vec<SampleDecodeFailureV1>,
     /// Number of failed indexed WAVs omitted after the diagnostic limit.
     pub omitted_sample_decode_failure_count: usize,
+    /// Optional SHA-256 over the ordered names, sizes, and contents of indexed WAVs.
+    /// None means content hashing was not requested or no files were indexable.
+    pub indexed_sample_content_manifest_sha256: Option<String>,
     /// Fully decoded files whose peak absolute sample value is <= 1e-5.
     pub silent_sample_file_count: usize,
     /// Distinct sample rates/channels across files that fully decoded.
@@ -693,6 +696,25 @@ pub fn capability_inventory_with_fluidsynth(
     vsco2_root: &Path,
     soundfont_path: Option<&Path>,
     fluidsynth_path: Option<&Path>,
+) -> std::io::Result<InstrumentCapabilityInventoryV1> {
+    capability_inventory_with_options(
+        vcsl_root,
+        vsco2_root,
+        soundfont_path,
+        fluidsynth_path,
+        false,
+    )
+}
+
+/// Build a capability inventory with explicit controls for external probes and
+/// expensive sample-byte hashing. Content hashing is opt-in because it reads
+/// every WAV accepted by the sample indexer a second time.
+pub fn capability_inventory_with_options(
+    vcsl_root: &Path,
+    vsco2_root: &Path,
+    soundfont_path: Option<&Path>,
+    fluidsynth_path: Option<&Path>,
+    hash_indexed_samples: bool,
 ) -> std::io::Result<InstrumentCapabilityInventoryV1> {
     if fluidsynth_path.is_some() && soundfont_path.is_none() {
         return Err(std::io::Error::new(
@@ -750,46 +772,45 @@ pub fn capability_inventory_with_fluidsynth(
     let vsco2_evidence = asset_root_evidence(vsco2_root)?;
     let soundfont = soundfont_path.map(soundfont_evidence).transpose()?;
     let mut sample_directory_cache =
-        HashMap::<(SampleSource, String), Option<SampleDirectoryEvidenceV1>>::new();
-    let instruments = INSTRUMENTS
-        .iter()
-        .copied()
-        .map(|instrument| {
-            let sustained_samples = sample_directory_evidence_cached(
-                instrument,
-                false,
-                vcsl_root,
-                vsco2_root,
-                &mut sample_directory_cache,
-            );
-            let short_articulation_samples = sample_directory_evidence_cached(
-                instrument,
-                true,
-                vcsl_root,
-                vsco2_root,
-                &mut sample_directory_cache,
-            );
-            let soundfont_bank0_program_matches = soundfont.as_ref().map(|evidence| {
-                evidence
-                    .preset_inventory
-                    .presets
-                    .iter()
-                    .filter(|preset| {
-                        preset.bank == 0 && preset.program == instrument.gm_program() as u16
-                    })
-                    .map(|preset| preset.name.clone())
-                    .collect()
-            });
-            InstrumentCapabilityV1 {
-                instrument: format!("{instrument:?}"),
-                gm_program_0_based: instrument.gm_program(),
-                procedural_renderer_path: procedural_renderer_path(instrument),
-                sustained_samples,
-                short_articulation_samples,
-                soundfont_bank0_program_matches,
-            }
-        })
-        .collect::<Vec<_>>();
+        HashMap::<(SampleSource, String, bool), Option<SampleDirectoryEvidenceV1>>::new();
+    let mut instruments = Vec::with_capacity(INSTRUMENTS.len());
+    for instrument in INSTRUMENTS.iter().copied() {
+        let sustained_samples = sample_directory_evidence_cached(
+            instrument,
+            false,
+            vcsl_root,
+            vsco2_root,
+            hash_indexed_samples,
+            &mut sample_directory_cache,
+        )?;
+        let short_articulation_samples = sample_directory_evidence_cached(
+            instrument,
+            true,
+            vcsl_root,
+            vsco2_root,
+            hash_indexed_samples,
+            &mut sample_directory_cache,
+        )?;
+        let soundfont_bank0_program_matches = soundfont.as_ref().map(|evidence| {
+            evidence
+                .preset_inventory
+                .presets
+                .iter()
+                .filter(|preset| {
+                    preset.bank == 0 && preset.program == instrument.gm_program() as u16
+                })
+                .map(|preset| preset.name.clone())
+                .collect()
+        });
+        instruments.push(InstrumentCapabilityV1 {
+            instrument: format!("{instrument:?}"),
+            gm_program_0_based: instrument.gm_program(),
+            procedural_renderer_path: procedural_renderer_path(instrument),
+            sustained_samples,
+            short_articulation_samples,
+            soundfont_bank0_program_matches,
+        });
+    }
     let source_revision = std::env::var("SYMTHAEA_SOURCE_REV")
         .or_else(|_| std::env::var("GITHUB_SHA"))
         .ok()
@@ -835,20 +856,29 @@ fn sample_directory_evidence_cached(
     short_articulation: bool,
     vcsl_root: &Path,
     vsco2_root: &Path,
-    cache: &mut HashMap<(SampleSource, String), Option<SampleDirectoryEvidenceV1>>,
-) -> Option<SampleDirectoryEvidenceV1> {
+    hash_indexed_samples: bool,
+    cache: &mut HashMap<(SampleSource, String, bool), Option<SampleDirectoryEvidenceV1>>,
+) -> std::io::Result<Option<SampleDirectoryEvidenceV1>> {
     let mapping = if short_articulation {
         staccato_subdir(instrument)
     } else {
         sample_subdir(instrument)
-    }?;
-    let key = (mapping.0, mapping.1.to_owned());
+    } else {
+        return Ok(None);
+    };
+    let key = (mapping.0, mapping.1.to_owned(), hash_indexed_samples);
     if let Some(cached) = cache.get(&key) {
-        return cached.clone();
+        return Ok(cached.clone());
     }
-    let evidence = sample_directory_evidence(instrument, short_articulation, vcsl_root, vsco2_root);
+    let evidence = sample_directory_evidence(
+        instrument,
+        short_articulation,
+        vcsl_root,
+        vsco2_root,
+        hash_indexed_samples,
+    )?;
     cache.insert(key, evidence.clone());
-    evidence
+    Ok(evidence)
 }
 
 fn sample_directory_evidence(
@@ -856,12 +886,15 @@ fn sample_directory_evidence(
     short_articulation: bool,
     vcsl_root: &Path,
     vsco2_root: &Path,
-) -> Option<SampleDirectoryEvidenceV1> {
+    hash_indexed_samples: bool,
+) -> std::io::Result<Option<SampleDirectoryEvidenceV1>> {
     let mapping = if short_articulation {
         staccato_subdir(instrument)
     } else {
         sample_subdir(instrument)
-    }?;
+    } else {
+        return Ok(None);
+    };
     let (source, relative_directory) = mapping;
     let source_name = match source {
         SampleSource::Vcsl => "vcsl",
@@ -880,6 +913,16 @@ fn sample_directory_evidence(
     };
     let indexed_sample_count = bank.as_ref().map_or(0, |bank| bank.samples.len());
     let audio_audit = audit_indexed_sample_audio(bank.as_ref());
+    let indexed_sample_content_manifest_sha256 = if hash_indexed_samples {
+        match bank.as_ref() {
+            Some(bank) if !bank.samples.is_empty() => {
+                Some(indexed_sample_content_manifest_sha256(bank)?)
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
     let audio_decode_status = if !directory_present {
         "mapped_directory_missing"
     } else if indexed_sample_count == 0 {
@@ -925,10 +968,60 @@ fn sample_directory_evidence(
         failed_sample_decode_count: audio_audit.failed_sample_decode_count,
         reported_sample_decode_failures: audio_audit.reported_sample_decode_failures,
         omitted_sample_decode_failure_count: audio_audit.omitted_sample_decode_failure_count,
+        indexed_sample_content_manifest_sha256,
         silent_sample_file_count: audio_audit.silent_sample_file_count,
         distinct_sample_rate_count: audio_audit.sample_rates.len(),
         distinct_channel_count: audio_audit.channel_counts.len(),
-    })
+    }))
+}
+
+/// Hash the sorted filename/size/content records for indexable samples. File
+/// bytes are streamed so hashing does not load large libraries into memory.
+fn indexed_sample_content_manifest_sha256(bank: &InstrumentBank) -> std::io::Result<String> {
+    use std::io::Read as _;
+
+    let mut manifest = Sha256::new();
+    manifest.update(b"muse-indexed-sample-content-manifest-v1\\0");
+    let mut buffer = [0u8; 64 * 1024];
+
+    for sample in &bank.samples {
+        let name = sample
+            .path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy();
+        let name_bytes = name.as_bytes();
+        manifest.update((name_bytes.len() as u64).to_be_bytes());
+        manifest.update(name_bytes);
+
+        let mut file = std::fs::File::open(&sample.path)?;
+        let expected_size = file.metadata()?.len();
+        manifest.update(expected_size.to_be_bytes());
+        let mut read_size = 0u64;
+        let mut file_hasher = Sha256::new();
+        loop {
+            let count = file.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            read_size += count as u64;
+            file_hasher.update(&buffer[..count]);
+        }
+        if read_size != expected_size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "indexed sample changed size while hashing: {}",
+                    name
+                ),
+            ));
+        }
+        let file_digest = file_hasher.finalize();
+        manifest.update(file_digest);
+    }
+
+    let digest = manifest.finalize();
+    Ok(hex_digest(&digest[..]))
 }
 
 #[derive(Debug, Clone, Serialize)]
