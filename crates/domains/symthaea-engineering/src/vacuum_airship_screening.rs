@@ -1758,6 +1758,14 @@ pub enum DefectPopulationGateState {
     CharacterizedForTargetManufacturingPopulation,
 }
 
+/// Demonstrated sensitivity of the selected inspection method on representative critical features.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DefectInspectionGateState {
+    Unselected,
+    NotValidatedForCriticalFeatures,
+    DetectionPerformanceDemonstratedOnRepresentativeParts,
+}
+
 /// Declared maturity profile used to find blockers before a candidate is promoted to review.
 ///
 /// Every state is supplied by the caller. This function does not inspect files, authenticate
@@ -1777,6 +1785,7 @@ pub struct CandidateEvidenceGateProfile {
     pub vehicle_mass_ledger: VehicleMassLedgerGateState,
     pub scale_transfer: ScaleTransferGateState,
     pub defect_population: DefectPopulationGateState,
+    pub defect_inspection: DefectInspectionGateState,
 }
 
 /// Fail-closed outcome of the candidate evidence-gap assessment.
@@ -1849,6 +1858,11 @@ pub fn assess_candidate_evidence_gates(
         != DefectPopulationGateState::CharacterizedForTargetManufacturingPopulation
     {
         blockers.push("manufacturing_defect_population_not_characterized");
+    }
+    if profile.defect_inspection
+        != DefectInspectionGateState::DetectionPerformanceDemonstratedOnRepresentativeParts
+    {
+        blockers.push("critical_defect_inspection_not_validated");
     }
 
     let status = match profile.mass_budget {
@@ -3045,6 +3059,7 @@ mod tests {
             vehicle_mass_ledger: VehicleMassLedgerGateState::ReconciledToMeasuredOrBuildEstimate,
             scale_transfer: ScaleTransferGateState::ValidatedAcrossRelevantScaleRange,
             defect_population: DefectPopulationGateState::CharacterizedForTargetManufacturingPopulation,
+            defect_inspection: DefectInspectionGateState::DetectionPerformanceDemonstratedOnRepresentativeParts,
         }
     }
 
@@ -3108,6 +3123,15 @@ mod tests {
         assert!(result.blockers.contains(&"vehicle_mass_ledger_not_reconciled"));
         assert!(result.blockers.contains(&"scale_transfer_not_validated"));
         assert!(result.blockers.contains(&"manufacturing_defect_population_not_characterized"));
+    }
+
+    #[test]
+    fn candidate_gate_requires_inspection_detection_validation() {
+        let mut profile = complete_candidate_evidence_profile();
+        profile.defect_inspection = DefectInspectionGateState::NotValidatedForCriticalFeatures;
+        let result = assess_candidate_evidence_gates(profile);
+        assert_eq!(result.status, CandidateEvidenceGateStatus::EvidenceGapsRemain);
+        assert!(result.blockers.contains(&"critical_defect_inspection_not_validated"));
     }
 
     #[test]
