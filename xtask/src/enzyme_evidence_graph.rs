@@ -161,6 +161,12 @@ struct ParameterClaim {
     endpoint_definition: String,
     value: Value,
     unit: String,
+    /// Optional normalized value; when present it must be numeric and paired with normalized_unit.
+    #[serde(default)]
+    normalized_value: Option<Value>,
+    /// Optional normalized unit; when present it must be paired with normalized_value.
+    #[serde(default)]
+    normalized_unit: Option<String>,
     enzyme_form_basis: String,
     reaction_id: String,
     substrate_ids: Vec<String>,
@@ -634,16 +640,26 @@ fn validate_parameter_claims(
         ensure!(!claim.reaction_id.trim().is_empty(), "parameter {} reaction_id must be nonempty", claim.parameter_id);
         ensure!(!claim.kinetic_equation_id.trim().is_empty(), "parameter {} kinetic_equation_id must be nonempty", claim.parameter_id);
         ensure!(
-            !claim.value.is_null()
-                && !claim.value.as_str().is_some_and(|value| value.trim().is_empty()),
-            "parameter {} must retain a non-empty verbatim value",
+            claim.value.is_number()
+                || claim.value.as_str().is_some_and(|value| !value.trim().is_empty()),
+            "parameter {} value must be a number or non-empty verbatim source string",
             claim.parameter_id
         );
         ensure!(
-            claim.assay_context.is_object(),
-            "parameter {} assay_context must be an object; unknowns should be explicit fields, not omitted context",
+            match (&claim.normalized_value, &claim.normalized_unit) {
+                (None, None) => true,
+                (Some(value), Some(unit)) => value.is_number() && !unit.trim().is_empty(),
+                _ => false,
+            },
+            "parameter {} normalized_value and normalized_unit must be supplied together, with a numeric value and non-empty unit",
             claim.parameter_id
         );
+        ensure!(
+            claim.assay_context.is_object() && !claim.assay_context.as_object().unwrap().is_empty(),
+            "parameter {} assay_context must be a non-empty object; represent missing conditions explicitly as null/status fields",
+            claim.parameter_id
+        );
+        ensure_unique_values(&claim.substrate_ids, &format!("parameter {} substrate_ids", claim.parameter_id));
         ensure!(
             UNCERTAINTY_STATUSES.contains(&claim.uncertainty_status.as_str()),
             "parameter {} has unknown uncertainty_status '{}'",
@@ -1073,6 +1089,93 @@ mod tests {
         }]);
         let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
         assert!(error.contains("uncertainty_status"));
+    }
+
+    #[test]
+    fn rejects_object_or_array_as_parameter_value() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["nodes"].as_array_mut().unwrap().push(json!({
+            "node_id": "n_reported",
+            "type": "reported_parameter_claim",
+            "evidence_class": "source_claim",
+            "artifact_ids": []
+        }));
+        graph["parameter_claims"] = json!([{
+            "parameter_id": "p1",
+            "parameter_name": "kcat",
+            "endpoint_definition": "catalytic turnover number",
+            "value": {"lower": 12, "upper": 14},
+            "unit": "s^-1",
+            "enzyme_form_basis": "not reported",
+            "reaction_id": "reaction-1",
+            "substrate_ids": ["substrate-1"],
+            "assay_context": {"pH": null, "temperature_c": 25.0},
+            "kinetic_equation_id": "michaelis-menten",
+            "source_or_fit_node_id": "n_reported",
+            "uncertainty_status": "reported"
+        }]);
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("value must be a number or non-empty verbatim source string"));
+    }
+
+    #[test]
+    fn rejects_normalized_value_without_paired_unit() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["nodes"].as_array_mut().unwrap().push(json!({
+            "node_id": "n_reported",
+            "type": "reported_parameter_claim",
+            "evidence_class": "source_claim",
+            "artifact_ids": []
+        }));
+        graph["parameter_claims"] = json!([{
+            "parameter_id": "p1",
+            "parameter_name": "kcat",
+            "endpoint_definition": "catalytic turnover number",
+            "value": "reported as 12.4",
+            "unit": "min^-1",
+            "normalized_value": 0.2066667,
+            "enzyme_form_basis": "not reported",
+            "reaction_id": "reaction-1",
+            "substrate_ids": ["substrate-1"],
+            "assay_context": {"pH": null, "temperature_c": 25.0},
+            "kinetic_equation_id": "michaelis-menten",
+            "source_or_fit_node_id": "n_reported",
+            "uncertainty_status": "reported"
+        }]);
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("normalized_value and normalized_unit must be supplied together"));
+    }
+
+    #[test]
+    fn rejects_duplicate_substrate_ids_in_parameter_claim() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["nodes"].as_array_mut().unwrap().push(json!({
+            "node_id": "n_reported",
+            "type": "reported_parameter_claim",
+            "evidence_class": "source_claim",
+            "artifact_ids": []
+        }));
+        graph["parameter_claims"] = json!([{
+            "parameter_id": "p1",
+            "parameter_name": "kcat",
+            "endpoint_definition": "catalytic turnover number",
+            "value": 12.4,
+            "unit": "s^-1",
+            "normalized_value": 12.4,
+            "normalized_unit": "s^-1",
+            "enzyme_form_basis": "not reported",
+            "reaction_id": "reaction-1",
+            "substrate_ids": ["substrate-1", "substrate-1"],
+            "assay_context": {"pH": null, "temperature_c": 25.0},
+            "kinetic_equation_id": "michaelis-menten",
+            "source_or_fit_node_id": "n_reported",
+            "uncertainty_status": "reported"
+        }]);
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("duplicate value 'substrate-1'"));
     }
 
     #[cfg(unix)]
