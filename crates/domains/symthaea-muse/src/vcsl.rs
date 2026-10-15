@@ -552,6 +552,29 @@ pub struct SoundFontEvidenceV1 {
     pub file_name: String,
     pub size_bytes: u64,
     pub sha256: String,
+    /// Parsed from the RIFF/SoundFont preset-header table. This is header
+    /// inventory only; it does not certify samples, FluidSynth loadability,
+    /// or audible fidelity.
+    pub preset_inventory: SoundFontPresetInventoryV1,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SoundFontPresetInventoryV1 {
+    pub status: &'static str,
+    pub declared_preset_count: usize,
+    pub declared_bank_count: usize,
+    pub duplicate_bank_program_slots: usize,
+    pub presets: Vec<SoundFontPresetV1>,
+}
+
+/// SoundFont preset-header identity. Program and bank are the values stored
+/// in the SoundFont header, not a claim about source instruments or quality.
+#[derive(Debug, Clone, Serialize)]
+pub struct SoundFontPresetV1 {
+    pub name: String,
+    pub bank: u16,
+    pub program: u16,
+    pub bag_index: u16,
 }
 
 /// A single sustained or short-articulation mapping and its local availability.
@@ -777,7 +800,8 @@ fn collect_wav_manifest(
 }
 
 fn soundfont_evidence(path: &Path) -> std::io::Result<SoundFontEvidenceV1> {
-    use std::io::Read as _;
+    use std::io::{Read as _, Seek as _, SeekFrom};
+
     let mut file = std::fs::File::open(path)?;
     let size_bytes = file.metadata()?.len();
     let mut hasher = Sha256::new();
@@ -790,6 +814,8 @@ fn soundfont_evidence(path: &Path) -> std::io::Result<SoundFontEvidenceV1> {
         hasher.update(&buffer[..read]);
     }
     let digest = hasher.finalize();
+    file.seek(SeekFrom::Start(0))?;
+    let preset_inventory = parse_soundfont_preset_headers(&mut file, size_bytes)?;
     Ok(SoundFontEvidenceV1 {
         file_name: path
             .file_name()
@@ -798,7 +824,171 @@ fn soundfont_evidence(path: &Path) -> std::io::Result<SoundFontEvidenceV1> {
             .into_owned(),
         size_bytes,
         sha256: hex_digest(&digest[..]),
+        preset_inventory,
     })
+}
+
+fn parse_soundfont_preset_headers(
+    file: &mut std::fs::File,
+    file_size: u64,
+) -> std::io::Result<SoundFontPresetInventoryV1> {
+    use std::io::{Read as _, Seek as _, SeekFrom};
+
+    let mut header = [0u8; 12];
+    file.seek(SeekFrom::Start(0))?;
+    file.read_exact(&mut header).map_err(|error| {
+        invalid_soundfont(format!("truncated RIFF header: {error}"))
+    })?;
+    if &header[0..4] != b"RIFF" || &header[8..12] != b"sfbk" {
+        return Err(invalid_soundfont(
+            "expected a RIFF SoundFont (sfbk) container",
+        ));
+    }
+    let riff_end = 8u64 + u32::from_le_bytes(header[4..8].try_into().unwrap()) as u64;
+    if riff_end < 12 || riff_end > file_size {
+        return Err(invalid_soundfont(
+            "RIFF container length extends beyond the file",
+        ));
+    }
+
+    let mut cursor = 12u64;
+    let mut preset_header_data: Option<(u64, u32)> = None;
+    while cursor + 8 <= riff_end {
+        let (chunk_id, chunk_size, data_start, data_end) =
+            read_riff_chunk_header(file, cursor, riff_end)?;
+        if &chunk_id == b"LIST" {
+            if chunk_size < 4 {
+                return Err(invalid_soundfont("LIST chunk is shorter than its type"));
+            }
+            let mut list_type = [0u8; 4];
+            file.seek(SeekFrom::Start(data_start))?;
+            file.read_exact(&mut list_type)?;
+            if &list_type == b"pdta" {
+                let mut sub_cursor = data_start + 4;
+                while sub_cursor + 8 <= data_end {
+                    let (sub_id, sub_size, sub_start, sub_end) =
+                        read_riff_chunk_header(file, sub_cursor, data_end)?;
+                    if &sub_id == b"phdr" {
+                        if preset_header_data.is_some() {
+                            return Err(invalid_soundfont(
+                                "SoundFont contains multiple pdta/phdr chunks",
+                            ));
+                        }
+                        preset_header_data = Some((sub_start, sub_size));
+                    }
+                    sub_cursor = sub_end + (sub_size as u64 % 2);
+                }
+                if sub_cursor != data_end {
+                    return Err(invalid_soundfont(
+                        "malformed chunk boundary inside pdta LIST",
+                    ));
+                }
+            }
+        }
+        cursor = data_end + (chunk_size as u64 % 2);
+    }
+    if cursor != riff_end {
+        return Err(invalid_soundfont("malformed RIFF chunk boundary"));
+    }
+
+    let (phdr_start, phdr_size) = preset_header_data
+        .ok_or_else(|| invalid_soundfont("SoundFont has no pdta/phdr preset-header table"))?;
+    const PRESET_HEADER_BYTES: u32 = 38;
+    if phdr_size < PRESET_HEADER_BYTES * 2 || phdr_size % PRESET_HEADER_BYTES != 0 {
+        return Err(invalid_soundfont(
+            "pdta/phdr size is invalid or omits the required terminal EOP record",
+        ));
+    }
+
+    let records = phdr_size / PRESET_HEADER_BYTES;
+    let mut presets = Vec::with_capacity(records.saturating_sub(1) as usize);
+    for index in 0..records {
+        let mut record = [0u8; PRESET_HEADER_BYTES as usize];
+        file.seek(SeekFrom::Start(
+            phdr_start + index as u64 * PRESET_HEADER_BYTES as u64,
+        ))?;
+        file.read_exact(&mut record)?;
+        let name_end = record[0..20]
+            .iter()
+            .position(|byte| *byte == 0)
+            .unwrap_or(20);
+        let name = String::from_utf8_lossy(&record[0..name_end])
+            .trim()
+            .to_owned();
+        let program = u16::from_le_bytes([record[20], record[21]]);
+        let bank = u16::from_le_bytes([record[22], record[23]]);
+        let bag_index = u16::from_le_bytes([record[24], record[25]]);
+
+        if index + 1 == records {
+            if name != "EOP" {
+                return Err(invalid_soundfont(
+                    "pdta/phdr terminal record is not named EOP",
+                ));
+            }
+        } else {
+            if name.is_empty() {
+                return Err(invalid_soundfont(
+                    "SoundFont preset header has an empty name",
+                ));
+            }
+            if program > 127 {
+                return Err(invalid_soundfont(format!(
+                    "SoundFont preset {name:?} has out-of-range program {program}"
+                )));
+            }
+            presets.push(SoundFontPresetV1 {
+                name,
+                bank,
+                program,
+                bag_index,
+            });
+        }
+    }
+
+    // Normalize output order so semantically equivalent header tables produce
+    // stable output even when the file stored records in a different order.
+    presets.sort_unstable_by(|left, right| {
+        (left.bank, left.program, &left.name).cmp(&(right.bank, right.program, &right.name))
+    });
+    let mut banks = std::collections::BTreeSet::new();
+    let mut slots = std::collections::BTreeMap::<(u16, u16), usize>::new();
+    for preset in &presets {
+        banks.insert(preset.bank);
+        *slots.entry((preset.bank, preset.program)).or_default() += 1;
+    }
+    let duplicate_bank_program_slots = slots.values().filter(|count| **count > 1).count();
+
+    Ok(SoundFontPresetInventoryV1 {
+        status: "preset_headers_parsed_not_renderability",
+        declared_preset_count: presets.len(),
+        declared_bank_count: banks.len(),
+        duplicate_bank_program_slots,
+        presets,
+    })
+}
+
+fn read_riff_chunk_header(
+    file: &mut std::fs::File,
+    position: u64,
+    parent_end: u64,
+) -> std::io::Result<([u8; 4], u32, u64, u64)> {
+    use std::io::{Read as _, Seek as _, SeekFrom};
+
+    let mut header = [0u8; 8];
+    file.seek(SeekFrom::Start(position))?;
+    file.read_exact(&mut header)?;
+    let chunk_id = header[0..4].try_into().unwrap();
+    let chunk_size = u32::from_le_bytes(header[4..8].try_into().unwrap());
+    let data_start = position + 8;
+    let data_end = data_start + chunk_size as u64;
+    if data_end > parent_end {
+        return Err(invalid_soundfont("RIFF chunk extends beyond its parent"));
+    }
+    Ok((chunk_id, chunk_size, data_start, data_end))
+}
+
+fn invalid_soundfont(message: impl Into<String>) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidData, message.into())
 }
 
 fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
