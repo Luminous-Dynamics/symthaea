@@ -777,7 +777,10 @@ impl KnowledgeManager {
 
     /// Persist current knowledge state to SQLite.
     ///
-    /// Saves all facts and causal edges. No-op if persistence is not configured.
+    /// Atomically replaces persisted facts, causal edges, and ontology primitives.
+    ///
+    /// No-op if persistence is not configured. On failure, SQLite keeps the
+    /// previous committed snapshot intact.
     pub fn persist_snapshot(&mut self) {
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
