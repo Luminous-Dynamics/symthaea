@@ -32,7 +32,7 @@ struct ExpectedMetric {
     metric: PlssTelemetryMetric,
     source_kind: PlssTelemetrySourceKind,
     status: PlssTelemetryStatus,
-    minimum_accepted_sources: usize,
+    accepted_sources: usize,
     #[serde(default)]
     requires_no_point_estimate: bool,
 }
@@ -62,8 +62,8 @@ fn replay_versioned_corpus_and_independently_verify_receipt() {
             expected.metric, expected.source_kind
         );
         assert!(
-            actual.accepted_source_count >= expected.minimum_accepted_sources,
-            "too few accepted sources for {:?}/{:?}",
+            actual.accepted_source_count, expected.accepted_sources,
+            "accepted source count mismatch for {:?}/{:?}",
             expected.metric, expected.source_kind
         );
         if expected.requires_no_point_estimate {
