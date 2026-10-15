@@ -114,6 +114,30 @@ fn additional_sample_style_mappings(instrument: Instrument) -> &'static [SampleS
             source: Vcsl,
             relative_directory: "Chordophones/Zithers/Upright Piano, Knight/Sustains",
         },
+        SampleStyleMapping {
+            style_name: "Steinway no-sustain samples",
+            style_kind: "alternate_articulation",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Grand Piano, Steinway B/NoSus",
+        },
+        SampleStyleMapping {
+            style_name: "Steinway release samples",
+            style_kind: "release_articulation",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Grand Piano, Steinway B/Rel",
+        },
+        SampleStyleMapping {
+            style_name: "Kawai release samples",
+            style_kind: "release_articulation",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Grand Piano, Kawai/Releases",
+        },
+        SampleStyleMapping {
+            style_name: "Knight upright piano release",
+            style_kind: "release_articulation",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Upright Piano, Knight/Releases",
+        },
     ];
     const HARP_STYLES: &[SampleStyleMapping] = &[SampleStyleMapping {
         style_name: "Folk harp",
@@ -173,6 +197,163 @@ fn additional_sample_style_mappings(instrument: Instrument) -> &'static [SampleS
             relative_directory: "Idiophones/Struck Idiophones/Xylophone/Soft Mallets",
         },
     ];
+    const VIOLIN_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Solo violin pizzicato",
+            style_kind: "pizzicato",
+            source: Vsco2,
+            relative_directory: "Strings/Solo Violin/Pizz",
+        },
+        SampleStyleMapping {
+            style_name: "Solo violin tremolo",
+            style_kind: "tremolo",
+            source: Vsco2,
+            relative_directory: "Strings/Solo Violin/Trem",
+        },
+    ];
+    const VIOLA_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Viola section pizzicato",
+            style_kind: "pizzicato",
+            source: Vsco2,
+            relative_directory: "Strings/Viola Section/pizz",
+        },
+        SampleStyleMapping {
+            style_name: "Viola section tremolo",
+            style_kind: "tremolo",
+            source: Vsco2,
+            relative_directory: "Strings/Viola Section/trem",
+        },
+    ];
+    const CELLO_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Cello section pizzicato",
+            style_kind: "pizzicato",
+            source: Vsco2,
+            relative_directory: "Strings/Cello Section/pizzT",
+        },
+        SampleStyleMapping {
+            style_name: "Cello section tremolo",
+            style_kind: "tremolo",
+            source: Vsco2,
+            relative_directory: "Strings/Cello Section/trem",
+        },
+    ];
+    const FLUTE_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Flute expressive vibrato",
+            style_kind: "expressive_vibrato",
+            source: Vsco2,
+            relative_directory: "Woodwinds/Flute/expvib",
+        },
+        SampleStyleMapping {
+            style_name: "Flute non-vibrato sustain",
+            style_kind: "sustain_without_vibrato",
+            source: Vsco2,
+            relative_directory: "Woodwinds/Flute/susNV",
+        },
+    ];
+    const OBOE_STYLES: &[SampleStyleMapping] = &[SampleStyleMapping {
+        style_name: "Oboe vibrato",
+        style_kind: "vibrato",
+        source: Vsco2,
+        relative_directory: "Woodwinds/Oboe/Vib",
+    }];
+    const BASSOON_STYLES: &[SampleStyleMapping] = &[SampleStyleMapping {
+        style_name: "Bassoon vibrato",
+        style_kind: "vibrato",
+        source: Vsco2,
+        relative_directory: "Woodwinds/Bassoon/vib",
+    }];
+    const TRUMPET_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Trumpet harmon mute",
+            style_kind: "muted",
+            source: Vsco2,
+            relative_directory: "Brass/Trumpet/harmonM-sus",
+        },
+        SampleStyleMapping {
+            style_name: "Trumpet straight mute",
+            style_kind: "muted",
+            source: Vsco2,
+            relative_directory: "Brass/Trumpet/straightM-sus",
+        },
+        SampleStyleMapping {
+            style_name: "Trumpet non-vibrato sustain",
+            style_kind: "sustain_without_vibrato",
+            source: Vsco2,
+            relative_directory: "Brass/Trumpet/sus",
+        },
+    ];
+    const FRENCH_HORN_STYLES: &[SampleStyleMapping] = &[SampleStyleMapping {
+        style_name: "French horn muted",
+        style_kind: "muted",
+        source: Vsco2,
+        relative_directory: "Brass/F Horn/mute",
+    }];
+    const SAXOPHONE_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Tenor saxophone non-vibrato",
+            style_kind: "sustain_without_vibrato",
+            source: Vcsl,
+            relative_directory: "Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato",
+        },
+        SampleStyleMapping {
+            style_name: "Tenor saxophone staccato",
+            style_kind: "staccato",
+            source: Vcsl,
+            relative_directory: "Aerophones/Reed Aerophones/Tenor Saxophone/Staccato",
+        },
+    ];
+    const ORGAN_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Pipe organ quiet",
+            style_kind: "registration_variant",
+            source: Vcsl,
+            relative_directory: "Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet",
+        },
+        SampleStyleMapping {
+            style_name: "Pipe organ loud pedal",
+            style_kind: "pedal_registration",
+            source: Vcsl,
+            relative_directory: "Aerophones/Edge-blown Aerophones/Pipe Organ/Loud Pedal",
+        },
+        SampleStyleMapping {
+            style_name: "Pipe organ quiet pedal",
+            style_kind: "pedal_registration",
+            source: Vcsl,
+            relative_directory: "Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet Pedal",
+        },
+    ];
+    const VIBRAPHONE_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Vibraphone soft mallets",
+            style_kind: "mallet_hardness",
+            source: Vcsl,
+            relative_directory: "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets",
+        },
+        SampleStyleMapping {
+            style_name: "Bowed vibraphone",
+            style_kind: "bowed",
+            source: Vcsl,
+            relative_directory: "Idiophones/Struck Idiophones/Vibraphone/Bowed",
+        },
+    ];
+    const MARIMBA_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Balafon hard mallet",
+            style_kind: "mallet_hardness",
+            source: Vcsl,
+            relative_directory: "Idiophones/Struck Idiophones/Balafon/Hard Mallet",
+        },
+        SampleStyleMapping {
+            style_name: "Balafon soft mallet",
+            style_kind: "mallet_hardness",
+            source: Vcsl,
+            relative_directory: "Idiophones/Struck Idiophones/Balafon/Soft Mallet",
+        },
+    ];
+
     const UPRIGHT_BASS_STYLES: &[SampleStyleMapping] = &[
         SampleStyleMapping {
             style_name: "Vibrato sustain",
