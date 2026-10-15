@@ -1116,6 +1116,7 @@ fn probe_fluidsynth_programs(
     };
 
     let unique_programs = programs.collect::<std::collections::BTreeSet<_>>();
+    let requested_program_count = unique_programs.len();
     const PROBE_NOTES_MIDI: [u8; 3] = [48, 60, 72];
     const PROBE_VELOCITIES: [u8; 3] = [48, 96, 120];
     let mut results = Vec::with_capacity(unique_programs.len() * PROBE_NOTES_MIDI.len() * PROBE_VELOCITIES.len());
@@ -1262,7 +1263,7 @@ fn probe_fluidsynth_programs(
         binary_version: version_text,
         binary_sha256,
         soundfont_sha256: soundfont_sha256.to_owned(),
-        requested_program_count: unique_programs.len(),
+        requested_program_count,
         probe_count: results.len(),
         rendered_non_silent_probe_count,
         probe_notes_midi: PROBE_NOTES_MIDI.to_vec(),
@@ -2000,14 +2001,18 @@ mod tests {
         assert_eq!(probe.binary_version.as_deref(), Some("fake-fluidsynth fixture 1"));
         assert_eq!(probe.binary_sha256, sha256_file(&fake_binary).unwrap());
         assert_eq!(probe.soundfont_sha256, evidence.sha256);
-        assert_eq!(probe.probe_note_midi, 60);
-        assert_eq!(probe.probe_velocity, 96);
+        assert_eq!(probe.probe_notes_midi, vec![48, 60, 72]);
+        assert_eq!(probe.probe_velocities, vec![48, 96, 120]);
         assert_eq!(probe.sample_rate_hz, 22050);
         assert!(probe.reverb_disabled && probe.chorus_disabled);
         assert!(probe.command_template.contains("<probe.mid>"));
         assert_eq!(probe.requested_program_count, 2);
-        assert_eq!(probe.rendered_non_silent_count, 1);
+        assert_eq!(probe.probe_count, 18);
+        assert_eq!(probe.programs.len(), 18);
+        assert_eq!(probe.rendered_non_silent_probe_count, 9);
         assert_eq!(probe.programs[0].program_0_based, 0);
+        assert_eq!(probe.programs[0].note_midi, 48);
+        assert_eq!(probe.programs[0].velocity, 48);
         assert_eq!(probe.programs[0].status, "rendered_non_silent");
         assert_eq!(probe.programs[0].sample_rate, Some(22050));
         assert_eq!(probe.programs[0].channels, Some(1));
@@ -2020,9 +2025,17 @@ mod tests {
             Some(expected_output_hash.as_str()),
             "receipt preserves the exact rendered WAV bytes"
         );
-        assert_eq!(probe.programs[1].program_0_based, 24);
-        assert_eq!(probe.programs[1].status, "skipped_no_bank0_header_match");
-        assert_eq!(probe.programs[1].command_exit_code, None);
+        let first_missing_slot = probe.programs.iter()
+            .find(|item| item.program_0_based == 24)
+            .unwrap();
+        assert_eq!(first_missing_slot.note_midi, 48);
+        assert_eq!(first_missing_slot.velocity, 48);
+        assert_eq!(first_missing_slot.status, "skipped_no_bank0_header_match");
+        assert_eq!(first_missing_slot.command_exit_code, None);
+        assert!(
+            probe.programs.iter().filter(|item| item.program_0_based == 24)
+                .all(|item| item.status == "skipped_no_bank0_header_match")
+        );
 
         std::fs::remove_dir_all(root).unwrap();
     }
