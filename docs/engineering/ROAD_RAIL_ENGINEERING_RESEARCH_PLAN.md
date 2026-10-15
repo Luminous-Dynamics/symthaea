@@ -27,6 +27,10 @@ Therefore:
 
 Do not add a second generic observation/provenance ontology for this work. The implementation should reuse canonical owners: SE-SEM-001 (#4861) for physical quantities, units, frames and time; FIELD/FIELD-001A/SE-OBS (#3589/#3633/#3695) for physical observations, calibration and provenance; ENG-EVID-INDEP (#4918) for dependency, common-mode and replication semantics; ENG-EVID-CLAIM (#5771) for evidence-bound claims; and MAT-007/008/013 for materials identity, conditioned measurements and physical-sample lineage. Road/rail-specific work should remain a thin domain profile or adapter unless the transport owner audit demonstrates a concrete semantic gap that existing owners cannot represent losslessly. See the dedicated ownership gates at [BIO-CEM-001 #5751](https://github.com/Luminous-Dynamics/symthaea/issues/5751), [literature benchmark #5753](https://github.com/Luminous-Dynamics/symthaea/issues/5753), [observation-contract preregistration #5767](https://github.com/Luminous-Dynamics/symthaea/issues/5767), and [zero-new-type gate #5768](https://github.com/Luminous-Dynamics/symthaea/issues/5768).
 
+## Current implementation focus: track-geometry forecast benchmark
+
+The execution contract is tracked in [TRANSPORT-RAIL-001A #7452](https://github.com/Luminous-Dynamics/symthaea/issues/7452), under the existing rail/fixed-guideway owner [#6248](https://github.com/Luminous-Dynamics/symthaea/issues/6248). It is a research/data workstream, not a new track-geometry schema or railway dynamics solver. The current FRA RR 26-01 report describes an initial investigation and states that case studies were the next research step; source access to raw track geometry remains a gate, not an assumption. The benchmark therefore separates (a) operational forecasts using only information available at issuance from (b) post-intervention forecasts after maintenance actually occurs, and requires future-time plus segment/route holdouts, negative leakage controls and independently recomputed metrics.
+
 ## First research targets
 
 ### Roads
