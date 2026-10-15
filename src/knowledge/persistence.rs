@@ -125,6 +125,13 @@ impl KnowledgePersistence {
 
         let mut count = 0;
         for fact in facts {
+            let cycle = i64::try_from(fact.cycle)
+                .map_err(|e| format!("Fact insertion cycle exceeds SQLite INTEGER range: {e}"))?;
+            let last_accessed_cycle = fact
+                .last_accessed_cycle
+                .map(i64::try_from)
+                .transpose()
+                .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
             conn.execute(
                 "INSERT INTO knowledge_facts
                  (vector_blob, source_text, confidence, domain, cycle, is_causal,
@@ -135,10 +142,10 @@ impl KnowledgePersistence {
                     fact.source_text,
                     fact.confidence,
                     fact.domain,
-                    fact.cycle as i64,
+                    cycle,
                     fact.is_causal,
                     fact.initial_confidence,
-                    fact.last_accessed_cycle.map(|cycle| cycle as i64),
+                    last_accessed_cycle,
                     fact.corroboration_count as i64,
                     fact.contradiction_count as i64,
                 ],
@@ -172,28 +179,51 @@ impl KnowledgePersistence {
 
         let facts: Vec<FactRecord> = stmt
             .query_map([], |row| {
-                let last_accessed_cycle: Option<i64> = row.get(7)?;
+                let cycle_raw = row.get::<_, i64>(4)?;
+                let cycle = u64::try_from(cycle_raw).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        4,
+                        rusqlite::types::Type::Integer,
+                        Box::new(e),
+                    )
+                })?;
+                let last_accessed_raw: Option<i64> = row.get(7)?;
+                let last_accessed_cycle = last_accessed_raw
+                    .map(|value| {
+                        u64::try_from(value).map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                7,
+                                rusqlite::types::Type::Integer,
+                                Box::new(e),
+                            )
+                        })
+                    })
+                    .transpose()?;
+                let corroboration_count = u32::try_from(row.get::<_, i64>(8)?).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        8,
+                        rusqlite::types::Type::Integer,
+                        Box::new(e),
+                    )
+                })?;
+                let contradiction_count = u32::try_from(row.get::<_, i64>(9)?).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        9,
+                        rusqlite::types::Type::Integer,
+                        Box::new(e),
+                    )
+                })?;
                 Ok(FactRecord {
                     vector_bytes: row.get(0)?,
                     source_text: row.get(1)?,
                     confidence: row.get(2)?,
                     domain: row.get(3)?,
-                    cycle: row.get::<_, i64>(4)? as u64,
+                    cycle,
                     is_causal: row.get(5)?,
                     initial_confidence: row.get(6)?,
-                    last_accessed_cycle: last_accessed_cycle.map(|cycle| cycle as u64),
-                    corroboration_count: u32::try_from(row.get::<_, i64>(8)?)
-                        .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                            8,
-                            rusqlite::types::Type::Integer,
-                            Box::new(e),
-                        ))?,
-                    contradiction_count: u32::try_from(row.get::<_, i64>(9)?)
-                        .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                            9,
-                            rusqlite::types::Type::Integer,
-                            Box::new(e),
-                        ))?,
+                    last_accessed_cycle,
+                    corroboration_count,
+                    contradiction_count,
                 })
             })
             .map_err(|e| e.to_string())?
@@ -415,9 +445,10 @@ impl KnowledgePersistence {
             let mut stmt = conn
                 .prepare("PRAGMA table_info(knowledge_facts)")
                 .map_err(|e| format!("Inspect knowledge_facts schema: {e}"))?;
-            stmt.query_map([], |row| row.get::<_, String>(1))
-                .map_err(|e| format!("Query knowledge_facts schema: {e}"))?
-                .collect::<Result<Vec<_>, _>>()
+            let rows = stmt
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(|e| format!("Query knowledge_facts schema: {e}"))?;
+            rows.collect::<Result<Vec<_>, _>>()
                 .map_err(|e| format!("Collect knowledge_facts schema: {e}"))?
         };
         for (name, declaration) in [
@@ -476,6 +507,46 @@ mod tests {
         conn.execute(
             "UPDATE knowledge_facts SET confidence = ?1",
             rusqlite::params!["not-a-number"],
+        )
+        .unwrap();
+        drop(conn);
+
+        let err = persistence.load_facts().unwrap_err();
+        assert!(err.contains("Collect:"), "unexpected error context: {err}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_negative_temporal_cycles() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_negative_fact_cycle_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; 2048],
+                source_text: "fixture fact".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 3,
+                is_causal: false,
+                initial_confidence: Some(0.9),
+                last_accessed_cycle: Some(3),
+                corroboration_count: 0,
+                contradiction_count: 0,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_facts SET last_accessed_cycle = -1",
+            [],
         )
         .unwrap();
         drop(conn);
