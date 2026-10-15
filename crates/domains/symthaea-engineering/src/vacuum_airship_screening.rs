@@ -2310,6 +2310,47 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn scoped_pressure_comparison_rejects_blank_supplied_scope_field() {
+        let required = matching_pressure_scope();
+        let mut supplied = required.clone();
+        supplied.boundary_condition_profile_id = "   ".into();
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+            required,
+            Some(supplied),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::ScopeIncomplete { missing_fields }
+                if missing_fields == vec![
+                    "supplied_capacity_scope.boundary_condition_profile_id"
+                ]
+        ));
+    }
+
+    #[test]
+    fn scoped_pressure_comparison_preserves_incomplete_evidence_provenance() {
+        let scope = matching_pressure_scope();
+        let mut capacity = pressure_capacity_bounds(105_000.0, 120_000.0);
+        capacity.independent_check_or_test_id.clear();
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(capacity),
+            scope.clone(),
+            Some(scope),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::PressureAssessment(
+                PressureBoundsAssessment::IncompleteProvenance {
+                    missing_fields,
+                    ..
+                }
+            ) if missing_fields == vec!["independent_check_or_test_id"]
+        ));
+    }
+
     #[test]
     fn scoped_pressure_comparison_keeps_unknown_capacity_without_scope() {
         let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
