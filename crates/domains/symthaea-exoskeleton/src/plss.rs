@@ -29,6 +29,17 @@ pub struct PlssConfig {
     pub co2_scrubber_removal_rate_l_min: f64,
     /// Finite total cartridge capacity in the same CO2-equivalent bookkeeping units.
     pub co2_scrubber_capacity_l: f64,
+    /// Ideal-gas circuit state: free gas volume, m^3. Synthetic reference only.
+    pub circuit_free_volume_m3: f64,
+    /// Uniform bulk-circuit gas temperature, K. Synthetic reference only.
+    pub circuit_gas_temperature_k: f64,
+    /// Reference conditions for CO2-equivalent liters, Pa and K.
+    pub co2_reference_pressure_pa: f64,
+    pub co2_reference_temperature_k: f64,
+    /// Initial bulk-circuit CO2 partial pressure, Pa; not inspired CO2.
+    pub initial_circuit_co2_partial_pressure_pa: f64,
+    /// Synthetic bulk-circuit screening ceiling, not a human exposure limit.
+    pub max_circuit_co2_partial_pressure_pa: f64,
     /// Maximum water-vapor condensation/removal rate, g water/min.
     pub humidity_removal_rate_g_min: f64,
     /// Finite liquid-condensate storage capacity, g water.
@@ -47,6 +58,12 @@ impl PlssConfig {
             ventilation_flow_l_min: 170.0,
             co2_scrubber_removal_rate_l_min: 1.6,
             co2_scrubber_capacity_l: 120.0,
+            circuit_free_volume_m3: 0.12,
+            circuit_gas_temperature_k: 295.0,
+            co2_reference_pressure_pa: 101_325.0,
+            co2_reference_temperature_k: 273.15,
+            initial_circuit_co2_partial_pressure_pa: 200.0,
+            max_circuit_co2_partial_pressure_pa: 1_200.0,
             humidity_removal_rate_g_min: 0.5,
             humidity_collector_capacity_g: 100.0,
             primary_heat_rejection_w: 900.0,
@@ -67,6 +84,19 @@ impl PlssConfig {
             && self.co2_scrubber_removal_rate_l_min >= 0.0
             && self.co2_scrubber_capacity_l.is_finite()
             && self.co2_scrubber_capacity_l >= 0.0
+            && self.circuit_free_volume_m3.is_finite()
+            && self.circuit_free_volume_m3 > 0.0
+            && self.circuit_gas_temperature_k.is_finite()
+            && self.circuit_gas_temperature_k > 0.0
+            && self.co2_reference_pressure_pa.is_finite()
+            && self.co2_reference_pressure_pa > 0.0
+            && self.co2_reference_temperature_k.is_finite()
+            && self.co2_reference_temperature_k > 0.0
+            && self.initial_circuit_co2_partial_pressure_pa.is_finite()
+            && self.initial_circuit_co2_partial_pressure_pa >= 0.0
+            && self.max_circuit_co2_partial_pressure_pa.is_finite()
+            && self.max_circuit_co2_partial_pressure_pa
+                >= self.initial_circuit_co2_partial_pressure_pa
             && self.humidity_removal_rate_g_min.is_finite()
             && self.humidity_removal_rate_g_min >= 0.0
             && self.humidity_collector_capacity_g.is_finite()
@@ -192,6 +222,88 @@ impl PlssReferenceTwin {
 
     pub fn config(&self) -> &PlssConfig {
         &self.config
+    }
+
+    /// Estimates well-mixed bulk-circuit CO2 partial pressure from the synthetic
+    /// initial inventory plus the excess CO2-equivalent burden. This is not
+    /// inspired CO2 (PICO2), which requires a validated suit/helmet flow model
+    /// and standardized human-in-the-loop measurement.
+    pub fn circuit_co2_partial_pressure_pa(&self) -> Option<f64> {
+        self.partial_pressure_for_excess_co2_l(self.state.co2_burden_l)
+    }
+
+    /// Projects bulk-circuit partial pressure after one segment using the same
+    /// declared removal rate, ventilation/scrubber states, and finite capacity
+    /// as the step model. Returns None for invalid state or failed ventilation.
+    pub fn projected_circuit_co2_partial_pressure_pa(
+        &self,
+        co2_generation_l_min: f64,
+        dt_s: f64,
+    ) -> Option<f64> {
+        if !self.config.is_valid()
+            || !co2_generation_l_min.is_finite()
+            || co2_generation_l_min < 0.0
+            || !dt_s.is_finite()
+            || dt_s <= 0.0
+            || self.state.ventilation == PlssPathState::Failed
+            || !self.state.co2_burden_l.is_finite()
+            || self.state.co2_burden_l < 0.0
+            || !self.state.co2_scrubber_capacity_remaining_l.is_finite()
+            || !(0.0..=self.config.co2_scrubber_capacity_l)
+                .contains(&self.state.co2_scrubber_capacity_remaining_l)
+        {
+            return None;
+        }
+
+        let minutes = dt_s / 60.0;
+        let co2_generated_l = co2_generation_l_min * minutes;
+        let available_l = self.state.co2_burden_l + co2_generated_l;
+        if !minutes.is_finite() || !co2_generated_l.is_finite() || !available_l.is_finite() {
+            return None;
+        }
+
+        let ventilation_factor = match self.state.ventilation {
+            PlssPathState::Available => 1.0,
+            PlssPathState::Degraded => 0.6,
+            PlssPathState::Failed => return None,
+        };
+        let scrubber_factor = match self.state.co2_scrubber {
+            PlssPathState::Available => 1.0,
+            PlssPathState::Degraded => 0.5,
+            PlssPathState::Failed => 0.0,
+        };
+        let capture_by_rate_l = self.config.co2_scrubber_removal_rate_l_min
+            * minutes
+            * ventilation_factor
+            * scrubber_factor;
+        if !capture_by_rate_l.is_finite() {
+            return None;
+        }
+        let captured_l = available_l
+            .min(capture_by_rate_l)
+            .min(self.state.co2_scrubber_capacity_remaining_l);
+        let projected_excess_l = available_l - captured_l;
+        self.partial_pressure_for_excess_co2_l(projected_excess_l)
+    }
+
+    fn partial_pressure_for_excess_co2_l(&self, excess_co2_l: f64) -> Option<f64> {
+        if !self.config.is_valid() || !excess_co2_l.is_finite() || excess_co2_l < 0.0 {
+            return None;
+        }
+        // Convert reference-condition liters to circuit partial pressure through
+        // the ideal gas law. One liter equals 1e-3 m^3.
+        let pressure_increment_pa = self.config.co2_reference_pressure_pa
+            * excess_co2_l
+            * self.config.circuit_gas_temperature_k
+            / (1_000.0
+                * self.config.co2_reference_temperature_k
+                * self.config.circuit_free_volume_m3);
+        let pressure_pa =
+            self.config.initial_circuit_co2_partial_pressure_pa + pressure_increment_pa;
+        pressure_increment_pa
+            .is_finite()
+            .then_some(pressure_pa)
+            .filter(|value| value.is_finite() && *value >= 0.0)
     }
 
     pub fn environment_heat_rejection_fraction(&self) -> f64 {
@@ -443,6 +555,58 @@ mod tests {
         assert!(twin.state().primary_o2_remaining_l < 2_000.0);
         assert!(twin.state().co2_scrubber_capacity_remaining_l < 120.0);
         assert!(twin.state().humidity_collector_capacity_remaining_g < 100.0);
+    }
+
+    #[test]
+    fn bulk_circuit_co2_pressure_starts_at_declared_initial_condition() {
+        let twin = PlssReferenceTwin::simulation_reference();
+        assert_eq!(
+            twin.circuit_co2_partial_pressure_pa(),
+            Some(PlssConfig::simulation_reference().initial_circuit_co2_partial_pressure_pa)
+        );
+    }
+
+    #[test]
+    fn one_liter_reference_excess_maps_to_ideal_gas_pressure_increment() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        twin.state_mut_for_fault_injection().co2_burden_l = 1.0;
+        let config = *twin.config();
+        let expected = config.initial_circuit_co2_partial_pressure_pa
+            + config.co2_reference_pressure_pa
+                * config.circuit_gas_temperature_k
+                / (1_000.0
+                    * config.co2_reference_temperature_k
+                    * config.circuit_free_volume_m3);
+        assert!((twin.circuit_co2_partial_pressure_pa().unwrap() - expected).abs() < 1e-9);
+    }
+
+    #[test]
+    fn projection_uses_bounded_capture_and_does_not_mutate_state() {
+        let mut config = PlssConfig::simulation_reference();
+        config.co2_scrubber_removal_rate_l_min = 0.10;
+        config.co2_scrubber_capacity_l = 100.0;
+        let mut twin = PlssReferenceTwin::new(config).unwrap();
+        let projected = twin
+            .projected_circuit_co2_partial_pressure_pa(1.0, 60.0)
+            .unwrap();
+        let expected_excess_l = 0.90;
+        let expected = config.initial_circuit_co2_partial_pressure_pa
+            + config.co2_reference_pressure_pa
+                * expected_excess_l
+                * config.circuit_gas_temperature_k
+                / (1_000.0
+                    * config.co2_reference_temperature_k
+                    * config.circuit_free_volume_m3);
+        assert!((projected - expected).abs() < 1e-9);
+        assert_eq!(twin.state().co2_burden_l, 0.0);
+        assert_eq!(twin.state().co2_scrubber_capacity_remaining_l, 100.0);
+    }
+
+    #[test]
+    fn failed_ventilation_has_no_valid_projection() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        twin.state_mut_for_fault_injection().ventilation = PlssPathState::Failed;
+        assert_eq!(twin.projected_circuit_co2_partial_pressure_pa(0.5, 60.0), None);
     }
 
     #[test]
