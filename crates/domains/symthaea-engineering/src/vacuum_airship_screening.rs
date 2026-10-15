@@ -188,9 +188,9 @@ pub fn screen_buoyancy(request: BuoyancyRequest) -> Result<BuoyancyResult, Scree
 /// Geometry-based mass budget for an idealized spherical envelope.
 ///
 /// The radius is used for both enclosed volume and pressure-boundary surface area. This is a
-//// thin-envelope screening approximation: it ignores thickness-induced volume/area differences,
-//// local appendages, deformation, and the mass of structural supports unless the caller includes
-//// those in `fixed_non_envelope_vehicle_mass_kg`.
+/// thin-envelope screening approximation: it ignores thickness-induced volume/area differences,
+/// local appendages, deformation, and the mass of structural supports unless the caller includes
+/// those in `fixed_non_envelope_vehicle_mass_kg`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SphericalEnvelopeBudgetRequest {
     /// Reference radius of the spherical pressure boundary, metres.
