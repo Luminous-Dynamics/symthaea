@@ -72,6 +72,19 @@ pub struct FactSearchResult {
     pub confidence: f32,
 }
 
+/// One auditable query-to-observation assignment returned by role-aware retrieval.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoleObservationMatch {
+    /// Semantic role used to constrain the match.
+    pub role: SemanticRole,
+    /// Entity text in the caller's query.
+    pub query_entity_text: String,
+    /// Entity text stored on the matched fact observation.
+    pub observed_entity_text: String,
+    /// Bipolar cosine similarity for this one-to-one assignment.
+    pub similarity: f32,
+}
+
 /// Result from matching typed role queries against all stored role observations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RoleAwareSearchResult {
@@ -84,6 +97,8 @@ pub struct RoleAwareSearchResult {
     pub confidence: f32,
     /// Number of query terms assigned a distinct stored observation.
     pub matched_query_terms: usize,
+    /// One-to-one match evidence, ordered by query term index.
+    pub matches: Vec<RoleObservationMatch>,
 }
 
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
@@ -324,27 +339,41 @@ impl EnhancedKnowledgeGraph {
             }
             let observation_to_query =
                 maximum_cardinality_matching(&candidates_by_query, observations.len());
-            let mut matched_query_terms = 0usize;
-            let mut total_similarity = 0.0f32;
+            let mut assignments: Vec<(usize, usize)> = observation_to_query
+                .iter()
+                .enumerate()
+                .filter_map(|(observation_index, query_index)| {
+                    query_index.map(|query_index| (query_index, observation_index))
+                })
+                .collect();
+            assignments.sort_unstable_by_key(|(query_index, _)| *query_index);
 
-            for (observation_index, query_index) in observation_to_query.iter().enumerate() {
-                if let Some(query_index) = query_index {
-                    if let Some((_, similarity)) = candidates_by_query[*query_index]
-                        .iter()
-                        .find(|(candidate_index, _)| *candidate_index == observation_index)
-                    {
-                        matched_query_terms += 1;
-                        total_similarity += *similarity;
-                    }
+            let mut matches = Vec::with_capacity(assignments.len());
+            let mut total_similarity = 0.0f32;
+            for (query_index, observation_index) in assignments {
+                if let Some((_, similarity)) = candidates_by_query[query_index]
+                    .iter()
+                    .find(|(candidate_index, _)| *candidate_index == observation_index)
+                {
+                    let observation = &observations[observation_index];
+                    total_similarity += *similarity;
+                    matches.push(RoleObservationMatch {
+                        role: query[query_index].role,
+                        query_entity_text: query[query_index].entity_text.clone(),
+                        observed_entity_text: observation.entity_text.clone(),
+                        similarity: *similarity,
+                    });
                 }
             }
 
+            let matched_query_terms = matches.len();
             if matched_query_terms > 0 {
                 results.push(RoleAwareSearchResult {
                     fact_id: fact.id,
                     similarity: total_similarity / query.len() as f32,
                     confidence: fact.confidence,
                     matched_query_terms,
+                    matches,
                 });
             }
         }
@@ -1051,6 +1080,13 @@ mod tests {
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].fact_id, complete_id);
         assert_eq!(results[0].matched_query_terms, 2);
+        assert_eq!(results[0].matches.len(), 2);
+        assert_eq!(results[0].matches[0].role, SemanticRole::Agent);
+        assert_eq!(results[0].matches[0].query_entity_text, "United States");
+        assert_eq!(results[0].matches[0].observed_entity_text, "United States");
+        assert!((results[0].matches[0].similarity - 1.0).abs() < f32::EPSILON);
+        assert_eq!(results[0].matches[1].query_entity_text, "European Union");
+        assert_eq!(results[0].matches[1].observed_entity_text, "European Union");
         assert!((results[0].similarity - 1.0).abs() < f32::EPSILON);
         assert!((results[0].confidence - 0.35).abs() < f32::EPSILON);
 
@@ -1149,6 +1185,7 @@ mod tests {
         assert_eq!(after.len(), before.len());
         assert_eq!(after[0].fact_id, before[0].fact_id);
         assert_eq!(after[0].matched_query_terms, before[0].matched_query_terms);
+        assert_eq!(after[0].matches, before[0].matches);
         assert!((after[0].similarity - before[0].similarity).abs() < f32::EPSILON);
         assert!((after[0].confidence - before[0].confidence).abs() < f32::EPSILON);
 
