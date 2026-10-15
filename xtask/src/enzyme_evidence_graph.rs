@@ -896,11 +896,23 @@ mod tests {
     fn rejects_directed_cycles_even_when_every_id_resolves() {
         let workspace = TempWorkspace::new();
         let mut graph = fixture(workspace.root());
+        graph["nodes"].as_array_mut().unwrap().push(json!({
+            "node_id": "n_rate",
+            "type": "rate_estimate",
+            "evidence_class": "derived_or_fitted",
+            "artifact_ids": []
+        }));
         graph["edges"].as_array_mut().unwrap().push(json!({
-            "edge_id": "e_cycle",
+            "edge_id": "e_cycle_a",
             "type": "derived_from",
             "from_node_id": "n_processed",
-            "to_node_id": "n_raw"
+            "to_node_id": "n_rate"
+        }));
+        graph["edges"].as_array_mut().unwrap().push(json!({
+            "edge_id": "e_cycle_b",
+            "type": "derived_from",
+            "from_node_id": "n_rate",
+            "to_node_id": "n_processed"
         }));
         let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
         assert!(error.contains("directed cycle"));
