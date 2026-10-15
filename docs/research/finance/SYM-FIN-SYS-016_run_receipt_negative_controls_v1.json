@@ -112,6 +112,41 @@
         "fixed_institution",
         "stock_flow_reconciliation"
       ]
+    },
+    {
+      "id": "SRC-SEM-006",
+      "validation_layer": "semantic_check",
+      "description": "A second event reuses an existing event_id, making event identity ambiguous.",
+      "pointer": "/events/1/event_id",
+      "replacement_value": "sim-event-0001"
+    },
+    {
+      "id": "SRC-SEM-007",
+      "validation_layer": "semantic_check",
+      "description": "An event's simulation tick moves backwards relative to the following event.",
+      "pointer": "/events/0/simulation_tick",
+      "replacement_value": 5
+    },
+    {
+      "id": "SRC-SEM-008",
+      "validation_layer": "semantic_check",
+      "description": "A bridge has identical source and target community identifiers.",
+      "pointer": "/profiles/bridge_profiles/0/target_community_id",
+      "replacement_value": "community-a"
+    },
+    {
+      "id": "SRC-SEM-009",
+      "validation_layer": "semantic_check",
+      "description": "A model-observed metric is marked missing without changing its measurement status.",
+      "pointer": "/metrics/0/value",
+      "replacement_value": null
+    },
+    {
+      "id": "SRC-SEM-010",
+      "validation_layer": "semantic_check",
+      "description": "The power-oracle flag is true although the independent power oracle control is absent.",
+      "pointer": "/evaluation/power_oracle_applied",
+      "replacement_value": true
     }
   ]
 }
