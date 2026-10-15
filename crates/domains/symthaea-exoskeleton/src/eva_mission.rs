@@ -38,7 +38,8 @@ pub struct EvaMissionSegment {
     pub survival_power_w: f64,
     pub mission_power_w: f64,
     pub non_actuator_equipment_heat_w: f64,
-    pub humidity_generation_per_min: f64,
+    /// Water-vapor generation, grams of water per minute.
+    pub humidity_generation_g_per_min: f64,
     pub regenerative_power_w: f64,
     pub external_charger_w: f64,
     pub personal_dose_rate_msv_h: f64,
@@ -68,7 +69,7 @@ impl EvaMissionSegment {
                 self.survival_power_w,
                 self.mission_power_w,
                 self.non_actuator_equipment_heat_w,
-                self.humidity_generation_per_min,
+                self.humidity_generation_g_per_min,
                 self.regenerative_power_w,
                 self.external_charger_w,
                 self.personal_dose_rate_msv_h,
@@ -92,7 +93,7 @@ impl EvaMissionSegment {
             survival_power_w: 180.0,
             mission_power_w: 40.0,
             non_actuator_equipment_heat_w: 35.0,
-            humidity_generation_per_min: 0.20,
+            humidity_generation_g_per_min: 0.20,
             regenerative_power_w: 0.0,
             external_charger_w: 0.0,
             personal_dose_rate_msv_h: 0.05,
@@ -335,7 +336,7 @@ impl IntegratedEvaMission {
             equipment_heat_w: segment.non_actuator_equipment_heat_w
                 + delivered_mobility_overhead_w
                 + actuator_waste_heat_w,
-            humidity_generation_per_min: segment.humidity_generation_per_min,
+            humidity_generation_g_per_min: segment.humidity_generation_g_per_min,
             dt_s: segment.duration_s,
         });
         let o2_after = self.plss.state().primary_o2_remaining_l
