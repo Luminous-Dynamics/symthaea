@@ -1190,6 +1190,108 @@ mod tests {
 
 
     #[test]
+    fn test_fact_relation_round_trip_preserves_negation_roles_and_confidence() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_relation_roundtrip_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let record = FactRecord {
+            vector_bytes: vec![3u8; BinaryHV::BYTES],
+            source_text: "The ceasefire did not prevent escalation.".into(),
+            confidence: 0.81,
+            domain: Some("geopolitics".into()),
+            cycle: 12,
+            is_causal: true,
+            relations: vec![ExtractedRelation {
+                subject: "ceasefire".into(),
+                predicate: "prevented".into(),
+                object: "escalation".into(),
+                subject_role: SemanticRole::Agent,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: true,
+                confidence: 0.73,
+            }],
+            graph_fact_id: Some(17),
+            initial_confidence: Some(0.88),
+            last_accessed_cycle: Some(15),
+            corroboration_count: 2,
+            contradiction_count: 1,
+        };
+
+        assert_eq!(persistence.save_facts(&[record]).unwrap(), 1);
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].relations.len(), 1);
+        let relation = &loaded[0].relations[0];
+        assert_eq!(relation.subject, "ceasefire");
+        assert_eq!(relation.predicate, "prevented");
+        assert_eq!(relation.object, "escalation");
+        assert_eq!(relation.subject_role, SemanticRole::Agent);
+        assert_eq!(relation.object_role, SemanticRole::Patient);
+        assert!(relation.is_causal);
+        assert!(relation.is_negated);
+        assert!((relation.confidence - 0.73).abs() < f32::EPSILON);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_unknown_persisted_relation_role() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_unknown_relation_role_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![5u8; BinaryHV::BYTES],
+                source_text: "source fact".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+                relations: vec![ExtractedRelation {
+                    subject: "A".into(),
+                    predicate: "blocks".into(),
+                    object: "B".into(),
+                    subject_role: SemanticRole::Agent,
+                    object_role: SemanticRole::Patient,
+                    is_causal: false,
+                    is_negated: false,
+                    confidence: 0.7,
+                }],
+                graph_fact_id: None,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_relations SET subject_role = 'unknown_role'",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("unknown persisted semantic role key"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_load_facts_propagates_row_decode_errors() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_corrupt_facts_test_{}",
