@@ -929,6 +929,7 @@ fn sample_audio_evidence_status(
     } else if indexed == 0 {
         "no_indexed_samples"
     } else if decoded == 0 {
+        // Count consistency above guarantees every indexed item failed decode.
         "all_indexed_samples_failed_decode"
     } else {
         let has_silent = silent > 0;
@@ -2131,7 +2132,7 @@ mod tests {
             (3, 1, 1, 0, "inconsistent_audio_evidence_counts"),
             (2, 1, 1, 2, "inconsistent_audio_evidence_counts"),
             (2, 0, 2, 0, "all_indexed_samples_failed_decode"),
-            (1, 0, 0, 0, "no_decoded_samples"),
+            (1, 0, 0, 0, "inconsistent_audio_evidence_counts"),
             (2, 2, 0, 2, "decoded_silent_only"),
             (3, 2, 1, 2, "decoded_silent_and_other_samples_failed"),
             (2, 2, 0, 1, "mixed_silent_and_non_silent_decoded_samples"),
