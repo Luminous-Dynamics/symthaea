@@ -46,6 +46,8 @@ pub struct FactRecord {
     pub cycle: u64,
     /// Whether the fact contains causal relations
     pub is_causal: bool,
+    /// Stable graph-level identity; absent for rows written before this field existed.
+    pub graph_fact_id: Option<u64>,
     /// Confidence assigned at insertion; absent for rows written by older schemas.
     pub initial_confidence: Option<f32>,
     /// Last access cycle; absent for rows written by older schemas.
@@ -111,6 +113,34 @@ fn validate_hypervector_bytes(bytes: &[u8], column_index: usize) -> rusqlite::Re
             ),
         ))
     }
+}
+
+fn decode_optional_graph_fact_id(value: Option<i64>, column_index: usize) -> rusqlite::Result<Option<u64>> {
+    value
+        .map(|id| {
+            if id > 0 {
+                Ok(id as u64)
+            } else {
+                Err(invalid_column_data(
+                    column_index,
+                    rusqlite::types::Type::Integer,
+                    format!("invalid persisted graph fact ID (must be positive): {id}"),
+                ))
+            }
+        })
+        .transpose()
+}
+
+fn encode_optional_graph_fact_id(value: Option<u64>) -> Result<Option<i64>, String> {
+    value
+        .map(|id| {
+            if id == 0 {
+                return Err("Graph fact ID must be positive".to_string());
+            }
+            i64::try_from(id)
+                .map_err(|e| format!("Graph fact ID exceeds SQLite INTEGER range: {e}"))
+        })
+        .transpose()
 }
 
 fn decode_nonnegative_counter(
@@ -230,11 +260,13 @@ impl KnowledgePersistence {
                 .map(i64::try_from)
                 .transpose()
                 .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
+            let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
+            let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
             conn.execute(
                 "INSERT INTO knowledge_facts
                  (vector_blob, source_text, confidence, domain, cycle, is_causal,
-                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count, graph_fact_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 rusqlite::params![
                     fact.vector_bytes,
                     fact.source_text,
@@ -246,6 +278,7 @@ impl KnowledgePersistence {
                     last_accessed_cycle,
                     fact.corroboration_count as i64,
                     fact.contradiction_count as i64,
+                    graph_fact_id,
                 ],
             )
             .map_err(|e| e.to_string())?;
@@ -290,8 +323,8 @@ impl KnowledgePersistence {
             tx.execute(
                 "INSERT INTO knowledge_facts
                  (vector_blob, source_text, confidence, domain, cycle, is_causal,
-                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count, graph_fact_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 rusqlite::params![
                     fact.vector_bytes,
                     fact.source_text,
@@ -303,6 +336,7 @@ impl KnowledgePersistence {
                     last_accessed_cycle,
                     fact.corroboration_count as i64,
                     fact.contradiction_count as i64,
+                    graph_fact_id,
                 ],
             )
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
@@ -362,7 +396,8 @@ impl KnowledgePersistence {
                 .map(i64::try_from)
                 .transpose()
                 .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
-            prepared_facts.push((fact, cycle, last_accessed_cycle));
+            let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
+            prepared_facts.push((fact, cycle, last_accessed_cycle, graph_fact_id));
         }
 
         let mut prepared_edges = Vec::with_capacity(edges.len());
@@ -410,12 +445,12 @@ impl KnowledgePersistence {
         tx.execute("DELETE FROM knowledge_ontology", [])
             .map_err(|e| format!("Clear ontology snapshot: {e}"))?;
 
-        for (fact, cycle, last_accessed_cycle) in &prepared_facts {
+        for (fact, cycle, last_accessed_cycle, graph_fact_id) in &prepared_facts {
             tx.execute(
                 "INSERT INTO knowledge_facts
                  (vector_blob, source_text, confidence, domain, cycle, is_causal,
-                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count, graph_fact_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 rusqlite::params![
                     fact.vector_bytes,
                     fact.source_text,
@@ -427,6 +462,7 @@ impl KnowledgePersistence {
                     last_accessed_cycle,
                     fact.corroboration_count as i64,
                     fact.contradiction_count as i64,
+                    graph_fact_id,
                 ],
             )
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
@@ -487,7 +523,8 @@ impl KnowledgePersistence {
         let mut stmt = conn
             .prepare(
                 "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal,
-                        initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count
+                        initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count,
+                        graph_fact_id
                  FROM knowledge_facts ORDER BY cycle DESC",
             )
             .map_err(|e| e.to_string())?;
@@ -510,6 +547,7 @@ impl KnowledgePersistence {
                     decode_nonnegative_u32_counter(row.get(8)?, 8, "fact corroboration count")?;
                 let contradiction_count =
                     decode_nonnegative_u32_counter(row.get(9)?, 9, "fact contradiction count")?;
+                let graph_fact_id = decode_optional_graph_fact_id(row.get(10)?, 10)?;
                 Ok(FactRecord {
                     vector_bytes,
                     source_text: row.get(1)?,
@@ -517,6 +555,8 @@ impl KnowledgePersistence {
                     domain: row.get(3)?,
                     cycle,
                     is_causal: row.get(5)?,
+                    graph_fact_id: None,
+                    graph_fact_id,
                     initial_confidence,
                     last_accessed_cycle,
                     corroboration_count,
@@ -720,7 +760,8 @@ impl KnowledgePersistence {
                 initial_confidence REAL,
                 last_accessed_cycle INTEGER,
                 corroboration_count INTEGER NOT NULL DEFAULT 0,
-                contradiction_count INTEGER NOT NULL DEFAULT 0
+                contradiction_count INTEGER NOT NULL DEFAULT 0,
+                graph_fact_id INTEGER
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
                 cause TEXT NOT NULL,
@@ -761,6 +802,7 @@ impl KnowledgePersistence {
             ("last_accessed_cycle", "INTEGER"),
             ("corroboration_count", "INTEGER NOT NULL DEFAULT 0"),
             ("contradiction_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("graph_fact_id", "INTEGER"),
         ] {
             if !columns.iter().any(|column| column == name) {
                 conn.execute_batch(&format!(
@@ -769,6 +811,12 @@ impl KnowledgePersistence {
                 .map_err(|e| format!("Migrate knowledge_facts.{name}: {e}"))?;
             }
         }
+
+        conn.execute_batch(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_facts_graph_fact_id
+             ON knowledge_facts(graph_fact_id);",
+        )
+        .map_err(|e| format!("Create graph fact ID index: {e}"))?;
 
         self.initialized = true;
         Ok(())
@@ -799,6 +847,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                    graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -841,6 +890,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                    graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -880,6 +930,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                    graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -916,6 +967,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                    graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -951,6 +1003,7 @@ mod tests {
                 domain: None,
                 cycle: 3,
                 is_causal: false,
+                    graph_fact_id: None,
                 initial_confidence: Some(0.9),
                 last_accessed_cycle: Some(3),
                 corroboration_count: 0,
@@ -1141,6 +1194,7 @@ mod tests {
             domain: Some("test".into()),
             cycle: 7,
             is_causal: true,
+                    graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(8),
             corroboration_count: 2,
@@ -1230,6 +1284,7 @@ mod tests {
             domain: None,
             cycle: 3,
             is_causal: false,
+                    graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
             corroboration_count: 0,
@@ -1274,6 +1329,7 @@ mod tests {
             domain: None,
             cycle: 10,
             is_causal: false,
+                    graph_fact_id: None,
             initial_confidence: Some(0.7),
             last_accessed_cycle: Some(10),
             corroboration_count: 0,
@@ -1331,6 +1387,7 @@ mod tests {
             domain: Some("test".into()),
             cycle: 7,
             is_causal: false,
+                    graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(8),
             corroboration_count: 2,
@@ -1363,6 +1420,7 @@ mod tests {
             domain: None,
             cycle: 3,
             is_causal: false,
+                    graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
             corroboration_count: 0,
@@ -1377,6 +1435,7 @@ mod tests {
             domain: None,
             cycle: u64::MAX,
             is_causal: false,
+                    graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
             corroboration_count: 0,
@@ -1416,6 +1475,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                    graph_fact_id: None,
                 initial_confidence: Some(0.95),
                 last_accessed_cycle: Some(42),
                 corroboration_count: 3,
@@ -1428,6 +1488,7 @@ mod tests {
                 domain: None,
                 cycle: 2,
                 is_causal: true,
+                    graph_fact_id: None,
                 initial_confidence: Some(0.85),
                 last_accessed_cycle: Some(44),
                 corroboration_count: 4,
