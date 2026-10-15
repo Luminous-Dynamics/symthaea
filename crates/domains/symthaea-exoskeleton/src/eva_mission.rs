@@ -269,6 +269,37 @@ impl IntegratedEvaMission {
             };
         }
 
+        // A known-failed critical atmosphere-control path is not treated as
+        // safe merely because this reduced-order model can continue calculating.
+        // This is a mission-planning disposition only; it does not command hardware.
+        let plss_state = self.plss.state();
+        let plss_config = self.plss.config();
+        let co2_path_unavailable = plss_state.co2_scrubber == crate::plss::PlssPathState::Failed
+            || !plss_state.co2_scrubber_capacity_remaining_l.is_finite()
+            || plss_state.co2_scrubber_capacity_remaining_l <= 0.0
+            || plss_config.co2_scrubber_removal_rate_l_min <= 0.0;
+        let humidity_path_unavailable =
+            plss_state.humidity_control == crate::plss::PlssPathState::Failed
+                || !plss_state.humidity_collector_capacity_remaining_g.is_finite()
+                || plss_state.humidity_collector_capacity_remaining_g <= 0.0
+                || plss_config.humidity_removal_rate_g_min <= 0.0;
+        if co2_path_unavailable || humidity_path_unavailable {
+            return EvaMissionSegmentReport {
+                name: segment.name.clone(),
+                phase: segment.phase,
+                disposition: EvaMissionDisposition::ReturnToSafeHaven,
+                abort_reason: None,
+                power: None,
+                metabolism: None,
+                radiation: Some(preflight_radiation),
+                actual_assist_fraction: 0.0,
+                human_positive_mechanical_power_w: 0.0,
+                actuator_waste_heat_w: 0.0,
+                oxygen_consumed_l: 0.0,
+                cumulative_radiation_msv: self.totals.cumulative_radiation_msv,
+            };
+        }
+
         let requested_assist_mechanical_w =
             segment.gross_positive_mechanical_power_w * segment.requested_assist_fraction;
         let requested_assist_electrical_w =
@@ -374,6 +405,20 @@ impl IntegratedEvaMission {
         });
 
         let mut disposition = disposition_for_radiation(radiation.action);
+
+        // Exhaustion discovered during this segment ends further EVA task work.
+        let plss_state = self.plss.state();
+        let plss_config = self.plss.config();
+        if plss_state.co2_scrubber == crate::plss::PlssPathState::Failed
+            || plss_state.co2_scrubber_capacity_remaining_l <= 0.0
+            || plss_config.co2_scrubber_removal_rate_l_min <= 0.0
+            || plss_state.humidity_control == crate::plss::PlssPathState::Failed
+            || plss_state.humidity_collector_capacity_remaining_g <= 0.0
+            || plss_config.humidity_removal_rate_g_min <= 0.0
+        {
+            disposition = disposition.max(EvaMissionDisposition::ReturnToSafeHaven);
+        }
+
         if !allocation.mobility_satisfied || !allocation.mission_satisfied {
             disposition = disposition.max(EvaMissionDisposition::DegradeMission);
             self.totals.degraded_segments += 1;
