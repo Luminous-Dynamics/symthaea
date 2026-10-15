@@ -148,6 +148,83 @@ pub fn screen_feature_defect_population(
     })
 }
 
+/// Conditional estimate of critical defects that may escape a specified inspection method.
+///
+/// Assumes each feature independently has the supplied probability of a critical defect and the
+/// inspection independently detects each such defect with the supplied conditional probability.
+/// This is not a structural failure probability, and the inputs need representative empirical
+/// support. Correlated manufacturing defects, correlated inspection misses, and heterogeneous
+/// feature populations are not modeled.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InspectionEscapePopulationResult {
+    pub feature_count: u64,
+    pub per_feature_critical_defect_probability: f64,
+    pub conditional_probability_of_detection: f64,
+    pub per_feature_probability_of_undetected_critical_defect: f64,
+    pub expected_undetected_critical_defect_count: f64,
+    pub probability_at_least_one_critical_defect_escapes: f64,
+}
+
+/// Propagate declared defect prevalence and inspection probability-of-detection over a feature set.
+///
+/// For one feature, p_escape = p_defect × (1 − POD). Under the explicit identical-independent
+/// feature model, P(any escape) = 1 − (1 − p_escape)^N. This screen describes inspection escape
+/// only, not failure likelihood. A defect can be harmless or critical depending on its location,
+/// shape, severity, and structural load redistribution; those mechanics are outside this function.
+pub fn screen_inspection_escape_population(
+    feature_count: u64,
+    per_feature_critical_defect_probability: f64,
+    conditional_probability_of_detection: f64,
+) -> Result<InspectionEscapePopulationResult, ScreeningError> {
+    if feature_count == 0 {
+        return Err(ScreeningError::MustBePositive("feature_count"));
+    }
+    for (name, value) in [
+        (
+            "per_feature_critical_defect_probability",
+            per_feature_critical_defect_probability,
+        ),
+        (
+            "conditional_probability_of_detection",
+            conditional_probability_of_detection,
+        ),
+    ] {
+        validate_finite(value, name)?;
+        if !(0.0..=1.0).contains(&value) {
+            return Err(ScreeningError::FractionOutOfRange(name));
+        }
+    }
+
+    let per_feature_probability_of_undetected_critical_defect =
+        per_feature_critical_defect_probability * (1.0 - conditional_probability_of_detection);
+    let expected_undetected_critical_defect_count =
+        feature_count as f64 * per_feature_probability_of_undetected_critical_defect;
+    let probability_at_least_one_critical_defect_escapes = -((feature_count as f64)
+        * (-per_feature_probability_of_undetected_critical_defect).ln_1p())
+    .exp_m1();
+    validate_result(
+        per_feature_probability_of_undetected_critical_defect,
+        "per-feature inspection escape probability",
+    )?;
+    validate_result(
+        expected_undetected_critical_defect_count,
+        "expected undetected critical defect count",
+    )?;
+    validate_result(
+        probability_at_least_one_critical_defect_escapes,
+        "population inspection escape probability",
+    )?;
+
+    Ok(InspectionEscapePopulationResult {
+        feature_count,
+        per_feature_critical_defect_probability,
+        conditional_probability_of_detection,
+        per_feature_probability_of_undetected_critical_defect,
+        expected_undetected_critical_defect_count,
+        probability_at_least_one_critical_defect_escapes,
+    })
+}
+
 /// Exact sphere volume for a positive radius, useful for an initial reference geometry.
 pub fn sphere_volume_m3(radius_m: f64) -> Result<f64, ScreeningError> {
     validate_positive(radius_m, "radius_m")?;
@@ -3048,6 +3125,61 @@ mod tests {
         assert_eq!(
             screen_feature_defect_population(10, f64::NAN).unwrap_err(),
             ScreeningError::NonFiniteInput("per_feature_exceedance_probability")
+        );
+    }
+
+    #[test]
+    fn inspection_escape_population_scales_with_feature_count() {
+        let small = screen_inspection_escape_population(270, 0.0001, 0.9).unwrap();
+        let large = screen_inspection_escape_population(10_000, 0.0001, 0.9).unwrap();
+        assert!((small.per_feature_probability_of_undetected_critical_defect - 0.00001).abs() < 1e-15);
+        assert!((small.probability_at_least_one_critical_defect_escapes - 0.002696).abs() < 0.000001);
+        assert!((large.probability_at_least_one_critical_defect_escapes - 0.095163).abs() < 0.000001);
+        assert!(large.expected_undetected_critical_defect_count > small.expected_undetected_critical_defect_count);
+    }
+
+    #[test]
+    fn inspection_escape_population_improves_with_higher_detection_probability() {
+        let lower_pod = screen_inspection_escape_population(1_000, 0.01, 0.9).unwrap();
+        let higher_pod = screen_inspection_escape_population(1_000, 0.01, 0.99).unwrap();
+        assert!(higher_pod.probability_at_least_one_critical_defect_escapes
+            < lower_pod.probability_at_least_one_critical_defect_escapes);
+        assert!(higher_pod.expected_undetected_critical_defect_count
+            < lower_pod.expected_undetected_critical_defect_count);
+    }
+
+    #[test]
+    fn inspection_escape_population_handles_zero_and_certain_detection() {
+        assert_eq!(
+            screen_inspection_escape_population(10, 0.0, 0.0).unwrap()
+                .probability_at_least_one_critical_defect_escapes,
+            0.0
+        );
+        assert_eq!(
+            screen_inspection_escape_population(10, 1.0, 1.0).unwrap()
+                .probability_at_least_one_critical_defect_escapes,
+            0.0
+        );
+        assert_eq!(
+            screen_inspection_escape_population(10, 1.0, 0.0).unwrap()
+                .probability_at_least_one_critical_defect_escapes,
+            1.0
+        );
+    }
+
+    #[test]
+    fn inspection_escape_population_rejects_invalid_inputs() {
+        assert_eq!(
+            screen_inspection_escape_population(0, 0.1, 0.9).unwrap_err(),
+            ScreeningError::MustBePositive("feature_count")
+        );
+        assert_eq!(
+            screen_inspection_escape_population(10, 1.1, 0.9).unwrap_err(),
+            ScreeningError::FractionOutOfRange("per_feature_critical_defect_probability")
+        );
+        assert_eq!(
+            screen_inspection_escape_population(10, 0.1, f64::NAN).unwrap_err(),
+            ScreeningError::NonFiniteInput("conditional_probability_of_detection")
         );
     }
 
