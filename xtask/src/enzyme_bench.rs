@@ -473,13 +473,15 @@ mod tests {
             "temperature_c": {"status":"reported", "value":30.0},
             "substrate_id": {"status":"reported", "value":"SUBSTRATE-B"}
         });
+        let context_a_json = context_a.to_string();
+        let context_b_json = context_b.to_string();
         writer.write_record([
             "obs-a", "source-a", "study-a", "protein-a", "family-a", "kcat",
-            "2.0", "s^-1", "2.0", "s^-1", "identity_s_per_s_v1", "1.0", &context_a.to_string()
+            "2.0", "s^-1", "2.0", "s^-1", "identity_s_per_s_v1", "1.0", context_a_json.as_str()
         ]).unwrap();
         writer.write_record([
             "obs-b", "source-b", "study-b", "protein-b", "family-b", "kcat",
-            "3.0", "s^-1", "3.0", "s^-1", "identity_s_per_s_v1", "1.0", &context_b.to_string()
+            "3.0", "s^-1", "3.0", "s^-1", "identity_s_per_s_v1", "1.0", context_b_json.as_str()
         ]).unwrap();
         let csv_bytes = writer.into_inner().unwrap();
         let dataset_artifact = write_hashed(root, csv_path, &csv_bytes);
@@ -602,10 +604,10 @@ mod tests {
         writer.write_record(&headers).unwrap();
         for row in reader.records() {
             let mut fields: Vec<String> = row.unwrap().iter().map(str::to_string).collect();
-            if fields.first().is_some_and(|value| value == "obs-a") {
+            if fields.first().is_some_and(|value| value.as_str() == "obs-a") {
                 let context_index = headers
                     .iter()
-                    .position(|name| *name == "assay_conditions_json")
+                    .position(|name| name == "assay_conditions_json")
                     .unwrap();
                 fields[context_index] = r#"{"ph":{"status":"unknown"},"temperature_c":{"status":"reported","value":25},"substrate_id":{"status":"reported","value":"X"}}"#.to_string();
             }
