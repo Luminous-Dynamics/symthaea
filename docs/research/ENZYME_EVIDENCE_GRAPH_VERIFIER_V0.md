@@ -35,7 +35,7 @@ For artifacts, acquisition_status "available" requires locator to be a workspace
 
 Terminal transformation statuses are success, null_result, failed, excluded, out_of_domain, and blocked. A non-success status and its reason must remain in the graph. null_result must not claim output nodes or artifacts. A successful transform must declare input and output nodes, and every input/output artifact it declares must be locally verified. Transform dependencies must be represented by edges, endpoints must resolve, edge types must match the contract's endpoint types, and the graph must be acyclic.
 
-Parameter claims distinguish source-reported values from fit outputs. An unknown uncertainty cannot be encoded as zero uncertainty; the allowed statuses are reported, recomputed, not_available, not_estimable, and not_applicable. A value is not admitted merely because it is syntactically valid.
+Parameter claims distinguish source-reported values from fit outputs. The raw source value must be a JSON number or a non-empty verbatim string; objects, arrays, booleans, and null are rejected rather than silently reinterpreted. A normalized value and unit must be supplied together, and a normalized value must be numeric. Duplicate substrate IDs are rejected. An unknown uncertainty cannot be encoded as zero uncertainty; the allowed statuses are reported, recomputed, not_available, not_estimable, and not_applicable. A value is not admitted merely because it is syntactically valid.
 
 ## What V0 checks—and does not check
 
@@ -47,4 +47,4 @@ The command's current success message therefore means **the submitted graph pass
 
 ## Adversarial tests
 
-The unit-test fixtures are synthetic, never sourced biological observations. Regression cases include valid local hashes plus metadata-only remote links, dangling references, directed cycles, tampered bytes, attempted use of unacquired remote data in a successful transformation, evidence class/type mismatch, missing output-artifact linkage, missing failure reason, a null result with inputs but no output node, invalid uncertainty status, workspace path traversal and symlink escape, malformed transformation fingerprints, and required frozen-graph hash pinning.
+The unit-test fixtures are synthetic, never sourced biological observations. Regression cases include valid paired raw/normalized parameter values, malformed parameter value types, incomplete normalized value/unit pairs, duplicate substrate IDs, and valid local hashes plus metadata-only remote links, dangling references, directed cycles, tampered bytes, attempted use of unacquired remote data in a successful transformation, evidence class/type mismatch, missing output-artifact linkage, missing failure reason, a null result with inputs but no output node, invalid uncertainty status, workspace path traversal and symlink escape, malformed transformation fingerprints, and required frozen-graph hash pinning.
