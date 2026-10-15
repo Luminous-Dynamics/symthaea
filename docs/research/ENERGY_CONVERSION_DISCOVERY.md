@@ -181,3 +181,5 @@ A candidate cannot advance unless all relevant gates pass:
 ## Claim discipline
 
 The success criterion for this program is not “Symthaea invented an engine” in the abstract. It is: **for a registered mission, the workflow produces a reproducible candidate that meets all hard constraints and demonstrates a measured, independently reviewed advantage over a fair incumbent baseline.** Until that final evidence exists, results remain hypotheses or model-level findings.
+
+The experiment-selection plan now has an initial deterministic Rust implementation in `crates/domains/symthaea-energy-bench/src/experiment_selection.rs`. It provides transparent lexicographic screening with hard evidence and safety gates, explicit rejection reasons, exact resource-unit matching, and deterministic tie-breaking. It is not active learning or expected information gain; next steps remain calibrated predictive distributions, covariance/Monte Carlo propagation, independent reference cases, and comparison against random/space-filling baselines.
