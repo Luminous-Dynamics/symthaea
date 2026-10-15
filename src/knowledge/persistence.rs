@@ -37,6 +37,17 @@ pub struct KnowledgePersistence {
     total_loaded: u64,
 }
 
+/// One role-bound vector attached to a specific entity occurrence.
+///
+/// This is separate from the legacy role-keyed map because a fact can contain
+/// multiple entities with the same semantic role.
+#[derive(Debug, Clone)]
+pub struct RoleVectorObservationRecord {
+    pub role: SemanticRole,
+    pub entity_text: String,
+    pub vector_bytes: Vec<u8>,
+}
+
 /// A fact record for persistence, including the source relations that were
 /// otherwise lost when the structured extraction was bundled into an HDC vector.
 #[derive(Debug, Clone)]
@@ -55,8 +66,10 @@ pub struct FactRecord {
     pub is_causal: bool,
     /// Structured extracted relations, retained separately from the lossy HDC bundle.
     pub relations: Vec<ExtractedRelation>,
-    /// Exact role-bound HDC vectors, stored separately from the lossy bundled vector.
+    /// Compatibility role-keyed view: at most one vector for each semantic role.
     pub role_vectors: HashMap<SemanticRole, Vec<u8>>,
+    /// Ordered role-bound vectors for every encoded entity occurrence.
+    pub role_vector_observations: Vec<RoleVectorObservationRecord>,
     /// Stable graph-level identity; absent for rows written before this field existed.
     pub graph_fact_id: Option<u64>,
     /// Confidence assigned at insertion; absent for rows written by older schemas.
@@ -214,6 +227,20 @@ fn validate_fact_relations(relations: &[ExtractedRelation]) -> Result<(), String
     Ok(())
 }
 
+fn validate_role_vector_observations(
+    observations: &[RoleVectorObservationRecord],
+) -> Result<(), String> {
+    for observation in observations {
+        validate_hypervector_bytes(&observation.vector_bytes, 2).map_err(|e| {
+            format!(
+                "Invalid role-vector observation for {} ({:?}): {e}",
+                observation.entity_text, observation.role
+            )
+        })?;
+    }
+    Ok(())
+}
+
 fn insert_fact_relations(
     conn: &rusqlite::Connection,
     fact_row_id: i64,
@@ -264,6 +291,32 @@ fn insert_fact_role_vectors(
             rusqlite::params![fact_row_id, role.storage_key(), vector_bytes],
         )
         .map_err(|e| format!("Insert fact role vector: {e}"))?;
+    }
+    Ok(())
+}
+
+fn insert_fact_role_observations(
+    conn: &rusqlite::Connection,
+    fact_row_id: i64,
+    observations: &[RoleVectorObservationRecord],
+) -> Result<(), String> {
+    validate_role_vector_observations(observations)?;
+    for (ordinal, observation) in observations.iter().enumerate() {
+        let ordinal = i64::try_from(ordinal)
+            .map_err(|e| format!("Role-vector observation ordinal exceeds SQLite INTEGER range: {e}"))?;
+        conn.execute(
+            "INSERT INTO knowledge_fact_role_observations
+             (fact_row_id, ordinal, role_key, entity_text, vector_blob)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![
+                fact_row_id,
+                ordinal,
+                observation.role.storage_key(),
+                observation.entity_text,
+                observation.vector_bytes,
+            ],
+        )
+        .map_err(|e| format!("Insert role-vector observation: {e}"))?;
     }
     Ok(())
 }
@@ -367,6 +420,55 @@ fn load_fact_role_vectors(
                 role.storage_key()
             ));
         }
+    }
+    Ok(by_fact)
+}
+
+fn load_fact_role_observations(
+    conn: &rusqlite::Connection,
+) -> Result<HashMap<i64, Vec<RoleVectorObservationRecord>>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT fact_row_id, ordinal, role_key, entity_text, vector_blob
+             FROM knowledge_fact_role_observations
+             ORDER BY fact_row_id, ordinal",
+        )
+        .map_err(|e| format!("Prepare role-vector observations: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let role = decode_semantic_role(row.get(2)?, 2)?;
+            let vector_bytes: Vec<u8> = row.get(4)?;
+            validate_hypervector_bytes(&vector_bytes, 4)?;
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, i64>(1)?,
+                RoleVectorObservationRecord {
+                    role,
+                    entity_text: row.get(3)?,
+                    vector_bytes,
+                },
+            ))
+        })
+        .map_err(|e| format!("Query role-vector observations: {e}"))?;
+    let decoded = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Decode role-vector observations: {e}"))?;
+
+    let mut by_fact: HashMap<i64, Vec<RoleVectorObservationRecord>> = HashMap::new();
+    for (fact_row_id, ordinal, observation) in decoded {
+        if fact_row_id <= 0 {
+            return Err(format!(
+                "Invalid fact row ID for role-vector observation: {fact_row_id}"
+            ));
+        }
+        let observations = by_fact.entry(fact_row_id).or_default();
+        if ordinal != observations.len() as i64 {
+            return Err(format!(
+                "Role-vector observations for fact row {fact_row_id} begin at ordinal {ordinal}, expected {}",
+                observations.len()
+            ));
+        }
+        observations.push(observation);
     }
     Ok(by_fact)
 }
@@ -1187,6 +1289,15 @@ impl KnowledgePersistence {
                 role_key TEXT NOT NULL,
                 vector_blob BLOB NOT NULL,
                 PRIMARY KEY (fact_row_id, role_key),
+                FOREIGN KEY (fact_row_id) REFERENCES knowledge_facts(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_fact_role_observations (
+                fact_row_id INTEGER NOT NULL,
+                ordinal INTEGER NOT NULL,
+                role_key TEXT NOT NULL,
+                entity_text TEXT NOT NULL,
+                vector_blob BLOB NOT NULL,
+                PRIMARY KEY (fact_row_id, ordinal),
                 FOREIGN KEY (fact_row_id) REFERENCES knowledge_facts(id) ON DELETE CASCADE
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
