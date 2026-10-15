@@ -267,6 +267,21 @@ Preregister these mapping outcomes before any ColabFit-based metric:
 
 No raw Parquet records have been downloaded, no sample crosswalk has been run, and the count/size differences remain unresolved. This is additional source-level evidence, not data admission.
 
+### ColabFit configuration rows versus official IS2RE sample pairs
+
+The ColabFit schema documentation defines each `co/*.parquet` row as a single configuration: one atomic structure plus its associated calculated properties. Its columns include structure fields (`positions`, `atomic_numbers`, `cell`, `pbc`) and individual properties such as `energy` (eV) and `atomic_forces` (eV/Å). ColabFit describes these configurations as data points in an interatomic-potential dataset. See the [configuration schema](https://materials.colabfit.org/docs/configuration_schema) and [Parquet usage guide](https://materials.colabfit.org/docs/how_to_use_parquet).
+
+By contrast, the [official OC22 task definition](https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/datasets/oc22.md) says the IS2RE-Total/IS2RS LMDB records contain the initial input structure and output relaxed structure/energy. These are different data contracts. A row in ColabFit with an energy and forces describes the calculated structure represented by that row; it is not, by itself, proof of the relaxed-energy target paired to an initial input for IS2RE. A label such as `is2re_train_*` or `is2re_val_ood_*` only marks dataset membership and does not establish which trajectory configuration is the initial structure or which is the relaxed endpoint.
+
+For any ColabFit conversion to be considered, construct and independently verify an explicit pair manifest:
+1. For each official `lmdb-system-id` / OC22 `sid`, identify the initial-structure configuration and the exact relaxed-total-energy target using source lineage and trajectory endpoint evidence.
+2. Do not choose a first/last row from file order, `configuration_last_modified`, hash ordering, or label text; none of those fields alone has been shown to encode trajectory order.
+3. Confirm initial and target structure/energy units, finite-value checks, atom ordering, composition, cell and periodic-boundary alignment, plus any cell/atom-count changes permitted by the official task.
+4. Require one unambiguous pair per eligible official system, report missing/ambiguous/multiple endpoints as explicit exclusions, and reconcile pair counts against the official split manifest.
+5. Run a deterministic sample crosswalk against the pinned FairChem loader when the source archive becomes accessible, followed by a complete independent comparison. If the endpoint mapping cannot be proved, ColabFit remains a separate single-configuration dataset and cannot substitute for the official IS2RE benchmark.
+
+This schema-level distinction is now a first-class blocker, not a guess about dataset size. No pair manifest or data rows have been downloaded or verified yet.
+
 ### Selector comparison
 
 Keep downstream predictor family, structure representation, training protocol, available label budget, compute budget, and evaluation sets fixed while comparing:
