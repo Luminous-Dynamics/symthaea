@@ -38,7 +38,7 @@ pub struct KnowledgePersistence {
 }
 
 /// One persisted entity-specific role binding. Older databases did not retain entity
-/// text or multiple entities per role; migrated rows use an empty entity_text sentinel.
+/// text or multiple entities per role; migrated rows use `None` for unknown entity text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoleVectorRecord {
     pub role: SemanticRole,
@@ -280,7 +280,7 @@ fn insert_fact_role_vectors(
                 ordinal,
                 binding.role.storage_key(),
                 binding.entity_text,
-                binding.vector_bytes
+                binding.vector_bytes,
             ],
         )
         .map_err(|e| format!("Insert fact role binding: {e}"))?;
@@ -367,7 +367,11 @@ fn load_fact_role_bindings(
             Ok((
                 fact_row_id,
                 ordinal,
-                RoleVectorRecord { role, entity_text, vector_bytes },
+                RoleVectorRecord {
+                    role,
+                    entity_text,
+                    vector_bytes,
+                },
             ))
         })
         .map_err(|e| format!("Query fact role bindings: {e}"))?;
@@ -1249,8 +1253,8 @@ impl KnowledgePersistence {
         .map_err(|e| format!("Schema init: {e}"))?;
 
         // Migrate the older map-shaped table once. The old schema only stored one
-        // vector per role and did not retain entity text; migrated rows use an empty
-        // entity_text sentinel because the original entity identity cannot be recovered.
+        // vector per role and did not retain entity text; migrated rows use NULL for
+        // unknown identity because the original entity text cannot be recovered.
         let legacy_role_table_exists: bool = conn
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'knowledge_fact_role_vectors')",
@@ -1457,10 +1461,16 @@ mod tests {
         };
 
         persistence.save_facts(&[fact.clone()]).unwrap();
-        assert_eq!(persistence.load_facts().unwrap()[0].role_vectors, fact.role_vectors);
+        assert_eq!(
+            persistence.load_facts().unwrap()[0].role_vectors,
+            fact.role_vectors
+        );
 
         persistence.replace_knowledge_snapshot(&[fact.clone()], &[], &[], 2).unwrap();
-        assert_eq!(persistence.load_facts().unwrap()[0].role_vectors, fact.role_vectors);
+        assert_eq!(
+            persistence.load_facts().unwrap()[0].role_vectors,
+            fact.role_vectors
+        );
 
         let replacement = FactRecord {
             role_vectors: Vec::new(),
@@ -1578,7 +1588,10 @@ mod tests {
         assert_eq!(loaded[0].role_vectors.len(), 1);
         assert_eq!(loaded[0].role_vectors[0].role, SemanticRole::Agent);
         assert_eq!(loaded[0].role_vectors[0].entity_text, None);
-        assert_eq!(loaded[0].role_vectors[0].vector_bytes, legacy_bytes);
+        assert_eq!(
+            loaded[0].role_vectors[0].vector_bytes,
+            legacy_bytes
+        );
 
         let conn = rusqlite::Connection::open(&db_path).unwrap();
         let legacy_table_exists: bool = conn
@@ -1588,7 +1601,10 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert!(!legacy_table_exists, "migration should retire the old keyed-by-role table");
+        assert!(
+            !legacy_table_exists,
+            "migration should retire the old keyed-by-role table"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
