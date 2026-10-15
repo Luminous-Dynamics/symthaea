@@ -20,7 +20,7 @@ Exit codes:
 - 5: the measured file contents changed between the initial hash and the post-inventory hash.
 - 1: argument, input, or output error prevented receipt creation.
 
-The JSON receipt embeds the pinned source-document commit, advertised artifact URL, upstream-reported checksum/license, locally measured byte size and hashes, and inventory diagnostics. Archives with a mismatching MD5 are deliberately not parsed. Do not treat upstream-reported license/checksum information as local artifact proof.
+The JSON receipt embeds the pinned source-document commit, advertised artifact URL, upstream-reported checksum/license, locally measured byte size and hashes, and inventory diagnostics. Archives with a mismatching MD5 are deliberately not parsed. Do not treat upstream-reported license/checksum information as local artifact proof. The output path must be new: an existing file, symlink, or hard-link path is refused rather than overwritten, and receipt creation uses exclusive create to close the preflight/write race. Choose a fresh `--output` path for each run.
 
 ## Safety and claim limits
 
