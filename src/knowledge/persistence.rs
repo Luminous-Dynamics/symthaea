@@ -964,6 +964,38 @@ mod tests {
     }
 
     #[test]
+    fn test_fact_snapshot_replacement_does_not_accumulate_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_snapshot_repeat_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let fact = FactRecord {
+            vector_bytes: vec![7u8; BinaryHV::BYTES],
+            source_text: "snapshot fixture".into(),
+            confidence: 0.8,
+            domain: Some("test".into()),
+            cycle: 7,
+            is_causal: false,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(8),
+            corroboration_count: 2,
+            contradiction_count: 1,
+        };
+
+        assert_eq!(persistence.replace_facts_snapshot(&[fact.clone()]).unwrap(), 1);
+        assert_eq!(persistence.replace_facts_snapshot(&[fact]).unwrap(), 1);
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].source_text, "snapshot fixture");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_unconfigured() {
         let mut p = KnowledgePersistence::default();
         assert!(!p.is_configured());
