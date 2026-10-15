@@ -111,7 +111,7 @@ pub struct EpistemicState {
     pub uncertainty: f64,
     /// How novel the current input is (0-1)
     pub novelty: f64,
-    /// How many contradictions are active
+    /// Number of pending direct knowledge-graph contradiction alerts, excluding confounder warnings.
     pub contradiction_count: usize,
     /// Whether we have any grounded knowledge about this topic
     pub has_grounding: bool,
@@ -253,7 +253,10 @@ impl ReasoningContext {
         // 6. Detect confounders separately. These are hypotheses for further
         // investigation, not direct contradiction alerts from the knowledge graph.
         let mut confounder_warnings: Vec<String> = Vec::new();
-        let chain_roots: Vec<&str> = causal_chains.iter().map(|chain| chain.root.as_str()).collect();
+        let chain_roots: Vec<&str> = causal_chains
+            .iter()
+            .map(|chain| chain.root.as_str())
+            .collect();
         for i in 0..chain_roots.len() {
             for j in (i + 1)..chain_roots.len() {
                 let confounders = manager.detect_confounders(chain_roots[i], chain_roots[j]);
@@ -451,7 +454,6 @@ fn generate_summary(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::knowledge::manager::KnowledgeManagerConfig;
 
     #[test]
     fn test_empty_context() {
