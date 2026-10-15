@@ -38,7 +38,8 @@ pub struct EvaMissionSegment {
     pub survival_power_w: f64,
     pub mission_power_w: f64,
     pub non_actuator_equipment_heat_w: f64,
-    pub humidity_generation_per_min: f64,
+    /// Water-vapor generation, grams of water per minute.
+    pub humidity_generation_g_per_min: f64,
     pub regenerative_power_w: f64,
     pub external_charger_w: f64,
     pub personal_dose_rate_msv_h: f64,
@@ -68,7 +69,7 @@ impl EvaMissionSegment {
                 self.survival_power_w,
                 self.mission_power_w,
                 self.non_actuator_equipment_heat_w,
-                self.humidity_generation_per_min,
+                self.humidity_generation_g_per_min,
                 self.regenerative_power_w,
                 self.external_charger_w,
                 self.personal_dose_rate_msv_h,
@@ -92,7 +93,7 @@ impl EvaMissionSegment {
             survival_power_w: 180.0,
             mission_power_w: 40.0,
             non_actuator_equipment_heat_w: 35.0,
-            humidity_generation_per_min: 0.20,
+            humidity_generation_g_per_min: 0.20,
             regenerative_power_w: 0.0,
             external_charger_w: 0.0,
             personal_dose_rate_msv_h: 0.05,
@@ -268,6 +269,89 @@ impl IntegratedEvaMission {
             };
         }
 
+        // Use the no-assist workload as a conservative planning estimate so
+        // a mobility-power shortfall cannot make the planned atmosphere load
+        // look artificially small. This is a reference model, not physiology validation.
+        let Some(planned_metabolism) = self.metabolic.estimate(HumanWorkload {
+            positive_mechanical_power_w: segment.gross_positive_mechanical_power_w,
+            negative_mechanical_power_w: segment.negative_mechanical_power_w,
+        }) else {
+            return self.abort_segment(segment, EvaMissionAbortReason::InvalidMetabolicState);
+        };
+        let planned_minutes = segment.duration_s / 60.0;
+        let planned_humidity_g = segment.humidity_generation_g_per_min * planned_minutes;
+        if !planned_minutes.is_finite() || !planned_humidity_g.is_finite() {
+            return self.abort_segment(segment, EvaMissionAbortReason::InvalidMetabolicState);
+        }
+
+        // A known-failed path, residual burden, insufficient removal rate, or
+        // inadequate capacity vetoes the planned segment. This is a mission-
+        // planning recommendation only; it does not command physical hardware.
+        let plss_state = self.plss.state();
+        let plss_config = self.plss.config();
+        if plss_state.ventilation == crate::plss::PlssPathState::Failed {
+            return self.abort_segment(
+                segment,
+                EvaMissionAbortReason::LifeSupportFailure(PlssStepError::VentilationFailed),
+            );
+        }
+        let ventilation_factor = match plss_state.ventilation {
+            crate::plss::PlssPathState::Available => 1.0,
+            crate::plss::PlssPathState::Degraded => 0.6,
+            crate::plss::PlssPathState::Failed => 0.0,
+        };
+        let humidity_control_factor = match plss_state.humidity_control {
+            crate::plss::PlssPathState::Available => 1.0,
+            crate::plss::PlssPathState::Degraded => 0.5,
+            crate::plss::PlssPathState::Failed => 0.0,
+        };
+        let current_circuit_co2_pa = self
+            .plss
+            .circuit_co2_partial_pressure_pa()
+            .unwrap_or(f64::INFINITY);
+        let projected_circuit_co2_pa = self
+            .plss
+            .projected_circuit_co2_partial_pressure_pa(
+                planned_metabolism.co2_l_min,
+                segment.duration_s,
+            )
+            .unwrap_or(f64::INFINITY);
+        let co2_path_unavailable =
+            plss_state.co2_scrubber == crate::plss::PlssPathState::Failed
+                || !plss_state.co2_scrubber_capacity_remaining_l.is_finite()
+                || plss_state.co2_scrubber_capacity_remaining_l <= 0.0
+                || !plss_config.co2_scrubber_removal_rate_l_min.is_finite()
+                || plss_config.co2_scrubber_removal_rate_l_min <= 0.0
+                || current_circuit_co2_pa > plss_config.max_circuit_co2_partial_pressure_pa
+                || projected_circuit_co2_pa > plss_config.max_circuit_co2_partial_pressure_pa;
+        let effective_humidity_rate =
+            plss_config.humidity_removal_rate_g_min * ventilation_factor * humidity_control_factor;
+        let humidity_path_unavailable =
+            plss_state.humidity_control == crate::plss::PlssPathState::Failed
+                || !plss_state.humidity_vapor_burden_g.is_finite()
+                || plss_state.humidity_vapor_burden_g > 0.0
+                || !plss_state.humidity_collector_capacity_remaining_g.is_finite()
+                || plss_state.humidity_collector_capacity_remaining_g <= 0.0
+                || !effective_humidity_rate.is_finite()
+                || effective_humidity_rate < segment.humidity_generation_g_per_min
+                || plss_state.humidity_collector_capacity_remaining_g < planned_humidity_g;
+        if co2_path_unavailable || humidity_path_unavailable {
+            return EvaMissionSegmentReport {
+                name: segment.name.clone(),
+                phase: segment.phase,
+                disposition: EvaMissionDisposition::ReturnToSafeHaven,
+                abort_reason: None,
+                power: None,
+                metabolism: None,
+                radiation: Some(preflight_radiation),
+                actual_assist_fraction: 0.0,
+                human_positive_mechanical_power_w: 0.0,
+                actuator_waste_heat_w: 0.0,
+                oxygen_consumed_l: 0.0,
+                cumulative_radiation_msv: self.totals.cumulative_radiation_msv,
+            };
+        }
+
         let requested_assist_mechanical_w =
             segment.gross_positive_mechanical_power_w * segment.requested_assist_fraction;
         let requested_assist_electrical_w =
@@ -335,7 +419,7 @@ impl IntegratedEvaMission {
             equipment_heat_w: segment.non_actuator_equipment_heat_w
                 + delivered_mobility_overhead_w
                 + actuator_waste_heat_w,
-            humidity_generation_per_min: segment.humidity_generation_per_min,
+            humidity_generation_g_per_min: segment.humidity_generation_g_per_min,
             dt_s: segment.duration_s,
         });
         let o2_after = self.plss.state().primary_o2_remaining_l
@@ -373,6 +457,26 @@ impl IntegratedEvaMission {
         });
 
         let mut disposition = disposition_for_radiation(radiation.action);
+
+        // Exhaustion discovered during this segment ends further EVA task work.
+        let plss_state = self.plss.state();
+        let plss_config = self.plss.config();
+        let circuit_co2_pa = self
+            .plss
+            .circuit_co2_partial_pressure_pa()
+            .unwrap_or(f64::INFINITY);
+        if plss_state.co2_scrubber == crate::plss::PlssPathState::Failed
+            || plss_state.co2_scrubber_capacity_remaining_l <= 0.0
+            || circuit_co2_pa > plss_config.max_circuit_co2_partial_pressure_pa
+            || plss_config.co2_scrubber_removal_rate_l_min <= 0.0
+            || plss_state.humidity_control == crate::plss::PlssPathState::Failed
+            || plss_state.humidity_collector_capacity_remaining_g <= 0.0
+            || plss_state.humidity_vapor_burden_g > 0.0
+            || plss_config.humidity_removal_rate_g_min <= 0.0
+        {
+            disposition = disposition.max(EvaMissionDisposition::ReturnToSafeHaven);
+        }
+
         if !allocation.mobility_satisfied || !allocation.mission_satisfied {
             disposition = disposition.max(EvaMissionDisposition::DegradeMission);
             self.totals.degraded_segments += 1;
@@ -514,6 +618,118 @@ mod tests {
         assert!(b.totals.mobility_energy_wh > a.totals.mobility_energy_wh);
         assert!(b.totals.human_positive_mechanical_energy_wh
             < a.totals.human_positive_mechanical_energy_wh);
+    }
+
+    #[test]
+    fn excessive_bulk_circuit_co2_pressure_vetoes_task_before_resource_use() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .co2_burden_l = 2.0;
+        let report = mission.run(&[one_hour_work(0.0)]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+    }
+
+    #[test]
+    fn projected_bulk_co2_pressure_vetoes_excessive_workload_before_task() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        let mut segment = EvaMissionSegment::lunar_reference(
+            "excessive-synthetic-workload",
+            EvaMissionPhase::SurfaceWork,
+            60.0,
+        );
+        segment.gross_positive_mechanical_power_w = 1_000.0;
+        segment.requested_assist_fraction = 0.0;
+        let report = mission.run(&[segment]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+    }
+
+    #[test]
+    fn failed_co2_scrubber_vetoes_planned_task_before_resource_use() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .co2_scrubber = crate::plss::PlssPathState::Failed;
+        let report = mission.run(&[one_hour_work(0.0)]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+        assert_eq!(report.totals.mobility_energy_wh, 0.0);
+    }
+
+    #[test]
+    fn failed_humidity_control_vetoes_planned_task_before_resource_use() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .humidity_control = crate::plss::PlssPathState::Failed;
+        let report = mission.run(&[one_hour_work(0.0)]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+        assert_eq!(report.totals.mobility_energy_wh, 0.0);
+    }
+
+    #[test]
+    fn insufficient_sorbent_capacity_vetoes_segment_before_work() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .co2_scrubber_capacity_remaining_l = 0.10;
+        let report = mission.run(&[one_hour_work(0.0)]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        let plss = mission.plss_mut_for_fault_injection();
+        assert_eq!(plss.state().co2_scrubber_capacity_remaining_l, 0.10);
+        assert_eq!(plss.state().co2_burden_l, 0.0);
+    }
+
+    #[test]
+    fn insufficient_condensate_capacity_vetoes_segment_before_work() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .humidity_collector_capacity_remaining_g = 0.10;
+        let report = mission.run(&[EvaMissionSegment::lunar_reference(
+            "humidity-limited",
+            EvaMissionPhase::SurfaceWork,
+            600.0,
+        )]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        let plss = mission.plss_mut_for_fault_injection();
+        assert_eq!(plss.state().humidity_collector_capacity_remaining_g, 0.10);
+        assert_eq!(plss.state().humidity_vapor_burden_g, 0.0);
+    }
+
+    #[test]
+    fn total_ventilation_failure_remains_a_hard_life_support_abort() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .ventilation = crate::plss::PlssPathState::Failed;
+        let report = mission.run(&[one_hour_work(0.0)]);
+        assert_eq!(report.disposition, EvaMissionDisposition::AbortEva);
+        assert_eq!(
+            report.segments[0].abort_reason,
+            Some(EvaMissionAbortReason::LifeSupportFailure(
+                PlssStepError::VentilationFailed
+            ))
+        );
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
     }
 
     #[test]

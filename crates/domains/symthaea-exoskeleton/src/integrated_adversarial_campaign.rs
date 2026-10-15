@@ -39,17 +39,21 @@ pub enum IntegratedEvaScenario {
     DustAndDexterityDegradation,
     MobilityPowerShortfall,
     PrimaryOxygenPathLoss,
+    Co2ScrubberFailure,
+    HumidityControlFailure,
     SolarParticleEventCommBlackout,
     GlovePowerLoss,
     ReturnNeededServiceAndShelterUnavailable,
 }
 
 impl IntegratedEvaScenario {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 9] = [
         Self::Nominal,
         Self::DustAndDexterityDegradation,
         Self::MobilityPowerShortfall,
         Self::PrimaryOxygenPathLoss,
+        Self::Co2ScrubberFailure,
+        Self::HumidityControlFailure,
         Self::SolarParticleEventCommBlackout,
         Self::GlovePowerLoss,
         Self::ReturnNeededServiceAndShelterUnavailable,
@@ -78,6 +82,14 @@ pub struct IntegratedEvaScenarioReport {
     pub safe_haven_recommendation: Option<SafeHavenRecommendation>,
     pub service_available: Option<bool>,
     pub oxygen_consumed_l: f64,
+    /// CO2-equivalent residual burden in the simulation's declared reference volume units.
+    pub co2_burden_l: f64,
+    /// Estimated uniform bulk-circuit CO2 partial pressure, Pa; not inspired PICO2.
+    pub bulk_circuit_co2_partial_pressure_pa: Option<f64>,
+    /// Water-vapor burden, represented as grams of water in the reduced-order model.
+    pub humidity_vapor_burden_g: f64,
+    pub co2_scrubber_capacity_remaining_l: f64,
+    pub humidity_collector_capacity_remaining_g: f64,
     pub mobility_energy_wh: f64,
     pub cumulative_radiation_msv: f64,
     pub approximation_notes: Vec<String>,
@@ -132,6 +144,18 @@ pub fn run_integrated_eva_scenario(
                 .plss_mut_for_fault_injection()
                 .state_mut_for_fault_injection()
                 .primary_oxygen = PlssPathState::Failed;
+        }
+        IntegratedEvaScenario::Co2ScrubberFailure => {
+            mission
+                .plss_mut_for_fault_injection()
+                .state_mut_for_fault_injection()
+                .co2_scrubber = PlssPathState::Failed;
+        }
+        IntegratedEvaScenario::HumidityControlFailure => {
+            mission
+                .plss_mut_for_fault_injection()
+                .state_mut_for_fault_injection()
+                .humidity_control = PlssPathState::Failed;
         }
         IntegratedEvaScenario::SolarParticleEventCommBlackout => {
             segment.energetic_particle_alert = true;
@@ -250,6 +274,24 @@ pub fn run_integrated_eva_scenario(
         );
     }
 
+    let (
+        co2_burden_l,
+        bulk_circuit_co2_partial_pressure_pa,
+        humidity_vapor_burden_g,
+        co2_scrubber_capacity_remaining_l,
+        humidity_collector_capacity_remaining_g,
+    ) = {
+        let plss = mission.plss_mut_for_fault_injection();
+        let state = plss.state();
+        (
+            state.co2_burden_l,
+            plss.circuit_co2_partial_pressure_pa(),
+            state.humidity_vapor_burden_g,
+            state.co2_scrubber_capacity_remaining_l,
+            state.humidity_collector_capacity_remaining_g,
+        )
+    };
+
     IntegratedEvaScenarioReport {
         scenario,
         disposition,
@@ -261,6 +303,11 @@ pub fn run_integrated_eva_scenario(
         safe_haven_recommendation,
         service_available,
         oxygen_consumed_l: mission_report.totals.oxygen_consumed_l,
+        co2_burden_l,
+        bulk_circuit_co2_partial_pressure_pa,
+        humidity_vapor_burden_g,
+        co2_scrubber_capacity_remaining_l,
+        humidity_collector_capacity_remaining_g,
         mobility_energy_wh: mission_report.totals.mobility_energy_wh,
         cumulative_radiation_msv: mission_report.totals.cumulative_radiation_msv,
         approximation_notes,
@@ -347,6 +394,7 @@ mod tests {
             let report = run_integrated_eva_scenario(scenario);
             assert_eq!(report.scenario, scenario);
             assert_eq!(report.evidence, ExosuitEvidenceLevel::Simulation);
+            assert!(report.bulk_circuit_co2_partial_pressure_pa.is_some());
             assert!(!report.approximation_notes.is_empty());
         }
     }
@@ -370,6 +418,32 @@ mod tests {
         let report = run_integrated_eva_scenario(IntegratedEvaScenario::PrimaryOxygenPathLoss);
         assert_ne!(report.mission_disposition, EvaMissionDisposition::AbortEva);
         assert!(report.oxygen_consumed_l > 0.0);
+    }
+
+    #[test]
+    fn integrated_scrubber_failure_vetoes_planned_task_before_resource_use() {
+        let report = run_integrated_eva_scenario(IntegratedEvaScenario::Co2ScrubberFailure);
+        assert_eq!(
+            report.mission_disposition,
+            EvaMissionDisposition::ReturnToSafeHaven
+        );
+        assert_eq!(report.disposition, IntegratedEvaDisposition::ReturnToSafeHaven);
+        assert_eq!(report.oxygen_consumed_l, 0.0);
+        assert_eq!(report.co2_burden_l, 0.0);
+        assert_eq!(report.co2_scrubber_capacity_remaining_l, 120.0);
+    }
+
+    #[test]
+    fn integrated_humidity_control_failure_vetoes_planned_task_before_resource_use() {
+        let report = run_integrated_eva_scenario(IntegratedEvaScenario::HumidityControlFailure);
+        assert_eq!(
+            report.mission_disposition,
+            EvaMissionDisposition::ReturnToSafeHaven
+        );
+        assert_eq!(report.disposition, IntegratedEvaDisposition::ReturnToSafeHaven);
+        assert_eq!(report.oxygen_consumed_l, 0.0);
+        assert_eq!(report.humidity_vapor_burden_g, 0.0);
+        assert_eq!(report.humidity_collector_capacity_remaining_g, 100.0);
     }
 
     #[test]

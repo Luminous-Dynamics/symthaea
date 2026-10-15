@@ -24,8 +24,26 @@ pub struct PlssConfig {
     pub primary_o2_l: f64,
     pub secondary_o2_l: f64,
     pub ventilation_flow_l_min: f64,
-    pub co2_removal_efficiency: f64,
-    pub humidity_removal_efficiency: f64,
+    /// Maximum CO2 capture rate in reference-condition L/min. Reference pressure
+    /// and temperature are explicit below; the rate remains synthetic/unvalidated.
+    pub co2_scrubber_removal_rate_l_min: f64,
+    /// Finite cartridge capacity in the same reference-condition CO2-equivalent liters.
+    pub co2_scrubber_capacity_l: f64,
+    /// Ideal-gas circuit state: free gas volume, m^3. Synthetic reference only.
+    pub circuit_free_volume_m3: f64,
+    /// Uniform bulk-circuit gas temperature, K. Synthetic reference only.
+    pub circuit_gas_temperature_k: f64,
+    /// Reference conditions for CO2-equivalent liters, Pa and K.
+    pub co2_reference_pressure_pa: f64,
+    pub co2_reference_temperature_k: f64,
+    /// Initial bulk-circuit CO2 partial pressure, Pa; not inspired CO2.
+    pub initial_circuit_co2_partial_pressure_pa: f64,
+    /// Synthetic bulk-circuit screening ceiling, not a human exposure limit.
+    pub max_circuit_co2_partial_pressure_pa: f64,
+    /// Maximum water-vapor condensation/removal rate, g water/min.
+    pub humidity_removal_rate_g_min: f64,
+    /// Finite liquid-condensate storage capacity, g water.
+    pub humidity_collector_capacity_g: f64,
     pub primary_heat_rejection_w: f64,
     pub secondary_heat_rejection_w: f64,
     pub thermal_capacitance_j_k: f64,
@@ -38,8 +56,16 @@ impl PlssConfig {
             primary_o2_l: 2_000.0,
             secondary_o2_l: 400.0,
             ventilation_flow_l_min: 170.0,
-            co2_removal_efficiency: 0.98,
-            humidity_removal_efficiency: 0.95,
+            co2_scrubber_removal_rate_l_min: 1.6,
+            co2_scrubber_capacity_l: 120.0,
+            circuit_free_volume_m3: 0.12,
+            circuit_gas_temperature_k: 295.0,
+            co2_reference_pressure_pa: 101_325.0,
+            co2_reference_temperature_k: 273.15,
+            initial_circuit_co2_partial_pressure_pa: 200.0,
+            max_circuit_co2_partial_pressure_pa: 1_200.0,
+            humidity_removal_rate_g_min: 0.5,
+            humidity_collector_capacity_g: 100.0,
             primary_heat_rejection_w: 900.0,
             secondary_heat_rejection_w: 250.0,
             thermal_capacitance_j_k: 300_000.0,
@@ -54,10 +80,27 @@ impl PlssConfig {
             && self.secondary_o2_l >= 0.0
             && self.ventilation_flow_l_min.is_finite()
             && self.ventilation_flow_l_min > 0.0
-            && self.co2_removal_efficiency.is_finite()
-            && (0.0..=1.0).contains(&self.co2_removal_efficiency)
-            && self.humidity_removal_efficiency.is_finite()
-            && (0.0..=1.0).contains(&self.humidity_removal_efficiency)
+            && self.co2_scrubber_removal_rate_l_min.is_finite()
+            && self.co2_scrubber_removal_rate_l_min >= 0.0
+            && self.co2_scrubber_capacity_l.is_finite()
+            && self.co2_scrubber_capacity_l >= 0.0
+            && self.circuit_free_volume_m3.is_finite()
+            && self.circuit_free_volume_m3 > 0.0
+            && self.circuit_gas_temperature_k.is_finite()
+            && self.circuit_gas_temperature_k > 0.0
+            && self.co2_reference_pressure_pa.is_finite()
+            && self.co2_reference_pressure_pa > 0.0
+            && self.co2_reference_temperature_k.is_finite()
+            && self.co2_reference_temperature_k > 0.0
+            && self.initial_circuit_co2_partial_pressure_pa.is_finite()
+            && self.initial_circuit_co2_partial_pressure_pa >= 0.0
+            && self.max_circuit_co2_partial_pressure_pa.is_finite()
+            && self.max_circuit_co2_partial_pressure_pa
+                >= self.initial_circuit_co2_partial_pressure_pa
+            && self.humidity_removal_rate_g_min.is_finite()
+            && self.humidity_removal_rate_g_min >= 0.0
+            && self.humidity_collector_capacity_g.is_finite()
+            && self.humidity_collector_capacity_g >= 0.0
             && self.primary_heat_rejection_w.is_finite()
             && self.primary_heat_rejection_w >= 0.0
             && self.secondary_heat_rejection_w.is_finite()
@@ -71,8 +114,20 @@ impl PlssConfig {
 pub struct PlssState {
     pub primary_o2_remaining_l: f64,
     pub secondary_o2_remaining_l: f64,
+    /// Excess CO2 above the synthetic initial bulk-circuit condition, as reference-
+    /// condition liters. Its derived pressure is a well-mixed ideal-gas estimate,
+    /// not inspired CO2 or a measured exposure.
     pub co2_burden_l: f64,
-    pub humidity_burden: f64,
+    pub co2_scrubber_capacity_remaining_l: f64,
+    /// Water vapor awaiting removal, represented as water mass in grams.
+    pub humidity_vapor_burden_g: f64,
+    /// Remaining physical storage capacity for collected condensate, grams.
+    pub humidity_collector_capacity_remaining_g: f64,
+    /// Carbon-dioxide sorbent path; failure means zero modeled capture.
+    pub co2_scrubber: PlssPathState,
+    /// Humidity/condensation path; failure means zero modeled collection.
+    pub humidity_control: PlssPathState,
+    /// Relative stored-energy/thermal-debt proxy in kelvin-equivalent.
     pub thermal_store_k: f64,
     pub primary_oxygen: PlssPathState,
     pub secondary_oxygen: PlssPathState,
@@ -85,20 +140,25 @@ pub struct PlssState {
 pub struct PlssStepInput {
     pub metabolism: MetabolicEstimate,
     pub equipment_heat_w: f64,
-    pub humidity_generation_per_min: f64,
+    /// Water-vapor generation, grams of water per minute.
+    pub humidity_generation_g_per_min: f64,
     pub dt_s: f64,
 }
 
 impl PlssStepInput {
     pub fn is_valid(&self) -> bool {
         self.metabolism.metabolic_power_w.is_finite()
+            && self.metabolism.metabolic_power_w >= 0.0
             && self.metabolism.oxygen_l_min.is_finite()
+            && self.metabolism.oxygen_l_min >= 0.0
             && self.metabolism.co2_l_min.is_finite()
+            && self.metabolism.co2_l_min >= 0.0
             && self.metabolism.metabolic_heat_w.is_finite()
+            && self.metabolism.metabolic_heat_w >= 0.0
             && self.equipment_heat_w.is_finite()
             && self.equipment_heat_w >= 0.0
-            && self.humidity_generation_per_min.is_finite()
-            && self.humidity_generation_per_min >= 0.0
+            && self.humidity_generation_g_per_min.is_finite()
+            && self.humidity_generation_g_per_min >= 0.0
             && self.dt_s.is_finite()
             && self.dt_s > 0.0
     }
@@ -132,7 +192,11 @@ impl PlssReferenceTwin {
                 primary_o2_remaining_l: config.primary_o2_l,
                 secondary_o2_remaining_l: config.secondary_o2_l,
                 co2_burden_l: 0.0,
-                humidity_burden: 0.0,
+                co2_scrubber_capacity_remaining_l: config.co2_scrubber_capacity_l,
+                humidity_vapor_burden_g: 0.0,
+                humidity_collector_capacity_remaining_g: config.humidity_collector_capacity_g,
+                co2_scrubber: PlssPathState::Available,
+                humidity_control: PlssPathState::Available,
                 thermal_store_k: 0.0,
                 primary_oxygen: PlssPathState::Available,
                 secondary_oxygen: PlssPathState::Available,
@@ -159,6 +223,88 @@ impl PlssReferenceTwin {
 
     pub fn config(&self) -> &PlssConfig {
         &self.config
+    }
+
+    /// Estimates well-mixed bulk-circuit CO2 partial pressure from the synthetic
+    /// initial inventory plus the excess CO2-equivalent burden. This is not
+    /// inspired CO2 (PICO2), which requires a validated suit/helmet flow model
+    /// and standardized human-in-the-loop measurement.
+    pub fn circuit_co2_partial_pressure_pa(&self) -> Option<f64> {
+        self.partial_pressure_for_excess_co2_l(self.state.co2_burden_l)
+    }
+
+    /// Projects bulk-circuit partial pressure after one segment using the same
+    /// declared removal rate, ventilation/scrubber states, and finite capacity
+    /// as the step model. Returns None for invalid state or failed ventilation.
+    pub fn projected_circuit_co2_partial_pressure_pa(
+        &self,
+        co2_generation_l_min: f64,
+        dt_s: f64,
+    ) -> Option<f64> {
+        if !self.config.is_valid()
+            || !co2_generation_l_min.is_finite()
+            || co2_generation_l_min < 0.0
+            || !dt_s.is_finite()
+            || dt_s <= 0.0
+            || self.state.ventilation == PlssPathState::Failed
+            || !self.state.co2_burden_l.is_finite()
+            || self.state.co2_burden_l < 0.0
+            || !self.state.co2_scrubber_capacity_remaining_l.is_finite()
+            || !(0.0..=self.config.co2_scrubber_capacity_l)
+                .contains(&self.state.co2_scrubber_capacity_remaining_l)
+        {
+            return None;
+        }
+
+        let minutes = dt_s / 60.0;
+        let co2_generated_l = co2_generation_l_min * minutes;
+        let available_l = self.state.co2_burden_l + co2_generated_l;
+        if !minutes.is_finite() || !co2_generated_l.is_finite() || !available_l.is_finite() {
+            return None;
+        }
+
+        let ventilation_factor = match self.state.ventilation {
+            PlssPathState::Available => 1.0,
+            PlssPathState::Degraded => 0.6,
+            PlssPathState::Failed => return None,
+        };
+        let scrubber_factor = match self.state.co2_scrubber {
+            PlssPathState::Available => 1.0,
+            PlssPathState::Degraded => 0.5,
+            PlssPathState::Failed => 0.0,
+        };
+        let capture_by_rate_l = self.config.co2_scrubber_removal_rate_l_min
+            * minutes
+            * ventilation_factor
+            * scrubber_factor;
+        if !capture_by_rate_l.is_finite() {
+            return None;
+        }
+        let captured_l = available_l
+            .min(capture_by_rate_l)
+            .min(self.state.co2_scrubber_capacity_remaining_l);
+        let projected_excess_l = available_l - captured_l;
+        self.partial_pressure_for_excess_co2_l(projected_excess_l)
+    }
+
+    fn partial_pressure_for_excess_co2_l(&self, excess_co2_l: f64) -> Option<f64> {
+        if !self.config.is_valid() || !excess_co2_l.is_finite() || excess_co2_l < 0.0 {
+            return None;
+        }
+        // Convert reference-condition liters to circuit partial pressure through
+        // the ideal gas law. One liter equals 1e-3 m^3.
+        let pressure_increment_pa = self.config.co2_reference_pressure_pa
+            * excess_co2_l
+            * self.config.circuit_gas_temperature_k
+            / (1_000.0
+                * self.config.co2_reference_temperature_k
+                * self.config.circuit_free_volume_m3);
+        let pressure_pa =
+            self.config.initial_circuit_co2_partial_pressure_pa + pressure_increment_pa;
+        pressure_increment_pa
+            .is_finite()
+            .then_some(pressure_pa)
+            .filter(|value| value.is_finite() && *value >= 0.0)
     }
 
     pub fn environment_heat_rejection_fraction(&self) -> f64 {
@@ -200,51 +346,166 @@ impl PlssReferenceTwin {
 
         let minutes = input.dt_s / 60.0;
         let oxygen_needed_l = input.metabolism.oxygen_l_min * minutes;
-        self.consume_oxygen(oxygen_needed_l)?;
+        let co2_added_l = input.metabolism.co2_l_min * minutes;
+        let humidity_added_g = input.humidity_generation_g_per_min * minutes;
+
+        // Check arithmetic and mutable simulation state before consuming
+        // resources. Non-finite intermediate values must not become zero burden.
+        let co2_available_l = self.state.co2_burden_l + co2_added_l;
+        let humidity_available_g = self.state.humidity_vapor_burden_g + humidity_added_g;
+        if !minutes.is_finite()
+            || !oxygen_needed_l.is_finite()
+            || !co2_added_l.is_finite()
+            || !humidity_added_g.is_finite()
+            || !co2_available_l.is_finite()
+            || !humidity_available_g.is_finite()
+            || !self.state.co2_burden_l.is_finite()
+            || self.state.co2_burden_l < 0.0
+            || !self.state.co2_scrubber_capacity_remaining_l.is_finite()
+            || !(0.0..=self.config.co2_scrubber_capacity_l)
+                .contains(&self.state.co2_scrubber_capacity_remaining_l)
+            || !self.state.humidity_vapor_burden_g.is_finite()
+            || self.state.humidity_vapor_burden_g < 0.0
+            || !self.state.humidity_collector_capacity_remaining_g.is_finite()
+            || !(0.0..=self.config.humidity_collector_capacity_g)
+                .contains(&self.state.humidity_collector_capacity_remaining_g)
+            || !self.state.primary_o2_remaining_l.is_finite()
+            || !(0.0..=self.config.primary_o2_l).contains(&self.state.primary_o2_remaining_l)
+            || !self.state.secondary_o2_remaining_l.is_finite()
+            || !(0.0..=self.config.secondary_o2_l).contains(&self.state.secondary_o2_remaining_l)
+            || !self.state.thermal_store_k.is_finite()
+        {
+            return Err(PlssStepError::InvalidInput);
+        }
 
         let ventilation_factor = match self.state.ventilation {
             PlssPathState::Available => 1.0,
             PlssPathState::Degraded => 0.6,
             PlssPathState::Failed => 0.0,
         };
-        let co2_added_l = input.metabolism.co2_l_min * minutes;
-        let removable_co2_l = (self.config.ventilation_flow_l_min * minutes)
-            * self.config.co2_removal_efficiency
-            * ventilation_factor;
-        self.state.co2_burden_l =
-            (self.state.co2_burden_l + co2_added_l - removable_co2_l).max(0.0);
+        let co2_scrubber_factor = match self.state.co2_scrubber {
+            PlssPathState::Available => 1.0,
+            PlssPathState::Degraded => 0.5,
+            PlssPathState::Failed => 0.0,
+        };
+        let humidity_control_factor = match self.state.humidity_control {
+            PlssPathState::Available => 1.0,
+            PlssPathState::Degraded => 0.5,
+            PlssPathState::Failed => 0.0,
+        };
 
-        let humidity_added = input.humidity_generation_per_min * minutes;
-        let humidity_removed = self.config.humidity_removal_efficiency
+        // Fan flow does not equal CO2 captured. Capture is separately bounded
+        // by a declared maximum rate, finite cartridge capacity, and the CO2
+        // gas-equivalent burden actually present.
+        let max_co2_by_rate_l = self.config.co2_scrubber_removal_rate_l_min
+            * minutes
             * ventilation_factor
-            * minutes;
-        self.state.humidity_burden =
-            (self.state.humidity_burden + humidity_added - humidity_removed).max(0.0);
+            * co2_scrubber_factor;
+        let co2_removed_l = co2_available_l
+            .min(max_co2_by_rate_l)
+            .min(self.state.co2_scrubber_capacity_remaining_l);
+        let co2_burden_l = co2_available_l - co2_removed_l;
+        let co2_capacity_remaining_l = self.state.co2_scrubber_capacity_remaining_l - co2_removed_l;
 
+        // Humidity is tracked as water mass. Collected condensate consumes finite
+        // storage capacity instead of disappearing via an unbounded efficiency.
+        let max_humidity_by_rate_g = self.config.humidity_removal_rate_g_min
+            * minutes
+            * ventilation_factor
+            * humidity_control_factor;
+        let humidity_removed_g = humidity_available_g
+            .min(max_humidity_by_rate_g)
+            .min(self.state.humidity_collector_capacity_remaining_g);
+        let humidity_vapor_burden_g = humidity_available_g - humidity_removed_g;
+        let humidity_capacity_remaining_g =
+            self.state.humidity_collector_capacity_remaining_g - humidity_removed_g;
+
+        if !max_co2_by_rate_l.is_finite()
+            || !co2_removed_l.is_finite()
+            || !co2_burden_l.is_finite()
+            || !co2_capacity_remaining_l.is_finite()
+            || !max_humidity_by_rate_g.is_finite()
+            || !humidity_removed_g.is_finite()
+            || !humidity_vapor_burden_g.is_finite()
+            || !humidity_capacity_remaining_g.is_finite()
+        {
+            return Err(PlssStepError::InvalidInput);
+        }
+
+        // Validate thermal arithmetic before any inventory or gas/water state is
+        // mutated. A finite input can still overflow when heat sources are added
+        // or integrated over a long step.
         let heat_in_w = input.metabolism.metabolic_heat_w + input.equipment_heat_w;
-        let heat_rejection_w = self.available_heat_rejection_w()? * heat_rejection_fraction;
+        if !heat_in_w.is_finite() {
+            return Err(PlssStepError::InvalidInput);
+        }
+        // Preserve the established simulation meaning of NoThermalPath: the
+        // segment's oxygen/gas/water exchange occurred, then the missing thermal
+        // path was reported. Still validate the no-cooling thermal arithmetic
+        // before committing those exchanges.
+        let heat_rejection_base_w = match self.available_heat_rejection_w() {
+            Ok(value) => Some(value),
+            Err(PlssStepError::NoThermalPath) => None,
+            Err(error) => return Err(error),
+        };
+        let heat_rejection_w = heat_rejection_base_w.unwrap_or(0.0) * heat_rejection_fraction;
         let net_heat_j = (heat_in_w - heat_rejection_w) * input.dt_s;
-        self.state.thermal_store_k += net_heat_j / self.config.thermal_capacitance_j_k;
+        let projected_thermal_store_k =
+            self.state.thermal_store_k + net_heat_j / self.config.thermal_capacitance_j_k;
+        if !heat_rejection_w.is_finite()
+            || !net_heat_j.is_finite()
+            || !projected_thermal_store_k.is_finite()
+        {
+            return Err(PlssStepError::InvalidInput);
+        }
 
-        Ok(())
+        // Oxygen consumption is all-or-nothing on this step API. A rejected
+        // segment must not partially drain the primary/secondary inventories.
+        self.consume_oxygen(oxygen_needed_l)?;
+
+        // Commit modeled gas/water changes before reporting a missing thermal
+        // path: those exchanges occurred during the simulated segment even when
+        // the independent cooling subsystem cannot complete its bookkeeping.
+        self.state.co2_burden_l = co2_burden_l;
+        self.state.co2_scrubber_capacity_remaining_l = co2_capacity_remaining_l;
+        self.state.humidity_vapor_burden_g = humidity_vapor_burden_g;
+        self.state.humidity_collector_capacity_remaining_g = humidity_capacity_remaining_g;
+
+        if let Some(thermal_store_k) = heat_rejection_base_w.map(|_| projected_thermal_store_k) {
+            self.state.thermal_store_k = thermal_store_k;
+            Ok(())
+        } else {
+            Err(PlssStepError::NoThermalPath)
+        }
     }
 
-    fn consume_oxygen(&mut self, mut needed_l: f64) -> Result<(), PlssStepError> {
-        if self.state.primary_oxygen != PlssPathState::Failed {
-            let take = needed_l.min(self.state.primary_o2_remaining_l);
-            self.state.primary_o2_remaining_l -= take;
-            needed_l -= take;
+    fn consume_oxygen(&mut self, needed_l: f64) -> Result<(), PlssStepError> {
+        if !needed_l.is_finite() || needed_l < 0.0 {
+            return Err(PlssStepError::InvalidInput);
         }
-        if needed_l > 0.0 && self.state.secondary_oxygen != PlssPathState::Failed {
-            let take = needed_l.min(self.state.secondary_o2_remaining_l);
-            self.state.secondary_o2_remaining_l -= take;
-            needed_l -= take;
-        }
-        if needed_l > 1e-9 {
-            Err(PlssStepError::NoOxygenPath)
+
+        // Work out the complete allocation first; do not mutate one inventory
+        // and then discover that the combined available supply is insufficient.
+        let primary_take = if self.state.primary_oxygen != PlssPathState::Failed {
+            needed_l.min(self.state.primary_o2_remaining_l)
         } else {
-            Ok(())
+            0.0
+        };
+        let after_primary = needed_l - primary_take;
+        let secondary_take = if after_primary > 0.0
+            && self.state.secondary_oxygen != PlssPathState::Failed
+        {
+            after_primary.min(self.state.secondary_o2_remaining_l)
+        } else {
+            0.0
+        };
+        if after_primary - secondary_take > 1e-9 {
+            return Err(PlssStepError::NoOxygenPath);
         }
+
+        self.state.primary_o2_remaining_l -= primary_take;
+        self.state.secondary_o2_remaining_l -= secondary_take;
+        Ok(())
     }
 
     fn available_heat_rejection_w(&self) -> Result<f64, PlssStepError> {
@@ -285,7 +546,7 @@ mod tests {
         PlssStepInput {
             metabolism: metabolism(),
             equipment_heat_w: 50.0,
-            humidity_generation_per_min: 0.2,
+            humidity_generation_g_per_min: 0.2,
             dt_s: 60.0,
         }
     }
@@ -299,6 +560,48 @@ mod tests {
     }
 
     #[test]
+    fn insufficient_oxygen_does_not_partially_consume_inventory() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        twin.state_mut_for_fault_injection().primary_o2_remaining_l = 0.01;
+        twin.state_mut_for_fault_injection().secondary_o2_remaining_l = 0.01;
+        let before = twin.state;
+        let mut attempted = input();
+        attempted.metabolism.oxygen_l_min = 1.0;
+        attempted.dt_s = 60.0;
+
+        assert_eq!(twin.step(attempted), Err(PlssStepError::NoOxygenPath));
+        assert_eq!(twin.state, before);
+    }
+
+    #[test]
+    fn thermal_arithmetic_overflow_is_rejected_before_state_mutation() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        let before = twin.state;
+        let mut attempted = input();
+        attempted.metabolism.metabolic_heat_w = f64::MAX;
+        attempted.equipment_heat_w = f64::MAX;
+
+        assert_eq!(twin.step(attempted), Err(PlssStepError::InvalidInput));
+        assert_eq!(twin.state, before);
+    }
+
+    #[test]
+    fn thermal_integration_overflow_is_rejected_before_state_mutation() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        let before = twin.state;
+        let mut attempted = input();
+        attempted.metabolism.oxygen_l_min = 0.0;
+        attempted.metabolism.co2_l_min = 0.0;
+        attempted.metabolism.metabolic_heat_w = 10.0;
+        attempted.equipment_heat_w = 0.0;
+        attempted.humidity_generation_g_per_min = 0.0;
+        attempted.dt_s = f64::MAX;
+
+        assert_eq!(twin.step(attempted), Err(PlssStepError::InvalidInput));
+        assert_eq!(twin.state, before);
+    }
+
+    #[test]
     fn secondary_oxygen_carries_primary_failure() {
         let mut twin = PlssReferenceTwin::simulation_reference();
         twin.state_mut_for_fault_injection().primary_oxygen = PlssPathState::Failed;
@@ -306,7 +609,7 @@ mod tests {
         twin.step(PlssStepInput {
             metabolism: metabolism(),
             equipment_heat_w: 0.0,
-            humidity_generation_per_min: 0.0,
+            humidity_generation_g_per_min: 0.0,
             dt_s: 30.0,
         })
         .unwrap();
@@ -321,10 +624,172 @@ mod tests {
         let result = twin.step(PlssStepInput {
             metabolism: metabolism(),
             equipment_heat_w: 0.0,
-            humidity_generation_per_min: 0.0,
+            humidity_generation_g_per_min: 0.25,
             dt_s: 1.0,
         });
         assert_eq!(result, Err(PlssStepError::NoThermalPath));
+        // The simulated segment still consumed oxygen and generated CO2/water
+        // before the independent thermal-path failure was reported.
+        assert!(twin.state().primary_o2_remaining_l < 2_000.0);
+        assert!(twin.state().co2_scrubber_capacity_remaining_l < 120.0);
+        assert!(twin.state().humidity_collector_capacity_remaining_g < 100.0);
+    }
+
+    #[test]
+    fn bulk_circuit_co2_pressure_starts_at_declared_initial_condition() {
+        let twin = PlssReferenceTwin::simulation_reference();
+        assert_eq!(
+            twin.circuit_co2_partial_pressure_pa(),
+            Some(PlssConfig::simulation_reference().initial_circuit_co2_partial_pressure_pa)
+        );
+    }
+
+    #[test]
+    fn one_liter_reference_excess_maps_to_ideal_gas_pressure_increment() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        twin.state_mut_for_fault_injection().co2_burden_l = 1.0;
+        let config = *twin.config();
+        let expected = config.initial_circuit_co2_partial_pressure_pa
+            + config.co2_reference_pressure_pa
+                * config.circuit_gas_temperature_k
+                / (1_000.0
+                    * config.co2_reference_temperature_k
+                    * config.circuit_free_volume_m3);
+        assert!((twin.circuit_co2_partial_pressure_pa().unwrap() - expected).abs() < 1e-9);
+    }
+
+    #[test]
+    fn projection_uses_bounded_capture_and_does_not_mutate_state() {
+        let mut config = PlssConfig::simulation_reference();
+        config.co2_scrubber_removal_rate_l_min = 0.10;
+        config.co2_scrubber_capacity_l = 100.0;
+        let mut twin = PlssReferenceTwin::new(config).unwrap();
+        let projected = twin
+            .projected_circuit_co2_partial_pressure_pa(1.0, 60.0)
+            .unwrap();
+        let expected_excess_l = 0.90;
+        let expected = config.initial_circuit_co2_partial_pressure_pa
+            + config.co2_reference_pressure_pa
+                * expected_excess_l
+                * config.circuit_gas_temperature_k
+                / (1_000.0
+                    * config.co2_reference_temperature_k
+                    * config.circuit_free_volume_m3);
+        assert!((projected - expected).abs() < 1e-9);
+        assert_eq!(twin.state().co2_burden_l, 0.0);
+        assert_eq!(twin.state().co2_scrubber_capacity_remaining_l, 100.0);
+    }
+
+    #[test]
+    fn failed_ventilation_has_no_valid_projection() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        twin.state_mut_for_fault_injection().ventilation = PlssPathState::Failed;
+        assert_eq!(twin.projected_circuit_co2_partial_pressure_pa(0.5, 60.0), None);
+    }
+
+    #[test]
+    fn co2_removal_is_bounded_by_finite_sorbent_capacity_even_at_high_fan_flow() {
+        let mut config = PlssConfig::simulation_reference();
+        config.co2_scrubber_removal_rate_l_min = 100.0;
+        config.co2_scrubber_capacity_l = 0.10;
+        let mut twin = PlssReferenceTwin::new(config).unwrap();
+        let metabolic = metabolism();
+        let generated_l = metabolic.co2_l_min;
+        twin.step(PlssStepInput {
+            metabolism: metabolic,
+            equipment_heat_w: 0.0,
+            humidity_generation_g_per_min: 0.0,
+            dt_s: 60.0,
+        })
+        .unwrap();
+        assert!((twin.state().co2_burden_l - (generated_l - 0.10)).abs() < 1e-9);
+        assert_eq!(twin.state().co2_scrubber_capacity_remaining_l, 0.0);
+    }
+
+    #[test]
+    fn co2_capture_rate_is_independent_of_total_fan_throughput() {
+        let mut config = PlssConfig::simulation_reference();
+        config.co2_scrubber_removal_rate_l_min = 0.10;
+        config.co2_scrubber_capacity_l = 100.0;
+        // Keep fan throughput high: it must not become a CO2-capture multiplier.
+        config.ventilation_flow_l_min = 10_000.0;
+        let mut twin = PlssReferenceTwin::new(config).unwrap();
+        let metabolic = metabolism();
+        let generated_l = metabolic.co2_l_min;
+        twin.step(PlssStepInput {
+            metabolism: metabolic,
+            equipment_heat_w: 0.0,
+            humidity_generation_g_per_min: 0.0,
+            dt_s: 60.0,
+        })
+        .unwrap();
+        assert!((twin.state().co2_burden_l - (generated_l - 0.10)).abs() < 1e-9);
+        assert!((twin.state().co2_scrubber_capacity_remaining_l - 99.90).abs() < 1e-9);
+    }
+
+    #[test]
+    fn failed_scrubber_accumulates_co2_despite_nominal_ventilation() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        twin.state_mut_for_fault_injection().co2_scrubber = PlssPathState::Failed;
+        let generated_l = metabolism().co2_l_min;
+        twin.step(PlssStepInput {
+            metabolism: metabolism(),
+            equipment_heat_w: 0.0,
+            humidity_generation_g_per_min: 0.0,
+            dt_s: 60.0,
+        })
+        .unwrap();
+        assert!((twin.state().co2_burden_l - generated_l).abs() < 1e-9);
+        assert_eq!(twin.state().co2_scrubber_capacity_remaining_l, 120.0);
+    }
+
+    #[test]
+    fn humidity_removal_is_bounded_by_finite_condensate_capacity() {
+        let mut config = PlssConfig::simulation_reference();
+        config.humidity_removal_rate_g_min = 100.0;
+        config.humidity_collector_capacity_g = 0.10;
+        let mut twin = PlssReferenceTwin::new(config).unwrap();
+        twin.step(PlssStepInput {
+            metabolism: metabolism(),
+            equipment_heat_w: 0.0,
+            humidity_generation_g_per_min: 0.25,
+            dt_s: 60.0,
+        })
+        .unwrap();
+        assert!((twin.state().humidity_vapor_burden_g - 0.15).abs() < 1e-9);
+        assert_eq!(twin.state().humidity_collector_capacity_remaining_g, 0.0);
+    }
+
+    #[test]
+    fn failed_humidity_control_accumulates_water_vapor_mass() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        twin.state_mut_for_fault_injection().humidity_control = PlssPathState::Failed;
+        twin.step(PlssStepInput {
+            metabolism: metabolism(),
+            equipment_heat_w: 0.0,
+            humidity_generation_g_per_min: 0.25,
+            dt_s: 60.0,
+        })
+        .unwrap();
+        assert!((twin.state().humidity_vapor_burden_g - 0.25).abs() < 1e-9);
+    }
+
+    #[test]
+    fn overflowed_mass_balance_is_rejected_before_oxygen_consumption() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        let oxygen_before =
+            twin.state().primary_o2_remaining_l + twin.state().secondary_o2_remaining_l;
+        let result = twin.step(PlssStepInput {
+            metabolism: metabolism(),
+            equipment_heat_w: 0.0,
+            humidity_generation_g_per_min: f64::MAX,
+            dt_s: 120.0,
+        });
+        assert_eq!(result, Err(PlssStepError::InvalidInput));
+        assert_eq!(
+            twin.state().primary_o2_remaining_l + twin.state().secondary_o2_remaining_l,
+            oxygen_before
+        );
     }
 
     #[test]
