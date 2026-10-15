@@ -27,7 +27,7 @@ EXPECTED_NEGATIVE_CORPUS_SCHEMA = (
 )
 EXPECTED_NEGATIVE_CONTROL_LAYERS = {
     **{f"SRC-NEG-{number:03d}": "json_schema" for number in range(1, 11)},
-    **{f"SRC-SEM-{number:03d}": "semantic_check" for number in range(1, 12)},
+    **{f"SRC-SEM-{number:03d}": "semantic_check" for number in range(1, 13)},
 }
 EXPECTED_NEGATIVE_CONTROL_FIELDS = {
     "id",
@@ -77,10 +77,12 @@ def schema_errors(validator: Draft202012Validator, value: Any) -> list[str]:
     return errors
 
 
-def semantic_errors(record: dict[str, Any], expected_registry_digest: str) -> list[str]:
+def semantic_errors(\n    record: dict[str, Any], expected_registry_digest: str, known_scenario_ids: set[str]\n) -> list[str]:
     errors: list[str] = []
     if record["run"]["scenario_registry_digest"] != expected_registry_digest:
         errors.append("scenario_registry_digest does not match the exact scenario registry bytes")
+    if record["run"]["scenario_id"] not in known_scenario_ids:
+        errors.append("scenario_id is not declared by the scenario registry")
 
     profiles = record["profiles"]
     assignments = profiles["regime_assignments"]
@@ -179,6 +181,16 @@ def main() -> int:
     ):
         print("FAIL: scenario registry metadata is missing or outside its research-only contract")
         return 1
+    scenario_ids = scenario_registry.get("scenario_ids")
+    if (
+        not isinstance(scenario_ids, list)
+        or not scenario_ids
+        or any(not isinstance(value, str) or not value.strip() for value in scenario_ids)
+        or len(scenario_ids) != len(set(scenario_ids))
+    ):
+        print("FAIL: scenario registry must declare a non-empty unique list of scenario_ids")
+        return 1
+    known_scenario_ids = set(scenario_ids)
     expected_registry_digest = "sha256:" + hashlib.sha256(REGISTRY_PATH.read_bytes()).hexdigest()
 
     Draft202012Validator.check_schema(schema)
@@ -191,7 +203,7 @@ def main() -> int:
             print(f"  - {error}")
         return 1
 
-    positive_semantics = semantic_errors(fixture, expected_registry_digest)
+    positive_semantics = semantic_errors(fixture, expected_registry_digest, known_scenario_ids)
     if positive_semantics:
         print("FAIL: positive example violates semantic invariants:")
         for error in positive_semantics:
@@ -292,7 +304,7 @@ def main() -> int:
             if errors:
                 failures.append(f"{case_id}: semantic control was already rejected at schema layer: {errors[0]}")
             else:
-                found = semantic_errors(mutated, expected_registry_digest)
+                found = semantic_errors(mutated, expected_registry_digest, known_scenario_ids)
                 if not found:
                     failures.append(f"{case_id}: invalid mutation unexpectedly passed semantic checks")
 
@@ -316,7 +328,7 @@ def main() -> int:
     print(
         "PASS: schema definition valid; positive fixture valid; "
         f"{checked_schema} schema-level and {checked_semantic} semantic negative controls rejected; "
-        "required v1 control IDs and corpus metadata intact; scenario registry digest matches exact bytes."
+        "required v1 control IDs intact; scenario digest and scenario ID are bound to the registry."
     )
     print("Claim boundary: synthetic deterministic research fixture only; no production or economic effects.")
     return 0
