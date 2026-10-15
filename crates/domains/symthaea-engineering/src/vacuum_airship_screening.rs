@@ -2670,6 +2670,24 @@ mod tests {
             (result.maximum_factor_scaled_demand_among_scenarios_n - 110.0).abs() < 1e-12
         );
         assert_eq!(result.maximum_scenario_id, "geometry-A/imperfection-1");
+
+        let independent_marginals = screen_bounded_load_path_demand(BoundedLoadPathDemandRequest {
+            total_compressive_resultant_n: ScalarBounds {
+                min: 1_000.0,
+                max: 2_000.0,
+            },
+            effective_load_path_count: ScalarBounds { min: 10.0, max: 40.0 },
+            peak_to_mean_load_factor: ScalarBounds { min: 1.1, max: 1.3 },
+        })
+        .unwrap();
+        assert!(
+            (independent_marginals.factor_scaled_load_path_demand_upper_bound_n - 260.0).abs()
+                < 1e-12
+        );
+        assert!(
+            result.maximum_factor_scaled_demand_among_scenarios_n
+                < independent_marginals.factor_scaled_load_path_demand_upper_bound_n
+        );
     }
 
     #[test]
