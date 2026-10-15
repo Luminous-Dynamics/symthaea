@@ -152,11 +152,25 @@ impl MetadataCoverage {
 }
 
 pub fn check(workspace_root: &Path, manifest_path: &Path) -> Result<()> {
-    let manifest_bytes = fs::read(manifest_path)
-        .with_context(|| format!("read manifest {}", manifest_path.display()))?;
+    let canonical_root = fs::canonicalize(workspace_root)
+        .with_context(|| format!("canonicalize workspace root {}", workspace_root.display()))?;
+    let requested_manifest = if manifest_path.is_absolute() {
+        manifest_path.to_path_buf()
+    } else {
+        canonical_root.join(manifest_path)
+    };
+    let canonical_manifest = fs::canonicalize(&requested_manifest)
+        .with_context(|| format!("canonicalize manifest {}", requested_manifest.display()))?;
+    ensure!(
+        canonical_manifest.starts_with(&canonical_root),
+        "manifest path escapes workspace root: {}",
+        manifest_path.display()
+    );
+    let manifest_bytes = fs::read(&canonical_manifest)
+        .with_context(|| format!("read manifest {}", canonical_manifest.display()))?;
     let manifest: Manifest = serde_json::from_slice(&manifest_bytes)
-        .with_context(|| format!("parse manifest {}", manifest_path.display()))?;
-    let report = validate(workspace_root, &manifest)?;
+        .with_context(|| format!("parse manifest {}", canonical_manifest.display()))?;
+    let report = validate(&canonical_root, &manifest)?;
     println!(
         "ENZYME_BENCH_ADMISSION=PASS observations={} train_studies={} test_studies={} train_families={} test_families={} cross_split_families={} cross_split_studies={} target={}",
         report.observations,
@@ -841,6 +855,20 @@ mod tests {
                 ]
             }
         })
+    }
+
+    #[test]
+    fn rejects_manifest_symlink_or_path_escape_outside_workspace() {
+        let root = fixture_root();
+        let value = make_manifest(&root);
+        let external_manifest = root.with_extension("outside-manifest.json");
+        fs::write(&external_manifest, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
+
+        let error = check(&root, &external_manifest).unwrap_err().to_string();
+        assert!(error.contains("manifest path escapes workspace root"));
+
+        fs::remove_file(external_manifest).unwrap();
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
