@@ -83,6 +83,9 @@ grep -q '"projection_metadata_exit_code": null' "$clean_root/target/cargo-lock-c
 grep -q '"proposed_locked_metadata_exit_code": null' "$clean_root/target/cargo-lock-closure/report.json" \
   || fail "clean report should mark proposed-lock validation as not run"
 [[ -s "$clean_root/target/cargo-lock-closure/toolchain.txt" ]] || fail "toolchain provenance is missing"
+clean_metadata_sha="$(sha256sum "$clean_root/target/cargo-lock-closure/metadata-locked.json" | awk '{print $1}')"
+grep -q "\"locked_metadata_sha256\": \"$clean_metadata_sha\"" "$clean_root/target/cargo-lock-closure/report.json" \
+  || fail "clean report is not bound to its metadata bytes"
 [[ "$(cat "$clean_root/Cargo.lock")" == "committed-lock" ]] || fail "clean lock was altered"
 
 drift_root="$TMP/drift"
@@ -99,6 +102,12 @@ grep -q '"projection_metadata_exit_code": 0' "$drift_root/target/cargo-lock-clos
   || fail "drift report should record successful unlocked projection"
 grep -q '"proposed_locked_metadata_exit_code": 0' "$drift_root/target/cargo-lock-closure/report.json" \
   || fail "drift report should record successful proposed-lock validation"
+drift_metadata_sha="$(sha256sum "$drift_root/target/cargo-lock-closure/metadata-projection.json" | awk '{print $1}')"
+proposed_metadata_sha="$(sha256sum "$drift_root/target/cargo-lock-closure/metadata-proposed-locked.json" | awk '{print $1}')"
+grep -q "\"projection_metadata_sha256\": \"$drift_metadata_sha\"" "$drift_root/target/cargo-lock-closure/report.json" \
+  || fail "drift report is not bound to the unlocked projection bytes"
+grep -q "\"proposed_locked_metadata_sha256\": \"$proposed_metadata_sha\"" "$drift_root/target/cargo-lock-closure/report.json" \
+  || fail "drift report is not bound to the proposed locked metadata bytes"
 [[ "$(cat "$drift_root/Cargo.lock")" == "committed-lock" ]] || fail "helper did not restore the committed lock"
 [[ "$(cat "$drift_root/target/cargo-lock-closure/proposed-Cargo.lock")" == "proposed-lock" ]] \
   || fail "Cargo-generated proposed lock was not retained"
