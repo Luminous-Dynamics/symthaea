@@ -942,7 +942,7 @@ pub fn assess_scoped_external_pressure_bounds(
 ) -> Result<ScopedPressureBoundsAssessment, ScreeningError> {
     let pressure_assessment = assess_external_pressure_bounds(request.pressure.clone())?;
     if matches!(
-        pressure_assessment,
+        &pressure_assessment,
         PressureBoundsAssessment::NoExternalPressureDemand { .. }
             | PressureBoundsAssessment::CapacityUnknown { .. }
     ) {
