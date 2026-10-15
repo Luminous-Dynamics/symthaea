@@ -575,7 +575,8 @@
           "minLength": 1
         },
         "registered_before_search": {
-          "const": true
+          "const": true,
+          "description": "Self-declared flag that must be true. It is not proof by itself; actual preregistration must be independently anchored to an immutable pre-search commit or signed append-only registry."
         },
         "preregistered_at": {
           "type": "string",
