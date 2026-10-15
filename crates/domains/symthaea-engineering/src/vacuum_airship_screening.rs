@@ -27,6 +27,8 @@ pub enum ScreeningError {
     FractionOutOfRange(&'static str),
     /// A declared lower bound exceeds its upper bound.
     InvalidInterval(&'static str),
+    /// A peak-to-mean load multiplier was less than one.
+    FactorBelowOne(&'static str),
 }
 
 impl fmt::Display for ScreeningError {
@@ -39,6 +41,9 @@ impl fmt::Display for ScreeningError {
             Self::FractionOutOfRange(name) => write!(f, "{name} must be within [0, 1]"),
             Self::InvalidInterval(name) => {
                 write!(f, "{name} lower bound must not exceed its upper bound")
+            },
+            Self::FactorBelowOne(name) => {
+                write!(f, "{name} must be greater than or equal to one")
             },
         }
     }
@@ -769,6 +774,83 @@ pub fn screen_spherical_pressure_load(
         positive_external_differential_pa,
         great_circle_area_m2,
         great_circle_compressive_resultant_n,
+    })
+}
+
+/// Inputs for translating a global compressive resultant into an explicit load-path estimate.
+///
+/// The effective path count may be a homogenized/non-integer count from a declared analytical
+/// model. It is not inferred from geometry by this function. The peak-to-mean factor is caller
+/// supplied; it is not a safety factor and is not automatically conservative.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LoadPathDemandRequest {
+    /// Total compressive resultant to be distributed, newtons.
+    pub total_compressive_resultant_n: f64,
+    /// Declared effective number of load paths crossing the cut; must be positive and finite.
+    pub effective_load_path_count: f64,
+    /// Declared peak-to-mean load concentration multiplier; must be >= 1.
+    pub assumed_peak_to_mean_load_factor: f64,
+}
+
+/// Arithmetic load-path estimate for a declared effective count and concentration factor.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LoadPathDemandResult {
+    pub total_compressive_resultant_n: f64,
+    pub effective_load_path_count: f64,
+    /// Equal-share reference load per effective path, newtons.
+    pub mean_compressive_load_per_effective_path_n: f64,
+    /// Caller-supplied factor. This is not an independently established upper bound.
+    pub assumed_peak_to_mean_load_factor: f64,
+    /// Mean load multiplied by the caller-supplied concentration factor, newtons.
+    pub factor_scaled_peak_load_path_demand_n: f64,
+}
+
+/// Convert a global resultant into an equal-share reference and factor-scaled load-path demand.
+///
+/// This is a bookkeeping bridge to a geometry-specific structural model. Actual load sharing
+/// depends on topology, joint stiffness, boundary conditions and spatial imperfections. A supplied
+/// factor below the real concentration would understate member demand, so this function never
+/// labels its scaled output as a maximum or capacity.
+pub fn screen_load_path_demand(
+    request: LoadPathDemandRequest,
+) -> Result<LoadPathDemandResult, ScreeningError> {
+    validate_non_negative(
+        request.total_compressive_resultant_n,
+        "total_compressive_resultant_n",
+    )?;
+    validate_positive(
+        request.effective_load_path_count,
+        "effective_load_path_count",
+    )?;
+    validate_finite(
+        request.assumed_peak_to_mean_load_factor,
+        "assumed_peak_to_mean_load_factor",
+    )?;
+    if request.assumed_peak_to_mean_load_factor < 1.0 {
+        return Err(ScreeningError::FactorBelowOne(
+            "assumed_peak_to_mean_load_factor",
+        ));
+    }
+
+    let mean_compressive_load_per_effective_path_n =
+        request.total_compressive_resultant_n / request.effective_load_path_count;
+    let factor_scaled_peak_load_path_demand_n =
+        mean_compressive_load_per_effective_path_n * request.assumed_peak_to_mean_load_factor;
+    validate_result(
+        mean_compressive_load_per_effective_path_n,
+        "mean compressive load per effective path",
+    )?;
+    validate_result(
+        factor_scaled_peak_load_path_demand_n,
+        "factor-scaled peak load-path demand",
+    )?;
+
+    Ok(LoadPathDemandResult {
+        total_compressive_resultant_n: request.total_compressive_resultant_n,
+        effective_load_path_count: request.effective_load_path_count,
+        mean_compressive_load_per_effective_path_n,
+        assumed_peak_to_mean_load_factor: request.assumed_peak_to_mean_load_factor,
+        factor_scaled_peak_load_path_demand_n,
     })
 }
 
@@ -2060,6 +2142,116 @@ mod tests {
         assert!((sum - result.payload_allowance_interval_width_kg).abs() < 1e-7);
     }
 
+
+    #[test]
+    fn load_path_screen_reproduces_declared_reference_scaling() {
+        let pressure = screen_spherical_pressure_load(SphericalPressureLoadRequest {
+            radius_m: 20.0,
+            external_pressure_pa: 101_325.0,
+            internal_pressure_pa: 0.0,
+        })
+        .unwrap();
+        let frequency = 3.0;
+        let effective_paths = 30.0 * frequency / std::f64::consts::PI;
+        let result = screen_load_path_demand(LoadPathDemandRequest {
+            total_compressive_resultant_n: pressure.great_circle_compressive_resultant_n,
+            effective_load_path_count: effective_paths,
+            assumed_peak_to_mean_load_factor: 1.32,
+        })
+        .unwrap();
+        assert!(
+            (result.mean_compressive_load_per_effective_path_n - 4_444_444.444444444).abs()
+                < 1e-6
+        );
+        assert!(
+            (result.factor_scaled_peak_load_path_demand_n - 5_866_666.666666667).abs()
+                < 1e-6
+        );
+        assert_eq!(result.assumed_peak_to_mean_load_factor, 1.32);
+    }
+
+    #[test]
+    fn load_path_screen_equal_share_conserves_total_resultant() {
+        let result = screen_load_path_demand(LoadPathDemandRequest {
+            total_compressive_resultant_n: 9_000.0,
+            effective_load_path_count: 12.0,
+            assumed_peak_to_mean_load_factor: 1.0,
+        })
+        .unwrap();
+        assert!((result.mean_compressive_load_per_effective_path_n - 750.0).abs() < 1e-12);
+        assert!(
+            (result.mean_compressive_load_per_effective_path_n
+                * result.effective_load_path_count
+                - result.total_compressive_resultant_n)
+                .abs()
+                < 1e-9
+        );
+        assert_eq!(result.factor_scaled_peak_load_path_demand_n, 750.0);
+    }
+
+    #[test]
+    fn load_path_screen_accepts_zero_resultant_without_hiding_path_inputs() {
+        let result = screen_load_path_demand(LoadPathDemandRequest {
+            total_compressive_resultant_n: 0.0,
+            effective_load_path_count: 4.5,
+            assumed_peak_to_mean_load_factor: 1.4,
+        })
+        .unwrap();
+        assert_eq!(result.mean_compressive_load_per_effective_path_n, 0.0);
+        assert_eq!(result.factor_scaled_peak_load_path_demand_n, 0.0);
+    }
+
+    #[test]
+    fn load_path_screen_rejects_zero_path_count() {
+        let result = screen_load_path_demand(LoadPathDemandRequest {
+            total_compressive_resultant_n: 1.0,
+            effective_load_path_count: 0.0,
+            assumed_peak_to_mean_load_factor: 1.0,
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::MustBePositive("effective_load_path_count")
+        );
+    }
+
+    #[test]
+    fn load_path_screen_rejects_factor_below_one() {
+        let result = screen_load_path_demand(LoadPathDemandRequest {
+            total_compressive_resultant_n: 1.0,
+            effective_load_path_count: 1.0,
+            assumed_peak_to_mean_load_factor: 0.99,
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::FactorBelowOne("assumed_peak_to_mean_load_factor")
+        );
+    }
+
+    #[test]
+    fn load_path_screen_rejects_non_finite_multiplier() {
+        let result = screen_load_path_demand(LoadPathDemandRequest {
+            total_compressive_resultant_n: 1.0,
+            effective_load_path_count: 1.0,
+            assumed_peak_to_mean_load_factor: f64::INFINITY,
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::NonFiniteInput("assumed_peak_to_mean_load_factor")
+        );
+    }
+
+    #[test]
+    fn load_path_screen_rejects_derived_overflow() {
+        let result = screen_load_path_demand(LoadPathDemandRequest {
+            total_compressive_resultant_n: f64::MAX,
+            effective_load_path_count: 0.5,
+            assumed_peak_to_mean_load_factor: 2.0,
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::NonFiniteResult("mean compressive load per effective path")
+        );
+    }
 
     fn pressure_capacity_bounds(min_pa: f64, max_pa: f64) -> PressureCapacityBoundsRecord {
         PressureCapacityBoundsRecord {
