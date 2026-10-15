@@ -820,6 +820,57 @@ mod tests {
     }
 
     #[test]
+    fn test_old_knowledge_facts_schema_migrates_without_losing_legacy_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_knowledge_schema_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE knowledge_facts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vector_blob BLOB NOT NULL,
+                source_text TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                domain TEXT,
+                cycle INTEGER NOT NULL,
+                is_causal INTEGER NOT NULL DEFAULT 0
+            );",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO knowledge_facts
+             (vector_blob, source_text, confidence, domain, cycle, is_causal)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![
+                vec![0u8; BinaryHV::BYTES],
+                "legacy fact",
+                0.4_f32,
+                "legacy",
+                7_i64,
+                false
+            ],
+        )
+        .unwrap();
+        drop(conn);
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let records = persistence.load_facts().unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].source_text, "legacy fact");
+        assert_eq!(records[0].initial_confidence, None);
+        assert_eq!(records[0].last_accessed_cycle, None);
+        assert_eq!(records[0].corroboration_count, 0);
+        assert_eq!(records[0].contradiction_count, 0);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_unconfigured() {
         let mut p = KnowledgePersistence::default();
         assert!(!p.is_configured());
@@ -844,10 +895,10 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
-                initial_confidence: None,
-                last_accessed_cycle: None,
-                corroboration_count: 0,
-                contradiction_count: 0,
+                initial_confidence: Some(0.95),
+                last_accessed_cycle: Some(42),
+                corroboration_count: 3,
+                contradiction_count: 2,
             },
             FactRecord {
                 vector_bytes: vec![1u8; 2048],
@@ -856,10 +907,10 @@ mod tests {
                 domain: None,
                 cycle: 2,
                 is_causal: true,
-                initial_confidence: None,
-                last_accessed_cycle: None,
-                corroboration_count: 0,
-                contradiction_count: 0,
+                initial_confidence: Some(0.85),
+                last_accessed_cycle: Some(44),
+                corroboration_count: 4,
+                contradiction_count: 1,
             },
         ];
 
@@ -871,6 +922,14 @@ mod tests {
         assert_eq!(loaded.len(), 2);
         assert_eq!(loaded[0].source_text, "Test fact two"); // DESC order
         assert_eq!(loaded[1].source_text, "Test fact one");
+        assert_eq!(loaded[0].initial_confidence, Some(0.85));
+        assert_eq!(loaded[0].last_accessed_cycle, Some(44));
+        assert_eq!(loaded[0].corroboration_count, 4);
+        assert_eq!(loaded[0].contradiction_count, 1);
+        assert_eq!(loaded[1].initial_confidence, Some(0.95));
+        assert_eq!(loaded[1].last_accessed_cycle, Some(42));
+        assert_eq!(loaded[1].corroboration_count, 3);
+        assert_eq!(loaded[1].contradiction_count, 2);
 
         // Cleanup
         let _ = std::fs::remove_dir_all(&dir);
