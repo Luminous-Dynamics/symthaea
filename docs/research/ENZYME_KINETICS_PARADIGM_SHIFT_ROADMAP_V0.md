@@ -2,7 +2,8 @@
 
 **Status:** research proposal; not a validated platform or a claim of novel scientific discovery.  
 **Scope:** a Rust-first, provenance-preserving route from published enzyme measurements to reproducible kinetic claims and honest prediction.  
-**Related work:** [Industrial Enzyme Benchmark V0](INDUSTRIAL_ENZYME_BENCHMARK_V0.md), [kcat admission profile](KCAT_ADMISSION_PROFILE_V0.json), [SLAC calibration reference manifest](SLAC_CALIBRATION_REFERENCE_MANIFEST.json).
+**Related work:** [Industrial Enzyme Benchmark V0](INDUSTRIAL_ENZYME_BENCHMARK_V0.md), [kcat admission profile](KCAT_ADMISSION_PROFILE_V0.json), [SLAC calibration reference manifest](SLAC_CALIBRATION_REFERENCE_MANIFEST.json).  
+**Machine-readable companion:** [ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json](ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json) defines proposed node/edge types and the hash-bound transformation-chain invariants for a future independent verifier.
 
 ## Executive thesis
 
