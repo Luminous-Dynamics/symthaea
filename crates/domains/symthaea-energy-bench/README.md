@@ -11,7 +11,7 @@ cargo test -p symthaea-energy-bench
 cargo fmt --all -- --check
 ```
 
-Current validation is performed by the Rust unit tests and exact-head CI. Do not treat a queued job as a pass.
+Run the Rust unit tests and formatting check locally, or verify a successful check on the exact commit under review. Tests authored but not executed are unverified; queued, pending, skipped, or cancelled jobs are not passes.
 
 ## Deterministic experiment selection (Phase A)
 
