@@ -884,6 +884,160 @@ pub fn assess_external_pressure(
     })
 }
 
+
+/// Identifies the exact model scope a pressure-capacity record claims to cover.
+///
+/// Values should be immutable IDs or content hashes for versioned artifacts, not free-form
+/// descriptions. This screen compares identifiers exactly but does not fetch or authenticate
+/// those artifacts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PressureCaseScope {
+    pub geometry_revision_id: String,
+    pub material_model_revision_id: String,
+    pub load_case_id: String,
+    pub boundary_condition_profile_id: String,
+    pub imperfection_basis_id: String,
+}
+
+/// One field where supplied capacity scope does not match the requested case.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PressureScopeMismatch {
+    pub field: &'static str,
+    pub required_value: String,
+    pub supplied_value: String,
+}
+
+/// Request the bounded pressure comparison only for evidence matching a declared case scope.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScopedExternalPressureBoundsRequest {
+    pub pressure: ExternalPressureBoundsRequest,
+    /// Scope of the exact model/article and load case being assessed.
+    pub required_scope: PressureCaseScope,
+    /// Scope claimed by the artifact used to justify the pressure capacity.
+    pub supplied_capacity_scope: Option<PressureCaseScope>,
+}
+
+/// Scope-aware wrapper around the arithmetic pressure comparison.
+///
+/// An identifier match is necessary metadata, not proof that the artifacts exist, are authentic,
+/// independent, or appropriately qualified. Scope mismatch blocks the capacity comparison.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ScopedPressureBoundsAssessment {
+    ScopeIncomplete {
+        missing_fields: Vec<&'static str>,
+    },
+    ScopeMismatch {
+        mismatches: Vec<PressureScopeMismatch>,
+    },
+    PressureAssessment(PressureBoundsAssessment),
+}
+
+/// Compare bounded pressure demand/capacity only after exact case-scope identifiers match.
+///
+/// Inputs and any declared capacity interval are arithmetically validated first. When no capacity
+/// is supplied, the result remains unknown. When there is no positive external-pressure demand,
+/// the demand result is returned without requiring an irrelevant capacity-scope record.
+pub fn assess_scoped_external_pressure_bounds(
+    request: ScopedExternalPressureBoundsRequest,
+) -> Result<ScopedPressureBoundsAssessment, ScreeningError> {
+    let pressure_assessment = assess_external_pressure_bounds(request.pressure.clone())?;
+    if matches!(
+        pressure_assessment,
+        PressureBoundsAssessment::NoExternalPressureDemand { .. }
+            | PressureBoundsAssessment::CapacityUnknown { .. }
+    ) {
+        return Ok(ScopedPressureBoundsAssessment::PressureAssessment(
+            pressure_assessment,
+        ));
+    }
+
+    let Some(supplied_scope) = request.supplied_capacity_scope.as_ref() else {
+        return Ok(ScopedPressureBoundsAssessment::ScopeIncomplete {
+            missing_fields: vec!["supplied_capacity_scope"],
+        });
+    };
+
+    let scope_fields: [(&'static str, &str, &str); 5] = [
+        (
+            "geometry_revision_id",
+            &request.required_scope.geometry_revision_id,
+            &supplied_scope.geometry_revision_id,
+        ),
+        (
+            "material_model_revision_id",
+            &request.required_scope.material_model_revision_id,
+            &supplied_scope.material_model_revision_id,
+        ),
+        (
+            "load_case_id",
+            &request.required_scope.load_case_id,
+            &supplied_scope.load_case_id,
+        ),
+        (
+            "boundary_condition_profile_id",
+            &request.required_scope.boundary_condition_profile_id,
+            &supplied_scope.boundary_condition_profile_id,
+        ),
+        (
+            "imperfection_basis_id",
+            &request.required_scope.imperfection_basis_id,
+            &supplied_scope.imperfection_basis_id,
+        ),
+    ];
+
+    let mut missing_fields = Vec::new();
+    let mut mismatches = Vec::new();
+    for (field, required, supplied) in scope_fields {
+        if required.trim().is_empty() {
+            missing_fields.push(match field {
+                "geometry_revision_id" => "required_scope.geometry_revision_id",
+                "material_model_revision_id" => "required_scope.material_model_revision_id",
+                "load_case_id" => "required_scope.load_case_id",
+                "boundary_condition_profile_id" => {
+                    "required_scope.boundary_condition_profile_id"
+                }
+                "imperfection_basis_id" => "required_scope.imperfection_basis_id",
+                _ => unreachable!("scope field names are a closed set"),
+            });
+        }
+        if supplied.trim().is_empty() {
+            missing_fields.push(match field {
+                "geometry_revision_id" => "supplied_capacity_scope.geometry_revision_id",
+                "material_model_revision_id" => {
+                    "supplied_capacity_scope.material_model_revision_id"
+                }
+                "load_case_id" => "supplied_capacity_scope.load_case_id",
+                "boundary_condition_profile_id" => {
+                    "supplied_capacity_scope.boundary_condition_profile_id"
+                }
+                "imperfection_basis_id" => "supplied_capacity_scope.imperfection_basis_id",
+                _ => unreachable!("scope field names are a closed set"),
+            });
+        }
+        if !required.trim().is_empty()
+            && !supplied.trim().is_empty()
+            && required != supplied
+        {
+            mismatches.push(PressureScopeMismatch {
+                field,
+                required_value: required.to_owned(),
+                supplied_value: supplied.to_owned(),
+            });
+        }
+    }
+
+    if !missing_fields.is_empty() {
+        return Ok(ScopedPressureBoundsAssessment::ScopeIncomplete { missing_fields });
+    }
+    if !mismatches.is_empty() {
+        return Ok(ScopedPressureBoundsAssessment::ScopeMismatch { mismatches });
+    }
+
+    Ok(ScopedPressureBoundsAssessment::PressureAssessment(
+        pressure_assessment,
+    ))
+}
+
 /// Deterministic bounds for a scalar quantity. These are engineering bounds, not statistical
 /// confidence intervals; the caller is responsible for choosing justified limits.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -2052,6 +2206,137 @@ mod tests {
             result.unwrap_err(),
             ScreeningError::InvalidInterval("allowable_external_pressure_pa")
         );
+    }
+
+
+    fn matching_pressure_scope() -> PressureCaseScope {
+        PressureCaseScope {
+            geometry_revision_id: "geometry/sha256:abc".into(),
+            material_model_revision_id: "material-model/v3".into(),
+            load_case_id: "external-pressure-sea-level/v1".into(),
+            boundary_condition_profile_id: "supports-and-joints/v2".into(),
+            imperfection_basis_id: "measured-imperfections/bounds-v1".into(),
+        }
+    }
+
+    fn scoped_pressure_request(
+        capacity: Option<PressureCapacityBoundsRecord>,
+        required_scope: PressureCaseScope,
+        supplied_capacity_scope: Option<PressureCaseScope>,
+    ) -> ScopedExternalPressureBoundsRequest {
+        ScopedExternalPressureBoundsRequest {
+            pressure: pressure_bounds_request(
+                ScalarBounds { min: 100_000.0, max: 102_000.0 },
+                ScalarBounds { min: 0.0, max: 1_000.0 },
+                capacity,
+            ),
+            required_scope,
+            supplied_capacity_scope,
+        }
+    }
+
+    #[test]
+    fn scoped_pressure_comparison_allows_exact_scope_match_only() {
+        let scope = matching_pressure_scope();
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+            scope.clone(),
+            Some(scope),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::PressureAssessment(
+                PressureBoundsAssessment::DeclaredCapacityBoundsComparison {
+                    status: CapacityBoundsStatus::DeclaredCapacityCoversDemandBounds,
+                    ..
+                }
+            )
+        ));
+    }
+
+    #[test]
+    fn scoped_pressure_comparison_blocks_geometry_revision_mismatch() {
+        let required = matching_pressure_scope();
+        let mut supplied = required.clone();
+        supplied.geometry_revision_id = "geometry/sha256:old".into();
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+            required,
+            Some(supplied),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::ScopeMismatch { mismatches }
+                if mismatches.len() == 1
+                    && mismatches[0].field == "geometry_revision_id"
+                    && mismatches[0].required_value == "geometry/sha256:abc"
+                    && mismatches[0].supplied_value == "geometry/sha256:old"
+        ));
+    }
+
+    #[test]
+    fn scoped_pressure_comparison_blocks_material_load_boundary_and_imperfection_mismatch() {
+        let required = matching_pressure_scope();
+        let mut supplied = required.clone();
+        supplied.material_model_revision_id = "material-model/v2".into();
+        supplied.load_case_id = "different-load-case".into();
+        supplied.boundary_condition_profile_id = "different-boundaries".into();
+        supplied.imperfection_basis_id = "perfect-geometry-only".into();
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+            required,
+            Some(supplied),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::ScopeMismatch { mismatches }
+                if mismatches.len() == 4
+        ));
+    }
+
+    #[test]
+    fn scoped_pressure_comparison_rejects_missing_scope_identifiers() {
+        let mut required = matching_pressure_scope();
+        required.imperfection_basis_id.clear();
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+            required,
+            Some(matching_pressure_scope()),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::ScopeIncomplete { missing_fields }
+                if missing_fields == vec!["required_scope.imperfection_basis_id"]
+        ));
+    }
+
+    #[test]
+    fn scoped_pressure_comparison_keeps_unknown_capacity_without_scope() {
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            None,
+            matching_pressure_scope(),
+            None,
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::PressureAssessment(
+                PressureBoundsAssessment::CapacityUnknown { .. }
+            )
+        ));
+    }
+
+    #[test]
+    fn scoped_pressure_comparison_rejects_missing_capacity_scope() {
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+            matching_pressure_scope(),
+            None,
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::ScopeIncomplete { missing_fields }
+                if missing_fields == vec!["supplied_capacity_scope"]
+        ));
     }
 
     #[test]
