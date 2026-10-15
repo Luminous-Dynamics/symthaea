@@ -289,4 +289,4 @@ Never describe a queued CI job as passed. Never claim compilation or tests that 
 7. NIST, *Nanotechnology Measurement Protocols* (updated 13 July 2026): https://www.nist.gov/mml/nanotechnology-measurement-protocols
 8. Ren et al., *Autonomous experiments using active learning and AI*, Nature Reviews Materials (2023): https://www.nature.com/articles/s41578-023-00588-4
 9. LAMMPS stable documentation (30 September 2026): https://docs.lammps.org/stable/
-10. Atomic Simulation Environment documentation: https://docs.ase-docs.org/
+10. Atomic Simulation Environment documentation: https://docs.ase-lib.org/
