@@ -537,6 +537,10 @@ impl EnhancedKnowledgeGraph {
                 .role_vectors
                 .values()
                 .any(|bytes| bytes.len() != symthaea_core::hdc::unified_hv::BinaryHV::BYTES)
+            || record.role_vector_observations.iter().any(|observation| {
+                observation.vector_bytes.len()
+                    != symthaea_core::hdc::unified_hv::BinaryHV::BYTES
+            })
         {
             return;
         }
@@ -551,9 +555,24 @@ impl EnhancedKnowledgeGraph {
                 (*role, symthaea_core::hdc::binary_hv::BinaryHV(role_arr))
             })
             .collect();
+        let role_vector_observations = record
+            .role_vector_observations
+            .iter()
+            .map(|observation| {
+                let mut observation_arr =
+                    [0u8; symthaea_core::hdc::unified_hv::BinaryHV::BYTES];
+                observation_arr.copy_from_slice(&observation.vector_bytes);
+                super::encoding::RoleBoundVector {
+                    role: observation.role,
+                    entity_text: observation.entity_text.clone(),
+                    vector: symthaea_core::hdc::binary_hv::BinaryHV(observation_arr),
+                }
+            })
+            .collect();
         let encoding = super::encoding::FactEncoding {
             vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
             role_vectors,
+            role_vector_observations,
             relations: record.relations.clone(),
             source_text: record.source_text.clone(),
             confidence: record.confidence,
@@ -621,6 +640,16 @@ impl EnhancedKnowledgeGraph {
                     .role_vectors
                     .iter()
                     .map(|(role, vector)| (*role, vector.0.to_vec()))
+                    .collect(),
+                role_vector_observations: f
+                    .encoding
+                    .role_vector_observations
+                    .iter()
+                    .map(|observation| super::persistence::RoleVectorObservationRecord {
+                        role: observation.role,
+                        entity_text: observation.entity_text.clone(),
+                        vector_bytes: observation.vector.0.to_vec(),
+                    })
                     .collect(),
                 source_text: f.encoding.source_text.clone(),
                 confidence: f.confidence,
