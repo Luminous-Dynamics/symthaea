@@ -417,3 +417,45 @@ problem + physical regime + information regime + governance regime
 -> transition cost
 
 The desired output is a **Civilization Mechanism Map**, not a winning ideology.
+
+
+## 16. Versioned run receipt and semantic export boundary
+
+The machine-readable run receipt is defined in [`SYM-FIN-SYS-016_run_receipt_v1.schema.json`](SYM-FIN-SYS-016_run_receipt_v1.schema.json). An illustrative shape is in [`SYM-FIN-SYS-016_run_receipt_example_v1.json`](SYM-FIN-SYS-016_run_receipt_example_v1.json); the schema-level rejection cases are in [`SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json`](SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json).
+
+A receipt binds:
+
+- exact source revision, scenario-registry digest, environment digest, deterministic seed, model version and initial/final world-state digests;
+- each community's explicit regime profile and each bridge's versioned profile;
+- governance/evidence-policy generation and settlement/finality profile;
+- ordered synthetic events, their payload digests, and scoped metric values with units, population scope, period and measurement status;
+- oracle/evaluator identity, applied controls and counterexample-corpus digest.
+
+The receipt's authority boundary is intentionally non-configurable in v1:
+
+- it is not a real-world observation;
+- it cannot authorize real action or reserve real resources;
+- it cannot settle real assets;
+- it cannot be imported into a production ledger as an instruction.
+
+A simulated reservation/commitment/delivery/verification/settlement is only a state transition inside the frozen model. Its event name must retain the `simulated_` prefix where applicable, and every event records `authority_effect = none`, `external_effect = none`, and `settlement_effect = none`.
+
+### Importing from Symthaea into Mycelix
+
+The initial integration is export-only. Mycelix may ingest a receipt as research provenance and compare it to the exact scenario/profile/run digest, but it must not infer an account balance, resource reservation, credential, entitlement, payment instruction or governance authority from it.
+
+Any later bridge into Mycelix production-oriented records needs a separately versioned adapter contract, an explicit evidence-class mapping, an independent verifier, and a capability check owned by the receiving system. Importing the receipt must be idempotent and must not have economic side effects.
+
+Keep the following relations machine-visible:
+
+`simulation result != observation of physical delivery`
+
+`simulation verification != independent real-world verification`
+
+`simulation authorization != real authorization`
+
+`simulation settlement != external settlement`
+
+### Evidence status
+
+The schema, illustrative fixture and negative-control list are reference artifacts. Until a pinned JSON Schema 2020-12 validator runs against the fixture and proves that every negative mutation is rejected, they are not a validated interchange format. The example metrics are synthetic placeholders, not observed results and not evidence for the efficacy of any regime.
