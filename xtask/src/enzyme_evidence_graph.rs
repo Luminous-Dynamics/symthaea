@@ -376,9 +376,11 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
         }
     }
 
+    let mut seen_edge_ids = BTreeSet::<String>::new();
     let mut seen_edge_pairs = BTreeSet::<(String, String, String)>::new();
     for edge in &graph.edges {
         ensure!(!edge.edge_id.trim().is_empty(), "edge_id must be nonempty");
+        ensure!(seen_edge_ids.insert(edge.edge_id.clone()), "duplicate edge_id {}", edge.edge_id);
         ensure!(
             EDGE_TYPES.contains(&edge.edge_type.as_str()),
             "edge {} has unknown type '{}'",
@@ -484,11 +486,15 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
             );
         }
 
-        let input_artifacts_linked = transformation.input_node_ids.iter().any(|node_id| {
-            nodes_by_id[node_id.as_str()].artifact_ids.iter().any(|id| transformation.input_artifact_ids.contains(id))
+        let input_artifacts_linked = transformation.input_artifact_ids.iter().all(|artifact_id| {
+            transformation.input_node_ids.iter().any(|node_id| {
+                nodes_by_id[node_id.as_str()].artifact_ids.contains(artifact_id)
+            })
         });
-        let output_artifacts_linked = transformation.output_node_ids.iter().any(|node_id| {
-            nodes_by_id[node_id.as_str()].artifact_ids.iter().any(|id| transformation.output_artifact_ids.contains(id))
+        let output_artifacts_linked = transformation.output_artifact_ids.iter().all(|artifact_id| {
+            transformation.output_node_ids.iter().any(|node_id| {
+                nodes_by_id[node_id.as_str()].artifact_ids.contains(artifact_id)
+            })
         });
         ensure!(
             transformation.input_artifact_ids.is_empty() || input_artifacts_linked,
@@ -505,7 +511,9 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
             ensure!(
                 transformation.output_node_ids.iter().any(|output_node_id| {
                     graph.edges.iter().any(|edge| {
-                        edge.from_node_id == *input_node_id && edge.to_node_id == *output_node_id
+                        edge.from_node_id == *input_node_id
+                            && edge.to_node_id == *output_node_id
+                            && is_transformation_dependency_edge(&edge.edge_type)
                     })
                 }),
                 "transformation {} input node {} has no explicit edge to any declared output node",
@@ -517,7 +525,9 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
             ensure!(
                 transformation.input_node_ids.iter().any(|input_node_id| {
                     graph.edges.iter().any(|edge| {
-                        edge.from_node_id == *input_node_id && edge.to_node_id == *output_node_id
+                        edge.from_node_id == *input_node_id
+                            && edge.to_node_id == *output_node_id
+                            && is_transformation_dependency_edge(&edge.edge_type)
                     })
                 }),
                 "transformation {} output node {} has no explicit incoming dependency from its declared inputs",
@@ -535,6 +545,16 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
             ensure!(
                 !transformation.output_node_ids.is_empty(),
                 "successful transformation {} has no output nodes",
+                transformation.transformation_id
+            );
+            ensure!(
+                !transformation.input_artifact_ids.is_empty(),
+                "successful transformation {} has no input artifacts",
+                transformation.transformation_id
+            );
+            ensure!(
+                !transformation.output_artifact_ids.is_empty(),
+                "successful transformation {} has no output artifacts",
                 transformation.transformation_id
             );
             ensure!(
@@ -653,6 +673,19 @@ fn edge_endpoints_valid(edge_type: &str, from: &str, to: &str) -> bool {
         "evaluated_by" => from == "prediction" && to == "evaluation",
         _ => false,
     }
+}
+
+fn is_transformation_dependency_edge(edge_type: &str) -> bool {
+    matches!(
+        edge_type,
+        "calibrated_by"
+            | "corrected_with"
+            | "derived_from"
+            | "fitted_using"
+            | "estimates"
+            | "predicts"
+            | "evaluated_by"
+    )
 }
 
 fn ensure_acyclic(nodes: &[Node], edges: &[Edge]) -> Result<()> {
@@ -931,8 +964,8 @@ mod tests {
     fn refuses_unacquired_remote_artifact_as_successful_transform_input() {
         let workspace = TempWorkspace::new();
         let mut graph = fixture(workspace.root());
-        graph["transformations"][0]["input_node_ids"] = json!(["n_source"]);
-        graph["transformations"][0]["input_artifact_ids"] = json!(["a_remote"]);
+        graph["nodes"][1]["artifact_ids"].as_array_mut().unwrap().push(json!("a_remote"));
+        graph["transformations"][0]["input_artifact_ids"] = json!(["a_input.bin", "a_remote"]);
         let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
         assert!(error.contains("unavailable or unverified input artifacts") || error.contains("not linked from its input nodes"));
     }
