@@ -1374,6 +1374,58 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_manager_restart_preserves_role_vectors() {
+        use crate::knowledge::encoding::FactEncoding;
+        use crate::knowledge::extraction::SemanticRole;
+
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_role_vector_roundtrip_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db").to_string_lossy().to_string();
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path),
+            ..KnowledgeManagerConfig::default()
+        };
+
+        let mut manager = KnowledgeManager::try_new(config.clone()).unwrap();
+        let mut encoding = FactEncoding {
+            vector: symthaea_core::hdc::binary_hv::BinaryHV::random(81),
+            role_vectors: std::collections::HashMap::new(),
+            relations: Vec::new(),
+            source_text: "role-vector manager restart fixture".into(),
+            confidence: 0.9,
+        };
+        encoding
+            .role_vectors
+            .insert(SemanticRole::Agent, symthaea_core::hdc::binary_hv::BinaryHV::random(82));
+        encoding
+            .role_vectors
+            .insert(SemanticRole::Patient, symthaea_core::hdc::binary_hv::BinaryHV::random(83));
+        let (fact_id, _) = manager
+            .graph
+            .insert(encoding.clone(), 7, Some("test".into()), false);
+
+        manager.persist_snapshot();
+        drop(manager);
+
+        let restored = KnowledgeManager::try_new(config).unwrap();
+        let restored_fact = restored
+            .graph()
+            .get_fact(fact_id)
+            .expect("fact ID should remain stable after restart");
+        assert_eq!(
+            restored_fact.encoding.role_vectors,
+            encoding.role_vectors,
+            "manager restart must preserve every role-bound vector"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_manager_snapshot_preserves_complete_causal_edge_observation() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_manager_causal_observation_roundtrip_{}",
