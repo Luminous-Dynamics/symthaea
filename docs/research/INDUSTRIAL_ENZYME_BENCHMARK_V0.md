@@ -74,7 +74,18 @@ Across all five files, the independently fitted slopes differ from the embedded 
 
 The official DaRUS record identifies version 1.0, reports CC BY 4.0, documents raw absorption data plus calibration JSON and EnzymeML `.omex` files across 25–45 °C, and publishes the file-level MD5 values shown above. The mirror README states its data are equivalent to the DaRUS deposit. SHA-256 was computed over each pinned mirror payload in memory using a known-answer-checked implementation; these values are recorded for later replay but are not yet frozen in a source manifest. The MD5 comparison is useful cross-repository integrity evidence, although MD5 is not collision-resistant. The new Rust command has **not** yet been run against these files because none was saved locally. After obtaining the canonical/versioned files through the authorized download path, run `sha256sum` on the local bytes and confirm each value matches the table before invoking the Rust command. This work does **not** yet reproduce absorbance extraction, calibration generation from raw readings, the EnzymeML kinetic fit, all five temperature-dependent kinetic models, or any enzyme-function prediction.
 
-For the 25 °C file, the replay command is:
+The five-file machine-readable reference index is [SLAC_CALIBRATION_REFERENCE_MANIFEST.json](SLAC_CALIBRATION_REFERENCE_MANIFEST.json). It records, per file, the pinned mirror Git commit/blob, byte length, source SHA-256, canonical DaRUS MD5, declared fitting range, sample counts and reference fit statistics. It is explicitly labelled `reference_only_not_admitted` and contains metadata only—no calibration JSON payloads.
+
+After acquiring the five source files under the official DaRUS terms and placing them in the ignored local staging directory, run the batch replay:
+
+```sh
+cargo run -p xtask -- enzyme-calibration-suite-check \
+  --manifest docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json
+```
+
+The suite verifies every file's byte length, SHA-256, Git blob SHA and canonical MD5, rejects paths escaping the workspace, recomputes each zero-intercept fit under its declared range, and compares sample counts plus slope/R²/RMSD against frozen references. Its status remains explicitly non-admitted; passing calibration checks is not approval for the predictive benchmark.
+
+For a one-file diagnostic, the replay command is:
 
 ```sh
 sha256sum research-data/enzyme-benchmark/ABTS_standard_25.0C.json
