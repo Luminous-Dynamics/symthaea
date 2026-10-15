@@ -1401,12 +1401,12 @@ mod tests {
         encoding.role_vectors = vec![
             RoleBinding {
                 role: SemanticRole::Agent,
-                entity_text: "Alice".into(),
+                entity_text: Some("Alice".into()),
                 vector: symthaea_core::hdc::binary_hv::BinaryHV::random(82),
             },
             RoleBinding {
                 role: SemanticRole::Agent,
-                entity_text: "Bob".into(),
+                entity_text: Some("Bob".into()),
                 vector: symthaea_core::hdc::binary_hv::BinaryHV::random(83),
             },
         ];
