@@ -97,6 +97,67 @@ Research context:
 - Prentice's 2024 study compares trucking with a modeled 100-tonne electric cargo airship for refrigerated supply chains: [Journal of Transportation Technologies](https://doi.org/10.4236/jtts.2024.142012).
 - A 2023 route-optimization study for solar airships estimates reduced energy/emissions in its model with longer travel times than conventional aircraft: [International Journal of Automotive and Mechanical Engineering](https://doi.org/10.1080/14786451.2023.2189488).
 
+## Material concept: a strong, recoverable “structural bubble”
+
+The phrase “strong bubble that flexes back into shape” points toward a useful requirement, but it should not be interpreted as a soft rubber envelope holding its shape by itself. An ordinary gas balloon relies on positive internal pressure to tension its skin. A vacuum envelope sees atmospheric pressure pushing inward. A soft membrane can remain intact in tension while still deflecting so far that its supported geometry becomes unusable; a compressed frame can snap through or buckle before its fibers reach their tensile strength.
+
+**Working concept:** a fiber-reinforced membrane + an elastic-but-stiff geodesic skeleton + redundant tension bracing + compliant, damage-tolerant joints. Make the pressure barrier replaceable and non-primary where possible; make the structural architecture resist buckling without requiring large deformations; use elastic recovery as a secondary property for small, bounded loads rather than as the primary collapse-resistance mechanism.
+
+### Candidate material stack
+
+| Layer / subsystem | First material families to test | Role and principal caveat |
+|---|---|---|
+| Primary compression skeleton | Continuous-fiber CFRP beams or pultruded/formed composite profiles; also compare a carbon-fiber thermoplastic composite (CFRTP) profile | High specific stiffness is crucial because buckling scales with geometry and modulus. CFRP laminates are anisotropic and sensitive to fiber alignment, joints, and impact-induced delamination; coupon strength alone does not qualify a strut or frame. |
+| Load-sharing shell / node regions | 3D-woven or through-thickness-reinforced composite; graded lattice/sandwich region around nodes | Woven through-thickness architecture is worth investigating for delamination and compression-damage resistance. Published multi-scale analysis of 3D-woven composite spherical shells under external hydrostatic pressure shows that weave architecture, radius/thickness ratio, and initial defects strongly affect strength and buckling. This is promising adjacent evidence, not proof for a full-scale atmospheric vacuum vessel. |
+| Pressure seal / membrane | Thin, replaceable, low-permeability film or elastomeric barrier backed by continuous-fiber reinforcement where load-carrying membrane tension is needed | The soft layer provides sealing, abrasion tolerance, and accommodation of very small geometric change. Do not credit it with primary compressive stiffness unless measured and structurally modelled. Its seams, penetrations, permeability, aging and tear propagation are first-class design variables. |
+| Internal bracing | Redundant tension cords/cables, with high-specific-strength fiber such as UHMWPE as a candidate | Cables work in tension only; they need an explicit load path and pretension policy. Creep, temperature, abrasion, termination efficiency, inspection, and long-term loss of pretension must be measured. The kenemostat paper itself explores a self-equalizing internal cable system, but its idealized mass and load distribution must be independently checked. |
+| Recoverable joints / local compliance | Replaceable flexures, toughened composite nodes, mechanically captured interfaces, or qualified thermoplastic-composite joints | Permit tiny elastic motion and distribute impact while retaining alignment. Joint rotation, backlash, stress concentration, creep, fatigue and loss of pretension can lower global stiffness. Compliant joints must not introduce a snap-through mechanism. |
+| Damage monitoring / repair | Strain or fiber-optic sensing, local vacuum/leak sensing, replaceable seal tiles, inspectable mechanical connections | These detect damage and support a controlled repair process. They do not make the structure self-healing or safe after damage unless a validated residual-strength case says so. |
+
+A thermoplastic matrix is attractive where welding and repairability could reduce joint count and ease repair, but those gains should be treated as manufacturing hypotheses. Reviews of aerospace thermoplastic-composite joining describe resistance, ultrasonic, induction and other fusion-welding routes, while also stressing process control, joint strength, nondestructive inspection and qualification challenges.
+
+### The main structural variant to pursue first
+
+Use **Variant A as the conservative baseline**: a triangulated geodesic frame with a bonded/stiffened load-sharing skin and replaceable low-permeability outer barrier. Compare it against **Variant B**: a detached, fiber-reinforced membrane supported in tension by geodesic frame edges. In the October 2026 kenemostat analysis, both are examined; the bonded/stiffened variant is modelled as more globally stiff, while the detached-membrane variant is lighter in the idealization but needs careful frame and global-buckling treatment. Their quoted buckling values are numerical predictions for the paper's assumed idealized geometry and material properties, not validated allowable pressure for our candidate.
+
+My initial priority is the **hybrid**: a stiff main geodesic compression network, membrane panels supported over controlled short spans, 3D-woven/toughened material at high-gradient zones, and redundant tension bracing. Add flexibility only in locations where it provides measured benefit; avoid a globally soft shell.
+
+### Define “flexes back into shape” quantitatively
+
+Do not accept a visual impression that the sphere “looks round again.” For a frozen test article and load profile, measure all of the following:
+
+1. **Loaded shape:** the full-field displacement/deformation map while external differential pressure is applied, not just one diameter or a few points.
+2. **Residual shape:** maximum and RMS surface deviation from the baseline geometry after unloading, with metrology uncertainty stated.
+3. **Stiffness retention:** pressure–deformation curve before and after the prescribed cycle; record stiffness degradation and hysteresis.
+4. **Damage / leakage:** delamination or matrix damage inspection, joint movement, fiber breakage, seal leakage and ingress rate.
+5. **Capacity retention:** repeat the qualified structural capacity analysis/test after cycling. Shape recovery does not imply retained buckling capacity.
+6. **Repeatability:** repeat across independently manufactured specimens, not just multiple cycles on one unusually good sample.
+7. **Environment:** repeat under declared temperature, moisture, aging, UV/thermal-cycle and impact/damage conditions relevant to service.
+
+The acceptance thresholds are **not yet chosen**. They must be based on geometry tolerances, seal requirements and an independently justified structural safety case before test results are exposed. A sudden snap-through or unstable post-buckling event is a failure mode, not an acceptable way to flex and rebound. An evacuated-shell test can involve catastrophic implosion; subscale pressure tests require a suitably rated chamber, remote operation, exclusion controls and a separately approved test plan.
+
+### Design-of-experiments matrix for Symthaea
+
+Do not optimize on “material strength” as a single number. Freeze a testable candidate matrix with factors such as:
+
+- **Architecture:** bonded skin; detached tension membrane; lattice-core sandwich; graded hybrid.
+- **Fiber/textile architecture:** unidirectional laminate baseline; quasi-isotropic layup; woven/3D-woven/through-thickness reinforcement.
+- **Matrix/joining:** qualified thermoset baseline versus a candidate thermoplastic/joining process.
+- **Support span:** membrane panel span and node spacing.
+- **Member geometry:** section area, second moment of area, effective length, curvature and member frequency.
+- **Joint mass/stiffness:** rotational stiffness, manufacturing tolerance, eccentricity and defect classes.
+- **Imperfections:** frozen measured or statistically bounded geometric deviations, missing/under-performing members, joint compliance and local seal defects.
+- **Load histories:** proof cycles, subcritical repeated cycles, thermal cycling, and separately qualified impact/damage cases.
+
+For each sample, the objective vector should include total structural-system mass, target payload allowance, buckling margin under imperfection-sensitive nonlinear analysis, peak and residual deformation, damage/leakage, fatigue/creep, inspectability, repairability and manufacturing burden. Keep hard safety gates separate from cost/performance objectives.
+
+### Why these choices are evidence-based, but not yet proven for this vessel
+
+- The 2026 kenemostat work models a geodesic frame, a bonded/stiffened sealing skin and a detached tension-membrane variant. It discusses both member and global buckling and identifies joint/manufacturing/dynamic-load limitations: [Aerospace Science and Technology, DOI 10.1016/j.ast.2026.112799](https://doi.org/10.1016/j.ast.2026.112799).
+- Wang et al. analyze 3D-woven composite spherical shells under external hydrostatic pressure with multi-scale modelling; their results identify weave architecture and initial defects as consequential: [Journal of Industrial Textiles, DOI 10.1177/1528083720981999](https://doi.org/10.1177/1528083720981999).
+- A review of thermoplastic-composite resistance welding explains routes for joining composite substructures and continuing issues with process control and NDT: [Materials 2024, DOI 10.3390/ma17194797](https://doi.org/10.3390/ma17194797).
+- Aerospace self-healing-composite reviews show promising mechanisms for cracks and interlaminar damage but describe specific trigger, efficiency and implementation limitations; healing should not be equated with restored collapse resistance: [Materials 2022, DOI 10.3390/ma15238521](https://doi.org/10.3390/ma15238521).
+
 ## New first-pass improvement: bound the envelope's allowable areal mass
 
 For a spherical pressure boundary with reference radius `R), the idealized outer area and enclosed volume are:
