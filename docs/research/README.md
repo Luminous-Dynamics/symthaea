@@ -336,3 +336,11 @@ Open an issue on GitHub for research discussions.
 
 - [Resilient Systems Feasibility Portfolio](./RESILIENT_SYSTEMS_FEASIBILITY_PORTFOLIO.md) — seven linked feasibility studies covering self-repairing structures, heavy-cargo transport, a 100-person/two-year settlement, first lunar industry, community microfactories, supply-network disruptions, and minimum viable civilization.
 - [Machine-readable screening baseline](./resilient_systems_baseline.json) — explicit scenario assumptions, computed settlement baselines, shared metrics, and stress-test definitions. Values are screening assumptions, not validated requirements.
+
+
+## Resilience and service continuity benchmarks
+
+- [Resilient Systems Feasibility Portfolio](./RESILIENT_SYSTEMS_FEASIBILITY_PORTFOLIO.md) — linked seven-study research program and implementation roadmap.
+- [Resilient Systems Benchmarks](./RESILIENT_SYSTEMS_BENCHMARKS.md) — proposed benchmark levels B0–B5, negative controls, scenario matrix RS-01–RS-14, and calibration gates.
+- [Machine-readable assumptions](./resilient_systems_baseline.json) — scenario assumptions and common metric schema.
+- [Rust service-continuity screening module](../../crates/domains/symthaea-engineering/src/resilient_service_screening.rs) — deterministic dependency/outage/recovery abstraction with unit tests; not calibrated for real-world prediction.
