@@ -74,3 +74,26 @@ The OC22 paper reports 62,331 DFT relaxations and approximately 9,854,504 single
 ## 6. Why total energy is only the first pipeline target
 
 OC22 IS2RE-Total is a tractable starting point for verifying structural inputs, labels, splits, and label-acquisition evaluation. **Raw total energies across different compositions and system sizes must not be interpreted as a direct measure of catalyst quality.** The first benchmark is total-energy prediction under fixed label budgets only. A later benchmark using an adsorption-energy or reaction-specific target must be separately preregistered before claiming the system improves catalyst ranking or discovery.
+
+
+## 7. Alternative hosted ColabFit representation (not admitted)
+
+Admission research identified an OC22 collection on ColabFit Exchange / Hugging Face:
+- [OC22 collection](https://huggingface.co/colabfit/collections)
+- [IS2RE train](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Train)
+- [IS2RE validation in-domain](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Validation-in-domain)
+- [IS2RE validation out-of-domain](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Validation-out-of-domain)
+
+The visible cards say CC BY 4.0 and expose a ColabFit/Parquet representation with energies, forces, structures and metadata. Their reported scale differs materially from the official compact LMDB benchmark: the train card reports about 7.24 million rows / 30.6 GB, and the out-of-domain validation card about 521 thousand rows / 2.04 GB, compared with ~62K systems and a 109 MB compressed official IS2RE-Total/IS2RS archive.
+
+Therefore this path is a **candidate alternate representation**, not a verified mirror or a drop-in replacement. The row-count difference could reflect configuration/trajectory-level records, but the exact interpretation must come from file metadata and source mapping. No files, rows, or labels were downloaded or independently verified as part of this source audit.
+
+Before admitting any ColabFit data:
+1. Freeze the exact dataset revision and every downloaded Parquet file's byte size and SHA-256; preserve uploader/processing provenance, license text and attribution.
+2. Trace configurations back to source OC22 system identifiers (sid / lmdb-system-id) and establish which rows represent initial structures, relaxed targets, trajectory frames, or S2EF records.
+3. Reconcile official train, validation-ID and validation-OOD membership; do not derive it from a label string alone.
+4. Check whether an official test partition exists in this representation. The collection currently surfaced here lists train and two validation sets, not a test set; this is not evidence that hidden test labels are available.
+5. Count configurations and unique systems separately and audit duplicates, trajectory-family leakage, units, missing values and structure/label alignment.
+6. Where original access becomes available, compare a deterministic sample against records parsed by the pinned FairChem source reader. If exact task/split semantics cannot be established, keep this as a separate exploratory dataset with a separate contract and do not combine its scores with official OC22 results.
+
+This discovery adds a possible retrieval/conversion route, but the canonical admission state remains not_downloaded and no benchmark is authorized.
