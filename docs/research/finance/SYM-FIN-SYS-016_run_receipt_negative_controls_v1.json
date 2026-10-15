@@ -175,6 +175,20 @@
       "pointer": "/metrics/0/dimension",
       "replacement_value": "distribution",
       "validation_layer": "semantic_check"
+    },
+    {
+      "id": "SRC-SEM-015",
+      "validation_layer": "semantic_check",
+      "description": "The receipt's artifact-manifest digest does not match the exact manifest bytes.",
+      "pointer": "/run/artifact_manifest_digest",
+      "replacement_value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "SRC-SEM-016",
+      "validation_layer": "semantic_check",
+      "description": "A digest-shaped input value differs from the value bound by the artifact manifest.",
+      "pointer": "/run/environment_digest",
+      "replacement_value": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
     }
   ]
 }
