@@ -1285,11 +1285,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_lsh_candidates_propagate_row_decode_errors() {
+    #[tokio::test]
+    async fn test_lsh_candidates_propagate_row_decode_errors() {
         let db = SqliteMemory::in_memory().unwrap();
         let record = make_record("lsh-corrupt", 46, MemoryType::Episodic);
-        db.store_batch_sync(std::slice::from_ref(&record)).unwrap();
+        // The async store creates the LSH rows that this corruption fixture targets.
+        db.store(record.clone()).await.unwrap();
         let hashes = SqliteMemory::lsh_band_hashes(&record.encoding);
         {
             let conn = db.conn.lock().unwrap();
