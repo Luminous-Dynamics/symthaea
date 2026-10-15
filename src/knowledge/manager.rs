@@ -1396,6 +1396,61 @@ mod tests {
     }
 
     #[test]
+    fn test_new_falls_back_without_writing_to_unreadable_database() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_fallback_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[super::super::persistence::FactRecord {
+                vector_bytes: vec![0u8; 2048],
+                source_text: "preserve this record".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_facts SET confidence = ?1",
+            rusqlite::params!["not-a-number"],
+        )
+        .unwrap();
+        drop(conn);
+
+        let mut manager = KnowledgeManager::new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..KnowledgeManagerConfig::default()
+        });
+        assert!(
+            manager.persistence.is_none(),
+            "compatibility fallback must not keep the unreadable database writable"
+        );
+
+        manager.process("Iran caused sanctions to escalate.", 1);
+        manager.persist_snapshot();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let row_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_facts", [], |row| row.get(0))
+            .unwrap();
+        let confidence: String = conn
+            .query_row("SELECT confidence FROM knowledge_facts LIMIT 1", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(row_count, 1, "fallback must not write a partial snapshot");
+        assert_eq!(confidence, "not-a-number", "fallback must preserve unreadable source state");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_basic_process() {
         let mut mgr = KnowledgeManager::default();
         mgr.bootstrap_entities();
