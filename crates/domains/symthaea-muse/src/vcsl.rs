@@ -1150,39 +1150,49 @@ fn sample_directory_evidence_cached(
     } else {
         sample_subdir(instrument)
     };
-    let Some(mapping) = mapping else {
+    let Some((source, relative_directory)) = mapping else {
         return Ok(None);
     };
-    let key = (mapping.0, mapping.1.to_owned(), hash_indexed_samples);
-    if let Some(cached) = cache.get(&key) {
+    Ok(Some(sample_directory_evidence_cached_for_mapping(
+        source,
+        relative_directory,
+        vcsl_root,
+        vsco2_root,
+        hash_indexed_samples,
+        cache,
+    )?))
+}
+
+fn sample_directory_evidence_cached_for_mapping(
+    source: SampleSource,
+    relative_directory: &str,
+    vcsl_root: &Path,
+    vsco2_root: &Path,
+    hash_indexed_samples: bool,
+    cache: &mut HashMap<(SampleSource, String, bool), Option<SampleDirectoryEvidenceV1>>,
+) -> std::io::Result<SampleDirectoryEvidenceV1> {
+    let key = (source, relative_directory.to_owned(), hash_indexed_samples);
+    if let Some(Some(cached)) = cache.get(&key) {
         return Ok(cached.clone());
     }
-    let evidence = sample_directory_evidence(
-        instrument,
-        short_articulation,
+    let evidence = sample_directory_evidence_for_mapping(
+        source,
+        relative_directory,
         vcsl_root,
         vsco2_root,
         hash_indexed_samples,
     )?;
-    cache.insert(key, evidence.clone());
+    cache.insert(key, Some(evidence.clone()));
     Ok(evidence)
 }
 
-fn sample_directory_evidence(
-    instrument: Instrument,
-    short_articulation: bool,
+fn sample_directory_evidence_for_mapping(
+    source: SampleSource,
+    relative_directory: &str,
     vcsl_root: &Path,
     vsco2_root: &Path,
     hash_indexed_samples: bool,
-) -> std::io::Result<Option<SampleDirectoryEvidenceV1>> {
-    let mapping = if short_articulation {
-        staccato_subdir(instrument)
-    } else {
-        sample_subdir(instrument)
-    };
-    let Some((source, relative_directory)) = mapping else {
-        return Ok(None);
-    };
+) -> std::io::Result<SampleDirectoryEvidenceV1> {
     let source_name = match source {
         SampleSource::Vcsl => "vcsl",
         SampleSource::Vsco2 => "vsco2_ce",
@@ -1277,7 +1287,7 @@ fn sample_directory_evidence(
             .collect::<std::collections::HashSet<_>>()
             .len()
     });
-    Ok(Some(SampleDirectoryEvidenceV1 {
+    Ok(SampleDirectoryEvidenceV1 {
         source_library: source_name,
         relative_directory: relative_directory.to_owned(),
         directory_present,
@@ -1297,7 +1307,7 @@ fn sample_directory_evidence(
         silent_sample_file_count: audio_audit.silent_sample_file_count,
         distinct_sample_rate_count: audio_audit.sample_rates.len(),
         distinct_channel_count: audio_audit.channel_counts.len(),
-    }))
+    })
 }
 
 /// Hash the sorted filename/size/content records for indexable samples. File
