@@ -20,6 +20,21 @@ SCHEMA_PATH = DOCS / "SYM-FIN-SYS-016_run_receipt_v1.schema.json"
 FIXTURE_PATH = DOCS / "SYM-FIN-SYS-016_run_receipt_example_v1.json"
 NEGATIVE_PATH = DOCS / "SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json"
 
+EXPECTED_NEGATIVE_CORPUS_SCHEMA = (
+    "civos.socioeconomic_interoperability.run_receipt_negative_controls.v1"
+)
+EXPECTED_NEGATIVE_CONTROL_LAYERS = {
+    **{f"SRC-NEG-{number:03d}": "json_schema" for number in range(1, 11)},
+    **{f"SRC-SEM-{number:03d}": "semantic_check" for number in range(1, 11)},
+}
+EXPECTED_NEGATIVE_CONTROL_FIELDS = {
+    "id",
+    "description",
+    "pointer",
+    "replacement_value",
+    "validation_layer",
+}
+
 
 class ValidationFailure(Exception):
     pass
@@ -103,10 +118,12 @@ def set_json_pointer(document: Any, pointer: str, replacement: Any) -> None:
     cursor = document
     for piece in pieces[:-1]:
         if isinstance(cursor, list):
-            try:
-                cursor = cursor[int(piece)]
-            except (ValueError, IndexError) as exc:
-                raise ValidationFailure(f"negative control pointer does not resolve: {pointer}") from exc
+            if not piece.isdecimal():
+                raise ValidationFailure(f"negative control array index is not a non-negative integer: {pointer}")
+            index = int(piece)
+            if index >= len(cursor):
+                raise ValidationFailure(f"negative control array index is out of range: {pointer}")
+            cursor = cursor[index]
         elif isinstance(cursor, dict) and piece in cursor:
             cursor = cursor[piece]
         else:
@@ -114,10 +131,12 @@ def set_json_pointer(document: Any, pointer: str, replacement: Any) -> None:
 
     leaf = pieces[-1]
     if isinstance(cursor, list):
-        try:
-            cursor[int(leaf)] = replacement
-        except (ValueError, IndexError) as exc:
-            raise ValidationFailure(f"negative control leaf does not resolve: {pointer}") from exc
+        if not leaf.isdecimal():
+            raise ValidationFailure(f"negative control array leaf is not a non-negative integer: {pointer}")
+        index = int(leaf)
+        if index >= len(cursor):
+            raise ValidationFailure(f"negative control array leaf is out of range: {pointer}")
+        cursor[index] = replacement
     elif isinstance(cursor, dict):
         cursor[leaf] = replacement
     else:
@@ -146,10 +165,37 @@ def main() -> int:
             print(f"  - {error}")
         return 1
 
-    cases = negative_corpus.get("cases")
-    if not isinstance(cases, list) or not cases:
-        print("FAIL: negative control corpus is empty or malformed")
+    if not isinstance(negative_corpus, dict):
+        print("FAIL: negative control corpus root must be an object")
         return 1
+
+    expected_metadata = {
+        "schema": EXPECTED_NEGATIVE_CORPUS_SCHEMA,
+        "status": "research_fixture",
+        "base_fixture": FIXTURE_PATH.name,
+    }
+    metadata_failures = [
+        f"{field}: expected {expected!r}, got {negative_corpus.get(field)!r}"
+        for field, expected in expected_metadata.items()
+        if negative_corpus.get(field) != expected
+    ]
+    if metadata_failures:
+        print("FAIL: negative control corpus metadata:")
+        for failure in metadata_failures:
+            print(f"  - {failure}")
+        return 1
+
+    cases = negative_corpus.get("cases")
+    if not isinstance(cases, list):
+        print("FAIL: negative control corpus cases must be an array")
+        return 1
+
+    if len(cases) != len(EXPECTED_NEGATIVE_CONTROL_LAYERS):
+        print(
+            "FAIL: negative control corpus size changed: "
+            f"expected {len(EXPECTED_NEGATIVE_CONTROL_LAYERS)}, got {len(cases)}"
+        )
+        # Continue inspecting entries to report missing/unknown/duplicate IDs as well.
 
     seen_case_ids: set[str] = set()
     failures: list[str] = []
@@ -157,11 +203,45 @@ def main() -> int:
     checked_semantic = 0
 
     for case in cases:
-        case_id = case.get("id", "<missing-id>")
+        if not isinstance(case, dict):
+            failures.append("negative control entry must be an object")
+            continue
+
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or not case_id:
+            failures.append("negative control is missing a non-empty string ID")
+            continue
         if case_id in seen_case_ids:
             failures.append(f"{case_id}: duplicate case ID")
             continue
         seen_case_ids.add(case_id)
+
+        expected_layer = EXPECTED_NEGATIVE_CONTROL_LAYERS.get(case_id)
+        if expected_layer is None:
+            failures.append(f"{case_id}: unexpected control ID; update the versioned corpus intentionally")
+            continue
+
+        missing_fields = EXPECTED_NEGATIVE_CONTROL_FIELDS - set(case)
+        extra_fields = set(case) - EXPECTED_NEGATIVE_CONTROL_FIELDS
+        if missing_fields or extra_fields:
+            if missing_fields:
+                failures.append(f"{case_id}: missing fields {sorted(missing_fields)}")
+            if extra_fields:
+                failures.append(f"{case_id}: unexpected fields {sorted(extra_fields)}")
+            continue
+
+        if not isinstance(case["description"], str) or not case["description"].strip():
+            failures.append(f"{case_id}: description must be a non-empty string")
+            continue
+        if not isinstance(case["pointer"], str) or not case["pointer"].startswith("/"):
+            failures.append(f"{case_id}: pointer must be an absolute JSON Pointer")
+            continue
+        layer = case["validation_layer"]
+        if layer != expected_layer:
+            failures.append(
+                f"{case_id}: expected validation layer {expected_layer!r}, got {layer!r}"
+            )
+            continue
 
         mutated = copy.deepcopy(fixture)
         try:
@@ -170,13 +250,12 @@ def main() -> int:
             failures.append(f"{case_id}: {exc}")
             continue
 
-        layer = case.get("validation_layer")
         errors = schema_errors(validator, mutated)
         if layer == "json_schema":
             checked_schema += 1
             if not errors:
                 failures.append(f"{case_id}: invalid mutation unexpectedly passed JSON Schema")
-        elif layer == "semantic_check":
+        else:
             checked_semantic += 1
             if errors:
                 failures.append(f"{case_id}: semantic control was already rejected at schema layer: {errors[0]}")
@@ -184,8 +263,17 @@ def main() -> int:
                 found = semantic_errors(mutated)
                 if not found:
                     failures.append(f"{case_id}: invalid mutation unexpectedly passed semantic checks")
-        else:
-            failures.append(f"{case_id}: unknown validation_layer {layer!r}")
+
+    missing_ids = set(EXPECTED_NEGATIVE_CONTROL_LAYERS) - seen_case_ids
+    if missing_ids:
+        failures.append(f"missing required control IDs: {sorted(missing_ids)}")
+
+    # Enforce the intended split as well as per-ID layer assignments so the suite
+    # cannot become smaller or silently move semantic cases into JSON Schema.
+    if checked_schema != 10:
+        failures.append(f"expected 10 schema-level controls to be checked, got {checked_schema}")
+    if checked_semantic != 10:
+        failures.append(f"expected 10 semantic controls to be checked, got {checked_semantic}")
 
     if failures:
         print("FAIL: run receipt negative controls:")
@@ -195,7 +283,8 @@ def main() -> int:
 
     print(
         "PASS: schema definition valid; positive fixture valid; "
-        f"{checked_schema} schema-level and {checked_semantic} semantic negative controls rejected."
+        f"{checked_schema} schema-level and {checked_semantic} semantic negative controls rejected; "
+        "required v1 control IDs and corpus metadata intact."
     )
     print("Claim boundary: synthetic deterministic research fixture only; no production or economic effects.")
     return 0
