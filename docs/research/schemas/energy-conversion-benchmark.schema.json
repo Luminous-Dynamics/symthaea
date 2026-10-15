@@ -567,7 +567,8 @@
         "minimum_superiority_margin",
         "baseline_id",
         "selection_rule",
-        "search_started_at"
+        "search_started_at",
+        "comparison_metric_id"
       ],
       "properties": {
         "policy_id": {
@@ -608,6 +609,10 @@
         "search_started_at": {
           "type": "string",
           "format": "date-time"
+        },
+        "comparison_metric_id": {
+          "const": "net_cycle_efficiency",
+          "description": "Metric implemented by benchmark contract v1. Other metrics (e.g. heat-pump COP, specific fuel consumption, thrust-specific metrics) require their own registered metric definition and comparison implementation."
         }
       }
     }
