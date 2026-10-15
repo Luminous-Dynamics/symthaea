@@ -2305,7 +2305,8 @@ mod tests {
             .as_deref()
             .unwrap();
         assert_ne!(
-            first_hash, changed_hash,
+            first_hash.as_str(),
+            changed_hash,
             "content manifest must catch same-size audio changes"
         );
         assert_eq!(
