@@ -80,7 +80,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 /// fills VCSL's biggest gap: the orchestral LEAD instruments — solo violin,
 /// cello section, flute, clarinet, trumpet — the most exposed voices in
 /// most ensembles.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum SampleSource {
     Vcsl,
     Vsco2,
@@ -741,14 +741,26 @@ pub fn capability_inventory_with_fluidsynth(
     let vcsl_evidence = asset_root_evidence(vcsl_root)?;
     let vsco2_evidence = asset_root_evidence(vsco2_root)?;
     let soundfont = soundfont_path.map(soundfont_evidence).transpose()?;
+    let mut sample_directory_cache =
+        HashMap::<(SampleSource, String), Option<SampleDirectoryEvidenceV1>>::new();
     let instruments = INSTRUMENTS
         .iter()
         .copied()
         .map(|instrument| {
-            let sustained_samples =
-                sample_directory_evidence(instrument, false, vcsl_root, vsco2_root);
-            let short_articulation_samples =
-                sample_directory_evidence(instrument, true, vcsl_root, vsco2_root);
+            let sustained_samples = sample_directory_evidence_cached(
+                instrument,
+                false,
+                vcsl_root,
+                vsco2_root,
+                &mut sample_directory_cache,
+            );
+            let short_articulation_samples = sample_directory_evidence_cached(
+                instrument,
+                true,
+                vcsl_root,
+                vsco2_root,
+                &mut sample_directory_cache,
+            );
             let soundfont_bank0_program_matches = soundfont.as_ref().map(|evidence| {
                 evidence
                     .preset_inventory
@@ -808,6 +820,27 @@ fn procedural_renderer_path(instrument: Instrument) -> &'static str {
     } else {
         "additive"
     }
+}
+
+fn sample_directory_evidence_cached(
+    instrument: Instrument,
+    short_articulation: bool,
+    vcsl_root: &Path,
+    vsco2_root: &Path,
+    cache: &mut HashMap<(SampleSource, String), Option<SampleDirectoryEvidenceV1>>,
+) -> Option<SampleDirectoryEvidenceV1> {
+    let mapping = if short_articulation {
+        staccato_subdir(instrument)
+    } else {
+        sample_subdir(instrument)
+    }?;
+    let key = (mapping.0, mapping.1.to_owned());
+    if let Some(cached) = cache.get(&key) {
+        return cached.clone();
+    }
+    let evidence = sample_directory_evidence(instrument, short_articulation, vcsl_root, vsco2_root);
+    cache.insert(key, evidence.clone());
+    evidence
 }
 
 fn sample_directory_evidence(
