@@ -67,6 +67,10 @@ A preferred experiment must try to distinguish the favored design from its best 
 
 Physical experiments require an approved protocol, trained operators, calibrated instrumentation, safety interlocks, abort criteria, raw-data retention, and independent review. Model-based experiment ranking must never bypass ordinary engineering controls.
 
+## Acceptance targets and fair comparison
+
+Use the staged acceptance targets in [ENERGY_CONVERSION_BENCHMARK_TARGETS.md](ENERGY_CONVERSION_BENCHMARK_TARGETS.md). In particular, compare Phase A against random and deterministic space-filling baselines under equal resource budgets and paired held-out scenarios. Report decision regret, budget to a correct registered decision, false-feasible and false-superiority rates, calibration when predictive distributions exist, selection robustness, and replay/audit completeness. The proposed 20%/25% cost-regret goals are targets to test, not established results or universal standards.
+
 ## Evaluation of the experiment selector
 
 Before using Symthaea's selector to guide real R&D, compare it against the deterministic queue and random/space-filling baselines under identical budgets. Report:
