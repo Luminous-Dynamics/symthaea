@@ -79,12 +79,34 @@ Symthaea may contribute:
 
 It must not silently turn an HDC distance, Phi metric, confidence score, fluent explanation, or consensus into a physical property, novelty finding, safety assessment, or evidence grade. Temporal models may analyze actual time-series or trajectory data only when the target and evaluation are specified; they do not replace molecular dynamics.
 
+### Current Symthaea materials modules: suitability gate
+
+The source-level review for [NANO-001B #7460](https://github.com/Luminous-Dynamics/symthaea/issues/7460) found that the existing materials modules are useful in their present domain but are not yet an atomistic OC22 representation/predictor:
+
+| Existing module | What current source implements | Permitted role in NANO-001 | Explicit non-claim |
+|---|---|---|---|
+| `symthaea-materials::MaterialHdcEncoder` | Maps eight normalized bulk engineering property values into a 16,384D HDC vector | Bulk-material metadata similarity where those properties exist and are measured/qualified | Not an atomistic structure encoder; it does not encode atom coordinates, periodic cells, adsorbate geometry, or local atomic environments |
+| `MaterialAgingModel` | Evolves an HDC state and sets `remaining_strength` from state similarity | No use as a physical strength or energy oracle until calibrated against independent outcomes | HDC state similarity is not measured retained strength and does not predict OC22 DFT energy |
+| `symthaea-psych-bench::MaterialsDesign` | Checks property ordering and similarity across a small set of bulk-material presets | May remain a bulk-property/similarity smoke test with its declared scope | Does not establish atomistic accuracy, catalyst ranking, novelty, or synthesis success |
+| `symthaea-quantum-chemistry` | Source documents Gaussian-basis molecular integrals, Hartree–Fock, and a limited LDA molecular DFT path | Candidate for separate method-specific capability review | No source evidence found in the audited public interface that qualifies it for periodic OC22 oxide-slab calculations or reproduces OC22 calculation settings |
+
+References audited at source snapshot `b9af191f380d635f0459b24284c1d1fd6a5516aa`:
+- [Material encoder](https://github.com/Luminous-Dynamics/symthaea/blob/b9af191f380d635f0459b24284c1d1fd6a5516aa/crates/domains/symthaea-materials/src/encoder.rs)
+- [Bulk property schema](https://github.com/Luminous-Dynamics/symthaea/blob/b9af191f380d635f0459b24284c1d1fd6a5516aa/crates/domains/symthaea-materials/src/properties.rs)
+- [Aging output](https://github.com/Luminous-Dynamics/symthaea/blob/b9af191f380d635f0459b24284c1d1fd6a5516aa/crates/domains/symthaea-materials/src/aging.rs)
+- [Bulk material benchmark](https://github.com/Luminous-Dynamics/symthaea/blob/b9af191f380d635f0459b24284c1d1fd6a5516aa/crates/domains/symthaea-psych-bench/src/benchmarks/science/materials_design.rs)
+- [Quantum chemistry module overview](https://github.com/Luminous-Dynamics/symthaea/blob/b9af191f380d635f0459b24284c1d1fd6a5516aa/crates/domains/symthaea-quantum-chemistry/src/lib.rs)
+
+Therefore, NANO-001 must not simply feed OC22 rows to the current bulk-material encoder and call that atomistic selection. The first useful integration should preserve atomistic structure/label identity through a pinned upstream data reader, reproduce a compatible reference baseline, and then test an atomistic representation whose units, periodicity, element handling, and symmetries are independently checked. HDC may contribute metadata retrieval, grouping, or candidate-diversity logic if those semantics are supported; any HDC atomistic encoder is a new research hypothesis and must earn its role against appropriate baselines.
+
+The OC22 source documents a mapping from system IDs to metadata including `bulk_id`, `bulk_symbols`, `miller_index`, `traj_id`, `slab_sid`, `ads_symbols`, and `nads`. When fields are present, use them to audit related-system grouping and possible train/test leakage. Missing mapping fields must stay missing—not be inferred from unrelated examples.
+
 ### Scientific engines — atomistic calculations and reference labels
 
 Use established, version-pinned external tools and datasets for calculations that need chemistry-specific physics. Depending on the exact question, the eventual toolchain may involve density-functional theory, established machine-learned interatomic potentials, molecular dynamics, or a materials data service. The selected method must document its approximation, parameterization, supported chemistry, and applicability domain.
 
 Possible tooling to evaluate—not dependencies chosen by this proposal:
-- [Open Catalyst Project / OC22](https://opencatalystproject.org/) is the frozen first data-admission target for relaxed total-energy label-efficiency; [OC20](https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/datasets/oc20.md) is a later, separate adsorption-energy benchmark.
+- [Open Catalyst Project / OC22](https://opencatalystproject.org/) is the frozen first data-admission target for relaxed total-energy label-efficiency; [OC20](https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/datasets/oc20.md) is a later, separate adsorption-energy benchmark. The [OC22 dataset paper](https://doi.org/10.1021/acscatal.2c05426) reports 62,331 DFT relaxations and approximately 9.85 million single-point calculations; these are calculations/relaxations, not 9.85 million independent candidates.
 - [LAMMPS](https://docs.lammps.org/stable/) for supported molecular/materials dynamics with declared interatomic potentials.
 - [Atomic Simulation Environment (ASE)](https://docs.ase-lib.org/) as a research environment for setting up atomistic calculations and invoking calculators.
 - DFT engines such as Quantum ESPRESSO or CP2K if the target study, license, and compute budget justify them.
@@ -285,6 +307,7 @@ Never describe a queued CI job as passed. Never claim compilation or tests that 
 3. FairChem OC22 dataset documentation at source commit `57c71322d5a5be0a0fcdcf05592e1699b120dc79`: https://github.com/facebookresearch/fairchem/blob/57c71322d5a5be0a0fcdcf05592e1699b120dc79/docs/catalysts/datasets/oc22.md
 4. Open Catalyst Dataset repository, dataset workflow and separate tooling license: https://github.com/Open-Catalyst-Project/Open-Catalyst-Dataset
 5. OC22 data license as reported by upstream: Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
+6. Tran et al. (2023), *The Open Catalyst 2022 (OC22) Dataset and Challenges for Oxide Electrocatalysts*, ACS Catalysis 13(5), 3066–3084: https://doi.org/10.1021/acscatal.2c05426
 6. FairChem OC20 documentation for the later adsorption-energy benchmark: https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/datasets/oc20.md
 7. NIST, *Nanotechnology Measurement Protocols* (updated 13 July 2026): https://www.nist.gov/mml/nanotechnology-measurement-protocols
 8. Ren et al., *Autonomous experiments using active learning and AI*, Nature Reviews Materials (2023): https://www.nature.com/articles/s41578-023-00588-4
