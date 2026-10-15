@@ -202,7 +202,7 @@ These are baselines to reproduce and learn from, not evidence that Symthaea alre
 
 ### B3. A concrete first pilot
 
-**Pilot:** a read-only track-geometry deterioration benchmark with maintenance-history covariates.
+**Pilot:** a read-only track-geometry deterioration benchmark with maintenance-history covariates. Execution is tracked separately in [TRANSPORT-RAIL-001A #7452](https://github.com/Luminous-Dynamics/symthaea/issues/7452) under the canonical rail owner #6248; this research note is not a duplicate implementation spec or split engine.
 
 Inputs:
 - exact segment/chainage or stable pseudonymous location ID;
@@ -303,6 +303,8 @@ Do not start a biological concrete pilot in a critical sleeper, turnout, bridge 
 3. “State-of-the-art review on self-healing in mortar, concrete, and composites” (2024). https://doi.org/10.1016/j.cscm.2024.e03298
 4. FHWA, “Internally Curing Concrete Produces EPIC² Results” (2023). https://www.fhwa.dot.gov/innovation/innovator/issue98/page_01.html
 5. FHWA, “Enhance Concrete Performance with Internal Curing” (2025). https://www.fhwa.dot.gov/innovation/innovator/issue103/page_06.html
+6. “Effect of bacteria on uncracked concrete mechanical properties correlated with damage self-healing efficiency — A critical review” (2024), *Developments in the Built Environment*, 17, 100301. https://doi.org/10.1016/j.dibe.2023.100301
+   This review reinforces that intact-material mechanical performance must be evaluated alongside post-crack healing; a candidate that seals cracks but degrades the uncracked matrix is not an acceptable improvement.
 
 ### Biosafety and environmental persistence
 
