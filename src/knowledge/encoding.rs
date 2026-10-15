@@ -330,6 +330,52 @@ mod tests {
     }
 
     #[test]
+    fn test_multiple_entities_can_share_a_semantic_role() {
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let mut role_map = HashMap::new();
+        role_map.insert("Alice".to_string(), SemanticRole::Agent);
+        role_map.insert("Bob".to_string(), SemanticRole::Agent);
+        role_map.insert("Project".to_string(), SemanticRole::Patient);
+
+        let fact = ExtractedFact {
+            entities: vec![
+                ExtractedEntity {
+                    text: "Alice".into(),
+                    entity_type: EntityType::Person,
+                    confidence: 0.95,
+                    offset: 0,
+                },
+                ExtractedEntity {
+                    text: "Bob".into(),
+                    entity_type: EntityType::Person,
+                    confidence: 0.93,
+                    offset: 10,
+                },
+                ExtractedEntity {
+                    text: "Project".into(),
+                    entity_type: EntityType::Artifact,
+                    confidence: 0.91,
+                    offset: 20,
+                },
+            ],
+            relations: Vec::new(),
+            role_map,
+            source_text: "Alice and Bob worked on Project.".into(),
+            confidence: 0.9,
+        };
+
+        let encoding = encoder.encode_fact(&fact);
+        assert_eq!(encoding.role_vectors.len(), 3);
+        assert_eq!(
+            encoding.role_vectors.iter().map(|binding| binding.entity_text.as_str()).collect::<Vec<_>>(),
+            vec!["Alice", "Bob", "Project"]
+        );
+        assert_eq!(encoding.role_vectors[0].role, SemanticRole::Agent);
+        assert_eq!(encoding.role_vectors[1].role, SemanticRole::Agent);
+        assert_eq!(encoding.role_vectors[2].role, SemanticRole::Patient);
+    }
+
+    #[test]
     fn test_compositional_query() {
         let mut encoder = KnowledgeEncoder::with_seed(42);
 
