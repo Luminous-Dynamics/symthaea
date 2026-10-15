@@ -1110,6 +1110,58 @@ mod tests {
     }
 
     #[test]
+    fn test_role_observation_search_distinguishes_entity_types() {
+        use crate::knowledge::encoding::RoleBoundVector;
+        use crate::knowledge::extraction::EntityType;
+
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let place_query = encoder.encode_role_terms(&[(
+            SemanticRole::Patient,
+            "Mercury",
+            EntityType::Place,
+        )]);
+        let organization_query = encoder.encode_role_terms(&[(
+            SemanticRole::Patient,
+            "Mercury",
+            EntityType::Organization,
+        )]);
+
+        assert_eq!(place_query[0].entity_text, organization_query[0].entity_text);
+        assert_eq!(place_query[0].role, organization_query[0].role);
+        assert!(
+            place_query[0].vector.cosine_similarity(&organization_query[0].vector) < 0.1,
+            "the same surface text bound to different entity types should be distinguishable"
+        );
+
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let mut place_fact = make_encoding("Mercury the planet", 0.8);
+        place_fact.role_vector_observations = vec![RoleBoundVector {
+            role: SemanticRole::Patient,
+            entity_text: "Mercury".into(),
+            vector: place_query[0].vector,
+        }];
+        let (place_id, _) = graph.insert(place_fact, 1, None, false);
+
+        let mut organization_fact = make_encoding("Mercury the organization", 0.9);
+        organization_fact.role_vector_observations = vec![RoleBoundVector {
+            role: SemanticRole::Patient,
+            entity_text: "Mercury".into(),
+            vector: organization_query[0].vector,
+        }];
+        let (organization_id, _) = graph.insert(organization_fact, 2, None, false);
+
+        let place_results = graph.search_role_observations(&place_query, 10, 3);
+        assert_eq!(place_results.len(), 1);
+        assert_eq!(place_results[0].fact_id, place_id);
+        assert_ne!(place_results[0].fact_id, organization_id);
+
+        let organization_results = graph.search_role_observations(&organization_query, 10, 4);
+        assert_eq!(organization_results.len(), 1);
+        assert_eq!(organization_results[0].fact_id, organization_id);
+        assert_ne!(organization_results[0].fact_id, place_id);
+    }
+
+    #[test]
     fn test_empty_role_observation_query_returns_no_results() {
         let mut graph = EnhancedKnowledgeGraph::new(10);
         graph.insert(make_encoding("any fact", 0.8), 1, None, false);
