@@ -42,7 +42,8 @@ pub struct KnowledgePersistence {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoleVectorRecord {
     pub role: SemanticRole,
-    pub entity_text: String,
+    /// None denotes a legacy binding whose entity identity was not persisted.
+    pub entity_text: Option<String>,
     pub vector_bytes: Vec<u8>,
 }
 
@@ -1214,7 +1215,7 @@ impl KnowledgePersistence {
                 fact_row_id INTEGER NOT NULL,
                 ordinal INTEGER NOT NULL,
                 role_key TEXT NOT NULL,
-                entity_text TEXT NOT NULL DEFAULT '',
+                entity_text TEXT,
                 vector_blob BLOB NOT NULL,
                 PRIMARY KEY (fact_row_id, ordinal),
                 FOREIGN KEY (fact_row_id) REFERENCES knowledge_facts(id) ON DELETE CASCADE
@@ -1309,7 +1310,7 @@ impl KnowledgePersistence {
                 tx.execute(
                     "INSERT INTO knowledge_fact_role_bindings
                      (fact_row_id, ordinal, role_key, entity_text, vector_blob)
-                     VALUES (?1, ?2, ?3, '', ?4)",
+                     VALUES (?1, ?2, ?3, NULL, ?4)",
                     rusqlite::params![
                         fact_row_id,
                         current_ordinal,
@@ -1434,17 +1435,17 @@ mod tests {
             role_vectors: vec![
                 RoleVectorRecord {
                     role: SemanticRole::Agent,
-                    entity_text: "Alice".into(),
+                    entity_text: Some("Alice".into()),
                     vector_bytes: vec![0x5A; BinaryHV::BYTES],
                 },
                 RoleVectorRecord {
                     role: SemanticRole::Agent,
-                    entity_text: "Bob".into(),
+                    entity_text: Some("Bob".into()),
                     vector_bytes: vec![0xC3; BinaryHV::BYTES],
                 },
                 RoleVectorRecord {
                     role: SemanticRole::Patient,
-                    entity_text: "Project".into(),
+                    entity_text: Some("Project".into()),
                     vector_bytes: vec![0x3C; BinaryHV::BYTES],
                 },
             ],
@@ -1491,7 +1492,7 @@ mod tests {
             relations: Vec::new(),
             role_vectors: vec![RoleVectorRecord {
                 role: SemanticRole::Agent,
-                entity_text: "Alice".into(),
+                entity_text: Some("Alice".into()),
                 vector_bytes: vec![0x5A; BinaryHV::BYTES],
             }],
             graph_fact_id: Some(1),
@@ -1576,7 +1577,7 @@ mod tests {
         let loaded = persistence.load_facts().unwrap();
         assert_eq!(loaded[0].role_vectors.len(), 1);
         assert_eq!(loaded[0].role_vectors[0].role, SemanticRole::Agent);
-        assert_eq!(loaded[0].role_vectors[0].entity_text, "");
+        assert_eq!(loaded[0].role_vectors[0].entity_text, None);
         assert_eq!(loaded[0].role_vectors[0].vector_bytes, legacy_bytes);
 
         let conn = rusqlite::Connection::open(&db_path).unwrap();
