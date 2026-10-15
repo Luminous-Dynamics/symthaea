@@ -1445,7 +1445,11 @@ mod tests {
             .query_row("SELECT confidence FROM knowledge_facts LIMIT 1", [], |row| row.get(0))
             .unwrap();
         assert_eq!(row_count, 1, "fallback must not write a partial snapshot");
-        assert_eq!(confidence, "not-a-number", "fallback must preserve unreadable source state");
+        assert_eq!(
+            confidence, "not-a-number",
+            "fallback must preserve unreadable source state"
+        );
+        drop(conn);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
