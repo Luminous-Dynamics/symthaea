@@ -29,7 +29,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Check formatting
-        run: cargo fmt --manifest-path tools/nano-admission/Cargo.toml -- --check
+        run: cargo fmt --package nano-admission-verifier -- --check
       - name: Run fixture tests
         run: cargo test --locked -p nano-admission-verifier
       - name: Run Clippy
