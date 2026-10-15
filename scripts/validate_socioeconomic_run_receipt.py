@@ -40,12 +40,31 @@ class ValidationFailure(Exception):
     pass
 
 
+def reject_duplicate_object_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous JSON objects instead of accepting the last duplicate key."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValidationFailure(f"duplicate JSON object key: {key!r}")
+        result[key] = value
+    return result
+
+
+def reject_non_finite_constant(value: str) -> None:
+    """Python's decoder accepts NaN/Infinity extensions that are not JSON values."""
+    raise ValidationFailure(f"non-standard numeric constant is not permitted in JSON: {value}")
+
+
 def load_json(path: Path) -> Any:
     try:
         with path.open("r", encoding="utf-8") as handle:
-            return json.load(handle)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValidationFailure(f"{path.relative_to(ROOT)}: cannot load JSON: {exc}") from exc
+            return json.load(
+                handle,
+                object_pairs_hook=reject_duplicate_object_keys,
+                parse_constant=reject_non_finite_constant,
+            )
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValidationFailure) as exc:
+        raise ValidationFailure(f"{path}: cannot load strict JSON: {exc}") from exc
 
 
 def schema_errors(validator: Draft202012Validator, value: Any) -> list[str]:
