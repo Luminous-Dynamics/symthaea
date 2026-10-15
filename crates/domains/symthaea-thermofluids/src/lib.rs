@@ -14,6 +14,9 @@
 //!
 //! - [`fluids`]: Reynolds number & regime, Bernoulli head, Darcy-Weisbach head
 //!   loss, continuity.
+//! - [`checked`]: additive `Result`-returning wrappers that reject non-finite
+//!   inputs, invalid physical domains, and non-finite derived results. They
+//!   validate arithmetic domains, not real-world model applicability.
 //! - [`thermal`]: Carnot efficiency, Fourier conduction, Newton cooling, engine
 //!   work.
 //! - [`joule_heating`]: stateful lumped-conductor Joule heating with explicit
@@ -38,6 +41,7 @@
 //! assert!(cooled.energy_balance_residual_j.abs() < 1e-9);
 //! ```
 
+pub mod checked;
 pub mod fluids;
 pub mod joule_heating;
 pub mod thermal;
