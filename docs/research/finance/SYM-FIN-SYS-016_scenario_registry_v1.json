@@ -98,7 +98,9 @@
       "idle_capacity",
       "inventory_coverage",
       "bottleneck_severity",
-      "maintenance_backlog",
+      "maintenance_backlog"
+    ],
+    "ecological": [
       "ecological_overshoot"
     ],
     "distribution": [

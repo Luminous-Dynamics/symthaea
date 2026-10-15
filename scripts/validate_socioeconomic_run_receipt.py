@@ -29,7 +29,7 @@ EXPECTED_NEGATIVE_CORPUS_SCHEMA = (
 )
 EXPECTED_NEGATIVE_CONTROL_LAYERS = {
     **{f"SRC-NEG-{number:03d}": "json_schema" for number in range(1, 11)},
-    **{f"SRC-SEM-{number:03d}": "semantic_check" for number in range(1, 13)},
+    **{f"SRC-SEM-{number:03d}": "semantic_check" for number in range(1, 15)},
 }
 EXPECTED_NEGATIVE_CONTROL_FIELDS = {
     "id",
@@ -94,8 +94,35 @@ def schema_errors(validator: Draft202012Validator, value: Any) -> list[str]:
     return errors
 
 
+def build_metric_catalog(raw_metrics: Any) -> dict[str, str]:
+    """Validate the registry metric catalogue and map each metric ID to one dimension."""
+    if not isinstance(raw_metrics, dict) or not raw_metrics:
+        raise ValidationFailure("metrics must be a non-empty object")
+
+    catalog: dict[str, str] = {}
+    for dimension, metric_ids in raw_metrics.items():
+        if not isinstance(dimension, str) or not dimension.strip():
+            raise ValidationFailure("metric dimensions must be non-empty strings")
+        if not isinstance(metric_ids, list):
+            raise ValidationFailure(f"{dimension}: metric IDs must be an array")
+        if any(not isinstance(metric_id, str) or not metric_id.strip() for metric_id in metric_ids):
+            raise ValidationFailure(f"{dimension}: metric IDs must be non-empty strings")
+        if len(metric_ids) != len(set(metric_ids)):
+            raise ValidationFailure(f"{dimension}: duplicate metric ID")
+        for metric_id in metric_ids:
+            if metric_id in catalog:
+                raise ValidationFailure(
+                    f"metric ID {metric_id!r} is declared under multiple dimensions"
+                )
+            catalog[metric_id] = dimension
+    if not catalog:
+        raise ValidationFailure("metric catalogue must declare at least one metric ID")
+    return catalog
+
+
 def semantic_errors(
-    record: dict[str, Any], expected_registry_digest: str, known_scenario_ids: set[str]
+    record: dict[str, Any], expected_registry_digest: str, known_scenario_ids: set[str],
+    metric_catalog: dict[str, str]
 ) -> list[str]:
     errors: list[str] = []
     if record["run"]["scenario_registry_digest"] != expected_registry_digest:
@@ -139,6 +166,15 @@ def semantic_errors(
         previous_tick = tick
 
     for metric in record["metrics"]:
+        metric_id = metric["metric_id"]
+        registered_dimension = metric_catalog.get(metric_id)
+        if registered_dimension is None:
+            errors.append(f"metric ID {metric_id!r} is not declared by the scenario registry")
+        elif metric["dimension"] != registered_dimension:
+            errors.append(
+                f"metric {metric_id!r} dimension {metric['dimension']!r} does not match "
+                f"registered dimension {registered_dimension!r}"
+            )
         value = metric["value"]
         status = metric["measurement_status"]
         if status == "unmeasured" and value is not None:
@@ -210,6 +246,11 @@ def main() -> int:
         print("FAIL: scenario registry must declare a non-empty unique list of scenario_ids")
         return 1
     known_scenario_ids = set(scenario_ids)
+    try:
+        metric_catalog = build_metric_catalog(scenario_registry.get("metrics"))
+    except ValidationFailure as exc:
+        print(f"FAIL: scenario registry metric catalogue is invalid: {exc}")
+        return 1
     expected_registry_digest = "sha256:" + hashlib.sha256(REGISTRY_PATH.read_bytes()).hexdigest()
 
     Draft202012Validator.check_schema(schema)
@@ -222,7 +263,7 @@ def main() -> int:
             print(f"  - {error}")
         return 1
 
-    positive_semantics = semantic_errors(fixture, expected_registry_digest, known_scenario_ids)
+    positive_semantics = semantic_errors(fixture, expected_registry_digest, known_scenario_ids, metric_catalog)
     if positive_semantics:
         print("FAIL: positive example violates semantic invariants:")
         for error in positive_semantics:
@@ -323,7 +364,7 @@ def main() -> int:
             if errors:
                 failures.append(f"{case_id}: semantic control was already rejected at schema layer: {errors[0]}")
             else:
-                found = semantic_errors(mutated, expected_registry_digest, known_scenario_ids)
+                found = semantic_errors(mutated, expected_registry_digest, known_scenario_ids, metric_catalog)
                 if not found:
                     failures.append(f"{case_id}: invalid mutation unexpectedly passed semantic checks")
 
@@ -335,8 +376,8 @@ def main() -> int:
     # cannot become smaller or silently move semantic cases into JSON Schema.
     if checked_schema != 10:
         failures.append(f"expected 10 schema-level controls to be checked, got {checked_schema}")
-    if checked_semantic != 12:
-        failures.append(f"expected 12 semantic controls to be checked, got {checked_semantic}")
+    if checked_semantic != 14:
+        failures.append(f"expected 14 semantic controls to be checked, got {checked_semantic}")
 
     if failures:
         print("FAIL: run receipt negative controls:")
@@ -347,7 +388,7 @@ def main() -> int:
     print(
         "PASS: schema definition valid; positive fixture valid; "
         f"{checked_schema} schema-level and {checked_semantic} semantic negative controls rejected; "
-        "required v1 control IDs intact; scenario digest and scenario ID are bound to the registry."
+        "required v1 control IDs intact; scenario digest, scenario ID, and metric IDs/dimensions are bound to the registry."
     )
     print("Claim boundary: synthetic deterministic research fixture only; no production or economic effects.")
     return 0

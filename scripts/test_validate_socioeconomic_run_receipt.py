@@ -3,11 +3,19 @@
 
 from __future__ import annotations
 
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
-from validate_socioeconomic_run_receipt import ValidationFailure, load_json
+from validate_socioeconomic_run_receipt import (
+    FIXTURE_PATH,
+    REGISTRY_PATH,
+    ValidationFailure,
+    build_metric_catalog,
+    load_json,
+    semantic_errors,
+)
 
 
 class StrictJsonLoaderTests(unittest.TestCase):
@@ -46,6 +54,34 @@ class StrictJsonLoaderTests(unittest.TestCase):
     def test_malformed_json_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValidationFailure, "cannot load strict JSON"):
             self.load_text('{"missing_value":')
+
+
+
+class MetricRegistrySemanticTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.fixture = load_json(FIXTURE_PATH)
+        self.registry = load_json(REGISTRY_PATH)
+        self.metric_catalog = build_metric_catalog(self.registry.get("metrics"))
+        self.registry_digest = "sha256:" + hashlib.sha256(REGISTRY_PATH.read_bytes()).hexdigest()
+        self.scenario_ids = set(self.registry["scenario_ids"])
+
+    def check_semantics(self) -> list[str]:
+        return semantic_errors(
+            self.fixture,
+            self.registry_digest,
+            self.scenario_ids,
+            self.metric_catalog,
+        )
+
+    def test_unknown_metric_id_is_rejected(self) -> None:
+        self.fixture["metrics"][0]["metric_id"] = "unregistered_metric"
+        errors = self.check_semantics()
+        self.assertTrue(any("is not declared by the scenario registry" in error for error in errors))
+
+    def test_registered_metric_with_wrong_dimension_is_rejected(self) -> None:
+        self.fixture["metrics"][0]["dimension"] = "distribution"
+        errors = self.check_semantics()
+        self.assertTrue(any("does not match registered dimension" in error for error in errors))
 
 
 if __name__ == "__main__":

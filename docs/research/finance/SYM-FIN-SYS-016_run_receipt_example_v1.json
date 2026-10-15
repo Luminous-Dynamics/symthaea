@@ -7,7 +7,7 @@
     "created_at": "2026-10-15T14:00:00Z",
     "source_revision": "a6ccaa5f8cf8fcb2f97442c86020a1d3c58a0b5a",
     "scenario_id": "mixed-regime-essential-service-smoke",
-    "scenario_registry_digest": "sha256:65248719dbaa5c7c4db9b79ece80a2ec0e46600fbfb9f88dc11a4d63ded0cb8c",
+    "scenario_registry_digest": "sha256:8ec2dded058cee8359778c17c1433ccd066048c86e4dbb23bc4e9c5a77ec1193",
     "random_seed": 314159,
     "world_seed_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
     "model_version": "symthaea-civos-sim-v1",

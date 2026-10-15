@@ -161,6 +161,20 @@
       "pointer": "/run/scenario_id",
       "replacement_value": "unregistered-scenario",
       "validation_layer": "semantic_check"
+    },
+    {
+      "id": "SRC-SEM-013",
+      "description": "A metric ID absent from the scenario registry is reported as if it were part of the run.",
+      "pointer": "/metrics/0/metric_id",
+      "replacement_value": "unregistered_metric",
+      "validation_layer": "semantic_check"
+    },
+    {
+      "id": "SRC-SEM-014",
+      "description": "A registered metric is assigned a different, schema-valid dimension.",
+      "pointer": "/metrics/0/dimension",
+      "replacement_value": "distribution",
+      "validation_layer": "semantic_check"
     }
   ]
 }

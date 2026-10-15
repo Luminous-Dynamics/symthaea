@@ -27,7 +27,7 @@ Reference: [ValueFlows specification](https://www.valueflo.ws/specification/vfsp
 
 “Schema-valid,” “cryptographically intact,” “issued by an identified party,” “independently observed,” “estimated,” and “synthetic-only” are different properties. A simulation receipt must never gain real-world authority merely because it parses, matches a schema, or is signed.
 
-The Mycelix reference adds a `SyntheticOnly` evidence class that cannot clear authorization/obligation gates or promote verification to `Verified`. This is an explicit type-level firewall in the reference state machine, not cryptographic authentication. A future production design needs issuer identity, signature/key lifecycle, revocation, evidence freshness, policy-specific trust roots, and an independent verifier; the current reference has none of those.
+The Mycelix reference separates `EvidenceStatus` from `EvidenceOrigin`: a result can be `Verified` as a simulation while remaining `SyntheticSimulation` in origin. Authorization and obligation gates require both `Verified` status and `LiveDomain` origin, and delivery verification plus dispute reassessment fail closed for synthetic-origin records. This is an explicit state-machine barrier, not cryptographic authentication: origin is caller-supplied. A production design still needs issuer identity, signature/key lifecycle, revocation, evidence freshness, policy-specific trust roots, and an independent verifier.
 
 Relevant general model: [W3C Verifiable Credentials Data Model 2.0](https://www.w3.org/TR/2025/REC-vc-data-model-2.0-20250515/) describes claims exchanged among issuers, holders, and verifiers, and includes credential status concepts. A credential representation or integrity check does not alone establish the real-world truth of every underlying claim.
 
@@ -69,16 +69,16 @@ The intended architecture is a **capability floor with bounded actions**, not a 
 
 ## Current implementation slice
 
-- Mycelix `SyntheticOnly` status blocks authorization via rights evidence, obligation commitment, and direct verification of delivery; regression tests are authored for all three paths.
+- Mycelix keeps evidence status and origin orthogonal; five authored regression tests cover synthetic-origin policy, obligation, delivery-claim, verification-result, and dispute-reassessment barriers. Caller-supplied origin remains an explicit provenance limitation.
 - Delivery claims must name the provider fixed by the request. This checks logical identity in the reference model, not a cryptographic signature.
 - Symthaea receipt loading rejects duplicate JSON object keys and Python's non-standard `NaN` / `Infinity` constants before schema or semantic validation.
-- Six standard-library unit tests cover strict JSON parsing, including numeric edge cases; the schema validator pins all 22 negative-control IDs with a 10/12 schema/semantic split and recomputes the scenario registry SHA-256 from its exact repository bytes and rejects receipt scenario IDs absent from the registry catalogue. Only the scenario-registry digest is bound to source bytes today; other digest-shaped fields remain unverified identifiers.
+- Eight standard-library unit tests cover strict JSON parsing and metric-catalog semantics, including unknown metric IDs and schema-valid but incorrect metric dimensions. The validator pins all 24 negative-control IDs with a 10/14 schema/semantic split; it recomputes the scenario-registry SHA-256 from exact repository bytes and checks both scenario IDs and metric ID/dimension pairs against that registry. Other digest-shaped receipt fields still need binding to their source artifacts.
 - Neither track is qualified by this note. Authored tests are not passing tests. CI must run against the exact final head.
 
 ## Acceptance gates before integration
 
-1. Execute the pinned Python unit tests and receipt validator on the exact PR head; record the SHA and full result.
-2. Execute Rust formatting and all 31 reference tests with the pinned toolchain; record the SHA and job logs.
+1. Execute all eight pinned Python unit tests and the receipt validator on the exact PR head; record the SHA and full result.
+2. Execute Rust formatting and all 33 authored reference tests with the pinned toolchain; record the SHA and job logs. Until the exact-head job completes, these remain authored, not passed.
 3. Add a conformance corpus for any ValueFlows adapter: positive mappings, unsupported-field failures, claim/intent/commitment/event distinction, and stable round-trip behavior where representable.
 4. Extend exact-byte digest binding to every receipt field that purports to identify an input artifact; currently only `scenario_registry_digest` is recomputed from exact bytes, and `scenario_id` is checked against the registry's declared IDs. The other digest-shaped fields are not proof that their referenced inputs match.
 5. Add model-level invariants for conservation, stock/flow reconciliation, capacity non-overcommit, liability accounting, and no authority-bearing transition from synthetic evidence.
