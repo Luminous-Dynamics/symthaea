@@ -19,7 +19,8 @@
     "Keep the registered date and registration URL identical in the manifest and the plan file.",
     "Do not analyze restricted source material unless the separate source authorization manifest is authorized for the declared purpose.",
     "A plan marked registered must include concrete hypotheses with unique IDs, primary test, analysis unit and falsification rule; each null model must specify what it preserves, the randomization/permutation and the resampling unit.",
-    "Populate source/version pin, inclusion and exclusion criteria, primary outcomes, mandatory sensitivity analyses, effect/uncertainty/decision thresholds, multiplicity correction, missing-data policy, split strategy and deviation policy. Boolean frozen flags alone are insufficient."
+    "Populate source/version pin, inclusion and exclusion criteria, primary outcomes, mandatory sensitivity analyses, effect/uncertainty/decision thresholds, multiplicity correction, missing-data policy, split strategy and deviation policy. Boolean frozen flags alone are insufficient.",
+    "The plan must enumerate exact authorized-source bindings (intake source ID, record URL, file URL, relative artifact path, SHA-256, byte count, and selected work/movement IDs); the validator must compare this list with the approved input manifest."
   ],
   "limitations": [
     "This checked-in file is a blocked template, not a registered plan.",
@@ -43,6 +44,7 @@
     "multiplicity_correction": null,
     "missing_data_policy": null,
     "split_strategy": null,
-    "deviation_policy": null
+    "deviation_policy": null,
+    "authorized_source_bindings": []
   }
 }
