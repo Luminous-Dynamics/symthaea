@@ -557,4 +557,72 @@ mod tests {
         let second = screen_service_continuity(&services, &disruptions, &config(7, 0.8)).unwrap();
         assert_eq!(first, second);
     }
+
+    #[test]
+    fn severe_capacity_loss_cannot_improve_service() {
+        let mild = CapacityDisruption::new("power", 1, 4, 0.5);
+        let severe = CapacityDisruption::new("power", 1, 4, 0.1);
+        let services = single_service(1.0);
+        let mild_report = screen_service_continuity(&services, &[mild], &config(8, 0.8)).unwrap();
+        let severe_report =
+            screen_service_continuity(&services, &[severe], &config(8, 0.8)).unwrap();
+        assert!(
+            severe_report.total_unmet_service_unit_steps
+                >= mild_report.total_unmet_service_unit_steps
+        );
+    }
+
+    #[test]
+    fn extra_capacity_cannot_increase_unmet_service() {
+        let disruption = CapacityDisruption::new("power", 1, 3, 0.2);
+        let less = screen_service_continuity(
+            &single_service(1.0),
+            &[disruption.clone()],
+            &config(8, 0.8),
+        )
+        .unwrap();
+        let more = screen_service_continuity(
+            &single_service(2.0),
+            &[disruption],
+            &config(8, 0.8),
+        )
+        .unwrap();
+        assert!(
+            more.total_unmet_service_unit_steps <= less.total_unmet_service_unit_steps
+        );
+        assert!(
+            more.services[0]
+                .fulfillment_fraction
+                .iter()
+                .zip(&less.services[0].fulfillment_fraction)
+                .all(|(a, b)| a + EPSILON >= *b)
+        );
+    }
+
+    #[test]
+    fn horizon_ending_before_floor_recovery_keeps_recovery_unknown() {
+        let disruption = CapacityDisruption::new("power", 1, 20, 0.0);
+        let report = screen_service_continuity(
+            &single_service(1.0),
+            &[disruption],
+            &config(5, 0.9),
+        )
+        .unwrap();
+        assert!(!report.all_services_at_floor_at_horizon);
+        assert_eq!(report.stable_recovery_step, None);
+        assert_eq!(report.recovery_delay_steps, None);
+    }
+
+    #[test]
+    fn recovery_is_after_the_final_violation_not_a_temporary_rebound() {
+        let events = [
+            CapacityDisruption::new("power", 1, 1, 0.0),
+            CapacityDisruption::new("power", 4, 3, 0.0),
+        ];
+        let report =
+            screen_service_continuity(&single_service(1.0), &events, &config(9, 0.8)).unwrap();
+        assert_eq!(report.first_floor_violation_step, Some(1));
+        assert_eq!(report.last_floor_violation_step, Some(6));
+        assert_eq!(report.stable_recovery_step, Some(7));
+    }
 }
