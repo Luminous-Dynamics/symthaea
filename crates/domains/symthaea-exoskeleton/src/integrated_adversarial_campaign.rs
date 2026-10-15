@@ -272,12 +272,21 @@ pub fn run_integrated_eva_scenario(
         );
     }
 
-    let plss_state = mission.plss_mut_for_fault_injection().state();
-    let co2_burden_l = plss_state.co2_burden_l;
-    let humidity_vapor_burden_g = plss_state.humidity_vapor_burden_g;
-    let co2_scrubber_capacity_remaining_l = plss_state.co2_scrubber_capacity_remaining_l;
-    let humidity_collector_capacity_remaining_g =
-        plss_state.humidity_collector_capacity_remaining_g;
+    let (
+        co2_burden_l,
+        humidity_vapor_burden_g,
+        co2_scrubber_capacity_remaining_l,
+        humidity_collector_capacity_remaining_g,
+    ) = {
+        let plss = mission.plss_mut_for_fault_injection();
+        let state = plss.state();
+        (
+            state.co2_burden_l,
+            state.humidity_vapor_burden_g,
+            state.co2_scrubber_capacity_remaining_l,
+            state.humidity_collector_capacity_remaining_g,
+        )
+    };
 
     IntegratedEvaScenarioReport {
         scenario,
@@ -408,16 +417,26 @@ mod tests {
     #[test]
     fn integrated_scrubber_failure_accumulates_co2_without_claiming_capture() {
         let report = run_integrated_eva_scenario(IntegratedEvaScenario::Co2ScrubberFailure);
-        assert_eq!(report.mission_disposition, EvaMissionDisposition::Continue);
-        assert!(report.co2_burden_l > 0.0);
+        assert_eq!(
+            report.mission_disposition,
+            EvaMissionDisposition::ReturnToSafeHaven
+        );
+        assert_eq!(report.disposition, IntegratedEvaDisposition::ReturnToSafeHaven);
+        assert_eq!(report.oxygen_consumed_l, 0.0);
+        assert_eq!(report.co2_burden_l, 0.0);
         assert_eq!(report.co2_scrubber_capacity_remaining_l, 120.0);
     }
 
     #[test]
     fn integrated_humidity_control_failure_accumulates_water_mass() {
         let report = run_integrated_eva_scenario(IntegratedEvaScenario::HumidityControlFailure);
-        assert_eq!(report.mission_disposition, EvaMissionDisposition::Continue);
-        assert!(report.humidity_vapor_burden_g > 0.0);
+        assert_eq!(
+            report.mission_disposition,
+            EvaMissionDisposition::ReturnToSafeHaven
+        );
+        assert_eq!(report.disposition, IntegratedEvaDisposition::ReturnToSafeHaven);
+        assert_eq!(report.oxygen_consumed_l, 0.0);
+        assert_eq!(report.humidity_vapor_burden_g, 0.0);
         assert_eq!(report.humidity_collector_capacity_remaining_g, 100.0);
     }
 
