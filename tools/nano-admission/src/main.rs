@@ -315,17 +315,19 @@ fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
         }
         let mut entry = result.with_context(|| format!("invalid tar entry at index {index}"))?;
         let entry_path = entry.path()?.into_owned();
-        let path_text = entry_path.to_str().map(str::to_owned);
+        // Borrow the path rather than cloning attacker-controlled path strings.
+        // Long paths are marked unsafe and only a bounded diagnostic prefix is kept.
+        let path_text = entry_path.to_str();
         let display_path = path_text
-            .clone()
+            .map(bounded_member_display)
             .unwrap_or_else(|| format!("<non-utf8-path-{index}>"));
 
-        let path_is_unsafe = path_is_unsafe(&entry_path, path_text.as_deref())
-            || path_text.as_ref().is_some_and(|text| text.len() > MAX_MEMBER_PATH_BYTES);
+        let path_is_unsafe = path_is_unsafe(&entry_path, path_text)
+            || path_text.is_some_and(|text| text.len() > MAX_MEMBER_PATH_BYTES);
         if path_is_unsafe {
             inventory.unsafe_member_paths.push(display_path.clone());
         }
-        if let Some(path) = path_text.as_deref() {
+        if let Some(path) = path_text.filter(|text| text.len() <= MAX_MEMBER_PATH_BYTES) {
             if let Some(normalized_path) = normalized_member_path(path) {
                 if !seen_paths.insert(normalized_path.clone()) {
                     inventory.duplicate_member_paths.push(normalized_path);
@@ -334,7 +336,6 @@ fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
         }
 
         let top_level = path_text
-            .as_deref()
             .map(top_level_component)
             .unwrap_or("<non-utf8>");
         *inventory
@@ -405,6 +406,16 @@ fn path_is_unsafe(path: &Path, text: Option<&str>) -> bool {
     normalized.starts_with('/')
         || has_windows_drive_prefix
         || normalized.split('/').any(|component| component == "..")
+}
+
+fn bounded_member_display(path: &str) -> String {
+    let mut chars = path.chars();
+    let prefix: String = chars.by_ref().take(200).collect();
+    if chars.next().is_some() {
+        format!("{prefix}…<truncated>")
+    } else {
+        prefix
+    }
 }
 
 fn normalized_member_path(path: &str) -> Option<String> {
