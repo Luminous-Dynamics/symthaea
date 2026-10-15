@@ -37,7 +37,9 @@ impl fmt::Display for ScreeningError {
             Self::MustBeNonNegative(name) => write!(f, "{name} must be non-negative"),
             Self::NonFiniteResult(name) => write!(f, "derived {name} is not finite"),
             Self::FractionOutOfRange(name) => write!(f, "{name} must be within [0, 1]"),
-            Self::InvalidInterval(name) => write!(f, "{name} lower bound must not exceed its upper bound"),
+            Self::InvalidInterval(name) => {
+                write!(f, "{name} lower bound must not exceed its upper bound")
+            },
         }
     }
 }
@@ -882,7 +884,6 @@ pub fn assess_external_pressure(
     })
 }
 
-
 /// Deterministic bounds for a scalar quantity. These are engineering bounds, not statistical
 /// confidence intervals; the caller is responsible for choosing justified limits.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1682,8 +1683,12 @@ mod tests {
             fixed_non_structural_vehicle_mass_kg: 10_000.0,
         })
         .unwrap();
-        assert!((bounded.payload_allowance_lower_bound_kg - point.payload_allowance_kg).abs() < 1e-8);
-        assert!((bounded.payload_allowance_upper_bound_kg - point.payload_allowance_kg).abs() < 1e-8);
+        assert!(
+            (bounded.payload_allowance_lower_bound_kg - point.payload_allowance_kg).abs() < 1e-8
+        );
+        assert!(
+            (bounded.payload_allowance_upper_bound_kg - point.payload_allowance_kg).abs() < 1e-8
+        );
         assert!(bounded.payload_allowance_interval_width_kg.abs() < 1e-8);
     }
 
