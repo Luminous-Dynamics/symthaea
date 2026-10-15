@@ -1561,6 +1561,120 @@ mod tests {
     }
 
     #[test]
+    fn test_role_observation_search_labeled_corpus_metrics() {
+        use std::collections::HashSet;
+
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let query_terms = [
+            (
+                SemanticRole::Agent,
+                "United States",
+                EntityType::Organization,
+            ),
+            (
+                SemanticRole::Agent,
+                "European Union",
+                EntityType::Organization,
+            ),
+        ];
+        let query = encoder.encode_role_terms(&query_terms);
+        assert_eq!(query.len(), 2);
+
+        let unrelated = encoder.encode_role_terms(&[
+            (SemanticRole::Agent, "Acme Holdings", EntityType::Organization),
+            (SemanticRole::Agent, "Blue Orchard", EntityType::Organization),
+        ]);
+
+        let mut graph = EnhancedKnowledgeGraph::new(16);
+        let mut positive_ids = HashSet::new();
+        let mut negative_ids = HashSet::new();
+
+        let mut exact = make_encoding("corpus/exact-two-agent-positive", 0.35);
+        exact.role_vector_observations = query.clone();
+        let (exact_id, _) = graph.insert(exact, 1, Some("role-eval".into()), false);
+        positive_ids.insert(exact_id);
+
+        let mut partial = make_encoding("corpus/partial-one-agent-positive", 0.99);
+        partial.role_vector_observations = vec![query[0].clone()];
+        let (partial_id, _) = graph.insert(partial, 2, Some("role-eval".into()), false);
+        positive_ids.insert(partial_id);
+
+        let mut wrong_role_observation = query[0].clone();
+        wrong_role_observation.role = SemanticRole::Patient;
+        let mut wrong_role = make_encoding("corpus/wrong-role-negative", 0.8);
+        wrong_role.role_vector_observations = vec![wrong_role_observation];
+        let (wrong_role_id, _) = graph.insert(wrong_role, 3, None, false);
+        negative_ids.insert(wrong_role_id);
+
+        let mut distractor = make_encoding("corpus/unrelated-same-role-negative", 0.8);
+        distractor.role_vector_observations = unrelated;
+        let (distractor_id, _) = graph.insert(distractor, 4, None, false);
+        negative_ids.insert(distractor_id);
+
+        let wrong_type = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "United States",
+            EntityType::Place,
+        )]);
+        let mut same_text_wrong_type =
+            make_encoding("corpus/same-text-wrong-type-negative", 0.8);
+        same_text_wrong_type.role_vector_observations = wrong_type;
+        let (wrong_type_id, _) = graph.insert(same_text_wrong_type, 5, None, false);
+        negative_ids.insert(wrong_type_id);
+
+        // Models a pre-multiplicity persisted record: the compatibility map
+        // exists, but there are no per-entity observations to score.
+        let mut legacy = make_encoding("corpus/legacy-map-only-negative", 0.9);
+        legacy
+            .role_vectors
+            .insert(SemanticRole::Agent, query[0].vector);
+        let (legacy_id, _) = graph.insert(legacy, 6, None, false);
+        negative_ids.insert(legacy_id);
+
+        let results = graph.search_role_observations(&query, 10, 6);
+        let result_ids: Vec<_> = results.iter().map(|result| result.fact_id).collect();
+        let result_id_set: HashSet<_> = result_ids.iter().copied().collect();
+
+        let true_positives = positive_ids.intersection(&result_id_set).count();
+        let false_positives = negative_ids.intersection(&result_id_set).count();
+        let recall_at_10 = true_positives as f32 / positive_ids.len() as f32;
+
+        assert_eq!(positive_ids.len(), 2);
+        assert_eq!(recall_at_10, 1.0, "both labeled positives should be retrieved");
+        assert_eq!(false_positives, 0, "negative controls must not be retrieved");
+        assert_eq!(
+            result_ids,
+            vec![exact_id, partial_id],
+            "full role coverage must outrank partial coverage even with lower confidence"
+        );
+        assert_eq!(results[0].matched_query_terms, 2);
+        assert_eq!(results[1].matched_query_terms, 1);
+        assert!(
+            results[0].similarity > results[1].similarity,
+            "coverage-sensitive retrieval should outrank partial coverage"
+        );
+        assert!(
+            results[0].confidence < results[1].confidence,
+            "retrieval ranking must not silently become confidence ranking"
+        );
+
+        let top_one = graph.search_role_observations(&query, 1, 7);
+        assert_eq!(top_one.len(), 1);
+        assert_eq!(top_one[0].fact_id, exact_id);
+
+        // One stored observation cannot be counted twice for repeated query terms.
+        let duplicate_term_query = [query[0].clone(), query[0].clone()];
+        let duplicate_results =
+            graph.search_role_observations(&duplicate_term_query, 10, 8);
+        let exact_duplicate_result = duplicate_results
+            .iter()
+            .find(|result| result.fact_id == exact_id)
+            .expect("exact positive should retain one of the repeated terms");
+        assert_eq!(exact_duplicate_result.matched_query_terms, 1);
+        assert!((exact_duplicate_result.similarity - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
     fn test_role_observation_search_is_stable_across_sqlite_restart() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_role_search_restart_{}",
