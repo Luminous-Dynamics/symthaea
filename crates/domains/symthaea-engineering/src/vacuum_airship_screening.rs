@@ -383,13 +383,10 @@ mod tests {
         })
         .unwrap();
         let helium_like = screen_buoyancy(BuoyancyRequest {
+            enclosed_volume_m3: 100.0,
+            ambient_air_density_kg_m3: 1.225,
             internal_gas_density_kg_m3: 0.169_280_218_717_622_25,
-            ..BuoyancyRequest {
-                enclosed_volume_m3: 100.0,
-                ambient_air_density_kg_m3: 1.225,
-                internal_gas_density_kg_m3: 0.0,
-                vehicle_mass: zero_mass(),
-            }
+            vehicle_mass: zero_mass(),
         })
         .unwrap();
         assert!(helium_like.net_buoyant_mass_kg < vacuum.net_buoyant_mass_kg);
