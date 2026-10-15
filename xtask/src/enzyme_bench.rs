@@ -934,6 +934,31 @@ mod tests {
         root
     }
 
+    #[test]
+    fn kcat_profile_covers_core_and_all_audited_optional_fields() {
+        let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("xtask should be one level below workspace root");
+        let profile_path = workspace_root.join("docs/research/KCAT_ADMISSION_PROFILE_V0.json");
+        let profile: Value = serde_json::from_slice(&fs::read(profile_path).unwrap()).unwrap();
+        assert_eq!(profile["profile_id"], "kcat-admission-profile-v0");
+        assert_eq!(profile["status"], "tier_counter_implemented_policy_review_required");
+        assert_eq!(profile["tiers"].as_array().unwrap().len(), 4);
+
+        let configured: BTreeSet<String> = profile["field_rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|field| field["field"].as_str().map(str::to_string))
+            .collect();
+        for required in ["ph", "temperature_c", "substrate_id"] {
+            assert!(configured.contains(required), "profile missing core field {required}");
+        }
+        for required in OPTIONAL_METADATA_FIELDS {
+            assert!(configured.contains(*required), "profile missing audited field {required}");
+        }
+    }
+
     fn write_hashed(root: &Path, path: &str, bytes: &[u8]) -> Value {
         let full_path = root.join(path);
         if let Some(parent) = full_path.parent() {
