@@ -39,17 +39,21 @@ pub enum IntegratedEvaScenario {
     DustAndDexterityDegradation,
     MobilityPowerShortfall,
     PrimaryOxygenPathLoss,
+    Co2ScrubberFailure,
+    HumidityControlFailure,
     SolarParticleEventCommBlackout,
     GlovePowerLoss,
     ReturnNeededServiceAndShelterUnavailable,
 }
 
 impl IntegratedEvaScenario {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 9] = [
         Self::Nominal,
         Self::DustAndDexterityDegradation,
         Self::MobilityPowerShortfall,
         Self::PrimaryOxygenPathLoss,
+        Self::Co2ScrubberFailure,
+        Self::HumidityControlFailure,
         Self::SolarParticleEventCommBlackout,
         Self::GlovePowerLoss,
         Self::ReturnNeededServiceAndShelterUnavailable,
@@ -78,6 +82,12 @@ pub struct IntegratedEvaScenarioReport {
     pub safe_haven_recommendation: Option<SafeHavenRecommendation>,
     pub service_available: Option<bool>,
     pub oxygen_consumed_l: f64,
+    /// CO2-equivalent residual burden in the simulation's declared reference volume units.
+    pub co2_burden_l: f64,
+    /// Water-vapor burden, represented as grams of water in the reduced-order model.
+    pub humidity_vapor_burden_g: f64,
+    pub co2_scrubber_capacity_remaining_l: f64,
+    pub humidity_collector_capacity_remaining_g: f64,
     pub mobility_energy_wh: f64,
     pub cumulative_radiation_msv: f64,
     pub approximation_notes: Vec<String>,
@@ -132,6 +142,18 @@ pub fn run_integrated_eva_scenario(
                 .plss_mut_for_fault_injection()
                 .state_mut_for_fault_injection()
                 .primary_oxygen = PlssPathState::Failed;
+        }
+        IntegratedEvaScenario::Co2ScrubberFailure => {
+            mission
+                .plss_mut_for_fault_injection()
+                .state_mut_for_fault_injection()
+                .co2_scrubber = PlssPathState::Failed;
+        }
+        IntegratedEvaScenario::HumidityControlFailure => {
+            mission
+                .plss_mut_for_fault_injection()
+                .state_mut_for_fault_injection()
+                .humidity_control = PlssPathState::Failed;
         }
         IntegratedEvaScenario::SolarParticleEventCommBlackout => {
             segment.energetic_particle_alert = true;
@@ -250,6 +272,13 @@ pub fn run_integrated_eva_scenario(
         );
     }
 
+    let plss_state = mission.plss_mut_for_fault_injection().state();
+    let co2_burden_l = plss_state.co2_burden_l;
+    let humidity_vapor_burden_g = plss_state.humidity_vapor_burden_g;
+    let co2_scrubber_capacity_remaining_l = plss_state.co2_scrubber_capacity_remaining_l;
+    let humidity_collector_capacity_remaining_g =
+        plss_state.humidity_collector_capacity_remaining_g;
+
     IntegratedEvaScenarioReport {
         scenario,
         disposition,
@@ -261,6 +290,10 @@ pub fn run_integrated_eva_scenario(
         safe_haven_recommendation,
         service_available,
         oxygen_consumed_l: mission_report.totals.oxygen_consumed_l,
+        co2_burden_l,
+        humidity_vapor_burden_g,
+        co2_scrubber_capacity_remaining_l,
+        humidity_collector_capacity_remaining_g,
         mobility_energy_wh: mission_report.totals.mobility_energy_wh,
         cumulative_radiation_msv: mission_report.totals.cumulative_radiation_msv,
         approximation_notes,
@@ -370,6 +403,22 @@ mod tests {
         let report = run_integrated_eva_scenario(IntegratedEvaScenario::PrimaryOxygenPathLoss);
         assert_ne!(report.mission_disposition, EvaMissionDisposition::AbortEva);
         assert!(report.oxygen_consumed_l > 0.0);
+    }
+
+    #[test]
+    fn integrated_scrubber_failure_accumulates_co2_without_claiming_capture() {
+        let report = run_integrated_eva_scenario(IntegratedEvaScenario::Co2ScrubberFailure);
+        assert_eq!(report.mission_disposition, EvaMissionDisposition::Continue);
+        assert!(report.co2_burden_l > 0.0);
+        assert_eq!(report.co2_scrubber_capacity_remaining_l, 120.0);
+    }
+
+    #[test]
+    fn integrated_humidity_control_failure_accumulates_water_mass() {
+        let report = run_integrated_eva_scenario(IntegratedEvaScenario::HumidityControlFailure);
+        assert_eq!(report.mission_disposition, EvaMissionDisposition::Continue);
+        assert!(report.humidity_vapor_burden_g > 0.0);
+        assert_eq!(report.humidity_collector_capacity_remaining_g, 100.0);
     }
 
     #[test]
