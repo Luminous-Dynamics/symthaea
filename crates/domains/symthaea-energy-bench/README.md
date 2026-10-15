@@ -19,6 +19,10 @@ The `experiment_selection` module implements a transparent queue baseline before
 
 Example API: `experiment_selection::rank_experiments(&policy, &proposals)`. The queue policy itself must be registered before ranking. Resource units are compared exactly; conversions must happen before selection. This is **not** Bayesian optimization, expected information gain, a calibrated uncertainty model, or a safety approval system. Ranking is a screening aid and cannot replace engineering review.
 
+## Benchmark acceptance targets
+
+The research acceptance ladder is specified in [ENERGY_CONVERSION_BENCHMARK_TARGETS.md](../../../docs/research/ENERGY_CONVERSION_BENCHMARK_TARGETS.md). It separates code/accounting conformance, oracle-backed selector quality, calibrated multifidelity evaluation, and independent physical validation. Proposed percentage improvements are unproven go/no-go targets, not current performance claims. Synthetic cases never establish physical superiority.
+
 ## What it checks
 
 - schema version and key identifiers;
