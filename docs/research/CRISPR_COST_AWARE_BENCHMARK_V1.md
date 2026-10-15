@@ -196,6 +196,92 @@ No new production model type is authorized by this plan. Compose the existing bi
 
 ---
 
+## Quantitative benchmark targets and critical interpretation rules
+
+This section fixes measurable research targets before implementation. Thresholds labeled **engineering targets** are proposed decision rules for this project, not field-wide standards, clinical safety thresholds, or known achievable Symthaea performance. Final acceptance must bind an exact data/model/source generation and remain open to a well-supported null result.
+
+### First critical split: nomination is not ranking
+
+The Kaufmann et al. benchmark exposes a critical methodological distinction:
+
+- **Nomination/coverage:** did a genome-wide search method include a measured positive site in its candidate set?
+- **Ranking/scoring:** conditional on a site being in the scored candidate universe, how high did a predictor rank it?
+- **Assay confirmation:** did an experimental measurement method detect and quantify the event under its specified conditions?
+
+These are different questions and require separate metrics. The paper's starting union of native search-tool outputs contained 324,375 unique sites, but 46 validated positive sites (representing 53 raw positive records) were absent before the authors explicitly added validated positives through 66 coordinate-resolved rows. This addition was intentional so rankings could be compared independently of nomination coverage. It means a ranking replay of the positive-seeded universe cannot be reported as proof that the original search methods found all positive sites. The exact final row/site count after this step must be reconstructed from source artifacts, not inferred from the pre-seeding count. Source: https://journals.sagepub.com/doi/10.1177/10430342261466407
+
+Accordingly, reports must publish separate values for:
+1. pre-seeding nomination coverage on the measured-positive reference subset;
+2. scoring/ranking quality conditional on the explicitly declared universe;
+3. the count and identities of reference positives injected into the union for rank-only analysis;
+4. assay sensitivity/precision where appropriate independent experimental evidence exists.
+
+The measured-positive set is itself incomplete. A benchmark miss is a miss relative to that reference cohort, not proof of universal biological falsehood; an unassayed candidate is unknown, not a true negative.
+
+### Source-replay acceptance targets
+
+**Target A — exact source and data identity**
+- Record source repository URL and exact commit SHA, manuscript DOI/version, artifact identifier, retrieval timestamp, artifact byte size and SHA-256 digest.
+- Audit code license and dataset/artifact rights separately. A code repository's MIT license does not automatically license bundled, linked or third-party biological data.
+- Pin reference genome/build, cohort transformations, duplicate key, threshold, and each candidate universe as independent immutable inputs.
+- Unresolved use rights, digest mismatch or ambiguous cohort provenance blocks qualification.
+
+**Target B — source cohort reconstruction**
+
+Reconstruct these reported anchors independently:
+- 3,827 sequence-resolved deep-sequenced observations across 26 guide/Cas9 combinations;
+- 383 observations at/above the paper's operational 0.1% indel threshold;
+- after repeated-site collapse, 1,806 unique labeled sites including 118 positives;
+- no-bulge ML subset: 1,768 unique labeled sites including 114 positives;
+- published sequence reconstruction agreement: 3,824 / 3,827 (reported as 0.9992);
+- pre-seeding search-union omission: 46 validated sites / 53 raw positive observations; 66 coordinate-resolved rows were added for positive seeding.
+
+The first five quantities must match the source's exact declared transformation/collapse semantics. For values reported only as rounded percentages, reproduce within **1.0 percentage point**; when exact result artifacts exist, compare exact integer counts and compute metrics locally instead of treating paper-rounded values as ground truth. Record both pre-seeding and post-seeding counts separately.
+
+**Target C — independent metric reconstruction**
+- Independently recalculate recall@K, precision@K, false-negative counts, coverage, and PR-AUC only where labels/universe make the metric well-defined.
+- Reproduce the source's primary per-guide/Cas9 ranking summaries at matched K and exact cohort; do not replace them with pooled-row averages without explicitly reporting both.
+- A report is not complete until the full expected prediction/result census and all exclusions reconcile.
+- Negative controls for altered cutoff, candidate-universe mismatch, label mutation and missing rows must fail closed.
+
+### Engineering targets for a Symthaea-added decision policy
+
+These are **aspirational gates**, not predictions about current capability:
+
+- **Fair comparison:** compare at least one source-supported transparent baseline and the strongest reproducibly available specialist baseline under exactly the same universe, split, K/budget, outcome labels and preprocessing. Freeze inclusion reasons for all candidate tools before evaluating outcomes.
+- **Primary impact target:** on pre-registered guide/Cas9-group holdouts, either (a) improve macro-averaged recall at a fixed, predeclared candidate budget by **at least 5 absolute percentage points** over the best fair baseline, or (b) use **at least 20% fewer candidate review slots** to reach the baseline's declared recall target. These alternatives are not interchangeable; report the complete precision/false-negative trade-off.
+- **Uncertainty:** report group-aware bootstrap or another justified interval that respects guide/Cas9 clusters. A headline point estimate without an uncertainty interval does not qualify a win. Require the pre-registered primary interval to exclude no improvement before using “demonstrated improvement”; otherwise report inconclusive/null.
+- **Generalization:** any gain must be evaluated without group leakage and repeated on at least one independent, use-permitted cohort before describing it as robust across datasets. A 26-group cohort alone is a first test, not broad generalization.
+- **No hidden regression:** publish group-level outcomes and predefined subgroup checks. Do not let gains for common groups hide a collapse for a specific held-out group.
+- **Ablation:** keep the strongest specialist model fixed and compare it with and without Symthaea's selection/coordination layer. Additional gains from a stronger wrapped model do not establish a Symthaea contribution.
+- **Operational burden:** measure data/compute/runtime and candidates reviewed. Candidate-slot reduction is a laboratory-review-burden proxy only; it is not a measured dollar saving or a treatment-cost reduction.
+
+The top-500 and top-1,250 figures from the paper (approximately 77% and 83% recall for top methods, in the particular evaluation) are useful reference points, not universal standards or a guarantee about a held-out split. The proposed +5 pp / 20% targets must be declared before examining new held-out results. If the sample or cluster count cannot support a stable interval, that is a benchmark limitation; do not weaken the statistical rule post hoc.
+
+### Additional frontier: orthogonal measurement is part of the system
+
+The field is moving beyond purely in-silico ranking toward explicit comparison of computational nomination and experimental nomination methods. Kinney et al., *Nature Communications* (2026), reported UNCOVERseq results of 97.6% analytical sensitivity and 78% precision on an inter-method confirmation benchmark; the sensitivity/precision calculations cover two guide RNAs, so these numbers must not be treated as universal across editor, cell or assay contexts. The paper discusses the need for orthogonal methods and limits imposed by library preparation, library complexity, read depth and analytical procedures: https://www.nature.com/articles/s41467-026-74623-7
+
+**Important data-rights gate:** the UNCOVERseq paper explicitly restricts the deposited study data to non-commercial research and prohibits commercial use—including training/developing predictive models or integrating into commercial software—without prior written permission. Until written permission for the intended project/use is secured, this project must not ingest those datasets or use them for model training/development. The published paper may inform a literature review, but its restricted measurements are not a permitted CRISPR training/evaluation corpus by default. The article had an author correction dated 12 October 2026; use the current version and preserve the correction lineage: https://doi.org/10.1038/s41467-026-78544-3
+
+The paradigm shift here is a **measurement-aware evidence system**: computational nomination, ranking, orthogonal observation and independent assessment are connected but never collapsed into one “off-target score.” Actual assay selection/execution remains under qualified external human/laboratory authority and outside this computational benchmark.
+
+### Cost claims: targets we can and cannot measure in v1
+
+V1 can measure **reproducibility, ranking at a fixed candidate budget, candidate-slot burden, software runtime and computational resource use**. It can estimate neither actual laboratory savings nor drug-price reduction unless those downstream quantities are observed in a suitable study.
+
+Later programs should separately measure:
+- cost per independently qualified finding;
+- assays/candidates needed to meet a predeclared evidence threshold;
+- repeat-run and batch failure rates;
+- manufacturing yield and cost of goods;
+- quality-control and delivery burden;
+- total treatment-pathway costs, payer/reimbursement effects and patient access.
+
+Do not extrapolate percentage reductions from simulated candidate slots directly into monetary savings or a therapy's sale price.
+
+---
+
 ## Symthaea contribution hypotheses
 
 These are hypotheses to test, not established capabilities.
