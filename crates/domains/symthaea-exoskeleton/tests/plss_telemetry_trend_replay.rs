@@ -51,7 +51,7 @@ fn replays_versioned_trend_corpus_and_independently_verifies_sha256_receipt() {
     let corpus: Corpus = serde_json::from_str(FIXTURE).expect("trend fixture JSON must parse");
     assert_eq!(corpus.schema_version, 1);
     assert_eq!(corpus.observations.len(), 21);
-    assert_eq!(corpus.expected.len(), 11);
+    assert_eq!(corpus.expected.len(), 12);
 
     let (report, receipt) = analyze_plss_telemetry_trends_with_receipt(
         &corpus.observations,
