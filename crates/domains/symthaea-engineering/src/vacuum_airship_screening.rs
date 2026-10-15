@@ -912,6 +912,163 @@ fn validate_bounds(
     Ok(())
 }
 
+
+/// A declared interval for qualified external-pressure capacity plus audit references.
+///
+/// Non-empty identifiers establish only metadata completeness: this screen cannot authenticate
+/// the artifacts, establish that the allowable is qualified, or validate that the evidence applies.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PressureCapacityBoundsRecord {
+    /// Lower/upper independently sourced allowable external differential pressure, Pa.
+    pub allowable_external_pressure_pa: ScalarBounds,
+    /// Immutable record identifying the capacity result.
+    pub evidence_record_id: String,
+    /// Exact model/test profile and configuration reference.
+    pub basis_profile_id: String,
+    /// Independent check or physical-test record reference.
+    pub independent_check_or_test_id: String,
+}
+
+/// Pressure-demand intervals plus an optional case-specific capacity evidence declaration.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExternalPressureBoundsRequest {
+    /// Lower/upper external absolute pressure, Pa.
+    pub external_pressure_pa: ScalarBounds,
+    /// Lower/upper internal absolute pressure, Pa.
+    pub internal_pressure_pa: ScalarBounds,
+    pub capacity: Option<PressureCapacityBoundsRecord>,
+}
+
+/// Arithmetic comparison status for bounded demand/capacity only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapacityBoundsStatus {
+    /// Maximum declared demand is no greater than the minimum declared capacity.
+    DeclaredCapacityCoversDemandBounds,
+    /// Demand and capacity intervals overlap; endpoint data do not settle the comparison.
+    BoundsOverlap,
+    /// Minimum positive demand exceeds the maximum declared capacity.
+    DeclaredCapacityBelowDemandBounds,
+}
+
+/// Result of comparing pressure-demand bounds with declared capacity bounds.
+///
+/// None of these variants establishes structural safety, model qualification, or airworthiness.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PressureBoundsAssessment {
+    /// The upper bound of external pressure does not exceed the lower bound of internal pressure.
+    NoExternalPressureDemand {
+        minimum_signed_differential_pa: f64,
+        maximum_signed_differential_pa: f64,
+    },
+    /// Positive external-pressure demand exists but no capacity bounds were supplied.
+    CapacityUnknown {
+        minimum_positive_demand_pa: f64,
+        maximum_positive_demand_pa: f64,
+    },
+    /// Required audit identifiers are missing from the supplied capacity declaration.
+    IncompleteProvenance {
+        minimum_positive_demand_pa: f64,
+        maximum_positive_demand_pa: f64,
+        missing_fields: Vec<&'static str>,
+    },
+    /// Comparison of declared endpoints only; supplied evidence references remain unauthenticated.
+    DeclaredCapacityBoundsComparison {
+        minimum_positive_demand_pa: f64,
+        maximum_positive_demand_pa: f64,
+        minimum_declared_capacity_pa: f64,
+        maximum_declared_capacity_pa: f64,
+        status: CapacityBoundsStatus,
+        evidence_record_id: String,
+        basis_profile_id: String,
+        independent_check_or_test_id: String,
+    },
+}
+
+/// Propagate absolute-pressure bounds to a positive differential-demand interval.
+///
+/// For independent bounded inputs, the signed differential lies in
+/// [external.min - internal.max, external.max - internal.min]. Positive demand is the maximum
+/// of that differential and zero. This function compares bounds only; it performs no shell
+/// analysis and must not be used to turn an unqualified prediction into qualified capacity.
+pub fn assess_external_pressure_bounds(
+    request: ExternalPressureBoundsRequest,
+) -> Result<PressureBoundsAssessment, ScreeningError> {
+    validate_bounds(request.external_pressure_pa, "external_pressure_pa", true)?;
+    validate_bounds(request.internal_pressure_pa, "internal_pressure_pa", true)?;
+
+    let minimum_signed_differential_pa =
+        request.external_pressure_pa.min - request.internal_pressure_pa.max;
+    let maximum_signed_differential_pa =
+        request.external_pressure_pa.max - request.internal_pressure_pa.min;
+    validate_result(minimum_signed_differential_pa, "minimum pressure differential")?;
+    validate_result(maximum_signed_differential_pa, "maximum pressure differential")?;
+
+    let minimum_positive_demand_pa = minimum_signed_differential_pa.max(0.0);
+    let maximum_positive_demand_pa = maximum_signed_differential_pa.max(0.0);
+    validate_result(minimum_positive_demand_pa, "minimum positive pressure demand")?;
+    validate_result(maximum_positive_demand_pa, "maximum positive pressure demand")?;
+
+    if maximum_positive_demand_pa <= 0.0 {
+        return Ok(PressureBoundsAssessment::NoExternalPressureDemand {
+            minimum_signed_differential_pa,
+            maximum_signed_differential_pa,
+        });
+    }
+
+    let Some(capacity) = request.capacity else {
+        return Ok(PressureBoundsAssessment::CapacityUnknown {
+            minimum_positive_demand_pa,
+            maximum_positive_demand_pa,
+        });
+    };
+    validate_bounds(
+        capacity.allowable_external_pressure_pa,
+        "allowable_external_pressure_pa",
+        false,
+    )?;
+
+    let mut missing_fields = Vec::new();
+    if capacity.evidence_record_id.trim().is_empty() {
+        missing_fields.push("evidence_record_id");
+    }
+    if capacity.basis_profile_id.trim().is_empty() {
+        missing_fields.push("basis_profile_id");
+    }
+    if capacity.independent_check_or_test_id.trim().is_empty() {
+        missing_fields.push("independent_check_or_test_id");
+    }
+    if !missing_fields.is_empty() {
+        return Ok(PressureBoundsAssessment::IncompleteProvenance {
+            minimum_positive_demand_pa,
+            maximum_positive_demand_pa,
+            missing_fields,
+        });
+    }
+
+    let status = if maximum_positive_demand_pa
+        <= capacity.allowable_external_pressure_pa.min
+    {
+        CapacityBoundsStatus::DeclaredCapacityCoversDemandBounds
+    } else if minimum_positive_demand_pa
+        > capacity.allowable_external_pressure_pa.max
+    {
+        CapacityBoundsStatus::DeclaredCapacityBelowDemandBounds
+    } else {
+        CapacityBoundsStatus::BoundsOverlap
+    };
+
+    Ok(PressureBoundsAssessment::DeclaredCapacityBoundsComparison {
+        minimum_positive_demand_pa,
+        maximum_positive_demand_pa,
+        minimum_declared_capacity_pa: capacity.allowable_external_pressure_pa.min,
+        maximum_declared_capacity_pa: capacity.allowable_external_pressure_pa.max,
+        status,
+        evidence_record_id: capacity.evidence_record_id,
+        basis_profile_id: capacity.basis_profile_id,
+        independent_check_or_test_id: capacity.independent_check_or_test_id,
+    })
+}
+
 /// Inputs for deterministic payload bounds at a fixed spherical reference radius.
 ///
 /// Only scalar masses/densities vary over intervals. The radius is held fixed so this
@@ -1735,6 +1892,134 @@ mod tests {
             + result.structural_areal_mass_interval_contribution_kg
             + result.fixed_vehicle_mass_interval_contribution_kg;
         assert!((sum - result.payload_allowance_interval_width_kg).abs() < 1e-7);
+    }
+
+
+    fn pressure_capacity_bounds(min_pa: f64, max_pa: f64) -> PressureCapacityBoundsRecord {
+        PressureCapacityBoundsRecord {
+            allowable_external_pressure_pa: ScalarBounds { min: min_pa, max: max_pa },
+            evidence_record_id: "capacity-record/v1".into(),
+            basis_profile_id: "design-profile/v1".into(),
+            independent_check_or_test_id: "independent-test/v1".into(),
+        }
+    }
+
+    fn pressure_bounds_request(
+        external: ScalarBounds,
+        internal: ScalarBounds,
+        capacity: Option<PressureCapacityBoundsRecord>,
+    ) -> ExternalPressureBoundsRequest {
+        ExternalPressureBoundsRequest {
+            external_pressure_pa: external,
+            internal_pressure_pa: internal,
+            capacity,
+        }
+    }
+
+    #[test]
+    fn bounded_pressure_capacity_covers_all_declared_demands_when_endpoints_allow() {
+        let result = assess_external_pressure_bounds(pressure_bounds_request(
+            ScalarBounds { min: 100_000.0, max: 102_000.0 },
+            ScalarBounds { min: 0.0, max: 2_000.0 },
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+        )).unwrap();
+        match result {
+            PressureBoundsAssessment::DeclaredCapacityBoundsComparison { status, minimum_positive_demand_pa, maximum_positive_demand_pa, .. } => {
+                assert_eq!(status, CapacityBoundsStatus::DeclaredCapacityCoversDemandBounds);
+                assert_eq!(minimum_positive_demand_pa, 98_000.0);
+                assert_eq!(maximum_positive_demand_pa, 102_000.0);
+            }
+            other => panic!("unexpected assessment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bounded_pressure_capacity_returns_overlap_when_bounds_cross() {
+        let result = assess_external_pressure_bounds(pressure_bounds_request(
+            ScalarBounds { min: 100_000.0, max: 110_000.0 },
+            ScalarBounds { min: 0.0, max: 1_000.0 },
+            Some(pressure_capacity_bounds(105_000.0, 115_000.0)),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            PressureBoundsAssessment::DeclaredCapacityBoundsComparison {
+                status: CapacityBoundsStatus::BoundsOverlap,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn bounded_pressure_capacity_reports_declared_capacity_below_all_demands() {
+        let result = assess_external_pressure_bounds(pressure_bounds_request(
+            ScalarBounds { min: 110_000.0, max: 120_000.0 },
+            ScalarBounds { min: 0.0, max: 1_000.0 },
+            Some(pressure_capacity_bounds(90_000.0, 100_000.0)),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            PressureBoundsAssessment::DeclaredCapacityBoundsComparison {
+                status: CapacityBoundsStatus::DeclaredCapacityBelowDemandBounds,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn bounded_pressure_screen_keeps_missing_capacity_unknown() {
+        let result = assess_external_pressure_bounds(pressure_bounds_request(
+            ScalarBounds { min: 100_000.0, max: 102_000.0 },
+            ScalarBounds { min: 0.0, max: 1_000.0 },
+            None,
+        )).unwrap();
+        assert!(matches!(result, PressureBoundsAssessment::CapacityUnknown { .. }));
+    }
+
+    #[test]
+    fn bounded_pressure_screen_reports_no_demand_only_if_entire_interval_has_no_positive_delta() {
+        let result = assess_external_pressure_bounds(pressure_bounds_request(
+            ScalarBounds { min: 80_000.0, max: 95_000.0 },
+            ScalarBounds { min: 100_000.0, max: 110_000.0 },
+            None,
+        )).unwrap();
+        assert!(matches!(
+            result,
+            PressureBoundsAssessment::NoExternalPressureDemand {
+                minimum_signed_differential_pa: -30_000.0,
+                maximum_signed_differential_pa: -5_000.0,
+            }
+        ));
+    }
+
+    #[test]
+    fn bounded_pressure_screen_blocks_comparison_on_missing_provenance() {
+        let mut capacity = pressure_capacity_bounds(120_000.0, 130_000.0);
+        capacity.independent_check_or_test_id.clear();
+        let result = assess_external_pressure_bounds(pressure_bounds_request(
+            ScalarBounds { min: 100_000.0, max: 102_000.0 },
+            ScalarBounds { min: 0.0, max: 1_000.0 },
+            Some(capacity),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            PressureBoundsAssessment::IncompleteProvenance {
+                missing_fields,
+                ..
+            } if missing_fields == vec!["independent_check_or_test_id"]
+        ));
+    }
+
+    #[test]
+    fn bounded_pressure_screen_rejects_reversed_capacity_bounds() {
+        let result = assess_external_pressure_bounds(pressure_bounds_request(
+            ScalarBounds { min: 100_000.0, max: 102_000.0 },
+            ScalarBounds { min: 0.0, max: 1_000.0 },
+            Some(pressure_capacity_bounds(130_000.0, 120_000.0)),
+        ));
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::InvalidInterval("allowable_external_pressure_pa")
+        );
     }
 
     #[test]
