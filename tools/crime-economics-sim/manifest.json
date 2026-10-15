@@ -44,7 +44,7 @@
     },
     {
       "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
-      "git_blob_sha1": "172c9b8b85cda76281586d0b735f63699bd5ef0f"
+      "git_blob_sha1": "15b3714e67e38124a26e0c4545f3105fae6725b7"
     },
     {
       "path": "tools/crime-economics-sim/src/viability.rs",
@@ -518,7 +518,38 @@
       "source_class": "official_descriptive_victimization_and_reporting_statistics",
       "used_as_crime_effect_parameter": false,
       "relevance": "Latest national victimization survey release; distinguishes incident counts, affected households, and the share reporting some or all incidents to police.",
-      "limitation": "National descriptive survey estimates are not Johannesburg pilot data, a causal effect coefficient, or an individual risk signal. Incident counts, affected-household counts, and reporting proportions are distinct measures. Technical notes report 85.57% national response, 76.97% for Gauteng, 73.72% for the City of Johannesburg, and 67.54% for the City of Tshwane; four geographic areas were below the cited 80% minimum-acceptable response rate. Response rates are quality diagnostics, not significance tests or proof every estimate in a lower-response area is invalid. Empirical comparisons must retain survey design and weights, indicator definitions and denominators, time comparability, geographic fit, and estimate-specific uncertainty information where available."
+      "limitation": "National descriptive survey estimates are not Johannesburg pilot data, a causal effect coefficient, or an individual risk signal. Incident counts, affected-household counts, and reporting proportions are distinct measures. Technical notes report 85.57% national response, 76.97% for Gauteng, 73.72% for the City of Johannesburg, and 67.54% for the City of Tshwane; four geographic areas were below the cited 80% minimum-acceptable response rate. Response rates are quality diagnostics, not significance tests or proof every estimate in a lower-response area is invalid. Empirical comparisons must retain survey design and weights, indicator definitions and denominators, time comparability, geographic fit, and estimate-specific uncertainty information where available. Table 41's 3% coefficients of variation apply to household housebreaking experience (43.1% in 2024/25; 46.0% in 2025/26), not the distinct 43.4% to 48.2% police-reporting proportion. These CVs and rounded differences alone do not establish statistical significance; these are descriptive context, not model inputs.",
+      "indicator_precision_examples": [
+        {
+          "release": "GPSJS 2024/25",
+          "table": "Table 41",
+          "indicator_id": "household_housebreaking_experience_past_12_months",
+          "estimate_percent": 43.1,
+          "coefficient_of_variation_percent": 3,
+          "source_uri": "https://www.statssa.gov.za/publications/P0341/P03412025.pdf",
+          "not_precision_for_reporting_rate_change": true,
+          "used_as_model_parameter": false
+        },
+        {
+          "release": "GPSJS 2025/26",
+          "table": "Table 41",
+          "indicator_id": "household_housebreaking_experience_past_12_months",
+          "estimate_percent": 46,
+          "coefficient_of_variation_percent": 3,
+          "source_uri": "https://www.statssa.gov.za/publications/P0341/P03412026.pdf",
+          "not_precision_for_reporting_rate_change": true,
+          "used_as_model_parameter": false
+        }
+      ],
+      "precision_scope_limits": {
+        "prevalence_indicator_id": "household_housebreaking_experience_past_12_months",
+        "distinct_reporting_indicator_id": "households_reporting_some_or_all_housebreaking_incidents_to_police",
+        "reporting_share_change_percent_points": 4.8,
+        "table_41_cvs_are_precision_for_reporting_share_change": false,
+        "cv_alone_establishes_statistical_significance": false,
+        "year_over_year_significance_established": false,
+        "reporting_share_change_is_causal_effect": false
+      }
     }
   ],
   "viability_measure_definitions": [
