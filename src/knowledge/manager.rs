@@ -1843,8 +1843,9 @@ mod tests {
         assert!((results[0].confidence - 0.4).abs() < f32::EPSILON);
 
         let composed = mgr.compose_typed_query(&terms);
-        let expected = super::super::encoding::KnowledgeEncoder::with_seed(0x4E0E_1ED6_E5ED)
-            .compose_typed_query(&terms);
+        let mut expected_encoder =
+            super::super::encoding::KnowledgeEncoder::with_seed(0x4E0E_1ED6_E5ED);
+        let expected = expected_encoder.compose_typed_query(&terms);
         assert_eq!(composed, expected);
     }
 
