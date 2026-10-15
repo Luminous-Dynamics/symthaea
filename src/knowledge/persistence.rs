@@ -46,6 +46,14 @@ pub struct FactRecord {
     pub cycle: u64,
     /// Whether the fact contains causal relations
     pub is_causal: bool,
+    /// Confidence assigned at insertion; absent for rows written by older schemas.
+    pub initial_confidence: Option<f32>,
+    /// Last access cycle; absent for rows written by older schemas.
+    pub last_accessed_cycle: Option<u64>,
+    /// Number of corroborations tracked by the graph.
+    pub corroboration_count: u32,
+    /// Number of contradictions tracked by the graph.
+    pub contradiction_count: u32,
 }
 
 /// A serializable causal edge record
@@ -131,6 +139,20 @@ fn decode_finite_f32(value: f32, column_index: usize, field: &str) -> rusqlite::
     }
 }
 
+fn decode_nonnegative_u32_counter(
+    value: i64,
+    column_index: usize,
+    field: &str,
+) -> rusqlite::Result<u32> {
+    u32::try_from(value).map_err(|_| {
+        invalid_column_data(
+            column_index,
+            rusqlite::types::Type::Integer,
+            format!("invalid persisted {field} outside u32 range: {value}"),
+        )
+    })
+}
+
 fn decode_confidence(value: f32, column_index: usize) -> rusqlite::Result<f32> {
     if value.is_finite() && (0.0..=1.0).contains(&value) {
         Ok(value)
@@ -201,16 +223,29 @@ impl KnowledgePersistence {
 
         let mut count = 0;
         for fact in facts {
+            let cycle = i64::try_from(fact.cycle)
+                .map_err(|e| format!("Fact insertion cycle exceeds SQLite INTEGER range: {e}"))?;
+            let last_accessed_cycle = fact
+                .last_accessed_cycle
+                .map(i64::try_from)
+                .transpose()
+                .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
             conn.execute(
-                "INSERT INTO knowledge_facts (vector_blob, source_text, confidence, domain, cycle, is_causal)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT INTO knowledge_facts
+                 (vector_blob, source_text, confidence, domain, cycle, is_causal,
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 rusqlite::params![
                     fact.vector_bytes,
                     fact.source_text,
                     fact.confidence,
                     fact.domain,
-                    fact.cycle as i64,
+                    cycle,
                     fact.is_causal,
+                    fact.initial_confidence,
+                    last_accessed_cycle,
+                    fact.corroboration_count as i64,
+                    fact.contradiction_count as i64,
                 ],
             )
             .map_err(|e| e.to_string())?;
@@ -234,7 +269,8 @@ impl KnowledgePersistence {
 
         let mut stmt = conn
             .prepare(
-                "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal
+                "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal,
+                        initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count
                  FROM knowledge_facts ORDER BY cycle DESC",
             )
             .map_err(|e| e.to_string())?;
@@ -245,6 +281,18 @@ impl KnowledgePersistence {
                 validate_hypervector_bytes(&vector_bytes, 0)?;
                 let confidence = decode_confidence(row.get(2)?, 2)?;
                 let cycle = decode_nonnegative_counter(row.get(4)?, 4, "fact cycle")?;
+                let initial_confidence = row
+                    .get::<_, Option<f32>>(6)?
+                    .map(|value| decode_confidence(value, 6))
+                    .transpose()?;
+                let last_accessed_cycle = row
+                    .get::<_, Option<i64>>(7)?
+                    .map(|value| decode_nonnegative_counter(value, 7, "fact last-access cycle"))
+                    .transpose()?;
+                let corroboration_count =
+                    decode_nonnegative_u32_counter(row.get(8)?, 8, "fact corroboration count")?;
+                let contradiction_count =
+                    decode_nonnegative_u32_counter(row.get(9)?, 9, "fact contradiction count")?;
                 Ok(FactRecord {
                     vector_bytes,
                     source_text: row.get(1)?,
@@ -252,6 +300,10 @@ impl KnowledgePersistence {
                     domain: row.get(3)?,
                     cycle,
                     is_causal: row.get(5)?,
+                    initial_confidence,
+                    last_accessed_cycle,
+                    corroboration_count,
+                    contradiction_count,
                 })
             })
             .map_err(|e| e.to_string())?
@@ -447,7 +499,11 @@ impl KnowledgePersistence {
                 confidence REAL NOT NULL,
                 domain TEXT,
                 cycle INTEGER NOT NULL,
-                is_causal INTEGER NOT NULL DEFAULT 0
+                is_causal INTEGER NOT NULL DEFAULT 0,
+                initial_confidence REAL,
+                last_accessed_cycle INTEGER,
+                corroboration_count INTEGER NOT NULL DEFAULT 0,
+                contradiction_count INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
                 cause TEXT NOT NULL,
@@ -470,6 +526,32 @@ impl KnowledgePersistence {
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
         )
         .map_err(|e| format!("Schema init: {e}"))?;
+
+        // Additive migration preserves pre-existing rows. NULL on initial confidence
+        // and last-access cycle means the legacy schema never recorded those values.
+        let columns = {
+            let mut stmt = conn
+                .prepare("PRAGMA table_info(knowledge_facts)")
+                .map_err(|e| format!("Inspect knowledge_facts schema: {e}"))?;
+            let rows = stmt
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(|e| format!("Query knowledge_facts schema: {e}"))?;
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("Collect knowledge_facts schema: {e}"))?
+        };
+        for (name, declaration) in [
+            ("initial_confidence", "REAL"),
+            ("last_accessed_cycle", "INTEGER"),
+            ("corroboration_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("contradiction_count", "INTEGER NOT NULL DEFAULT 0"),
+        ] {
+            if !columns.iter().any(|column| column == name) {
+                conn.execute_batch(&format!(
+                    "ALTER TABLE knowledge_facts ADD COLUMN {name} {declaration}"
+                ))
+                .map_err(|e| format!("Migrate knowledge_facts.{name}: {e}"))?;
+            }
+        }
 
         self.initialized = true;
         Ok(())
@@ -500,6 +582,10 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
             }])
             .unwrap();
 
@@ -538,6 +624,10 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
             }])
             .unwrap();
 
@@ -573,6 +663,10 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
             }])
             .unwrap();
 
@@ -605,6 +699,10 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
             }])
             .unwrap();
 
@@ -614,6 +712,42 @@ mod tests {
 
         let error = persistence.load_facts().unwrap_err();
         assert!(error.contains("invalid negative persisted fact cycle"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_negative_last_access_cycle() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_negative_fact_access_cycle_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                source_text: "fixture fact".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 3,
+                is_causal: false,
+                initial_confidence: Some(0.9),
+                last_accessed_cycle: Some(3),
+                corroboration_count: 0,
+                contradiction_count: 0,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute("UPDATE knowledge_facts SET last_accessed_cycle = -1", [])
+            .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("invalid negative persisted fact last-access cycle"), "{error}");
         assert_eq!(persistence.total_loaded(), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -722,6 +856,57 @@ mod tests {
     }
 
     #[test]
+    fn test_old_knowledge_facts_schema_migrates_without_losing_legacy_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_knowledge_schema_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE knowledge_facts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vector_blob BLOB NOT NULL,
+                source_text TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                domain TEXT,
+                cycle INTEGER NOT NULL,
+                is_causal INTEGER NOT NULL DEFAULT 0
+            );",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO knowledge_facts
+             (vector_blob, source_text, confidence, domain, cycle, is_causal)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![
+                vec![0u8; BinaryHV::BYTES],
+                "legacy fact",
+                0.4_f32,
+                "legacy",
+                7_i64,
+                false
+            ],
+        )
+        .unwrap();
+        drop(conn);
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let records = persistence.load_facts().unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].source_text, "legacy fact");
+        assert_eq!(records[0].initial_confidence, None);
+        assert_eq!(records[0].last_accessed_cycle, None);
+        assert_eq!(records[0].corroboration_count, 0);
+        assert_eq!(records[0].contradiction_count, 0);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_unconfigured() {
         let mut p = KnowledgePersistence::default();
         assert!(!p.is_configured());
@@ -746,6 +931,10 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                initial_confidence: Some(0.95),
+                last_accessed_cycle: Some(42),
+                corroboration_count: 3,
+                contradiction_count: 2,
             },
             FactRecord {
                 vector_bytes: vec![1u8; 2048],
@@ -754,6 +943,10 @@ mod tests {
                 domain: None,
                 cycle: 2,
                 is_causal: true,
+                initial_confidence: Some(0.85),
+                last_accessed_cycle: Some(44),
+                corroboration_count: 4,
+                contradiction_count: 1,
             },
         ];
 
@@ -765,6 +958,14 @@ mod tests {
         assert_eq!(loaded.len(), 2);
         assert_eq!(loaded[0].source_text, "Test fact two"); // DESC order
         assert_eq!(loaded[1].source_text, "Test fact one");
+        assert_eq!(loaded[0].initial_confidence, Some(0.85));
+        assert_eq!(loaded[0].last_accessed_cycle, Some(44));
+        assert_eq!(loaded[0].corroboration_count, 4);
+        assert_eq!(loaded[0].contradiction_count, 1);
+        assert_eq!(loaded[1].initial_confidence, Some(0.95));
+        assert_eq!(loaded[1].last_accessed_cycle, Some(42));
+        assert_eq!(loaded[1].corroboration_count, 3);
+        assert_eq!(loaded[1].contradiction_count, 2);
 
         // Cleanup
         let _ = std::fs::remove_dir_all(&dir);
