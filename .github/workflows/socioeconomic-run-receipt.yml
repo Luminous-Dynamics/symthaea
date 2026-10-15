@@ -1,26 +1,42 @@
 name: Socioeconomic Run Receipt Contract
 
-# Manual re-validation path after this contract is merged to the default branch.
-# Pull-request validation is owned by the draft-capable job in ci.yml.
+# Keep this evidence-format check independent of Symthaea's large CI matrix.
+# It validates only the synthetic run-receipt contract on the exact PR head.
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/socioeconomic-run-receipt.yml"
+      - ".github/workflows/ci.yml"
+      - "docs/research/finance/SYM-FIN-SYS-016_run_receipt_*"
+      - "scripts/validate_socioeconomic_run_receipt.py"
+      - "scripts/socioeconomic_run_receipt_requirements.txt"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/socioeconomic-run-receipt.yml"
+      - ".github/workflows/ci.yml"
+      - "docs/research/finance/SYM-FIN-SYS-016_run_receipt_*"
+      - "scripts/validate_socioeconomic_run_receipt.py"
+      - "scripts/socioeconomic_run_receipt_requirements.txt"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: socioeconomic-run-receipt-${{ github.ref }}
+  group: socioeconomic-run-receipt-${{ github.event.pull_request.head.ref || github.ref }}
   cancel-in-progress: false
 
 jobs:
   validate-contract:
     name: JSON Schema and semantic negative controls
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Checkout dispatched revision
+      - name: Checkout exact subject
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 immutable commit
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Create isolated validation environment
         run: python3 -m venv "$RUNNER_TEMP/run-receipt-venv"
