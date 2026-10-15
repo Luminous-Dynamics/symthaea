@@ -261,7 +261,6 @@ impl KnowledgePersistence {
                 .transpose()
                 .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
             let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
-            let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
             conn.execute(
                 "INSERT INTO knowledge_facts
                  (vector_blob, source_text, confidence, domain, cycle, is_causal,
@@ -319,6 +318,7 @@ impl KnowledgePersistence {
                 .map(i64::try_from)
                 .transpose()
                 .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
+            let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
 
             tx.execute(
                 "INSERT INTO knowledge_facts
@@ -555,7 +555,6 @@ impl KnowledgePersistence {
                     domain: row.get(3)?,
                     cycle,
                     is_causal: row.get(5)?,
-                    graph_fact_id: None,
                     graph_fact_id,
                     initial_confidence,
                     last_accessed_cycle,
