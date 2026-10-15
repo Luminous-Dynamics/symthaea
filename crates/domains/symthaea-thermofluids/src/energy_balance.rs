@@ -53,7 +53,7 @@ pub enum EnergyBalanceError {
     NonPositiveInputPower,
     /// Output or loss flows cannot be negative.
     NegativePowerFlow,
-    /// Relative tolerance must be finite and non-negative.
+    /// Relative tolerance must be finite and in the range [0, 1).
     InvalidTolerance,
     /// Reported gross output exceeds reported input, which is not admissible.
     OutputExceedsInput,
@@ -67,7 +67,7 @@ impl std::fmt::Display for EnergyBalanceError {
             Self::NonFiniteInput => f.write_str("all power flows and tolerance must be finite"),
             Self::NonPositiveInputPower => f.write_str("input power must be greater than zero"),
             Self::NegativePowerFlow => f.write_str("output and loss power flows cannot be negative"),
-            Self::InvalidTolerance => f.write_str("relative tolerance must be finite and non-negative"),
+            Self::InvalidTolerance => f.write_str("relative tolerance must be finite and in the range [0, 1)"),
             Self::OutputExceedsInput => f.write_str("gross output cannot exceed input power"),
             Self::FirstLawImbalance { relative_error, tolerance } => write!(
                 f,
@@ -110,7 +110,7 @@ impl EnergyBalance {
         {
             return Err(EnergyBalanceError::NegativePowerFlow);
         }
-        if relative_tolerance < 0.0 {
+        if !(0.0..1.0).contains(&relative_tolerance) {
             return Err(EnergyBalanceError::InvalidTolerance);
         }
 
@@ -258,6 +258,10 @@ mod tests {
         };
         assert_eq!(
             valid_flows.evaluate(-1e-6),
+            Err(EnergyBalanceError::InvalidTolerance)
+        );
+        assert_eq!(
+            valid_flows.evaluate(1.0),
             Err(EnergyBalanceError::InvalidTolerance)
         );
     }
