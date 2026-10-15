@@ -13,7 +13,7 @@
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
 use super::encoding::{FactEncoding, RoleBoundVector};
-use super::extraction::SemanticRole;
+use super::extraction::{ExtractedRelation, SemanticRole};
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
@@ -143,6 +143,53 @@ pub struct RoleAwareSearchResult {
     pub matches: Vec<RoleObservationMatch>,
     /// Query role/entity pairs that did not match, in query order.
     pub unmatched_query_terms: Vec<(SemanticRole, String)>,
+}
+
+/// One explicit relation constraint in a structured retrieval query.
+///
+/// Matching is intentionally structural: normalized subject, predicate and
+/// object text must match in the same direction, roles must agree, and causal
+/// and negation flags must match. This is not a semantic-synonym matcher.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelationObservationQuery {
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub subject_role: SemanticRole,
+    pub object_role: SemanticRole,
+    pub is_causal: bool,
+    pub is_negated: bool,
+}
+
+/// Stored relation evidence assigned to one relation constraint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelationConstraintMatch {
+    pub query_index: usize,
+    pub stored_subject: String,
+    pub stored_predicate: String,
+    pub stored_object: String,
+    pub stored_subject_role: SemanticRole,
+    pub stored_object_role: SemanticRole,
+    pub stored_is_causal: bool,
+    pub stored_is_negated: bool,
+}
+
+/// Role-aware retrieval plus an explicit audit of relation constraints.
+///
+/// A high role-similarity score does not imply that the stored fact satisfies
+/// predicate, direction, causality, or negation requirements. Consumers should
+/// inspect `constraints_satisfied` and `unmatched_relation_constraints`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConstrainedRoleAwareSearchResult {
+    pub retrieval: RoleAwareSearchResult,
+    pub matched_relation_constraints: Vec<RelationConstraintMatch>,
+    pub unmatched_relation_constraints: Vec<RelationObservationQuery>,
+    /// Fraction of requested relation constraints matched, in [0, 1].
+    /// Empty constraint lists receive 1.0 (vacuous satisfaction).
+    pub relation_coverage: f32,
+    /// True only when every requested relation constraint has a distinct exact
+    /// structural match in the stored fact. It is not a truth/authenticity claim.
+    pub constraints_satisfied: bool,
 }
 
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
@@ -363,6 +410,100 @@ impl EnhancedKnowledgeGraph {
         current_cycle: u64,
         config: RoleObservationSearchConfig,
     ) -> Vec<RoleAwareSearchResult> {
+        let results = self.search_role_observations_untracked(query, k, config);
+        for result in &results {
+            if let Some(fact) = self.facts.get_mut(&result.fact_id) {
+                fact.last_accessed_cycle = current_cycle;
+            }
+        }
+        results
+    }
+
+    /// Retrieve role-matching facts while independently auditing relation constraints.
+    ///
+    /// Candidates are ranked first by whether every relation constraint is
+    /// satisfied, then by relation coverage, role coverage, retrieval score, and
+    /// stable fact ID. Unsatisfied candidates remain in the result so callers can
+    /// inspect what was missing; they must not be treated as satisfying the query.
+    /// Predicate matching is exact after case/whitespace normalization. No
+    /// synonym, causal entailment, or negation inference is performed.
+    pub fn search_role_observations_with_relation_constraints(
+        &mut self,
+        query: &[RoleBoundVector],
+        relation_constraints: &[RelationObservationQuery],
+        k: usize,
+        current_cycle: u64,
+        config: RoleObservationSearchConfig,
+    ) -> Vec<ConstrainedRoleAwareSearchResult> {
+        if query.is_empty() || k == 0 {
+            return Vec::new();
+        }
+
+        // Score candidates without changing recency; only the final returned
+        // candidates should receive the existing access-refresh side effect.
+        let all_results =
+            self.search_role_observations_untracked(query, self.facts.len(), config);
+        let mut constrained = Vec::with_capacity(all_results.len());
+
+        for retrieval in all_results {
+            let Some(fact) = self.facts.get(&retrieval.fact_id) else {
+                continue;
+            };
+            let (matched_relation_constraints, unmatched_relation_constraints) =
+                match_relation_constraints(relation_constraints, &fact.encoding.relations);
+            let relation_coverage = if relation_constraints.is_empty() {
+                1.0
+            } else {
+                matched_relation_constraints.len() as f32 / relation_constraints.len() as f32
+            };
+            let constraints_satisfied = unmatched_relation_constraints.is_empty();
+            constrained.push(ConstrainedRoleAwareSearchResult {
+                retrieval,
+                matched_relation_constraints,
+                unmatched_relation_constraints,
+                relation_coverage,
+                constraints_satisfied,
+            });
+        }
+
+        constrained.sort_by(|a, b| {
+            b.constraints_satisfied
+                .cmp(&a.constraints_satisfied)
+                .then_with(|| {
+                    b.relation_coverage
+                        .partial_cmp(&a.relation_coverage)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .then_with(|| {
+                    b.retrieval
+                        .coverage
+                        .partial_cmp(&a.retrieval.coverage)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .then_with(|| {
+                    b.retrieval
+                        .similarity
+                        .partial_cmp(&a.retrieval.similarity)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .then_with(|| a.retrieval.fact_id.cmp(&b.retrieval.fact_id))
+        });
+        constrained.truncate(k);
+
+        for result in &constrained {
+            if let Some(fact) = self.facts.get_mut(&result.retrieval.fact_id) {
+                fact.last_accessed_cycle = current_cycle;
+            }
+        }
+        constrained
+    }
+
+    fn search_role_observations_untracked(
+        &self,
+        query: &[RoleBoundVector],
+        k: usize,
+        config: RoleObservationSearchConfig,
+    ) -> Vec<RoleAwareSearchResult> {
         if query.is_empty() || k == 0 {
             return Vec::new();
         }
@@ -470,12 +611,6 @@ impl EnhancedKnowledgeGraph {
                 .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(k);
-
-        for result in &results {
-            if let Some(fact) = self.facts.get_mut(&result.fact_id) {
-                fact.last_accessed_cycle = current_cycle;
-            }
-        }
 
         results
     }
@@ -1032,6 +1167,66 @@ impl EnhancedKnowledgeGraph {
             }
         }
     }
+}
+
+fn normalized_relation_text(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+fn relation_constraint_matches(
+    query: &RelationObservationQuery,
+    stored: &ExtractedRelation,
+) -> bool {
+    normalized_relation_text(&query.subject) == normalized_relation_text(&stored.subject)
+        && normalized_relation_text(&query.predicate)
+            == normalized_relation_text(&stored.predicate)
+        && normalized_relation_text(&query.object) == normalized_relation_text(&stored.object)
+        && query.subject_role == stored.subject_role
+        && query.object_role == stored.object_role
+        && query.is_causal == stored.is_causal
+        && query.is_negated == stored.is_negated
+}
+
+fn match_relation_constraints(
+    queries: &[RelationObservationQuery],
+    stored: &[ExtractedRelation],
+) -> (Vec<RelationConstraintMatch>, Vec<RelationObservationQuery>) {
+    let mut used_stored = vec![false; stored.len()];
+    let mut matched = Vec::with_capacity(queries.len());
+    let mut unmatched = Vec::new();
+
+    for (query_index, query) in queries.iter().enumerate() {
+        let stored_index = stored.iter().enumerate().find_map(|(index, relation)| {
+            if !used_stored[index] && relation_constraint_matches(query, relation) {
+                Some(index)
+            } else {
+                None
+            }
+        });
+
+        if let Some(index) = stored_index {
+            used_stored[index] = true;
+            let relation = &stored[index];
+            matched.push(RelationConstraintMatch {
+                query_index,
+                stored_subject: relation.subject.clone(),
+                stored_predicate: relation.predicate.clone(),
+                stored_object: relation.object.clone(),
+                stored_subject_role: relation.subject_role,
+                stored_object_role: relation.object_role,
+                stored_is_causal: relation.is_causal,
+                stored_is_negated: relation.is_negated,
+            });
+        } else {
+            unmatched.push(query.clone());
+        }
+    }
+
+    (matched, unmatched)
 }
 
 fn maximum_weight_maximum_cardinality_matching(
@@ -1822,6 +2017,176 @@ mod tests {
             maximum_weight_maximum_cardinality_matching(&candidates_by_query, 2);
 
         assert_eq!(observation_to_query, vec![Some(1), Some(0)]);
+    }
+
+    #[test]
+    fn test_relation_constraints_expose_direction_predicate_and_negation_failures() {
+        use super::super::extraction::{EntityType, ExtractedRelation, SemanticRole};
+
+        let mut graph = EnhancedKnowledgeGraph::new(32);
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let query_terms = encoder.encode_role_terms(&[
+            (SemanticRole::Agent, "Service A", EntityType::Organization),
+            (SemanticRole::Patient, "Service B", EntityType::Organization),
+        ]);
+
+        let relation = |subject: &str,
+                        predicate: &str,
+                        object: &str,
+                        subject_role: SemanticRole,
+                        object_role: SemanticRole,
+                        is_causal: bool,
+                        is_negated: bool| ExtractedRelation {
+            subject: subject.to_string(),
+            predicate: predicate.to_string(),
+            object: object.to_string(),
+            subject_role,
+            object_role,
+            is_causal,
+            is_negated,
+            confidence: 0.9,
+        };
+
+        let variants = vec![
+            (
+                "positive",
+                vec![relation(
+                    "Service A", "Prevented", "Service B",
+                    SemanticRole::Agent, SemanticRole::Patient, true, false,
+                )],
+            ),
+            (
+                "reversed",
+                vec![relation(
+                    "Service B", "prevented", "Service A",
+                    SemanticRole::Patient, SemanticRole::Agent, true, false,
+                )],
+            ),
+            (
+                "wrong-predicate",
+                vec![relation(
+                    "Service A", "caused", "Service B",
+                    SemanticRole::Agent, SemanticRole::Patient, true, false,
+                )],
+            ),
+            (
+                "negated",
+                vec![relation(
+                    "Service A", "prevented", "Service B",
+                    SemanticRole::Agent, SemanticRole::Patient, true, true,
+                )],
+            ),
+            (
+                "wrong-role",
+                vec![relation(
+                    "Service A", "prevented", "Service B",
+                    SemanticRole::Patient, SemanticRole::Agent, true, false,
+                )],
+            ),
+            ("missing-relation", Vec::new()),
+        ];
+        let mut ids = HashMap::new();
+        for (label, relations) in variants {
+            let mut encoding = make_encoding(label, 0.6);
+            // Hold the entity/role evidence constant so the counterfactual
+            // relation differences, not vector similarity, determine the audit.
+            encoding.role_vector_observations = query_terms.clone();
+            encoding.relations = relations;
+            let (id, _) = graph.insert(encoding, 1, None, false);
+            ids.insert(label.to_string(), id);
+        }
+
+        let constraints = [RelationObservationQuery {
+            subject: " SERVICE   A ".into(),
+            predicate: "PREVENTED".into(),
+            object: "service b".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+        }];
+        let results = graph.search_role_observations_with_relation_constraints(
+            &query_terms,
+            &constraints,
+            16,
+            2,
+            RoleObservationSearchConfig::new(0.99).unwrap(),
+        );
+
+        assert_eq!(results.len(), 6);
+        assert_eq!(results[0].retrieval.fact_id, ids["positive"]);
+        assert!(results[0].constraints_satisfied);
+        assert_eq!(results[0].relation_coverage, 1.0);
+        assert_eq!(results[0].matched_relation_constraints.len(), 1);
+        assert!(results[0].unmatched_relation_constraints.is_empty());
+
+        let rejected: Vec<_> = results.iter().filter(|result| !result.constraints_satisfied).collect();
+        assert_eq!(rejected.len(), 5);
+        for result in rejected {
+            assert_eq!(result.relation_coverage, 0.0);
+            assert_eq!(result.matched_relation_constraints.len(), 0);
+            assert_eq!(result.unmatched_relation_constraints.len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_one_stored_relation_cannot_satisfy_duplicate_constraints() {
+        use super::super::extraction::{EntityType, ExtractedRelation, SemanticRole};
+
+        let mut graph = EnhancedKnowledgeGraph::new(8);
+        let mut encoder = KnowledgeEncoder::with_seed(84);
+        let query_terms = encoder.encode_role_terms(&[
+            (SemanticRole::Agent, "Worker", EntityType::Organization),
+            (SemanticRole::Patient, "Queue", EntityType::Concept),
+        ]);
+        let relation = ExtractedRelation {
+            subject: "Worker".into(),
+            predicate: "drains".into(),
+            object: "Queue".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: false,
+            is_negated: false,
+            confidence: 0.8,
+        };
+        let mut one = make_encoding("one stored relation", 0.6);
+        one.role_vector_observations = query_terms.clone();
+        one.relations = vec![relation.clone()];
+        let (one_id, _) = graph.insert(one, 1, None, false);
+
+        let mut two = make_encoding("two stored relations", 0.6);
+        two.role_vector_observations = query_terms.clone();
+        two.relations = vec![relation.clone(), relation];
+        let (two_id, _) = graph.insert(two, 1, None, false);
+
+        let constraint = RelationObservationQuery {
+            subject: "Worker".into(),
+            predicate: "drains".into(),
+            object: "Queue".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: false,
+            is_negated: false,
+        };
+        let results = graph.search_role_observations_with_relation_constraints(
+            &query_terms,
+            &[constraint.clone(), constraint],
+            8,
+            2,
+            RoleObservationSearchConfig::new(0.99).unwrap(),
+        );
+
+        assert_eq!(results.len(), 2);
+        let full = results.iter().find(|result| result.retrieval.fact_id == two_id).unwrap();
+        assert!(full.constraints_satisfied);
+        assert_eq!(full.relation_coverage, 1.0);
+        assert_eq!(full.matched_relation_constraints.len(), 2);
+
+        let partial = results.iter().find(|result| result.retrieval.fact_id == one_id).unwrap();
+        assert!(!partial.constraints_satisfied);
+        assert_eq!(partial.relation_coverage, 0.5);
+        assert_eq!(partial.matched_relation_constraints.len(), 1);
+        assert_eq!(partial.unmatched_relation_constraints.len(), 1);
     }
 
     #[test]
