@@ -304,7 +304,11 @@ mod tests {
         // BinaryHV is always HDC_DIMENSION (16,384 bits = 2048 bytes)
         assert!(encoding.confidence > 0.0);
         assert!(!encoding.role_vectors.is_empty());
-        assert!(encoding.confidence > 0.0);
+        assert_eq!(encoding.relations.len(), fact.relations.len());
+        assert_eq!(encoding.relations[0].predicate, "sanctioned");
+        assert!(!encoding.relations[0].is_negated);
+        assert_eq!(encoding.relations[0].subject_role, SemanticRole::Agent);
+        assert_eq!(encoding.relations[0].object_role, SemanticRole::Patient);
     }
 
     #[test]
