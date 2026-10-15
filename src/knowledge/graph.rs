@@ -1038,6 +1038,65 @@ mod tests {
     }
 
     #[test]
+    fn test_role_observation_search_is_stable_across_sqlite_restart() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_role_search_restart_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let terms = [
+            (
+                SemanticRole::Agent,
+                "United States",
+                EntityType::Organization,
+            ),
+            (
+                SemanticRole::Agent,
+                "European Union",
+                EntityType::Organization,
+            ),
+        ];
+        let query = encoder.encode_role_terms(&terms);
+
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let mut encoding = make_encoding("role-query persistence fixture", 0.73);
+        encoding.role_vector_observations = query.clone();
+        let (id, _) = graph.insert(encoding, 7, Some("test".into()), false);
+        let before = graph.search_role_observations(&query, 5, 8);
+        assert_eq!(before.len(), 1);
+        assert_eq!(before[0].fact_id, id);
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .replace_knowledge_snapshot(&graph.export_fact_records(), &[], &[], graph.next_fact_id())
+            .unwrap();
+        let records = persistence.load_facts().unwrap();
+        assert_eq!(records.len(), 1);
+
+        let mut restored = EnhancedKnowledgeGraph::new(10);
+        assert_eq!(restored.import_fact_records(&records), 1);
+        let restored_observations = &restored
+            .get_fact(id)
+            .expect("restored fact must retain its stable ID")
+            .encoding
+            .role_vector_observations;
+        assert_eq!(restored_observations, &query);
+
+        let after = restored.search_role_observations(&query, 5, 8);
+        assert_eq!(after.len(), before.len());
+        assert_eq!(after[0].fact_id, before[0].fact_id);
+        assert_eq!(after[0].matched_query_terms, before[0].matched_query_terms);
+        assert!((after[0].similarity - before[0].similarity).abs() < f32::EPSILON);
+        assert!((after[0].confidence - before[0].confidence).abs() < f32::EPSILON);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_confidence_decay() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
