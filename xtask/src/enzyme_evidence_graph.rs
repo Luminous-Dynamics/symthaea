@@ -725,7 +725,7 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
         );
     }
 
-    validate_parameter_claims(&graph.parameter_claims, &nodes_by_id)?;
+    validate_parameter_claims(&graph.parameter_claims, &nodes_by_id, &graph.edges)?;
 
     Ok(Report {
         artifacts_verified: verified_artifacts.values().filter(|verified| **verified).count(),
@@ -740,6 +740,7 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
 fn validate_parameter_claims(
     claims: &[ParameterClaim],
     nodes_by_id: &BTreeMap<String, &Node>,
+    edges: &[Edge],
 ) -> Result<()> {
     let mut seen = BTreeSet::<String>::new();
     for claim in claims {
@@ -786,15 +787,38 @@ fn validate_parameter_claims(
         let source_or_fit = nodes_by_id
             .get(claim.source_or_fit_node_id.as_str())
             .with_context(|| format!("parameter {} references missing source_or_fit_node_id {}", claim.parameter_id, claim.source_or_fit_node_id))?;
-        ensure!(
-            matches!(
-                source_or_fit.node_type.as_str(),
-                "source_record" | "reported_parameter_claim" | "fit_run" | "reproduced_parameter_estimate"
+        match source_or_fit.node_type.as_str() {
+            "source_record" => ensure!(
+                edges.iter().any(|edge| {
+                    edge.edge_type == "reported_by"
+                        && edge.from_node_id == claim.source_or_fit_node_id
+                        && nodes_by_id
+                            .get(edge.to_node_id.as_str())
+                            .is_some_and(|node| node.node_type == "reported_parameter_claim")
+                }),
+                "parameter {} references source record {} without a reported_by edge to a reported_parameter_claim node",
+                claim.parameter_id,
+                claim.source_or_fit_node_id
             ),
-            "parameter {} source_or_fit_node_id must identify a source claim or fit node, got {}",
-            claim.parameter_id,
-            source_or_fit.node_type
-        );
+            "fit_run" => ensure!(
+                edges.iter().any(|edge| {
+                    edge.edge_type == "estimates"
+                        && edge.from_node_id == claim.source_or_fit_node_id
+                        && nodes_by_id
+                            .get(edge.to_node_id.as_str())
+                            .is_some_and(|node| node.node_type == "reproduced_parameter_estimate")
+                }),
+                "parameter {} references fit_run {} without an estimates edge to a reproduced_parameter_estimate node",
+                claim.parameter_id,
+                claim.source_or_fit_node_id
+            ),
+            "reported_parameter_claim" | "reproduced_parameter_estimate" => {}
+            other => bail!(
+                "parameter {} source_or_fit_node_id must identify a source/fit record with a claim edge or a parameter-claim node, got {}",
+                claim.parameter_id,
+                other
+            ),
+        }
     }
     Ok(())
 }
@@ -1361,6 +1385,64 @@ mod tests {
         graph["transformations"][0].as_object_mut().unwrap().remove("terminal_reason");
         let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
         assert!(error.contains("terminal_reason"));
+    }
+
+    #[test]
+    fn rejects_parameter_claim_linked_to_source_without_reported_by_edge() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["parameter_claims"] = json!([{
+            "parameter_id": "p_source",
+            "parameter_name": "kcat",
+            "endpoint_definition": "catalytic turnover number",
+            "value": 12.4,
+            "unit": "s^-1",
+            "enzyme_form_basis": "not reported",
+            "reaction_id": "reaction-1",
+            "substrate_ids": ["substrate-1"],
+            "assay_context": {"pH": null, "temperature_c": 25.0},
+            "kinetic_equation_id": "michaelis-menten",
+            "source_or_fit_node_id": "n_source",
+            "uncertainty_status": "not_available"
+        }]);
+
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("without a reported_by edge"));
+    }
+
+    #[test]
+    fn accepts_parameter_claim_linked_to_source_by_reported_by_edge() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["nodes"].as_array_mut().unwrap().push(json!({
+            "node_id": "n_reported",
+            "type": "reported_parameter_claim",
+            "evidence_class": "source_claim",
+            "artifact_ids": []
+        }));
+        graph["edges"].as_array_mut().unwrap().push(json!({
+            "edge_id": "e_reported_parameter",
+            "type": "reported_by",
+            "from_node_id": "n_source",
+            "to_node_id": "n_reported"
+        }));
+        graph["parameter_claims"] = json!([{
+            "parameter_id": "p_source",
+            "parameter_name": "kcat",
+            "endpoint_definition": "catalytic turnover number",
+            "value": 12.4,
+            "unit": "s^-1",
+            "enzyme_form_basis": "not reported",
+            "reaction_id": "reaction-1",
+            "substrate_ids": ["substrate-1"],
+            "assay_context": {"pH": null, "temperature_c": 25.0},
+            "kinetic_equation_id": "michaelis-menten",
+            "source_or_fit_node_id": "n_source",
+            "uncertainty_status": "not_available"
+        }]);
+
+        let report = validate_fixture(workspace.root(), &graph).unwrap();
+        assert_eq!(report.parameter_claims, 1);
     }
 
     #[test]
