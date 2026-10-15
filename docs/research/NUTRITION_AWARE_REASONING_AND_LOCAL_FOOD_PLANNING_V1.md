@@ -138,7 +138,7 @@ Validation sequence: (a) nutrition-qualified review of food matching; (b) agrono
 
 ## 8. Staged implementation
 
-**A. Evidence quality.** Build a source registry and provenance schema. Review data licenses and choose South African sources before global fallback. No licensed dataset is embedded until access and redistribution terms are understood.
+**A. Evidence quality.** Build a source registry and provenance schema. Review data licenses and choose South African sources before global fallback. No licensed dataset is embedded until access and redistribution terms are understood. Implementation contract: [NUTRI-SOURCE-001](https://github.com/Luminous-Dynamics/symthaea/issues/7481), including explicit license/permission fields, versioned source manifests, digest policy, food-state matching and fail-closed fixture rules.
 
 **B. Deterministic calculator.** Compute edible delivered mass and per-nutrient contribution from source-pinned inputs with dimensional validation. Independent recomputation and missing-data behavior are release gates.
 
