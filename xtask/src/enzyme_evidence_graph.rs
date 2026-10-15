@@ -182,7 +182,7 @@ struct Transformation {
     terminal_reason: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct ParameterClaim {
     parameter_id: String,
@@ -1422,7 +1422,7 @@ mod tests {
             uncertainty_status: "not_available".to_owned(),
         };
 
-        let error = validate_parameter_claims(&[claim], &nodes_by_id, &[])
+        let error = validate_parameter_claims(&[claim.clone()], &nodes_by_id, &[])
             .unwrap_err()
             .to_string();
         assert!(error.contains("without an estimates edge"));
