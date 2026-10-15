@@ -475,7 +475,7 @@ mod tests {
                 report.rejected[0]
                     .reasons
                     .iter()
-                    .any(|reason| reason.to_lowercase().contains(&expected_reason)),
+                    .any(|reason| reason.to_lowercase().contains(expected_reason)),
                 "expected reason {expected_reason:?}, got {:?}",
                 report.rejected[0].reasons,
             );
