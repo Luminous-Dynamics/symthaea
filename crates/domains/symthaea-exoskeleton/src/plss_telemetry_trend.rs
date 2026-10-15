@@ -324,11 +324,13 @@ fn analyze_source_trend(
         rate_upper_bound_per_s: None,
     };
 
-    if duplicate_conflict {
-        return empty(PlssTelemetryTrendStatus::Conflicted, unique.len());
-    }
     if unique.len() < 2 {
-        return empty(PlssTelemetryTrendStatus::InsufficientEvidence, unique.len());
+        let status = if duplicate_conflict {
+            PlssTelemetryTrendStatus::Conflicted
+        } else {
+            PlssTelemetryTrendStatus::InsufficientEvidence
+        };
+        return empty(status, unique.len());
     }
 
     let first = &unique[0];
@@ -343,12 +345,18 @@ fn analyze_source_trend(
     for pair in unique.windows(2) {
         maximum_gap = maximum_gap.max(pair[1].observed_at_s - pair[0].observed_at_s);
     }
-    if unique.len() < config.minimum_samples
+    if duplicate_conflict
+        || unique.len() < config.minimum_samples
         || !coverage.is_finite()
         || coverage < config.minimum_coverage_fraction
         || maximum_gap > config.maximum_gap_s
     {
-        let mut result = empty(PlssTelemetryTrendStatus::InsufficientEvidence, unique.len());
+        let status = if duplicate_conflict {
+            PlssTelemetryTrendStatus::Conflicted
+        } else {
+            PlssTelemetryTrendStatus::InsufficientEvidence
+        };
+        let mut result = empty(status, unique.len());
         result.maximum_observed_gap_s = Some(maximum_gap);
         result.temporal_coverage_fraction = Some(coverage);
         return result;
