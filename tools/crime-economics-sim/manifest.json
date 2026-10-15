@@ -28,11 +28,11 @@
     },
     {
       "path": "tools/crime-economics-sim/src/lib.rs",
-      "git_blob_sha1": "f5a7004e0d43eaad743e7c824194d445ea045f85"
+      "git_blob_sha1": "2d50643d3f4a52ea15f3a7ffde285b4e96a02ac5"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/simulate.rs",
-      "git_blob_sha1": "e458d300d12ce10c105882e7cadb63b38f8d00fb"
+      "git_blob_sha1": "31518909a08a1d5684790efa3e998e48d4c8998b"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/verify.rs",
@@ -44,7 +44,7 @@
     },
     {
       "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
-      "git_blob_sha1": "d5b05acbbaf09b499e831466eb334f7599a838b5"
+      "git_blob_sha1": "a1a709d99dc4f054bde37703d2dfab2906e010ce"
     },
     {
       "path": "tools/crime-economics-sim/src/viability.rs",

@@ -111,6 +111,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          manifest="tools/crime-economics-sim/manifest.json"
           while IFS='|' read -r name value rust_type; do
             grep -Fq "pub const $name: $rust_type = $value;" tools/crime-economics-sim/src/viability.rs
             grep -Fq "const $name: $rust_type = $value;" tools/crime-economics-sim/src/bin/verify_viability.rs

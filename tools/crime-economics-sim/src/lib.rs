@@ -208,27 +208,6 @@ pub struct ResultRow {
 }
 
 impl ResultRow {
-    fn same_outcomes_except_scenario_id(&self, other: &Self) -> bool {
-        self.seed == other.seed
-            && self.policy_id == other.policy_id
-            && self.population == other.population
-            && self.model_weeks == other.model_weeks
-            && self.need_property_events_local == other.need_property_events_local
-            && self.opportunity_property_events_local == other.opportunity_property_events_local
-            && self.non_economic_harm_events == other.non_economic_harm_events
-            && self.displaced_property_events == other.displaced_property_events
-            && self.simulated_harm_events_total == other.simulated_harm_events_total
-            && self.reported_harm_events == other.reported_harm_events
-            && self.false_alarms == other.false_alarms
-            && self.robot_compromise_weeks == other.robot_compromise_weeks
-            && self.robot_safety_incidents == other.robot_safety_incidents
-            && self.annualized_cost_units == other.annualized_cost_units
-            && self.essential_access_gain_bps == other.essential_access_gain_bps
-            && self.essential_access_gap_bps == other.essential_access_gap_bps
-            && self.privacy_burden_points == other.privacy_burden_points
-            && self.benefit_concentration_bps == other.benefit_concentration_bps
-    }
-
     pub fn to_tsv(&self) -> String {
         format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
