@@ -154,7 +154,7 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
 
     let baselines: BTreeSet<&str> = manifest.evaluation.baseline_ids.iter().map(String::as_str).collect();
     for required in REQUIRED_BASELINES {
-        ensure!(baselines.contains(required), "missing required baseline: {required}");
+        ensure!(baselines.contains(*required), "missing required baseline: {required}");
     }
     ensure!(
         baselines.len() == manifest.evaluation.baseline_ids.len(),
@@ -208,7 +208,7 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         .map(|(index, name)| (name, index))
         .collect();
     for required in REQUIRED_COLUMNS {
-        ensure!(header_index.contains_key(required), "dataset CSV missing column: {required}");
+        ensure!(header_index.contains_key(*required), "dataset CSV missing column: {required}");
     }
 
     let mut seen_observations = BTreeSet::new();
@@ -537,7 +537,7 @@ mod tests {
     fn make_manifest(root: &Path) -> Value {
         let csv_path = "data/synthetic_enzyme_observations.csv";
         let mut writer = csv::Writer::from_writer(Vec::new());
-        writer.write_record(REQUIRED_COLUMNS).unwrap();
+        writer.write_record(REQUIRED_COLUMNS.iter().copied()).unwrap();
         let context_a = json!({
             "ph": {"status":"reported", "value":7.0},
             "temperature_c": {"status":"reported", "value":25.0},
