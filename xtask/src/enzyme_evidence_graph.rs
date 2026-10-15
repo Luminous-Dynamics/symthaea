@@ -94,6 +94,7 @@ const RIGHTS_STATUSES: &[&str] = &[
 const ACQUISITION_STATUSES: &[&str] = &["available", "not_acquired"];
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct EvidenceGraph {
     schema_version: u32,
     graph_id: String,
@@ -108,6 +109,7 @@ struct EvidenceGraph {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Node {
     node_id: String,
     #[serde(rename = "type")]
@@ -118,6 +120,7 @@ struct Node {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Edge {
     edge_id: String,
     #[serde(rename = "type")]
@@ -127,6 +130,7 @@ struct Edge {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ArtifactRecord {
     artifact_id: String,
     role: String,
@@ -141,6 +145,7 @@ struct ArtifactRecord {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RightsRecord {
     rights_record_id: String,
     source_id: String,
@@ -150,6 +155,7 @@ struct RightsRecord {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Transformation {
     transformation_id: String,
     name: String,
@@ -177,6 +183,7 @@ struct Transformation {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ParameterClaim {
     parameter_id: String,
     parameter_name: String,
@@ -1042,6 +1049,74 @@ mod tests {
     fn validate_fixture(root: &Path, value: &Value) -> Result<Report> {
         let graph: EvidenceGraph = serde_json::from_value(value.clone())?;
         validate_graph(root, &graph)
+    }
+
+    #[test]
+    fn rejects_unknown_fields_at_every_typed_graph_level() {
+        let workspace = TempWorkspace::new();
+
+        let mut graph = fixture(workspace.root());
+        graph["unrecognized_top_level"] = json!(true);
+        assert!(
+            serde_json::from_value::<EvidenceGraph>(graph).is_err(),
+            "unknown top-level fields must not be silently ignored"
+        );
+
+        let mut graph = fixture(workspace.root());
+        graph["nodes"][0]["evidnce_class"] = json!("observed");
+        assert!(
+            serde_json::from_value::<EvidenceGraph>(graph).is_err(),
+            "unknown node fields must not be silently ignored"
+        );
+
+        let mut graph = fixture(workspace.root());
+        graph["edges"][0]["from_nod_id"] = json!("n_source");
+        assert!(
+            serde_json::from_value::<EvidenceGraph>(graph).is_err(),
+            "unknown edge fields must not be silently ignored"
+        );
+
+        let mut graph = fixture(workspace.root());
+        graph["artifacts"][0]["byte_lenght"] = json!(17);
+        assert!(
+            serde_json::from_value::<EvidenceGraph>(graph).is_err(),
+            "unknown artifact fields must not be silently ignored"
+        );
+
+        let mut graph = fixture(workspace.root());
+        graph["rights_records"][0]["licence_id"] = json!("CC0-1.0");
+        assert!(
+            serde_json::from_value::<EvidenceGraph>(graph).is_err(),
+            "unknown rights-record fields must not be silently ignored"
+        );
+
+        let mut graph = fixture(workspace.root());
+        graph["transformations"][0]["terminal_reasn"] = json!("none");
+        assert!(
+            serde_json::from_value::<EvidenceGraph>(graph).is_err(),
+            "unknown transformation fields must not be silently ignored"
+        );
+
+        let mut graph = fixture(workspace.root());
+        graph["parameter_claims"] = json!([{
+            "parameter_id": "p_kcat",
+            "parameter_name": "kcat",
+            "endpoint_definition": "turnover number",
+            "value": 1.0,
+            "unit": "s^-1",
+            "enzyme_form_basis": "per catalytic site",
+            "reaction_id": "reaction_1",
+            "substrate_ids": ["substrate_1"],
+            "assay_context": {"pH": 7.0},
+            "kinetic_equation_id": "equation_1",
+            "source_or_fit_node_id": "n_source",
+            "uncertainty_status": "not_available",
+            "uncertainty_stauts": "reported"
+        }]);
+        assert!(
+            serde_json::from_value::<EvidenceGraph>(graph).is_err(),
+            "unknown parameter-claim fields must not be silently ignored"
+        );
     }
 
     #[test]
