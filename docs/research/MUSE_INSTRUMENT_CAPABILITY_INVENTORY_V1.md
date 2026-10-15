@@ -48,7 +48,7 @@ cargo run -p symthaea-muse --bin muse_instrument_inventory -- \
 
 The probe flag is deliberately opt-in. It requires `--soundfont`; the tool resolves the executable, records its file SHA-256 and first version line when available, and invokes offline MIDI-to-WAV rendering without a live MIDI or audio device. Each distinct GM program referenced by the inventory is tested once, but a render is attempted only when the SoundFont header table declares the exact bank-0/program slot. The probe uses a fixed 3×3 MIDI grid: notes 48, 60 and 72, each at velocities 48, 96 and 120; sample rate 22050 Hz; gain 0.8; reverb and chorus disabled via FluidSynth's documented `-R0` and `-C0` switches; and one half-second note followed by a half-second tail. Each program/note/velocity cell gets its own MIDI/WAV artifact and status. It records the executable hash/version, command template, output WAV hash, and decoded signal metrics. Running probes takes longer than a filesystem-only inventory and results may differ between FluidSynth builds or SoundFonts.
 
-To bind the receipt to the bytes in each indexed WAV file, add `--hash-indexed-samples` to any invocation. This opt-in performs a second streaming read of every WAV accepted by the sample filename indexer and emits a per-mapped-directory content-manifest SHA-256. It can add substantial I/O for large libraries; the default inventory remains lightweight and leaves these hashes null. If a file cannot be read consistently during hashing, the command fails instead of emitting a partial content fingerprint.
+To bind the receipt to the bytes in each indexed WAV file, add `--hash-indexed-samples` to any invocation. This opt-in performs a second streaming read of every WAV accepted by the sample filename indexer and emits a per-mapped-directory content-manifest SHA-256. It can add substantial I/O for large libraries; the default inventory remains lightweight and leaves these hashes null. If an indexed file cannot be opened or fully read during hashing, or its size changes while being hashed, the command fails instead of emitting a partial content fingerprint. The top-level `indexed_sample_content_hashing_enabled` flag makes it explicit whether this optional pass was requested, even when no mapped directory has indexable files.
 
 The roots default to SYMTHAEA_VCSL_DIR and SYMTHAEA_VSCO2_DIR when set; otherwise the CLI uses the repository's conventional data/samples/vcsl and sibling data/samples/vsco2-ce paths. Explicit command-line roots override the defaults. JSON is emitted to stdout.
 
@@ -56,7 +56,7 @@ Missing optional asset roots are a valid observation and are reported as unavail
 
 ## Evidence fields
 
-- instrument_count and instruments enumerate the current 42 source-declared instrument variants.
+- instrument_count and instruments enumerate the current 42 source-declared instrument variants. The top-level `indexed_sample_content_hashing_enabled` boolean records whether the optional sample-byte hashing pass was requested; a null per-directory digest with this flag true means that mapping had no indexable WAV files to fingerprint.
 - procedural_renderer_path is derived from the instrument's source dispatch classifiers: karplus_strong, frequency_modulation, or additive. This is not an audio-quality score.
 - gm_program_0_based is Muse's output mapping, not an asserted original source-patch identity. Some instruments use documented nearest-family approximations because General MIDI does not have exact names for all instruments.
 - soundfont_bank0_program_matches is null when no SoundFont was supplied. With a SoundFont, it lists declared preset names matching bank 0 and that instrument's selected program; an empty list is evidence of no exact header match, not proof that no suitable sound is available in another bank or via a fallback.
@@ -82,7 +82,7 @@ Keep the following status dimensions separate when consuming the inventory:
 | Can the current indexer index files? | indexed_sample_count > 0; audio still unproven |
 | Do indexed WAVs fully decode, or are some silent? | audio_decode_status, decoded/failed counts, and silent_sample_file_count |
 | Which indexed WAV files failed decoding? | reported_sample_decode_failures (bounded filename/reason entries) and omitted_sample_decode_failure_count |
-| Did indexed WAV bytes change while paths and file sizes stayed the same? | Compare indexed_sample_content_manifest_sha256 when `--hash-indexed-samples` was enabled on both inventories |
+| Did indexed WAV bytes change while paths and file sizes stayed the same? | Confirm `indexed_sample_content_hashing_enabled` is true, then compare indexed_sample_content_manifest_sha256 for mappings with indexable files |
 | What WAV formats occur among decoded files? | distinct sample-rate and channel-count fields |
 | What pitch/dynamic filename coverage is visible? | min/max MIDI, distinct pitch count, and distinct normalized dynamic-value count |
 | Which SoundFont file was inspected? | Optional content SHA-256 |
