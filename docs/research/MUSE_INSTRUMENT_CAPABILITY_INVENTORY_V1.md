@@ -15,7 +15,7 @@ Muse has multiple kinds of instrument support that must not be conflated:
 7. the ability of a particular preset/articulation/range to render correctly;
 8. evidence that the resulting sound is musically convincing.
 
-The inventory CLI records source and filesystem evidence plus structurally parsed SoundFont preset headers. It does **not** certify full SoundFont validity, FluidSynth loadability, sample-zone presence, note-range coverage, or perceptual realism. Those remain separate gates.
+The inventory CLI records source and filesystem evidence, fully consumes the decoded samples of WAV files accepted by its current filename indexer, and structurally parses SoundFont preset headers. It does **not** certify full SoundFont validity, FluidSynth loadability, SoundFont sample-zone presence, complete note-range/articulation coverage, or perceptual realism. Those remain separate gates.
 
 ## Running the inventory
 
@@ -46,11 +46,11 @@ Missing optional asset roots are a valid observation and are reported as unavail
 - procedural_renderer_path is derived from the instrument's source dispatch classifiers: karplus_strong, frequency_modulation, or additive. This is not an audio-quality score.
 - gm_program_0_based is Muse's output mapping, not an asserted original source-patch identity. Some instruments use documented nearest-family approximations because General MIDI does not have exact names for all instruments.
 - soundfont_bank0_program_matches is null when no SoundFont was supplied. With a SoundFont, it lists declared preset names matching bank 0 and that instrument's selected program; an empty list is evidence of no exact header match, not proof that no suitable sound is available in another bank or via a fallback.
-- sustained_samples and short_articulation_samples report the mapped library, relative mapping directory, whether the directory exists, and how many WAV filenames are accepted by the current sample indexer. They also report the minimum/maximum MIDI note and distinct pitch/dynamic-value counts from accepted filenames.
+- sustained_samples and short_articulation_samples report the mapped library, relative mapping directory, whether the directory exists, and how many WAV filenames are accepted by the current sample indexer. They also report filename-derived minimum/maximum MIDI note and distinct pitch/dynamic-value counts, plus an audio-decode audit: decode status, fully decoded file count, failed full-decode count, near-silent file count, and diversity of sample rates/channel counts among successfully decoded files.
 - vcsl_root and vsco2_root record root presence, number of recursively discovered lowercase .wav files, and a deterministic path_size_manifest_sha256.
 - soundfont, when requested, records the file name, byte size, and SHA-256 of the SoundFont bytes, plus parsed preset-header names, bank/program values, bank count, and duplicate bank/program slots.
 
-path_size_manifest_sha256 hashes sorted relative WAV paths and file sizes. It is a compact layout/inventory digest, **not** a content digest; changing audio bytes while preserving each file path and size will not change it. indexed_sample_count establishes filename/indexer compatibility only. The observed min/max MIDI values and distinct pitch/dynamic values describe filename metadata, not calibrated acoustic velocity layers, usable rendered range, successful WAV decoding, sample quality, or audible rendering. Two files can name the same pitch at different dynamics; filename coverage must not be treated as one-sample-per-note full support. The preset table is parsed from the RIFF/sfbk pdta/phdr chunk, including the terminal EOP-record check; invalid containers, chunk boundaries, empty preset names and out-of-range program values fail closed. The parsed table reports what the file declares. It does not prove that the SoundFont's sample chunks or instrument zones are complete, that libfluidsynth will load it, or that any program can render audible output. The SoundFont SHA-256 proves the byte identity of the file that was indexed.
+path_size_manifest_sha256 hashes sorted relative WAV paths and file sizes. It is a compact layout/inventory digest, **not** a content digest; changing audio bytes while preserving each file path and size will not change it. indexed_sample_count establishes filename/indexer compatibility only. The WAV audit opens each indexed file and consumes its complete hound sample iterator, rejecting empty/incomplete frames, decoder errors, invalid sample-rate/channel/bit-depth metadata and non-finite float samples. A successful decode only proves the file can be fully decoded by this audit; it does not prove the samples are musically useful, that their named pitch is correct, or that the renderer can play them in context. The silent-file threshold is peak absolute normalized sample value <= 1e-5, a mechanical silence check rather than a perceptual test. The observed min/max MIDI values and distinct pitch/dynamic values describe filename metadata, not calibrated acoustic velocity layers or rendered range. Two files can name the same pitch at different dynamics; filename coverage must not be treated as one-sample-per-note full support. The preset table is parsed from the RIFF/sfbk pdta/phdr chunk, including the terminal EOP-record check; invalid containers, chunk boundaries, empty preset names and out-of-range program values fail closed. The parsed table reports what the file declares. It does not prove that the SoundFont's sample chunks or instrument zones are complete, that libfluidsynth will load it, or that any program can render audible output. The SoundFont SHA-256 proves the byte identity of the file that was indexed.
 
 The inventory intentionally contains no absolute root paths and no wall-clock timestamp. With the same source revision, roots' relative path/size manifests, optional SoundFont bytes, and environment-free values, its JSON is deterministic.
 
@@ -64,7 +64,9 @@ Keep the following status dimensions separate when consuming the inventory:
 | Which procedural renderer family does source dispatch select? | Source-derived Karplus-Strong / FM / additive classifier, separate from fidelity evidence |
 | Is a sample mapping declared? | Explicit sample_subdir or staccato_subdir match |
 | Does the mapped directory exist locally? | Filesystem observation in this receipt |
-| Can the current indexer index files? | indexed_sample_count > 0; decode still unproven |
+| Can the current indexer index files? | indexed_sample_count > 0; audio still unproven |
+| Do indexed WAVs fully decode, or are some silent? | audio_decode_status, decoded/failed counts, and silent_sample_file_count |
+| What WAV formats occur among decoded files? | distinct sample-rate and channel-count fields |
 | What pitch/dynamic filename coverage is visible? | min/max MIDI, distinct pitch count, and distinct normalized dynamic-value count |
 | Which SoundFont file was inspected? | Optional content SHA-256 |
 | Does its preset-header table declare a bank/program/name? | Parsed RIFF SoundFont preset headers |
@@ -84,8 +86,8 @@ Never infer an instrument mapping from register, VoiceRole, cultural label, or G
 
 After this path-derived inventory is qualified:
 
-1. Cross-check parsed header entries against FluidSynth's runtime preset listing and a deterministic render probe; keep the parser and renderer evidence separate.
-2. Add note-range, dynamic-layer and articulation coverage from real, inspected files rather than assuming one sample equals full support.
+1. Cross-check parsed SoundFont header entries against FluidSynth's runtime preset listing and a deterministic per-program render probe; keep header, loadability and render evidence separate.
+2. Add note-range, dynamic-layer and articulation coverage from real, decoded files rather than assuming one sample equals full support.
 3. Add a drum-number-aware index and dedicated percussion semantics instead of forcing percussion into pitched-note matching.
 4. Add import → instrumentation sidecar → MIDI export → re-import fixtures for patch, bank, channel, part identity and instrument-change preservation.
 5. Add rendered-output and listener evidence as independent layers; do not promote inventory counts into claims of musical quality.
