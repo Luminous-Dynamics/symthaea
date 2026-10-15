@@ -1144,3 +1144,7 @@ mod tests {
         assert_eq!(report.net_cycle_efficiency, None);
     }
 }
+
+
+/// Deterministic Phase A experiment ranking; not an active-learning claim.
+pub mod experiment_selection;
