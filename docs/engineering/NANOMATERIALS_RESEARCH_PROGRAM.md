@@ -5,7 +5,8 @@
 **Tracking:** [NANO-001 #7453](https://github.com/Luminous-Dynamics/symthaea/issues/7453)  
 **Parent research boundary:** [MAT-HYPOTHESIS-001 #5254](https://github.com/Luminous-Dynamics/symthaea/issues/5254)  
 **Date:** 2026-10-15  
-**Initial data-admission companion:** [NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md](./NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md)
+**Initial data-admission companion:** [NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md](./NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md)  
+**Checkpoint eligibility gate:** [NANO-001C #7465](https://github.com/Luminous-Dynamics/symthaea/issues/7465)
 
 ## 1. Mission
 
@@ -100,6 +101,29 @@ References audited at source snapshot `b9af191f380d635f0459b24284c1d1fd6a5516aa`
 Therefore, NANO-001 must not simply feed OC22 rows to the current bulk-material encoder and call that atomistic selection. The first useful integration should preserve atomistic structure/label identity through a pinned upstream data reader, reproduce a compatible reference baseline, and then test an atomistic representation whose units, periodicity, element handling, and symmetries are independently checked. HDC may contribute metadata retrieval, grouping, or candidate-diversity logic if those semantics are supported; any HDC atomistic encoder is a new research hypothesis and must earn its role against appropriate baselines.
 
 The OC22 source documents a mapping from system IDs to metadata including `bulk_id`, `bulk_symbols`, `miller_index`, `traj_id`, `slab_sid`, `ads_symbols`, and `nads`. When fields are present, use them to audit related-system grouping and possible train/test leakage. Missing mapping fields must stay missing—not be inferred from unrelated examples.
+
+### Reference-checkpoint eligibility, training exposure, and license
+
+The baseline choice is a separate qualification gate, tracked in [NANO-001C #7465](https://github.com/Luminous-Dynamics/symthaea/issues/7465). Do not choose a reference model merely because it is recent or reports high benchmark accuracy.
+
+Current upstream sources show:
+- FairChem's current pretrained-model page recommends UMA for many new atomistic applications.
+- The UMA task documentation lists an `oc22` task as available only in UMA-1.2, associated with PBE+U/VASP oxide catalysis and storage use.
+- The public UMA model card describes the released checkpoints as trained on OC20, ODAC23, OMat24, OMC25, and OMol25; that list does not name OC22. These documents alone are not enough to determine the exact training exposure and intended evaluation role of a particular UMA 1.2 checkpoint.
+
+References:
+- [FairChem pretrained models](https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/models.md)
+- [FairChem UMA task/domain matrix](https://github.com/facebookresearch/fairchem/blob/main/docs/core/uma.md)
+- [UMA checkpoint model card](https://huggingface.co/facebook/UMA)
+- [UMA license text and acceptable-use policy](https://huggingface.co/facebook/UMA/blob/main/LICENSE)
+
+Treat this as a provenance question requiring resolution for the exact checkpoint/release, not as proof of either leakage or independence. For every candidate checkpoint, bind its exact hash, config, software revision, selected task/head, DFT level, model paper, training datasets/splits, license revision, and inference recipe. Specifically document exposure to any target, source trajectory, parent slab/bulk, train/validation/test records, and derived labels in the evaluation corpus.
+
+A pretrained model may be an external comparator, a frozen feature extractor, a model fine-tuned on a declared acquired-label partition, or an active-learning oracle; these roles are not interchangeable. If training data exposure to a benchmark's evaluation records is unknown, mark it `exposure_unknown` and do not use it as the primary proof of out-of-sample accuracy or label-efficiency improvement. A model trained on held-out labels cannot be described as an independent predictor of those records.
+
+The UMA model card incorporates the FAIR Chemistry License and Acceptable Use Policy. Its policy lists use related to the operation of critical infrastructure, transportation technologies, and heavy machinery among prohibited uses. That clause may materially affect future applications in rail, construction, and industrial operations. The intended use needs explicit review; do not deploy UMA-derived outputs for an operational use potentially covered by that restriction without written rights-holder clarification or an alternative license. This note is a technical licensing gate, not legal advice.
+
+Keep code, dataset, checkpoint, and output/use terms separate. OC22's CC BY 4.0 dataset terms and the MIT license for the data-reader software do not grant rights under the UMA weights license. If no suitably documented, permitted, compatible baseline is available, continue only with data-admission and integrity work or a transparent simple baseline until model eligibility is resolved.
 
 ### Scientific engines — atomistic calculations and reference labels
 
