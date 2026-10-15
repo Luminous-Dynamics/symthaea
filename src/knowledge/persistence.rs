@@ -37,6 +37,15 @@ pub struct KnowledgePersistence {
     total_loaded: u64,
 }
 
+/// One persisted entity-specific role binding. Older databases did not retain entity
+/// text or multiple entities per role; migrated rows use an empty entity_text sentinel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoleVectorRecord {
+    pub role: SemanticRole,
+    pub entity_text: String,
+    pub vector_bytes: Vec<u8>,
+}
+
 /// A fact record for persistence, including the source relations that were
 /// otherwise lost when the structured extraction was bundled into an HDC vector.
 #[derive(Debug, Clone)]
@@ -55,8 +64,9 @@ pub struct FactRecord {
     pub is_causal: bool,
     /// Structured extracted relations, retained separately from the lossy HDC bundle.
     pub relations: Vec<ExtractedRelation>,
-    /// Exact role-bound HDC vectors, stored separately from the lossy bundled vector.
-    pub role_vectors: HashMap<SemanticRole, Vec<u8>>,
+    /// Ordered, entity-specific role-bound HDC vectors. Unlike the former map this
+    /// retains more than one entity assigned to the same semantic role.
+    pub role_vectors: Vec<RoleVectorRecord>,
     /// Stable graph-level identity; absent for rows written before this field existed.
     pub graph_fact_id: Option<u64>,
     /// Confidence assigned at insertion; absent for rows written by older schemas.
@@ -249,21 +259,30 @@ fn insert_fact_relations(
 fn insert_fact_role_vectors(
     conn: &rusqlite::Connection,
     fact_row_id: i64,
-    role_vectors: &HashMap<SemanticRole, Vec<u8>>,
+    role_vectors: &[RoleVectorRecord],
 ) -> Result<(), String> {
-    for (role, vector_bytes) in role_vectors {
-        validate_hypervector_bytes(vector_bytes, 2).map_err(|e| {
+    for (index, binding) in role_vectors.iter().enumerate() {
+        validate_hypervector_bytes(&binding.vector_bytes, 2).map_err(|e| {
             format!(
                 "Invalid role vector for {} on fact row {fact_row_id}: {e}",
-                role.storage_key()
+                binding.role.storage_key()
             )
         })?;
+        let ordinal = i64::try_from(index)
+            .map_err(|e| format!("Role-vector ordinal exceeds SQLite INTEGER range: {e}"))?;
         conn.execute(
-            "INSERT INTO knowledge_fact_role_vectors (fact_row_id, role_key, vector_blob)
-             VALUES (?1, ?2, ?3)",
-            rusqlite::params![fact_row_id, role.storage_key(), vector_bytes],
+            "INSERT INTO knowledge_fact_role_bindings
+             (fact_row_id, ordinal, role_key, entity_text, vector_blob)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![
+                fact_row_id,
+                ordinal,
+                binding.role.storage_key(),
+                binding.entity_text,
+                binding.vector_bytes
+            ],
         )
-        .map_err(|e| format!("Insert fact role vector: {e}"))?;
+        .map_err(|e| format!("Insert fact role binding: {e}"))?;
     }
     Ok(())
 }
@@ -326,47 +345,56 @@ fn load_fact_relations(
     Ok(by_fact)
 }
 
-fn load_fact_role_vectors(
+fn load_fact_role_bindings(
     conn: &rusqlite::Connection,
-) -> Result<HashMap<i64, HashMap<SemanticRole, Vec<u8>>>, String> {
+) -> Result<HashMap<i64, Vec<RoleVectorRecord>>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT fact_row_id, role_key, vector_blob
-             FROM knowledge_fact_role_vectors
-             ORDER BY fact_row_id, role_key",
+            "SELECT fact_row_id, ordinal, role_key, entity_text, vector_blob
+             FROM knowledge_fact_role_bindings
+             ORDER BY fact_row_id, ordinal",
         )
-        .map_err(|e| format!("Prepare fact role vectors: {e}"))?;
+        .map_err(|e| format!("Prepare fact role bindings: {e}"))?;
     let rows = stmt
         .query_map([], |row| {
             let fact_row_id = row.get::<_, i64>(0)?;
-            let role = decode_semantic_role(row.get(1)?, 1)?;
-            let vector_bytes: Vec<u8> = row.get(2)?;
-            validate_hypervector_bytes(&vector_bytes, 2)?;
-            Ok((fact_row_id, role, vector_bytes))
+            let ordinal = row.get::<_, i64>(1)?;
+            let role = decode_semantic_role(row.get(2)?, 2)?;
+            let entity_text = row.get(3)?;
+            let vector_bytes: Vec<u8> = row.get(4)?;
+            validate_hypervector_bytes(&vector_bytes, 4)?;
+            Ok((
+                fact_row_id,
+                ordinal,
+                RoleVectorRecord { role, entity_text, vector_bytes },
+            ))
         })
-        .map_err(|e| format!("Query fact role vectors: {e}"))?;
+        .map_err(|e| format!("Query fact role bindings: {e}"))?;
     let decoded = rows
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Decode fact role vectors: {e}"))?;
+        .map_err(|e| format!("Decode fact role bindings: {e}"))?;
 
-    let mut by_fact: HashMap<i64, HashMap<SemanticRole, Vec<u8>>> = HashMap::new();
-    for (fact_row_id, role, vector_bytes) in decoded {
-        if fact_row_id <= 0 {
+    let mut by_fact: HashMap<i64, Vec<RoleVectorRecord>> = HashMap::new();
+    let mut previous: HashMap<i64, i64> = HashMap::new();
+    for (fact_row_id, ordinal, binding) in decoded {
+        if fact_row_id <= 0 || ordinal < 0 {
             return Err(format!(
-                "Invalid fact row ID for persisted role vector: {fact_row_id}"
+                "Invalid role-binding key: fact row {fact_row_id}, ordinal {ordinal}"
             ));
         }
-        if by_fact
-            .entry(fact_row_id)
-            .or_default()
-            .insert(role, vector_bytes)
-            .is_some()
-        {
+        if let Some(previous_ordinal) = previous.insert(fact_row_id, ordinal) {
+            if previous_ordinal.checked_add(1) != Some(ordinal) {
+                return Err(format!(
+                    "Non-contiguous role-binding ordinal for fact row {fact_row_id}: expected {}, got {ordinal}",
+                    previous_ordinal.saturating_add(1)
+                ));
+            }
+        } else if ordinal != 0 {
             return Err(format!(
-                "Duplicate persisted role vector for fact row {fact_row_id}, role {}",
-                role.storage_key()
+                "Role bindings for fact row {fact_row_id} begin at ordinal {ordinal}, expected 0"
             ));
         }
+        by_fact.entry(fact_row_id).or_default().push(binding);
     }
     Ok(by_fact)
 }
@@ -576,7 +604,7 @@ impl KnowledgePersistence {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin fact snapshot transaction: {e}"))?;
 
-        tx.execute("DELETE FROM knowledge_fact_role_vectors", [])
+        tx.execute("DELETE FROM knowledge_fact_role_bindings", [])
             .map_err(|e| format!("Clear previous role-vector snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_fact_relations", [])
             .map_err(|e| format!("Clear previous fact relation snapshot: {e}"))?;
@@ -656,9 +684,9 @@ impl KnowledgePersistence {
             validate_fact_relations(&fact.relations)?;
             validate_hypervector_bytes(&fact.vector_bytes, 0)
                 .map_err(|e| format!("Invalid fact snapshot vector: {e}"))?;
-            for (role, bytes) in &fact.role_vectors {
-                validate_hypervector_bytes(bytes, 2).map_err(|e| {
-                    format!("Invalid role vector for {}: {e}", role.storage_key())
+            for binding in &fact.role_vectors {
+                validate_hypervector_bytes(&binding.vector_bytes, 2).map_err(|e| {
+                    format!("Invalid role vector for {}: {e}", binding.role.storage_key())
                 })?;
             }
             if !fact.confidence.is_finite() || !(0.0..=1.0).contains(&fact.confidence) {
@@ -738,7 +766,7 @@ impl KnowledgePersistence {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin knowledge snapshot transaction: {e}"))?;
 
-        tx.execute("DELETE FROM knowledge_fact_role_vectors", [])
+        tx.execute("DELETE FROM knowledge_fact_role_bindings", [])
             .map_err(|e| format!("Clear previous role-vector snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_fact_relations", [])
             .map_err(|e| format!("Clear fact relation snapshot: {e}"))?;
@@ -900,7 +928,7 @@ impl KnowledgePersistence {
                         domain: row.get(3)?,
                         cycle,
                         is_causal: row.get(5)?,
-                        role_vectors: HashMap::new(),
+                        role_vectors: Vec::new(),
                         relations: Vec::new(),
                         graph_fact_id,
                         initial_confidence,
@@ -916,7 +944,7 @@ impl KnowledgePersistence {
         drop(stmt);
 
         let mut relations_by_fact = load_fact_relations(&conn)?;
-        let mut role_vectors_by_fact = load_fact_role_vectors(&conn)?;
+        let mut role_vectors_by_fact = load_fact_role_bindings(&conn)?;
         let fact_row_ids: std::collections::HashSet<i64> =
             facts_with_row_id.iter().map(|(id, _)| *id).collect();
         if let Some(orphan_id) = relations_by_fact
@@ -1182,11 +1210,13 @@ impl KnowledgePersistence {
                 PRIMARY KEY (fact_row_id, ordinal),
                 FOREIGN KEY (fact_row_id) REFERENCES knowledge_facts(id) ON DELETE CASCADE
             );
-            CREATE TABLE IF NOT EXISTS knowledge_fact_role_vectors (
+            CREATE TABLE IF NOT EXISTS knowledge_fact_role_bindings (
                 fact_row_id INTEGER NOT NULL,
+                ordinal INTEGER NOT NULL,
                 role_key TEXT NOT NULL,
+                entity_text TEXT NOT NULL DEFAULT '',
                 vector_blob BLOB NOT NULL,
-                PRIMARY KEY (fact_row_id, role_key),
+                PRIMARY KEY (fact_row_id, ordinal),
                 FOREIGN KEY (fact_row_id) REFERENCES knowledge_facts(id) ON DELETE CASCADE
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
@@ -1216,6 +1246,84 @@ impl KnowledgePersistence {
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
         )
         .map_err(|e| format!("Schema init: {e}"))?;
+
+        // Migrate the older map-shaped table once. The old schema only stored one
+        // vector per role and did not retain entity text; migrated rows use an empty
+        // entity_text sentinel because the original entity identity cannot be recovered.
+        let legacy_role_table_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'knowledge_fact_role_vectors')",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Inspect legacy role-vector table: {e}"))?;
+        if legacy_role_table_exists {
+            let legacy_rows = {
+                let mut stmt = conn
+                    .prepare(
+                        "SELECT fact_row_id, role_key, vector_blob
+                         FROM knowledge_fact_role_vectors
+                         ORDER BY fact_row_id, role_key",
+                    )
+                    .map_err(|e| format!("Prepare legacy role-vector migration: {e}"))?;
+                let rows = stmt
+                    .query_map([], |row| {
+                        let fact_row_id = row.get::<_, i64>(0)?;
+                        let role = decode_semantic_role(row.get(1)?, 1)?;
+                        let vector_bytes: Vec<u8> = row.get(2)?;
+                        validate_hypervector_bytes(&vector_bytes, 2)?;
+                        Ok((fact_row_id, role, vector_bytes))
+                    })
+                    .map_err(|e| format!("Query legacy role-vector migration: {e}"))?;
+                rows.collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| format!("Decode legacy role-vector migration: {e}"))?
+            };
+            let fact_ids: std::collections::HashSet<i64> = {
+                let mut stmt = conn
+                    .prepare("SELECT id FROM knowledge_facts")
+                    .map_err(|e| format!("Prepare fact IDs for role-vector migration: {e}"))?;
+                let rows = stmt
+                    .query_map([], |row| row.get::<_, i64>(0))
+                    .map_err(|e| format!("Query fact IDs for role-vector migration: {e}"))?;
+                rows.collect::<Result<std::collections::HashSet<_>, _>>()
+                    .map_err(|e| format!("Decode fact IDs for role-vector migration: {e}"))?
+            };
+            if let Some((fact_row_id, _, _)) =
+                legacy_rows.iter().find(|(id, _, _)| !fact_ids.contains(id))
+            {
+                return Err(format!(
+                    "Legacy role-vector row refers to missing fact row {fact_row_id}"
+                ));
+            }
+
+            let tx = conn
+                .unchecked_transaction()
+                .map_err(|e| format!("Begin legacy role-vector migration: {e}"))?;
+            let mut next_ordinal: HashMap<i64, i64> = HashMap::new();
+            for (fact_row_id, role, vector_bytes) in legacy_rows {
+                let ordinal = next_ordinal.entry(fact_row_id).or_insert(0);
+                let current_ordinal = *ordinal;
+                *ordinal = (*ordinal)
+                    .checked_add(1)
+                    .ok_or_else(|| "Legacy role-vector ordinal overflow".to_string())?;
+                tx.execute(
+                    "INSERT INTO knowledge_fact_role_bindings
+                     (fact_row_id, ordinal, role_key, entity_text, vector_blob)
+                     VALUES (?1, ?2, ?3, '', ?4)",
+                    rusqlite::params![
+                        fact_row_id,
+                        current_ordinal,
+                        role.storage_key(),
+                        vector_bytes
+                    ],
+                )
+                .map_err(|e| format!("Copy legacy role vector into bindings table: {e}"))?;
+            }
+            tx.execute("DROP TABLE knowledge_fact_role_vectors", [])
+                .map_err(|e| format!("Drop legacy role-vector table: {e}"))?;
+            tx.commit()
+                .map_err(|e| format!("Commit legacy role-vector migration: {e}"))?;
+        }
 
         // The legacy causal table has PRIMARY KEY(cause, effect), which collapses
         // repeated observations and cannot retain negation or source text. Migrate it
@@ -1306,117 +1414,180 @@ mod tests {
 
 
     #[test]
-    fn test_fact_role_vectors_round_trip_preserves_exact_bytes() {
+    fn test_fact_role_bindings_round_trip_preserves_duplicates_and_order() {
         let dir = std::env::temp_dir().join(format!(
-            "symthaea_role_vector_round_trip_{}",
+            "symthaea_role_binding_round_trip_{}",
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let db_path = dir.join("knowledge.db");
         let mut persistence = KnowledgePersistence::new(&db_path);
-
-        let mut fact = FactRecord {
+        let fact = FactRecord {
             vector_bytes: vec![0xA5; BinaryHV::BYTES],
-            source_text: "role vector fixture".into(),
+            source_text: "role binding fixture".into(),
             confidence: 0.9,
             domain: Some("test".into()),
             cycle: 1,
             is_causal: false,
             relations: Vec::new(),
-            role_vectors: HashMap::new(),
+            role_vectors: vec![
+                RoleVectorRecord {
+                    role: SemanticRole::Agent,
+                    entity_text: "Alice".into(),
+                    vector_bytes: vec![0x5A; BinaryHV::BYTES],
+                },
+                RoleVectorRecord {
+                    role: SemanticRole::Agent,
+                    entity_text: "Bob".into(),
+                    vector_bytes: vec![0xC3; BinaryHV::BYTES],
+                },
+                RoleVectorRecord {
+                    role: SemanticRole::Patient,
+                    entity_text: "Project".into(),
+                    vector_bytes: vec![0x3C; BinaryHV::BYTES],
+                },
+            ],
             graph_fact_id: Some(1),
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(1),
             corroboration_count: 0,
             contradiction_count: 0,
         };
-        fact.role_vectors
-            .insert(SemanticRole::Agent, vec![0x5A; BinaryHV::BYTES]);
-        fact.role_vectors
-            .insert(SemanticRole::Patient, vec![0xC3; BinaryHV::BYTES]);
 
-        assert_eq!(persistence.save_facts(&[fact.clone()]).unwrap(), 1);
-        let loaded = persistence.load_facts().unwrap();
-        assert_eq!(loaded.len(), 1);
-        assert_eq!(loaded[0].role_vectors, fact.role_vectors);
+        persistence.save_facts(&[fact.clone()]).unwrap();
+        assert_eq!(persistence.load_facts().unwrap()[0].role_vectors, fact.role_vectors);
 
-        assert_eq!(
-            persistence
-                .replace_knowledge_snapshot(&[fact.clone()], &[], &[], 2)
-                .unwrap(),
-            (1, 0, 0)
-        );
-        let snapshot = persistence.load_facts().unwrap();
-        assert_eq!(snapshot[0].role_vectors, fact.role_vectors);
+        persistence.replace_knowledge_snapshot(&[fact.clone()], &[], &[], 2).unwrap();
+        assert_eq!(persistence.load_facts().unwrap()[0].role_vectors, fact.role_vectors);
 
         let replacement = FactRecord {
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             ..fact
         };
-        assert_eq!(
-            persistence
-                .replace_knowledge_snapshot(&[replacement], &[], &[], 2)
-                .unwrap(),
-            (1, 0, 0)
-        );
-        assert!(
-            persistence.load_facts().unwrap()[0].role_vectors.is_empty(),
-            "removed role vectors must not survive snapshot replacement"
-        );
+        persistence.replace_knowledge_snapshot(&[replacement], &[], &[], 2).unwrap();
+        assert!(persistence.load_facts().unwrap()[0].role_vectors.is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn test_load_facts_rejects_corrupt_role_vector_rows() {
+    fn test_load_facts_rejects_corrupt_role_binding_rows() {
         let dir = std::env::temp_dir().join(format!(
-            "symthaea_corrupt_role_vector_{}",
+            "symthaea_corrupt_role_binding_{}",
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let db_path = dir.join("knowledge.db");
         let mut persistence = KnowledgePersistence::new(&db_path);
-        let mut fact = FactRecord {
+        let fact = FactRecord {
             vector_bytes: vec![0; BinaryHV::BYTES],
-            source_text: "corrupt role vector fixture".into(),
+            source_text: "corrupt role binding fixture".into(),
             confidence: 0.9,
             domain: None,
             cycle: 1,
             is_causal: false,
             relations: Vec::new(),
-            role_vectors: HashMap::new(),
+            role_vectors: vec![RoleVectorRecord {
+                role: SemanticRole::Agent,
+                entity_text: "Alice".into(),
+                vector_bytes: vec![0x5A; BinaryHV::BYTES],
+            }],
             graph_fact_id: Some(1),
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(1),
             corroboration_count: 0,
             contradiction_count: 0,
         };
-        fact.role_vectors
-            .insert(SemanticRole::Agent, vec![0x5A; BinaryHV::BYTES]);
         persistence.save_facts(&[fact]).unwrap();
 
         let conn = rusqlite::Connection::open(&db_path).unwrap();
         conn.execute(
-            "UPDATE knowledge_fact_role_vectors SET vector_blob = ?1",
+            "UPDATE knowledge_fact_role_bindings SET vector_blob = ?1",
             rusqlite::params![vec![0u8; 1]],
-        )
-        .unwrap();
+        ).unwrap();
         drop(conn);
         let error = persistence.load_facts().unwrap_err();
         assert!(error.contains("invalid hypervector length"), "{error}");
 
         let conn = rusqlite::Connection::open(&db_path).unwrap();
         conn.execute(
-            "UPDATE knowledge_fact_role_vectors
-             SET role_key = 'future_role', vector_blob = ?1",
+            "UPDATE knowledge_fact_role_bindings SET role_key = 'future_role', vector_blob = ?1",
             rusqlite::params![vec![0x5Au8; BinaryHV::BYTES]],
-        )
-        .unwrap();
+        ).unwrap();
         drop(conn);
         let error = persistence.load_facts().unwrap_err();
         assert!(error.contains("unknown persisted semantic role key"), "{error}");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_legacy_role_vector_table_migrates_without_losing_bytes() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_role_vector_migration_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let fact = FactRecord {
+            vector_bytes: vec![0; BinaryHV::BYTES],
+            source_text: "legacy role-vector fixture".into(),
+            confidence: 0.9,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+            relations: Vec::new(),
+            role_vectors: Vec::new(),
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        persistence.save_facts(&[fact]).unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE knowledge_fact_role_vectors (
+                fact_row_id INTEGER NOT NULL,
+                role_key TEXT NOT NULL,
+                vector_blob BLOB NOT NULL,
+                PRIMARY KEY (fact_row_id, role_key)
+            );",
+        )
+        .unwrap();
+        let fact_row_id: i64 = conn
+            .query_row("SELECT id FROM knowledge_facts LIMIT 1", [], |row| row.get(0))
+            .unwrap();
+        let legacy_bytes = vec![0x71u8; BinaryHV::BYTES];
+        conn.execute(
+            "INSERT INTO knowledge_fact_role_vectors (fact_row_id, role_key, vector_blob)
+             VALUES (?1, 'agent', ?2)",
+            rusqlite::params![fact_row_id, &legacy_bytes],
+        )
+        .unwrap();
+        drop(conn);
+
+        persistence.initialized = false;
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded[0].role_vectors.len(), 1);
+        assert_eq!(loaded[0].role_vectors[0].role, SemanticRole::Agent);
+        assert_eq!(loaded[0].role_vectors[0].entity_text, "");
+        assert_eq!(loaded[0].role_vectors[0].vector_bytes, legacy_bytes);
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let legacy_table_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'knowledge_fact_role_vectors')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!legacy_table_exists, "migration should retire the old keyed-by-role table");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1439,7 +1610,7 @@ mod tests {
             domain: Some("geopolitics".into()),
             cycle: 12,
             is_causal: true,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: vec![ExtractedRelation {
                 subject: "ceasefire".into(),
                 predicate: "prevented".into(),
@@ -1505,7 +1676,7 @@ mod tests {
             domain: None,
             cycle: 1,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: Some(1),
             initial_confidence: Some(0.8),
@@ -1524,7 +1695,7 @@ mod tests {
             domain: None,
             cycle: 2,
             is_causal: true,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: vec![ExtractedRelation {
                 subject: "A".into(),
                 predicate: "caused".into(),
@@ -1574,7 +1745,7 @@ mod tests {
                 domain: None,
                 cycle: 1,
                 is_causal: true,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: vec![
                     ExtractedRelation {
                         subject: "A".into(),
@@ -1666,7 +1837,7 @@ mod tests {
                 domain: None,
                 cycle: 1,
                 is_causal: false,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: vec![ExtractedRelation {
                     subject: "A".into(),
                     predicate: "blocks".into(),
@@ -1718,7 +1889,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
@@ -1763,7 +1934,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
@@ -1805,7 +1976,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
@@ -1844,7 +2015,7 @@ mod tests {
                 domain: None,
                 cycle: 1,
                 is_causal: false,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: Some(1),
                 initial_confidence: Some(0.9),
@@ -1883,7 +2054,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
@@ -1921,7 +2092,7 @@ mod tests {
                 domain: None,
                 cycle: 3,
                 is_causal: false,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: Some(0.9),
@@ -2119,7 +2290,7 @@ mod tests {
             domain: Some("test".into()),
             cycle: 7,
             is_causal: true,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
@@ -2229,7 +2400,7 @@ mod tests {
             domain: None,
             cycle: 1,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: Some(5),
             initial_confidence: Some(0.8),
@@ -2248,7 +2419,7 @@ mod tests {
             domain: None,
             cycle: 2,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: Some(7),
             initial_confidence: Some(0.7),
@@ -2310,7 +2481,7 @@ mod tests {
             domain: None,
             cycle: 1,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: Some(1),
             initial_confidence: Some(0.8),
@@ -2325,7 +2496,7 @@ mod tests {
             domain: None,
             cycle: 2,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: Some(2),
             initial_confidence: Some(0.4),
@@ -2378,7 +2549,7 @@ mod tests {
             domain: None,
             cycle: 3,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
@@ -2427,7 +2598,7 @@ mod tests {
             domain: None,
             cycle: 10,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.7),
@@ -2494,7 +2665,7 @@ mod tests {
             domain: Some("test".into()),
             cycle: 7,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
@@ -2529,7 +2700,7 @@ mod tests {
             domain: None,
             cycle: 3,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
@@ -2546,7 +2717,7 @@ mod tests {
             domain: None,
             cycle: u64::MAX,
             is_causal: false,
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             graph_fact_id: None,
             initial_confidence: Some(0.9),
@@ -2588,7 +2759,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: Some(0.95),
@@ -2603,7 +2774,7 @@ mod tests {
                 domain: None,
                 cycle: 2,
                 is_causal: true,
-                role_vectors: HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: Some(0.85),
