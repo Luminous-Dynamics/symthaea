@@ -1913,6 +1913,7 @@ mod tests {
         assert_eq!(probe.binary_name, "fake-fluidsynth");
         assert_eq!(probe.binary_version.as_deref(), Some("fake-fluidsynth fixture 1"));
         assert_eq!(probe.binary_sha256, sha256_file(&fake_binary).unwrap());
+        assert_eq!(probe.soundfont_sha256, evidence.sha256);
         assert_eq!(probe.requested_program_count, 2);
         assert_eq!(probe.rendered_non_silent_count, 1);
         assert_eq!(probe.programs[0].program_0_based, 0);
