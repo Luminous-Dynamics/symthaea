@@ -735,6 +735,9 @@ impl InstrumentBank {
 pub struct VcslLibrary {
     banks: HashMap<Instrument, InstrumentBank>,
     staccato_banks: HashMap<Instrument, InstrumentBank>,
+    /// Explicitly selectable note-on variants, keyed by instrument and style name.
+    /// Release-only samples remain catalogued but are deliberately excluded here.
+    style_banks: HashMap<(Instrument, &'static str), InstrumentBank>,
 }
 
 impl VcslLibrary {
@@ -757,6 +760,7 @@ impl VcslLibrary {
     fn load_from_roots(root: &Path, vsco2_root: &Path) -> Option<Self> {
         let mut banks = HashMap::new();
         let mut staccato_banks = HashMap::new();
+        let mut style_banks = HashMap::new();
         for instrument in [
             Instrument::Piano,
             Instrument::PianoPP,
@@ -801,13 +805,31 @@ impl VcslLibrary {
                     staccato_banks.insert(instrument, bank);
                 }
             }
+            for style in additional_sample_style_mappings(instrument) {
+                // Release samples are note-off assets, not ordinary note-on
+                // banks. They remain visible in the capability inventory but
+                // cannot be selected through this pitch-triggered API.
+                if style.style_kind == "release_articulation" {
+                    continue;
+                }
+                let base = match style.source {
+                    SampleSource::Vcsl => root,
+                    SampleSource::Vsco2 => vsco2_root,
+                };
+                if let Some(bank) =
+                    InstrumentBank::index(&base.join(style.relative_directory))
+                {
+                    style_banks.insert((instrument, style.style_name), bank);
+                }
+            }
         }
-        if banks.is_empty() {
+        if banks.is_empty() && style_banks.is_empty() {
             None
         } else {
             Some(Self {
                 banks,
                 staccato_banks,
+                style_banks,
             })
         }
     }
@@ -832,7 +854,48 @@ impl VcslLibrary {
             .is_some_and(|b| b.pick(midi, velocity, 0).is_some())
     }
 
-    /// Number of instruments with a usable bank (for logging/tests).
+    /// Whether this instrument has a loaded, pitch-triggered bank for the
+    /// named non-release style. A directory declared upstream but absent
+    /// locally, or one containing no filenames accepted by the pitch indexer,
+    /// does not qualify as loaded.
+    pub fn has_sample_style(&self, instrument: Instrument, style_name: &str) -> bool {
+        self.style_bank(instrument, style_name).is_some()
+    }
+
+    /// Whether the named style can select a sample at this pitch/velocity.
+    /// This checks sample selection and decoding, not perceptual quality.
+    pub fn can_play_style(
+        &self,
+        instrument: Instrument,
+        style_name: &str,
+        midi: f32,
+        velocity: f32,
+    ) -> bool {
+        self.pick_style(instrument, style_name, midi, velocity, 0).is_some()
+    }
+
+    fn style_bank(&self, instrument: Instrument, style_name: &str) -> Option<&InstrumentBank> {
+        self.style_banks
+            .iter()
+            .find_map(|((candidate_instrument, candidate_style), bank)| {
+                (*candidate_instrument == instrument && *candidate_style == style_name)
+                    .then_some(bank)
+            })
+    }
+
+    fn pick_style(
+        &self,
+        instrument: Instrument,
+        style_name: &str,
+        midi: f32,
+        velocity: f32,
+        seed: u32,
+    ) -> Option<Arc<DecodedSample>> {
+        self.style_bank(instrument, style_name)?
+            .pick(midi, velocity, seed)
+    }
+
+    /// Number of instruments with a usable default bank (for logging/tests).
     pub fn instrument_count(&self) -> usize {
         self.banks.len()
     }
