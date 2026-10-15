@@ -602,6 +602,36 @@ fn digest_trend_receipt(receipt: &PlssTelemetryTrendReceipt) -> String {
     h.finish()
 }
 
+/// Verify that the source revision, report counts, report digest, and receipt
+/// envelope agree. The receipt does not authenticate raw sensors or the revision.
+pub fn verify_plss_telemetry_trend_receipt(
+    report: &PlssTelemetryTrendReport,
+    receipt: &PlssTelemetryTrendReceipt,
+) -> bool {
+    let valid_revision =
+        (receipt.source_revision.len() == 40 || receipt.source_revision.len() == 64)
+        && receipt.source_revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && receipt.source_revision == receipt.source_revision.to_ascii_lowercase();
+    let valid_digest = |digest: &str| {
+        digest.len() == 71
+            && digest.starts_with("sha256:")
+            && digest[7..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    };
+    valid_revision
+        && valid_digest(&receipt.input_digest_sha256)
+        && valid_digest(&receipt.result_digest_sha256)
+        && valid_digest(&receipt.receipt_digest_sha256)
+        && receipt.input_observation_count == report.input_observation_count
+        && receipt.accepted_observation_count == report.accepted_observation_count
+        && receipt.rejected_invalid_observations == report.rejected_invalid_observations
+        && receipt.rejected_future_dated_observations == report.rejected_future_dated_observations
+        && receipt.excluded_out_of_window_observations == report.excluded_out_of_window_observations
+        && receipt.excluded_low_confidence_observations
+            == report.excluded_low_confidence_observations
+        && receipt.result_digest_sha256 == digest_trend_report(report)
+        && receipt.receipt_digest_sha256 == digest_trend_receipt(receipt)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

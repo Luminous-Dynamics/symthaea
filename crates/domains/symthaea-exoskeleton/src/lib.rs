@@ -43,6 +43,7 @@ pub mod perturbations;
 pub mod plss;
 pub mod plss_telemetry;
 pub mod plss_telemetry_trend;
+pub mod plss_telemetry_boundary;
 pub mod plugin;
 pub mod power;
 pub mod powered_glove;

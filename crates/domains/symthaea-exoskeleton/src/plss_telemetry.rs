@@ -45,7 +45,7 @@ impl PlssTelemetryMetric {
     }
 
     /// Encoding/domain guardrails only; these are not atmosphere safety limits.
-    fn accepts_value(self, value: f64) -> bool {
+    pub(crate) fn accepts_value(self, value: f64) -> bool {
         if !value.is_finite() {
             return false;
         }
