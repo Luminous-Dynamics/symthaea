@@ -176,6 +176,10 @@ pub enum SuitEvidenceLevel {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SuitCapabilityClaim {
     pub capability: SuitCapability,
+    /// Evidence is bound to one exact variant ID; it is not portable by default.
+    pub applies_to_variant_id: String,
+    /// Evidence is bound to one exact hardware/configuration revision.
+    pub applies_to_hardware_revision: String,
     /// Identity of the specific implementation / assembly for this capability.
     pub implementation_id: String,
     pub evidence_level: SuitEvidenceLevel,
@@ -246,6 +250,7 @@ pub enum SuitProfileError {
     InvalidVariantId,
     InvalidHardwareRevision,
     InvalidCapabilityClaim,
+    EvidenceScopeMismatch,
 }
 
 impl SuitVariantDeclaration {
@@ -259,6 +264,10 @@ impl SuitVariantDeclaration {
                     && claim.implementation_id.trim() == claim.implementation_id
                     && !claim.evidence_reference.trim().is_empty()
                     && claim.evidence_reference.trim() == claim.evidence_reference
+                    && !claim.applies_to_variant_id.trim().is_empty()
+                    && claim.applies_to_variant_id.trim() == claim.applies_to_variant_id
+                    && !claim.applies_to_hardware_revision.trim().is_empty()
+                    && claim.applies_to_hardware_revision.trim() == claim.applies_to_hardware_revision
             })
     }
 }
@@ -286,8 +295,18 @@ pub fn evaluate_suit_profile(
             || claim.implementation_id.trim() != claim.implementation_id
             || claim.evidence_reference.trim().is_empty()
             || claim.evidence_reference.trim() != claim.evidence_reference
+            || claim.applies_to_variant_id.trim().is_empty()
+            || claim.applies_to_variant_id.trim() != claim.applies_to_variant_id
+            || claim.applies_to_hardware_revision.trim().is_empty()
+            || claim.applies_to_hardware_revision.trim() != claim.applies_to_hardware_revision
     }) {
         return Err(SuitProfileError::InvalidCapabilityClaim);
+    }
+    if declaration.capability_claims.iter().any(|claim| {
+        claim.applies_to_variant_id != declaration.variant_id
+            || claim.applies_to_hardware_revision != declaration.hardware_revision
+    }) {
+        return Err(SuitProfileError::EvidenceScopeMismatch);
     }
 
     let required_capabilities = profile.required_capabilities();
@@ -417,6 +436,8 @@ mod tests {
                 .into_iter()
                 .map(|capability| SuitCapabilityClaim {
                     capability,
+                    applies_to_variant_id: format!("research-{:?}", profile),
+                    applies_to_hardware_revision: "prototype-r1".to_string(),
                     implementation_id: format!("impl-{:?}", capability),
                     evidence_level: level,
                     evidence_reference: format!("sim://{:?}/{:?}", profile, capability),
@@ -520,6 +541,33 @@ mod tests {
         ).unwrap();
         assert_eq!(result.status, SuitProfileEvaluationStatus::ConflictingRequiredClaims);
         assert_eq!(result.conflicting_required_count, 1);
+    }
+
+    #[test]
+    fn capability_evidence_cannot_be_reused_for_another_variant_or_revision() {
+        let mut changed_variant =
+            declaration(SuitMissionProfile::OrbitalEva, SuitEvidenceLevel::Qualified);
+        changed_variant.variant_id = "orbital-eva-variant-b".into();
+        assert_eq!(
+            evaluate_suit_profile(
+                SuitMissionProfile::OrbitalEva,
+                &changed_variant,
+                policy(SuitEvidenceLevel::Declared),
+            ),
+            Err(SuitProfileError::EvidenceScopeMismatch)
+        );
+
+        let mut changed_revision =
+            declaration(SuitMissionProfile::OrbitalEva, SuitEvidenceLevel::Qualified);
+        changed_revision.hardware_revision = "prototype-r2".into();
+        assert_eq!(
+            evaluate_suit_profile(
+                SuitMissionProfile::OrbitalEva,
+                &changed_revision,
+                policy(SuitEvidenceLevel::Declared),
+            ),
+            Err(SuitProfileError::EvidenceScopeMismatch)
+        );
     }
 
     #[test]
