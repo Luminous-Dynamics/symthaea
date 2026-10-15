@@ -2029,24 +2029,71 @@ mod tests {
         mgr.bootstrap_entities();
         mgr.process("Sanctions caused oil shortage.", 1);
 
+        // Seed stale persisted records that are absent from the live manager.
+        // A full snapshot must remove these, not merely upsert current records.
+        {
+            let persistence = mgr.persistence.as_mut().expect("persistence configured");
+            persistence
+                .save_causal_edges(&[CausalEdgeRecord {
+                    cause: "stale-sentinel-cause".into(),
+                    effect: "stale-sentinel-effect".into(),
+                    strength: 0.7,
+                    is_inhibitory: false,
+                    cycle: 0,
+                }])
+                .unwrap();
+            persistence
+                .save_ontology(&[OntologyRecord {
+                    name: "stale-sentinel-primitive".into(),
+                    vector_bytes: vec![9u8; BinaryHV::BYTES],
+                    usage_count: 1,
+                    utility: 0.3,
+                    created_at_cycle: 0,
+                    last_used_cycle: 0,
+                    is_a_parent: None,
+                }])
+                .unwrap();
+        }
+
         mgr.persist_snapshot();
-        let first = mgr
-            .persistence
-            .as_mut()
-            .expect("persistence configured")
+        let persistence = mgr.persistence.as_mut().expect("persistence configured");
+        let first = persistence
             .load_facts()
             .expect("first snapshot should load");
         assert_eq!(first.len(), mgr.graph().len());
 
+        let first_edges = persistence
+            .load_causal_edges()
+            .expect("first causal snapshot should load");
+        assert!(
+            !first_edges.iter().any(|edge| edge.cause == "stale-sentinel-cause"),
+            "stale causal edges must be removed by the full snapshot"
+        );
+        let first_ontology = persistence
+            .load_ontology()
+            .expect("first ontology snapshot should load");
+        assert!(
+            !first_ontology.iter().any(|record| record.name == "stale-sentinel-primitive"),
+            "pruned ontology primitives must be removed by the full snapshot"
+        );
+
         mgr.persist_snapshot();
-        let second = mgr
-            .persistence
-            .as_mut()
-            .expect("persistence configured")
+        let persistence = mgr.persistence.as_mut().expect("persistence configured");
+        let second = persistence
             .load_facts()
             .expect("second snapshot should load");
         assert_eq!(second.len(), first.len());
         assert_eq!(second.len(), mgr.graph().len());
+        assert_eq!(
+            persistence.load_causal_edges().unwrap().len(),
+            first_edges.len(),
+            "repeated full snapshots must not accumulate causal edges"
+        );
+        assert_eq!(
+            persistence.load_ontology().unwrap().len(),
+            first_ontology.len(),
+            "repeated full snapshots must not accumulate ontology primitives"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
