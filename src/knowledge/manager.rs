@@ -24,7 +24,9 @@ use super::adaptive_ontology::{AdaptiveOntology, AdaptiveOntologyConfig};
 use super::causal_bridge::{CausalEdge, CausalKnowledgeBridge};
 use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
-use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
+use super::graph::{
+    ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult, RoleAwareSearchResult,
+};
 use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord};
 use super::reasoning_context::{KnowledgeQueryResult, ReasoningContext};
 use std::collections::VecDeque;
@@ -775,6 +777,28 @@ impl KnowledgeManager {
         role_terms: &[(super::extraction::SemanticRole, &str)],
     ) -> BinaryHV {
         self.encoder.compose_query(role_terms)
+    }
+
+    /// Compose a typed HDC query using the same role/type binding as encoded facts.
+    pub fn compose_typed_query(
+        &mut self,
+        role_terms: &[(super::extraction::SemanticRole, &str, EntityType)],
+    ) -> BinaryHV {
+        self.encoder.compose_typed_query(role_terms)
+    }
+
+    /// Search every role-bound entity observation for typed role terms.
+    ///
+    /// Retrieval similarity and fact confidence remain separate; this API does
+    /// not treat an HDC match as proof that a claim is true.
+    pub fn search_with_role_terms(
+        &mut self,
+        role_terms: &[(super::extraction::SemanticRole, &str, EntityType)],
+        k: usize,
+    ) -> Vec<RoleAwareSearchResult> {
+        let query = self.encoder.encode_role_terms(role_terms);
+        self.graph
+            .search_role_observations(&query, k, self.current_cycle)
     }
 
     /// Search the knowledge graph with a pre-composed HDC query
@@ -1784,6 +1808,44 @@ mod tests {
         let results = mgr.search_with_vector(&query, 5);
         // May or may not find depending on similarity
         assert!(results.len() <= 5);
+    }
+
+    #[test]
+    fn test_role_observation_search_through_manager_api() {
+        let mut mgr = KnowledgeManager::default();
+        let terms = [
+            (
+                super::super::extraction::SemanticRole::Agent,
+                "United States",
+                EntityType::Organization,
+            ),
+            (
+                super::super::extraction::SemanticRole::Agent,
+                "European Union",
+                EntityType::Organization,
+            ),
+        ];
+        let observations = mgr.encoder.encode_role_terms(&terms);
+        let encoding = super::super::encoding::FactEncoding {
+            vector: BinaryHV::random(9_381),
+            role_vectors: std::collections::HashMap::new(),
+            role_vector_observations: observations,
+            relations: Vec::new(),
+            source_text: "two-agent manager test fixture".into(),
+            confidence: 0.4,
+        };
+        mgr.graph_mut().insert(encoding, 1, None, false);
+
+        let results = mgr.search_with_role_terms(&terms, 5);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].matched_query_terms, 2);
+        assert!((results[0].similarity - 1.0).abs() < f32::EPSILON);
+        assert!((results[0].confidence - 0.4).abs() < f32::EPSILON);
+
+        let composed = mgr.compose_typed_query(&terms);
+        let expected = super::super::encoding::KnowledgeEncoder::with_seed(0x4E0E_1ED6_E5ED)
+            .compose_typed_query(&terms);
+        assert_eq!(composed, expected);
     }
 
     #[test]
