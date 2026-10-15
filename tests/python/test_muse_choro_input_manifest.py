@@ -41,6 +41,15 @@ def approved_fixture(analysis_plan_root: Path) -> tuple[dict, dict]:
         "design": {
             "source_version_pin": "synthetic fixture only; no corpus source",
             "study_question": "Does the synthetic metric distinguish the fabricated pattern from its null?",
+            "authorized_source_bindings": [{
+                "intake_source_id": "imslp-choro-mineiro-rocha-2022",
+                "source_record_url": "https://imslp.org/wiki/Choro_mineiro_%28Rocha%2C_Davi%29",
+                "source_file_url": "https://example.org/synthetic-score-artifact.pdf",
+                "artifact_path": "synthetic-score-artifact.bin",
+                "artifact_sha256": digest,
+                "artifact_bytes": len(ARTIFACT_BYTES),
+                "selected_work_ids": ["synthetic fixture work only"],
+            }],
             "inclusion_criteria": ["fabricated fixture row with complete labels"],
             "exclusion_criteria": ["malformed or missing synthetic labels"],
             "hypotheses": [{
@@ -190,6 +199,8 @@ class ChoroInputManifestTests(unittest.TestCase):
         self.assertIn("reviewed_scope_sha256", contract["rights_review_required_fields"])
         self.assertIn("review_scope_digest", contract)
         self.assertIn("analysis_plan_contract", contract)
+        self.assertIn("concrete_design_required_fields", contract)
+        self.assertIn("authorized_source_bindings[]", contract["concrete_design_required_fields"])
         self.assertIn("sha256", contract["scope_analysis_plan_required_fields"])
 
     def test_analysis_plan_digest_rejects_on_disk_tampering(self) -> None:
@@ -231,6 +242,31 @@ class ChoroInputManifestTests(unittest.TestCase):
             approval_path.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
             with self.assertRaisesRegex(
                 ManifestError, "analysis-plan design.hypotheses must contain at least one concrete hypothesis"
+            ):
+                evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
+
+    def test_analysis_plan_must_match_exact_authorized_source_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture(root)
+            plan_path = root / "synthetic-analysis-plan.json"
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["design"]["authorized_source_bindings"][0]["selected_work_ids"] = [
+                "a different fabricated work"
+            ]
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\\n").encode()
+            plan_path.write_bytes(plan_bytes)
+            manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
+            manifest_path = root / "manifest.json"
+            approval_path = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            manifest_path.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            approval_path.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ManifestError,
+                "analysis plan authorized_source_bindings do not exactly match source artifacts",
             ):
                 evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
 
@@ -322,6 +358,9 @@ class ChoroInputManifestTests(unittest.TestCase):
                 report["scope"]["analysis_plan"]["sha256"],
                 manifest["scope"]["analysis_plan"]["sha256"],
             )
+            self.assertEqual(report["scope"]["analysis_plan"]["hypothesis_count"], 1)
+            self.assertEqual(report["scope"]["analysis_plan"]["null_model_count"], 1)
+            self.assertEqual(report["scope"]["analysis_plan"]["source_binding_count"], 1)
             self.assertEqual(report["artifacts"][0]["artifact_bytes"], len(ARTIFACT_BYTES))
             self.assertEqual(
                 report["artifacts"][0]["artifact_path"],
