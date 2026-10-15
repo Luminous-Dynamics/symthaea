@@ -35,8 +35,9 @@ impl PermissionDecision {
         )
     }
 
-    fn requires_permission_reference(self) -> bool {
-        self == Self::GrantedByWrittenPermission
+    fn requires_evidence_reference(self) -> bool {
+        // Both license grants and written permissions need auditable evidence.
+        self.is_granted()
     }
 }
 
@@ -490,7 +491,7 @@ fn validate_permission_reference(
     missing_code: RegistryIssueCode,
     issues: &mut Vec<RegistryIssueV1>,
 ) {
-    if decision.requires_permission_reference()
+    if decision.requires_evidence_reference()
         && reference.unwrap_or_default().trim().is_empty()
     {
         push_issue(issues, IssueCategory::License, missing_code);
@@ -837,7 +838,14 @@ mod tests {
             source_uri: "https://example.invalid/food-table".to_owned(),
             terms_uri: "https://example.invalid/terms".to_owned(),
             license_id: "synthetic-fixture-only".to_owned(),
-            permission_references: SourcePermissionReferencesV1::default(),
+            permission_references: SourcePermissionReferencesV1 {
+                use_for_assessment: Some("license:assessment-clause".to_owned()),
+                cache: Some("license:cache-clause".to_owned()),
+                transform: Some("license:transformation-clause".to_owned()),
+                redistribute: Some("license:redistribution-clause".to_owned()),
+                commercial_use: Some("license:commercial-use-clause".to_owned()),
+                public_fixture: Some("license:public-fixture-clause".to_owned()),
+            },
             permissions: allowed_permissions(),
             artifact_sha256: Some(sha256_hex(ARTIFACT)),
             retrieved_on: "2026-01-02".to_owned(),
@@ -964,6 +972,17 @@ mod tests {
     }
 
     #[test]
+    fn a_license_grant_requires_a_right_scoped_license_evidence_reference() {
+        let mut m = manifest();
+        m.permission_references.cache = None;
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::CachePermissionReferenceMissing
+        }));
+    }
+
+    #[test]
     fn written_permission_requires_a_reference() {
         let mut m = manifest();
         m.permissions.use_for_assessment = PermissionDecision::GrantedByWrittenPermission;
@@ -983,6 +1002,7 @@ mod tests {
         // This reference is specifically for assessment; commercial authorization is absent.
         m.permission_references.use_for_assessment =
             Some("permission:assessment-only".to_owned());
+        m.permission_references.commercial_use = None;
         let mut use_case = use_request();
         use_case.commercial_use = true;
         let result = assess_nutrition_source(
@@ -1005,6 +1025,7 @@ mod tests {
     fn cache_written_permission_requires_a_cache_scoped_reference() {
         let mut m = manifest();
         m.permissions.cache = PermissionDecision::GrantedByWrittenPermission;
+        m.permission_references.cache = None;
         let result = assess(&m, &fact(), Some(ARTIFACT));
         assert_eq!(result.license_eligibility, Eligibility::Blocked);
         assert!(result.issues.iter().any(|issue| {
@@ -1016,6 +1037,7 @@ mod tests {
     fn transformation_written_permission_requires_a_transformation_scoped_reference() {
         let mut m = manifest();
         m.permissions.transform = PermissionDecision::GrantedByWrittenPermission;
+        m.permission_references.transform = None;
         let mut f = fact();
         f.transformation_applied = true;
         f.transformation_lineage = vec![NutritionTransformationStepV1 {
@@ -1036,6 +1058,7 @@ mod tests {
     fn public_fixture_written_permission_requires_a_fixture_scoped_reference() {
         let mut m = manifest();
         m.permissions.public_fixture = PermissionDecision::GrantedByWrittenPermission;
+        m.permission_references.public_fixture = None;
         let mut use_case = use_request();
         use_case.public_fixture = true;
         let result = assess_nutrition_source(
@@ -1055,6 +1078,7 @@ mod tests {
     fn redistribution_written_permission_requires_a_redistribution_scoped_reference() {
         let mut m = manifest();
         m.permissions.redistribute = PermissionDecision::GrantedByWrittenPermission;
+        m.permission_references.redistribute = None;
         let mut use_case = use_request();
         use_case.public_fixture = true;
         let result = assess_nutrition_source(
