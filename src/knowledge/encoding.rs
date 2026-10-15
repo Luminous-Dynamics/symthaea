@@ -21,13 +21,28 @@ use symthaea_core::hdc::unified_hv::{BinaryHV, HDC_DIMENSION};
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+/// One role-bound vector for one extracted entity occurrence.
+///
+/// Unlike the compatibility map on `FactEncoding`, this representation preserves
+/// distinct entities that share a semantic role.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoleBoundVector {
+    pub role: SemanticRole,
+    pub entity_text: String,
+    pub vector: BinaryHV,
+}
+
 /// An HDC-encoded fact ready for storage and similarity search
 #[derive(Debug, Clone)]
 pub struct FactEncoding {
     /// The composite hypervector representing this fact
     pub vector: BinaryHV,
-    /// Role-specific sub-vectors for compositional queries
+    /// Compatibility view: one sub-vector per role (the last occurrence wins).
+    ///
+    /// Use `role_vector_observations` when every encoded entity must be retained.
     pub role_vectors: HashMap<SemanticRole, BinaryHV>,
+    /// Ordered role-bound vector observations, preserving same-role multiplicity.
+    pub role_vector_observations: Vec<RoleBoundVector>,
     /// Structured source relations retained independently of the bundled vector.
     ///
     /// HDC bundling is a lossy retrieval representation; predicates, negation and
@@ -153,6 +168,7 @@ impl KnowledgeEncoder {
     /// then bundles all role-bound vectors into a single fact representation.
     pub fn encode_fact(&mut self, fact: &ExtractedFact) -> FactEncoding {
         let mut role_vectors = HashMap::new();
+        let mut role_vector_observations = Vec::new();
         let mut components = Vec::new();
 
         // Encode each entity with its role
@@ -173,6 +189,11 @@ impl KnowledgeEncoder {
                     // role_bound = role_basis ⊗ entity_typed
                     let role_bound = role_basis.bind(&entity_typed);
                     role_vectors.insert(*role, role_bound.clone());
+                    role_vector_observations.push(RoleBoundVector {
+                        role: *role,
+                        entity_text: entity.text.clone(),
+                        vector: role_bound.clone(),
+                    });
                     components.push(role_bound);
                 }
             }
@@ -197,6 +218,7 @@ impl KnowledgeEncoder {
         FactEncoding {
             vector,
             role_vectors,
+            role_vector_observations,
             relations: fact.relations.clone(),
             source_text: fact.source_text.clone(),
             confidence: fact.confidence,
@@ -309,6 +331,39 @@ mod tests {
         assert!(!encoding.relations[0].is_negated);
         assert_eq!(encoding.relations[0].subject_role, SemanticRole::Agent);
         assert_eq!(encoding.relations[0].object_role, SemanticRole::Patient);
+    }
+
+    #[test]
+    fn test_role_vector_observations_preserve_same_role_multiplicity() {
+        let mut fact = make_test_fact();
+        fact.entities.push(ExtractedEntity {
+            text: "European Union".to_string(),
+            entity_type: EntityType::Organization,
+            confidence: 0.95,
+            offset: 32,
+        });
+        fact.role_map
+            .insert("European Union".to_string(), SemanticRole::Agent);
+
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let encoding = encoder.encode_fact(&fact);
+
+        // The legacy map remains one entry per role, but the observation list
+        // must retain both Agent entities independently and in source order.
+        assert_eq!(encoding.role_vectors.len(), 2);
+        assert_eq!(encoding.role_vector_observations.len(), 3);
+        let agents: Vec<_> = encoding
+            .role_vector_observations
+            .iter()
+            .filter(|observation| observation.role == SemanticRole::Agent)
+            .collect();
+        assert_eq!(agents.len(), 2);
+        assert_eq!(agents[0].entity_text, "United States");
+        assert_eq!(agents[1].entity_text, "European Union");
+        assert!(
+            agents[0].vector.similarity(&agents[1].vector) < 1.0,
+            "distinct same-role entities must retain distinct bound vectors"
+        );
     }
 
     #[test]

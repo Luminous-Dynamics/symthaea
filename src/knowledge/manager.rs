@@ -1375,7 +1375,7 @@ mod tests {
 
     #[test]
     fn test_manager_restart_preserves_role_vectors() {
-        use crate::knowledge::encoding::FactEncoding;
+        use crate::knowledge::encoding::{FactEncoding, RoleBoundVector};
         use crate::knowledge::extraction::SemanticRole;
 
         let dir = std::env::temp_dir().join(format!(
@@ -1394,6 +1394,7 @@ mod tests {
         let mut encoding = FactEncoding {
             vector: symthaea_core::hdc::binary_hv::BinaryHV::random(81),
             role_vectors: std::collections::HashMap::new(),
+            role_vector_observations: Vec::new(),
             relations: Vec::new(),
             source_text: "role-vector manager restart fixture".into(),
             confidence: 0.9,
@@ -1410,6 +1411,23 @@ mod tests {
                 SemanticRole::Patient,
                 symthaea_core::hdc::binary_hv::BinaryHV::random(83),
             );
+        encoding.role_vector_observations = vec![
+            RoleBoundVector {
+                role: SemanticRole::Agent,
+                entity_text: "United States".into(),
+                vector: symthaea_core::hdc::binary_hv::BinaryHV::random(84),
+            },
+            RoleBoundVector {
+                role: SemanticRole::Agent,
+                entity_text: "European Union".into(),
+                vector: symthaea_core::hdc::binary_hv::BinaryHV::random(85),
+            },
+            RoleBoundVector {
+                role: SemanticRole::Patient,
+                entity_text: "Iran".into(),
+                vector: symthaea_core::hdc::binary_hv::BinaryHV::random(86),
+            },
+        ];
         let (fact_id, _) = manager
             .graph
             .insert(encoding.clone(), 7, Some("test".into()), false);
@@ -1425,7 +1443,22 @@ mod tests {
         assert_eq!(
             restored_fact.encoding.role_vectors,
             encoding.role_vectors,
-            "manager restart must preserve every role-bound vector"
+            "manager restart must preserve the compatibility role map"
+        );
+        assert_eq!(
+            restored_fact.encoding.role_vector_observations,
+            encoding.role_vector_observations,
+            "manager restart must preserve every per-entity role-bound vector"
+        );
+        assert_eq!(
+            restored_fact
+                .encoding
+                .role_vector_observations
+                .iter()
+                .filter(|observation| observation.role == SemanticRole::Agent)
+                .count(),
+            2,
+            "same-role entities must remain distinct after restart"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -1497,6 +1530,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: std::collections::HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1548,6 +1583,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: std::collections::HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1600,6 +1637,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: std::collections::HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,

@@ -50,7 +50,7 @@ pub mod self_schema;
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use causal_bridge::CausalKnowledgeBridge;
 pub use causal_reasoning_bridge::CausalReasoningBridge;
-pub use encoding::{FactEncoding, KnowledgeEncoder};
+pub use encoding::{FactEncoding, KnowledgeEncoder, RoleBoundVector};
 pub use extraction::{
     EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, KnowledgeExtractor, SemanticRole,
 };
