@@ -6,7 +6,8 @@
 **Parent research boundary:** [MAT-HYPOTHESIS-001 #5254](https://github.com/Luminous-Dynamics/symthaea/issues/5254)  
 **Date:** 2026-10-15  
 **Initial data-admission companion:** [NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md](./NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md)
-**Cross-domain strategy:** [NANOTECHNOLOGY_FRONTIER_PORTFOLIO.md](./NANOTECHNOLOGY_FRONTIER_PORTFOLIO.md) — staged opportunities beyond the initial OC22 benchmark.  
+**Cross-domain strategy:** [NANOTECHNOLOGY_FRONTIER_PORTFOLIO.md](./NANOTECHNOLOGY_FRONTIER_PORTFOLIO.md) — staged opportunities beyond the initial OC22 benchmark.
+**Independent policy benchmark:** [NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md](./NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md), tracked by [NANO-003](https://github.com/Luminous-Dynamics/symthaea/issues/7519). This tests discovery-policy value in MADE's convex-hull task and does not replace OC22 validation.  
 **Checkpoint eligibility gate:** [NANO-001C #7465](https://github.com/Luminous-Dynamics/symthaea/issues/7465)
 
 ## 1. Mission
