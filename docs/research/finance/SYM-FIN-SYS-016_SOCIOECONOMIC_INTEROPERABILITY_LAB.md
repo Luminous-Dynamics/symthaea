@@ -421,7 +421,7 @@ The desired output is a **Civilization Mechanism Map**, not a winning ideology.
 
 ## 16. Versioned run receipt and semantic export boundary
 
-The machine-readable run receipt is defined in [`SYM-FIN-SYS-016_run_receipt_v1.schema.json`](SYM-FIN-SYS-016_run_receipt_v1.schema.json). An illustrative shape is in [`SYM-FIN-SYS-016_run_receipt_example_v1.json`](SYM-FIN-SYS-016_run_receipt_example_v1.json); schema-level and cross-field rejection cases are in [`SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json`](SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json). The test-only [validator](../../../scripts/validate_socioeconomic_run_receipt.py) checks both layers. A small job in the existing `.github/workflows/ci.yml` is deliberately not draft-gated; a separate focused workflow is also included for subsequent maintenance/dispatch.
+The machine-readable run receipt is defined in [`SYM-FIN-SYS-016_run_receipt_v1.schema.json`](SYM-FIN-SYS-016_run_receipt_v1.schema.json). An illustrative shape is in [`SYM-FIN-SYS-016_run_receipt_example_v1.json`](SYM-FIN-SYS-016_run_receipt_example_v1.json); schema-level and cross-field rejection cases are in [`SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json`](SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json). The test-only [validator](../../../scripts/validate_socioeconomic_run_receipt.py) checks both layers. A small job in the existing `.github/workflows/ci.yml` is deliberately not draft-gated. A separate workflow-dispatch verifier is retained for manual re-validation after merge to the default branch.
 
 A receipt binds:
 
