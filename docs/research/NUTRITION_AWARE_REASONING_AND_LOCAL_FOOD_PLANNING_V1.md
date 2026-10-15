@@ -140,7 +140,7 @@ Validation sequence: (a) nutrition-qualified review of food matching; (b) agrono
 
 **B. Deterministic calculator.** Compute edible delivered mass and per-nutrient contribution from source-pinned inputs with dimensional validation. Independent recomputation and missing-data behavior are release gates.
 
-**C. Scenario comparison.** Symtropy compares crop/supplier portfolios over time and resource constraints. Check its existing capabilities before introducing another solver or runtime.
+**C. Scenario comparison.** Symtropy's first executable layer now aggregates source-pinned nutrient contributions across multiple food-delivery lines against a declared nutrient target, preserving per-line receipts and blocking missing composition, duplicated delivery references, cross-scope/period mixing and overflow. It is still not a crop/supplier portfolio optimizer. The next step is [NUTRI-PORTFOLIO-001 in Symtropy issue #1649](https://github.com/Luminous-Dynamics/symtropy/issues/1649): a deterministic, synthetic-first Pareto comparison across per-nutrient shortfalls, seasonal delivery, water, area, labour, storage, cost and resilience. That stage is gated on exact-head validation of [Symtropy PR #1637](https://github.com/Luminous-Dynamics/symtropy/pull/1637) and requires licensed composition data and reviewed local yield evidence before any real-world crop recommendation. Check existing capabilities before introducing another solver or runtime.
 
 **D. Symthaea integration.** Retrieve source-backed facts, state assumptions, request missing preferences, call the deterministic planner, verify the report and explain trade-offs. HDC/CfC may help associate and maintain context, but do not replace evidence validation or numerical solvers.
 
