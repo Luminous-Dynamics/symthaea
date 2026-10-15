@@ -17,6 +17,11 @@ const ABS_TOLERANCE: f64 = 1e-12;
 
 #[derive(Debug, Deserialize)]
 struct CalibrationArtifact {
+    ph: f64,
+    temperature: f64,
+    temperature_unit: String,
+    wavelength: f64,
+    signal_type: String,
     samples: Vec<CalibrationSample>,
     model_result: CalibrationModel,
 }
@@ -58,6 +63,11 @@ struct CalibrationStatistics {
 #[derive(Debug, PartialEq)]
 struct CalibrationReport {
     sha256: String,
+    ph: f64,
+    temperature_c: f64,
+    temperature_unit: String,
+    wavelength_nm: f64,
+    signal_type: String,
     concentration_unit: String,
     range_lower: f64,
     range_upper: f64,
@@ -105,6 +115,11 @@ struct CalibrationSuiteFile {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ExpectedCalibrationFit {
+    ph: f64,
+    temperature_c: f64,
+    temperature_unit: String,
+    wavelength_nm: f64,
+    signal_type: String,
     concentration_unit: String,
     range_lower: f64,
     range_upper: f64,
@@ -154,6 +169,15 @@ fn validate_bytes(bytes: &[u8], expected_sha256: &str) -> Result<CalibrationRepo
     let artifact: CalibrationArtifact =
         serde_json::from_slice(bytes).context("parse calibration JSON")?;
     ensure!(!artifact.samples.is_empty(), "calibration contains no samples");
+    ensure!(
+        artifact.ph.is_finite()
+            && artifact.temperature.is_finite()
+            && !artifact.temperature_unit.trim().is_empty()
+            && artifact.wavelength.is_finite()
+            && artifact.wavelength > 0.0
+            && !artifact.signal_type.trim().is_empty(),
+        "calibration pH, temperature, wavelength, unit, and signal type must be valid"
+    );
     ensure!(
         artifact.model_result.equation.trim() == "a * concentration = signal",
         "only the declared zero-intercept linear calibration is supported"
@@ -270,6 +294,11 @@ fn validate_bytes(bytes: &[u8], expected_sha256: &str) -> Result<CalibrationRepo
     let concentration_unit = unit.context("calibration has no samples")?.to_string();
     Ok(CalibrationReport {
         sha256: actual_sha256,
+        ph: artifact.ph,
+        temperature_c: artifact.temperature,
+        temperature_unit: artifact.temperature_unit,
+        wavelength_nm: artifact.wavelength,
+        signal_type: artifact.signal_type,
         concentration_unit,
         range_lower: lower,
         range_upper: upper,
@@ -335,19 +364,32 @@ fn validate_suite(
         manifest.status == "reference_only_not_admitted",
         "suite manifest must remain explicitly reference_only_not_admitted"
     );
-    ensure!(!manifest.source.dataset_doi.trim().is_empty(), "source dataset DOI is required");
+    ensure!(
+        manifest.source.dataset_doi == "10.18419/DARUS-3867",
+        "unexpected dataset DOI for the SLAC calibration suite"
+    );
     let dataverse_url = Url::parse(&manifest.source.dataverse_url)
         .context("source.dataverse_url must be a valid URL")?;
     ensure!(
-        dataverse_url.scheme() == "https" && dataverse_url.host_str().is_some(),
-        "source.dataverse_url must use HTTPS and include a host"
+        dataverse_url.scheme() == "https"
+            && dataverse_url.host_str() == Some("darus.uni-stuttgart.de")
+            && dataverse_url.path() == "/dataset.xhtml"
+            && dataverse_url.query()
+                == Some("persistentId=doi%3A10.18419%2Fdarus-3867"),
+        "source.dataverse_url must identify the canonical DaRUS-3867 record over HTTPS"
     );
     ensure!(
         manifest.source.license == "CC-BY-4.0",
         "unexpected source license label; re-review before updating this suite"
     );
-    ensure!(!manifest.source.mirror_repository.trim().is_empty(), "source.mirror_repository is required");
-    ensure!(is_sha1(&manifest.source.mirror_commit), "source.mirror_commit must be a 40-character hexadecimal commit SHA");
+    ensure!(
+        manifest.source.mirror_repository == "EnzymeML/slac_modeling",
+        "unexpected mirror repository for the SLAC calibration suite"
+    );
+    ensure!(
+        manifest.source.mirror_commit == "737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5",
+        "unexpected mirror commit for the pinned SLAC calibration suite"
+    );
     ensure!(manifest.files.len() == 5, "SLAC calibration reference suite requires exactly five temperature files");
 
     let root = fs::canonicalize(workspace_root)
@@ -362,6 +404,24 @@ fn validate_suite(
         ensure!(
             Path::new(&file.file_name).file_name().and_then(|value| value.to_str()) == Some(file.file_name.as_str()),
             "file_name must be a filename without path components"
+        );
+        ensure!(
+            Path::new(&file.local_path).file_name().and_then(|value| value.to_str()) == Some(file.file_name.as_str()),
+            "local_path filename must equal file_name for {}",
+            file.file_name
+        );
+        let expected_temperature = match file.file_name.as_str() {
+            "ABTS_standard_25.0C.json" => 25.0,
+            "ABTS_standard_30.0C.json" => 30.0,
+            "ABTS_standard_35.5C.json" => 35.5,
+            "ABTS_standard_40.0C.json" => 40.0,
+            "ABTS_standard_45.0C.json" => 45.0,
+            _ => anyhow::bail!("unexpected SLAC calibration filename: {}", file.file_name),
+        };
+        ensure!(
+            close(file.expected_fit.temperature_c, expected_temperature),
+            "filename/temperature reference mismatch for {}",
+            file.file_name
         );
         ensure!(is_sha1(&file.github_blob_sha), "github_blob_sha must be a 40-character hexadecimal Git blob SHA");
         ensure!(is_sha256(&file.sha256), "file SHA-256 must be 64 hexadecimal characters");
@@ -418,6 +478,23 @@ fn validate_suite(
         );
         let report = validate_bytes(&source_bytes, &file.sha256)
             .with_context(|| format!("verify/reproduce calibration {}", file.file_name))?;
+        ensure!(close(report.ph, file.expected_fit.ph), "pH mismatch for {}", file.file_name);
+        ensure!(
+            close(report.temperature_c, file.expected_fit.temperature_c)
+                && report.temperature_unit == file.expected_fit.temperature_unit,
+            "temperature mismatch for {}",
+            file.file_name
+        );
+        ensure!(
+            close(report.wavelength_nm, file.expected_fit.wavelength_nm),
+            "wavelength mismatch for {}",
+            file.file_name
+        );
+        ensure!(
+            report.signal_type == file.expected_fit.signal_type,
+            "signal type mismatch for {}",
+            file.file_name
+        );
         ensure!(report.concentration_unit == file.expected_fit.concentration_unit, "concentration unit mismatch for {}", file.file_name);
         ensure!(
             close(report.range_lower, file.expected_fit.range_lower)
@@ -476,6 +553,11 @@ mod tests {
 
     fn fixture() -> Value {
         json!({
+            "ph": 3.0,
+            "temperature": 25.0,
+            "temperature_unit": "C",
+            "wavelength": 340.0,
+            "signal_type": "Absorbance",
             "samples": [
                 {"id":"s0","concentration":0.0,"conc_unit":"umol / l","signal":0.0},
                 {"id":"s1","concentration":1.0,"conc_unit":"umol / l","signal":2.0},
@@ -492,31 +574,34 @@ mod tests {
         })
     }
 
+    fn fixture_at_temperature(temperature: f64) -> Value {
+        let mut value = fixture();
+        value["temperature"] = json!(temperature);
+        value
+    }
+
     fn validate_fixture(value: &Value) -> anyhow::Result<CalibrationReport> {
         let bytes = serde_json::to_vec(value)?;
         let expected = format!("{:x}", Sha256::digest(&bytes));
         validate_bytes(&bytes, &expected)
     }
 
-    #[test]
-    fn calibration_suite_fixture_checks_hash_git_blob_md5_range_counts_and_fits() {
-        let root = std::env::temp_dir().join(format!("symthaea-calibration-suite-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(&root).unwrap();
-        let bytes = serde_json::to_vec(&fixture()).unwrap();
-        let sha256 = format!("{:x}", Sha256::digest(&bytes));
-        let report = validate_bytes(&bytes, &sha256).unwrap();
-        let md5 = format!("{:x}", Md5::digest(&bytes));
-        let blob = git_blob_sha1(&bytes);
-        let names = [
-            "ABTS_standard_25.0C.json",
-            "ABTS_standard_30.0C.json",
-            "ABTS_standard_35.5C.json",
-            "ABTS_standard_40.0C.json",
-            "ABTS_standard_45.0C.json",
+    fn build_suite_fixture(root: &Path, corrupt_first_md5: bool) -> CalibrationSuiteManifest {
+        let temperatures = [
+            ("ABTS_standard_25.0C.json", 25.0),
+            ("ABTS_standard_30.0C.json", 30.0),
+            ("ABTS_standard_35.5C.json", 35.5),
+            ("ABTS_standard_40.0C.json", 40.0),
+            ("ABTS_standard_45.0C.json", 45.0),
         ];
         let mut files = Vec::new();
-        for name in names {
+        for (index, (name, temperature)) in temperatures.into_iter().enumerate() {
+            let value = fixture_at_temperature(temperature);
+            let bytes = serde_json::to_vec(&value).unwrap();
+            let sha256 = format!("{:x}", Sha256::digest(&bytes));
+            let report = validate_bytes(&bytes, &sha256).unwrap();
+            let md5 = if corrupt_first_md5 && index == 0 { "0".repeat(32) } else { format!("{:x}", Md5::digest(&bytes)) };
+            let blob = git_blob_sha1(&bytes);
             let local_path = format!("research-data/enzyme-benchmark/slac-calibration/{name}");
             let full_path = root.join(&local_path);
             fs::create_dir_all(full_path.parent().unwrap()).unwrap();
@@ -525,24 +610,36 @@ mod tests {
                 "file_name":name,"local_path":local_path,"github_blob_sha":blob,
                 "byte_length":bytes.len(),"sha256":sha256,"canonical_dataverse_md5":md5,
                 "expected_fit":{
-                    "concentration_unit":report.concentration_unit,"range_lower":report.range_lower,"range_upper":report.range_upper,
-                    "total_samples":report.total_samples,"selected_samples":report.selected_samples,"excluded_samples":report.excluded_samples,
-                    "slope":report.reported_slope,"r2":report.reported_r2,"rmsd":report.reported_rmsd
+                    "ph":report.ph,"temperature_c":report.temperature_c,
+                    "temperature_unit":report.temperature_unit,"wavelength_nm":report.wavelength_nm,
+                    "signal_type":report.signal_type,"concentration_unit":report.concentration_unit,
+                    "range_lower":report.range_lower,"range_upper":report.range_upper,
+                    "total_samples":report.total_samples,"selected_samples":report.selected_samples,
+                    "excluded_samples":report.excluded_samples,"slope":report.reported_slope,
+                    "r2":report.reported_r2,"rmsd":report.reported_rmsd
                 }
             }));
         }
-        let manifest: CalibrationSuiteManifest = serde_json::from_value(json!({
+        serde_json::from_value(json!({
             "schema_version":1,"status":"reference_only_not_admitted",
             "source":{
-                "dataset_doi":"test:fixture","dataverse_url":"https://example.invalid/dataset",
-                "license":"CC-BY-4.0","mirror_repository":"Example/fixture",
-                "mirror_commit":"0123456789abcdef0123456789abcdef01234567"
-            },
-            "files":files
-        })).unwrap();
+                "dataset_doi":"10.18419/DARUS-3867",
+                "dataverse_url":"https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi%3A10.18419%2Fdarus-3867",
+                "license":"CC-BY-4.0","mirror_repository":"EnzymeML/slac_modeling",
+                "mirror_commit":"737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5"
+            },"files":files
+        })).unwrap()
+    }
+
+    #[test]
+    fn calibration_suite_fixture_checks_hash_git_blob_md5_range_counts_fits_and_identity() {
+        let root = std::env::temp_dir().join(format!("symthaea-calibration-suite-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let manifest = build_suite_fixture(&root, false);
         let reports = validate_suite(&root, &manifest).unwrap();
         assert_eq!(reports.len(), 5);
-        assert!(reports.iter().all(|(_, row, seen_md5)| row.selected_samples == 4 && seen_md5 == &md5));
+        assert!(reports.iter().all(|(_, report, md5)| report.selected_samples == 4 && md5.len() == 32));
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -551,36 +648,33 @@ mod tests {
         let root = std::env::temp_dir().join(format!("symthaea-calibration-suite-md5-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
-        let bytes = serde_json::to_vec(&fixture()).unwrap();
-        let sha256 = format!("{:x}", Sha256::digest(&bytes));
-        let report = validate_bytes(&bytes, &sha256).unwrap();
-        let names = [
-            "ABTS_standard_25.0C.json","ABTS_standard_30.0C.json","ABTS_standard_35.5C.json",
-            "ABTS_standard_40.0C.json","ABTS_standard_45.0C.json",
-        ];
-        let mut files = Vec::new();
-        for name in names {
-            let local_path = format!("research-data/enzyme-benchmark/slac-calibration/{name}");
-            let full_path = root.join(&local_path);
-            fs::create_dir_all(full_path.parent().unwrap()).unwrap();
-            fs::write(&full_path, &bytes).unwrap();
-            files.push(json!({
-                "file_name":name,"local_path":local_path,"github_blob_sha":git_blob_sha1(&bytes),
-                "byte_length":bytes.len(),"sha256":sha256,"canonical_dataverse_md5":"0".repeat(32),
-                "expected_fit":{
-                    "concentration_unit":report.concentration_unit,"range_lower":report.range_lower,"range_upper":report.range_upper,
-                    "total_samples":report.total_samples,"selected_samples":report.selected_samples,"excluded_samples":report.excluded_samples,
-                    "slope":report.reported_slope,"r2":report.reported_r2,"rmsd":report.reported_rmsd
-                }
-            }));
-        }
-        let manifest: CalibrationSuiteManifest = serde_json::from_value(json!({
-            "schema_version":1,"status":"reference_only_not_admitted",
-            "source":{"dataset_doi":"test:fixture","dataverse_url":"https://example.invalid/dataset","license":"CC-BY-4.0","mirror_repository":"Example/fixture","mirror_commit":"0123456789abcdef0123456789abcdef01234567"},
-            "files":files
-        })).unwrap();
+        let manifest = build_suite_fixture(&root, true);
         let error = validate_suite(&root, &manifest).unwrap_err().to_string();
         assert!(error.contains("canonical DaRUS MD5 mismatch"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn calibration_suite_rejects_temperature_mismatch() {
+        let root = std::env::temp_dir().join(format!("symthaea-calibration-suite-temp-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let mut manifest = build_suite_fixture(&root, false);
+        manifest.files[0].expected_fit.temperature_c = 24.0;
+        let error = validate_suite(&root, &manifest).unwrap_err().to_string();
+        assert!(error.contains("filename/temperature reference mismatch"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn calibration_suite_rejects_wavelength_mismatch() {
+        let root = std::env::temp_dir().join(format!("symthaea-calibration-suite-wavelength-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let mut manifest = build_suite_fixture(&root, false);
+        manifest.files[0].expected_fit.wavelength_nm = 420.0;
+        let error = validate_suite(&root, &manifest).unwrap_err().to_string();
+        assert!(error.contains("wavelength mismatch"));
         fs::remove_dir_all(root).unwrap();
     }
 
