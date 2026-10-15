@@ -52,7 +52,7 @@ Do not silently merge unlike foods. A local cultivar, wild/underutilized food, f
 
 A source name alone is not provenance. Record its exact edition, record and permitted transformation rather than inventing a citation because a food or nutrient sounds plausible.
 
-A written permission must be scoped to the right it actually grants. The source registry stores separate evidence references for assessment, cache/retention, transformation, commercial use, public fixture use and redistribution; one document reference cannot silently satisfy a different right's evidence requirement. A reference is only a pointer to evidence, not automatic proof of scope, authenticity, legal sufficiency or continued validity.
+Every affirmative rights decision—whether allowed by a license or granted by written permission—must be backed by a non-empty evidence reference scoped to that right. The source registry stores separate references for assessment, cache/retention, transformation, commercial use, public fixture use and redistribution; one reference cannot silently satisfy a different right's requirement. A reference is only a pointer to a license clause or permission record, not automatic proof of scope, authenticity, legal sufficiency or continued validity.
 
 ### Johannesburg/Highveld candidate-food hypothesis (not yet a planting recommendation)
 
