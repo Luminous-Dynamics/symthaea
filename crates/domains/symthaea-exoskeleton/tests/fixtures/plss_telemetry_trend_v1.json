@@ -185,7 +185,7 @@
       "observed_at_s": 1,
       "confidence": 0.98,
       "source_id": "humidity-outside-window",
-      "source_kind": "Instrument"
+      "source_kind": "ModelEstimate"
     },
     {
       "metric": "RelativeHumidityPercent",
@@ -325,6 +325,13 @@
       "metric": "RelativeHumidityPercent",
       "source_kind": "ModelPrediction",
       "status": "LowConfidence",
+      "source_ids": [],
+      "rates_per_s": []
+    },
+    {
+      "metric": "RelativeHumidityPercent",
+      "source_kind": "ModelEstimate",
+      "status": "OutOfWindow",
       "source_ids": [],
       "rates_per_s": []
     }
