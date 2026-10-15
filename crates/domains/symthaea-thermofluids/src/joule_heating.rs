@@ -386,6 +386,40 @@ mod tests {
     }
 
     #[test]
+    fn cumulative_convective_energy_balance_holds_across_conditions() {
+        let mut model = reference_model();
+        let initial_temperature_k = model.temperature_k();
+        let heat_capacity_j_per_k = model.thermal_capacity_j_per_k();
+        let schedule = [
+            (3.0, 1.0, 295.0, 5.0),
+            (0.0, 2.0, 310.0, 10.0),
+            (-2.0, 0.5, 290.0, 0.1),
+            (1.5, 3.0, 300.0, 2.0),
+            (0.0, 0.1, 280.0, 20.0),
+        ];
+
+        let mut energy_in_j = 0.0;
+        let mut ambient_energy_out_j = 0.0;
+        for (current_a, dt_s, ambient_k, conductance_w_per_k) in schedule {
+            let step = model
+                .step_with_convection(current_a, dt_s, ambient_k, conductance_w_per_k)
+                .unwrap();
+            assert!(step.energy_balance_residual_j.abs() < 1e-8);
+            energy_in_j += step.electrical_energy_in_j;
+            ambient_energy_out_j += step.ambient_energy_out_j;
+        }
+
+        let total_stored_energy_change_j =
+            heat_capacity_j_per_k * (model.temperature_k() - initial_temperature_k);
+        let cumulative_residual_j =
+            energy_in_j - ambient_energy_out_j - total_stored_energy_change_j;
+        assert!(
+            cumulative_residual_j.abs() < 1e-8,
+            "cumulative residual = {cumulative_residual_j} J"
+        );
+    }
+
+    #[test]
     fn convection_cools_hot_conductor_and_closes_energy_balance() {
         let mut model = JouleHeatingModel::new(2.0, 0.5, 900.0, 400.0).unwrap();
         let step = model
