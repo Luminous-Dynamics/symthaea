@@ -657,7 +657,9 @@ impl KnowledgePersistence {
             validate_hypervector_bytes(&fact.vector_bytes, 0)
                 .map_err(|e| format!("Invalid fact snapshot vector: {e}"))?;
             for (role, bytes) in &fact.role_vectors {
-                validate_hypervector_bytes(bytes, 2).map_err(|e| format!("Invalid role vector for {}: {e}", role.storage_key()))?;
+                validate_hypervector_bytes(bytes, 2).map_err(|e| {
+                    format!("Invalid role vector for {}: {e}", role.storage_key())
+                })?;
             }
             if !fact.confidence.is_finite() || !(0.0..=1.0).contains(&fact.confidence) {
                 return Err(format!(
@@ -925,8 +927,13 @@ impl KnowledgePersistence {
                 "Structured relation rows refer to missing fact row {orphan_id}"
             ));
         }
-        if let Some(orphan_id) = role_vectors_by_fact.keys().find(|id| !fact_row_ids.contains(id)) {
-            return Err(format!("Role-vector rows refer to missing fact row {orphan_id}"));
+        if let Some(orphan_id) = role_vectors_by_fact
+            .keys()
+            .find(|id| !fact_row_ids.contains(id))
+        {
+            return Err(format!(
+                "Role-vector rows refer to missing fact row {orphan_id}"
+            ));
         }
         for (fact_row_id, fact) in &mut facts_with_row_id {
             fact.relations = relations_by_fact.remove(fact_row_id).unwrap_or_default();
@@ -1342,6 +1349,21 @@ mod tests {
         );
         let snapshot = persistence.load_facts().unwrap();
         assert_eq!(snapshot[0].role_vectors, fact.role_vectors);
+
+        let replacement = FactRecord {
+            role_vectors: HashMap::new(),
+            ..fact
+        };
+        assert_eq!(
+            persistence
+                .replace_knowledge_snapshot(&[replacement], &[], &[], 2)
+                .unwrap(),
+            (1, 0, 0)
+        );
+        assert!(
+            persistence.load_facts().unwrap()[0].role_vectors.is_empty(),
+            "removed role vectors must not survive snapshot replacement"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
