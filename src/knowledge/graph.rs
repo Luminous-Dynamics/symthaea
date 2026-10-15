@@ -785,6 +785,7 @@ fn contains_negation(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::extraction::{ExtractedRelation, SemanticRole};
     use super::super::persistence::KnowledgePersistence;
 
     fn make_encoding(text: &str, confidence: f32) -> FactEncoding {
@@ -1017,6 +1018,16 @@ mod tests {
             Some("test".to_string()),
             true,
         );
+        graph.facts.get_mut(&id).unwrap().encoding.relations = vec![ExtractedRelation {
+            subject: "ceasefire".into(),
+            predicate: "prevented".into(),
+            object: "escalation".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: true,
+            confidence: 0.73,
+        }];
         {
             let fact = graph.facts.get_mut(&id).unwrap();
             fact.confidence = 0.61;
@@ -1045,6 +1056,16 @@ mod tests {
         assert_eq!(fact.id, id, "SQLite round trip must preserve graph-level fact IDs");
         assert_eq!(fact.encoding.source_text, "persistent temporal fixture");
         assert_eq!(fact.encoding.vector.0.to_vec(), expected_vector);
+        assert_eq!(fact.encoding.relations.len(), 1);
+        let relation = &fact.encoding.relations[0];
+        assert_eq!(relation.subject, "ceasefire");
+        assert_eq!(relation.predicate, "prevented");
+        assert_eq!(relation.object, "escalation");
+        assert_eq!(relation.subject_role, SemanticRole::Agent);
+        assert_eq!(relation.object_role, SemanticRole::Patient);
+        assert!(relation.is_causal);
+        assert!(relation.is_negated);
+        assert!((relation.confidence - 0.73).abs() < f32::EPSILON);
         assert!((fact.confidence - 0.61).abs() < f32::EPSILON);
         assert!((fact.initial_confidence - 0.94).abs() < f32::EPSILON);
         assert_eq!(fact.inserted_at_cycle, 7);
