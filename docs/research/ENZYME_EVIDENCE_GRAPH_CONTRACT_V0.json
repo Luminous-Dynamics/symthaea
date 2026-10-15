@@ -238,6 +238,7 @@
       "A fitted value is not relabeled as a directly measured datum.",
       "kcat is not merged with Km, kcat/Km, Vmax, specific activity, yield, or activity without an explicitly defined conversion/model.",
       "The subunit/oligomer concentration basis is explicit; if uncertain, comparability is blocked or qualified.",
+      "When source_or_fit_node_id identifies a source_record, a reported_by edge to a reported_parameter_claim node is required; when it identifies a fit_run, an estimates edge to a reproduced_parameter_estimate node is required.",
       "Missing uncertainty is not encoded as zero uncertainty."
     ]
   },
