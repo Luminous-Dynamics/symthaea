@@ -14,6 +14,8 @@ use url::Url;
 
 const REQUIRED_COLUMNS: &[&str] = &[
     "observation_id",
+    "source_id",
+    "source_release",
     "source_record_id",
     "source_record_url",
     "source_locator",
@@ -235,6 +237,8 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
             "duplicate observation_id: {observation_id}"
         );
         for required in [
+            "source_id",
+            "source_release",
             "source_record_id",
             "source_record_url",
             "source_locator",
@@ -255,6 +259,16 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
                 row_index + 2
             );
         }
+        ensure!(
+            field(&row, &header_index, "source_id") == manifest.source.source_id,
+            "source_id differs from manifest source.source_id at CSV record {}",
+            row_index + 2
+        );
+        ensure!(
+            field(&row, &header_index, "source_release") == manifest.source.release,
+            "source_release differs from manifest source.release at CSV record {}",
+            row_index + 2
+        );
         let source_record_url = field(&row, &header_index, "source_record_url");
         ensure!(
             is_valid_https_url(source_record_url),
@@ -618,13 +632,15 @@ mod tests {
         let context_a_json = context_a.to_string();
         let context_b_json = context_b.to_string();
         writer.write_record([
-            "obs-a", "source-a", "https://example.invalid/source-a", "synthetic:record-a",
-            "study-a", "synthetic:assay-method-v1", "protein-a", "family-a", "kcat",
+            "obs-a", "SYNTHETIC_TEST_FIXTURE", "test-v1", "source-a",
+            "https://example.invalid/source-a", "synthetic:record-a", "study-a",
+            "synthetic:assay-method-v1", "protein-a", "family-a", "kcat",
             "2.0", "s^-1", "2.0", "s^-1", "kcat_s-1_identity_v1", "1.0", context_a_json.as_str()
         ]).unwrap();
         writer.write_record([
-            "obs-b", "source-b", "https://example.invalid/source-b", "synthetic:record-b",
-            "study-b", "synthetic:assay-method-v1", "protein-b", "family-b", "kcat",
+            "obs-b", "SYNTHETIC_TEST_FIXTURE", "test-v1", "source-b",
+            "https://example.invalid/source-b", "synthetic:record-b", "study-b",
+            "synthetic:assay-method-v1", "protein-b", "family-b", "kcat",
             "3.0", "s^-1", "3.0", "s^-1", "kcat_s-1_identity_v1", "1.0", context_b_json.as_str()
         ]).unwrap();
         let csv_bytes = writer.into_inner().unwrap();
@@ -710,6 +726,35 @@ mod tests {
         let parsed: Manifest = serde_json::from_value(value).unwrap();
         let error = validate(&root, &parsed).unwrap_err().to_string();
         assert!(error.contains("dataset CSV contains duplicate column names"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_row_source_id_that_differs_from_manifest_rights_review() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        let dataset_bytes = rewrite_csv_field(
+            &root,
+            "obs-a",
+            "source_id",
+            "UNREVIEWED_SECOND_SOURCE",
+        );
+        value["dataset_artifact"]["sha256"] = json!(format!("{:x}", Sha256::digest(&dataset_bytes)));
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let error = validate(&root, &parsed).unwrap_err().to_string();
+        assert!(error.contains("source_id differs from manifest"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_row_source_release_that_differs_from_manifest() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        let dataset_bytes = rewrite_csv_field(&root, "obs-a", "source_release", "unreviewed-new-release");
+        value["dataset_artifact"]["sha256"] = json!(format!("{:x}", Sha256::digest(&dataset_bytes)));
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let error = validate(&root, &parsed).unwrap_err().to_string();
+        assert!(error.contains("source_release differs from manifest"));
         fs::remove_dir_all(root).unwrap();
     }
 
