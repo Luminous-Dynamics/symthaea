@@ -256,11 +256,19 @@ impl CausalKnowledgeBridge {
         self.add_edge(edge);
     }
 
+    /// Legacy persistence view: signed-strength triples for non-negated edges.
+    ///
+    /// Keep this established return type for downstream callers. New persistence
+    /// code should use `export_observations()` to retain all observation metadata.
+    pub fn export_edge_records(&self) -> Vec<(String, String, f32)> {
+        self.export_edges()
+    }
+
     /// Export all edge observations with their original semantic and provenance fields.
     ///
     /// Unlike `export_edges()`, this does not filter negated relations or encode
     /// inhibitory polarity by negating the confidence/strength number.
-    pub fn export_edge_records(&self) -> Vec<CausalEdge> {
+    pub fn export_observations(&self) -> Vec<CausalEdge> {
         self.edges.clone()
     }
 
@@ -666,7 +674,7 @@ mod tests {
             source.export_edges().is_empty(),
             "legacy reasoning export still filters explicitly negated observations"
         );
-        let exported = source.export_edge_records();
+        let exported = source.export_observations();
         assert_eq!(exported.len(), 1);
         assert_eq!(exported[0].cause, original.cause);
         assert_eq!(exported[0].effect, original.effect);
@@ -680,7 +688,7 @@ mod tests {
         for edge in exported {
             restored.import_edge_record(edge);
         }
-        let restored_edges = restored.export_edge_records();
+        let restored_edges = restored.export_observations();
         assert_eq!(restored_edges.len(), 1);
         assert_eq!(restored_edges[0].strength, 0.7);
         assert!(restored_edges[0].is_inhibitory);
