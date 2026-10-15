@@ -4,7 +4,8 @@
 
 **Tracking:** [NANO-001 #7453](https://github.com/Luminous-Dynamics/symthaea/issues/7453)  
 **Parent research boundary:** [MAT-HYPOTHESIS-001 #5254](https://github.com/Luminous-Dynamics/symthaea/issues/5254)  
-**Date:** 2026-10-15
+**Date:** 2026-10-15  
+**Initial data-admission companion:** [NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md](./NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md)
 
 ## 1. Mission
 
@@ -280,11 +281,12 @@ Never describe a queued CI job as passed. Never claim compilation or tests that 
 ## 10. References
 
 1. ACS Nano (2025), *Artificial Intelligence for Materials Discovery, Development, and Optimization*: https://pubs.acs.org/doi/10.1021/acsnano.5c04200
-2. Open Catalyst Project, project background: https://opencatalystproject.org/
-3. FairChem OC22 dataset documentation at pinned source commit 57c71322d5a5be0a0fcdcf05592e1699b120dc79: https://github.com/facebookresearch/fairchem/blob/57c71322d5a5be0a0fcdcf05592e1699b120dc79/docs/catalysts/datasets/oc22.md
-4. Open Catalyst Dataset repository, dataset workflow, and separate tooling license: https://github.com/Open-Catalyst-Project/Open-Catalyst-Dataset
-5. OC22 CC BY 4.0 license text: https://creativecommons.org/licenses/by/4.0/
-4. NIST, *Nanotechnology Measurement Protocols* (page updated 13 July 2026): https://www.nist.gov/mml/nanotechnology-measurement-protocols
-5. Ren et al., *Autonomous experiments using active learning and AI*, Nature Reviews Materials (2023): https://www.nature.com/articles/s41578-023-00588-4
-6. LAMMPS stable documentation (30 September 2026): https://docs.lammps.org/stable/
-7. Atomic Simulation Environment documentation: https://docs.ase-lib.org/
+2. Open Catalyst Project, project background and data portals: https://opencatalystproject.org/
+3. FairChem OC22 dataset documentation at source commit `57c71322d5a5be0a0fcdcf05592e1699b120dc79`: https://github.com/facebookresearch/fairchem/blob/57c71322d5a5be0a0fcdcf05592e1699b120dc79/docs/catalysts/datasets/oc22.md
+4. Open Catalyst Dataset repository, dataset workflow and separate tooling license: https://github.com/Open-Catalyst-Project/Open-Catalyst-Dataset
+5. OC22 data license as reported by upstream: Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
+6. FairChem OC20 documentation for the later adsorption-energy benchmark: https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/datasets/oc20.md
+7. NIST, *Nanotechnology Measurement Protocols* (updated 13 July 2026): https://www.nist.gov/mml/nanotechnology-measurement-protocols
+8. Ren et al., *Autonomous experiments using active learning and AI*, Nature Reviews Materials (2023): https://www.nature.com/articles/s41578-023-00588-4
+9. LAMMPS stable documentation (30 September 2026): https://docs.lammps.org/stable/
+10. Atomic Simulation Environment documentation: https://docs.ase-docs.org/
