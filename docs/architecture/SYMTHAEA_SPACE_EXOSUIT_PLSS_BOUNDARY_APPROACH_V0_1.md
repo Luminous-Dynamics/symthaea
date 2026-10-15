@@ -27,7 +27,7 @@ SX-026 emits source-separated endpoint-rate envelopes, explicit coverage/gaps, u
 - Both the aggregate lane and selected source trend must be Fresh. A conflicted aggregate lane suppresses numeric projections even where one individual source has a plausible slope. Sparse, missing, invalid, out-of-window, low-confidence, or conflicting evidence never becomes a reassuring forecast.
 - The module orients lower-boundary problems by negating value and rate, then applies the same calculation as an upper-boundary crossing.
 - If the current value-uncertainty envelope is already past or overlaps a boundary, no future crossing interval is manufactured.
-- When the complete rate envelope points toward the boundary, the earliest time uses the near side of the current value envelope and the fastest admissible endpoint rate; the latest uses the far side and the slowest admissible positive rate. If rate bounds include zero, only a possible earliest crossing is reported and the result is DirectionUncertain.
+- When the complete rate envelope points toward the boundary, the earliest time uses the near side of the current value envelope and the fastest admissible endpoint rate; the latest uses the far side and the slowest admissible positive rate. If some admissible rates point toward the boundary while others do not (including zero), only a possible earliest crossing is reported and the result is DirectionUncertain. If the greatest admissible rate is exactly zero, the result is NotApproaching rather than MovingAway.
 - A candidate interval is CandidateWithinHorizon only when its latest crossing estimate fits inside the configured horizon. If the interval runs beyond that horizon, the result is CandidateBeyondHorizon. Such times remain mathematical candidates, not guarantees.
 - These calculations are arithmetic endpoint envelopes, not probability distributions or statistical confidence intervals. They may be conservative and effectively count current endpoint uncertainty both in the rate envelope and current-value envelope. They do not model nonlinearity, sensor lag, future workload, scrubber saturation, transient dynamics between samples, or causal coupling among atmospheric variables.
 - No output issues alerts, changes mission state, actuates hardware, infers inspired CO2 (PICO2), or makes claims about human exposure safety.
@@ -42,7 +42,7 @@ Fingerprints reveal input/output changes; they are not signatures and do not aut
 
 Corpus: `crates/domains/symthaea-exoskeleton/tests/fixtures/plss_telemetry_boundary_v1.json`.
 
-It includes upper and lower directions, boundary already beyond current data, a threshold inside the endpoint uncertainty envelope, candidates inside and outside the horizon, and missing-source behavior. Additional unit tests cover rate intervals that include zero, moving-away trajectories, source conflicts, altered SX-026 reports/receipts, invalid thresholds, and boundary input-order invariance.
+It includes upper and lower directions, boundary already beyond current data, a threshold inside the endpoint uncertainty envelope, candidates inside and outside the horizon, and missing-source behavior. Additional unit tests cover rate intervals that include zero, a flat zero-rate control, moving-away trajectories, source conflicts, altered SX-026 reports/receipts, invalid thresholds, and boundary input-order invariance.
 
 Run on a configured Rust workspace:
 
