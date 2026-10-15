@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "fixture_id": "synthetic-lunar-grounding-interface-pair-v1",
+  "left": {
+    "component_id": "simulated-lunar-suit-r1",
+    "hardware_revision": "prototype-r1",
+    "endpoints": [
+      {
+        "interface_id": "lunar-grounding",
+        "endpoint_id": "suit-grounding-interface",
+        "kind": "GroundingAndEsd",
+        "role": "Consumer",
+        "contract_revision": "1.0.0",
+        "schema_digest_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "connector_profile_id": "grounding-profile-sim-r1",
+        "applicable_environments": ["LunarShadowOrPolarRegion"],
+        "evidence_level": "BenchTested",
+        "evidence_reference": "sim://fixture/lunar-grounding-contract",
+        "required": true
+      }
+    ]
+  },
+  "right": {
+    "component_id": "simulated-lunar-lander-r1",
+    "hardware_revision": "prototype-r1",
+    "endpoints": [
+      {
+        "interface_id": "lunar-grounding",
+        "endpoint_id": "lander-grounding-terminal",
+        "kind": "GroundingAndEsd",
+        "role": "Provider",
+        "contract_revision": "1.0.0",
+        "schema_digest_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "connector_profile_id": "grounding-profile-sim-r1",
+        "applicable_environments": ["LunarShadowOrPolarRegion"],
+        "evidence_level": "BenchTested",
+        "evidence_reference": "sim://fixture/lunar-grounding-contract",
+        "required": true
+      }
+    ]
+  },
+  "policy": {
+    "minimum_evidence_level": "Simulated",
+    "required_environments": ["LunarShadowOrPolarRegion"]
+  },
+  "expected": {
+    "status": "MeetsDeclaredCompatibilityPolicy",
+    "required_interface_count": 1,
+    "required_compatible_count": 1,
+    "blocked_required_count": 0,
+    "finding_count": 1,
+    "finding_status": "CompatibleUnderPolicy",
+    "represents_physical_qualification": false
+  }
+}

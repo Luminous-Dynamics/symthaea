@@ -62,6 +62,7 @@ pub mod resource_optimizer;
 pub mod resource_transfer;
 pub mod safe_haven;
 pub mod suit_profile;
+pub mod suit_interop;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
 pub mod simulator;

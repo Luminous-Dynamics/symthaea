@@ -72,6 +72,9 @@ pub enum SuitCapability {
     OrbitalWorksiteInterfaces,
     PlanetaryLocomotion,
     DustMitigation,
+    /// Explicit capability category for lunar charge/grounding risk analysis;
+    /// not a claim that any discharge design is safe or qualified.
+    ElectrostaticChargeManagement,
     AbrasionAndPunctureResistance,
     HighDexterityGloveInterfaces,
     SurfaceNavigationInterface,
@@ -105,6 +108,7 @@ const ORBITAL_EVA_CAPABILITIES: &[SuitCapability] = &[
 const LUNAR_SURFACE_CAPABILITIES: &[SuitCapability] = &[
     SuitCapability::PlanetaryLocomotion,
     SuitCapability::DustMitigation,
+    SuitCapability::ElectrostaticChargeManagement,
     SuitCapability::AbrasionAndPunctureResistance,
     SuitCapability::HighDexterityGloveInterfaces,
     SuitCapability::SurfaceNavigationInterface,
@@ -132,6 +136,7 @@ const CONSTRUCTION_CAPABILITIES: &[SuitCapability] = &[
 const DUST_INTENSIVE_CAPABILITIES: &[SuitCapability] = &[
     SuitCapability::PlanetaryLocomotion,
     SuitCapability::DustMitigation,
+    SuitCapability::ElectrostaticChargeManagement,
     SuitCapability::AbrasionAndPunctureResistance,
     SuitCapability::ContaminationContainment,
     SuitCapability::FieldRepairableSubsystems,
@@ -467,6 +472,15 @@ mod tests {
         assert!(SuitMissionProfile::LunarSurfaceEva
             .required_capabilities()
             .contains(&SuitCapability::DustMitigation));
+        assert!(SuitMissionProfile::LunarSurfaceEva
+            .required_capabilities()
+            .contains(&SuitCapability::ElectrostaticChargeManagement));
+        assert!(SuitMissionProfile::DustIntensiveSurfaceWork
+            .required_capabilities()
+            .contains(&SuitCapability::ElectrostaticChargeManagement));
+        assert!(!SuitMissionProfile::OrbitalEva
+            .required_capabilities()
+            .contains(&SuitCapability::ElectrostaticChargeManagement));
         assert!(SuitMissionProfile::CrewRescueAndRecovery
             .required_capabilities()
             .contains(&SuitCapability::CrewRescueHandlingInterfaces));
