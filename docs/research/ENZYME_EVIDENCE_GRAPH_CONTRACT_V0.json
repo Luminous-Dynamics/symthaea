@@ -230,6 +230,7 @@
     "The evidence graph's own serialized bytes are versioned and SHA-256 pinned when frozen."
   ],
   "future_verifier_checks": [
+    "Bind code/configuration/environment identities to immutable source, configuration, and environment-lock artifacts and verify their exact bytes; hash-shaped strings alone do not prove executable reproducibility.",
     "Finalize and enforce a JSON Schema for the instance layout.",
     "Semantic-unit checks and parameter meaning using the selected EnzymeML version rather than a duplicate ontology.",
     "Chemical reaction-balance checks where appropriate; this must be a separate domain-aware validator.",
