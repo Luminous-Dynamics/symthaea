@@ -343,6 +343,7 @@
     "Successful transformations may use and publish only artifacts whose linked rights record declares approved_for_this_use; this is enforcement of a recorded status, not legal adjudication.",
     "Parameter claim source values must be a JSON number or non-empty verbatim string; optional normalized_value and normalized_unit must appear together, and normalized_value is numeric.",
     "Parameter claims require at least one unique substrate ID; missing substrate identity must be represented explicitly rather than as an empty list.",
-    "For successful transformations, code/configuration/environment-lock fingerprints resolve to separate artifacts with matching declared SHA-256, verified local bytes, and approved-for-this-use rights status."
+    "For successful transformations, code/configuration/environment-lock fingerprints resolve to separate artifacts with matching declared SHA-256, verified local bytes, and approved-for-this-use rights status.",
+    "The Rust unit suite loads this contract and compares node/evidence-class, edge, artifact-role, graph-status, rights-status, acquisition-status, terminal-status, and uncertainty vocabularies against executable policy constants."
   ]
 }
