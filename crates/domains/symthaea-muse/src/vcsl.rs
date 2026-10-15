@@ -3028,6 +3028,45 @@ mod tests {
             assert_eq!(style.evidence.decoded_sample_file_count, 1, "{style_name}");
         }
 
+        // Verify actual style-bank loading and pitch selection, not merely
+        // the presence of metadata. Release samples are catalogued but excluded
+        // from the note-on API because they belong to note-off handling.
+        let mut selectable_styles = 0usize;
+        let mut release_only_styles = 0usize;
+        for (instrument, style_name, _source, _relative_dir, filename) in alternate_styles {
+            let style = additional_sample_style_mappings(instrument)
+                .iter()
+                .find(|style| style.style_name == style_name)
+                .expect("fixture style must be declared");
+            let stem = Path::new(filename)
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap();
+            let midi = stem
+                .split('_')
+                .find_map(parse_note_token)
+                .expect("each fixture style includes a note pitch") as f32;
+            if style.style_kind == "release_articulation" {
+                release_only_styles += 1;
+                assert!(
+                    !library.has_sample_style(instrument, style_name),
+                    "release-only style {style_name} must not enter note-on selection"
+                );
+            } else {
+                selectable_styles += 1;
+                assert!(
+                    library.has_sample_style(instrument, style_name),
+                    "style {style_name} should be loaded into the runtime library"
+                );
+                assert!(
+                    library.can_play_style(instrument, style_name, midi, 0.7),
+                    "style {style_name} should select and decode its fixture sample"
+                );
+            }
+        }
+        assert_eq!(selectable_styles, 39);
+        assert_eq!(release_only_styles, 3);
+
         // These two still lack a matching sample set in either inspected source.
         assert!(sample_subdir(Instrument::Duduk).is_none());
         assert!(sample_subdir(Instrument::ChoirOoh).is_none());
