@@ -710,11 +710,18 @@ mod tests {
     fn future_invalid_outside_and_missing_evidence_remain_distinct() {
         let mut invalid = obs(PlssTelemetryMetric::GasTemperatureK, 290.0, 30.0, "bad");
         invalid.value = f64::NAN;
-        let report = analyze_plss_telemetry_trends(&[
-            invalid,
-            obs(PlssTelemetryMetric::VentilationFlowLMin, 150.0, 80.0, "future"),
-            obs(PlssTelemetryMetric::RelativeHumidityPercent, 45.0, -10.0, "outside"),
-        ], config()).unwrap();
+        let mut cfg = config();
+        cfg.window_start_s = 10.0;
+        cfg.window_end_s = 70.0;
+        let report = analyze_plss_telemetry_trends(
+            &[
+                invalid,
+                obs(PlssTelemetryMetric::VentilationFlowLMin, 150.0, 80.0, "future"),
+                obs(PlssTelemetryMetric::RelativeHumidityPercent, 45.0, 5.0, "outside"),
+            ],
+            cfg,
+        )
+        .unwrap();
         assert_eq!(
             report
                 .lane(
