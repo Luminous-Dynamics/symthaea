@@ -237,7 +237,8 @@
     "Human review and evidence for source-specific rights/attribution decisions; software status labels do not establish legal clearance.",
     "A separately implemented computational replay verifier that compares every required pipeline-stage output within preregistered tolerances.",
     "Independent checks of uncertainty calibration, parameter identifiability, model ambiguity, denominator accounting, and negative controls.",
-    "Prospective experimental-decision utility and generalization under study, sequence-family, laboratory/protocol, and assay-context holdouts."
+    "Prospective experimental-decision utility and generalization under study, sequence-family, laboratory/protocol, and assay-context holdouts.",
+    "Validate exact parameter source-value provenance and conversion-rule identity for normalized values; V0 checks the presence/type pairing of normalized value and unit but does not re-perform unit conversion."
   ],
   "non_claims": [
     "The Rust verifier implements only a structural/provenance subset. Scientific semantics, legal clearance, and actual computational replay remain unimplemented.",
@@ -298,6 +299,7 @@
     "Explicit terminal reason for non-success transformations; null_result cannot claim outputs.",
     "Parameter-claim uncertainty-status vocabulary and source/fit-node reference checks.",
     "External exact-byte SHA-256 pin requirement for frozen graph inputs.",
-    "Successful transformations may use and publish only artifacts whose linked rights record declares approved_for_this_use; this is enforcement of a recorded status, not legal adjudication."
+    "Successful transformations may use and publish only artifacts whose linked rights record declares approved_for_this_use; this is enforcement of a recorded status, not legal adjudication.",
+    "Parameter claim source values must be a JSON number or non-empty verbatim string; optional normalized_value and normalized_unit must appear together, and normalized_value is numeric."
   ]
 }
