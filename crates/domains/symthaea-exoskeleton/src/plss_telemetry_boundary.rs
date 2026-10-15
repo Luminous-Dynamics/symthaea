@@ -36,8 +36,8 @@ pub struct PlssTelemetryBoundary {
     /// SHA-like identifier for the external threshold-set revision (40/64 hex).
     /// It provides provenance linkage, not qualification or authenticity.
     pub threshold_revision: String,
-    /// Projection is only considered within this future horizon, in seconds
-    /// from the last accepted sample. It is not a sampling or freshness setting.
+    /// Maximum projection horizon in seconds from the last accepted sample.
+    /// Candidate intervals that exceed it are marked CandidateBeyondHorizon.
     pub maximum_projection_horizon_s: f64,
 }
 
