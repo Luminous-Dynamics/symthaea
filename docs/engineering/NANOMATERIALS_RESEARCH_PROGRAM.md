@@ -220,6 +220,26 @@ Execute [NANO-001A #7455](https://github.com/Luminous-Dynamics/symthaea/issues/7
 5. Freeze source rights, attribution/citation, dataset artifact identity, software/runtime identity, transformations, exclusion list, and output manifest schema.
 6. Stop on unresolved rights, checksum mismatch, unknown units, ambiguous split membership, hidden-label exposure, or missing structural lineage. Do not produce a benchmark accuracy claim if any gate fails.
 
+### Hosted conversion candidate discovered during admission research (2026-10-15)
+
+A second possible access route is the ColabFit Exchange collection of OC22 in Parquet form:
+- [OC22 collection](https://huggingface.co/colabfit/collections)
+- [OC22 IS2RE train](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Train)
+- [OC22 IS2RE validation in-domain](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Validation-in-domain)
+- [OC22 IS2RE validation out-of-domain](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Validation-out-of-domain)
+
+The visible cards identify CC BY 4.0, energy/force properties, a Parquet-based ColabFit schema, and attribute the original data to FairChem. However, the reported sizes are markedly different from the official compact benchmark archive: the train card reports approximately 7.24 million rows / 30.6 GB, while the out-of-domain validation card reports about 521 thousand rows / 2.04 GB. The official FairChem combined IS2RE-Total/IS2RS archive is about 109 MB compressed / 424 MB expanded and documents about 62K oxide systems. The hosted conversion is therefore **not presumed byte-equivalent or task-row-equivalent**. Its larger configuration counts may include trajectory/configuration-level records, but that interpretation must be proved from metadata rather than assumed.
+
+Treat ColabFit as a separate potential source/conversion path, not a substitute admitted by its dataset name or license badge. Before using it for this benchmark:
+1. Pin exact dataset revision and file hashes, record uploader/processing provenance, and inspect the actual Parquet files.
+2. Reconcile rows and identifiers back to OC22 `sid`, source LMDB membership, task labels, units, and official train / validation-ID / validation-OOD membership.
+3. Establish whether an official test partition is provided through this path. The currently surfaced collection lists train and the two validation datasets, not a test dataset; do not infer held-out test availability.
+4. Detect duplicated structures and trajectory-family overlap; count unique systems separately from configuration rows.
+5. Cross-check a deterministic sample against the pinned FairChem reader/source when those original records become accessible.
+6. If an exact mapping cannot be established, keep this route as an exploratory dataset with its own contract and do not combine its metrics with official OC22 split results.
+
+No ColabFit rows or labels have been downloaded or independently verified in this workstream. This finding changes the retrieval options, not the admission state.
+
 ### Selector comparison
 
 Keep downstream predictor family, structure representation, training protocol, available label budget, compute budget, and evaluation sets fixed while comparing:
