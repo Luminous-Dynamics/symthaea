@@ -16,6 +16,14 @@ use url::Url;
 pub const NUTRITION_SOURCE_SCHEMA_VERSION: u16 = 1;
 pub const NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION: u16 = 1;
 
+/// Identifies the exact hashing profile used by the current receipt envelope.
+/// This profile is deterministic for this Rust contract, but is not RFC 8785/JCS.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NutritionCanonicalizationProfileV1 {
+    SortedSerdeJsonV1,
+}
+
 fn serialize_u64_as_decimal_string<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
@@ -432,6 +440,8 @@ pub struct RegistryIssueV1 {
 pub struct NutritionRegistryAssessmentV1 {
     /// Independent version of the receipt/digest envelope schema.
     pub receipt_schema_version: u16,
+    /// Names the hashing/canonicalization profile used by this receipt.
+    pub canonicalization_profile: NutritionCanonicalizationProfileV1,
     /// Context fields make the decision receipt self-describing for replay tooling.
     pub evaluation_date: String,
     pub source_id: String,
@@ -459,6 +469,7 @@ pub struct NutritionRegistryAssessmentV1 {
 #[derive(Serialize)]
 struct RegistryInputEnvelopeV1<'a> {
     receipt_schema_version: u16,
+    canonicalization_profile: NutritionCanonicalizationProfileV1,
     evaluation_date: &'a str,
     manifest: &'a NutritionSourceManifestV1,
     fact: &'a NutritionFoodFactV1,
@@ -500,6 +511,7 @@ fn registry_input_sha256(
 ) -> Result<String, ()> {
     let envelope = RegistryInputEnvelopeV1 {
         receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
+        canonicalization_profile: NutritionCanonicalizationProfileV1::SortedSerdeJsonV1,
         evaluation_date,
         manifest,
         fact,
@@ -624,6 +636,7 @@ pub fn assess_nutrition_source(
 
     NutritionRegistryAssessmentV1 {
         receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
+        canonicalization_profile: NutritionCanonicalizationProfileV1::SortedSerdeJsonV1,
         evaluation_date: evaluation_date.to_owned(),
         source_id: manifest.source_id.clone(),
         source_record_id: fact.source_record_id.clone(),
@@ -1902,6 +1915,10 @@ mod tests {
         assert_eq!(result.source_id, m.source_id);
         assert_eq!(result.source_record_id, f.source_record_id);
         assert_eq!(result.receipt_schema_version, NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION);
+        assert_eq!(
+            result.canonicalization_profile,
+            NutritionCanonicalizationProfileV1::SortedSerdeJsonV1
+        );
         assert!(is_canonical_sha256(result.manifest_sha256.as_deref().expect("manifest digest")));
         assert!(is_canonical_sha256(result.food_fact_sha256.as_deref().expect("fact digest")));
         assert!(is_canonical_sha256(result.use_request_sha256.as_deref().expect("request digest")));
@@ -1917,6 +1934,16 @@ mod tests {
             result.use_request_sha256,
             stable_json_sha256(&request).ok()
         );
+        let expected_envelope = RegistryInputEnvelopeV1 {
+            receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
+            canonicalization_profile: NutritionCanonicalizationProfileV1::SortedSerdeJsonV1,
+            evaluation_date: EVALUATION_DATE,
+            manifest: &m,
+            fact: &f,
+            use_request: &request,
+            supplied_artifact_sha256: Some(sha256_hex(ARTIFACT)),
+        };
+        assert_eq!(result.input_sha256, stable_json_sha256(&expected_envelope).ok());
         assert_eq!(result.declared_artifact_sha256, m.artifact_sha256);
         assert_eq!(
             result.supplied_artifact_sha256.as_deref(),
