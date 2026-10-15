@@ -717,6 +717,42 @@ mod tests {
     }
 
     #[test]
+    fn test_load_facts_rejects_negative_last_access_cycle() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_negative_fact_access_cycle_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                source_text: "fixture fact".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 3,
+                is_causal: false,
+                initial_confidence: Some(0.9),
+                last_accessed_cycle: Some(3),
+                corroboration_count: 0,
+                contradiction_count: 0,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute("UPDATE knowledge_facts SET last_accessed_cycle = -1", [])
+            .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("invalid negative persisted fact last-access cycle"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_load_ontology_rejects_wrong_hypervector_length() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_wrong_ontology_vector_test_{}",
