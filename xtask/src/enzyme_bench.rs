@@ -40,6 +40,21 @@ const REQUIRED_BASELINES: &[&str] = &[
     "symthaea_assisted",
 ];
 
+// Optional STRENDA-inspired reporting fields. These are audited, not admission gates:
+// incomplete historical records remain eligible for review with their missingness visible.
+const OPTIONAL_METADATA_FIELDS: &[&str] = &[
+    "enzyme_purity",
+    "enzyme_concentration",
+    "buffer_system",
+    "assay_pressure",
+    "replicate_count",
+    "measurement_precision",
+    "detection_limit",
+    "reaction_equation",
+    "analysis_method",
+    "raw_measurement_data",
+];
+
 #[derive(Debug, Deserialize)]
 struct Manifest {
     schema_version: u32,
@@ -112,6 +127,19 @@ pub struct CheckReport {
     pub cross_split_families: usize,
     /// Study overlap across train/test in a sequence-family-held-out track.
     pub cross_split_studies: usize,
+    /// Descriptive STRENDA-inspired metadata coverage; this is not a data-quality score.
+    pub metadata_coverage: BTreeMap<String, MetadataCoverage>,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct MetadataCoverage {
+    pub reported: usize,
+    pub not_reported: usize,
+    pub not_applicable: usize,
+    /// The key was absent, distinct from an explicit not_reported status.
+    pub unrecorded: usize,
+    /// A present field had an unrecognized or internally inconsistent status/value.
+    pub invalid: usize,
 }
 
 pub fn check(workspace_root: &Path, manifest_path: &Path) -> Result<()> {
@@ -131,6 +159,18 @@ pub fn check(workspace_root: &Path, manifest_path: &Path) -> Result<()> {
         report.cross_split_studies,
         manifest.target.endpoint
     );
+    for (field_name, coverage) in &report.metadata_coverage {
+        println!(
+            "ENZYME_METADATA_COVERAGE field={} observations={} reported={} not_reported={} not_applicable={} unrecorded={} invalid={}",
+            field_name,
+            report.observations,
+            coverage.reported,
+            coverage.not_reported,
+            coverage.not_applicable,
+            coverage.unrecorded,
+            coverage.invalid
+        );
+    }
     Ok(())
 }
 
@@ -226,6 +266,7 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
     let mut observed_test_studies = BTreeSet::new();
     let mut observed_train_families = BTreeSet::new();
     let mut observed_test_families = BTreeSet::new();
+    let mut metadata_coverage = empty_metadata_coverage();
     let mut observations = 0usize;
 
     for (row_index, row) in reader.records().enumerate() {
@@ -336,6 +377,7 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         validate_condition(&conditions, "ph", row_index + 2)?;
         validate_condition(&conditions, "temperature_c", row_index + 2)?;
         validate_condition(&conditions, "substrate_id", row_index + 2)?;
+        record_optional_metadata_coverage(&conditions, &mut metadata_coverage);
 
         let study = field(&row, &header_index, "source_study_id");
         let family = field(&row, &header_index, "sequence_family_id");
@@ -428,7 +470,50 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         test_sequence_families: observed_test_families.len(),
         cross_split_families,
         cross_split_studies,
+        metadata_coverage,
     })
+}
+
+fn empty_metadata_coverage() -> BTreeMap<String, MetadataCoverage> {
+    OPTIONAL_METADATA_FIELDS
+        .iter()
+        .map(|field| ((*field).to_string(), MetadataCoverage::default()))
+        .collect()
+}
+
+/// Count declared metadata statuses without treating missing context as zero or as a gate failure.
+fn record_optional_metadata_coverage(
+    conditions: &Value,
+    coverage: &mut BTreeMap<String, MetadataCoverage>,
+) {
+    for field in OPTIONAL_METADATA_FIELDS {
+        let counts = coverage.get_mut(*field).expect("all optional fields preinitialized");
+        let Some(value) = conditions.as_object().and_then(|object| object.get(*field)) else {
+            counts.unrecorded += 1;
+            continue;
+        };
+        let Some(object) = value.as_object() else {
+            counts.invalid += 1;
+            continue;
+        };
+        let status = object.get("status").and_then(Value::as_str).unwrap_or("");
+        let has_value = object.get("value").is_some_and(|value| !value.is_null());
+        let value_absent = !has_value;
+        match status {
+            "reported" if has_value => counts.reported += 1,
+            "not_reported" if value_absent => counts.not_reported += 1,
+            "not_applicable"
+                if value_absent
+                    && object
+                        .get("reason")
+                        .and_then(Value::as_str)
+                        .is_some_and(|reason| !reason.trim().is_empty()) =>
+            {
+                counts.not_applicable += 1
+            }
+            _ => counts.invalid += 1,
+        }
+    }
 }
 
 fn is_valid_https_url(value: &str) -> bool {
@@ -759,23 +844,57 @@ mod tests {
     }
 
     #[test]
+    fn metadata_coverage_separates_missingness_from_invalid_statuses() {
+        let mut coverage = empty_metadata_coverage();
+        let row_a = json!({
+            "enzyme_purity": {"status":"reported", "value":"apparent homogeneity by PAGE"},
+            "enzyme_concentration": {"status":"not_reported"},
+            "buffer_system": {"status":"not_applicable", "reason":"not specified in source record"},
+            "assay_pressure": {"status":"reported", "value":{"value":101.325,"unit":"kPa"}},
+            "replicate_count": {"status":"reported", "value":3},
+            "measurement_precision": {"status":"not_reported", "value":null},
+            "detection_limit": {"status":"not_applicable", "reason":"positive kcat estimate reported"},
+            "reaction_equation": {"status":"unknown", "value":"A -> B"},
+            "analysis_method": {"status":"reported"},
+            "raw_measurement_data": "malformed"
+        });
+        let row_b = json!({
+            "enzyme_purity": {"status":"reported"},
+            "enzyme_concentration": {"status":"unknown"}
+        });
+        record_optional_metadata_coverage(&row_a, &mut coverage);
+        record_optional_metadata_coverage(&row_b, &mut coverage);
+
+        assert_eq!(coverage["enzyme_purity"].reported, 1);
+        assert_eq!(coverage["enzyme_purity"].invalid, 1);
+        assert_eq!(coverage["enzyme_concentration"].not_reported, 1);
+        assert_eq!(coverage["enzyme_concentration"].invalid, 1);
+        assert_eq!(coverage["buffer_system"].not_applicable, 1);
+        assert_eq!(coverage["buffer_system"].unrecorded, 1);
+        assert_eq!(coverage["assay_pressure"].reported, 1);
+        assert_eq!(coverage["replicate_count"].reported, 1);
+        assert_eq!(coverage["measurement_precision"].not_reported, 1);
+        assert_eq!(coverage["detection_limit"].not_applicable, 1);
+        assert_eq!(coverage["reaction_equation"].invalid, 1);
+        assert_eq!(coverage["analysis_method"].invalid, 1);
+        assert_eq!(coverage["raw_measurement_data"].invalid, 1);
+    }
+
+    #[test]
     fn accepts_complete_synthetic_fixture_and_reports_counts() {
         let root = fixture_root();
         let manifest = make_manifest(&root);
         let parsed: Manifest = serde_json::from_value(manifest).unwrap();
         let report = validate(&root, &parsed).unwrap();
-        assert_eq!(
-            report,
-            CheckReport {
-                observations: 2,
-                train_studies: 1,
-                test_studies: 1,
-                train_sequence_families: 1,
-                test_sequence_families: 1,
-                cross_split_families: 0,
-                cross_split_studies: 0
-            }
-        );
+        assert_eq!(report.observations, 2);
+        assert_eq!(report.train_studies, 1);
+        assert_eq!(report.test_studies, 1);
+        assert_eq!(report.train_sequence_families, 1);
+        assert_eq!(report.test_sequence_families, 1);
+        assert_eq!(report.cross_split_families, 0);
+        assert_eq!(report.cross_split_studies, 0);
+        assert_eq!(report.metadata_coverage.len(), OPTIONAL_METADATA_FIELDS.len());
+        assert_eq!(report.metadata_coverage["enzyme_purity"].unrecorded, 2);
         fs::remove_dir_all(root).unwrap();
     }
 
