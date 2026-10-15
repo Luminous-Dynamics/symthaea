@@ -187,6 +187,10 @@ The innovation should be judged by measurable outcomes: fewer unreproducible par
 - [STRENDA database and guideline overview](https://www.beilstein-strenda-db.org/strenda/public/guidelines.xhtml): explicitly distinguishes useful/reliable reporting from a universal data-quality metric.
 - [EnzymeML V2 formal specification](https://github.com/EnzymeML/enzymeml-specifications/blob/main/specifications/v2.md): structured reaction conditions, molecular species, measurements/time courses, equations, parameters and references.
 - [EnzymeML documentation](https://enzymeml.org/): exchange format and FAIR data rationale.
+- [CatPred: a comprehensive framework for deep learning in vitro enzyme kinetic parameters](https://www.nature.com/articles/s41467-025-57215-9) (Nature Communications, 2025): established kcat/Km/Ki prediction and query-level uncertainty; baseline for scientific comparison, not novelty to claim.
+- [On Over-Parameterisation and Parameter Estimation of Enzyme Kinetics](https://www.mdpi.com/2673-9623/6/2/25) (AppliedChem, 9 April 2026): warns that added kinetic model parameters can impair practical identifiability and fit noise.
+- [A Practical Identifiability Criterion Leveraging Weak-Form Parameter Estimation](https://link.springer.com/article/10.1007/s11538-026-01639-x) (Bulletin of Mathematical Biology, 31 March 2026): makes identifiability a measurable gate rather than an informal warning.
+
 - [On the reproducibility of enzyme reactions and kinetic modelling](https://pubmed.ncbi.nlm.nih.gov/35357794/) (2022): practical guidance on experiment design, kinetic modelling and reproducible enzyme data.
 - [Benchmarking and Experimental Validation of Machine Learning Strategies for Enzyme Engineering](https://www.biorxiv.org/content/10.64898/2026.03.29.715152v2) (bioRxiv preprint, 2026): a recent, not-yet-definitive argument that heterogeneous assay conditions can confound apparent generalization.
 - [Industrial Enzyme Benchmark V0 contract](INDUSTRIAL_ENZYME_BENCHMARK_V0.md): task scope and separation of calibration reproduction, kinetic-model replay, and prediction.
