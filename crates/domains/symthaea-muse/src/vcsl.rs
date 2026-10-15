@@ -590,9 +590,18 @@ pub struct SampleDirectoryEvidenceV1 {
     pub min_midi: Option<u8>,
     pub max_midi: Option<u8>,
     pub distinct_pitch_count: usize,
-    /// Distinct normalized dynamic values parsed from the indexed filenames.
-    /// This is not a count of calibrated acoustic velocity layers.
+    /// Distinct normalized dynamic values parsed from indexed filenames; not calibrated layers.
     pub distinct_dynamic_strength_count: usize,
+    /// Result of fully reading every WAV accepted by the filename indexer.
+    /// This does not establish rendered playback or perceptual quality.
+    pub audio_decode_status: &'static str,
+    pub decoded_sample_file_count: usize,
+    pub failed_sample_decode_count: usize,
+    /// Fully decoded files whose peak absolute sample value is <= 1e-5.
+    pub silent_sample_file_count: usize,
+    /// Distinct sample rates/channels across files that fully decoded.
+    pub distinct_sample_rate_count: usize,
+    pub distinct_channel_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -751,6 +760,18 @@ fn sample_directory_evidence(
         None
     };
     let indexed_sample_count = bank.as_ref().map_or(0, |bank| bank.samples.len());
+    let audio_audit = audit_indexed_sample_audio(bank.as_ref());
+    let audio_decode_status = if !directory_present {
+        "mapped_directory_missing"
+    } else if indexed_sample_count == 0 {
+        "no_indexed_samples"
+    } else if audio_audit.failed_sample_decode_count == 0 {
+        "all_indexed_files_fully_decoded"
+    } else if audio_audit.decoded_sample_file_count == 0 {
+        "no_indexed_files_fully_decoded"
+    } else {
+        "some_indexed_files_failed_decode"
+    };
     let min_midi = bank
         .as_ref()
         .and_then(|bank| bank.samples.iter().map(|sample| sample.midi).min());
@@ -780,7 +801,101 @@ fn sample_directory_evidence(
         max_midi,
         distinct_pitch_count,
         distinct_dynamic_strength_count,
+        audio_decode_status,
+        decoded_sample_file_count: audio_audit.decoded_sample_file_count,
+        failed_sample_decode_count: audio_audit.failed_sample_decode_count,
+        silent_sample_file_count: audio_audit.silent_sample_file_count,
+        distinct_sample_rate_count: audio_audit.sample_rates.len(),
+        distinct_channel_count: audio_audit.channel_counts.len(),
     })
+}
+
+#[derive(Default)]
+struct IndexedSampleAudioAudit {
+    decoded_sample_file_count: usize,
+    failed_sample_decode_count: usize,
+    silent_sample_file_count: usize,
+    sample_rates: std::collections::BTreeSet<u32>,
+    channel_counts: std::collections::BTreeSet<u16>,
+}
+
+fn audit_indexed_sample_audio(bank: Option<&InstrumentBank>) -> IndexedSampleAudioAudit {
+    let mut audit = IndexedSampleAudioAudit::default();
+    let Some(bank) = bank else {
+        return audit;
+    };
+
+    for sample in &bank.samples {
+        match audit_one_wav(&sample.path) {
+            Ok((sample_rate, channels, peak)) => {
+                audit.decoded_sample_file_count += 1;
+                audit.sample_rates.insert(sample_rate);
+                audit.channel_counts.insert(channels);
+                if peak <= 1e-5 {
+                    audit.silent_sample_file_count += 1;
+                }
+            }
+            Err(_) => audit.failed_sample_decode_count += 1,
+        }
+    }
+    audit
+}
+
+/// Fully consume the WAV sample iterator rather than treating a valid header
+/// as a successful decode. Invalid/truncated sample data, empty audio, invalid
+/// channel/rate metadata and non-finite float samples fail this file-level audit.
+fn audit_one_wav(path: &Path) -> std::io::Result<(u32, u16, f32)> {
+    let mut reader = hound::WavReader::open(path).map_err(|error| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string())
+    })?;
+    let spec = reader.spec();
+    if spec.channels == 0
+        || spec.sample_rate == 0
+        || spec.bits_per_sample == 0
+        || spec.bits_per_sample > 32
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "invalid WAV sample rate, channel count, or bit depth",
+        ));
+    }
+
+    let mut sample_count = 0u64;
+    let mut peak = 0.0f32;
+    match spec.sample_format {
+        hound::SampleFormat::Int => {
+            let scale = (1i64 << (spec.bits_per_sample - 1)) as f32;
+            for sample in reader.samples::<i32>() {
+                let sample = sample.map_err(|error| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string())
+                })?;
+                peak = peak.max((sample as f32 / scale).abs());
+                sample_count += 1;
+            }
+        }
+        hound::SampleFormat::Float => {
+            for sample in reader.samples::<f32>() {
+                let sample = sample.map_err(|error| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string())
+                })?;
+                if !sample.is_finite() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "WAV contains a non-finite floating-point sample",
+                    ));
+                }
+                peak = peak.max(sample.abs());
+                sample_count += 1;
+            }
+        }
+    }
+    if sample_count == 0 || sample_count % u64::from(spec.channels) != 0 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "WAV has no complete audio frames",
+        ));
+    }
+    Ok((spec.sample_rate, spec.channels, peak))
 }
 
 fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
@@ -1441,8 +1556,29 @@ mod tests {
         let harp_dir =
             vcsl_root.join("Chordophones/Composite Chordophones/Concert Harp");
         std::fs::create_dir_all(&harp_dir).unwrap();
-        std::fs::write(harp_dir.join("Harp_A4_vl1.wav"), []).unwrap();
-        std::fs::write(harp_dir.join("Harp_C3_vl2.wav"), []).unwrap();
+        fn write_fixture_wav(path: &Path, amplitude: i16) {
+            let spec = hound::WavSpec {
+                channels: 1,
+                sample_rate: 22050,
+                bits_per_sample: 16,
+                sample_format: hound::SampleFormat::Int,
+            };
+            let mut writer = hound::WavWriter::create(path, spec).unwrap();
+            for index in 0..256 {
+                let sample = if amplitude == 0 {
+                    0
+                } else if index % 2 == 0 {
+                    amplitude
+                } else {
+                    -amplitude
+                };
+                writer.write_sample(sample).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        write_fixture_wav(&harp_dir.join("Harp_A4_vl1.wav"), 8000);
+        write_fixture_wav(&harp_dir.join("Harp_C3_vl2.wav"), 0);
+        std::fs::write(harp_dir.join("Harp_D4_vl3.wav"), b"truncated-not-wav").unwrap();
         std::fs::write(harp_dir.join("not-a-pitch-file.wav"), []).unwrap();
         std::fs::create_dir_all(&vsco2_root).unwrap();
         let soundfont = root.join("fixture.sf2");
@@ -1456,7 +1592,7 @@ mod tests {
 
         let inventory = capability_inventory(&vcsl_root, &vsco2_root, Some(&soundfont)).unwrap();
         assert!(inventory.vcsl_root.root_present);
-        assert_eq!(inventory.vcsl_root.wav_file_count, 3);
+        assert_eq!(inventory.vcsl_root.wav_file_count, 4);
         assert!(inventory.vcsl_root.path_size_manifest_sha256.is_some());
         assert!(inventory.vsco2_root.root_present);
         assert_eq!(inventory.vsco2_root.wav_file_count, 0);
@@ -1468,11 +1604,17 @@ mod tests {
             .unwrap();
         let mapping = harp.sustained_samples.as_ref().unwrap();
         assert!(mapping.directory_present);
-        assert_eq!(mapping.indexed_sample_count, 2);
+        assert_eq!(mapping.indexed_sample_count, 3);
         assert_eq!(mapping.min_midi, Some(48));
         assert_eq!(mapping.max_midi, Some(69));
-        assert_eq!(mapping.distinct_pitch_count, 2);
-        assert_eq!(mapping.distinct_dynamic_strength_count, 2);
+        assert_eq!(mapping.distinct_pitch_count, 3);
+        assert_eq!(mapping.distinct_dynamic_strength_count, 3);
+        assert_eq!(mapping.audio_decode_status, "some_indexed_files_failed_decode");
+        assert_eq!(mapping.decoded_sample_file_count, 2);
+        assert_eq!(mapping.failed_sample_decode_count, 1);
+        assert_eq!(mapping.silent_sample_file_count, 1);
+        assert_eq!(mapping.distinct_sample_rate_count, 1);
+        assert_eq!(mapping.distinct_channel_count, 1);
 
         let soundfont_evidence = inventory.soundfont.as_ref().unwrap();
         assert_eq!(soundfont_evidence.file_name, "fixture.sf2");
