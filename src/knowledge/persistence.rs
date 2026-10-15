@@ -197,18 +197,25 @@ fn decode_semantic_role(value: String, column_index: usize) -> rusqlite::Result<
     })
 }
 
+fn validate_fact_relations(relations: &[ExtractedRelation]) -> Result<(), String> {
+    for relation in relations {
+        if !relation.confidence.is_finite() || !(0.0..=1.0).contains(&relation.confidence) {
+            return Err(format!(
+                "Invalid extracted-relation confidence outside [0, 1]: {}",
+                relation.confidence
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn insert_fact_relations(
     conn: &rusqlite::Connection,
     fact_row_id: i64,
     relations: &[ExtractedRelation],
 ) -> Result<(), String> {
+    validate_fact_relations(relations)?;
     for (ordinal, relation) in relations.iter().enumerate() {
-        if !relation.confidence.is_finite() || !(0.0..=1.0).contains(&relation.confidence) {
-            return Err(format!(
-                "Invalid extracted-relation confidence outside [0, 1] for fact row {fact_row_id}: {}",
-                relation.confidence
-            ));
-        }
         let ordinal = i64::try_from(ordinal)
             .map_err(|e| format!("Relation ordinal exceeds SQLite INTEGER range: {e}"))?;
         conn.execute(
@@ -424,6 +431,9 @@ impl KnowledgePersistence {
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
+        for fact in facts {
+            validate_fact_relations(&fact.relations)?;
+        }
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
@@ -482,6 +492,9 @@ impl KnowledgePersistence {
     pub fn replace_facts_snapshot(&mut self, facts: &[FactRecord]) -> Result<usize, String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
+        }
+        for fact in facts {
+            validate_fact_relations(&fact.relations)?;
         }
 
         let mut conn = self.open_connection()?;
@@ -564,6 +577,7 @@ impl KnowledgePersistence {
         let mut prepared_facts = Vec::with_capacity(facts.len());
         let mut max_graph_fact_id = 0_u64;
         for fact in facts {
+            validate_fact_relations(&fact.relations)?;
             validate_hypervector_bytes(&fact.vector_bytes, 0)
                 .map_err(|e| format!("Invalid fact snapshot vector: {e}"))?;
             if !fact.confidence.is_finite() || !(0.0..=1.0).contains(&fact.confidence) {
