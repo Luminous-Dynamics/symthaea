@@ -3,6 +3,6 @@ name = "symthaea-thermofluids"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Applied fluid and thermal engineering for Symthaea: Bernoulli, Reynolds number/flow regime, Darcy-Weisbach head loss, continuity, Carnot efficiency, Fourier conduction, Newton cooling, and energy-accounted Joule heating with exact convection coupling. Pure std, with analytical reference tests."
+description = "Applied fluid and thermal engineering for Symthaea: checked Bernoulli, Reynolds number/flow regime, Darcy-Weisbach head loss, continuity, Carnot efficiency, Fourier conduction, Newton cooling, and energy-accounted Joule heating with exact convection coupling. Pure std, with analytical reference tests."
 
 [dependencies]
