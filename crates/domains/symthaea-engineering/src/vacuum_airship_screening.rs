@@ -974,13 +974,22 @@ pub fn assess_external_pressure(
 /// those artifacts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PressureCaseScope {
+    /// Exact CAD/as-built geometry or measured shape-scan revision.
     pub geometry_revision_id: String,
+    /// Exact FE mesh or, for physical evidence, specimen/build revision.
+    pub mesh_or_specimen_revision_id: String,
+    /// Exact laminate/material model or tested material/batch revision.
     pub material_model_revision_id: String,
+    /// Solver build/settings or physical test method/instrumentation procedure.
+    pub analysis_or_test_method_id: String,
     pub load_case_id: String,
     pub boundary_condition_profile_id: String,
     /// ID/hash for the spatial imperfection field, mode family and bounded defect set;
     /// a single scalar amplitude is not sufficient to identify this analysis basis.
     pub imperfection_basis_id: String,
+    /// Defines the quantity and derivation of the claimed capacity, including knockdown/allowable
+    /// method or the tested failure/cycle criterion; eigenvalue and qualified allowable are distinct.
+    pub capacity_basis_id: String,
 }
 
 /// One field where supplied capacity scope does not match the requested case.
@@ -1041,16 +1050,26 @@ pub fn assess_scoped_external_pressure_bounds(
         });
     };
 
-    let scope_fields: [(&'static str, &str, &str); 5] = [
+    let scope_fields: [(&'static str, &str, &str); 8] = [
         (
             "geometry_revision_id",
             &request.required_scope.geometry_revision_id,
             &supplied_scope.geometry_revision_id,
         ),
         (
+            "mesh_or_specimen_revision_id",
+            &request.required_scope.mesh_or_specimen_revision_id,
+            &supplied_scope.mesh_or_specimen_revision_id,
+        ),
+        (
             "material_model_revision_id",
             &request.required_scope.material_model_revision_id,
             &supplied_scope.material_model_revision_id,
+        ),
+        (
+            "analysis_or_test_method_id",
+            &request.required_scope.analysis_or_test_method_id,
+            &supplied_scope.analysis_or_test_method_id,
         ),
         (
             "load_case_id",
@@ -1067,6 +1086,11 @@ pub fn assess_scoped_external_pressure_bounds(
             &request.required_scope.imperfection_basis_id,
             &supplied_scope.imperfection_basis_id,
         ),
+        (
+            "capacity_basis_id",
+            &request.required_scope.capacity_basis_id,
+            &supplied_scope.capacity_basis_id,
+        ),
     ];
 
     let mut missing_fields = Vec::new();
@@ -1075,26 +1099,38 @@ pub fn assess_scoped_external_pressure_bounds(
         if required.trim().is_empty() {
             missing_fields.push(match field {
                 "geometry_revision_id" => "required_scope.geometry_revision_id",
+                "mesh_or_specimen_revision_id" => {
+                    "required_scope.mesh_or_specimen_revision_id"
+                }
                 "material_model_revision_id" => "required_scope.material_model_revision_id",
+                "analysis_or_test_method_id" => "required_scope.analysis_or_test_method_id",
                 "load_case_id" => "required_scope.load_case_id",
                 "boundary_condition_profile_id" => {
                     "required_scope.boundary_condition_profile_id"
                 }
                 "imperfection_basis_id" => "required_scope.imperfection_basis_id",
+                "capacity_basis_id" => "required_scope.capacity_basis_id",
                 _ => unreachable!("scope field names are a closed set"),
             });
         }
         if supplied.trim().is_empty() {
             missing_fields.push(match field {
                 "geometry_revision_id" => "supplied_capacity_scope.geometry_revision_id",
+                "mesh_or_specimen_revision_id" => {
+                    "supplied_capacity_scope.mesh_or_specimen_revision_id"
+                }
                 "material_model_revision_id" => {
                     "supplied_capacity_scope.material_model_revision_id"
+                }
+                "analysis_or_test_method_id" => {
+                    "supplied_capacity_scope.analysis_or_test_method_id"
                 }
                 "load_case_id" => "supplied_capacity_scope.load_case_id",
                 "boundary_condition_profile_id" => {
                     "supplied_capacity_scope.boundary_condition_profile_id"
                 }
                 "imperfection_basis_id" => "supplied_capacity_scope.imperfection_basis_id",
+                "capacity_basis_id" => "supplied_capacity_scope.capacity_basis_id",
                 _ => unreachable!("scope field names are a closed set"),
             });
         }
@@ -2406,10 +2442,13 @@ mod tests {
     fn matching_pressure_scope() -> PressureCaseScope {
         PressureCaseScope {
             geometry_revision_id: "geometry/sha256:abc".into(),
+            mesh_or_specimen_revision_id: "mesh-or-specimen/sha256:def".into(),
             material_model_revision_id: "material-model/v3".into(),
+            analysis_or_test_method_id: "analysis-method/nonlinear-imperfection-sensitive-v1".into(),
             load_case_id: "external-pressure-sea-level/v1".into(),
             boundary_condition_profile_id: "supports-and-joints/v2".into(),
             imperfection_basis_id: "measured-imperfections/bounds-v1".into(),
+            capacity_basis_id: "allowable-basis/validated-knockdown-method-v1".into(),
         }
     }
 
@@ -2485,6 +2524,61 @@ mod tests {
             result,
             ScopedPressureBoundsAssessment::ScopeMismatch { mismatches }
                 if mismatches.len() == 4
+        ));
+    }
+
+
+    #[test]
+    fn scoped_pressure_comparison_blocks_method_and_capacity_basis_mismatch() {
+        let required = matching_pressure_scope();
+        let mut supplied = required.clone();
+        supplied.analysis_or_test_method_id = "linear-eigenvalue-only".into();
+        supplied.capacity_basis_id = "perfect-geometry-critical-load".into();
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+            required,
+            Some(supplied),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::ScopeMismatch { mismatches }
+                if mismatches.len() == 2
+                    && mismatches.iter().any(|m| m.field == "analysis_or_test_method_id")
+                    && mismatches.iter().any(|m| m.field == "capacity_basis_id")
+        ));
+    }
+
+    #[test]
+    fn scoped_pressure_comparison_blocks_mesh_or_specimen_revision_mismatch() {
+        let required = matching_pressure_scope();
+        let mut supplied = required.clone();
+        supplied.mesh_or_specimen_revision_id = "mesh-or-specimen/old".into();
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+            required,
+            Some(supplied),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::ScopeMismatch { mismatches }
+                if mismatches.len() == 1
+                    && mismatches[0].field == "mesh_or_specimen_revision_id"
+        ));
+    }
+
+    #[test]
+    fn scoped_pressure_comparison_rejects_missing_capacity_basis() {
+        let mut required = matching_pressure_scope();
+        required.capacity_basis_id.clear();
+        let result = assess_scoped_external_pressure_bounds(scoped_pressure_request(
+            Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
+            required,
+            Some(matching_pressure_scope()),
+        )).unwrap();
+        assert!(matches!(
+            result,
+            ScopedPressureBoundsAssessment::ScopeIncomplete { missing_fields }
+                if missing_fields == vec!["required_scope.capacity_basis_id"]
         ));
     }
 
