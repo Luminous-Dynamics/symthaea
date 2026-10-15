@@ -354,6 +354,8 @@ Evaluate by *future* time periods and held-out segments/routes; report site-leve
 
 The first prototype may use openly permitted synthetic data to validate the pipeline, but it must label those results synthetic and must not claim real-rail predictive performance from them.
 
+**Supplemental sensor-data lead (separate scope; reuse rights unresolved):** the 2025 [Train track environmental data for predictive maintenance dataset](https://zenodo.org/records/17607068) (DOI https://doi.org/10.5281/zenodo.17607068) lists a 65.6 MB CSV of 40 Hz on-board inertial and environmental measurements plus GPS-tagged points from a Madrid–Barcelona run. This can be considered for a distinct schema/signal-quality pipeline exercise—not as track-geometry labels or proof of detecting physical defects. The current Zenodo record says “Dataset Open” and lists a download, but its rendered Rights → License field is blank; use for extraction, model training or redistribution remains `data_access_unresolved` until explicit rights terms are confirmed. The listed MD5 is `cc24e0419d1bb820abb4bce388350518`. Do not publish GPS-linked route traces or derivative location outputs without a rights and release review. See [TRANSPORT-RAIL-001A #7452](https://github.com/Luminous-Dynamics/symthaea/issues/7452).
+
 #### Preregistered benchmark execution contract
 
 **Data-admission gate (run before modeling):**
