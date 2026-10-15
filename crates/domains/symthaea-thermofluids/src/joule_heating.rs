@@ -291,6 +291,7 @@ impl JouleHeatingModel {
         if !heating_power_w.is_finite()
             || !electrical_energy_in_j.is_finite()
             || !rate_per_s.is_finite()
+            || !decay_exponent.is_finite()
             || !decay.is_finite()
             || !one_minus_decay.is_finite()
             || !integral_decay_s.is_finite()
@@ -468,6 +469,20 @@ mod tests {
             (actual.final_temperature_k - expected.final_temperature_k).abs() < 1e-12
         );
         assert!(actual.energy_balance_residual_j.abs() < 1e-9);
+    }
+
+    #[test]
+    fn overflowed_convection_exponent_fails_closed_without_mutation() {
+        let mut model = reference_model();
+        let before = model.temperature_k();
+
+        // All raw inputs are finite; G/C * dt overflows. Do not silently
+        // promote that non-finite intermediate into a successful model step.
+        assert_eq!(
+            model.step_with_convection(0.0, 1.0e308, 300.0, 1.0e308),
+            Err(JouleHeatingError::NonFiniteResult)
+        );
+        assert_eq!(model.temperature_k(), before);
     }
 
     #[test]
