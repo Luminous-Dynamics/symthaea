@@ -283,6 +283,166 @@ pub fn screen_spherical_envelope_budget(
     })
 }
 
+/// Side-by-side ideal lift comparison for vacuum and helium at the same outer displacement volume.
+///
+/// Vehicle masses are separately declared for each configuration. They should include every
+/// non-payload mass item for that lifting-gas architecture; the function does not estimate
+/// pressure-vessel mass or assert that either configuration is structurally viable.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VacuumHeliumComparisonRequest {
+    /// Enclosed external displacement volume, cubic metres.
+    pub enclosed_volume_m3: f64,
+    /// Ambient air density at the specified operating condition, kg/m³.
+    pub ambient_air_density_kg_m3: f64,
+    /// Helium density at the same pressure and temperature as ambient density, kg/m³.
+    pub helium_density_kg_m3: f64,
+    /// Complete vacuum-vehicle non-payload mass, kg.
+    pub vacuum_vehicle_mass_kg: f64,
+    /// Complete helium-vehicle non-payload mass, kg.
+    pub helium_vehicle_mass_kg: f64,
+}
+
+/// Relative mass-budget result for two idealized vehicles with identical outer volume.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VacuumHeliumComparisonResult {
+    /// Ideal gross buoyant mass for the vacuum configuration before vehicle mass, kg.
+    pub vacuum_gross_buoyant_mass_kg: f64,
+    /// Ideal gross buoyant mass for helium before vehicle mass, kg.
+    pub helium_gross_buoyant_mass_kg: f64,
+    /// Additional gross lift available to vacuum solely because it omits helium, kg.
+    pub vacuum_gross_lift_advantage_kg: f64,
+    /// Payload allowance after declared vacuum vehicle mass, kg; signed.
+    pub vacuum_payload_allowance_kg: f64,
+    /// Payload allowance after declared helium vehicle mass, kg; signed.
+    pub helium_payload_allowance_kg: f64,
+    /// Vacuum payload allowance minus helium payload allowance, kg; signed.
+    pub vacuum_minus_helium_payload_kg: f64,
+    /// Vacuum vehicle mass minus helium vehicle mass, kg; signed.
+    pub vacuum_minus_helium_vehicle_mass_kg: f64,
+    /// True when vacuum has the higher arithmetic payload allowance, not a viability claim.
+    pub vacuum_has_higher_payload_allowance: bool,
+}
+
+/// Compare idealized vacuum and helium payload budgets without hiding the vacuum structure penalty.
+///
+/// Since `gross_lift_vacuum - gross_lift_helium = helium_density * volume`,
+/// vacuum only carries more payload when its additional non-payload mass is less than this amount.
+/// Densities must refer to the same operating conditions. No cargo bay, range, weather, reserve,
+/// dynamic loading, structural strength, reliability, or operating-cost model is included.
+pub fn compare_vacuum_and_helium(
+    request: VacuumHeliumComparisonRequest,
+) -> Result<VacuumHeliumComparisonResult, ScreeningError> {
+    validate_positive(request.enclosed_volume_m3, "enclosed_volume_m3")?;
+    validate_positive(
+        request.ambient_air_density_kg_m3,
+        "ambient_air_density_kg_m3",
+    )?;
+    validate_non_negative(request.helium_density_kg_m3, "helium_density_kg_m3")?;
+    validate_non_negative(request.vacuum_vehicle_mass_kg, "vacuum_vehicle_mass_kg")?;
+    validate_non_negative(request.helium_vehicle_mass_kg, "helium_vehicle_mass_kg")?;
+
+    let vacuum_gross_buoyant_mass_kg =
+        request.ambient_air_density_kg_m3 * request.enclosed_volume_m3;
+    let helium_gross_buoyant_mass_kg = (request.ambient_air_density_kg_m3
+        - request.helium_density_kg_m3)
+        * request.enclosed_volume_m3;
+    let vacuum_gross_lift_advantage_kg =
+        vacuum_gross_buoyant_mass_kg - helium_gross_buoyant_mass_kg;
+    let vacuum_payload_allowance_kg =
+        vacuum_gross_buoyant_mass_kg - request.vacuum_vehicle_mass_kg;
+    let helium_payload_allowance_kg =
+        helium_gross_buoyant_mass_kg - request.helium_vehicle_mass_kg;
+    for (name, value) in [
+        ("vacuum gross buoyant mass", vacuum_gross_buoyant_mass_kg),
+        ("helium gross buoyant mass", helium_gross_buoyant_mass_kg),
+        ("vacuum gross lift advantage", vacuum_gross_lift_advantage_kg),
+        ("vacuum payload allowance", vacuum_payload_allowance_kg),
+        ("helium payload allowance", helium_payload_allowance_kg),
+    ] {
+        validate_result(value, name)?;
+    }
+
+    let vacuum_minus_helium_payload_kg =
+        vacuum_payload_allowance_kg - helium_payload_allowance_kg;
+    let vacuum_minus_helium_vehicle_mass_kg =
+        request.vacuum_vehicle_mass_kg - request.helium_vehicle_mass_kg;
+    validate_result(
+        vacuum_minus_helium_payload_kg,
+        "vacuum-minus-helium payload",
+    )?;
+    validate_result(
+        vacuum_minus_helium_vehicle_mass_kg,
+        "vacuum-minus-helium vehicle mass",
+    )?;
+
+    Ok(VacuumHeliumComparisonResult {
+        vacuum_gross_buoyant_mass_kg,
+        helium_gross_buoyant_mass_kg,
+        vacuum_gross_lift_advantage_kg,
+        vacuum_payload_allowance_kg,
+        helium_payload_allowance_kg,
+        vacuum_minus_helium_payload_kg,
+        vacuum_minus_helium_vehicle_mass_kg,
+        vacuum_has_higher_payload_allowance: vacuum_minus_helium_payload_kg > 0.0,
+    })
+}
+
+/// Explicit cargo payload requirement and declared usable cargo-space envelope.
+///
+/// Usable cargo volume is intentionally caller-supplied; it must not be inferred from a vacuum
+/// hull's internal volume because pressure boundaries, structure, access, restraints, payload
+/// enclosures, and clearances consume or restrict usable space.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CargoFitRequest {
+    /// Vehicle's calculated payload allowance, kg; may be negative.
+    pub payload_allowance_kg: f64,
+    /// Required cargo mass, kg.
+    pub target_cargo_mass_kg: f64,
+    /// Required cargo volume, m³.
+    pub target_cargo_volume_m3: f64,
+    /// Configuration-specific usable cargo volume, m³.
+    pub usable_cargo_volume_m3: f64,
+}
+
+/// Separate mass/volume requirements. Passing both gates is only a cargo-fit screen.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CargoFitResult {
+    /// Payload allowance minus target cargo mass, kg; non-negative is a mass fit.
+    pub cargo_mass_margin_kg: f64,
+    /// Usable cargo volume minus target cargo volume, m³; non-negative is a volume fit.
+    pub cargo_volume_margin_m3: f64,
+    pub cargo_fits_mass: bool,
+    pub cargo_fits_volume: bool,
+    /// True only when both the mass and the declared volume gates pass.
+    /// It does not imply route, structure, handling, weather, or commercial feasibility.
+    pub cargo_fits_declared_mass_and_volume: bool,
+}
+
+/// Check cargo mass and package volume against explicitly supplied vehicle capacity.
+pub fn screen_cargo_fit(request: CargoFitRequest) -> Result<CargoFitResult, ScreeningError> {
+    validate_finite(request.payload_allowance_kg, "payload_allowance_kg")?;
+    validate_non_negative(request.target_cargo_mass_kg, "target_cargo_mass_kg")?;
+    validate_non_negative(request.target_cargo_volume_m3, "target_cargo_volume_m3")?;
+    validate_non_negative(request.usable_cargo_volume_m3, "usable_cargo_volume_m3")?;
+
+    let cargo_mass_margin_kg =
+        request.payload_allowance_kg - request.target_cargo_mass_kg;
+    let cargo_volume_margin_m3 =
+        request.usable_cargo_volume_m3 - request.target_cargo_volume_m3;
+    validate_result(cargo_mass_margin_kg, "cargo mass margin")?;
+    validate_result(cargo_volume_margin_m3, "cargo volume margin")?;
+    let cargo_fits_mass = cargo_mass_margin_kg >= 0.0;
+    let cargo_fits_volume = cargo_volume_margin_m3 >= 0.0;
+
+    Ok(CargoFitResult {
+        cargo_mass_margin_kg,
+        cargo_volume_margin_m3,
+        cargo_fits_mass,
+        cargo_fits_volume,
+        cargo_fits_declared_mass_and_volume: cargo_fits_mass && cargo_fits_volume,
+    })
+}
+
 /// An externally sourced pressure-capacity declaration plus the references needed to audit it.
 ///
 /// The caller must supply a conservative allowable pressure for the exact applicable design
@@ -584,6 +744,82 @@ mod tests {
         assert_eq!(
             result.unwrap_err(),
             ScreeningError::MustBeNonNegative("target_payload_mass_kg")
+        );
+    }
+
+    #[test]
+    fn twenty_metre_sphere_gains_about_5_67_tonnes_gross_lift_over_helium() {
+        let volume = sphere_volume_m3(20.0).unwrap();
+        let result = compare_vacuum_and_helium(VacuumHeliumComparisonRequest {
+            enclosed_volume_m3: volume,
+            ambient_air_density_kg_m3: 1.225,
+            helium_density_kg_m3: 0.169_280_218_717_622_25,
+            vacuum_vehicle_mass_kg: 0.0,
+            helium_vehicle_mass_kg: 0.0,
+        })
+        .unwrap();
+        assert!((result.vacuum_gross_lift_advantage_kg - 5_672.6345762277915).abs() < 1e-6);
+        assert!(result.vacuum_has_higher_payload_allowance);
+    }
+
+    #[test]
+    fn vacuum_loses_payload_advantage_when_extra_mass_exceeds_helium_mass() {
+        let volume = sphere_volume_m3(20.0).unwrap();
+        let helium_density = 0.169_280_218_717_622_25;
+        let helium_mass = 20_000.0;
+        let vacuum_mass = helium_mass + helium_density * volume + 1.0;
+        let result = compare_vacuum_and_helium(VacuumHeliumComparisonRequest {
+            enclosed_volume_m3: volume,
+            ambient_air_density_kg_m3: 1.225,
+            helium_density_kg_m3: helium_density,
+            vacuum_vehicle_mass_kg: vacuum_mass,
+            helium_vehicle_mass_kg: helium_mass,
+        })
+        .unwrap();
+        assert!((result.vacuum_minus_helium_payload_kg + 1.0).abs() < 1e-6);
+        assert!(!result.vacuum_has_higher_payload_allowance);
+    }
+
+    #[test]
+    fn cargo_fit_keeps_mass_and_volume_gates_separate() {
+        let result = screen_cargo_fit(CargoFitRequest {
+            payload_allowance_kg: 12_000.0,
+            target_cargo_mass_kg: 10_000.0,
+            target_cargo_volume_m3: 100.0,
+            usable_cargo_volume_m3: 80.0,
+        })
+        .unwrap();
+        assert!(result.cargo_fits_mass);
+        assert!(!result.cargo_fits_volume);
+        assert!(!result.cargo_fits_declared_mass_and_volume);
+        assert_eq!(result.cargo_volume_margin_m3, -20.0);
+    }
+
+    #[test]
+    fn cargo_mass_fit_rejects_infeasible_negative_payload_allowance() {
+        let result = screen_cargo_fit(CargoFitRequest {
+            payload_allowance_kg: -1.0,
+            target_cargo_mass_kg: 0.0,
+            target_cargo_volume_m3: 0.0,
+            usable_cargo_volume_m3: 1.0,
+        })
+        .unwrap();
+        assert!(!result.cargo_fits_mass);
+        assert!(result.cargo_fits_volume);
+        assert!(!result.cargo_fits_declared_mass_and_volume);
+    }
+
+    #[test]
+    fn invalid_cargo_volume_is_rejected() {
+        let result = screen_cargo_fit(CargoFitRequest {
+            payload_allowance_kg: 10.0,
+            target_cargo_mass_kg: 1.0,
+            target_cargo_volume_m3: 2.0,
+            usable_cargo_volume_m3: f64::INFINITY,
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::NonFiniteInput("usable_cargo_volume_m3")
         );
     }
 
