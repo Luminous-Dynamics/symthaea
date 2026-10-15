@@ -198,3 +198,27 @@ The current authoring environment has no local Rust checkout/toolchain, so neith
 Before enabling role-observation search in the default `KnowledgeManager::do_search` path, qualification still requires an independently sourced and versioned corpus, adjudicated qrels, development/held-out separation, hard negatives (same text/different type; same entities/different role; reversed relation; negation; missing terms; legacy records; contradictory claims), and direct comparisons to lexical and conventional-structural baselines over the same candidate universe. Report Recall@k, MRR/nDCG, per-query coverage, false-match rate, abstention/coverage trade-offs, and p50/p95 latency by query size and observation count. Fix thresholds on development data and report held-out results; do not select a default from unit fixtures or from one high-dimensional random-token setup.
 
 The default search path remains unchanged. Retrieval similarity remains separate from stored confidence and must not be reported as calibrated epistemic probability, source authenticity, causal identification, or truth.
+
+## Typed retrieval source-review corrections (2026-10-15)
+
+A follow-up source review of the role-retrieval stack found two concrete type-space issues and corrected them without changing the default `KnowledgeManager::do_search` path:
+
+1. **Public type import:** `src/knowledge/graph.rs` referred to `SemanticRole` in public result structs without importing it in that module. PR #7494 now imports it explicitly.
+2. **Code entity type collision:** `EntityType::Function`, `Type`, `Module`, `ErrorPattern`, and `CodeSnippet` were not assigned entries in `KnowledgeEncoder::with_seed`'s type-basis map. They therefore all used the same `BinaryHV::random(999)` fallback for a given token, collapsing type distinctions across these variants. A dedicated fixed seed range `seed + 1100..1104` now assigns one stable basis per code-oriented type while leaving every existing type seed unchanged. Regression coverage asserts both pairwise distinction and the declared seed mapping.
+
+The corresponding regression test is authored but has **not** been executed locally. This correction has no measured retrieval-accuracy claim and is not evidence of threshold calibration.
+
+### Current exact stack after rebase
+
+The three open pull requests were rebuilt so each child is one commit ahead of its immediate parent, with no commits behind at the inspected refs:
+
+- [PR #7494 — typed role observations](https://github.com/Luminous-Dynamics/symthaea/pull/7494): head `9706c3bca0c8a1edda0e7ac2d5b2941f74795dbd`; CI [38809032692](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809032692) queued; PR Governance [38809032660](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809032660) queued.
+- [PR #7499 — coverage-first maximum-weight assignment](https://github.com/Luminous-Dynamics/symthaea/pull/7499): head `47da1742f20bc14bbe4b49aa45dbdf930ca03793`; CI [38809077530](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809077530) queued; PR Governance [38809077499](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809077499) pending.
+- [PR #7508 — threshold sweep and scaling probe](https://github.com/Luminous-Dynamics/symthaea/pull/7508): head `62738165a3831425aab13c8d04f04b72cf4a0b4e`; CI [38809107357](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809107357) queued; PR Governance [38809107077](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809107077) pending.
+
+All checks above were **not passing** at this audit update. Queued/pending are not passes; prior runs tied to superseded heads do not qualify the current source. The child PRs remain stacked on the exact current parent heads, and all three PRs were reported mergeable by GitHub after the rebase. No local Rust test run or benchmark execution has been performed in this environment.
+
+### Next research step
+
+The most useful conceptual advance remains to treat retrieval as **constraint verification with explicit failure states**, not merely ranking: predicates, argument direction, negation, source/version/time constraints, and abstention should be independently represented and scored. Begin with metamorphic negative controls that hold the entity pair constant while flipping only predicate, direction, polarity, or entity type. Publish each family as separate cases and split by source/family before threshold selection so derived counterfactual negatives cannot leak across development and held-out sets. Compare role-HDC retrieval against lexical and conventional structural baselines over the same candidate universe. Until those results exist, do not change the production default or label retrieval similarity as truth, source authenticity, or calibrated probability.
+
