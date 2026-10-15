@@ -461,9 +461,9 @@ pub fn fuse_plss_telemetry(
 }
 
 
-/// Reproducibility metadata for one fusion evaluation. FNV-1a 64-bit digests
-/// are non-cryptographic fingerprints only; they are not signatures or proof
-/// that a caller supplied a truthful source revision.
+/// Reproducibility metadata for one fusion evaluation. SHA-256 fingerprints
+/// detect input/result changes, but do not authenticate sensors or prove that
+/// a caller supplied a truthful source revision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlssTelemetryReceipt {
     /// Must be the exact 40-character Git SHA or 64-character Git object ID.
@@ -480,7 +480,7 @@ pub struct PlssTelemetryReceipt {
 
 /// Evaluate and produce a deterministic receipt tied to a caller-supplied,
 /// syntactically valid source revision. Callers should supply the exact checked
-/// out commit SHA; this function validates the identifier's form, not Git trust.
+/// out commit SHA; this function validates identifier form, not Git authenticity.
 pub fn evaluate_plss_telemetry_with_receipt(
     observations: &[PlssTelemetryObservation],
     evaluated_at_s: f64,
@@ -963,6 +963,68 @@ mod tests {
         assert_eq!(first.result_digest_sha256, second.result_digest_sha256);
         assert!(first.input_digest_sha256.starts_with("sha256:"));
         assert!(first.result_digest_sha256.starts_with("sha256:"));
+    }
+
+    #[test]
+    fn changing_an_observation_changes_input_and_result_fingerprints() {
+        let first_observation = observation(
+            PlssTelemetryMetric::VentilationFlowLMin,
+            100.0,
+            2.0,
+            99.0,
+            0.95,
+            "flow-a",
+            PlssTelemetrySourceKind::Instrument,
+        );
+        let changed_observation = observation(
+            PlssTelemetryMetric::VentilationFlowLMin,
+            101.0,
+            2.0,
+            99.0,
+            0.95,
+            "flow-a",
+            PlssTelemetrySourceKind::Instrument,
+        );
+        let revision = "b".repeat(40);
+        let (_, first) = evaluate_plss_telemetry_with_receipt(
+            &[first_observation],
+            100.0,
+            PlssTelemetryConfig::simulation_reference(),
+            &revision,
+        )
+        .unwrap();
+        let (_, second) = evaluate_plss_telemetry_with_receipt(
+            &[changed_observation],
+            100.0,
+            PlssTelemetryConfig::simulation_reference(),
+            &revision,
+        )
+        .unwrap();
+        assert_ne!(first.input_digest_sha256, second.input_digest_sha256);
+        assert_ne!(first.result_digest_sha256, second.result_digest_sha256);
+    }
+
+    #[test]
+    fn changing_configuration_changes_result_fingerprint() {
+        let revision = "c".repeat(40);
+        let (_, first) = evaluate_plss_telemetry_with_receipt(
+            &[],
+            100.0,
+            PlssTelemetryConfig::simulation_reference(),
+            &revision,
+        )
+        .unwrap();
+        let mut config = PlssTelemetryConfig::simulation_reference();
+        config.maximum_observation_age_s += 1.0;
+        let (_, second) = evaluate_plss_telemetry_with_receipt(
+            &[],
+            100.0,
+            config,
+            &revision,
+        )
+        .unwrap();
+        assert_eq!(first.input_digest_sha256, second.input_digest_sha256);
+        assert_ne!(first.result_digest_sha256, second.result_digest_sha256);
     }
 
     #[test]
