@@ -667,6 +667,27 @@ mod tests {
     }
 
     #[test]
+    fn calibration_suite_rejects_source_temperature_mismatch_even_when_hashes_match() {
+        let root = std::env::temp_dir().join(format!("symthaea-calibration-suite-source-temp-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let mut manifest = build_suite_fixture(&root, false);
+        let path = root.join(&manifest.files[0].local_path);
+        let original = fs::read(&path).unwrap();
+        let mut value: Value = serde_json::from_slice(&original).unwrap();
+        value["temperature"] = json!(24.0);
+        let altered = serde_json::to_vec(&value).unwrap();
+        fs::write(&path, &altered).unwrap();
+        manifest.files[0].byte_length = altered.len();
+        manifest.files[0].sha256 = format!("{:x}", Sha256::digest(&altered));
+        manifest.files[0].github_blob_sha = git_blob_sha1(&altered);
+        manifest.files[0].canonical_dataverse_md5 = format!("{:x}", Md5::digest(&altered));
+        let error = validate_suite(&root, &manifest).unwrap_err().to_string();
+        assert!(error.contains("temperature mismatch"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn calibration_suite_rejects_wavelength_mismatch() {
         let root = std::env::temp_dir().join(format!("symthaea-calibration-suite-wavelength-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
