@@ -270,7 +270,13 @@ pub fn evaluate_duty_cycle(
     let storage_is_balanced =
         net_stored_energy_change_j.abs()
             <= relative_tolerance * aggregate_report.energy_throughput_j;
-    let net_cycle_efficiency = if storage_is_balanced && total_input_energy_j > 0.0 {
+    // A tiny net discharge within tolerance can still inflate output/input. Be
+    // conservative: only expose the ratio when storage is balanced and does not
+    // show a net discharge.
+    let net_cycle_efficiency = if storage_is_balanced
+        && net_stored_energy_change_j >= 0.0
+        && total_input_energy_j > 0.0
+    {
         Some(total_net_useful_output_energy_j / total_input_energy_j)
     } else {
         None
@@ -451,6 +457,21 @@ mod tests {
             stored_energy_change_j: 100.0,
         }];
         let report = evaluate_duty_cycle(&intervals, 1e-9).unwrap();
+        assert_eq!(report.net_cycle_efficiency, None);
+    }
+
+    #[test]
+    fn small_net_storage_discharge_does_not_inflate_cycle_efficiency() {
+        let intervals = [EnergyIntervalBalance {
+            input_energy_j: 1000.0,
+            net_useful_output_energy_j: 300.0,
+            auxiliary_energy_j: 20.0,
+            rejected_or_loss_energy_j: 680.00001,
+            stored_energy_change_j: -0.00001,
+        }];
+        let report = evaluate_duty_cycle(&intervals, 1e-6).unwrap();
+        assert!(report.net_stored_energy_change_j.abs()
+            <= 1e-6 * report.total_energy_throughput_j);
         assert_eq!(report.net_cycle_efficiency, None);
     }
 
