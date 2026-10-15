@@ -181,7 +181,8 @@ pub fn analyze_plss_telemetry_trends(
     let mut excluded_window = 0;
     let mut excluded_low_confidence = 0;
     let mut accepted_count = 0;
-    let mut lanes = Vec::with_capacity(PLSS_TELEMETRY_METRIC_COUNT * PlssTelemetrySourceKind::ALL.len());
+    let lane_capacity = PLSS_TELEMETRY_METRIC_COUNT * PlssTelemetrySourceKind::ALL.len();
+    let mut lanes = Vec::with_capacity(lane_capacity);
 
     for metric in PlssTelemetryMetric::ALL {
         for source_kind in PlssTelemetrySourceKind::ALL {
@@ -194,7 +195,9 @@ pub fn analyze_plss_telemetry_trends(
 
             for observation in observations
                 .iter()
-                .filter(|observation| observation.metric == metric && observation.source_kind == source_kind)
+                .filter(|observation| {
+                    observation.metric == metric && observation.source_kind == source_kind
+                })
             {
                 saw_any = true;
                 if !observation.is_valid() {
@@ -212,13 +215,18 @@ pub fn analyze_plss_telemetry_trends(
                     saw_outside = true;
                     continue;
                 }
-                if observation.confidence < config.minimum_confidence || observation.confidence <= 0.0 {
+                if observation.confidence < config.minimum_confidence
+                    || observation.confidence <= 0.0
+                {
                     excluded_low_confidence += 1;
                     saw_low_confidence = true;
                     continue;
                 }
                 accepted_count += 1;
-                if let Some((_, samples)) = by_source.iter_mut().find(|(id, _)| id == &observation.source_id) {
+                if let Some((_, samples)) = by_source
+                    .iter_mut()
+                    .find(|(id, _)| id == &observation.source_id)
+                {
                     samples.push(observation.clone());
                 } else {
                     by_source.push((observation.source_id.clone(), vec![observation.clone()]));
@@ -241,11 +249,16 @@ pub fn analyze_plss_telemetry_trends(
                     (false, false, false, false, false) => PlssTelemetryTrendStatus::Missing,
                     _ => PlssTelemetryTrendStatus::InsufficientEvidence,
                 }
-            } else if source_trends.iter().any(|trend| trend.status == PlssTelemetryTrendStatus::Conflicted)
+            } else if source_trends
+                .iter()
+                .any(|trend| trend.status == PlssTelemetryTrendStatus::Conflicted)
                 || sources_disagree(&source_trends, metric, config.cross_source_tolerances)
             {
                 PlssTelemetryTrendStatus::Conflicted
-            } else if source_trends.iter().all(|trend| trend.status == PlssTelemetryTrendStatus::Fresh) {
+            } else if source_trends
+                .iter()
+                .all(|trend| trend.status == PlssTelemetryTrendStatus::Fresh)
+            {
                 PlssTelemetryTrendStatus::Fresh
             } else {
                 PlssTelemetryTrendStatus::InsufficientEvidence
@@ -462,7 +475,13 @@ impl HashWriter {
     fn f64(&mut self, value: f64) { self.u64(value.to_bits()); }
     fn string(&mut self, value: &str) { self.usize(value.len()); self.raw(value.as_bytes()); }
     fn option_f64(&mut self, value: Option<f64>) {
-        match value { Some(number) => { self.raw(&[1]); self.f64(number); }, None => self.raw(&[0]) }
+        match value {
+            Some(number) => {
+                self.raw(&[1]);
+                self.f64(number);
+            }
+            None => self.raw(&[0]),
+        }
     }
     fn finish(self) -> String {
         let digest = self.0.finalize();
@@ -560,7 +579,12 @@ fn digest_trend_receipt(receipt: &PlssTelemetryTrendReceipt) -> String {
 mod tests {
     use super::*;
 
-    fn obs(metric: PlssTelemetryMetric, value: f64, time: f64, id: &str) -> PlssTelemetryObservation {
+    fn obs(
+        metric: PlssTelemetryMetric,
+        value: f64,
+        time: f64,
+        id: &str,
+    ) -> PlssTelemetryObservation {
         PlssTelemetryObservation {
             metric,
             unit: metric.unit(),
@@ -584,7 +608,12 @@ mod tests {
             obs(PlssTelemetryMetric::CircuitCo2PartialPressurePa, 210.0, 30.0, "a"),
             obs(PlssTelemetryMetric::CircuitCo2PartialPressurePa, 230.0, 60.0, "a"),
         ], config()).unwrap();
-        let lane = report.lane(PlssTelemetryMetric::CircuitCo2PartialPressurePa, PlssTelemetrySourceKind::Instrument).unwrap();
+        let lane = report
+            .lane(
+                PlssTelemetryMetric::CircuitCo2PartialPressurePa,
+                PlssTelemetrySourceKind::Instrument,
+            )
+            .unwrap();
         assert_eq!(lane.status, PlssTelemetryTrendStatus::Fresh);
         assert_eq!(lane.source_trends[0].rate_per_s, Some(0.5));
         assert_eq!(lane.source_trends[0].unit, PlssTelemetryUnit::Pascal);
@@ -599,7 +628,12 @@ mod tests {
             obs(PlssTelemetryMetric::GasTemperatureK, 290.0, 20.0, "a"),
             obs(PlssTelemetryMetric::GasTemperatureK, 290.0, 30.0, "a"),
         ], cfg).unwrap();
-        let lane = report.lane(PlssTelemetryMetric::GasTemperatureK, PlssTelemetrySourceKind::Instrument).unwrap();
+        let lane = report
+            .lane(
+                PlssTelemetryMetric::GasTemperatureK,
+                PlssTelemetrySourceKind::Instrument,
+            )
+            .unwrap();
         assert_eq!(lane.status, PlssTelemetryTrendStatus::InsufficientEvidence);
         assert_eq!(lane.source_trends[0].rate_per_s, None);
     }
@@ -637,7 +671,13 @@ mod tests {
             obs(PlssTelemetryMetric::CircuitPressurePa, 55_000.0, 0.0, "a"),
             obs(PlssTelemetryMetric::CircuitPressurePa, 54_000.0, 30.0, "a"),
         ], config()).unwrap();
-        let source = &report.lane(PlssTelemetryMetric::CircuitPressurePa, PlssTelemetrySourceKind::Instrument).unwrap().source_trends[0];
+        let source = &report
+            .lane(
+                PlssTelemetryMetric::CircuitPressurePa,
+                PlssTelemetrySourceKind::Instrument,
+            )
+            .unwrap()
+            .source_trends[0];
         assert_eq!(source.status, PlssTelemetryTrendStatus::Conflicted);
         assert_eq!(source.rate_per_s, None);
     }
@@ -652,7 +692,12 @@ mod tests {
             obs(PlssTelemetryMetric::CircuitCo2PartialPressurePa, 350.0, 30.0, "b"),
             obs(PlssTelemetryMetric::CircuitCo2PartialPressurePa, 1_000.0, 60.0, "b"),
         ], config()).unwrap();
-        let lane = report.lane(PlssTelemetryMetric::CircuitCo2PartialPressurePa, PlssTelemetrySourceKind::Instrument).unwrap();
+        let lane = report
+            .lane(
+                PlssTelemetryMetric::CircuitCo2PartialPressurePa,
+                PlssTelemetrySourceKind::Instrument,
+            )
+            .unwrap();
         assert_eq!(lane.status, PlssTelemetryTrendStatus::Conflicted);
         assert_eq!(lane.source_trends.len(), 2);
         assert_eq!(lane.source_trends[0].source_id, "a");
@@ -670,10 +715,46 @@ mod tests {
             obs(PlssTelemetryMetric::VentilationFlowLMin, 150.0, 80.0, "future"),
             obs(PlssTelemetryMetric::RelativeHumidityPercent, 45.0, -10.0, "outside"),
         ], config()).unwrap();
-        assert_eq!(report.lane(PlssTelemetryMetric::GasTemperatureK, PlssTelemetrySourceKind::Instrument).unwrap().status, PlssTelemetryTrendStatus::Invalid);
-        assert_eq!(report.lane(PlssTelemetryMetric::VentilationFlowLMin, PlssTelemetrySourceKind::Instrument).unwrap().status, PlssTelemetryTrendStatus::FutureDated);
-        assert_eq!(report.lane(PlssTelemetryMetric::RelativeHumidityPercent, PlssTelemetrySourceKind::Instrument).unwrap().status, PlssTelemetryTrendStatus::OutOfWindow);
-        assert_eq!(report.lane(PlssTelemetryMetric::OxygenPartialPressurePa, PlssTelemetrySourceKind::Instrument).unwrap().status, PlssTelemetryTrendStatus::Missing);
+        assert_eq!(
+            report
+                .lane(
+                    PlssTelemetryMetric::GasTemperatureK,
+                    PlssTelemetrySourceKind::Instrument,
+                )
+                .unwrap()
+                .status,
+            PlssTelemetryTrendStatus::Invalid
+        );
+        assert_eq!(
+            report
+                .lane(
+                    PlssTelemetryMetric::VentilationFlowLMin,
+                    PlssTelemetrySourceKind::Instrument,
+                )
+                .unwrap()
+                .status,
+            PlssTelemetryTrendStatus::FutureDated
+        );
+        assert_eq!(
+            report
+                .lane(
+                    PlssTelemetryMetric::RelativeHumidityPercent,
+                    PlssTelemetrySourceKind::Instrument,
+                )
+                .unwrap()
+                .status,
+            PlssTelemetryTrendStatus::OutOfWindow
+        );
+        assert_eq!(
+            report
+                .lane(
+                    PlssTelemetryMetric::OxygenPartialPressurePa,
+                    PlssTelemetrySourceKind::Instrument,
+                )
+                .unwrap()
+                .status,
+            PlssTelemetryTrendStatus::Missing
+        );
     }
 
     #[test]
@@ -682,8 +763,14 @@ mod tests {
         let b = obs(PlssTelemetryMetric::GasTemperatureK, 292.0, 30.0, "b");
         let c = obs(PlssTelemetryMetric::GasTemperatureK, 291.0, 60.0, "a");
         let rev = "d".repeat(40);
-        let (report_a, receipt_a) = analyze_plss_telemetry_trends_with_receipt(&[a.clone(), b.clone(), c.clone()], config(), &rev).unwrap();
-        let (report_b, receipt_b) = analyze_plss_telemetry_trends_with_receipt(&[c, a, b], config(), &rev).unwrap();
+        let (report_a, receipt_a) = analyze_plss_telemetry_trends_with_receipt(
+            &[a.clone(), b.clone(), c.clone()],
+            config(),
+            &rev,
+        )
+        .unwrap();
+        let (report_b, receipt_b) =
+            analyze_plss_telemetry_trends_with_receipt(&[c, a, b], config(), &rev).unwrap();
         assert_eq!(report_a, report_b);
         assert_eq!(receipt_a.input_digest_sha256, receipt_b.input_digest_sha256);
         assert_eq!(receipt_a.result_digest_sha256, receipt_b.result_digest_sha256);
@@ -714,15 +801,40 @@ mod tests {
             low,
         ], cfg).unwrap();
         assert_eq!(report.excluded_low_confidence_observations, 1);
-        assert_eq!(report.lane(PlssTelemetryMetric::GasTemperatureK, PlssTelemetrySourceKind::Instrument).unwrap().source_trends[0].last_value, Some(291.0));
-        assert_eq!(report.lane(PlssTelemetryMetric::GasTemperatureK, PlssTelemetrySourceKind::Instrument).unwrap().status, PlssTelemetryTrendStatus::InsufficientEvidence);
+        assert_eq!(
+            report
+                .lane(
+                    PlssTelemetryMetric::GasTemperatureK,
+                    PlssTelemetrySourceKind::Instrument,
+                )
+                .unwrap()
+                .source_trends[0]
+                .last_value,
+            Some(291.0)
+        );
+        assert_eq!(
+            report
+                .lane(
+                    PlssTelemetryMetric::GasTemperatureK,
+                    PlssTelemetrySourceKind::Instrument,
+                )
+                .unwrap()
+                .status,
+            PlssTelemetryTrendStatus::InsufficientEvidence
+        );
     }
 
     #[test]
     fn invalid_config_and_revision_fail_closed() {
         let mut changed = config();
         changed.minimum_samples = 1;
-        assert_eq!(analyze_plss_telemetry_trends(&[], changed), Err(PlssTelemetryTrendError::InvalidConfig));
-        assert_eq!(analyze_plss_telemetry_trends_with_receipt(&[], config(), "bad"), Err(PlssTelemetryTrendError::InvalidSourceRevision));
+        assert_eq!(
+            analyze_plss_telemetry_trends(&[], changed),
+            Err(PlssTelemetryTrendError::InvalidConfig)
+        );
+        assert_eq!(
+            analyze_plss_telemetry_trends_with_receipt(&[], config(), "bad"),
+            Err(PlssTelemetryTrendError::InvalidSourceRevision)
+        );
     }
 }
