@@ -270,13 +270,25 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
             "reported/normalized values and conversion factor must be finite and positive at CSV record {}",
             row_index + 2
         );
+        let (expected_factor, expected_rule_id) =
+            match field(&row, &header_index, "reported_unit") {
+                "s^-1" | "1/s" | "s-1" => (1.0, "kcat_s-1_identity_v1"),
+                "min^-1" | "1/min" | "min-1" => (1.0 / 60.0, "kcat_min-1_to_s-1_v1"),
+                "h^-1" | "1/h" | "h-1" => (1.0 / 3600.0, "kcat_h-1_to_s-1_v1"),
+                other => bail!("unsupported kcat reported_unit at CSV record {}: {other}", row_index + 2),
+            };
         ensure!(
-            !field(&row, &header_index, "unit_conversion_rule_id").is_empty(),
-            "unit conversion rule ID is required at CSV record {}",
+            field(&row, &header_index, "unit_conversion_rule_id") == expected_rule_id,
+            "unit conversion rule does not match reported_unit at CSV record {}",
+            row_index + 2
+        );
+        ensure!(
+            (conversion_factor - expected_factor).abs() <= 1e-12 * expected_factor.max(1.0),
+            "unit conversion factor does not match reported_unit at CSV record {}",
             row_index + 2
         );
         let converted = reported_value * conversion_factor;
-        let tolerance = 1e-9 * converted.abs().max(normalized_value.abs()).max(1.0);
+        let tolerance = 1e-9 * converted.abs().max(normalized_value.abs()).max(1e-12);
         ensure!(
             converted.is_finite() && (converted - normalized_value).abs() <= tolerance,
             "unit conversion mismatch at CSV record {}: reported_value * factor != normalized_value",
@@ -398,11 +410,21 @@ fn validate_condition(conditions: &Value, key: &str, csv_record: usize) -> Resul
     let status = condition.get("status").and_then(Value::as_str).unwrap_or("");
     match status {
         "reported" => {
-            let value = condition.get("value").filter(|value| {
-                !value.is_null()
-                    && value.as_str().map(|s| !s.trim().is_empty()).unwrap_or(true)
-            });
-            ensure!(value.is_some(), "{key} reported without a value at CSV record {csv_record}");
+            let value = condition
+                .get("value")
+                .filter(|value| !value.is_null())
+                .with_context(|| format!("{key} reported without a value at CSV record {csv_record}"))?;
+            match key {
+                "ph" | "temperature_c" => ensure!(
+                    value.as_f64().is_some_and(f64::is_finite),
+                    "{key} must be a finite number at CSV record {csv_record}"
+                ),
+                "substrate_id" => ensure!(
+                    value.as_str().is_some_and(|s| !s.trim().is_empty()),
+                    "substrate_id must be a nonempty string at CSV record {csv_record}"
+                ),
+                _ => bail!("unsupported assay context key: {key}"),
+            }
         }
         "not_reported" => {
             ensure!(
@@ -530,11 +552,11 @@ mod tests {
         let context_b_json = context_b.to_string();
         writer.write_record([
             "obs-a", "source-a", "study-a", "protein-a", "family-a", "kcat",
-            "2.0", "s^-1", "2.0", "s^-1", "identity_s_per_s_v1", "1.0", context_a_json.as_str()
+            "2.0", "s^-1", "2.0", "s^-1", "kcat_s-1_identity_v1", "1.0", context_a_json.as_str()
         ]).unwrap();
         writer.write_record([
             "obs-b", "source-b", "study-b", "protein-b", "family-b", "kcat",
-            "3.0", "s^-1", "3.0", "s^-1", "identity_s_per_s_v1", "1.0", context_b_json.as_str()
+            "3.0", "s^-1", "3.0", "s^-1", "kcat_s-1_identity_v1", "1.0", context_b_json.as_str()
         ]).unwrap();
         let csv_bytes = writer.into_inner().unwrap();
         let dataset_artifact = write_hashed(root, csv_path, &csv_bytes);
