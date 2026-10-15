@@ -35,6 +35,8 @@ pub enum ScreeningError {
     EmptyIdentifier(&'static str),
     /// Scenario identifiers must be unique within one set.
     DuplicateScenarioId,
+    /// An observed event count is larger than the number of trials.
+    CountExceedsTotal(&'static str),
 }
 
 impl fmt::Display for ScreeningError {
@@ -55,6 +57,9 @@ impl fmt::Display for ScreeningError {
             Self::EmptyIdentifier(name) => write!(f, "{name} must not be blank"),
             Self::DuplicateScenarioId => {
                 write!(f, "scenario_id values must be unique within the scenario set")
+            },
+            Self::CountExceedsTotal(name) => {
+                write!(f, "{name} must not exceed its trial count")
             },
         }
     }
@@ -317,6 +322,122 @@ pub fn screen_bounded_inspection_escape_population(
         expected_undetected_critical_defect_count_upper_bound,
         probability_at_least_one_critical_defect_escapes_lower_bound,
         probability_at_least_one_critical_defect_escapes_upper_bound,
+    })
+}
+
+/// Observed binomial rate and a Wilson score interval at the caller-selected z-score.
+///
+/// The interval quantifies finite-sample uncertainty under a binomial sampling model; it does not
+/// account for sampling bias, non-representative specimens, dependence between trials, or changes
+/// in manufacturing/inspection conditions.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BinomialRateEstimate {
+    pub trial_count: u64,
+    pub event_count: u64,
+    pub observed_rate: f64,
+    pub wilson_confidence_interval: ScalarBounds,
+}
+
+/// Detection and false-alarm estimates from representative inspection qualification trials.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InspectionQualificationResult {
+    /// Caller-supplied z-score; approximately 1.96 corresponds to a nominal two-sided 95% interval.
+    pub confidence_z_score: f64,
+    /// Detected critical defects divided by trials containing the target defect class/severity.
+    pub probability_of_detection: BinomialRateEstimate,
+    /// False positives divided by representative trials without the target defect.
+    pub false_alarm_rate: BinomialRateEstimate,
+}
+
+/// Observed inspection trials used to estimate probability of detection and false-alarm rate.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InspectionQualificationRequest {
+    pub defect_trial_count: u64,
+    pub detected_defect_count: u64,
+    pub clean_trial_count: u64,
+    pub false_positive_count: u64,
+    /// Explicit z-score for two-sided Wilson score intervals; e.g. about 1.96 for nominal 95%.
+    pub confidence_z_score: f64,
+}
+
+fn wilson_score_interval(
+    event_count: u64,
+    trial_count: u64,
+    z_score: f64,
+) -> Result<ScalarBounds, ScreeningError> {
+    let n = trial_count as f64;
+    let x = event_count as f64;
+    let z_squared = z_score * z_score;
+    let denominator = 1.0 + z_squared / n;
+    let observed_rate = x / n;
+    let center = (observed_rate + z_squared / (2.0 * n)) / denominator;
+    let half_width = z_score
+        * (observed_rate * (1.0 - observed_rate) / n
+            + z_squared / (4.0 * n * n))
+            .sqrt()
+        / denominator;
+    let interval = ScalarBounds {
+        min: (center - half_width).max(0.0),
+        max: (center + half_width).min(1.0),
+    };
+    validate_result(interval.min, "Wilson interval lower endpoint")?;
+    validate_result(interval.max, "Wilson interval upper endpoint")?;
+    Ok(interval)
+}
+
+/// Derive detection and false-alarm rates from qualification counts, retaining sampling uncertainty.
+///
+/// The trials must represent the intended manufacturing process, critical-defect class, geometry,
+/// size/orientation range, inspection method and threshold. Aggregate counts across unlike strata
+/// can hide poor detection for a small but consequential defect class. A Wilson interval is not a
+/// guarantee of population coverage when trials are biased or dependent; the returned interval is
+/// an estimate for the declared binomial sampling model, not structural reliability.
+pub fn screen_inspection_qualification_counts(
+    request: InspectionQualificationRequest,
+) -> Result<InspectionQualificationResult, ScreeningError> {
+    if request.defect_trial_count == 0 {
+        return Err(ScreeningError::MustBePositive("defect_trial_count"));
+    }
+    if request.clean_trial_count == 0 {
+        return Err(ScreeningError::MustBePositive("clean_trial_count"));
+    }
+    validate_positive(request.confidence_z_score, "confidence_z_score")?;
+    if request.detected_defect_count > request.defect_trial_count {
+        return Err(ScreeningError::CountExceedsTotal("detected_defect_count"));
+    }
+    if request.false_positive_count > request.clean_trial_count {
+        return Err(ScreeningError::CountExceedsTotal("false_positive_count"));
+    }
+
+    let probability_of_detection_interval = wilson_score_interval(
+        request.detected_defect_count,
+        request.defect_trial_count,
+        request.confidence_z_score,
+    )?;
+    let false_alarm_interval = wilson_score_interval(
+        request.false_positive_count,
+        request.clean_trial_count,
+        request.confidence_z_score,
+    )?;
+    let probability_of_detection = BinomialRateEstimate {
+        trial_count: request.defect_trial_count,
+        event_count: request.detected_defect_count,
+        observed_rate: request.detected_defect_count as f64 / request.defect_trial_count as f64,
+        wilson_confidence_interval: probability_of_detection_interval,
+    };
+    let false_alarm_rate = BinomialRateEstimate {
+        trial_count: request.clean_trial_count,
+        event_count: request.false_positive_count,
+        observed_rate: request.false_positive_count as f64 / request.clean_trial_count as f64,
+        wilson_confidence_interval: false_alarm_interval,
+    };
+    validate_result(probability_of_detection.observed_rate, "observed probability of detection")?;
+    validate_result(false_alarm_rate.observed_rate, "observed false-alarm rate")?;
+
+    Ok(InspectionQualificationResult {
+        confidence_z_score: request.confidence_z_score,
+        probability_of_detection,
+        false_alarm_rate,
     })
 }
 
@@ -3350,6 +3471,79 @@ mod tests {
             )
             .unwrap_err(),
             ScreeningError::FractionOutOfRange("per_feature_critical_defect_probability")
+        );
+    }
+
+    #[test]
+    fn inspection_qualification_counts_retain_observed_rates_and_wilson_intervals() {
+        let result = screen_inspection_qualification_counts(InspectionQualificationRequest {
+            defect_trial_count: 20,
+            detected_defect_count: 18,
+            clean_trial_count: 50,
+            false_positive_count: 2,
+            confidence_z_score: 1.959_963_984_540_054,
+        })
+        .unwrap();
+        assert_eq!(result.probability_of_detection.observed_rate, 0.9);
+        assert_eq!(result.false_alarm_rate.observed_rate, 0.04);
+        assert!(result.probability_of_detection.wilson_confidence_interval.min < 0.9);
+        assert!(result.probability_of_detection.wilson_confidence_interval.max > 0.9);
+        assert!(result.false_alarm_rate.wilson_confidence_interval.min < 0.04);
+        assert!(result.false_alarm_rate.wilson_confidence_interval.max > 0.04);
+    }
+
+    #[test]
+    fn inspection_qualification_counts_handle_zero_detections_and_no_false_alarms() {
+        let result = screen_inspection_qualification_counts(InspectionQualificationRequest {
+            defect_trial_count: 10,
+            detected_defect_count: 0,
+            clean_trial_count: 10,
+            false_positive_count: 0,
+            confidence_z_score: 1.96,
+        })
+        .unwrap();
+        assert_eq!(result.probability_of_detection.observed_rate, 0.0);
+        assert_eq!(result.probability_of_detection.wilson_confidence_interval.min, 0.0);
+        assert!(result.probability_of_detection.wilson_confidence_interval.max > 0.0);
+        assert_eq!(result.false_alarm_rate.observed_rate, 0.0);
+        assert_eq!(result.false_alarm_rate.wilson_confidence_interval.min, 0.0);
+        assert!(result.false_alarm_rate.wilson_confidence_interval.max > 0.0);
+    }
+
+    #[test]
+    fn inspection_qualification_counts_reject_invalid_counts_and_z_score() {
+        assert_eq!(
+            screen_inspection_qualification_counts(InspectionQualificationRequest {
+                defect_trial_count: 0,
+                detected_defect_count: 0,
+                clean_trial_count: 10,
+                false_positive_count: 0,
+                confidence_z_score: 1.96,
+            })
+            .unwrap_err(),
+            ScreeningError::MustBePositive("defect_trial_count")
+        );
+        assert_eq!(
+            screen_inspection_qualification_counts(InspectionQualificationRequest {
+                defect_trial_count: 10,
+                detected_defect_count: 11,
+                clean_trial_count: 10,
+                false_positive_count: 0,
+                confidence_z_score: 1.96,
+            })
+            .unwrap_err(),
+            ScreeningError::CountExceedsTotal("detected_defect_count")
+        );
+        assert_eq!(
+            screen_inspection_qualification_counts(InspectionQualificationRequest {
+                defect_trial_count: 10,
+                detected_defect_count: 10,
+                clean_trial_count: 10,
+                false_positive_count: 0,
+                confidence_z_score: 0.0,
+            })
+            .unwrap_err(),
+            ScreeningError::MustBePositive("confidence_z_score")
         );
     }
 
