@@ -27,6 +27,18 @@ Useful local starting points:
 
 The Cognitive Self-Model document specifically recommends extending existing `PredictiveSelfModel` machinery instead of creating a duplicative parallel abstraction. Follow that principle across the whole experiment: inventory first, adapt interfaces second, add a new component only when the existing one demonstrably cannot satisfy the required contract.
 
+## Repository-grounded starting inventory (checked 2026-10-15)
+
+This is a source inventory, not a claim that the complete cognitive integration or research hypotheses are validated.
+
+- `crates/core/symthaea-core/src/hdc/binary_hv.rs` defines `BinaryHV` as a 16,384-bit vector backed by 2,048 bytes and documents deterministic seeded vectors. This is a concrete baseline for associative operations and bit-packed storage.
+- `src/consciousness/dynamics/predictive_self.rs` defines `PredictiveSelfModel` and configuration for history depth, horizons, prediction-error thresholds, counterfactuals, and prospective memory. It is the first candidate to reuse for prediction-error experiments.
+- `src/cognitive_loop/self_model_tier.rs` already groups predictive self, narrative self, meta-cognition, and attention-schema subsystems behind independent configuration flags. An additional generic self-model manager would risk duplication.
+- `src/benchmarks/unified_causal_understanding.rs` contains a causal-discovery architecture organized around HDC encoding, interventional invariance, and directional integration. Treat it as an existing causal path to inspect, not proof that the whole causal workload suite or its scientific claims are validated.
+- `docs/architecture/UNIFIED_ARCHITECTURE_PROPOSAL.md` proposes a common cognitive-module protocol and workspace flow. A proposal document is not evidence that every module currently implements the proposed protocol end to end.
+
+Before implementation, map actual call sites, feature flags, typed outputs, current tests, and ownership of each subsystem. In particular, define whether an experiment is evaluating a module in isolation, one cognitive-cycle integration, or an end-to-end task; do not mix those levels in one score.
+
 ## Candidate architecture families
 
 These are complementary hypotheses, not mutually exclusive products. Initially, compare each as a separate configuration against the current baseline. Combination experiments come only after each individual contribution is measurable.
@@ -119,11 +131,15 @@ Own task semantics, cognitive-module adapters, benchmark tasks, reference implem
 
 ### Symtropy
 
-Use its physical/dynamical modelling capabilities to explore schedule, energy, thermal, latency, and embodied-constraint scenarios. Clearly label assumptions and model versions. Before treating simulation output as predictive, calibrate it against measurements and report residual error. Do not let a simulated advantage override the actual hardware benchmark.
+Symtropy's current README describes an N-dimensional Bevy physics engine with configurable metric-coupled forces/friction and energy budgets, plus embodied robotics/world-bridge work. That makes it a plausible place to test consequences of candidate controllers in physical simulations and explicit resource constraints.
+
+Do **not** assume this automatically supplies a validated model of CPU/GPU energy draw, chip thermals, cognitive scheduling latency, or neuromorphic dynamics. Those require explicit component models and calibration. Label simulations as simulations, measure residual error against physical runs where possible, and do not let a simulated advantage override an actual workload benchmark. Treat Phi-driven motor authority as one experimental control mapping, not a validated universal law.
 
 ### Mycelix
 
-Provide optional experiment provenance and collaboration coordination: immutable experiment identity, source/data permissions, contributor attribution, signed or otherwise verifiable result receipts where implemented, and reproducible links to artifacts. Mycelix's governance layer should not be in the hot path of every local cognitive operation, and a stored receipt is not itself proof that a scientific result is correct.
+A future integration could coordinate experiment identity, data permissions, contributor attribution, and result receipts. However, Mycelix's current README explicitly describes the project as pre-alpha research and warns that unit-test coverage is not equivalent to real multi-agent integration or deployment readiness. Therefore, treat this as a proposed integration contract—not an existing, qualified provenance service.
+
+For the first experiment, retain reproducibility through Git commit IDs, checksummed inputs/splits, frozen config, tool versions, and result artifacts in the repository or CI. Add a Mycelix adapter only after the specific capability and its adversarial/integration tests are identified and qualified. A stored or signed receipt helps establish provenance; it does not prove scientific correctness.
 
 Keep these responsibilities separate so that each system can be tested independently. Cross-repository integration should be introduced through versioned, narrow contracts rather than direct dependence on internal types.
 
