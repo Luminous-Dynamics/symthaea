@@ -84,7 +84,7 @@ Interpretation boundary: the deterministic token encoder is not a semantic embed
 
 A weaker exact-text-only alternative was briefly opened as [PR #7496](https://github.com/Luminous-Dynamics/symthaea/pull/7496) and then closed unmerged in favor of #7494 to avoid competing lookup APIs. The closure comment records the reason.
 
-Tests were authored but have **not** been run locally; no local Rust checkout/toolchain is available in this authoring environment. On exact head `9ba52279de4fb25dac6300b46ae4485b7bb3b240`, CI run [38778027894](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38778027894) is **pending** and PR Governance run [38778027918](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38778027918) is **queued**. Neither is a pass. The graph/manager restart-parity tests are authored regressions, not verified outcomes; real-corpus relevance calibration remains future work. This is an implementation under review, not retrieval calibration or qualification.
+Tests were authored but have **not** been run locally; no local Rust checkout/toolchain is available in this authoring environment. On exact head `9ba52279de4fb25dac6300b46ae4485b7bb3b240`, CI run [38778027894](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38778027894) and PR Governance run [38778027918](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38778027918) are both **queued**. Neither is a pass. The graph/manager restart-parity tests are authored regressions, not verified outcomes; real-corpus relevance calibration remains future work. This is an implementation under review, not retrieval calibration or qualification.
 
 ## Mycelix handoff boundary — schema-derived mapping (2026-10-15)
 
