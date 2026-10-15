@@ -126,3 +126,23 @@ Sources:
 - [FairChem OC22 source contract](https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/datasets/oc22.md)
 
 No Parquet data bytes or row-level crosswalk have been independently verified. These findings are source-audit observations only; admission state remains `not_downloaded`.
+
+
+## 9. Target-pair semantics: a ColabFit configuration is not automatically an IS2RE example
+
+The ColabFit schema defines every row in a configuration Parquet file as one structure plus its associated calculated properties. Its documented fields include structure arrays (`positions`, `atomic_numbers`, `cell`, `pbc`) and energy/force properties (`energy` in eV and `atomic_forces` in eV/Å). References: [ColabFit configuration schema](https://materials.colabfit.org/docs/configuration_schema) and [Parquet usage guide](https://materials.colabfit.org/docs/how_to_use_parquet).
+
+The official FairChem OC22 task definition states that IS2RE-Total/IS2RS LMDB records contain initial input structures and output relaxed structures/energies. A ColabFit row with one structure and its energy/forces therefore does not alone establish the official IS2RE input-target pair. The visible inclusion of some records in both IS2RE and S2EF collections does not prove which configuration is the initial input or the relaxed endpoint.
+
+Before treating ColabFit as an IS2RE dataset, require a pair-level conversion manifest with:
+- OC22 `sid` / ColabFit `lmdb-system-id` crosswalk and provenance for every source record;
+- explicit evidence selecting the initial structure and the relaxed endpoint/energy for each SID;
+- no reliance on file order, label text, modified timestamps, or hash ordering to infer trajectory position;
+- structure integrity comparisons over elements/atomic numbers, atom count/order, coordinates, cell, periodic-boundary flags and units;
+- finite target-energy validation and explicit missing/ambiguous/multiple-endpoint dispositions;
+- exact pair counts reconciled to the official train, validation-ID, validation-OOD and test membership where available;
+- deterministic sample-level validation against the pinned FairChem loader, followed by a complete independent comparison.
+
+If a unique input/endpoint pair cannot be established, retain ColabFit as a separate single-configuration energy/force collection; do not use it to claim IS2RE label efficiency. Its surfaced collection still lists train and validation sets only, so the absence of a separately identified official test partition remains a separate holdout blocker.
+
+This is a data-contract gate, not an assertion that a correct conversion is impossible. No ColabFit pair manifest has been generated and no data rows have been independently validated.
