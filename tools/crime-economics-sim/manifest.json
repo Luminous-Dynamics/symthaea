@@ -40,7 +40,7 @@
     },
     {
       "path": "tools/crime-economics-sim/README.md",
-      "git_blob_sha1": "d243743e20f2eb87347641bdc6aa41d66cdeae9f"
+      "git_blob_sha1": "85ee106ad67b4c63b45fde5309b697d256d33671"
     },
     {
       "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
@@ -518,7 +518,7 @@
       "source_class": "official_descriptive_victimization_and_reporting_statistics",
       "used_as_crime_effect_parameter": false,
       "relevance": "Latest national victimization survey release; distinguishes incident counts, affected households, and the share reporting some or all incidents to police.",
-      "limitation": "National descriptive survey estimates are not Johannesburg pilot data, a causal effect coefficient, or an individual risk signal. Incident counts, affected-household counts, and reporting proportions are distinct measures. Technical notes report an 85.57% national response rate, 76.97% in Gauteng, and four geographic areas below the cited 80% minimum-acceptable threshold; response rates are quality diagnostics, not significance tests or proof every estimate in a lower-response area is invalid. Any empirical comparison must retain survey design and weights, indicator definitions and denominators, time comparability, geographic fit, and estimate-specific standard error, confidence interval, coefficient of variation, or other precision information where available."
+      "limitation": "National descriptive survey estimates are not Johannesburg pilot data, a causal effect coefficient, or an individual risk signal. Incident counts, affected-household counts, and reporting proportions are distinct measures. Technical notes report 85.57% national response, 76.97% for Gauteng, 73.72% for the City of Johannesburg, and 67.54% for the City of Tshwane; four geographic areas were below the cited 80% minimum-acceptable response rate. Response rates are quality diagnostics, not significance tests or proof every estimate in a lower-response area is invalid. Empirical comparisons must retain survey design and weights, indicator definitions and denominators, time comparability, geographic fit, and estimate-specific uncertainty information where available."
     }
   ],
   "viability_measure_definitions": [
