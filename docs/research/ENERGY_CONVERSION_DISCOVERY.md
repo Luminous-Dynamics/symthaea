@@ -14,7 +14,7 @@ The claim being tested is not that Symthaea can ignore physical limits. The clai
 
 The work should compose existing public Symthaea capabilities rather than start a parallel monolith:
 
-- `symthaea-thermofluids`: applied heat-transfer and fluid-flow relations. Its new `cycles` module provides ideal Carnot, Brayton, Otto, and Diesel efficiency baselines with input validation and analytical reference tests.
+- `symthaea-thermofluids`: applied heat-transfer and fluid-flow relations. The `cycles` module provides ideal Carnot, Brayton, Otto, and Diesel efficiency baselines with input validation and analytical reference tests. The `energy_balance` module provides steady-state first-law closure checks and gross/net efficiency accounting with a declared relative tolerance.
 - `symthaea-materials`, `symthaea-structural`, and `symthaea-fabrication-kernel`: material/structural constraints and eventual geometry/fabrication hand-off.
 - `symthaea-circuits` and `symthaea-control-theory`: electrical conversion, instrumentation, and control models.
 - `symthaea-operations-research`: optimization techniques and constrained trade-offs.
@@ -22,6 +22,12 @@ The work should compose existing public Symthaea capabilities rather than start 
 - `symthaea-formal-safety` and `symthaea-lean-bridge`: safety cases and formal obligations where applicable.
 
 These components do not by themselves establish a high-fidelity engine-design capability. Each solver and coupling still needs to be qualified for the question it is used to answer. In particular, the generic dynamical-system integrators are not a substitute for validated combustion CFD, turbomachinery, electrochemistry, structural fatigue, or material-property solvers.
+
+### System-boundary energy accounting
+
+The new `energy_balance::EnergyBalance` API accepts four mutually exclusive steady-state power flows in watts: input, net useful output, auxiliary consumption, and rejected/other loss. It computes gross output as net useful output plus auxiliary draw, checks that gross output does not exceed input, and rejects a first-law residual that exceeds a caller-supplied relative tolerance. The tolerance must be chosen and justified before examining a candidate's score; do not relax it to make a design pass.
+
+This is intentionally a narrow accounting primitive, not an engine simulation. It assumes steady-state operation and cannot account for changing stored energy, start-up, or transient thermal inventories. Those require a dynamic energy-storage term or interval-integrated energy totals. A measured balance that fails closure is a failed data-quality gate, not a reason to tune the efficiency calculation.
 
 ## Define “better” before searching
 
@@ -82,13 +88,15 @@ This baseline is deliberately modest. It is a small trustworthy floor, not a des
 
 ### E1 — benchmark contract and known-system reproduction
 
-Before proposing a novel system, freeze at least one target mission and reproduce a known design within stated tolerances. Populate measured or authoritative baseline data with sources and compatible system boundaries. Do not mix ideal-cycle values with measured engine results in the same leaderboard.
+Before proposing a novel system, freeze at least one target mission and reproduce a known design within stated tolerances. Require the steady-state energy-balance checker to close for any steady-state data record; for transient tests, integrate total energy over a registered interval and account for energy stored or released over that interval. Populate measured or authoritative baseline data with sources and compatible system boundaries. Do not mix ideal-cycle values with measured engine results in the same leaderboard.
 
 Use negative controls: deliberately invalid ratios, unit/boundary mismatches, impossible material properties, and candidate outputs that violate constraints must be rejected. Preserve them as regression tests.
 
 ### E2 — calibrated multi-fidelity search
 
 Expose a typed design representation with explicit ranges and dependencies. Enumerate established candidate families first, then use an optimizer (grid/random or Latin-hypercube baseline, followed by Bayesian or evolutionary multi-objective search if justified). Compare search methods under equal solver budgets and the same constraints.
+
+Optimize across a registered operating envelope and mission duty cycle, not just the most favorable design point. Report both the best-point result and duty-cycle-weighted net output/efficiency, start/stop costs, constraint violations, and robustness to uncertain inputs. The 2025 supercritical-CO2 cycle design/control review specifically notes that design-point-only optimization underutilizes system potential and argues for off-design points and coupled control design. This is a general lesson for thermal systems, not evidence that one particular cycle is universally superior.
 
 The Symthaea-generated search should beat simple baselines on at least one preregistered measure—e.g., time to find a feasible candidate, hypervolume of the Pareto set, or validated improvement over the incumbent—without increasing false-feasible rates. Report failed candidates and the full experiment budget, not only winners.
 
@@ -106,7 +114,7 @@ No operational autonomy or real-world actuation should be enabled merely because
 
 A candidate cannot advance unless all relevant gates pass:
 
-- **Physics:** conservation balances close within declared solver tolerances; assumptions and domains are explicit; no over-unity claims or impossible property combinations.
+- **Physics:** steady-state conservation balances close within declared solver tolerances; transient studies account for stored-energy change; assumptions and domains are explicit; no over-unity claims or impossible property combinations.
 - **Software:** deterministic test vectors, invalid-input tests, reproducible runs, immutable artifact hashes, and pinned solver/tool versions.
 - **Model validity:** validation data is separate from optimization data; uncertainty and extrapolation are surfaced; a low-cost surrogate cannot certify itself.
 - **Comparison fairness:** identical mission and boundary, compatible units, equal accounting for auxiliaries and storage, and transparent baseline sources.
@@ -125,7 +133,7 @@ A candidate cannot advance unless all relevant gates pass:
 - U.S. Department of Energy, [Typical EV efficiency compared with conventional gasoline vehicles](https://www.energy.gov/cmei/vehicles/articles/fotw-1360-sept-16-2024-typical-ev-87-91-efficient-compared-30-conventional) (2024). Useful vehicle-level motivation; its accounting assumptions must be preserved when making comparisons.
 - NASA, [Integrated Rotating Detonation Engine System (InRoDES)](https://www.nasa.gov/integrated-rotating-detonation-engine-system-inrodes/). An example of a specialized propulsion architecture progressing through hardware tests; it does not establish superiority for road vehicles or other missions.
 - [A review on supercritical CO2 and CO2-based mixtures in power cycles](https://doi.org/10.1016/j.enconman.2024.119295), *Energy Conversion and Management* (2025). Reviews cycle configurations, components, heat-source integration, and limitations.
-- [Review of system design and operation control technology of supercritical CO2 power cycle](https://doi.org/10.1016/j.enconman.2024.119462), *Energy Conversion and Management* (2025). Emphasizes joint system-design and off-design control issues.
+- [Review of system design and operation control technology of supercritical CO2 power cycle](https://doi.org/10.1016/j.enconman.2024.119462), *Energy Conversion and Management* (2025). Emphasizes joint system-design and off-design control issues; its review notes the shortcomings of design-point-only optimization.
 - [Machine learning techniques in thermodynamic cycle system design and control for energy harvesting](https://doi.org/10.1016/j.rser.2025.115802), *Renewable and Sustainable Energy Reviews* (2025). Survey of machine-learning work on fluids, configurations, components, dynamics, and control.
 
 ## Claim discipline
