@@ -605,7 +605,7 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
 
 fn validate_parameter_claims(
     claims: &[ParameterClaim],
-    nodes_by_id: &BTreeMap<&str, &Node>,
+    nodes_by_id: &BTreeMap<String, &Node>,
 ) -> Result<()> {
     let mut seen = BTreeSet::<String>::new();
     for claim in claims {
@@ -736,11 +736,11 @@ fn safe_relative_path(value: &str) -> Result<PathBuf> {
 fn unique_index<'a, T>(
     iter: impl Iterator<Item = (&'a str, &'a T)>,
     field_name: &str,
-) -> Result<BTreeMap<&'a str, &'a T>> {
+) -> Result<BTreeMap<String, &'a T>> {
     let mut map = BTreeMap::new();
     for (id, item) in iter {
         ensure!(
-            map.insert(id, item).is_none(),
+            map.insert(id.to_owned(), item).is_none(),
             "duplicate {} '{}'",
             field_name,
             id
