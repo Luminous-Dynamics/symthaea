@@ -3,6 +3,7 @@
 **Status:** Source-level research complete; artifact admission **not yet complete**. The archive has not been downloaded, parsed, or independently checksum-verified in this workstream.  
 **Tracking:** [Symthaea #7455](https://github.com/Luminous-Dynamics/symthaea/issues/7455)  
 **Program:** [NANOMATERIALS_RESEARCH_PROGRAM.md](./NANOMATERIALS_RESEARCH_PROGRAM.md)  
+**Representation/predictor suitability gate:** [NANO-001B #7460](https://github.com/Luminous-Dynamics/symthaea/issues/7460)  
 **Prepared:** 2026-10-15
 
 ## 1. Candidate artifact record
@@ -10,6 +11,8 @@
 | Field | Current research finding | Admission requirement |
 |---|---|---|
 | Dataset/task | Open Catalyst 2022 (OC22), IS2RE-Total | Confirm the artifact's internal schema and task metadata on download |
+| Dataset paper scale | 62,331 DFT relaxations and approximately 9,854,504 single-point calculations (paper) | Do not confuse calculations/relaxations with independent candidate count; record actual row counts for this task's exact splits |
+| Related-system metadata | mapping fields documented as bulk_id, bulk_symbols, miller_index, traj_id, slab_sid, ads_symbols, nads | Check field presence/coverage and use available lineage to audit cross-split related structures; unknown fields stay unknown |
 | Target | DFT-derived relaxed total energy from initial structure | Verify units, finite values, and target semantics |
 | Upstream source documentation | [FairChem OC22 docs at commit `57c71322d5a5be0a0fcdcf05592e1699b120dc79`](https://github.com/facebookresearch/fairchem/blob/57c71322d5a5be0a0fcdcf05592e1699b120dc79/docs/catalysts/datasets/oc22.md) | Preserve immutable source reference and access date in the run manifest |
 | Direct archive | [is2res_total_train_val_test_lmdbs.tar.gz](https://dl.fbaipublicfiles.com/opencatalystproject/data/oc22/is2res_total_train_val_test_lmdbs.tar.gz) | Download to temporary research storage; do not commit or mirror |
@@ -62,6 +65,12 @@ Do not place the full local filesystem path or machine-specific secrets in a pub
 
 No benchmark accuracy or Symthaea value claim is allowed until this gate has a reviewed pass receipt. A passed data-integrity gate means the admitted artifact and its split metadata are understood; it does not mean the atomistic target is scientifically complete, the dataset is unbiased, or a learned model will generalize to physical chemistry.
 
-## 5. Why total energy is only the first pipeline target
+## 5. Lineage and split-leakage metadata
+
+The pinned FairChem OC22 documentation describes an optional mapping file whose per-system metadata can include `bulk_id`, `bulk_symbols`, `miller_index`, `traj_id`, `slab_sid`, `ads_symbols`, and `nads`. During admission, produce a field-presence and missingness report for these fields. Where present, use `traj_id`/`slab_sid` to detect related trajectory or surface records, and `bulk_id`/`miller_index`/adsorbate metadata to inspect whether nominally different system IDs share a source family across splits. This is a diagnostic, not permission to redefine the upstream official split. Any additional group holdout must be registered and reported separately. Do not assign synthetic lineage where the mapping is missing.
+
+The OC22 paper reports 62,331 DFT relaxations and approximately 9,854,504 single-point calculations. These counts describe different scientific events and do not imply that the benchmark contains 9.85 million independent candidates. The exact usable record counts must come from the admitted IS2RE-Total archive and its split metadata, not be copied from the headline paper number.
+
+## 6. Why total energy is only the first pipeline target
 
 OC22 IS2RE-Total is a tractable starting point for verifying structural inputs, labels, splits, and label-acquisition evaluation. **Raw total energies across different compositions and system sizes must not be interpreted as a direct measure of catalyst quality.** The first benchmark is total-energy prediction under fixed label budgets only. A later benchmark using an adsorption-energy or reaction-specific target must be separately preregistered before claiming the system improves catalyst ranking or discovery.
