@@ -521,7 +521,9 @@ fn report_status_tag(status: SuitInteropReportStatus) -> &'static str {
     match status {
         SuitInteropReportStatus::NoRequiredInterfacesToVerify => "no_required_interfaces_to_verify",
         SuitInteropReportStatus::RequiredInterfacesBlocked => "required_interfaces_blocked",
-        SuitInteropReportStatus::MeetsDeclaredCompatibilityPolicy => "meets_declared_compatibility_policy",
+        SuitInteropReportStatus::MeetsDeclaredCompatibilityPolicy => {
+            "meets_declared_compatibility_policy"
+        },
     }
 }
 
@@ -727,14 +729,16 @@ mod tests {
     fn revision_and_connector_mismatches_are_not_coerced() {
         let (left, mut right) = pair();
         right.endpoints[0].contract_revision = "v2".to_string();
-        let (revision_report, _) = evaluate_suit_interoperability(&left, &right, &policy()).unwrap();
+        let (revision_report, _) =
+            evaluate_suit_interoperability(&left, &right, &policy()).unwrap();
         assert!(revision_report.findings.iter().any(|finding| {
             finding.status == SuitInteropFindingStatus::ContractRevisionMismatch
         }));
 
         right.endpoints[0].contract_revision = "v1".to_string();
         right.endpoints[0].connector_profile_id = "connector-other".to_string();
-        let (connector_report, _) = evaluate_suit_interoperability(&left, &right, &policy()).unwrap();
+        let (connector_report, _) =
+            evaluate_suit_interoperability(&left, &right, &policy()).unwrap();
         assert!(connector_report.findings.iter().any(|finding| {
             finding.status == SuitInteropFindingStatus::ConnectorProfileMismatch
         }));
