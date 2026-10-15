@@ -793,8 +793,8 @@ impl KnowledgeManager {
                 })
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
-            if let Err(e) = p.save_facts(&facts) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
+            if let Err(e) = p.replace_facts_snapshot(&facts) {
+                tracing::warn!(error = %e, "Knowledge persistence: failed to replace fact snapshot");
             }
             if let Err(e) = p.save_causal_edges(&edges) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
