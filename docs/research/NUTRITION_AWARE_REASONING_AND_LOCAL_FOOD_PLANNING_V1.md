@@ -50,6 +50,14 @@ Do not silently merge unlike foods. A local cultivar, wild/underutilized food, f
 
 A source name alone is not provenance. Record its exact edition, record and permitted transformation rather than inventing a citation because a food or nutrient sounds plausible.
 
+### Johannesburg/Highveld candidate-food hypothesis (not yet a planting recommendation)
+
+The South African food-based dietary guidelines organize a healthy diet across starchy foods; vegetables and fruit; dry beans, peas, lentils and soya; poultry/fish/meat/eggs; milk/maas/yoghurt; fats/oils; and water. This suggests that a garden-only optimizer will be structurally incomplete: it should plan what can be grown locally while leaving explicit supply gaps for foods/groups that require a wider cooperative, market or fortification network. [FAO summary of South African food-based dietary guidelines](https://www.fao.org/nutrition/education/food-dietary-guidelines/regions/countries/south-africa/en/).
+
+Candidate research to evaluate for local food acceptance, growing feasibility and properly matched composition data includes morogo/amaranth leaves, pumpkin leaves, cowpea leaves, spider flower (Cleome gynandra) and wild jute (Corchorus olitorius). South African studies report nutrient measurements for traditional leafy vegetables, but the data are not interchangeable across species, sampled regions or raw/cooked states; one study of morogo also found that cooking with discarded water changed measured nutrient/bioactive amounts. These papers justify targeted data collection and local review—not a blanket nutrient claim or automatic crop recommendation. ([Schönfeldt & Pretorius, 2011, University of Pretoria repository](https://repository.up.ac.za/handle/2263/18102); [morogo cooking/drying study](https://pmc.ncbi.nlm.nih.gov/articles/PMC3982004/)).
+
+For each candidate, first verify correct edible identity, local growing window, seed access, water/soil safety, land permission, community preference and food/preparation-state match. Do not promote a plant based solely on a paper's high single-nutrient measurement. Composition data should be locally relevant and license-reviewed; where local assay/validated data are absent, expose the uncertainty and use a wider-supply option rather than overstate nutritional self-sufficiency.
+
 ## 4. Objective: seasonal, constrained and multi-objective
 
 Compare candidate portfolios across several explicit axes:
