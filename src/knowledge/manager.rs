@@ -1933,6 +1933,11 @@ mod tests {
         let description = &context.contradictions[0];
         assert!(description.contains(&first_text));
         assert!(description.contains(&second_text));
+        assert_eq!(
+            mgr.pending_alerts().count(),
+            1,
+            "building a reasoning context must not consume alerts owned by the cognitive loop"
+        );
     }
 
 }
