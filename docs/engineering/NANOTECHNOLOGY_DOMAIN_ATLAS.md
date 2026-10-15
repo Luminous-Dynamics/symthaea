@@ -143,7 +143,49 @@ Do not total these into one misleading scalar if a critical gate fails. Rights, 
 
 This is an audit shortlist, not a declaration that the datasets have already been acquired or that one candidate won a readiness score. NANO-002 is the gate for that evidence.
 
-## 6. Recommended implementation sequence
+## 6. Concrete source/solver leads from this review
+
+These checks give the follow-on-domain choice a real technical basis. They are source-level findings, not proof that the software has been installed or any experiment has run.
+
+### Lead A — Nanophotonic inverse design (strong candidate for a separate physics pilot)
+
+The official [Meep adjoint-solver documentation](https://meep.readthedocs.io/en/latest/Python_Tutorials/Adjoint_Solver/) documents gradient-based inverse design for frequency-domain quantities including S-parameters, DFT fields, local density of states and far fields. It states that a forward and an adjoint time-stepping run can compute gradients with respect to a material grid independent of the number of grid degrees of freedom; it also describes minimum feature-size constraints and multi-wavelength / multi-objective optimization examples. The worked mode-converter example reports a runtime of around 14 hours on three 2 GHz Xeon CPU cores, so this example itself is not a lightweight test.
+
+Official [Meep licensing documentation](https://meep.readthedocs.io/en/latest/License_and_Copyright/) says Meep is GPL version 2 or later. The adjoint features use Python/autograd and JAX components. Since Symthaea's production preference is Rust-first, keep Meep as a separately versioned research tool behind a clean process/JSON interface if selected; audit distribution and license implications before deciding an implementation layout.
+
+**Potential bounded task:** design a two-dimensional waveguide mode converter for a frozen wavelength range, target transmission and reflectance, and explicit minimum feature size. Compare a conventional adjoint/gradient baseline, a small-budget non-gradient or multi-start baseline, and only then a Symthaea-assisted *proposal/batch selection* policy. Symthaea should not be credited for work performed by Meep's gradients. Re-simulate final geometry independently, evaluate across wavelength and material/geometry perturbations, and report manufacturability assumptions. Begin with a smaller benchmark than the 14-hour tutorial example and measure runtime before selecting a budget.
+
+### Lead B — 2D materials / heterostructures
+
+[2DHub](https://www.2dhub.org/) currently links the Computational 2D Materials Database (C2DB), van der Waals bilayer and heterostructure databases (BiDB / HetDB), Quantum Point Defects Database (QPOD), 2D-Alloys, and an experimental 2D materials database (X2DB). It says the databases other than X2DB contain first-principles results produced with GPAW, and links GPAW and workflow tools. This is a concrete source ecosystem for 2D-material questions.
+
+**Important rights warning:** 2DHub states that *CMR databases* use CC BY-SA 4.0; that statement must not be generalized to every linked database. The chosen database's actual access terms, license, attribution, redistribution, intended-use restrictions, snapshot/date and data/structure identities must be reviewed separately. A third-party catalog or browser listing is not a locally verified dataset. Do not assume commercial use is permitted, or that calculated band properties predict fabricated-device performance.
+
+**Potential bounded task:** predict or rank one explicitly chosen property on a family-aware held-out set, or compare data-efficient selection policies; verify DFT settings, duplicated structures, family lineage and measurement-vs-calculation semantics.
+
+### Lead C — Nanoscale metrology / particle-size characterization
+
+[NIST SP 1200-22](https://doi.org/10.6028/NIST.SP.1200-22) describes challenges and approaches for particle-size analysis on micrographs of nanoparticles loaded onto textiles, including a repeatable, high-throughput methodology. This is a methodological reference rather than proof of an available machine-learning dataset.
+
+**Potential bounded task:** with a rights-cleared image set and trusted reference annotations, compare human/reference particle-size distributions with automated segmentation and uncertainty; include instrument/operator/material holdouts, calibration, ambiguous images, and a record of preprocessing. Do not treat a visually plausible segmentation as a calibrated particle-size measurement.
+
+### Cross-cutting safety evidence
+
+The [OECD's 2025 report on safe-and-sustainable-by-design tools](https://doi.org/10.1787/e411a4b7-en) reviews integrative tools for bringing safety and sustainability into early material design when information is limited. Treat that as a reason to include safety/lifecycle evidence in the candidate data contract from the start—not as a substitute for material-specific hazard assessment.
+
+Recent reviews also underscore domain-specific barriers. The 2026 overview of AI in nanotechnology spans inverse design, synthesis/process optimization, characterization, nanofluid simulation and nanomedicine, while noting interpretability and translation challenges: https://link.springer.com/article/10.1186/s44301-026-00038-4. The 2026 nanophotonic inverse-design review emphasizes translation to scalable, manufacturable devices: https://www.nature.com/articles/s41578-026-00915-5. The 2026 review of machine learning for nanoparticle drug delivery emphasizes biological barriers, formulation sensitivity and clinical translation: https://www.nature.com/articles/s44222-026-00495-7.
+
+### Current provisional shortlist
+
+| Candidate | Why it is attractive | Hard blockers to check before selecting |
+|---|---|---|
+| **Nanophotonic inverse design** | Explicit Maxwell solver, well-defined response objective, manufacturability constraints, and a meaningful comparison against adjoint optimization; can explore a new physical regime distinct from atomistic chemistry | Meep feature/license/runtime audit; frozen geometry/material/wavelength definition; fair conventional baselines; independent forward re-simulation; robustness and manufacturability |
+| **2D materials / heterostructures** | Multiple related computational and experimental data resources; clear scientific property families | Data-rights/access audit for the exact database; immutable snapshot; consistent settings and labels; family/structure leakage; calculated-to-experimental domain gap |
+| **Nanometrology / characterization** | Cross-cutting utility and a clear route to test uncertainty, data-quality and reference-standard handling | Rights-cleared images, expert reference measurements/annotations, cross-instrument splits, preprocessing and calibration contract |
+
+This is a **provisional review order**, not a computed readiness score. Select the next domain only after source bytes/terms, task semantics, solver availability and a fair baseline are actually checked.
+
+## 7. Recommended implementation sequence
 
 1. **Complete the existing infrastructure gates.** Continue the OC22 data-integrity and pair-crosswalk work; keep the MADE method benchmark separate and reproduce its baseline.
 2. **Audit three follow-on pilots against the readiness questions.** Suggested comparison: photonic inverse design, 2D-material properties, and nanoscale characterization. Identify one actual source, license, target, solver/model and baseline for each before choosing.
