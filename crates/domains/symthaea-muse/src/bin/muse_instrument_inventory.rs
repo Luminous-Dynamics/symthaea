@@ -5,7 +5,7 @@
 //!   cargo run -p symthaea-muse --bin muse_instrument_inventory -- \
 //!     --vcsl-root data/samples/vcsl \
 //!     --vsco2-root data/samples/vsco2-ce \
-//!     --soundfont /path/to/soundfont.sf2
+//!     --soundfont /path/to/soundfont.sf2 \
 //!     --fluidsynth /path/to/fluidsynth
 //!
 //! Runtime render probes are opt-in and require --soundfont. Missing optional sample roots are recorded as unavailable evidence. The
