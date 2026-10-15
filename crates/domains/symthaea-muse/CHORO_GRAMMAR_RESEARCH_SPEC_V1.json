@@ -22,7 +22,8 @@
       "pre-registered hypothesis and null model",
       "runtime implementation and deterministic behavior evidence",
       "rendering/instrument limits recorded",
-      "neighboring-style distinctness comparison before any authenticity claim"
+      "neighboring-style distinctness comparison before any authenticity claim",
+      "substantive preregistered plan with concrete hypotheses/null models and exact plan-to-authorized-source binding"
     ]
   },
   "sources": [
@@ -302,7 +303,10 @@
       "registered null parameters",
       "seeded outputs",
       "metric output digest",
-      "expert review record where applicable"
+      "expert review record where applicable",
+      "exact preregistered analysis-plan file SHA-256 and immutable registration URL",
+      "exact plan-to-manifest source binding comparison for source IDs, artifact URLs/paths/digests/bytes and selected work IDs",
+      "registered primary hypotheses, concrete null models, threshold/uncertainty rules, multiplicity policy, missing-data policy, split strategy and mandatory sensitivity analyses"
     ]
   },
   "synthetic_fixture_harness": {
