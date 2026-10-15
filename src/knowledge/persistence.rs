@@ -276,9 +276,10 @@ fn load_fact_relations(
             ));
         }
         if let Some(previous_ordinal) = previous.insert(fact_row_id, ordinal) {
-            if ordinal <= previous_ordinal {
+            if previous_ordinal.checked_add(1) != Some(ordinal) {
                 return Err(format!(
-                    "Non-increasing relation ordinal for fact row {fact_row_id}: {ordinal}"
+                    "Non-contiguous relation ordinal for fact row {fact_row_id}: expected {}, got {ordinal}",
+                    previous_ordinal.saturating_add(1)
                 ));
             }
         } else if ordinal != 0 {
@@ -460,6 +461,8 @@ impl KnowledgePersistence {
                 ],
             )
             .map_err(|e| e.to_string())?;
+            let fact_row_id = conn.last_insert_rowid();
+            insert_fact_relations(&conn, fact_row_id, &fact.relations)?;
             count += 1;
         }
 
@@ -487,6 +490,8 @@ impl KnowledgePersistence {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin fact snapshot transaction: {e}"))?;
 
+        tx.execute("DELETE FROM knowledge_fact_relations", [])
+            .map_err(|e| format!("Clear previous fact relation snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_facts", [])
             .map_err(|e| format!("Clear previous fact snapshot: {e}"))?;
 
@@ -521,6 +526,8 @@ impl KnowledgePersistence {
                 ],
             )
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
+            let fact_row_id = tx.last_insert_rowid();
+            insert_fact_relations(&tx, fact_row_id, &fact.relations)?;
             count += 1;
         }
 
@@ -636,6 +643,8 @@ impl KnowledgePersistence {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin knowledge snapshot transaction: {e}"))?;
 
+        tx.execute("DELETE FROM knowledge_fact_relations", [])
+            .map_err(|e| format!("Clear fact relation snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_facts", [])
             .map_err(|e| format!("Clear fact snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_causal_edges", [])
@@ -664,6 +673,8 @@ impl KnowledgePersistence {
                 ],
             )
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
+            let fact_row_id = tx.last_insert_rowid();
+            insert_fact_relations(&tx, fact_row_id, &fact.relations)?;
         }
 
         for (edge, cycle, strength, is_inhibitory) in &prepared_edges {
@@ -757,12 +768,12 @@ impl KnowledgePersistence {
             .prepare(
                 "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal,
                         initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count,
-                        graph_fact_id
+                        graph_fact_id, id
                  FROM knowledge_facts ORDER BY cycle DESC",
             )
             .map_err(|e| e.to_string())?;
 
-        let facts: Vec<FactRecord> = stmt
+        let mut facts_with_row_id: Vec<(i64, FactRecord)> = stmt
             .query_map([], |row| {
                 let vector_bytes: Vec<u8> = row.get(0)?;
                 validate_hypervector_bytes(&vector_bytes, 0)?;
@@ -781,24 +792,49 @@ impl KnowledgePersistence {
                 let contradiction_count =
                     decode_nonnegative_u32_counter(row.get(9)?, 9, "fact contradiction count")?;
                 let graph_fact_id = decode_optional_graph_fact_id(row.get(10)?, 10)?;
-                Ok(FactRecord {
-                    vector_bytes,
-                    source_text: row.get(1)?,
-                    confidence,
-                    domain: row.get(3)?,
-                    cycle,
-                    is_causal: row.get(5)?,
-                    graph_fact_id,
-                    initial_confidence,
-                    last_accessed_cycle,
-                    corroboration_count,
-                    contradiction_count,
-                })
+                let fact_row_id: i64 = row.get(11)?;
+                Ok((
+                    fact_row_id,
+                    FactRecord {
+                        vector_bytes,
+                        source_text: row.get(1)?,
+                        confidence,
+                        domain: row.get(3)?,
+                        cycle,
+                        is_causal: row.get(5)?,
+                        relations: Vec::new(),
+                        graph_fact_id,
+                        initial_confidence,
+                        last_accessed_cycle,
+                        corroboration_count,
+                        contradiction_count,
+                    },
+                ))
             })
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| format!("Collect: {e}"))?;
+        drop(stmt);
 
+        let mut relations_by_fact = load_fact_relations(&conn)?;
+        let fact_row_ids: std::collections::HashSet<i64> =
+            facts_with_row_id.iter().map(|(id, _)| *id).collect();
+        if let Some(orphan_id) = relations_by_fact
+            .keys()
+            .find(|id| !fact_row_ids.contains(id))
+        {
+            return Err(format!(
+                "Structured relation rows refer to missing fact row {orphan_id}"
+            ));
+        }
+        for (fact_row_id, fact) in &mut facts_with_row_id {
+            fact.relations = relations_by_fact.remove(fact_row_id).unwrap_or_default();
+        }
+
+        let facts: Vec<FactRecord> = facts_with_row_id
+            .into_iter()
+            .map(|(_, fact)| fact)
+            .collect();
         self.total_loaded += facts.len() as u64;
         Ok(facts)
     }
