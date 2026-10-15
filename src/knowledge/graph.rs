@@ -1161,6 +1161,10 @@ mod tests {
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].fact_id, complete_id);
         assert_eq!(results[0].matched_query_terms, 2);
+        assert_eq!(results[0].query_term_count, 2);
+        assert!((results[0].coverage - 1.0).abs() < f32::EPSILON);
+        assert!((results[0].mean_match_similarity - 1.0).abs() < f32::EPSILON);
+        assert!(results[0].unmatched_query_terms.is_empty());
         assert_eq!(results[0].matches.len(), 2);
         assert_eq!(results[0].matches[0].role, SemanticRole::Agent);
         assert_eq!(results[0].matches[0].query_entity_text, "United States");
@@ -1176,6 +1180,13 @@ mod tests {
             .find(|result| result.fact_id == partial_id)
             .expect("one matching Agent should retain partial relevance");
         assert_eq!(partial_result.matched_query_terms, 1);
+        assert_eq!(partial_result.query_term_count, 2);
+        assert!((partial_result.coverage - 0.5).abs() < f32::EPSILON);
+        assert!((partial_result.mean_match_similarity - 1.0).abs() < f32::EPSILON);
+        assert_eq!(
+            partial_result.unmatched_query_terms,
+            vec![(SemanticRole::Agent, "European Union".to_string())]
+        );
         assert!((partial_result.similarity - 0.5).abs() < f32::EPSILON);
         assert!((partial_result.confidence - 0.99).abs() < f32::EPSILON);
         assert!(results[0].similarity > partial_result.similarity);
@@ -1240,6 +1251,54 @@ mod tests {
         assert_eq!(organization_results.len(), 1);
         assert_eq!(organization_results[0].fact_id, organization_id);
         assert_ne!(organization_results[0].fact_id, place_id);
+    }
+
+    #[test]
+    fn test_role_observation_search_threshold_is_explicit_and_validated() {
+        use crate::knowledge::encoding::RoleBoundVector;
+
+        assert!(RoleObservationSearchConfig::new(-1.0).is_ok());
+        assert!(RoleObservationSearchConfig::new(1.0).is_ok());
+        assert!(RoleObservationSearchConfig::new(1.01).is_err());
+        assert!(RoleObservationSearchConfig::new(f32::NAN).is_err());
+
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let query = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "United States",
+            EntityType::Organization,
+        )]);
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+
+        let mut exact = make_encoding("exact typed observation", 0.8);
+        exact.role_vector_observations = query.clone();
+        let (exact_id, _) = graph.insert(exact, 1, None, false);
+
+        let mut distractor = make_encoding("unrelated same-role observation", 0.8);
+        distractor.role_vector_observations = vec![RoleBoundVector {
+            role: SemanticRole::Agent,
+            entity_text: "Canada".into(),
+            vector: BinaryHV::random(123_456),
+        }];
+        let _ = graph.insert(distractor, 2, None, false);
+
+        let permissive = graph.search_role_observations_with_config(
+            &query,
+            10,
+            3,
+            RoleObservationSearchConfig::new(-1.0).unwrap(),
+        );
+        assert_eq!(permissive.len(), 2);
+
+        let strict = graph.search_role_observations_with_config(
+            &query,
+            10,
+            4,
+            RoleObservationSearchConfig::new(1.0).unwrap(),
+        );
+        assert_eq!(strict.len(), 1);
+        assert_eq!(strict[0].fact_id, exact_id);
+        assert!((strict[0].coverage - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -1318,7 +1377,11 @@ mod tests {
         assert_eq!(after.len(), before.len());
         assert_eq!(after[0].fact_id, before[0].fact_id);
         assert_eq!(after[0].matched_query_terms, before[0].matched_query_terms);
+        assert_eq!(after[0].query_term_count, before[0].query_term_count);
+        assert_eq!(after[0].coverage, before[0].coverage);
+        assert_eq!(after[0].mean_match_similarity, before[0].mean_match_similarity);
         assert_eq!(after[0].matches, before[0].matches);
+        assert_eq!(after[0].unmatched_query_terms, before[0].unmatched_query_terms);
         assert!((after[0].similarity - before[0].similarity).abs() < f32::EPSILON);
         assert!((after[0].confidence - before[0].confidence).abs() < f32::EPSILON);
 
