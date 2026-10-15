@@ -211,6 +211,10 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         .enumerate()
         .map(|(index, name)| (name, index))
         .collect();
+    ensure!(
+        header_index.len() == headers.len(),
+        "dataset CSV contains duplicate column names"
+    );
     for required in REQUIRED_COLUMNS {
         ensure!(header_index.contains_key(*required), "dataset CSV missing column: {required}");
     }
@@ -671,6 +675,42 @@ mod tests {
                 ]
             }
         })
+    }
+
+    #[test]
+    fn rejects_embedded_credentials_in_manifest_source_url() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        value["source"]["url"] = json!("https://user:secret@example.invalid/dataset");
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let error = validate(&root, &parsed).unwrap_err().to_string();
+        assert!(error.contains("source.url must be a valid HTTPS URL"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_duplicate_csv_header_names() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        let csv_path = root.join("data/synthetic_enzyme_observations.csv");
+        let original = fs::read(&csv_path).unwrap();
+        let mut reader = csv::Reader::from_reader(original.as_slice());
+        let headers = reader.headers().unwrap().clone();
+        let mut header_fields: Vec<String> = headers.iter().map(str::to_string).collect();
+        let source_id_index = headers.iter().position(|name| name == "source_record_id").unwrap();
+        header_fields[source_id_index] = "source_record_url".to_string();
+        let mut writer = csv::Writer::from_writer(Vec::new());
+        writer.write_record(&header_fields).unwrap();
+        for row in reader.records() {
+            writer.write_record(row.unwrap().iter()).unwrap();
+        }
+        let changed = writer.into_inner().unwrap();
+        fs::write(&csv_path, &changed).unwrap();
+        value["dataset_artifact"]["sha256"] = json!(format!("{:x}", Sha256::digest(&changed)));
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let error = validate(&root, &parsed).unwrap_err().to_string();
+        assert!(error.contains("dataset CSV contains duplicate column names"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
