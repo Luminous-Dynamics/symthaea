@@ -85,20 +85,63 @@ pub struct RoleObservationMatch {
     pub similarity: f32,
 }
 
+/// Validated policy for role-observation matching.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RoleObservationSearchConfig {
+    min_cosine_similarity: f32,
+}
+
+impl RoleObservationSearchConfig {
+    /// Construct a search policy with a bipolar-cosine threshold in [-1, 1].
+    pub fn new(min_cosine_similarity: f32) -> Result<Self, String> {
+        if !min_cosine_similarity.is_finite()
+            || !(-1.0..=1.0).contains(&min_cosine_similarity)
+        {
+            return Err(format!(
+                "Role-observation cosine threshold must be finite and in [-1, 1], got {min_cosine_similarity}"
+            ));
+        }
+        Ok(Self { min_cosine_similarity })
+    }
+
+    /// Return the minimum bipolar-cosine similarity required for a candidate match.
+    pub fn min_cosine_similarity(&self) -> f32 {
+        self.min_cosine_similarity
+    }
+}
+
+impl Default for RoleObservationSearchConfig {
+    fn default() -> Self {
+        Self {
+            min_cosine_similarity: 0.1,
+        }
+    }
+}
+
 /// Result from matching typed role queries against all stored role observations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RoleAwareSearchResult {
     /// Stable graph fact identifier.
     pub fact_id: FactId,
-    /// Mean matched cosine similarity, with unmatched query terms contributing zero.
-    /// This is a retrieval score, not calibrated epistemic confidence.
+    /// Coverage-penalized mean matched cosine similarity.
+    ///
+    /// This equals coverage multiplied by mean_match_similarity. It is a retrieval
+    /// score, not calibrated epistemic confidence.
     pub similarity: f32,
     /// Current stored fact confidence, returned separately from retrieval similarity.
     pub confidence: f32,
     /// Number of query terms assigned a distinct stored observation.
     pub matched_query_terms: usize,
+    /// Number of distinct query terms submitted.
+    pub query_term_count: usize,
+    /// Fraction of query terms assigned a distinct stored observation, in [0, 1].
+    pub coverage: f32,
+    /// Mean cosine among matched pairs only; this is absent when no result is returned.
+    pub mean_match_similarity: f32,
     /// One-to-one match evidence, ordered by query term index.
     pub matches: Vec<RoleObservationMatch>,
+    /// Query role/entity pairs that did not match, in query order.
+    pub unmatched_query_terms: Vec<(SemanticRole, String)>,
 }
 
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
@@ -302,11 +345,28 @@ impl EnhancedKnowledgeGraph {
         k: usize,
         current_cycle: u64,
     ) -> Vec<RoleAwareSearchResult> {
+        self.search_role_observations_with_config(
+            query,
+            k,
+            current_cycle,
+            RoleObservationSearchConfig::default(),
+        )
+    }
+
+    /// Search with an explicit, validated cosine policy so threshold sweeps can
+    /// be evaluated without changing code or silently calibrating the default.
+    pub fn search_role_observations_with_config(
+        &mut self,
+        query: &[RoleBoundVector],
+        k: usize,
+        current_cycle: u64,
+        config: RoleObservationSearchConfig,
+    ) -> Vec<RoleAwareSearchResult> {
         if query.is_empty() || k == 0 {
             return Vec::new();
         }
 
-        const MIN_ROLE_MATCH_COSINE: f32 = 0.1;
+        let min_role_match_cosine = config.min_cosine_similarity();
         let mut results = Vec::new();
 
         for fact in self.facts.values() {
@@ -322,7 +382,7 @@ impl EnhancedKnowledgeGraph {
                         continue;
                     }
                     let similarity = query_term.vector.cosine_similarity(&observation.vector);
-                    if similarity >= MIN_ROLE_MATCH_COSINE {
+                    if similarity >= min_role_match_cosine {
                         candidates_by_query[query_index].push((observation_index, similarity));
                     }
                 }
@@ -349,6 +409,7 @@ impl EnhancedKnowledgeGraph {
             assignments.sort_unstable_by_key(|(query_index, _)| *query_index);
 
             let mut matches = Vec::with_capacity(assignments.len());
+            let mut query_matched = vec![false; query.len()];
             let mut total_similarity = 0.0f32;
             for (query_index, observation_index) in assignments {
                 if let Some((_, similarity)) = candidates_by_query[query_index]
@@ -356,6 +417,7 @@ impl EnhancedKnowledgeGraph {
                     .find(|(candidate_index, _)| *candidate_index == observation_index)
                 {
                     let observation = &observations[observation_index];
+                    query_matched[query_index] = true;
                     total_similarity += *similarity;
                     matches.push(RoleObservationMatch {
                         role: query[query_index].role,
@@ -368,12 +430,31 @@ impl EnhancedKnowledgeGraph {
 
             let matched_query_terms = matches.len();
             if matched_query_terms > 0 {
+                let query_term_count = query.len();
+                let coverage = matched_query_terms as f32 / query_term_count as f32;
+                let mean_match_similarity = total_similarity / matched_query_terms as f32;
+                let unmatched_query_terms = query
+                    .iter()
+                    .zip(query_matched.iter())
+                    .filter_map(|(term, matched)| {
+                        if *matched {
+                            None
+                        } else {
+                            Some((term.role, term.entity_text.clone()))
+                        }
+                    })
+                    .collect();
+
                 results.push(RoleAwareSearchResult {
                     fact_id: fact.id,
-                    similarity: total_similarity / query.len() as f32,
+                    similarity: total_similarity / query_term_count as f32,
                     confidence: fact.confidence,
                     matched_query_terms,
+                    query_term_count,
+                    coverage,
+                    mean_match_similarity,
                     matches,
+                    unmatched_query_terms,
                 });
             }
         }
