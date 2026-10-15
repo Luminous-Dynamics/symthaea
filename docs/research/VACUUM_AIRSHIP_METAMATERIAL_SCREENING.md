@@ -290,6 +290,22 @@ The resulting MassBudgetStatus is one of:
 
 This status only describes the mass equation. RobustlyNonNegative does **not** mean structurally feasible. The inputs must cite the actual origin and applicability of their bounds before results should be used for engineering decisions. The current interval holds radius fixed; radius tolerance, geometry variation, covariance between parameters, manufacturing variability, and operating-condition changes need separate treatment rather than silently assuming they are covered.
 
+### Bound pressure demand and declared capacity separately
+
+The Rust screen now exposes `assess_external_pressure_bounds`. It accepts explicit lower/upper bounds for exterior and interior absolute pressures, plus an optional declared allowable-capacity interval and evidence identifiers. It first propagates the pressure bounds into a positive external-differential demand interval:
+
+```text
+signed Δp ∈ [p_external,min − p_internal,max,
+             p_external,max − p_internal,min]
+demand = max(signed Δp, 0)
+```
+
+If every possible case has no positive external differential, it reports `NoExternalPressureDemand`. If demand can be positive but no capacity is declared, capacity remains unknown. If capacity metadata is incomplete, comparison is blocked. Otherwise, the result distinguishes three arithmetic relationships: the minimum declared capacity covers the maximum declared demand; the intervals overlap; or even the maximum declared capacity is below the minimum positive demand.
+
+For example, a hypothetical demand bound of 98–102 kPa and a hypothetical declared allowable-capacity bound of 105–120 kPa yields `DeclaredCapacityCoversDemandBounds`. That means only the *declared endpoint intervals* are ordered. It does not mean the evidence is genuine, the capacity is qualified for the exact design, or the shell is safe. The code cannot authenticate the referenced solver/test records, inspect their scopes, verify independence, establish imperfection coverage, or account for damage and dynamic effects.
+
+Use demand bounds tied to an explicit operating envelope (altitude, weather, internal pressure and transients) and capacity bounds from geometry-specific, independently reviewed nonlinear analysis and relevant physical tests. A linear eigenvalue or perfect-geometry result must not be presented as a qualified allowable without an applicable and justified methodology.
+
 ### Expand geometry search beyond a smooth sphere—but keep the loads honest
 
 Compare the spherical reference against at least two distinct families:
@@ -299,7 +315,7 @@ Compare the spherical reference against at least two distinct families:
 3. **Lattice-core sandwich shells.** Track facesheet wrinkling, core shear/crush, debonding, and global shell instability as separate failure modes.
 4. **Conventional pressure-capable buoyant baseline.** Compare a helium envelope or another validated buoyant architecture using the same cargo, range, reserve, and operating constraints. This baseline prevents the vacuum concept from benefiting from asymmetric assumptions.
 
-An important research lead is Ning and Pellegrino's study of externally pressurized geodesic and stellated shells, which reports reduced imperfection sensitivity for some examined configurations: [DOI 10.1016/j.jmps.2018.06.008](https://doi.org/10.1016/j.jmps.2018.06.008). That supports studying geometry as a design variable, not transferring its result to an untested airship. Likewise, NASA's shell-buckling work emphasizes that geometric/loading imperfections can materially reduce capacity and that knockdown recommendations are geometry- and scope-specific: [NASA NTRS 2016 study of composite sandwich shell buckling](https://ntrs.nasa.gov/citations/20160012029).
+An important research lead is Ning and Pellegrino's study of externally pressurized geodesic and stellated shells, which reports reduced imperfection sensitivity for some examined configurations: [DOI 10.1016/j.jmps.2018.06.008](https://doi.org/10.1016/j.jmps.2018.06.008). The paper's reported gains are specific to its idealized configurations and analysis assumptions; treat them as a geometry-screening hypothesis, not a transferable knockdown factor or certified design value. That supports studying geometry as a design variable, not transferring its result to an untested airship. Likewise, NASA's shell-buckling work emphasizes that geometric/loading imperfections can materially reduce capacity and that knockdown recommendations are geometry- and scope-specific: [NASA NTRS 2016 study of composite sandwich shell buckling](https://ntrs.nasa.gov/citations/20160012029).
 
 ### The next evidence gate
 
