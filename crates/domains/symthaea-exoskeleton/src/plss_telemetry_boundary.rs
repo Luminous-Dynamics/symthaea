@@ -51,8 +51,11 @@ pub enum PlssBoundaryProjectionStatus {
     AlreadyBeyondBoundary,
     /// The boundary intersects the current value-uncertainty envelope.
     BoundaryWithinCurrentUncertainty,
-    /// The entire rate envelope does not point toward the selected boundary.
+    /// The complete rate envelope points away from the selected boundary.
     MovingAway,
+    /// No admissible endpoint rate points toward the selected boundary, but the
+    /// interval includes a flat (zero) rate.
+    NotApproaching,
     /// Some admissible endpoint rates point toward the boundary while others do not.
     DirectionUncertain,
     /// Upstream trend evidence is not Fresh or required numeric fields are absent.
@@ -354,6 +357,8 @@ fn project_one(
         || !rate_lower.is_finite()
         || !rate_upper.is_finite()
         || rate_lower > rate_upper
+        || rate < rate_lower
+        || rate > rate_upper
     {
         projection.status = PlssBoundaryProjectionStatus::InsufficientEvidence;
         return projection;
@@ -387,8 +392,12 @@ fn project_one(
         return projection;
     }
 
-    if oriented_rate_upper <= 0.0 {
+    if oriented_rate_upper < 0.0 {
         projection.status = PlssBoundaryProjectionStatus::MovingAway;
+        return projection;
+    }
+    if oriented_rate_upper == 0.0 {
+        projection.status = PlssBoundaryProjectionStatus::NotApproaching;
         return projection;
     }
 
@@ -593,6 +602,7 @@ fn projection_status_tag(status: PlssBoundaryProjectionStatus) -> &'static str {
             "boundary_within_current_uncertainty"
         },
         PlssBoundaryProjectionStatus::MovingAway => "moving_away",
+        PlssBoundaryProjectionStatus::NotApproaching => "not_approaching",
         PlssBoundaryProjectionStatus::DirectionUncertain => "direction_uncertain",
         PlssBoundaryProjectionStatus::InsufficientEvidence => "insufficient_evidence",
         PlssBoundaryProjectionStatus::Conflicted => "conflicted",
@@ -722,6 +732,22 @@ mod tests {
             obs(400.0, 60.0, "sensor-a"),
         ], boundary(PlssBoundaryDirection::Lower, 100.0, 60.0));
         assert_eq!(p.status, PlssBoundaryProjectionStatus::MovingAway);
+        assert_eq!(p.earliest_candidate_crossing_after_last_sample_s, None);
+    }
+
+    #[test]
+    fn flat_rate_envelope_is_not_mislabelled_as_moving_away() {
+        let mut flat = obs(300.0, 0.0, "sensor-a");
+        flat.uncertainty_abs = 0.0;
+        let mut middle = obs(300.0, 30.0, "sensor-a");
+        middle.uncertainty_abs = 0.0;
+        let mut last = obs(300.0, 60.0, "sensor-a");
+        last.uncertainty_abs = 0.0;
+        let p = project(
+            &[flat, middle, last],
+            boundary(PlssBoundaryDirection::Upper, 500.0, 60.0),
+        );
+        assert_eq!(p.status, PlssBoundaryProjectionStatus::NotApproaching);
         assert_eq!(p.earliest_candidate_crossing_after_last_sample_s, None);
     }
 
