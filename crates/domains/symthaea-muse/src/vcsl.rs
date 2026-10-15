@@ -1032,10 +1032,12 @@ fn probe_midi_bytes(program: u8, note: u8, velocity: u8) -> Vec<u8> {
     // SMF format 0, one track, 480 PPQN at the MIDI default tempo (120 BPM).
     // Program change + one half-second note + half-second release tail.
     let track = [
-        0x00, 0xC0, program,       // bank-0 program change, channel 0
-        0x00, 0x90, note, velocity, // note on, channel 0
-        0x83, 0x60, 0x80, note, 0x00, // delta 480, note off
-        0x83, 0x60, 0xFF, 0x2F, 0x00, // delta 480, end of track
+        0x00, 0xB0, 0x00, 0x00,       // bank-select MSB = 0, channel 0
+        0x00, 0xB0, 0x20, 0x00,       // bank-select LSB = 0, channel 0
+        0x00, 0xC0, program,          // bank-0 program change, channel 0
+        0x00, 0x90, note, velocity,    // note on, channel 0
+        0x83, 0x60, 0x80, note, 0x00,  // delta 480, note off
+        0x83, 0x60, 0xFF, 0x2F, 0x00,  // delta 480, end of track
     ];
     let mut midi = Vec::with_capacity(14 + 8 + track.len());
     midi.extend_from_slice(b"MThd");
@@ -1869,10 +1871,12 @@ mod tests {
         assert_eq!(u16::from_be_bytes(midi[10..12].try_into().unwrap()), 1);
         assert_eq!(u16::from_be_bytes(midi[12..14].try_into().unwrap()), 480);
         assert_eq!(&midi[14..18], b"MTrk");
-        assert_eq!(u32::from_be_bytes(midi[18..22].try_into().unwrap()), 17);
-        assert_eq!(midi[24], 40, "program change event uses requested GM program");
-        assert_eq!(midi[27], 60, "probe note is middle C");
-        assert_eq!(midi[28], 96, "probe velocity is fixed");
+        assert_eq!(u32::from_be_bytes(midi[18..22].try_into().unwrap()), 25);
+        assert_eq!(&midi[23..26], &[0xB0, 0x00, 0x00], "bank MSB is zero");
+        assert_eq!(&midi[27..30], &[0xB0, 0x20, 0x00], "bank LSB is zero");
+        assert_eq!(midi[32], 40, "program change event uses requested GM program");
+        assert_eq!(midi[35], 60, "probe note is middle C");
+        assert_eq!(midi[36], 96, "probe velocity is fixed");
         assert_eq!(&midi[midi.len() - 3..], &[0xFF, 0x2F, 0x00]);
     }
 
