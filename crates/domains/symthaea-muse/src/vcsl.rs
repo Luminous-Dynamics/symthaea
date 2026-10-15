@@ -86,6 +86,131 @@ enum SampleSource {
     Vsco2,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct SampleStyleMapping {
+    style_name: &'static str,
+    style_kind: &'static str,
+    source: SampleSource,
+    relative_directory: &'static str,
+}
+
+/// Explicitly verified alternate sound/articulation folders. These are catalogued
+/// separately from each instrument's default sustain and short-articulation bank;
+/// inventory evidence does not imply that the renderer selects them automatically.
+fn additional_sample_style_mappings(instrument: Instrument) -> &'static [SampleStyleMapping] {
+    use SampleSource::{Vcsl, Vsco2};
+
+    const NO_STYLES: &[SampleStyleMapping] = &[];
+    const PIANO_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Kawai grand piano",
+            style_kind: "alternate_instrument_model",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Grand Piano, Kawai/Sustains",
+        },
+        SampleStyleMapping {
+            style_name: "Knight upright piano",
+            style_kind: "alternate_instrument_model",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Upright Piano, Knight/Sustains",
+        },
+    ];
+    const HARP_STYLES: &[SampleStyleMapping] = &[SampleStyleMapping {
+        style_name: "Folk harp",
+        style_kind: "alternate_instrument_model",
+        source: Vcsl,
+        relative_directory: "Chordophones/Composite Chordophones/Folk Harp",
+    }];
+    const HARPSICHORD_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "English lute disposition",
+            style_kind: "alternate_stringing",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Harpsichord, English/Sustains/Lute",
+        },
+        SampleStyleMapping {
+            style_name: "French harpsichord",
+            style_kind: "alternate_instrument_model",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Harpsichord, French/Sustains",
+        },
+        SampleStyleMapping {
+            style_name: "Italian stop 1",
+            style_kind: "alternate_stop",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1",
+        },
+        SampleStyleMapping {
+            style_name: "Flemish low register",
+            style_kind: "register_variant",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low",
+        },
+        SampleStyleMapping {
+            style_name: "Flemish high register",
+            style_kind: "register_variant",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Harpsichord, Flemish/Sustains/High",
+        },
+        SampleStyleMapping {
+            style_name: "Unclassified harpsichord",
+            style_kind: "alternate_instrument_model",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Harpsichord, Unk/Sustains",
+        },
+    ];
+    const XYLOPHONE_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Medium mallets",
+            style_kind: "mallet_hardness",
+            source: Vcsl,
+            relative_directory: "Idiophones/Struck Idiophones/Xylophone/Medium Mallets",
+        },
+        SampleStyleMapping {
+            style_name: "Soft mallets",
+            style_kind: "mallet_hardness",
+            source: Vcsl,
+            relative_directory: "Idiophones/Struck Idiophones/Xylophone/Soft Mallets",
+        },
+    ];
+    const UPRIGHT_BASS_STYLES: &[SampleStyleMapping] = &[
+        SampleStyleMapping {
+            style_name: "Vibrato sustain",
+            style_kind: "sustain_with_vibrato",
+            source: Vsco2,
+            relative_directory: "Strings/Solo Contrabass/SusVib",
+        },
+        SampleStyleMapping {
+            style_name: "Pizzicato",
+            style_kind: "pizzicato",
+            source: Vsco2,
+            relative_directory: "Strings/Solo Contrabass/Pizz",
+        },
+        SampleStyleMapping {
+            style_name: "Tremolo",
+            style_kind: "tremolo",
+            source: Vsco2,
+            relative_directory: "Strings/Solo Contrabass/Trem",
+        },
+    ];
+    const TROMBONE_STYLES: &[SampleStyleMapping] = &[SampleStyleMapping {
+        style_name: "Tenor trombone vibrato",
+        style_kind: "vibrato",
+        source: Vsco2,
+        relative_directory: "Brass/Tenor Trombone/vib",
+    }];
+
+    match instrument {
+        Instrument::Piano | Instrument::PianoPP => PIANO_STYLES,
+        Instrument::Harp => HARP_STYLES,
+        Instrument::Harpsichord => HARPSICHORD_STYLES,
+        Instrument::Xylophone => XYLOPHONE_STYLES,
+        Instrument::UprightBass => UPRIGHT_BASS_STYLES,
+        Instrument::Trombone => TROMBONE_STYLES,
+        _ => NO_STYLES,
+    }
+}
+
 /// Relative subdirectory (within its library's root) providing samples for
 /// a muse instrument, or `None` when neither library has an honest
 /// equivalent. Sustained/vibrato articulations are chosen to match how the
@@ -738,11 +863,22 @@ pub struct InstrumentCapabilityV1 {
     pub procedural_renderer_path: &'static str,
     pub sustained_samples: Option<SampleDirectoryEvidenceV1>,
     pub short_articulation_samples: Option<SampleDirectoryEvidenceV1>,
+    /// Explicitly verified alternate sample/style folders. These are observed
+    /// independently from the default banks; not all are runtime-selectable yet.
+    pub additional_sample_styles: Vec<SampleStyleVariantEvidenceV1>,
     /// Names declared by an optional SoundFont at bank 0 and this instrument's
     /// selected GM program. None means no SoundFont was supplied; Some(empty)
     /// means the inspected header table had no exact bank/program match.
     /// A match is still not evidence that the preset will render successfully.
     pub soundfont_bank0_program_matches: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SampleStyleVariantEvidenceV1 {
+    pub style_name: &'static str,
+    /// Source-folder interpretation only; never a timbral or quality score.
+    pub style_kind: &'static str,
+    pub evidence: SampleDirectoryEvidenceV1,
 }
 
 /// Build a deterministic capability snapshot from the current source mappings
@@ -859,6 +995,24 @@ pub fn capability_inventory_with_options(
             hash_indexed_samples,
             &mut sample_directory_cache,
         )?;
+        let additional_sample_styles = additional_sample_style_mappings(instrument)
+            .iter()
+            .map(|style| {
+                let evidence = sample_directory_evidence_cached_for_mapping(
+                    style.source,
+                    style.relative_directory,
+                    vcsl_root,
+                    vsco2_root,
+                    hash_indexed_samples,
+                    &mut sample_directory_cache,
+                )?;
+                Ok(SampleStyleVariantEvidenceV1 {
+                    style_name: style.style_name,
+                    style_kind: style.style_kind,
+                    evidence,
+                })
+            })
+            .collect::<std::io::Result<Vec<_>>>()?;
         let soundfont_bank0_program_matches = soundfont.as_ref().map(|evidence| {
             evidence
                 .preset_inventory
@@ -876,6 +1030,7 @@ pub fn capability_inventory_with_options(
             procedural_renderer_path: procedural_renderer_path(instrument),
             sustained_samples,
             short_articulation_samples,
+            additional_sample_styles,
             soundfont_bank0_program_matches,
         });
     }
