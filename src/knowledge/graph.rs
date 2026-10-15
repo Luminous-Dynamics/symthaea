@@ -515,8 +515,11 @@ impl EnhancedKnowledgeGraph {
     // ── Persistence Support ─────────────────────────────────────────────
 
     /// Import a fact from a persistence record.
+    ///
+    /// Preserves its graph-level ID when present. Legacy records without an ID
+    /// receive a fresh ID that does not collide with facts already imported.
     pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
-        if record.vector_bytes.len() != 2048 {
+        if record.vector_bytes.len() != symthaea_core::hdc::unified_hv::BinaryHV::BYTES {
             return;
         }
         let mut arr = [0u8; 2048];
@@ -527,8 +530,20 @@ impl EnhancedKnowledgeGraph {
             source_text: record.source_text.clone(),
             confidence: record.confidence,
         };
-        let id: FactId = self.next_id;
-        self.next_id += 1;
+
+        let id = match record.graph_fact_id {
+            Some(id) if id > 0 && !self.facts.contains_key(&id) => id,
+            _ => {
+                while self.facts.contains_key(&self.next_id) {
+                    self.next_id = self.next_id.saturating_add(1);
+                }
+                let id = self.next_id;
+                self.next_id = self.next_id.saturating_add(1);
+                id
+            }
+        };
+        self.next_id = self.next_id.max(id.saturating_add(1));
+
         let fact = TemporalFact {
             id,
             encoding,
@@ -550,6 +565,22 @@ impl EnhancedKnowledgeGraph {
         self.facts.insert(id, fact);
     }
 
+    /// Import a batch without allowing legacy rows to occupy IDs that belong to
+    /// newer records carrying stable graph IDs.
+    ///
+    /// Records with explicit IDs are imported first; rows from pre-ID schemas
+    /// then receive IDs above the highest restored stable ID.
+    pub fn import_fact_records(&mut self, records: &[super::persistence::FactRecord]) -> usize {
+        let before = self.facts.len();
+        for record in records.iter().filter(|record| record.graph_fact_id.is_some()) {
+            self.import_fact_record(record);
+        }
+        for record in records.iter().filter(|record| record.graph_fact_id.is_none()) {
+            self.import_fact_record(record);
+        }
+        self.facts.len().saturating_sub(before)
+    }
+
     /// Export all facts as persistence records.
     pub fn export_fact_records(&self) -> Vec<super::persistence::FactRecord> {
         self.facts
@@ -561,6 +592,7 @@ impl EnhancedKnowledgeGraph {
                 domain: f.domain.clone(),
                 cycle: f.inserted_at_cycle,
                 is_causal: f.has_causal_relations,
+                graph_fact_id: Some(f.id),
                 initial_confidence: Some(f.initial_confidence),
                 last_accessed_cycle: Some(f.last_accessed_cycle),
                 corroboration_count: f.corroboration_count,
