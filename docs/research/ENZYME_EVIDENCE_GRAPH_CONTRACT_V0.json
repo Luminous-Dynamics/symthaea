@@ -233,7 +233,7 @@
     "Finalize and enforce a JSON Schema for the instance layout.",
     "Semantic-unit checks and parameter meaning using the selected EnzymeML version rather than a duplicate ontology.",
     "Chemical reaction-balance checks where appropriate; this must be a separate domain-aware validator.",
-    "Rights/attribution review and permitted-use enforcement, with human review where needed.",
+    "Human review and evidence for source-specific rights/attribution decisions; software status labels do not establish legal clearance.",
     "A separately implemented computational replay verifier that compares every required pipeline-stage output within preregistered tolerances.",
     "Independent checks of uncertainty calibration, parameter identifiability, model ambiguity, denominator accounting, and negative controls.",
     "Prospective experimental-decision utility and generalization under study, sequence-family, laboratory/protocol, and assay-context holdouts."
@@ -296,6 +296,7 @@
     "Transformation input/output node and artifact reference closure, explicit dependency edges, and verified artifacts for successful transformations.",
     "Explicit terminal reason for non-success transformations; null_result cannot claim outputs.",
     "Parameter-claim uncertainty-status vocabulary and source/fit-node reference checks.",
-    "External exact-byte SHA-256 pin requirement for frozen graph inputs."
+    "External exact-byte SHA-256 pin requirement for frozen graph inputs.",
+    "Successful transformations may use and publish only artifacts whose linked rights record declares approved_for_this_use; this is enforcement of a recorded status, not legal adjudication."
   ]
 }
