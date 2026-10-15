@@ -445,9 +445,12 @@ impl SqliteMemory {
                 .query_map(params![band as i64, hash], |row| row.get::<_, String>(0))
                 .map_err(|e| DatabaseError::QueryFailed(format!("LSH query failed: {e}")))?;
 
-            for id in rows.flatten() {
-                candidates.insert(id);
-            }
+            let ids: Vec<String> = rows
+                .collect::<Result<_, _>>()
+                .map_err(|e| {
+                    DatabaseError::QueryFailed(format!("LSH candidate row decode failed: {e}"))
+                })?;
+            candidates.extend(ids);
         }
 
         Ok(candidates.into_iter().collect())
@@ -637,22 +640,44 @@ impl SqliteMemory {
 
     /// Synchronously load the top `limit` episodic memories sorted by Phi (descending).
     ///
-    /// Used by the cognitive loop's memory rehydration path, which runs outside
-    /// an async context. Returns an empty Vec on any error rather than propagating.
+    /// This compatibility API preserves the historical return type. Prefer
+    /// [`try_load_top_by_psi_sync`](Self::try_load_top_by_psi_sync) when a failed
+    /// rehydration must be distinguishable from a database containing no memories.
     pub fn load_top_by_psi_sync(&self, limit: usize) -> Vec<MemoryRecord> {
+        match self.try_load_top_by_psi_sync(limit) {
+            Ok(records) => records,
+            Err(error) => {
+                tracing::error!(
+                    error = %error,
+                    "SQLite memory rehydration failed; legacy API is returning an empty vector"
+                );
+                Vec::new()
+            }
+        }
+    }
+
+    /// Fallible synchronous memory rehydration.
+    ///
+    /// Query, row-decoding, and record-validation failures are returned to the
+    /// caller; they are not represented as an empty memory set.
+    pub fn try_load_top_by_psi_sync(&self, limit: usize) -> DbResult<Vec<MemoryRecord>> {
         let conn = self.conn.lock_resilient("sqlite_rehydrate");
-        let mut stmt = match conn.prepare(
-            "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
-             FROM memories WHERE memory_type = 'episodic' ORDER BY phi DESC LIMIT ?1"
-        ) {
-            Ok(s) => s,
-            Err(_) => return Vec::new(),
-        };
-        let rows = match stmt.query_map([limit as i64], Self::row_to_record) {
-            Ok(r) => r,
-            Err(_) => return Vec::new(),
-        };
-        rows.filter_map(|r| r.ok()).collect()
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
+                 FROM memories WHERE memory_type = 'episodic' ORDER BY phi DESC LIMIT ?1"
+            )
+            .map_err(|e| {
+                DatabaseError::QueryFailed(format!("Memory rehydration prepare failed: {e}"))
+            })?;
+        let rows = stmt
+            .query_map([limit as i64], Self::row_to_record)
+            .map_err(|e| {
+                DatabaseError::QueryFailed(format!("Memory rehydration query failed: {e}"))
+            })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| {
+            DatabaseError::QueryFailed(format!("Memory rehydration row decode failed: {e}"))
+        })
     }
 }
 
@@ -811,13 +836,16 @@ impl ConsciousnessDatabase for SqliteMemory {
                 DatabaseError::QueryFailed(format!("Filtered search prepare failed: {e}"))
             })?;
 
-            let records: Vec<MemoryRecord> = stmt
+            let rows = stmt
                 .query_map([], Self::row_to_record)
                 .map_err(|e| {
                     DatabaseError::QueryFailed(format!("Filtered search query failed: {e}"))
-                })?
-                .filter_map(|r| r.ok())
-                .collect();
+                })?;
+            let records: Vec<MemoryRecord> = rows
+                .collect::<Result<_, _>>()
+                .map_err(|e| {
+                    DatabaseError::QueryFailed(format!("Filtered search row decode failed: {e}"))
+                })?;
 
             let mut results: Vec<SearchResult> = records
                 .into_iter()
@@ -922,8 +950,8 @@ impl ConsciousnessDatabase for SqliteMemory {
 
             let rows = stmt.query_map([], Self::row_to_record)
                 .map_err(|e| DatabaseError::QueryFailed(format!("list_all query failed: {e}")))?;
-
-            Ok(rows.filter_map(|r| r.ok()).collect())
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|e| DatabaseError::QueryFailed(format!("list_all row decode failed: {e}")))
         })
         .await
     }
@@ -986,15 +1014,18 @@ impl ConsciousnessDatabase for SqliteMemory {
                 "SELECT memory_type, COUNT(*) as cnt FROM memories GROUP BY memory_type ORDER BY cnt DESC"
             ).map_err(|e| DatabaseError::QueryFailed(format!("Type counts query failed: {e}")))?;
 
-            let memory_type_counts: Vec<(String, usize)> = type_counts_stmt
+            let type_count_rows = type_counts_stmt
                 .query_map([], |row| {
                     let mt: String = row.get(0)?;
                     let cnt: i64 = row.get(1)?;
                     Ok((mt, cnt as usize))
                 })
-                .map_err(|e| DatabaseError::QueryFailed(format!("Type counts failed: {e}")))?
-                .filter_map(|r| r.ok())
-                .collect();
+                .map_err(|e| DatabaseError::QueryFailed(format!("Type counts failed: {e}")))?;
+            let memory_type_counts: Vec<(String, usize)> = type_count_rows
+                .collect::<Result<_, _>>()
+                .map_err(|e| {
+                    DatabaseError::QueryFailed(format!("Type counts row decode failed: {e}"))
+                })?;
 
             // Get average psi (stored in DB column `phi` for schema compatibility)
             let avg_psi: f64 = conn.query_row(
@@ -1175,6 +1206,114 @@ impl ConsciousnessDatabase for SqliteMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn corrupt_phi(db: &SqliteMemory, id: &str) {
+        let conn = db.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE memories SET phi = ?1 WHERE id = ?2",
+            params!["not-a-number", id],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_try_load_top_by_psi_sync_propagates_row_decode_errors() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let record = make_record("rehydration-corrupt", 42, MemoryType::Episodic);
+        db.store_batch_sync(std::slice::from_ref(&record)).unwrap();
+        corrupt_phi(&db, &record.id);
+
+        let error = db.try_load_top_by_psi_sync(10).unwrap_err();
+        assert!(
+            error.to_string().contains("row decode"),
+            "unexpected error context: {error}"
+        );
+        // The compatibility API keeps its Vec return type, but must emit an
+        // explicit diagnostic rather than silently treating the DB as empty.
+        assert!(db.load_top_by_psi_sync(10).is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_filtered_search_propagates_row_decode_errors() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let record = make_record("filtered-corrupt", 43, MemoryType::Episodic);
+        db.store_batch_sync(std::slice::from_ref(&record)).unwrap();
+        corrupt_phi(&db, &record.id);
+
+        let error = db
+            .search_similar_filtered(&BinaryHV::random(43), 10, Some("phi > 0.1"))
+            .await
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("row decode"),
+            "unexpected error context: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_list_all_propagates_row_decode_errors() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let record = make_record("list-corrupt", 44, MemoryType::Semantic);
+        db.store_batch_sync(std::slice::from_ref(&record)).unwrap();
+        corrupt_phi(&db, &record.id);
+
+        let error = db.list_all().await.unwrap_err();
+        assert!(
+            error.to_string().contains("row decode"),
+            "unexpected error context: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stats_propagates_memory_type_decode_errors() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let record = make_record("stats-corrupt", 45, MemoryType::Episodic);
+        db.store_batch_sync(std::slice::from_ref(&record)).unwrap();
+        {
+            let conn = db.conn.lock().unwrap();
+            conn.execute(
+                "UPDATE memories SET memory_type = ?1 WHERE id = ?2",
+                params![vec![0xFF_u8], record.id],
+            )
+            .unwrap();
+        }
+
+        let error = db.stats().await.unwrap_err();
+        assert!(
+            error.to_string().contains("Type counts row decode failed"),
+            "unexpected error context: {error}"
+        );
+    }
+
+    #[test]
+    fn test_lsh_candidates_propagate_row_decode_errors() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let record = make_record("lsh-corrupt", 46, MemoryType::Episodic);
+        db.store_batch_sync(std::slice::from_ref(&record)).unwrap();
+        let hashes = SqliteMemory::lsh_band_hashes(&record.encoding);
+        {
+            let conn = db.conn.lock().unwrap();
+            conn.execute(
+                "UPDATE vector_lsh SET memory_id = ?1 WHERE memory_id = ?2 AND band_idx = 0",
+                params![vec![0xFE_u8], record.id],
+            )
+            .unwrap();
+            let error = SqliteMemory::lsh_candidates(&conn, &record.encoding).unwrap_err();
+            assert!(
+                error.to_string().contains("candidate row decode failed"),
+                "unexpected error context: {error}"
+            );
+            // Prove the row's corrupt type would be queried for this input.
+            let hash: i64 = conn
+                .query_row(
+                    "SELECT band_hash FROM vector_lsh WHERE band_idx = 0 LIMIT 1",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(hash, hashes[0]);
+        }
+    }
 
     #[tokio::test]
     async fn test_sqlite_memory_basic() {
