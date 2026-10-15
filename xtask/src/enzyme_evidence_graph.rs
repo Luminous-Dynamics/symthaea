@@ -507,33 +507,38 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
             transformation.transformation_id
         );
 
-        for input_node_id in &transformation.input_node_ids {
-            ensure!(
-                transformation.output_node_ids.iter().any(|output_node_id| {
-                    graph.edges.iter().any(|edge| {
-                        edge.from_node_id == *input_node_id
-                            && edge.to_node_id == *output_node_id
-                            && is_transformation_dependency_edge(&edge.edge_type)
-                    })
-                }),
-                "transformation {} input node {} has no explicit edge to any declared output node",
-                transformation.transformation_id,
-                input_node_id
-            );
-        }
-        for output_node_id in &transformation.output_node_ids {
-            ensure!(
-                transformation.input_node_ids.iter().any(|input_node_id| {
-                    graph.edges.iter().any(|edge| {
-                        edge.from_node_id == *input_node_id
-                            && edge.to_node_id == *output_node_id
-                            && is_transformation_dependency_edge(&edge.edge_type)
-                    })
-                }),
-                "transformation {} output node {} has no explicit incoming dependency from its declared inputs",
-                transformation.transformation_id,
-                output_node_id
-            );
+        // A null/failed/blocked computation can legitimately have no output node.
+        // When outputs are declared, however, every input and output must be tied together
+        // by a contract-recognized dependency edge.
+        if !transformation.output_node_ids.is_empty() {
+            for input_node_id in &transformation.input_node_ids {
+                ensure!(
+                    transformation.output_node_ids.iter().any(|output_node_id| {
+                        graph.edges.iter().any(|edge| {
+                            edge.from_node_id == *input_node_id
+                                && edge.to_node_id == *output_node_id
+                                && is_transformation_dependency_edge(&edge.edge_type)
+                        })
+                    }),
+                    "transformation {} input node {} has no explicit edge to any declared output node",
+                    transformation.transformation_id,
+                    input_node_id
+                );
+            }
+            for output_node_id in &transformation.output_node_ids {
+                ensure!(
+                    transformation.input_node_ids.iter().any(|input_node_id| {
+                        graph.edges.iter().any(|edge| {
+                            edge.from_node_id == *input_node_id
+                                && edge.to_node_id == *output_node_id
+                                && is_transformation_dependency_edge(&edge.edge_type)
+                        })
+                    }),
+                    "transformation {} output node {} has no explicit incoming dependency from its declared inputs",
+                    transformation.transformation_id,
+                    output_node_id
+                );
+            }
         }
 
         if transformation.terminal_status == "success" {
@@ -979,6 +984,30 @@ mod tests {
         graph["transformations"][0]["input_artifact_ids"] = json!(["a_input.bin", "a_remote"]);
         let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
         assert!(error.contains("unavailable or unverified input artifacts") || error.contains("not linked from its input nodes"));
+    }
+
+    #[test]
+    fn preserves_null_result_with_inputs_and_no_output_nodes() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["transformations"].as_array_mut().unwrap().push(json!({
+            "transformation_id": "t_null",
+            "name": "synthetic fit that returns no estimate",
+            "version": "1",
+            "code_sha256": "4".repeat(64),
+            "configuration_sha256": "5".repeat(64),
+            "environment_lock_sha256": "6".repeat(64),
+            "input_node_ids": ["n_raw"],
+            "output_node_ids": [],
+            "input_artifact_ids": ["a_input.bin"],
+            "output_artifact_ids": [],
+            "deterministic": true,
+            "terminal_status": "null_result",
+            "terminal_reason": "Fit returned no finite parameter estimate"
+        }));
+        let report = validate_fixture(workspace.root(), &graph).unwrap();
+        assert_eq!(report.transformations_terminal_non_success, 1);
+        assert_eq!(report.transformations_successful, 1);
     }
 
     #[test]
