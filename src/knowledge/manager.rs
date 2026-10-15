@@ -1400,10 +1400,16 @@ mod tests {
         };
         encoding
             .role_vectors
-            .insert(SemanticRole::Agent, symthaea_core::hdc::binary_hv::BinaryHV::random(82));
+            .insert(
+                SemanticRole::Agent,
+                symthaea_core::hdc::binary_hv::BinaryHV::random(82),
+            );
         encoding
             .role_vectors
-            .insert(SemanticRole::Patient, symthaea_core::hdc::binary_hv::BinaryHV::random(83));
+            .insert(
+                SemanticRole::Patient,
+                symthaea_core::hdc::binary_hv::BinaryHV::random(83),
+            );
         let (fact_id, _) = manager
             .graph
             .insert(encoding.clone(), 7, Some("test".into()), false);
