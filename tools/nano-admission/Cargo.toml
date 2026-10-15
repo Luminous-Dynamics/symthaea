@@ -1,0 +1,20 @@
+[package]
+name = "nano-admission-verifier"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Verify and inventory a local OC22 IS2RE-Total archive without extracting it"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+flate2 = "=1.1.9"
+md-5 = "=0.10.6"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { version = "=0.10.9", features = ["oid"] }
+tar = "=0.4.46"
+
+[dev-dependencies]
+tempfile = "=3.27.0"
