@@ -44,9 +44,14 @@ const REQUIRED_BASELINES: &[&str] = &[
 // incomplete historical records remain eligible for review with their missingness visible.
 const OPTIONAL_METADATA_FIELDS: &[&str] = &[
     "enzyme_purity",
+    "enzyme_form",
     "enzyme_concentration",
     "buffer_system",
+    "buffer_concentration",
     "assay_pressure",
+    "ph_measurement_temperature_c",
+    "substrate_concentration_range",
+    "kinetic_equation",
     "replicate_count",
     "independent_experiment_count",
     "replicate_structure",
@@ -564,10 +569,26 @@ fn optional_metadata_value_is_valid(field: &str, value: &Value) -> bool {
     };
 
     match field {
-        "enzyme_purity" | "buffer_system" | "replicate_structure" | "reaction_equation" => {
-            nonempty_string(value)
+        "enzyme_purity" | "enzyme_form" | "buffer_system" | "replicate_structure"
+        | "reaction_equation" | "kinetic_equation" => nonempty_string(value),
+        "enzyme_concentration" | "buffer_concentration" | "assay_pressure" => {
+            numeric_with_unit(value, false)
         }
-        "enzyme_concentration" | "assay_pressure" => numeric_with_unit(value, false),
+        "ph_measurement_temperature_c" => value
+            .as_f64()
+            .is_some_and(|temperature| temperature.is_finite() && temperature > -273.15),
+        "substrate_concentration_range" => {
+            let Some(object) = value.as_object() else {
+                return false;
+            };
+            let lower = object.get("lower").and_then(Value::as_f64);
+            let upper = object.get("upper").and_then(Value::as_f64);
+            lower.is_some_and(|number| number.is_finite() && number >= 0.0)
+                && upper.is_some_and(|number| {
+                    number.is_finite() && lower.is_some_and(|lower| number > lower)
+                })
+                && object.get("unit").is_some_and(nonempty_string)
+        }
         "replicate_count" | "independent_experiment_count" => {
             value.as_u64().is_some_and(|count| count > 0)
         }
@@ -990,13 +1011,39 @@ mod tests {
     }
 
     #[test]
+    fn kcat_context_metadata_validates_range_and_measurement_temperature_shapes() {
+        assert!(optional_metadata_value_is_valid(
+            "substrate_concentration_range",
+            &json!({"lower":0,"upper":150,"unit":"umol/L"})
+        ));
+        assert!(!optional_metadata_value_is_valid(
+            "substrate_concentration_range",
+            &json!({"lower":150,"upper":150,"unit":"umol/L"})
+        ));
+        assert!(!optional_metadata_value_is_valid(
+            "substrate_concentration_range",
+            &json!({"lower":0,"upper":150,"unit":""})
+        ));
+        assert!(optional_metadata_value_is_valid("ph_measurement_temperature_c", &json!(25.0)));
+        assert!(!optional_metadata_value_is_valid("ph_measurement_temperature_c", &json!(-300.0)));
+        assert!(optional_metadata_value_is_valid("kinetic_equation", &json!("Michaelis-Menten; initial rate vs substrate concentration")));
+        assert!(!optional_metadata_value_is_valid("enzyme_form", &json!(" ")));
+        assert!(optional_metadata_value_is_valid("buffer_concentration", &json!({"value":50,"unit":"mmol/L"})));
+    }
+
+    #[test]
     fn metadata_coverage_separates_missingness_from_invalid_statuses() {
         let mut coverage = empty_metadata_coverage();
         let row_a = json!({
             "enzyme_purity": {"status":"reported", "value":"apparent homogeneity by PAGE"},
+            "enzyme_form": {"status":"reported", "value":"homodimer; concentration relative to dimer"},
             "enzyme_concentration": {"status":"not_reported"},
             "buffer_system": {"status":"not_applicable", "reason":"not specified in source record"},
+            "buffer_concentration": {"status":"reported", "value":{"value":50,"unit":"mmol/L"}},
             "assay_pressure": {"status":"reported", "value":{"value":101.325,"unit":"kPa"}},
+            "ph_measurement_temperature_c": {"status":"reported", "value":25},
+            "substrate_concentration_range": {"status":"reported", "value":{"lower":0,"upper":150,"unit":"umol/L"}},
+            "kinetic_equation": {"status":"reported", "value":"Michaelis-Menten; initial rate vs substrate concentration"},
             "replicate_count": {"status":"reported", "value":3},
             "independent_experiment_count": {"status":"reported", "value":2},
             "replicate_structure": {"status":"reported", "value":"two independent enzyme preparations"},
