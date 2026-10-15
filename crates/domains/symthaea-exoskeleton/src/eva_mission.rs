@@ -293,6 +293,12 @@ impl IntegratedEvaMission {
         // planning recommendation only; it does not command physical hardware.
         let plss_state = self.plss.state();
         let plss_config = self.plss.config();
+        if plss_state.ventilation == crate::plss::PlssPathState::Failed {
+            return self.abort_segment(
+                segment,
+                EvaMissionAbortReason::LifeSupportFailure(PlssStepError::VentilationFailed),
+            );
+        }
         let ventilation_factor = match plss_state.ventilation {
             crate::plss::PlssPathState::Available => 1.0,
             crate::plss::PlssPathState::Degraded => 0.6,
@@ -672,6 +678,25 @@ mod tests {
         let plss = mission.plss_mut_for_fault_injection();
         assert_eq!(plss.state().humidity_collector_capacity_remaining_g, 0.10);
         assert_eq!(plss.state().humidity_vapor_burden_g, 0.0);
+    }
+
+    #[test]
+    fn total_ventilation_failure_remains_a_hard_life_support_abort() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .ventilation = crate::plss::PlssPathState::Failed;
+        let report = mission.run(&[one_hour_work(0.0)]);
+        assert_eq!(report.disposition, EvaMissionDisposition::AbortEva);
+        assert_eq!(
+            report.segments[0].abort_reason,
+            Some(EvaMissionAbortReason::LifeSupportFailure(
+                PlssStepError::VentilationFailed
+            ))
+        );
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
     }
 
     #[test]
