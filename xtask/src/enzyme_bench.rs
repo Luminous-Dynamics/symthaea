@@ -144,6 +144,13 @@ pub struct MetadataCoverage {
     pub invalid: usize,
 }
 
+impl MetadataCoverage {
+    /// Number of observations accounted for by exactly one coverage outcome.
+    fn accounted_observations(&self) -> usize {
+        self.reported + self.not_reported + self.not_applicable + self.unrecorded + self.invalid
+    }
+}
+
 pub fn check(workspace_root: &Path, manifest_path: &Path) -> Result<()> {
     let manifest_bytes = fs::read(manifest_path)
         .with_context(|| format!("read manifest {}", manifest_path.display()))?;
@@ -428,6 +435,13 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         observations
     );
     ensure!(observations > 0, "dataset contains no observations");
+    for (field_name, coverage) in &metadata_coverage {
+        ensure!(
+            coverage.accounted_observations() == observations,
+            "metadata coverage accounting mismatch for {field_name}: expected {observations}, accounted {}",
+            coverage.accounted_observations()
+        );
+    }
     match split.split_mode.as_str() {
         "study_holdout" => {
             ensure!(observed_train_studies == train_studies, "train_study_ids contains unused or absent studies");
@@ -909,6 +923,42 @@ mod tests {
         assert!(!optional_metadata_value_is_valid("analysis_method", &json!({"software":"fit"})));
         assert!(!optional_metadata_value_is_valid("raw_measurement_data", &json!("file:///etc/passwd")));
         assert!(optional_metadata_value_is_valid("raw_measurement_data", &json!("https://example.org/raw-data.csv")));
+    }
+
+    #[test]
+    fn metadata_coverage_accounts_for_every_observation_exactly_once() {
+        let mut coverage = empty_metadata_coverage();
+        let rows = [
+            json!({
+                "enzyme_purity":{"status":"reported","value":"purified"},
+                "enzyme_concentration":{"status":"not_reported"},
+                "buffer_system":{"status":"not_applicable","reason":"no buffer used"}
+            }),
+            json!({
+                "enzyme_purity":{"status":"reported"},
+                "enzyme_concentration":"malformed",
+                "buffer_system":{"status":"not_reported"}
+            }),
+            json!({}),
+        ];
+        for row in &rows {
+            record_optional_metadata_coverage(row, &mut coverage);
+        }
+        for (field, counts) in &coverage {
+            assert_eq!(
+                counts.accounted_observations(),
+                rows.len(),
+                "coverage must account for each row once for {field}"
+            );
+        }
+        assert_eq!(coverage["enzyme_purity"].reported, 2);
+        assert_eq!(coverage["enzyme_purity"].invalid, 1);
+        assert_eq!(coverage["enzyme_concentration"].not_reported, 1);
+        assert_eq!(coverage["enzyme_concentration"].invalid, 1);
+        assert_eq!(coverage["enzyme_concentration"].unrecorded, 1);
+        assert_eq!(coverage["buffer_system"].not_applicable, 1);
+        assert_eq!(coverage["buffer_system"].not_reported, 1);
+        assert_eq!(coverage["buffer_system"].unrecorded, 1);
     }
 
     #[test]
