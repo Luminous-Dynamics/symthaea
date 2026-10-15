@@ -56,7 +56,7 @@ pub use extraction::{
 };
 pub use graph::{
     ContradictionAlert, EnhancedKnowledgeGraph, FactId, RoleAwareSearchResult,
-    RoleObservationMatch, TemporalFact,
+    RoleObservationMatch, RoleObservationSearchConfig, TemporalFact,
 };
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
 pub use reasoning_context::{
