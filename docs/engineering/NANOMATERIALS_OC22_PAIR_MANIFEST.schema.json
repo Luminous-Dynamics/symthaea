@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/nano-001-atomistic-discovery/docs/engineering/NANOMATERIALS_OC22_PAIR_MANIFEST.schema.json",
+  "$id": "urn:luminous-dynamics:symthaea:oc22-is2re-pair-manifest:v1",
   "title": "OC22 IS2RE pair-admission manifest",
   "description": "Evidence contract for reconciling a frozen OC22 source representation into official initial-structure to relaxed-total-energy examples. Schema validity never by itself admits a dataset or establishes scientific validity.",
   "type": "object",
