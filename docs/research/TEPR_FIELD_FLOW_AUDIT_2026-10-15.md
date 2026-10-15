@@ -27,7 +27,9 @@ Review and qualify [PR #7469](https://github.com/Luminous-Dynamics/symthaea/pull
 
 ### P1 — make contradiction context honest
 
-Provide a non-destructive read path for pending graph contradiction alerts (or snapshot alerts into the context before their explicit drain). Represent their fact IDs, similarity, detection cycle and relative-confidence basis separately from causal confounder warnings. Do not silently label confounders as direct contradictions, and do not consume alerts as a side effect of rendering a context.
+The required semantics are: read pending graph alerts without consuming them; retain both fact IDs, similarity, detection cycle and the higher-confidence fact recorded at detection time; attach source text only if the referenced graph record still exists; and represent direct contradictions separately from causal-confounder hypotheses.
+
+[PR #7475](https://github.com/Luminous-Dynamics/symthaea/pull/7475) now proposes the implementation: a non-destructive alert snapshot, typed `ContradictionEvidence`, separate `direct_contradictions` and `confounder_warnings`, compatibility-preserving human-readable messages, summary labels that distinguish the two, and deterministic tests including the missing/evicted-fact case. It is stacked on [PR #7469](https://github.com/Luminous-Dynamics/symthaea/pull/7469), which must land first. As checked on 2026-10-15, PR #7475 head `f9b1355288328de825531830003ce5f8cf5f4c0e` has CI and PR Governance **queued**. The change is open and unverified; queued is not a pass.
 
 ### P2 — specify the persistence round-trip invariant
 
@@ -93,4 +95,4 @@ The existing Mycelix contracts should remain the civic-facing owners; Symthaea s
 
 ## Claim ceiling
 
-This is a source inspection and engineering plan. No runtime improvement, test pass, source authentication, calibration improvement, causal effect, or production readiness is claimed by this document. The actionable first implementation is limited to the grounded-query projection fix; subsequent changes should be separately reviewed and qualified.
+This is a source inspection and engineering plan. No runtime improvement, test pass, source authentication, calibration improvement, causal effect, or production readiness is claimed by this document. The grounded-query projection fix is under review in PR #7469; PR #7475 proposes the separate contradiction-context correction. Neither is treated as validated or merged in this audit. Subsequent changes should be separately reviewed and qualified.
