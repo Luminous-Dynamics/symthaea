@@ -1819,6 +1819,17 @@ mod tests {
     }
 
     #[test]
+    fn wide_integer_wire_fields_reject_json_number_coercion() {
+        let encoded = serde_json::to_string(&fact()).expect("fact serializes");
+        let numeric_wire = encoded.replace(
+            r#""value_scale":"1000""#,
+            r#""value_scale":1000"#,
+        );
+        assert_ne!(numeric_wire, encoded);
+        assert!(serde_json::from_str::<NutritionFoodFactV1>(&numeric_wire).is_err());
+    }
+
+    #[test]
     fn missing_nutrient_quantity_remains_json_null() {
         let mut f = fact();
         f.value_scaled = None;
