@@ -796,6 +796,78 @@ mod tests {
         assert!(error.issues.iter().any(|issue| issue.contains("cached metric total_external_input_j")));
     }
 
+    fn comparison_runs() -> (BenchmarkRun, BenchmarkRun) {
+        let mut baseline: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
+        baseline.evidence_class = "simulated".into();
+        baseline.not_for_decision = false;
+        baseline.data_provenance[0].kind = "simulation_output".into();
+        baseline.data_provenance[0].sha256 = Some("b".repeat(64));
+        baseline.uncertainty.correlation_model = "independent".into();
+        baseline.uncertainty.method = "test-only independent primitive uncertainties".into();
+        baseline.evaluation_policy.minimum_superiority_margin = 0.02;
+
+        let mut candidate = baseline.clone();
+        candidate.candidate.candidate_id = "candidate-better".into();
+        candidate.data_provenance[0].sha256 = Some("a".repeat(64));
+        candidate.intervals[1].energy_j.net_useful_output = 40.0;
+        candidate.intervals[1].energy_j.rejected_or_loss = 54.0;
+        let metrics = candidate.computed_metrics.as_mut().unwrap();
+        metrics.total_net_useful_output_j = Some(40.7);
+        metrics.net_cycle_efficiency = Some(40.7 / 112.0);
+        (candidate, baseline)
+    }
+
+    #[test]
+    fn comparison_only_supports_improvement_when_lower_bound_clears_margin() {
+        let (candidate, baseline) = comparison_runs();
+        let result = compare_candidates(&candidate, &baseline).unwrap();
+        assert_eq!(result.decision, ComparisonDecision::ImprovementSupportedWithinDeclaredUncertainty);
+        assert!(result.estimated_efficiency_difference.unwrap() > 0.02);
+        assert!(result.conservative_lower_bound.unwrap() > result.required_superiority_margin);
+        assert!(result.expanded_difference_uncertainty.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn large_uncertainty_does_not_turn_point_estimate_into_a_win() {
+        let (mut candidate, baseline) = comparison_runs();
+        candidate.intervals[1].standard_uncertainty_j.external_input = 25.0;
+        candidate.intervals[1].standard_uncertainty_j.net_useful_output = 20.0;
+        let result = compare_candidates(&candidate, &baseline).unwrap();
+        assert_eq!(result.decision, ComparisonDecision::NoImprovementDemonstrated);
+        assert!(result.conservative_lower_bound.unwrap() <= result.required_superiority_margin);
+    }
+
+    #[test]
+    fn unknown_or_correlated_inputs_are_indeterminate() {
+        let (candidate, mut baseline) = comparison_runs();
+        baseline.uncertainty.correlation_model = "unknown".into();
+        let result = compare_candidates(&candidate, &baseline).unwrap();
+        assert_eq!(result.decision, ComparisonDecision::Indeterminate);
+        assert!(result.reason.unwrap().contains("independent standard uncertainties"));
+    }
+
+    #[test]
+    fn candidates_with_different_energy_boundaries_cannot_be_compared() {
+        let (candidate, mut baseline) = comparison_runs();
+        baseline.boundary.useful_output_definition = "shaft work, not electricity at system terminals".into();
+        let error = compare_candidates(&candidate, &baseline).unwrap_err();
+        assert!(error.issues.iter().any(|issue| issue.contains("system boundaries differ")));
+    }
+
+    #[test]
+    fn synthetic_fixture_cannot_support_a_comparison_decision() {
+        let (candidate, baseline) = comparison_runs();
+        let result = compare_candidates(&candidate, &baseline).unwrap();
+        assert_ne!(result.decision, ComparisonDecision::Indeterminate);
+        let mut synthetic = baseline.clone();
+        synthetic.evidence_class = "synthetic_fixture".into();
+        synthetic.not_for_decision = true;
+        synthetic.data_provenance[0].kind = "synthetic_fixture".into();
+        synthetic.data_provenance[0].sha256 = None;
+        let result = compare_candidates(&candidate, &synthetic).unwrap();
+        assert_eq!(result.decision, ComparisonDecision::Indeterminate);
+    }
+
     #[test]
     fn exact_bytes_are_checked_against_sha256() {
         const ABC_SHA256: &str =
