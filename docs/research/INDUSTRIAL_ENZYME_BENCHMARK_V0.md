@@ -14,7 +14,9 @@ This document does **not** claim that Symthaea can fold proteins, establish enzy
 
 ## 2. Why this first step
 
-Industrial enzymes are a useful starting point because the task can remain offline and low-risk while still measuring whether the stack handles real biological heterogeneity. Enzyme outcomes depend on identity and sequence, organism/source, assay method, pH, temperature, substrate, units, and replication. Missing conditions and conflicting reports are part of the evidence—not permission to silently manufacture a complete record.
+Industrial enzymes are a useful starting point because the task can remain offline and low-risk while still measuring whether the stack handles real biological heterogeneity. For v0, narrow the target to **one reported enzyme turnover number (kcat), normalized to s^-1**, rather than blending kcat, Km, kcat/Km, optimum temperature, activity and yield. Every row must preserve the originally reported value/unit as well as the normalized value and the exact conversion rule/factor.
+
+Enzyme outcomes depend on identity and sequence, organism/source, assay method, pH, temperature, substrate, units, and replication. Missing conditions and conflicting reports are part of the evidence—not permission to silently manufacture a complete record.
 
 Use existing scientific resources as sources and specialist tools as replaceable adapters. Do not build a second generic scientific-reasoning stack or new canonical biological type unless an ownership audit proves a lossless representation gap; this follows the compose-first constraint in #6271.
 
@@ -22,9 +24,13 @@ Use existing scientific resources as sources and specialist tools as replaceable
 
 Sources are candidates, **not yet an admitted corpus**:
 
-- **BRENDA:** https://www.brenda-enzymes.de/ — curated enzyme functional data. Its download page currently documents release **2026.1 (4 March 2026)** and a **CC BY 4.0** license; the download flow requires explicit acceptance. At dataset freeze, record the release actually downloaded, access date, exact license/terms, required attribution, download URL, and SHA-256. Do not mirror records before the applicable terms are accepted and checked.
-- **STRENDA Guidelines / STRENDA DB:** https://www.beilstein-institut.de/en/projects/strenda/guidelines/ and https://www.beilstein-strenda-db.org/strenda/ — use the guidelines to inform completeness checks for enzyme identity, assay context, units, precision, and replication. A reported data row does not become complete or reliable merely because it appears in a database.
+- **Primary-source candidate — BRENDA:** https://www.brenda-enzymes.info/ — curated enzyme functional data. The official site identifies release **2026.1 (4 March 2026)** and CC BY 4.0; the bulk download requires active license acceptance. The official license page also warns that access to digital sequence information may entail benefit-sharing obligations under the UN Convention on Biological Diversity's multilateral mechanism, including potential monetary contributions by commercial users. Therefore **CC BY 4.0 alone is not recorded as a completed rights review**. The manifest must record actual release, accepted terms, attribution, access date and SHA-256, and a human-reviewed rights status that includes any applicable sequence-data benefit-sharing assessment. We have not downloaded or accepted the license for this workstream.
+- **STRENDA Guidelines / STRENDA DB:** https://www.beilstein-institut.de/en/projects/strenda/guidelines/ and https://www.beilstein-strenda-db.org/strenda/ — use the guidelines to inform completeness checks for enzyme identity, assay context, units, precision and replication. A reported row does not become complete or reliable merely because it appears in a database.
+- **SABIO-RK:** https://sabiork.h-its.org/webservice.jsp — its official documentation describes REST-based programmatic access to kinetic data. Treat it as a secondary source only after its relevant access, use and redistribution terms are independently cleared. Cross-source duplicates must not be treated as independent experiments.
+- **Candidate explicitly not admitted — Zenodo forward/backward kcat dataset:** https://zenodo.org/records/21241849 (DOI 10.5281/zenodo.21241849). The page describes a compact dataset compiled from BRENDA and SABIO-RK and says a newer version exists, but the page's license field is blank. It is also prefiltered to enzyme/reaction pairs with both directional kcat values, so selection bias is built into the cohort. It is **not** admitted until the author/source terms, version lineage and redistribution rights are established; convenient downloadability is not a license.
 - **BioModels / SBML:** https://www.ebi.ac.uk/biomodels/ and https://sbml.org/software/ — consider later for independently sourced, published pathway or kinetic model validation. These model files are not a substitute for a consistent enzyme-assay table and should not be mixed into the initial supervised target corpus without a separate track.
+
+The BRENDA statistics page reports 94,073 turnover-number occurrences for release 2026.1. This is a source-database occurrence count, **not** the number of unique, rights-cleared, fully conditioned benchmark observations. The eligible corpus size is unknown until source admission and deduplication are complete.
 
 ### Corpus admission checklist
 
@@ -38,6 +44,18 @@ The corpus is frozen only when all items below are recorded:
 - A record-level manifest that can be independently rechecked without distributing restricted source material.
 
 If licensing, endpoint semantics, units, or observation lineage cannot be resolved, stop at **data-admission-unresolved**. Do not substitute an invented or silently scraped dataset.
+
+### Executable admission gate
+
+A fail-closed Rust checker is wired into the existing workspace task runner:
+
+```sh
+cargo run -p xtask -- enzyme-bench-check --manifest docs/research/ENZYME_BENCHMARK_MANIFEST.json
+```
+
+Use [ENZYME_BENCHMARK_MANIFEST_TEMPLATE.json](ENZYME_BENCHMARK_MANIFEST_TEMPLATE.json) and [ENZYME_BENCHMARK_SPLITS_TEMPLATE.json](ENZYME_BENCHMARK_SPLITS_TEMPLATE.json) as non-admitted templates. They are deliberately marked/incomplete so they **must fail** until a human has cleared rights, the real files are frozen and hashed, and the split is populated. Local, rights-gated data artifacts belong in the ignored `research-data/enzyme-benchmark/` directory and must never be committed as part of this PR.
+
+The checker currently enforces: frozen-state and source-rights metadata; SHA-256 for corpus, split and preregistration; a single kcat endpoint and normalized s^-1 units; finite positive numeric values and an explicit, arithmetically consistent unit-conversion rule/factor per row; explicit reported/not-reported/not-applicable status for pH, temperature and substrate; unique observation IDs; exact record count; and disjoint study and sequence-family groups with every row assigned consistently. This is an **admission/integrity gate**, not the metric scorer and not evidence that Symthaea has predictive value.
 
 ## 4. Observation unit and missingness
 
@@ -114,7 +132,7 @@ No wet-lab execution is part of this milestone. Any later prospective experiment
 
 ## 7. Independent verifier and staged exits
 
-The verifier must read the frozen manifests independently of the candidate generator and recompute row counts, split disjointness, metric values, denominators, and negative controls. It should fail closed on unknown units, missing hashes, unresolved licensing, incomplete provenance, or changed data/model heads.
+The new `xtask enzyme-bench-check` command verifies source admission and dataset/split/preregistration artifact integrity. It does not yet score predictions, prove full source deduplication, or independently compute benchmark metrics; those are subsequent milestones. The eventual scorer must read frozen manifests independently of the candidate generator and recompute metrics, denominators, uncertainty intervals and negative controls. Fail closed on unknown units, missing hashes, unresolved licensing, incomplete provenance or changed data/model heads.
 
 1. **Admission:** source rights, release, records, target and units are resolved; content hashes match.
 2. **Baseline reproduction:** an independent run reproduces a baseline within preregistered numerical tolerances.
@@ -127,10 +145,10 @@ Terminal statuses must include success, null result, failure, excluded, out-of-d
 ## 8. Deliverables for the first implementation tranche
 
 - Versioned data-admission and benchmark manifest schema (reuse current evidence/identity owners wherever possible).
-- Small rights-cleared fixture corpus with synthetic/known-answer rows for unit tests; clearly mark synthetic rows so they cannot be mistaken for biological measurements.
-- Rust-first deterministic validator for schema, units, source identity, and split disjointness.
-- Independent scorer/manifest checker plus hostile tests for shuffled labels, duplicates, unknown units, source leakage, and missing provenance.
-- A frozen report containing baseline results, confidence intervals, exclusions, runtime/resource cost, and explicit limitations.
+- Rust-first deterministic `xtask enzyme-bench-check` admission gate; unit tests use generated **synthetic-only** observations and do not assert biological performance.
+- Rights-cleared source admission and an independently frozen corpus/split/preregistration with exact hashes.
+- Independent scorer/manifest checker plus hostile tests for shuffled labels, duplicate rows, unknown units, source leakage and missing provenance.
+- A frozen report containing baseline results, confidence intervals, exclusions, runtime/resource cost and explicit limitations.
 
 **Not in this tranche:** broad sequence generation, wet-lab automation, clinical recommendations, a new canonical biology ontology, a new biochemical simulator, or claims of improved biotech outcomes before measured evaluation.
 
