@@ -787,8 +787,8 @@ impl KnowledgeManager {
                 .map(|(cause, effect, strength)| CausalEdgeRecord {
                     cause,
                     effect,
+                    is_inhibitory: strength < 0.0,
                     strength,
-                    is_inhibitory: false,
                     cycle: 0,
                 })
                 .collect();
@@ -2028,6 +2028,9 @@ mod tests {
         let mut mgr = KnowledgeManager::new(config);
         mgr.bootstrap_entities();
         mgr.process("Sanctions caused oil shortage.", 1);
+        // Repeated observations can produce multiple in-memory edges with the
+        // same database key; snapshot persistence must handle that intentionally.
+        mgr.process("Sanctions caused oil shortage.", 2);
 
         // Seed stale persisted records that are absent from the live manager.
         // A full snapshot must remove these, not merely upsert current records.
