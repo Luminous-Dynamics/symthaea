@@ -1233,10 +1233,29 @@ mod tests {
 
     #[test]
     fn legato_instrument_policy_is_cross_target() {
-        assert!(instrument_benefits_from_legato(Instrument::Violin));
-        assert!(instrument_benefits_from_legato(Instrument::Flute));
-        assert!(!instrument_benefits_from_legato(Instrument::AcousticGuitar));
-        assert!(!instrument_benefits_from_legato(Instrument::Piano));
+        // Every currently admitted bowed/blown instrument stays available to
+        // the shared browser synthesis path.
+        for instrument in [
+            Instrument::Violin,
+            Instrument::Cello,
+            Instrument::Flute,
+            Instrument::Clarinet,
+            Instrument::Trumpet,
+        ] {
+            assert!(
+                instrument_benefits_from_legato(instrument),
+                "{instrument:?} should use legato continuation"
+            );
+        }
+
+        // Plucked/struck attacks must remain articulated rather than being
+        // softened as if a bow or breath were continuing.
+        for instrument in [Instrument::AcousticGuitar, Instrument::Piano] {
+            assert!(
+                !instrument_benefits_from_legato(instrument),
+                "{instrument:?} should retain its attack"
+            );
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
