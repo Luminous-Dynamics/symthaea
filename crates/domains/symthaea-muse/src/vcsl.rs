@@ -1173,10 +1173,8 @@ fn probe_fluidsynth_programs(
                     .arg("-i")
                     .arg("-g")
                     .arg("0.8")
-                    .arg("-o")
-                    .arg("synth.reverb.active=0")
-                    .arg("-o")
-                    .arg("synth.chorus.active=0")
+                    .arg("-C0")
+                    .arg("-R0")
                     .arg("-T")
                     .arg("wav")
                     .arg("-F")
@@ -1271,7 +1269,7 @@ fn probe_fluidsynth_programs(
         sample_rate_hz: 22050,
         reverb_disabled: true,
         chorus_disabled: true,
-        command_template: "-n -i -g 0.8 -o synth.reverb.active=0 -o synth.chorus.active=0 -T wav -F <output.wav> -r 22050 <soundfont.sf2> <probe.mid>",
+        command_template: "-n -i -g 0.8 -C0 -R0 -T wav -F <output.wav> -r 22050 <soundfont.sf2> <probe.mid>",
         programs: results,
     })
 }
