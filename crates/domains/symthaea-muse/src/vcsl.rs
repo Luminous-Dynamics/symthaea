@@ -32,13 +32,15 @@
 //!   mapping isn't honestly possible without a second, drum-number-aware
 //!   indexing scheme this module doesn't have. `Instrument::Timpani`
 //!   therefore stays synthesis-only.
-//! - Follow-up source-tree verification added real mappings for four wave-2
-//!   instruments: Harpsichord uses VCSL's
+//! - Follow-up source-tree verification added real mappings for verified
+//!   catalogue gaps: Harpsichord uses VCSL's
 //!   `Chordophones/Zithers/Harpsichord, English/Sustains/Normal`; Xylophone
 //!   uses VCSL's `Idiophones/Struck Idiophones/Xylophone/Hard Mallets`;
 //!   Tuba uses VSCO2-CE's `Brass/Tuba/sus` and `Brass/Tuba/stac`; and
 //!   Trombone uses `Brass/Tenor Trombone/sus` and `Brass/Tenor Trombone/stac`.
-//!   These paths were confirmed in the upstream Git tree snapshots (VCSL
+//!   UprightBass uses VSCO-2-CE's `Strings/Solo Contrabass/SusNV` and real
+//!   spiccato articulation `Strings/Solo Contrabass/Spic`. These paths were
+//!   confirmed in the upstream Git tree snapshots (VCSL
 //!   `c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e`, VSCO-2-CE
 //!   `440300901dfe9275fd84e0b7763af1f8443ae62e`); they are upstream-path
 //!   evidence, not a claim that a particular machine has downloaded those
@@ -99,6 +101,7 @@ fn sample_subdir(instrument: Instrument) -> Option<(SampleSource, &'static str)>
             Vcsl,
             "Chordophones/Zithers/Harpsichord, English/Sustains/Normal",
         )),
+        Instrument::UprightBass => Some((Vsco2, "Strings/Solo Contrabass/SusNV")),
         Instrument::Xylophone => Some((
             Vcsl,
             "Idiophones/Struck Idiophones/Xylophone/Hard Mallets",
@@ -144,6 +147,7 @@ fn staccato_subdir(instrument: Instrument) -> Option<(SampleSource, &'static str
         Instrument::Violin => Some((Vsco2, "Strings/Solo Violin/spic")),
         Instrument::Viola => Some((Vsco2, "Strings/Viola Section/spic")),
         Instrument::Cello => Some((Vsco2, "Strings/Cello Section/spic")),
+        Instrument::UprightBass => Some((Vsco2, "Strings/Solo Contrabass/Spic")),
         Instrument::Flute => Some((Vsco2, "Woodwinds/Flute/stac")),
         Instrument::Clarinet => Some((Vsco2, "Woodwinds/Clarinet/stac")),
         Instrument::Oboe => Some((Vsco2, "Woodwinds/Oboe/Stacc")),
@@ -440,6 +444,7 @@ impl VcslLibrary {
             Instrument::PianoPP,
             Instrument::Harp,
             Instrument::Harpsichord,
+            Instrument::UprightBass,
             Instrument::Xylophone,
             Instrument::Tuba,
             Instrument::Trombone,
