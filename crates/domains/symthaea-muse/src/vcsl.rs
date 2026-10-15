@@ -1951,9 +1951,10 @@ mod tests {
         assert!(probe.programs[0].frames.unwrap() > 0);
         assert!(probe.programs[0].peak_absolute_sample.unwrap() > 1e-5);
         assert!(probe.programs[0].rms.unwrap() > 0.0);
+        let expected_output_hash = sha256_file(&output_fixture).unwrap();
         assert_eq!(
             probe.programs[0].output_wav_sha256.as_deref(),
-            Some(sha256_file(&output_fixture).unwrap().as_str()),
+            Some(expected_output_hash.as_str()),
             "receipt preserves the exact rendered WAV bytes"
         );
         assert_eq!(probe.programs[1].program_0_based, 24);
