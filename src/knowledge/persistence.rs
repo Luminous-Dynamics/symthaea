@@ -119,11 +119,7 @@ fn decode_nonnegative_counter(
     })
 }
 
-fn decode_finite_f32(
-    value: f32,
-    column_index: usize,
-    field: &str,
-) -> rusqlite::Result<f32> {
+fn decode_finite_f32(value: f32, column_index: usize, field: &str) -> rusqlite::Result<f32> {
     if value.is_finite() {
         Ok(value)
     } else {
@@ -147,11 +143,7 @@ fn decode_confidence(value: f32, column_index: usize) -> rusqlite::Result<f32> {
     }
 }
 
-fn decode_finite_f64(
-    value: f64,
-    column_index: usize,
-    field: &str,
-) -> rusqlite::Result<f64> {
+fn decode_finite_f64(value: f64, column_index: usize, field: &str) -> rusqlite::Result<f64> {
     if value.is_finite() {
         Ok(value)
     } else {
@@ -323,8 +315,7 @@ impl KnowledgePersistence {
         let edges: Vec<CausalEdgeRecord> = stmt
             .query_map([], |row| {
                 let strength = decode_finite_f32(row.get(2)?, 2, "causal strength")?;
-                let cycle =
-                    decode_nonnegative_counter(row.get(4)?, 4, "causal-edge cycle")?;
+                let cycle = decode_nonnegative_counter(row.get(4)?, 4, "causal-edge cycle")?;
                 Ok(CausalEdgeRecord {
                     cause: row.get(0)?,
                     effect: row.get(1)?,
@@ -405,13 +396,10 @@ impl KnowledgePersistence {
             .query_map([], |row| {
                 let vector_bytes: Vec<u8> = row.get(1)?;
                 validate_hypervector_bytes(&vector_bytes, 1)?;
-                let usage_count =
-                    decode_nonnegative_counter(row.get(2)?, 2, "ontology usage count")?;
+                let usage_count = decode_nonnegative_counter(row.get(2)?, 2, "ontology usage count")?;
                 let utility = decode_finite_f64(row.get(3)?, 3, "ontology utility")?;
-                let created_at_cycle =
-                    decode_nonnegative_counter(row.get(4)?, 4, "ontology creation cycle")?;
-                let last_used_cycle =
-                    decode_nonnegative_counter(row.get(5)?, 5, "ontology last-used cycle")?;
+                let created_at_cycle = decode_nonnegative_counter(row.get(4)?, 4, "ontology creation cycle")?;
+                let last_used_cycle = decode_nonnegative_counter(row.get(5)?, 5, "ontology last-used cycle")?;
                 Ok(OntologyRecord {
                     name: row.get(0)?,
                     vector_bytes,
@@ -589,11 +577,8 @@ mod tests {
             .unwrap();
 
         let conn = rusqlite::Connection::open(&db_path).unwrap();
-        conn.execute(
-            "UPDATE knowledge_facts SET confidence = 1.25",
-            [],
-        )
-        .unwrap();
+        conn.execute("UPDATE knowledge_facts SET confidence = 1.25", [])
+            .unwrap();
         drop(conn);
 
         let error = persistence.load_facts().unwrap_err();
@@ -690,11 +675,8 @@ mod tests {
             .unwrap();
 
         let conn = rusqlite::Connection::open(&db_path).unwrap();
-        conn.execute(
-            "UPDATE knowledge_causal_edges SET cycle = -1",
-            [],
-        )
-        .unwrap();
+        conn.execute("UPDATE knowledge_causal_edges SET cycle = -1", [])
+            .unwrap();
         drop(conn);
 
         let error = persistence.load_causal_edges().unwrap_err();
