@@ -257,7 +257,9 @@ fn report_status_tag(status: SuitInteropReportStatus) -> &'static str {
     match status {
         SuitInteropReportStatus::NoRequiredInterfacesToVerify => "no_required_interfaces_to_verify",
         SuitInteropReportStatus::RequiredInterfacesBlocked => "required_interfaces_blocked",
-        SuitInteropReportStatus::MeetsDeclaredCompatibilityPolicy => "meets_declared_compatibility_policy",
+        SuitInteropReportStatus::MeetsDeclaredCompatibilityPolicy => {
+            "meets_declared_compatibility_policy"
+        },
     }
 }
 
