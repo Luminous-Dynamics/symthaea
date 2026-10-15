@@ -128,7 +128,7 @@ pub struct MissionConfigurationReport {
     pub missing_required_connection_count: usize,
     pub compatible_required_connection_count: usize,
     pub blocked_required_connection_count: usize,
-    pub missing_required_component_count: usize,
+    pub missing_required_component_kind_count: usize,
     pub disconnected_required_component_count: usize,
     /// Always false: graph consistency is not physical qualification.
     pub represents_physical_qualification: bool,
@@ -290,7 +290,7 @@ pub fn evaluate_mission_configuration(
             present_required_kinds.insert(component.kind);
         }
     }
-    let missing_required_component_count = configuration
+    let missing_required_component_kind_count = configuration
         .required_component_kinds
         .iter()
         .filter(|kind| !present_required_kinds.contains(kind))
@@ -473,7 +473,7 @@ pub fn evaluate_mission_configuration(
         missing_required_connection_count,
         compatible_required_connection_count,
         blocked_required_connection_count,
-        missing_required_component_count,
+        missing_required_component_kind_count,
         disconnected_required_component_count,
         represents_physical_qualification: false,
     };
@@ -734,7 +734,7 @@ fn digest_report(report: &MissionConfigurationReport) -> String {
     writer.usize(report.missing_required_connection_count);
     writer.usize(report.compatible_required_connection_count);
     writer.usize(report.blocked_required_connection_count);
-    writer.usize(report.missing_required_component_count);
+    writer.usize(report.missing_required_component_kind_count);
     writer.usize(report.disconnected_required_component_count);
     writer.finish()
 }
@@ -1057,7 +1057,7 @@ mod tests {
         configuration.required_component_kinds.insert(MissionComponentKind::RescueCapability);
         let (report, _) = evaluate_mission_configuration(&configuration).unwrap();
         assert_eq!(report.status, MissionConfigurationStatus::Blocked);
-        assert_eq!(report.missing_required_component_count, 1);
+        assert_eq!(report.missing_required_component_kind_count, 1);
         assert!(report.findings.iter().any(|finding| {
             finding.code == MissionFindingCode::MissingRequiredComponent
                 && finding.subject_id == "rescue_capability"
