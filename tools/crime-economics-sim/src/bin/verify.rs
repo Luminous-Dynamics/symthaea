@@ -52,10 +52,16 @@ impl Row {
     fn parse(line: &str, line_number: usize) -> Result<Self, String> {
         let f: Vec<&str> = line.split('\t').collect();
         if f.len() != 20 {
-            return Err(format!("line {line_number}: expected 20 fields, got {}", f.len()));
+            return Err(format!(
+                "line {line_number}: expected 20 fields, got {}",
+                f.len()
+            ));
         }
         if f[0] != "1" {
-            return Err(format!("line {line_number}: unsupported schema version {}", f[0]));
+            return Err(format!(
+                "line {line_number}: unsupported schema version {}",
+                f[0]
+            ));
         }
         let parse_u64 = |index: usize, name: &str| -> Result<u64, String> {
             f[index]
@@ -139,7 +145,9 @@ fn get<'a>(
 fn run(path: &str) -> Result<(), String> {
     let text = fs::read_to_string(path).map_err(|e| format!("cannot read artifact {path}: {e}"))?;
     let mut lines = text.lines();
-    let header = lines.next().ok_or_else(|| "artifact is empty".to_string())?;
+    let header = lines
+        .next()
+        .ok_or_else(|| "artifact is empty".to_string())?;
     if header != EXPECTED_HEADER {
         return Err("artifact header differs from the frozen verifier schema".to_string());
     }
@@ -157,23 +165,41 @@ fn run(path: &str) -> Result<(), String> {
             return Err(format!("unknown policy on line {}", offset + 2));
         }
         if row.seed >= REPLICATIONS {
-            return Err(format!("seed outside frozen replication range on line {}", offset + 2));
+            return Err(format!(
+                "seed outside frozen replication range on line {}",
+                offset + 2
+            ));
         }
         if row.population != POPULATION || row.weeks != WEEKS {
-            return Err(format!("unexpected population/window on line {}", offset + 2));
+            return Err(format!(
+                "unexpected population/window on line {}",
+                offset + 2
+            ));
         }
         let expected_total = row.need + row.opportunity + row.non_economic + row.displaced;
         if expected_total != row.simulated_harm {
-            return Err(format!("crime event accounting identity failed on line {}", offset + 2));
+            return Err(format!(
+                "crime event accounting identity failed on line {}",
+                offset + 2
+            ));
         }
         if row.reported_harm > row.simulated_harm {
-            return Err(format!("reported incidents exceed underlying simulated incidents on line {}", offset + 2));
+            return Err(format!(
+                "reported incidents exceed underlying simulated incidents on line {}",
+                offset + 2
+            ));
         }
         if row.access_gain_bps > 10_000 || row.access_gap_bps > 10_000 {
-            return Err(format!("access metric outside basis-point bounds on line {}", offset + 2));
+            return Err(format!(
+                "access metric outside basis-point bounds on line {}",
+                offset + 2
+            ));
         }
         if row.compromise_weeks > WEEKS || row.safety_incidents > row.compromise_weeks {
-            return Err(format!("robot safety/compromise bounds failed on line {}", offset + 2));
+            return Err(format!(
+                "robot safety/compromise bounds failed on line {}",
+                offset + 2
+            ));
         }
 
         let robot_policy = row.policy == "robot_protection" || row.policy == "combined";
@@ -197,15 +223,24 @@ fn run(path: &str) -> Result<(), String> {
                 || row.concentration_bps != -1
                 || row.displaced != 0)
         {
-            return Err(format!("non-robot policy contains robot-only outcomes on line {}", offset + 2));
+            return Err(format!(
+                "non-robot policy contains robot-only outcomes on line {}",
+                offset + 2
+            ));
         }
         if robot_policy
             && (row.privacy_points == 0 || !(0..=10_000).contains(&row.concentration_bps))
         {
-            return Err(format!("robot-policy governance fields invalid on line {}", offset + 2));
+            return Err(format!(
+                "robot-policy governance fields invalid on line {}",
+                offset + 2
+            ));
         }
         if !essentials_policy && row.access_gain_bps != 0 {
-            return Err(format!("policy without an essentials program reported_harm access gains on line {}", offset + 2));
+            return Err(format!(
+                "policy without an essentials program reported_harm access gains on line {}",
+                offset + 2
+            ));
         }
         let key = row.identity_key();
         if rows.insert(key.clone(), row).is_some() {
@@ -215,7 +250,10 @@ fn run(path: &str) -> Result<(), String> {
 
     let expected_rows = EXPECTED_SCENARIOS.len() * EXPECTED_POLICIES.len() * REPLICATIONS as usize;
     if rows.len() != expected_rows {
-        return Err(format!("expected {expected_rows} unique rows, found {}", rows.len()));
+        return Err(format!(
+            "expected {expected_rows} unique rows, found {}",
+            rows.len()
+        ));
     }
     for scenario in EXPECTED_SCENARIOS {
         for seed in 0..REPLICATIONS {
@@ -231,10 +269,14 @@ fn run(path: &str) -> Result<(), String> {
             let reference = get(&rows, "reference", seed, policy)?;
             let suppressed = get(&rows, "reporting_suppression", seed, policy)?;
             if !reference.same_non_reporting_fields(suppressed) {
-                return Err(format!("reporting-only scenario changed non-report outcomes: seed={seed}, policy={policy}"));
+                return Err(format!(
+                    "reporting-only scenario changed non-report outcomes: seed={seed}, policy={policy}"
+                ));
             }
             if suppressed.reported_harm > reference.reported_harm {
-                return Err(format!("suppressed reporting unexpectedly created more reported_harm: seed={seed}, policy={policy}"));
+                return Err(format!(
+                    "suppressed reporting unexpectedly created more reported_harm: seed={seed}, policy={policy}"
+                ));
             }
         }
     }
@@ -248,12 +290,16 @@ fn run(path: &str) -> Result<(), String> {
                 || reference.opportunity != high.opportunity
                 || reference.non_economic != high.non_economic
             {
-                return Err(format!("displacement scenario changed focal-area outcomes: seed={seed}, policy={policy}"));
+                return Err(format!(
+                    "displacement scenario changed focal-area outcomes: seed={seed}, policy={policy}"
+                ));
             }
             if (policy == "robot_protection" || policy == "combined")
                 && high.displaced < reference.displaced
             {
-                return Err(format!("higher displacement did not increase displacement count: seed={seed}, policy={policy}"));
+                return Err(format!(
+                    "higher displacement did not increase displacement count: seed={seed}, policy={policy}"
+                ));
             }
         }
     }
@@ -264,7 +310,9 @@ fn run(path: &str) -> Result<(), String> {
         for scenario in EXPECTED_SCENARIOS {
             for policy in EXPECTED_POLICIES {
                 if get(&rows, scenario, seed, policy)?.non_economic != expected {
-                    return Err(format!("non-economic harm was silently changed: seed={seed}, scenario={scenario}, policy={policy}"));
+                    return Err(format!(
+                        "non-economic harm was silently changed: seed={seed}, scenario={scenario}, policy={policy}"
+                    ));
                 }
             }
         }
@@ -278,7 +326,9 @@ fn run(path: &str) -> Result<(), String> {
             if unequal.access_gap_bps <= reference.access_gap_bps
                 || unequal.access_gain_bps >= reference.access_gain_bps
             {
-                return Err(format!("unequal access was not surfaced: seed={seed}, policy={policy}"));
+                return Err(format!(
+                    "unequal access was not surfaced: seed={seed}, policy={policy}"
+                ));
             }
         }
     }
@@ -293,12 +343,16 @@ fn run(path: &str) -> Result<(), String> {
                 if concentrated.need < reference.need
                     || concentrated.concentration_bps <= reference.concentration_bps
                 {
-                    return Err(format!("concentrated automation shock not surfaced: seed={seed}, policy={policy}"));
+                    return Err(format!(
+                        "concentrated automation shock not surfaced: seed={seed}, policy={policy}"
+                    ));
                 }
             } else if !reference.same_non_reporting_fields(concentrated)
                 || reference.reported_harm != concentrated.reported_harm
             {
-                return Err(format!("automation shock leaked into a non-robot arm: seed={seed}, policy={policy}"));
+                return Err(format!(
+                    "automation shock leaked into a non-robot arm: seed={seed}, policy={policy}"
+                ));
             }
         }
     }
@@ -315,10 +369,16 @@ fn run(path: &str) -> Result<(), String> {
                     || low.displaced > reference.displaced
                     || low.simulated_harm < reference.simulated_harm
                 {
-                    return Err(format!("lower robot effectiveness improved outcomes: seed={seed}, policy={policy}"));
+                    return Err(format!(
+                        "lower robot effectiveness improved outcomes: seed={seed}, policy={policy}"
+                    ));
                 }
-            } else if !reference.same_non_reporting_fields(low) || reference.reported_harm != low.reported_harm {
-                return Err(format!("robot effectiveness sensitivity changed a non-robot arm: seed={seed}, policy={policy}"));
+            } else if !reference.same_non_reporting_fields(low)
+                || reference.reported_harm != low.reported_harm
+            {
+                return Err(format!(
+                    "robot effectiveness sensitivity changed a non-robot arm: seed={seed}, policy={policy}"
+                ));
             }
         }
     }
@@ -333,7 +393,9 @@ fn run(path: &str) -> Result<(), String> {
             || null_baseline.cost != 0
             || null_work.cost != 60_000
         {
-            return Err(format!("zero quality-work effect did not reduce to null outcomes: seed={seed}"));
+            return Err(format!(
+                "zero quality-work effect did not reduce to null outcomes: seed={seed}"
+            ));
         }
 
         for policy in ["baseline", "essentials", "robot_protection"] {
@@ -342,7 +404,9 @@ fn run(path: &str) -> Result<(), String> {
             if !reference.same_non_reporting_fields(null)
                 || reference.reported_harm != null.reported_harm
             {
-                return Err(format!("zero quality-work effect changed non-work policy: seed={seed}, policy={policy}"));
+                return Err(format!(
+                    "zero quality-work effect changed non-work policy: seed={seed}, policy={policy}"
+                ));
             }
         }
     }
@@ -359,22 +423,34 @@ fn run(path: &str) -> Result<(), String> {
                     || high.need < reference.need
                     || high.opportunity < reference.opportunity
                 {
-                    return Err(format!("robot compromise exposure not surfaced: seed={seed}, policy={policy}"));
+                    return Err(format!(
+                        "robot compromise exposure not surfaced: seed={seed}, policy={policy}"
+                    ));
                 }
-            } else if !reference.same_non_reporting_fields(high) || reference.reported_harm != high.reported_harm {
-                return Err(format!("robot compromise changed a non-robot policy: seed={seed}, policy={policy}"));
+            } else if !reference.same_non_reporting_fields(high)
+                || reference.reported_harm != high.reported_harm
+            {
+                return Err(format!(
+                    "robot compromise changed a non-robot policy: seed={seed}, policy={policy}"
+                ));
             }
         }
     }
 
     println!("VERIFICATION=PASS");
-    println!("CLAIM_CEILING=synthetic artifact invariants only; no causal, legal, safety, or real-world claim");
+    println!(
+        "CLAIM_CEILING=synthetic artifact invariants only; no causal, legal, safety, or real-world claim"
+    );
     println!("ROWS={}", rows.len());
     println!("SCENARIOS={}", EXPECTED_SCENARIOS.len());
     println!("POLICIES={}", EXPECTED_POLICIES.len());
     println!("REPLICATIONS_PER_CELL={REPLICATIONS}");
-    println!("NEGATIVE_CONTROLS=reporting_suppression,high_displacement,non_economic_harm,unequal_access,concentrated_automation,high_robot_compromise,low_robot_effectiveness,zero_quality_work_effect");
-    println!("SUMMARY_FIELDS=scenario,policy,mean_simulated_harm_events,mean_reported_harm_events,mean_displaced_property_events,mean_robot_safety_incidents,cost_units,access_gap_bps");
+    println!(
+        "NEGATIVE_CONTROLS=reporting_suppression,high_displacement,non_economic_harm,unequal_access,concentrated_automation,high_robot_compromise,low_robot_effectiveness,zero_quality_work_effect"
+    );
+    println!(
+        "SUMMARY_FIELDS=scenario,policy,mean_simulated_harm_events,mean_reported_harm_events,mean_displaced_property_events,mean_robot_safety_incidents,cost_units,access_gap_bps"
+    );
     for scenario in EXPECTED_SCENARIOS {
         for policy in EXPECTED_POLICIES {
             let group: Vec<&Row> = (0..REPLICATIONS)

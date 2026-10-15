@@ -325,7 +325,8 @@ pub fn run_one(scenario: &Scenario, arm: &PolicyArm, seed: u64) -> ResultRow {
                 1,
                 ROBOT_SAFETY_HARM_GIVEN_COMPROMISE,
                 cell_seed(seed, week, 99, ROBOT_SAFETY_STREAM),
-            ) > 0 {
+            ) > 0
+            {
                 robot_safety_incidents += 1;
             }
         }
@@ -360,9 +361,8 @@ pub fn run_one(scenario: &Scenario, arm: &PolicyArm, seed: u64) -> ResultRow {
                 * OPPORTUNITY_MULTIPLIERS[cohort]
                 * (1.0 - work_opportunity_reduction))
                 .clamp(0.0, 1.0);
-            let non_economic_probability =
-                BASE_NON_ECONOMIC_HARM_PROBABILITY_PER_HOUSEHOLD_WEEK
-                    * NON_ECONOMIC_MULTIPLIERS[cohort];
+            let non_economic_probability = BASE_NON_ECONOMIC_HARM_PROBABILITY_PER_HOUSEHOLD_WEEK
+                * NON_ECONOMIC_MULTIPLIERS[cohort];
 
             let need_generated = binomial(
                 COHORT_SIZES[cohort],
@@ -436,8 +436,7 @@ pub fn run_one(scenario: &Scenario, arm: &PolicyArm, seed: u64) -> ResultRow {
 
     let access = access_summary(scenario, arm);
     let benefit_concentration_bps = if arm.uses_robot_protection {
-        scenario.benefit_concentration_bps
-            - if arm.provides_quality_work { 1_500 } else { 0 }
+        scenario.benefit_concentration_bps - if arm.provides_quality_work { 1_500 } else { 0 }
     } else {
         -1
     };
@@ -542,7 +541,10 @@ mod tests {
         assert_eq!(REPLICATIONS, 32);
         assert_eq!(SCENARIOS.len(), 8);
         assert_eq!(POLICY_ARMS.len(), 5);
-        assert_eq!(run_matrix().len(), SCENARIOS.len() * POLICY_ARMS.len() * REPLICATIONS as usize);
+        assert_eq!(
+            run_matrix().len(),
+            SCENARIOS.len() * POLICY_ARMS.len() * REPLICATIONS as usize
+        );
     }
 
     #[test]
@@ -551,7 +553,11 @@ mod tests {
             for policy in POLICY_ARMS {
                 let first = run_one(scenario, policy, 17);
                 let second = run_one(scenario, policy, 17);
-                assert_eq!(first, second, "non-deterministic result for {}/{}", scenario.id, policy.id);
+                assert_eq!(
+                    first, second,
+                    "non-deterministic result for {}/{}",
+                    scenario.id, policy.id
+                );
             }
         }
     }
@@ -562,10 +568,22 @@ mod tests {
             for seed in 0..REPLICATIONS {
                 let reference = run_one(scenario("reference"), policy, seed);
                 let suppressed = run_one(scenario("reporting_suppression"), policy, seed);
-                assert_eq!(reference.simulated_harm_events_total, suppressed.simulated_harm_events_total);
-                assert_eq!(reference.need_property_events_local, suppressed.need_property_events_local);
-                assert_eq!(reference.opportunity_property_events_local, suppressed.opportunity_property_events_local);
-                assert_eq!(reference.non_economic_harm_events, suppressed.non_economic_harm_events);
+                assert_eq!(
+                    reference.simulated_harm_events_total,
+                    suppressed.simulated_harm_events_total
+                );
+                assert_eq!(
+                    reference.need_property_events_local,
+                    suppressed.need_property_events_local
+                );
+                assert_eq!(
+                    reference.opportunity_property_events_local,
+                    suppressed.opportunity_property_events_local
+                );
+                assert_eq!(
+                    reference.non_economic_harm_events,
+                    suppressed.non_economic_harm_events
+                );
                 assert!(suppressed.reported_harm_events <= reference.reported_harm_events);
             }
         }
@@ -577,9 +595,18 @@ mod tests {
             for seed in 0..REPLICATIONS {
                 let reference = run_one(scenario("reference"), policy, seed);
                 let high = run_one(scenario("high_displacement"), policy, seed);
-                assert_eq!(reference.need_property_events_local, high.need_property_events_local);
-                assert_eq!(reference.opportunity_property_events_local, high.opportunity_property_events_local);
-                assert_eq!(reference.non_economic_harm_events, high.non_economic_harm_events);
+                assert_eq!(
+                    reference.need_property_events_local,
+                    high.need_property_events_local
+                );
+                assert_eq!(
+                    reference.opportunity_property_events_local,
+                    high.opportunity_property_events_local
+                );
+                assert_eq!(
+                    reference.non_economic_harm_events,
+                    high.non_economic_harm_events
+                );
                 if policy.uses_robot_protection {
                     assert!(high.displaced_property_events >= reference.displaced_property_events);
                 } else {
@@ -595,7 +622,10 @@ mod tests {
             for policy in POLICY_ARMS {
                 let observed = run_one(scenario, policy, 7);
                 let baseline = run_one(scenario_by_id("reference").unwrap(), arm("baseline"), 7);
-                assert_eq!(observed.non_economic_harm_events, baseline.non_economic_harm_events);
+                assert_eq!(
+                    observed.non_economic_harm_events,
+                    baseline.non_economic_harm_events
+                );
             }
         }
     }
@@ -607,8 +637,12 @@ mod tests {
                 let policy = arm(policy_id);
                 let reference = run_one(scenario("reference"), policy, seed);
                 let concentrated = run_one(scenario("concentrated_automation"), policy, seed);
-                assert!(concentrated.need_property_events_local >= reference.need_property_events_local);
-                assert!(concentrated.benefit_concentration_bps > reference.benefit_concentration_bps);
+                assert!(
+                    concentrated.need_property_events_local >= reference.need_property_events_local
+                );
+                assert!(
+                    concentrated.benefit_concentration_bps > reference.benefit_concentration_bps
+                );
             }
         }
     }
@@ -617,15 +651,32 @@ mod tests {
     fn compromised_robot_weeks_raise_exposure_without_affecting_non_robot_arms() {
         for seed in 0..REPLICATIONS {
             let reference_robot = run_one(scenario("reference"), arm("robot_protection"), seed);
-            let compromised_robot = run_one(scenario("high_robot_compromise"), arm("robot_protection"), seed);
-            assert!(compromised_robot.robot_compromise_weeks >= reference_robot.robot_compromise_weeks);
-            assert!(compromised_robot.robot_safety_incidents >= reference_robot.robot_safety_incidents);
+            let compromised_robot = run_one(
+                scenario("high_robot_compromise"),
+                arm("robot_protection"),
+                seed,
+            );
+            assert!(
+                compromised_robot.robot_compromise_weeks >= reference_robot.robot_compromise_weeks
+            );
+            assert!(
+                compromised_robot.robot_safety_incidents >= reference_robot.robot_safety_incidents
+            );
 
-            for policy in POLICY_ARMS.iter().filter(|policy| !policy.uses_robot_protection) {
+            for policy in POLICY_ARMS
+                .iter()
+                .filter(|policy| !policy.uses_robot_protection)
+            {
                 let reference = run_one(scenario("reference"), policy, seed);
                 let compromised = run_one(scenario("high_robot_compromise"), policy, seed);
-                assert_eq!(reference.simulated_harm_events_total, compromised.simulated_harm_events_total);
-                assert_eq!(reference.reported_harm_events, compromised.reported_harm_events);
+                assert_eq!(
+                    reference.simulated_harm_events_total,
+                    compromised.simulated_harm_events_total
+                );
+                assert_eq!(
+                    reference.reported_harm_events,
+                    compromised.reported_harm_events
+                );
             }
         }
     }
@@ -652,10 +703,21 @@ mod tests {
                 let reference = run_one(reference_scenario, policy, seed);
                 let low_effect = run_one(low_effect_scenario, policy, seed);
                 if policy.uses_robot_protection {
-                    assert!(low_effect.need_property_events_local >= reference.need_property_events_local);
-                    assert!(low_effect.opportunity_property_events_local >= reference.opportunity_property_events_local);
-                    assert!(low_effect.displaced_property_events <= reference.displaced_property_events);
-                    assert!(low_effect.simulated_harm_events_total >= reference.simulated_harm_events_total);
+                    assert!(
+                        low_effect.need_property_events_local
+                            >= reference.need_property_events_local
+                    );
+                    assert!(
+                        low_effect.opportunity_property_events_local
+                            >= reference.opportunity_property_events_local
+                    );
+                    assert!(
+                        low_effect.displaced_property_events <= reference.displaced_property_events
+                    );
+                    assert!(
+                        low_effect.simulated_harm_events_total
+                            >= reference.simulated_harm_events_total
+                    );
                 } else {
                     assert!(low_effect.same_outcomes_except_scenario_id(&reference));
                 }
@@ -687,7 +749,10 @@ mod tests {
                 quality_work.simulated_harm_events_total,
                 baseline.simulated_harm_events_total
             );
-            assert_eq!(quality_work.reported_harm_events, baseline.reported_harm_events);
+            assert_eq!(
+                quality_work.reported_harm_events,
+                baseline.reported_harm_events
+            );
             assert_eq!(quality_work.annualized_cost_units, 60_000);
             assert_eq!(baseline.annualized_cost_units, 0);
 

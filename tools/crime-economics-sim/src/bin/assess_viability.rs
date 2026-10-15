@@ -1,4 +1,4 @@
-use symthaea_crime_economics_sim::viability::{rows, TSV_HEADER};
+use symthaea_crime_economics_sim::viability::{TSV_HEADER, rows};
 
 fn main() {
     println!("{TSV_HEADER}");

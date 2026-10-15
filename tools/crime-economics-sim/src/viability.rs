@@ -6,7 +6,13 @@
 //! The gates are illustrative policy-contract values, not universal standards.
 
 pub const VIABILITY_SCHEMA_VERSION: u32 = 1;
-pub const COHORT_IDS: [&str; 5] = ["cohort_01", "cohort_02", "cohort_03", "cohort_04", "cohort_05"];
+pub const COHORT_IDS: [&str; 5] = [
+    "cohort_01",
+    "cohort_02",
+    "cohort_03",
+    "cohort_04",
+    "cohort_05",
+];
 pub const VIABILITY_SCENARIOS: [&str; 10] = [
     "baseline",
     "high_mean_low_floor",
@@ -73,16 +79,56 @@ pub struct ViabilityRow {
 }
 
 pub static SCENARIOS: [Scenario; 10] = [
-    Scenario { id: "baseline", evidence_status: "usable", evidence_age_days: 30 },
-    Scenario { id: "high_mean_low_floor", evidence_status: "usable", evidence_age_days: 30 },
-    Scenario { id: "opportunity_without_quality", evidence_status: "usable", evidence_age_days: 30 },
-    Scenario { id: "high_access_friction", evidence_status: "usable", evidence_age_days: 30 },
-    Scenario { id: "threshold_straddle", evidence_status: "usable", evidence_age_days: 30 },
-    Scenario { id: "stale_source_data", evidence_status: "stale", evidence_age_days: 270 },
-    Scenario { id: "conflicted_sources", evidence_status: "conflicted", evidence_age_days: 30 },
-    Scenario { id: "missing_data", evidence_status: "unavailable", evidence_age_days: 30 },
-    Scenario { id: "wide_uncertainty", evidence_status: "usable", evidence_age_days: 30 },
-    Scenario { id: "opportunity_gap_hidden_by_mean", evidence_status: "usable", evidence_age_days: 30 },
+    Scenario {
+        id: "baseline",
+        evidence_status: "usable",
+        evidence_age_days: 30,
+    },
+    Scenario {
+        id: "high_mean_low_floor",
+        evidence_status: "usable",
+        evidence_age_days: 30,
+    },
+    Scenario {
+        id: "opportunity_without_quality",
+        evidence_status: "usable",
+        evidence_age_days: 30,
+    },
+    Scenario {
+        id: "high_access_friction",
+        evidence_status: "usable",
+        evidence_age_days: 30,
+    },
+    Scenario {
+        id: "threshold_straddle",
+        evidence_status: "usable",
+        evidence_age_days: 30,
+    },
+    Scenario {
+        id: "stale_source_data",
+        evidence_status: "stale",
+        evidence_age_days: 270,
+    },
+    Scenario {
+        id: "conflicted_sources",
+        evidence_status: "conflicted",
+        evidence_age_days: 30,
+    },
+    Scenario {
+        id: "missing_data",
+        evidence_status: "unavailable",
+        evidence_age_days: 30,
+    },
+    Scenario {
+        id: "wide_uncertainty",
+        evidence_status: "usable",
+        evidence_age_days: 30,
+    },
+    Scenario {
+        id: "opportunity_gap_hidden_by_mean",
+        evidence_status: "usable",
+        evidence_age_days: 30,
+    },
 ];
 
 const fn baseline_profile(cohort: usize) -> CohortProfile {
@@ -141,7 +187,12 @@ fn profile_for(scenario_id: &str, cohort: usize) -> CohortProfile {
         "baseline" | "stale_source_data" | "conflicted_sources" => profile,
         "high_mean_low_floor" => {
             profile.essentials_access = Some(if cohort < 4 {
-                [interval(0.97, 0.99), interval(0.96, 0.99), interval(0.96, 0.98), interval(0.95, 0.98)][cohort]
+                [
+                    interval(0.97, 0.99),
+                    interval(0.96, 0.99),
+                    interval(0.96, 0.98),
+                    interval(0.95, 0.98),
+                ][cohort]
             } else {
                 interval(0.68, 0.72)
             });
@@ -217,7 +268,12 @@ fn lower_is_better_pass_or_uncertain(interval: Option<Interval>, ceiling: f64) -
         None => "missing",
         Some(value) if !valid_time(value) => "invalid",
         Some(value) if value.low > ceiling => "fail",
-        Some(value) if value.high <= ceiling && value.high - value.low <= MAX_TIME_INTERVAL_WIDTH_MINUTES => "pass",
+        Some(value)
+            if value.high <= ceiling
+                && value.high - value.low <= MAX_TIME_INTERVAL_WIDTH_MINUTES =>
+        {
+            "pass"
+        }
         Some(_) => "uncertain",
     }
 }
@@ -240,12 +296,18 @@ pub fn cohort_status(scenario: &Scenario, profile: CohortProfile) -> &'static st
     }
     let checks = [
         interval_pass_or_uncertain(profile.essentials_access, MIN_ESSENTIALS_ACCESS),
-        interval_pass_or_uncertain(profile.lawful_opportunity_coverage, MIN_LAWFUL_OPPORTUNITY_COVERAGE),
+        interval_pass_or_uncertain(
+            profile.lawful_opportunity_coverage,
+            MIN_LAWFUL_OPPORTUNITY_COVERAGE,
+        ),
         interval_pass_or_uncertain(profile.fair_pay_adequacy, MIN_FAIR_PAY_ADEQUACY),
         interval_pass_or_uncertain(profile.safe_work, MIN_SAFE_WORK),
         interval_pass_or_uncertain(profile.work_stability, MIN_WORK_STABILITY),
         interval_pass_or_uncertain(profile.social_protection_coverage, MIN_SOCIAL_PROTECTION),
-        lower_is_better_pass_or_uncertain(profile.lawful_access_time_minutes, MAX_LAWFUL_ACCESS_TIME_MINUTES),
+        lower_is_better_pass_or_uncertain(
+            profile.lawful_access_time_minutes,
+            MAX_LAWFUL_ACCESS_TIME_MINUTES,
+        ),
     ];
     if checks.contains(&"invalid") {
         return "fixture_indeterminate";
@@ -259,7 +321,10 @@ pub fn cohort_status(scenario: &Scenario, profile: CohortProfile) -> &'static st
     "fixture_pass"
 }
 
-fn scenario_gap(profile_selector: impl Fn(usize) -> CohortProfile, selector: impl Fn(CohortProfile) -> Option<Interval>) -> Option<f64> {
+fn scenario_gap(
+    profile_selector: impl Fn(usize) -> CohortProfile,
+    selector: impl Fn(CohortProfile) -> Option<Interval>,
+) -> Option<f64> {
     let mut min_low = f64::INFINITY;
     let mut max_high = f64::NEG_INFINITY;
     for cohort in 0..COHORT_IDS.len() {
@@ -288,11 +353,20 @@ pub fn scenario_status(scenario: &Scenario) -> &'static str {
     if any_indeterminate {
         return "fixture_indeterminate";
     }
-    let essentials_gap = scenario_gap(|cohort| profile_for(scenario.id, cohort), |profile| profile.essentials_access);
-    let opportunity_gap = scenario_gap(|cohort| profile_for(scenario.id, cohort), |profile| profile.lawful_opportunity_coverage);
+    let essentials_gap = scenario_gap(
+        |cohort| profile_for(scenario.id, cohort),
+        |profile| profile.essentials_access,
+    );
+    let opportunity_gap = scenario_gap(
+        |cohort| profile_for(scenario.id, cohort),
+        |profile| profile.lawful_opportunity_coverage,
+    );
     match (essentials_gap, opportunity_gap) {
         (Some(essential), Some(opportunity))
-            if essential <= MAX_COHORT_COVERAGE_GAP && opportunity <= MAX_COHORT_COVERAGE_GAP => "fixture_pass",
+            if essential <= MAX_COHORT_COVERAGE_GAP && opportunity <= MAX_COHORT_COVERAGE_GAP =>
+        {
+            "fixture_pass"
+        }
         (Some(_), Some(_)) => "fixture_fail",
         _ => "fixture_indeterminate",
     }
@@ -314,7 +388,8 @@ pub fn rows() -> Vec<ViabilityRow> {
                 evidence_status: scenario.evidence_status.to_string(),
                 evidence_age_days: scenario.evidence_age_days,
                 profile: profile_for(scenario.id, index),
-                cohort_gate_status: cohort_status(scenario, profile_for(scenario.id, index)).to_string(),
+                cohort_gate_status: cohort_status(scenario, profile_for(scenario.id, index))
+                    .to_string(),
                 scenario_gate_status: scenario_gate_status.clone(),
             });
         }
@@ -365,7 +440,10 @@ mod tests {
     use super::*;
 
     fn scenario(id: &str) -> &'static Scenario {
-        SCENARIOS.iter().find(|scenario| scenario.id == id).expect("fixture scenario missing")
+        SCENARIOS
+            .iter()
+            .find(|scenario| scenario.id == id)
+            .expect("fixture scenario missing")
     }
 
     #[test]
@@ -373,7 +451,11 @@ mod tests {
         assert_eq!(rows().len(), 50);
         assert_eq!(COHORT_IDS.len(), 5);
         assert_eq!(SCENARIOS.len(), 10);
-        assert!(rows().iter().all(|row| row.evidence_class == "synthetic_fixture"));
+        assert!(
+            rows()
+                .iter()
+                .all(|row| row.evidence_class == "synthetic_fixture")
+        );
     }
 
     #[test]
@@ -385,14 +467,25 @@ mod tests {
     fn high_average_cannot_hide_a_low_floor_cohort() {
         let mean = (0..COHORT_IDS.len())
             .map(|index| {
-                let range = profile_for("high_mean_low_floor", index).essentials_access.unwrap();
+                let range = profile_for("high_mean_low_floor", index)
+                    .essentials_access
+                    .unwrap();
                 (range.low + range.high) / 2.0
             })
             .sum::<f64>()
             / COHORT_IDS.len() as f64;
         assert!(mean > MIN_ESSENTIALS_ACCESS);
-        assert_eq!(cohort_status(scenario("high_mean_low_floor"), profile_for("high_mean_low_floor", 4)), "fixture_fail");
-        assert_eq!(scenario_status(scenario("high_mean_low_floor")), "fixture_fail");
+        assert_eq!(
+            cohort_status(
+                scenario("high_mean_low_floor"),
+                profile_for("high_mean_low_floor", 4)
+            ),
+            "fixture_fail"
+        );
+        assert_eq!(
+            scenario_status(scenario("high_mean_low_floor")),
+            "fixture_fail"
+        );
     }
 
     #[test]
@@ -400,23 +493,42 @@ mod tests {
         let p = profile_for("opportunity_without_quality", 0);
         assert!(p.lawful_opportunity_coverage.unwrap().low >= MIN_LAWFUL_OPPORTUNITY_COVERAGE);
         assert!(p.fair_pay_adequacy.unwrap().high < MIN_FAIR_PAY_ADEQUACY);
-        assert_eq!(scenario_status(scenario("opportunity_without_quality")), "fixture_fail");
+        assert_eq!(
+            scenario_status(scenario("opportunity_without_quality")),
+            "fixture_fail"
+        );
     }
 
     #[test]
     fn access_friction_is_an_independent_veto() {
-        assert_eq!(scenario_status(scenario("high_access_friction")), "fixture_fail");
+        assert_eq!(
+            scenario_status(scenario("high_access_friction")),
+            "fixture_fail"
+        );
     }
 
     #[test]
     fn uncertain_stale_conflicted_and_missing_data_do_not_pass() {
-        for id in ["threshold_straddle", "stale_source_data", "conflicted_sources", "missing_data", "wide_uncertainty"] {
-            assert_eq!(scenario_status(scenario(id)), "fixture_indeterminate", "scenario {id}");
+        for id in [
+            "threshold_straddle",
+            "stale_source_data",
+            "conflicted_sources",
+            "missing_data",
+            "wide_uncertainty",
+        ] {
+            assert_eq!(
+                scenario_status(scenario(id)),
+                "fixture_indeterminate",
+                "scenario {id}"
+            );
         }
     }
 
     #[test]
     fn cohort_coverage_gap_cannot_be_hidden_by_a_mean() {
-        assert_eq!(scenario_status(scenario("opportunity_gap_hidden_by_mean")), "fixture_fail");
+        assert_eq!(
+            scenario_status(scenario("opportunity_gap_hidden_by_mean")),
+            "fixture_fail"
+        );
     }
 }

@@ -28,15 +28,15 @@
     },
     {
       "path": "tools/crime-economics-sim/src/lib.rs",
-      "git_blob_sha1": "18635ec899850c2d8a660dc8cd287e89e45e64b0"
+      "git_blob_sha1": "f5a7004e0d43eaad743e7c824194d445ea045f85"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/simulate.rs",
-      "git_blob_sha1": "50ecbee795befeeb4d91c71b188b1feb1aec6848"
+      "git_blob_sha1": "e458d300d12ce10c105882e7cadb63b38f8d00fb"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/verify.rs",
-      "git_blob_sha1": "c77c37c8a571bf2079070ff30bbd9df4c7dc3f5c"
+      "git_blob_sha1": "a9b38f6d2e436abaf4a746e61ad695b0e3ea7434"
     },
     {
       "path": "tools/crime-economics-sim/README.md",
@@ -48,15 +48,15 @@
     },
     {
       "path": "tools/crime-economics-sim/src/viability.rs",
-      "git_blob_sha1": "3b5b5fb0699721dfc4aa05c75a8aacc19263fd82"
+      "git_blob_sha1": "f155492ac0914b354199a724fe316a4a8e28b121"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/assess_viability.rs",
-      "git_blob_sha1": "a324d08ebc78336f09646a6d6efdaa7de027f3f2"
+      "git_blob_sha1": "d6bbda4af37b8d5f8dea63f43b8f4290542dfd3d"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/verify_viability.rs",
-      "git_blob_sha1": "7591f19edd762cc6b171a7097c3099bc2550f5c8"
+      "git_blob_sha1": "31056e3e4231c6321a9c21e2a427fa2483d7d40d"
     }
   ],
   "scenario_ids": [

@@ -1,4 +1,4 @@
-use symthaea_crime_economics_sim::{run_matrix, TSV_HEADER};
+use symthaea_crime_economics_sim::{TSV_HEADER, run_matrix};
 
 fn main() {
     println!("{TSV_HEADER}");

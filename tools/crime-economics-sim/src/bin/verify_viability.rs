@@ -16,7 +16,13 @@ const SCENARIOS: [&str; 10] = [
     "wide_uncertainty",
     "opportunity_gap_hidden_by_mean",
 ];
-const COHORTS: [&str; 5] = ["cohort_01", "cohort_02", "cohort_03", "cohort_04", "cohort_05"];
+const COHORTS: [&str; 5] = [
+    "cohort_01",
+    "cohort_02",
+    "cohort_03",
+    "cohort_04",
+    "cohort_05",
+];
 const MIN_ESSENTIALS_ACCESS: f64 = 0.90;
 const MIN_LAWFUL_OPPORTUNITY_COVERAGE: f64 = 0.80;
 const MIN_FAIR_PAY_ADEQUACY: f64 = 0.80;
@@ -38,17 +44,27 @@ struct Range {
 impl Range {
     fn parse(low: &str, high: &str, name: &str, line: usize) -> Result<Self, String> {
         if low.is_empty() && high.is_empty() {
-            return Ok(Self { low: None, high: None });
+            return Ok(Self {
+                low: None,
+                high: None,
+            });
         }
         if low.is_empty() || high.is_empty() {
             return Err(format!("line {line}: half-missing range {name}"));
         }
-        let low = low.parse::<f64>().map_err(|_| format!("line {line}: invalid {name} lower bound"))?;
-        let high = high.parse::<f64>().map_err(|_| format!("line {line}: invalid {name} upper bound"))?;
+        let low = low
+            .parse::<f64>()
+            .map_err(|_| format!("line {line}: invalid {name} lower bound"))?;
+        let high = high
+            .parse::<f64>()
+            .map_err(|_| format!("line {line}: invalid {name} upper bound"))?;
         if !low.is_finite() || !high.is_finite() || low > high {
             return Err(format!("line {line}: invalid {name} interval"));
         }
-        Ok(Self { low: Some(low), high: Some(high) })
+        Ok(Self {
+            low: Some(low),
+            high: Some(high),
+        })
     }
 
     fn complete(&self) -> Result<(f64, f64), String> {
@@ -89,12 +105,17 @@ impl Row {
     fn parse(line: &str, line_number: usize) -> Result<Self, String> {
         let f: Vec<&str> = line.split('\t').collect();
         if f.len() != 22 {
-            return Err(format!("line {line_number}: expected 22 columns, found {}", f.len()));
+            return Err(format!(
+                "line {line_number}: expected 22 columns, found {}",
+                f.len()
+            ));
         }
         if f[0] != "1" {
             return Err(format!("line {line_number}: unsupported schema version"));
         }
-        let age_days = f[5].parse::<u32>().map_err(|_| format!("line {line_number}: invalid evidence age"))?;
+        let age_days = f[5]
+            .parse::<u32>()
+            .map_err(|_| format!("line {line_number}: invalid evidence age"))?;
         Ok(Self {
             scenario: f[1].to_string(),
             cohort: f[2].to_string(),
@@ -200,7 +221,9 @@ fn group_gap(rows: &[&Row], selector: fn(&Row) -> &Range) -> Option<f64> {
 
 fn assess_scenario(rows: &[&Row]) -> &'static str {
     if rows.len() != COHORTS.len()
-        || rows.iter().any(|r| r.evidence_status != "usable" || r.age_days > MAX_EVIDENCE_AGE_DAYS)
+        || rows
+            .iter()
+            .any(|r| r.evidence_status != "usable" || r.age_days > MAX_EVIDENCE_AGE_DAYS)
     {
         return "fixture_indeterminate";
     }
@@ -214,7 +237,11 @@ fn assess_scenario(rows: &[&Row]) -> &'static str {
     let essentials_gap = group_gap(rows, |r| &r.essentials);
     let opportunity_gap = group_gap(rows, |r| &r.opportunity);
     match (essentials_gap, opportunity_gap) {
-        (Some(essentials), Some(opportunity)) if essentials <= MAX_COHORT_COVERAGE_GAP && opportunity <= MAX_COHORT_COVERAGE_GAP => "fixture_pass",
+        (Some(essentials), Some(opportunity))
+            if essentials <= MAX_COHORT_COVERAGE_GAP && opportunity <= MAX_COHORT_COVERAGE_GAP =>
+        {
+            "fixture_pass"
+        }
         (Some(_), Some(_)) => "fixture_fail",
         _ => "fixture_indeterminate",
     }
@@ -239,9 +266,19 @@ fn run(path: &str) -> Result<(), String> {
             return Err(format!("unknown cohort at line {}", i + 2));
         }
         if row.evidence_class != "synthetic_fixture" {
-            return Err(format!("non-synthetic evidence class is forbidden in this fixture at line {}", i + 2));
+            return Err(format!(
+                "non-synthetic evidence class is forbidden in this fixture at line {}",
+                i + 2
+            ));
         }
-        for range in [&row.essentials, &row.opportunity, &row.pay, &row.safe_work, &row.stability, &row.social_protection] {
+        for range in [
+            &row.essentials,
+            &row.opportunity,
+            &row.pay,
+            &row.safe_work,
+            &row.stability,
+            &row.social_protection,
+        ] {
             if let (Some(low), Some(high)) = (range.low, range.high) {
                 if low < 0.0 || high > 1.0 || low > high {
                     return Err(format!("fractional range out of bounds at line {}", i + 2));
@@ -251,7 +288,8 @@ fn run(path: &str) -> Result<(), String> {
         if row.age_days > 100_000 {
             return Err(format!("implausible evidence age at line {}", i + 2));
         }
-        if !["usable", "stale", "conflicted", "unavailable"].contains(&row.evidence_status.as_str()) {
+        if !["usable", "stale", "conflicted", "unavailable"].contains(&row.evidence_status.as_str())
+        {
             return Err(format!("unknown evidence state at line {}", i + 2));
         }
         let key = row.key();
@@ -261,19 +299,30 @@ fn run(path: &str) -> Result<(), String> {
     }
 
     if rows.len() != SCENARIOS.len() * COHORTS.len() {
-        return Err(format!("expected {} rows, got {}", SCENARIOS.len() * COHORTS.len(), rows.len()));
+        return Err(format!(
+            "expected {} rows, got {}",
+            SCENARIOS.len() * COHORTS.len(),
+            rows.len()
+        ));
     }
 
     let mut scenario_map: BTreeMap<String, Vec<&Row>> = BTreeMap::new();
     for scenario in SCENARIOS {
         for cohort in COHORTS {
-            let row = rows.get(&(scenario.to_string(), cohort.to_string()))
+            let row = rows
+                .get(&(scenario.to_string(), cohort.to_string()))
                 .ok_or_else(|| format!("missing row {scenario}/{cohort}"))?;
             let calculated = assess_cohort(row);
             if row.recorded_cohort_status != calculated {
-                return Err(format!("cohort status mismatch for {scenario}/{cohort}: recorded={}, calculated={calculated}", row.recorded_cohort_status));
+                return Err(format!(
+                    "cohort status mismatch for {scenario}/{cohort}: recorded={}, calculated={calculated}",
+                    row.recorded_cohort_status
+                ));
             }
-            scenario_map.entry(scenario.to_string()).or_default().push(row);
+            scenario_map
+                .entry(scenario.to_string())
+                .or_default()
+                .push(row);
         }
     }
 
@@ -282,7 +331,10 @@ fn run(path: &str) -> Result<(), String> {
         let calculated = assess_scenario(group);
         for row in group {
             if row.recorded_scenario_status != calculated {
-                return Err(format!("scenario gate mismatch for {scenario}: recorded={}, calculated={calculated}", row.recorded_scenario_status));
+                return Err(format!(
+                    "scenario gate mismatch for {scenario}: recorded={}, calculated={calculated}",
+                    row.recorded_scenario_status
+                ));
             }
         }
     }
@@ -292,23 +344,40 @@ fn run(path: &str) -> Result<(), String> {
         return Err("baseline synthetic fixture must pass all gates".to_string());
     }
     let high_mean: Vec<&Row> = scenario_map["high_mean_low_floor"].clone();
-    let mean_essentials = high_mean.iter().map(|row| {
-        let (low, high) = row.essentials.complete().expect("fixture intervals are present");
-        (low + high) / 2.0
-    }).sum::<f64>() / high_mean.len() as f64;
+    let mean_essentials = high_mean
+        .iter()
+        .map(|row| {
+            let (low, high) = row
+                .essentials
+                .complete()
+                .expect("fixture intervals are present");
+            (low + high) / 2.0
+        })
+        .sum::<f64>()
+        / high_mean.len() as f64;
     if mean_essentials <= MIN_ESSENTIALS_ACCESS || assess_scenario(&high_mean) != "fixture_fail" {
         return Err("high mean must not hide a clearly failing cohort floor".to_string());
     }
     let job_count: Vec<&Row> = scenario_map["opportunity_without_quality"].clone();
-    if job_count.iter().any(|row| row.opportunity.low.unwrap_or(0.0) < MIN_LAWFUL_OPPORTUNITY_COVERAGE)
+    if job_count
+        .iter()
+        .any(|row| row.opportunity.low.unwrap_or(0.0) < MIN_LAWFUL_OPPORTUNITY_COVERAGE)
         || assess_scenario(&job_count) != "fixture_fail"
     {
-        return Err("high opportunity coverage must not compensate for poor quality dimensions".to_string());
+        return Err(
+            "high opportunity coverage must not compensate for poor quality dimensions".to_string(),
+        );
     }
     if assess_scenario(&scenario_map["high_access_friction"]) != "fixture_fail" {
         return Err("high lawful-access friction must veto apparent feasibility".to_string());
     }
-    for scenario in ["threshold_straddle", "stale_source_data", "conflicted_sources", "missing_data", "wide_uncertainty"] {
+    for scenario in [
+        "threshold_straddle",
+        "stale_source_data",
+        "conflicted_sources",
+        "missing_data",
+        "wide_uncertainty",
+    ] {
         if assess_scenario(&scenario_map[scenario]) != "fixture_indeterminate" {
             return Err(format!("{scenario} should remain indeterminate"));
         }
@@ -318,14 +387,23 @@ fn run(path: &str) -> Result<(), String> {
     }
 
     println!("VIABILITY_VERIFICATION=PASS");
-    println!("CLAIM_CEILING=synthetic gate contract only; not an empirical, causal, legal, or individual assessment");
+    println!(
+        "CLAIM_CEILING=synthetic gate contract only; not an empirical, causal, legal, or individual assessment"
+    );
     println!("SCENARIOS={}", SCENARIOS.len());
     println!("COHORTS_PER_SCENARIO={}", COHORTS.len());
     println!("ROWS={}", rows.len());
-    println!("NON_COMPENSATORY_GATES=essentials,opportunity_coverage,fair_pay,safe_work,stability,social_protection,access_time,cohort_gap,evidence_freshness,uncertainty");
-    println!("NEGATIVE_CONTROLS=high_mean_low_floor,opportunity_without_quality,high_access_friction,threshold_straddle,stale_source_data,conflicted_sources,missing_data,wide_uncertainty,opportunity_gap_hidden_by_mean");
+    println!(
+        "NON_COMPENSATORY_GATES=essentials,opportunity_coverage,fair_pay,safe_work,stability,social_protection,access_time,cohort_gap,evidence_freshness,uncertainty"
+    );
+    println!(
+        "NEGATIVE_CONTROLS=high_mean_low_floor,opportunity_without_quality,high_access_friction,threshold_straddle,stale_source_data,conflicted_sources,missing_data,wide_uncertainty,opportunity_gap_hidden_by_mean"
+    );
     for scenario in SCENARIOS {
-        println!("SYNTHETIC_FIXTURE scenario={scenario} gate={} note=ILLUSTRATIVE_NOT_EMPIRICAL", assess_scenario(&scenario_map[scenario]));
+        println!(
+            "SYNTHETIC_FIXTURE scenario={scenario} gate={} note=ILLUSTRATIVE_NOT_EMPIRICAL",
+            assess_scenario(&scenario_map[scenario])
+        );
     }
     Ok(())
 }
