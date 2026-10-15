@@ -263,6 +263,46 @@ The optimizer may propose candidates and select the next analysis. It must not s
 - No material allowables, safety factors, densities, or solver results are silently defaulted.
 - Independent checker and physical-test gates remain outstanding until evidence exists.
 
+## Next refinement: deterministic uncertainty bounds and geometry alternatives
+
+### Propagate stated uncertainty instead of hiding it in a single assumed mass
+
+The Rust screen now exposes screen_spherical_payload_bounds. For a fixed radius, the caller supplies lower and upper bounds for:
+
+- ambient-air density;
+- internal-gas density;
+- complete structural-system areal mass; and
+- fixed non-structural vehicle mass.
+
+The lower payload allowance uses the lowest ambient density, highest internal density, highest structural areal mass, and highest fixed mass. The upper allowance uses the opposite endpoints. These are deterministic outer bounds for all independent combinations inside those intervals, not confidence intervals and not probability-weighted forecasts.
+
+For a reference sphere with radius 20 m, one deliberately hypothetical example uses air density 1.20–1.25 kg/m³, internal density 0–0.01 kg/m³, structural-system areal mass 4–5 kg/m², and fixed non-structural mass 14–18 tonnes. The resulting payload mass interval is approximately **−3.26 to +7.78 tonnes**. This is an example of the method, not a prediction: those mass bounds have not been sourced or validated, and the assumed structure has no demonstrated external-pressure capacity.
+
+The resulting MassBudgetStatus is one of:
+
+- RobustlyNonNegative: all input combinations in the declared bounds give non-negative payload allowance.
+- BoundSensitive: the interval crosses zero, so the mass conclusion changes with the assumptions.
+- NegativeThroughout: even the optimistic bound is negative.
+
+This status only describes the mass equation. RobustlyNonNegative does **not** mean structurally feasible. The inputs must cite the actual origin and applicability of their bounds before results should be used for engineering decisions. The current interval holds radius fixed; radius tolerance, geometry variation, covariance between parameters, manufacturing variability, and operating-condition changes need separate treatment rather than silently assuming they are covered.
+
+### Expand geometry search beyond a smooth sphere—but keep the loads honest
+
+Compare the spherical reference against at least two distinct families:
+
+1. **Triangulated geodesic/polyhedral shells.** Member compression and joint eccentricity may govern; use measured node stiffness and explicit imperfections.
+2. **Stellated or deliberately faceted shells.** Some shapes may reduce sensitivity to imperfections compared with a smooth sphere, but facet bending, edge compression, local panel buckling, joinery, and volume penalties become central.
+3. **Lattice-core sandwich shells.** Track facesheet wrinkling, core shear/crush, debonding, and global shell instability as separate failure modes.
+4. **Conventional pressure-capable buoyant baseline.** Compare a helium envelope or another validated buoyant architecture using the same cargo, range, reserve, and operating constraints. This baseline prevents the vacuum concept from benefiting from asymmetric assumptions.
+
+An important research lead is Ning and Pellegrino's study of externally pressurized geodesic and stellated shells, which reports reduced imperfection sensitivity for some examined configurations: [DOI 10.1016/j.jmps.2018.06.008](https://doi.org/10.1016/j.jmps.2018.06.008). That supports studying geometry as a design variable, not transferring its result to an untested airship. Likewise, NASA's shell-buckling work emphasizes that geometric/loading imperfections can materially reduce capacity and that knockdown recommendations are geometry- and scope-specific: [NASA NTRS 2016 study of composite sandwich shell buckling](https://ntrs.nasa.gov/citations/20160012029).
+
+### The next evidence gate
+
+For each candidate, retain a complete and versioned evidence bundle: exact CAD/mesh generation, as-built geometry, material/layup and batch data, joint/edge stiffness, defect bounds, load/support definition, solver and convergence record, nonlinear imperfection analysis, and test receipt. Then compare blinded preregistered predictions against instrumented subassembly tests. Do not let a candidate optimizer use a predicted buckling load as a qualified capacity; only an independently reviewed, case-specific analysis and relevant tests can support that conclusion.
+
+The screening code should remain the quick-rejection layer. Candidate search may organize these alternatives and select high-information experiments, but it must not generate material allowables, infer shell strength from HDC similarity, or turn a recovery score into a safety claim.
+
 ## Known exclusions
 
 This first tranche does not perform topology optimization, constitutive modelling, composite failure analysis, finite-element analysis, uncertainty quantification, leak-rate prediction, atmospheric flight dynamics, active control, regulatory certification, or airworthiness determination. Positive arithmetic payload allowance alone is not evidence of a viable vehicle.
