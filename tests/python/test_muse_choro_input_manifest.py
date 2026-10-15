@@ -236,10 +236,10 @@ class ChoroInputManifestTests(unittest.TestCase):
             manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
             manifest_path = root / "manifest.json"
             approval_path = root / "approval.json"
-            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
             manifest_path.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
-            approval_path.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             with self.assertRaisesRegex(
                 ManifestError, "analysis-plan design.hypotheses must contain at least one concrete hypothesis"
             ):
@@ -260,10 +260,10 @@ class ChoroInputManifestTests(unittest.TestCase):
             manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
             manifest_path = root / "manifest.json"
             approval_path = root / "approval.json"
-            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
             manifest_path.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
-            approval_path.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             with self.assertRaisesRegex(
                 ManifestError,
                 "analysis plan authorized_source_bindings do not exactly match source artifacts",
@@ -283,10 +283,10 @@ class ChoroInputManifestTests(unittest.TestCase):
             manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
             manifest_path = root / "manifest.json"
             approval_path = root / "approval.json"
-            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
             manifest_path.write_bytes(raw)
             approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
-            approval_path.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             with self.assertRaisesRegex(
                 ManifestError, "analysis-plan design.null_models must contain at least one concrete null model"
             ):
