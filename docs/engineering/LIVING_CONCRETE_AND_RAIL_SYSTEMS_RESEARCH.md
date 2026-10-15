@@ -191,6 +191,8 @@ This is enough to motivate a bounded *measurement-method* benchmark, not to clai
 
 The initial implementation should use a small, rights-cleared local working copy of the metadata/table and the existing BIO-CEM corpus/observation contracts. Use standard tabular baselines before HDC/CfC; keep source data, labels, derived variables, model predictions and synthetic augmentation explicitly separated. Synthetic rows can test pipeline behavior but must never enter the measured-data evaluation denominator.
 
+Execution is tracked in [BIO-CEM-001A2 #7462](https://github.com/Luminous-Dynamics/symthaea/issues/7462), including the dataset-rights gate, grouped split requirements and explicit claim ceiling.
+
 ## B. Better railway systems
 
 ### B1. Highest-value first move: predict deterioration, not just geometry
