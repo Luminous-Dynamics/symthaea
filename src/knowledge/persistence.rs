@@ -1256,6 +1256,73 @@ mod tests {
     }
 
     #[test]
+    fn test_full_snapshot_rejects_invalid_relation_without_replacing_prior_state() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_invalid_relation_snapshot_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let old_fact = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "previous committed fact".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+            relations: Vec::new(),
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.8),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        persistence
+            .replace_knowledge_snapshot(&[old_fact], &[], &[], 2)
+            .unwrap();
+
+        let invalid_fact = FactRecord {
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            source_text: "invalid candidate".into(),
+            confidence: 0.7,
+            domain: None,
+            cycle: 2,
+            is_causal: true,
+            relations: vec![ExtractedRelation {
+                subject: "A".into(),
+                predicate: "caused".into(),
+                object: "B".into(),
+                subject_role: SemanticRole::Agent,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: false,
+                confidence: 1.2,
+            }],
+            graph_fact_id: Some(2),
+            initial_confidence: Some(0.7),
+            last_accessed_cycle: Some(2),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let error = persistence
+            .replace_knowledge_snapshot(&[invalid_fact], &[], &[], 3)
+            .unwrap_err();
+        assert!(error.contains("Invalid extracted-relation confidence"), "{error}");
+
+        let restored = persistence.load_facts().unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].source_text, "previous committed fact");
+        assert_eq!(restored[0].graph_fact_id, Some(1));
+        assert_eq!(restored[0].relations.len(), 0);
+        assert_eq!(persistence.load_next_graph_fact_id().unwrap(), Some(2));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_load_facts_rejects_unknown_persisted_relation_role() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_unknown_relation_role_test_{}",
