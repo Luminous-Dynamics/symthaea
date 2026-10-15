@@ -22,8 +22,8 @@
 //! - [`energy_balance`]: steady-state first-law closure and gross/net efficiency
 //!   accounting with an explicit system boundary and declared tolerance.
 //! - [`energy_interval`]: transient interval-integrated first-law closure,
-//!   including signed stored-energy change, without mislabeling output/input as
-//!   engine efficiency when storage is discharged.
+//!   including signed stored-energy change, plus per-interval-validated duty-cycle
+//!   aggregation. No engine efficiency is reported when storage is not charge-sustaining.
 //!
 //! ## Example
 //!
