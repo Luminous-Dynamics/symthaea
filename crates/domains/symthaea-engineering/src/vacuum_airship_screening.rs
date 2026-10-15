@@ -283,6 +283,95 @@ pub fn screen_spherical_envelope_budget(
     })
 }
 
+/// Candidate spherical-vehicle mass balance using an externally supplied structural areal-mass estimate.
+///
+/// The structural areal mass must be understood as an effective mass per outer envelope area for
+/// the selected architecture (pressure boundary, primary frame/lattice, joints and attached
+/// structural elements). It is an input assumption, not a structural prediction. A low value does
+/// not imply the candidate can withstand atmospheric pressure.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SphericalPayloadRequest {
+    /// Reference outer radius in metres.
+    pub radius_m: f64,
+    /// Ambient air density in kg/m³ at the declared operating condition.
+    pub ambient_air_density_kg_m3: f64,
+    /// Interior gas density in kg/m³ at the same condition; 0 represents the vacuum limit.
+    pub internal_gas_density_kg_m3: f64,
+    /// Assumed total primary pressure-envelope / structural-system mass per outer area, kg/m².
+    pub structural_system_areal_mass_kg_m2: f64,
+    /// Other non-payload vehicle mass not already included in structural areal mass, kg.
+    pub fixed_non_structural_vehicle_mass_kg: f64,
+}
+
+/// Arithmetic payload budget for one explicitly assumed structural architecture.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SphericalPayloadResult {
+    pub enclosed_volume_m3: f64,
+    pub outer_surface_area_m2: f64,
+    pub gross_buoyant_mass_kg: f64,
+    pub assumed_structural_system_mass_kg: f64,
+    pub fixed_non_structural_vehicle_mass_kg: f64,
+    /// Signed maximum payload allowance; negative values mean infeasible under the assumptions.
+    pub payload_allowance_kg: f64,
+    pub payload_allowance_non_negative: bool,
+}
+
+/// Estimate payload allowance conditional on a supplied effective structural areal mass.
+///
+/// This model is intentionally not a buckling or material model. The caller must source the
+/// structural areal-mass assumption and separately establish pressure capacity, failure margins,
+/// cargo geometry, route capability, and operational reserves.
+pub fn screen_spherical_payload(
+    request: SphericalPayloadRequest,
+) -> Result<SphericalPayloadResult, ScreeningError> {
+    validate_positive(request.radius_m, "radius_m")?;
+    validate_positive(
+        request.ambient_air_density_kg_m3,
+        "ambient_air_density_kg_m3",
+    )?;
+    validate_non_negative(
+        request.internal_gas_density_kg_m3,
+        "internal_gas_density_kg_m3",
+    )?;
+    validate_non_negative(
+        request.structural_system_areal_mass_kg_m2,
+        "structural_system_areal_mass_kg_m2",
+    )?;
+    validate_non_negative(
+        request.fixed_non_structural_vehicle_mass_kg,
+        "fixed_non_structural_vehicle_mass_kg",
+    )?;
+
+    let enclosed_volume_m3 = sphere_volume_m3(request.radius_m)?;
+    let outer_surface_area_m2 =
+        4.0 * std::f64::consts::PI * request.radius_m.powi(2);
+    validate_result(outer_surface_area_m2, "outer surface area")?;
+    let gross_buoyant_mass_kg = (request.ambient_air_density_kg_m3
+        - request.internal_gas_density_kg_m3)
+        * enclosed_volume_m3;
+    let assumed_structural_system_mass_kg =
+        request.structural_system_areal_mass_kg_m2 * outer_surface_area_m2;
+    validate_result(gross_buoyant_mass_kg, "gross buoyant mass")?;
+    validate_result(
+        assumed_structural_system_mass_kg,
+        "assumed structural system mass",
+    )?;
+    let payload_allowance_kg = gross_buoyant_mass_kg
+        - assumed_structural_system_mass_kg
+        - request.fixed_non_structural_vehicle_mass_kg;
+    validate_result(payload_allowance_kg, "payload allowance")?;
+
+    Ok(SphericalPayloadResult {
+        enclosed_volume_m3,
+        outer_surface_area_m2,
+        gross_buoyant_mass_kg,
+        assumed_structural_system_mass_kg,
+        fixed_non_structural_vehicle_mass_kg: request.fixed_non_structural_vehicle_mass_kg,
+        payload_allowance_kg,
+        payload_allowance_non_negative: payload_allowance_kg >= 0.0,
+    })
+}
+
 /// Side-by-side ideal lift comparison for vacuum and helium at the same outer displacement volume.
 ///
 /// Vehicle masses are separately declared for each configuration. They should include every
@@ -745,6 +834,48 @@ mod tests {
             result.unwrap_err(),
             ScreeningError::MustBeNonNegative("target_payload_mass_kg")
         );
+    }
+
+    #[test]
+    fn payload_screen_uses_declared_structural_areal_mass_without_claiming_capacity() {
+        let result = screen_spherical_payload(SphericalPayloadRequest {
+            radius_m: 20.0,
+            ambient_air_density_kg_m3: 1.225,
+            internal_gas_density_kg_m3: 0.0,
+            structural_system_areal_mass_kg_m2: 4.0,
+            fixed_non_structural_vehicle_mass_kg: 10_000.0,
+        })
+        .unwrap();
+
+        assert!(
+            (result.assumed_structural_system_mass_kg
+                - 4.0 * 4.0 * std::f64::consts::PI * 20.0_f64.powi(2))
+                .abs()
+                < 1e-8
+        );
+        assert!(
+            (result.payload_allowance_kg
+                - (1.225 * (4.0 / 3.0) * std::f64::consts::PI * 20.0_f64.powi(3)
+                    - 4.0 * 4.0 * std::f64::consts::PI * 20.0_f64.powi(2)
+                    - 10_000.0))
+                .abs()
+                < 1e-8
+        );
+        assert!(result.payload_allowance_non_negative);
+    }
+
+    #[test]
+    fn payload_screen_preserves_negative_allowance() {
+        let result = screen_spherical_payload(SphericalPayloadRequest {
+            radius_m: 1.0,
+            ambient_air_density_kg_m3: 1.0,
+            internal_gas_density_kg_m3: 0.0,
+            structural_system_areal_mass_kg_m2: 1.0,
+            fixed_non_structural_vehicle_mass_kg: 0.0,
+        })
+        .unwrap();
+        assert!(result.payload_allowance_kg < 0.0);
+        assert!(!result.payload_allowance_non_negative);
     }
 
     #[test]
