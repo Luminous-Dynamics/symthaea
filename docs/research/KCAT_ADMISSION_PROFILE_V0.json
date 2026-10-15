@@ -245,10 +245,10 @@
   },
   "limitations": [
     "This is a proposed analysis profile, not a formal STRENDA conformance checker.",
-    "Tier assignment still requires a future implementation and independent review of the exact source-specific assay semantics.",
     "The current checker reports optional-field coverage and validates field shapes but does not establish scientific validity.",
     "A record that meets these metadata requirements can still be biased, incorrectly fitted, duplicated, or out of domain.",
     "The Rust checker reports per-row aggregate tier counts, but the JSON file is not loaded as the runtime source of policy; a unit test checks that its field inventory covers all audited descriptors, and the hard-coded tier rules still require synchronized review.",
-    "Tier labels are candidate classifications based on declared metadata shape and presence, not validation that values are truthful, assays are comparable in all material respects, or kinetic fits are scientifically correct."
+    "Tier labels are candidate classifications based on declared metadata shape and presence, not validation that values are truthful, assays are comparable in all material respects, or kinetic fits are scientifically correct.",
+    "The tier classifier is implemented and reports aggregate counts, but its threshold choices still require domain review; it has not yet been validated against an independently reviewed real kcat corpus."
   ]
 }
