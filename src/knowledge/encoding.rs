@@ -99,6 +99,13 @@ impl KnowledgeEncoder {
             SemanticRole::ProtectiveFactor,
             #[cfg(feature = "therapeutic")]
             SemanticRole::RiskFactor,
+            // Keep newer code/structure roles after the existing variants so
+            // the historical role-basis seeds remain unchanged.
+            SemanticRole::Calls,
+            SemanticRole::Implements,
+            SemanticRole::DependsOn,
+            SemanticRole::ReturnsType,
+            SemanticRole::FixedBy,
         ];
 
         for (i, role) in roles.iter().enumerate() {
@@ -452,6 +459,46 @@ mod tests {
             EntityType::Organization,
         )]);
         assert_eq!(composed, stored.vector);
+    }
+
+    #[test]
+    fn test_encoder_has_basis_for_every_semantic_role() {
+        let roles = [
+            SemanticRole::Agent,
+            SemanticRole::Patient,
+            SemanticRole::Instrument,
+            SemanticRole::Context,
+            SemanticRole::Goal,
+            SemanticRole::Source,
+            SemanticRole::Destination,
+            SemanticRole::Temporal,
+            SemanticRole::Location,
+            SemanticRole::Cause,
+            SemanticRole::Result,
+            #[cfg(feature = "therapeutic")]
+            SemanticRole::TherapeuticTarget,
+            #[cfg(feature = "therapeutic")]
+            SemanticRole::ProtectiveFactor,
+            #[cfg(feature = "therapeutic")]
+            SemanticRole::RiskFactor,
+            SemanticRole::Calls,
+            SemanticRole::Implements,
+            SemanticRole::DependsOn,
+            SemanticRole::ReturnsType,
+            SemanticRole::FixedBy,
+        ];
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let terms: Vec<_> = roles
+            .iter()
+            .map(|role| (*role, "role-basis-probe", EntityType::Concept))
+            .collect();
+
+        let encoded = encoder.encode_role_terms(&terms);
+        assert_eq!(
+            encoded.len(),
+            roles.len(),
+            "every declared SemanticRole must have a role-basis vector"
+        );
     }
 
     #[test]
