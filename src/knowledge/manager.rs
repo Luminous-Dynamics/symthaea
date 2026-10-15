@@ -24,7 +24,10 @@ use super::adaptive_ontology::{AdaptiveOntology, AdaptiveOntologyConfig};
 use super::causal_bridge::{CausalEdge, CausalKnowledgeBridge};
 use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
-use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
+use super::graph::{
+    ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult, RoleAwareSearchResult,
+    RoleObservationSearchConfig,
+};
 use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord};
 use super::reasoning_context::{KnowledgeQueryResult, ReasoningContext};
 use std::collections::VecDeque;
@@ -775,6 +778,49 @@ impl KnowledgeManager {
         role_terms: &[(super::extraction::SemanticRole, &str)],
     ) -> BinaryHV {
         self.encoder.compose_query(role_terms)
+    }
+
+    /// Compose a typed HDC query using the same role/type binding as encoded facts.
+    pub fn compose_typed_query(
+        &mut self,
+        role_terms: &[(super::extraction::SemanticRole, &str, EntityType)],
+    ) -> BinaryHV {
+        self.encoder.compose_typed_query(role_terms)
+    }
+
+    /// Search every role-bound entity observation for typed role terms.
+    ///
+    /// Retrieval similarity and fact confidence remain separate; this API does
+    /// not treat an HDC match as proof that a claim is true.
+    pub fn search_with_role_terms(
+        &mut self,
+        role_terms: &[(super::extraction::SemanticRole, &str, EntityType)],
+        k: usize,
+    ) -> Vec<RoleAwareSearchResult> {
+        self.search_with_role_terms_and_config(
+            role_terms,
+            k,
+            RoleObservationSearchConfig::default(),
+        )
+    }
+
+    /// Search with an explicit validated role-observation policy.
+    ///
+    /// This enables controlled threshold sweeps and domain-specific evaluation
+    /// without changing the default retrieval behavior.
+    pub fn search_with_role_terms_and_config(
+        &mut self,
+        role_terms: &[(super::extraction::SemanticRole, &str, EntityType)],
+        k: usize,
+        config: RoleObservationSearchConfig,
+    ) -> Vec<RoleAwareSearchResult> {
+        let query = self.encoder.encode_role_terms(role_terms);
+        self.graph.search_role_observations_with_config(
+            &query,
+            k,
+            self.current_cycle,
+            config,
+        )
     }
 
     /// Search the knowledge graph with a pre-composed HDC query
@@ -1784,6 +1830,142 @@ mod tests {
         let results = mgr.search_with_vector(&query, 5);
         // May or may not find depending on similarity
         assert!(results.len() <= 5);
+    }
+
+    #[test]
+    fn test_role_observation_search_through_manager_api() {
+        let mut mgr = KnowledgeManager::default();
+        let terms = [
+            (
+                super::super::extraction::SemanticRole::Agent,
+                "United States",
+                EntityType::Organization,
+            ),
+            (
+                super::super::extraction::SemanticRole::Agent,
+                "European Union",
+                EntityType::Organization,
+            ),
+        ];
+        let observations = mgr.encoder.encode_role_terms(&terms);
+        let encoding = super::super::encoding::FactEncoding {
+            vector: BinaryHV::random(9_381),
+            role_vectors: std::collections::HashMap::new(),
+            role_vector_observations: observations,
+            relations: Vec::new(),
+            source_text: "two-agent manager test fixture".into(),
+            confidence: 0.4,
+        };
+        mgr.graph_mut().insert(encoding, 1, None, false);
+
+        let results = mgr.search_with_role_terms(&terms, 5);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].matched_query_terms, 2);
+        assert_eq!(results[0].query_term_count, 2);
+        assert!((results[0].coverage - 1.0).abs() < f32::EPSILON);
+        assert!((results[0].mean_match_similarity - 1.0).abs() < f32::EPSILON);
+        assert!(results[0].unmatched_query_terms.is_empty());
+        assert_eq!(results[0].matches.len(), 2);
+        assert_eq!(results[0].matches[0].query_entity_text, "United States");
+        assert_eq!(results[0].matches[0].observed_entity_text, "United States");
+        assert_eq!(results[0].matches[1].query_entity_text, "European Union");
+        assert_eq!(results[0].matches[1].observed_entity_text, "European Union");
+        assert!((results[0].similarity - 1.0).abs() < f32::EPSILON);
+        assert!((results[0].confidence - 0.4).abs() < f32::EPSILON);
+
+        let strict_results = mgr.search_with_role_terms_and_config(
+            &terms,
+            5,
+            RoleObservationSearchConfig::new(1.0).unwrap(),
+        );
+        assert_eq!(strict_results[0].fact_id, results[0].fact_id);
+        assert!((strict_results[0].coverage - 1.0).abs() < f32::EPSILON);
+
+        let composed = mgr.compose_typed_query(&terms);
+        let mut expected_encoder =
+            super::super::encoding::KnowledgeEncoder::with_seed(0x4E0E_1ED6_E5ED);
+        let expected = expected_encoder.compose_typed_query(&terms);
+        assert_eq!(composed, expected);
+    }
+
+    #[test]
+    fn test_typed_role_search_replays_after_manager_restart() {
+        use crate::knowledge::encoding::FactEncoding;
+        use crate::knowledge::extraction::SemanticRole;
+
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_typed_role_search_restart_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db").to_string_lossy().to_string();
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path),
+            ..KnowledgeManagerConfig::default()
+        };
+        let terms = [
+            (
+                SemanticRole::Agent,
+                "United States",
+                EntityType::Organization,
+            ),
+            (
+                SemanticRole::Agent,
+                "European Union",
+                EntityType::Organization,
+            ),
+            (SemanticRole::Patient, "Iran", EntityType::Organization),
+        ];
+
+        let mut manager = KnowledgeManager::try_new(config.clone()).unwrap();
+        let observations = manager.encoder.encode_role_terms(&terms);
+        let encoding = FactEncoding {
+            vector: BinaryHV::random(9_382),
+            role_vectors: std::collections::HashMap::new(),
+            role_vector_observations: observations,
+            relations: Vec::new(),
+            source_text: "three-term role-query restart fixture".into(),
+            confidence: 0.73,
+        };
+        let (fact_id, _) = manager.graph_mut().insert(encoding, 0, Some("test".into()), false);
+
+        let before = manager.search_with_role_terms(&terms, 5);
+        assert_eq!(before.len(), 1);
+        assert_eq!(before[0].fact_id, fact_id);
+        assert_eq!(before[0].matched_query_terms, 3);
+        assert_eq!(before[0].query_term_count, 3);
+        assert!((before[0].coverage - 1.0).abs() < f32::EPSILON);
+        assert!((before[0].mean_match_similarity - 1.0).abs() < f32::EPSILON);
+        assert!(before[0].unmatched_query_terms.is_empty());
+        assert_eq!(before[0].matches.len(), 3);
+        assert_eq!(before[0].matches[0].query_entity_text, "United States");
+        assert_eq!(before[0].matches[0].observed_entity_text, "United States");
+        assert_eq!(before[0].matches[1].query_entity_text, "European Union");
+        assert_eq!(before[0].matches[1].observed_entity_text, "European Union");
+        assert_eq!(before[0].matches[2].query_entity_text, "Iran");
+        assert_eq!(before[0].matches[2].observed_entity_text, "Iran");
+        assert!((before[0].similarity - 1.0).abs() < f32::EPSILON);
+        assert!((before[0].confidence - 0.73).abs() < f32::EPSILON);
+
+        manager.persist_snapshot();
+        drop(manager);
+
+        let mut restored = KnowledgeManager::try_new(config).unwrap();
+        let after = restored.search_with_role_terms(&terms, 5);
+        assert_eq!(after.len(), before.len());
+        assert_eq!(after[0].fact_id, before[0].fact_id);
+        assert_eq!(after[0].matched_query_terms, before[0].matched_query_terms);
+        assert_eq!(after[0].query_term_count, before[0].query_term_count);
+        assert_eq!(after[0].coverage, before[0].coverage);
+        assert_eq!(after[0].mean_match_similarity, before[0].mean_match_similarity);
+        assert_eq!(after[0].matches, before[0].matches);
+        assert_eq!(after[0].unmatched_query_terms, before[0].unmatched_query_terms);
+        assert!((after[0].similarity - before[0].similarity).abs() < f32::EPSILON);
+        assert!((after[0].confidence - before[0].confidence).abs() < f32::EPSILON);
+
+        drop(restored);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

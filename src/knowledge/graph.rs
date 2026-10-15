@@ -12,7 +12,8 @@
 //! Science: Temporal knowledge graphs (Trivedi et al. 2017),
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
-use super::encoding::FactEncoding;
+use super::encoding::{FactEncoding, RoleBoundVector};
+use super::extraction::SemanticRole;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
@@ -70,6 +71,78 @@ pub struct FactSearchResult {
     pub similarity: f32,
     /// Current confidence
     pub confidence: f32,
+}
+
+/// One auditable query-to-observation assignment returned by role-aware retrieval.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoleObservationMatch {
+    /// Semantic role used to constrain the match.
+    pub role: SemanticRole,
+    /// Entity text in the caller's query.
+    pub query_entity_text: String,
+    /// Entity text stored on the matched fact observation.
+    pub observed_entity_text: String,
+    /// Bipolar cosine similarity for this one-to-one assignment.
+    pub similarity: f32,
+}
+
+/// Validated policy for role-observation matching.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RoleObservationSearchConfig {
+    min_cosine_similarity: f32,
+}
+
+impl RoleObservationSearchConfig {
+    /// Construct a search policy with a bipolar-cosine threshold in [-1, 1].
+    pub fn new(min_cosine_similarity: f32) -> Result<Self, String> {
+        if !min_cosine_similarity.is_finite()
+            || !(-1.0..=1.0).contains(&min_cosine_similarity)
+        {
+            return Err(format!(
+                "Role-observation cosine threshold must be finite and in [-1, 1], got {min_cosine_similarity}"
+            ));
+        }
+        Ok(Self { min_cosine_similarity })
+    }
+
+    /// Return the minimum bipolar-cosine similarity required for a candidate match.
+    pub fn min_cosine_similarity(&self) -> f32 {
+        self.min_cosine_similarity
+    }
+}
+
+impl Default for RoleObservationSearchConfig {
+    fn default() -> Self {
+        Self {
+            min_cosine_similarity: 0.1,
+        }
+    }
+}
+
+/// Result from matching typed role queries against all stored role observations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoleAwareSearchResult {
+    /// Stable graph fact identifier.
+    pub fact_id: FactId,
+    /// Coverage-penalized mean matched cosine similarity.
+    ///
+    /// This equals coverage multiplied by mean_match_similarity. It is a retrieval
+    /// score, not calibrated epistemic confidence.
+    pub similarity: f32,
+    /// Current stored fact confidence, returned separately from retrieval similarity.
+    pub confidence: f32,
+    /// Number of query terms assigned a distinct stored observation.
+    pub matched_query_terms: usize,
+    /// Number of distinct query terms submitted.
+    pub query_term_count: usize,
+    /// Fraction of query terms assigned a distinct stored observation, in [0, 1].
+    pub coverage: f32,
+    /// Mean cosine among matched pairs only; this is absent when no result is returned.
+    pub mean_match_similarity: f32,
+    /// One-to-one match evidence, ordered by query term index.
+    pub matches: Vec<RoleObservationMatch>,
+    /// Query role/entity pairs that did not match, in query order.
+    pub unmatched_query_terms: Vec<(SemanticRole, String)>,
 }
 
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
@@ -253,6 +326,155 @@ impl EnhancedKnowledgeGraph {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         results.truncate(k);
+        results
+    }
+
+    /// Search using typed role-bound query observations.
+    ///
+    /// A deterministic maximum-cardinality one-to-one matcher ensures each
+    /// query term and stored observation is used at most once. It uses augmenting
+    /// paths so a locally highest-scoring pair cannot reduce overall query coverage.
+    /// This preserves same-role multiplicity: one stored Agent cannot satisfy two
+    /// distinct Agent terms.
+    ///
+    /// Only same-role pairs with bipolar cosine similarity >= 0.1 are matched.
+    /// Similarity is a retrieval signal; confidence remains a separate field
+    /// and is not multiplied into the ranking score.
+    pub fn search_role_observations(
+        &mut self,
+        query: &[RoleBoundVector],
+        k: usize,
+        current_cycle: u64,
+    ) -> Vec<RoleAwareSearchResult> {
+        self.search_role_observations_with_config(
+            query,
+            k,
+            current_cycle,
+            RoleObservationSearchConfig::default(),
+        )
+    }
+
+    /// Search with an explicit, validated cosine policy so threshold sweeps can
+    /// be evaluated without changing code or silently calibrating the default.
+    pub fn search_role_observations_with_config(
+        &mut self,
+        query: &[RoleBoundVector],
+        k: usize,
+        current_cycle: u64,
+        config: RoleObservationSearchConfig,
+    ) -> Vec<RoleAwareSearchResult> {
+        if query.is_empty() || k == 0 {
+            return Vec::new();
+        }
+
+        let min_role_match_cosine = config.min_cosine_similarity();
+        let mut results = Vec::new();
+
+        for fact in self.facts.values() {
+            let observations = &fact.encoding.role_vector_observations;
+            if observations.is_empty() {
+                continue;
+            }
+
+            let mut candidates_by_query = vec![Vec::new(); query.len()];
+            for (query_index, query_term) in query.iter().enumerate() {
+                for (observation_index, observation) in observations.iter().enumerate() {
+                    if query_term.role != observation.role {
+                        continue;
+                    }
+                    let similarity = query_term.vector.cosine_similarity(&observation.vector);
+                    if similarity >= min_role_match_cosine {
+                        candidates_by_query[query_index].push((observation_index, similarity));
+                    }
+                }
+            }
+
+            // Search high-similarity edges first, but permit reassignment through
+            // augmenting paths so a locally best edge cannot reduce total coverage.
+            for candidates in &mut candidates_by_query {
+                candidates.sort_by(|a, b| {
+                    b.1.partial_cmp(&a.1)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.0.cmp(&b.0))
+                });
+            }
+            let observation_to_query =
+                maximum_cardinality_matching(&candidates_by_query, observations.len());
+            let mut assignments: Vec<(usize, usize)> = observation_to_query
+                .iter()
+                .enumerate()
+                .filter_map(|(observation_index, query_index)| {
+                    query_index.map(|query_index| (query_index, observation_index))
+                })
+                .collect();
+            assignments.sort_unstable_by_key(|(query_index, _)| *query_index);
+
+            let mut matches = Vec::with_capacity(assignments.len());
+            let mut query_matched = vec![false; query.len()];
+            let mut total_similarity = 0.0f32;
+            for (query_index, observation_index) in assignments {
+                if let Some((_, similarity)) = candidates_by_query[query_index]
+                    .iter()
+                    .find(|(candidate_index, _)| *candidate_index == observation_index)
+                {
+                    let observation = &observations[observation_index];
+                    query_matched[query_index] = true;
+                    total_similarity += *similarity;
+                    matches.push(RoleObservationMatch {
+                        role: query[query_index].role,
+                        query_entity_text: query[query_index].entity_text.clone(),
+                        observed_entity_text: observation.entity_text.clone(),
+                        similarity: *similarity,
+                    });
+                }
+            }
+
+            let matched_query_terms = matches.len();
+            if matched_query_terms > 0 {
+                let query_term_count = query.len();
+                let coverage = matched_query_terms as f32 / query_term_count as f32;
+                let mean_match_similarity = total_similarity / matched_query_terms as f32;
+                let unmatched_query_terms = query
+                    .iter()
+                    .zip(query_matched.iter())
+                    .filter_map(|(term, matched)| {
+                        if *matched {
+                            None
+                        } else {
+                            Some((term.role, term.entity_text.clone()))
+                        }
+                    })
+                    .collect();
+
+                results.push(RoleAwareSearchResult {
+                    fact_id: fact.id,
+                    similarity: total_similarity / query_term_count as f32,
+                    confidence: fact.confidence,
+                    matched_query_terms,
+                    query_term_count,
+                    coverage,
+                    mean_match_similarity,
+                    matches,
+                    unmatched_query_terms,
+                });
+            }
+        }
+
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.matched_query_terms.cmp(&a.matched_query_terms))
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
+        });
+        results.truncate(k);
+
+        for result in &results {
+            if let Some(fact) = self.facts.get_mut(&result.fact_id) {
+                fact.last_accessed_cycle = current_cycle;
+            }
+        }
+
         results
     }
 
@@ -810,6 +1032,54 @@ impl EnhancedKnowledgeGraph {
     }
 }
 
+fn maximum_cardinality_matching(
+    candidates_by_query: &[Vec<(usize, f32)>],
+    observation_count: usize,
+) -> Vec<Option<usize>> {
+    fn augment(
+        query_index: usize,
+        candidates_by_query: &[Vec<(usize, f32)>],
+        observation_to_query: &mut [Option<usize>],
+        seen_observations: &mut [bool],
+    ) -> bool {
+        for &(observation_index, _) in &candidates_by_query[query_index] {
+            if observation_index >= observation_to_query.len()
+                || seen_observations[observation_index]
+            {
+                continue;
+            }
+            seen_observations[observation_index] = true;
+
+            let can_assign = match observation_to_query[observation_index] {
+                None => true,
+                Some(previous_query) => augment(
+                    previous_query,
+                    candidates_by_query,
+                    observation_to_query,
+                    seen_observations,
+                ),
+            };
+            if can_assign {
+                observation_to_query[observation_index] = Some(query_index);
+                return true;
+            }
+        }
+        false
+    }
+
+    let mut observation_to_query = vec![None; observation_count];
+    for query_index in 0..candidates_by_query.len() {
+        let mut seen_observations = vec![false; observation_count];
+        let _ = augment(
+            query_index,
+            candidates_by_query,
+            &mut observation_to_query,
+            &mut seen_observations,
+        );
+    }
+    observation_to_query
+}
+
 fn contains_negation(text: &str) -> bool {
     let markers = [
         "not ",
@@ -834,7 +1104,8 @@ fn contains_negation(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::extraction::{ExtractedRelation, SemanticRole};
+    use super::super::encoding::KnowledgeEncoder;
+    use super::super::extraction::{EntityType, ExtractedRelation, SemanticRole};
     use super::super::persistence::KnowledgePersistence;
 
     fn make_encoding(text: &str, confidence: f32) -> FactEncoding {
@@ -860,6 +1131,273 @@ mod tests {
         let results = graph.search(&query, 5, 2);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].fact_id, id);
+    }
+
+    #[test]
+    fn test_role_observation_search_uses_multiplicity_and_separate_confidence() {
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let query = encoder.encode_role_terms(&[
+            (
+                SemanticRole::Agent,
+                "United States",
+                EntityType::Organization,
+            ),
+            (
+                SemanticRole::Agent,
+                "European Union",
+                EntityType::Organization,
+            ),
+        ]);
+
+        let mut complete = make_encoding("complete two-agent fact", 0.35);
+        complete.role_vector_observations = query.clone();
+        let (complete_id, _) = graph.insert(complete, 1, None, false);
+
+        let mut partial = make_encoding("partial one-agent fact", 0.99);
+        partial.role_vector_observations = vec![query[0].clone()];
+        let (partial_id, _) = graph.insert(partial, 2, None, false);
+
+        let results = graph.search_role_observations(&query, 10, 3);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].fact_id, complete_id);
+        assert_eq!(results[0].matched_query_terms, 2);
+        assert_eq!(results[0].query_term_count, 2);
+        assert!((results[0].coverage - 1.0).abs() < f32::EPSILON);
+        assert!((results[0].mean_match_similarity - 1.0).abs() < f32::EPSILON);
+        assert!(results[0].unmatched_query_terms.is_empty());
+        assert_eq!(results[0].matches.len(), 2);
+        assert_eq!(results[0].matches[0].role, SemanticRole::Agent);
+        assert_eq!(results[0].matches[0].query_entity_text, "United States");
+        assert_eq!(results[0].matches[0].observed_entity_text, "United States");
+        assert!((results[0].matches[0].similarity - 1.0).abs() < f32::EPSILON);
+        assert_eq!(results[0].matches[1].query_entity_text, "European Union");
+        assert_eq!(results[0].matches[1].observed_entity_text, "European Union");
+        assert!((results[0].similarity - 1.0).abs() < f32::EPSILON);
+        assert!((results[0].confidence - 0.35).abs() < f32::EPSILON);
+
+        let partial_result = results
+            .iter()
+            .find(|result| result.fact_id == partial_id)
+            .expect("one matching Agent should retain partial relevance");
+        assert_eq!(partial_result.matched_query_terms, 1);
+        assert_eq!(partial_result.query_term_count, 2);
+        assert!((partial_result.coverage - 0.5).abs() < f32::EPSILON);
+        assert!((partial_result.mean_match_similarity - 1.0).abs() < f32::EPSILON);
+        assert_eq!(
+            partial_result.unmatched_query_terms,
+            vec![(SemanticRole::Agent, "European Union".to_string())]
+        );
+        assert!((partial_result.similarity - 0.5).abs() < f32::EPSILON);
+        assert!((partial_result.confidence - 0.99).abs() < f32::EPSILON);
+        assert!(results[0].similarity > partial_result.similarity);
+
+        let mut wrong_role = query[0].clone();
+        wrong_role.role = SemanticRole::Patient;
+        assert!(
+            graph
+                .search_role_observations(&[wrong_role], 10, 4)
+                .is_empty(),
+            "a vector tagged with the wrong semantic role must not match"
+        );
+    }
+
+    #[test]
+    fn test_role_observation_search_distinguishes_entity_types() {
+        use crate::knowledge::encoding::RoleBoundVector;
+        use crate::knowledge::extraction::EntityType;
+
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let place_query = encoder.encode_role_terms(&[(
+            SemanticRole::Patient,
+            "Mercury",
+            EntityType::Place,
+        )]);
+        let organization_query = encoder.encode_role_terms(&[(
+            SemanticRole::Patient,
+            "Mercury",
+            EntityType::Organization,
+        )]);
+
+        assert_eq!(place_query[0].entity_text, organization_query[0].entity_text);
+        assert_eq!(place_query[0].role, organization_query[0].role);
+        assert!(
+            place_query[0].vector.cosine_similarity(&organization_query[0].vector) < 0.1,
+            "the same surface text bound to different entity types should be distinguishable"
+        );
+
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let mut place_fact = make_encoding("Mercury the planet", 0.8);
+        place_fact.role_vector_observations = vec![RoleBoundVector {
+            role: SemanticRole::Patient,
+            entity_text: "Mercury".into(),
+            vector: place_query[0].vector,
+        }];
+        let (place_id, _) = graph.insert(place_fact, 1, None, false);
+
+        let mut organization_fact = make_encoding("Mercury the organization", 0.9);
+        organization_fact.role_vector_observations = vec![RoleBoundVector {
+            role: SemanticRole::Patient,
+            entity_text: "Mercury".into(),
+            vector: organization_query[0].vector,
+        }];
+        let (organization_id, _) = graph.insert(organization_fact, 2, None, false);
+
+        let place_results = graph.search_role_observations(&place_query, 10, 3);
+        assert_eq!(place_results.len(), 1);
+        assert_eq!(place_results[0].fact_id, place_id);
+        assert_ne!(place_results[0].fact_id, organization_id);
+
+        let organization_results = graph.search_role_observations(&organization_query, 10, 4);
+        assert_eq!(organization_results.len(), 1);
+        assert_eq!(organization_results[0].fact_id, organization_id);
+        assert_ne!(organization_results[0].fact_id, place_id);
+    }
+
+    #[test]
+    fn test_role_observation_search_threshold_is_explicit_and_validated() {
+        use crate::knowledge::encoding::RoleBoundVector;
+
+        assert!(RoleObservationSearchConfig::new(-1.0).is_ok());
+        assert!(RoleObservationSearchConfig::new(1.0).is_ok());
+        assert!(RoleObservationSearchConfig::new(1.01).is_err());
+        assert!(RoleObservationSearchConfig::new(f32::NAN).is_err());
+
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let query = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "United States",
+            EntityType::Organization,
+        )]);
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+
+        let mut exact = make_encoding("exact typed observation", 0.8);
+        exact.role_vector_observations = query.clone();
+        let (exact_id, _) = graph.insert(exact, 1, None, false);
+
+        let mut distractor = make_encoding("unrelated same-role observation", 0.8);
+        distractor.role_vector_observations = vec![RoleBoundVector {
+            role: SemanticRole::Agent,
+            entity_text: "Canada".into(),
+            vector: BinaryHV::random(123_456),
+        }];
+        let _ = graph.insert(distractor, 2, None, false);
+
+        let permissive = graph.search_role_observations_with_config(
+            &query,
+            10,
+            3,
+            RoleObservationSearchConfig::new(-1.0).unwrap(),
+        );
+        assert_eq!(permissive.len(), 2);
+
+        let strict = graph.search_role_observations_with_config(
+            &query,
+            10,
+            4,
+            RoleObservationSearchConfig::new(1.0).unwrap(),
+        );
+        assert_eq!(strict.len(), 1);
+        assert_eq!(strict[0].fact_id, exact_id);
+        assert!((strict[0].coverage - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_empty_role_observation_query_returns_no_results() {
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        graph.insert(make_encoding("any fact", 0.8), 1, None, false);
+        assert!(graph.search_role_observations(&[], 5, 2).is_empty());
+        assert!(graph
+            .search_role_observations(
+                &[RoleBoundVector {
+                    role: SemanticRole::Agent,
+                    entity_text: "missing".into(),
+                    vector: BinaryHV::random(404),
+                }],
+                0,
+                2
+            )
+            .is_empty());
+    }
+
+    #[test]
+    fn test_role_observation_search_is_stable_across_sqlite_restart() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_role_search_restart_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let terms = [
+            (
+                SemanticRole::Agent,
+                "United States",
+                EntityType::Organization,
+            ),
+            (
+                SemanticRole::Agent,
+                "European Union",
+                EntityType::Organization,
+            ),
+        ];
+        let query = encoder.encode_role_terms(&terms);
+
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let mut encoding = make_encoding("role-query persistence fixture", 0.73);
+        encoding.role_vector_observations = query.clone();
+        let (id, _) = graph.insert(encoding, 7, Some("test".into()), false);
+        let before = graph.search_role_observations(&query, 5, 8);
+        assert_eq!(before.len(), 1);
+        assert_eq!(before[0].fact_id, id);
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .replace_knowledge_snapshot(
+                &graph.export_fact_records(),
+                &[],
+                &[],
+                graph.next_fact_id(),
+            )
+            .unwrap();
+        let records = persistence.load_facts().unwrap();
+        assert_eq!(records.len(), 1);
+
+        let mut restored = EnhancedKnowledgeGraph::new(10);
+        assert_eq!(restored.import_fact_records(&records), 1);
+        let restored_observations = &restored
+            .get_fact(id)
+            .expect("restored fact must retain its stable ID")
+            .encoding
+            .role_vector_observations;
+        assert_eq!(restored_observations, &query);
+
+        let after = restored.search_role_observations(&query, 5, 8);
+        assert_eq!(after.len(), before.len());
+        assert_eq!(after[0].fact_id, before[0].fact_id);
+        assert_eq!(after[0].matched_query_terms, before[0].matched_query_terms);
+        assert_eq!(after[0].query_term_count, before[0].query_term_count);
+        assert_eq!(after[0].coverage, before[0].coverage);
+        assert_eq!(after[0].mean_match_similarity, before[0].mean_match_similarity);
+        assert_eq!(after[0].matches, before[0].matches);
+        assert_eq!(after[0].unmatched_query_terms, before[0].unmatched_query_terms);
+        assert!((after[0].similarity - before[0].similarity).abs() < f32::EPSILON);
+        assert!((after[0].confidence - before[0].confidence).abs() < f32::EPSILON);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_role_matcher_uses_augmenting_paths_to_maximize_coverage() {
+        // A greedy global-edge walk would take query 0 -> observation 0 (0.9),
+        // leaving query 1 unmatched. Reassignment should find the full solution:
+        // query 0 -> observation 1 and query 1 -> observation 0.
+        let candidates_by_query = vec![vec![(0, 0.9), (1, 0.2)], vec![(0, 0.8)]];
+        let observation_to_query = maximum_cardinality_matching(&candidates_by_query, 2);
+
+        assert_eq!(observation_to_query, vec![Some(1), Some(0)]);
     }
 
     #[test]

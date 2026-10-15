@@ -81,7 +81,10 @@ impl KnowledgeEncoder {
 
     pub fn with_seed(seed: u64) -> Self {
         let mut role_bases = HashMap::new();
-        let roles = [
+        // Keep the historical role-to-seed mapping for every pre-existing role.
+        // Do not place feature-gated variants in the same positional seed list as
+        // newer variants: build features must not change a role's vector space.
+        let core_roles = [
             SemanticRole::Agent,
             SemanticRole::Patient,
             SemanticRole::Instrument,
@@ -93,16 +96,36 @@ impl KnowledgeEncoder {
             SemanticRole::Location,
             SemanticRole::Cause,
             SemanticRole::Result,
-            #[cfg(feature = "therapeutic")]
-            SemanticRole::TherapeuticTarget,
-            #[cfg(feature = "therapeutic")]
-            SemanticRole::ProtectiveFactor,
-            #[cfg(feature = "therapeutic")]
-            SemanticRole::RiskFactor,
         ];
 
-        for (i, role) in roles.iter().enumerate() {
+        for (i, role) in core_roles.iter().enumerate() {
             role_bases.insert(*role, BinaryHV::random(seed + i as u64));
+        }
+
+        #[cfg(feature = "therapeutic")]
+        for (offset, role) in [
+            SemanticRole::TherapeuticTarget,
+            SemanticRole::ProtectiveFactor,
+            SemanticRole::RiskFactor,
+        ]
+        .iter()
+        .enumerate()
+        {
+            // Preserve the original therapeutic-role seeds (seed + 11..13).
+            role_bases.insert(*role, BinaryHV::random(seed + 11 + offset as u64));
+        }
+
+        // New code/structure roles use their own fixed seed range, independent
+        // of whether the therapeutic feature is enabled in this build.
+        let code_roles = [
+            SemanticRole::Calls,
+            SemanticRole::Implements,
+            SemanticRole::DependsOn,
+            SemanticRole::ReturnsType,
+            SemanticRole::FixedBy,
+        ];
+        for (offset, role) in code_roles.iter().enumerate() {
+            role_bases.insert(*role, BinaryHV::random(seed + 1_000 + offset as u64));
         }
 
         let mut type_bases = HashMap::new();
@@ -127,6 +150,20 @@ impl KnowledgeEncoder {
 
         for (i, etype) in types.iter().enumerate() {
             type_bases.insert(*etype, BinaryHV::random(seed + 100 + i as u64));
+        }
+
+        // Code-oriented entity types use a dedicated seed range. Keep every
+        // historical type seed above unchanged, and do not let feature-gated
+        // therapeutic types affect these newer code/type distinctions.
+        let code_entity_types = [
+            EntityType::Function,
+            EntityType::Type,
+            EntityType::Module,
+            EntityType::ErrorPattern,
+            EntityType::CodeSnippet,
+        ];
+        for (offset, entity_type) in code_entity_types.iter().enumerate() {
+            type_bases.insert(*entity_type, BinaryHV::random(seed + 1_100 + offset as u64));
         }
 
         Self {
@@ -225,14 +262,15 @@ impl KnowledgeEncoder {
         }
     }
 
-    /// Create a query vector for compositional search
+    /// Create a legacy, untyped query vector for compositional search.
     ///
-    /// Example: to find "who sanctioned Iran?", call:
+    /// This compatibility API has no EntityType parameter and therefore does
+    /// not reproduce the type-bound role vectors stored for facts.
+    /// Prefer compose_typed_query / encode_role_terms for role-aware search.
+    ///
+    /// Example: search facts where Iran is the Patient:
     /// ```rust,ignore
-    /// let query = encoder.compose_query(&[
-    ///     (SemanticRole::Patient, "Iran"),
-    ///     (SemanticRole::Agent, "sanctions"),
-    /// ]);
+    /// let query = encoder.compose_query(&[(SemanticRole::Patient, "Iran")]);
     /// ```
     pub fn compose_query(&mut self, role_terms: &[(SemanticRole, &str)]) -> BinaryHV {
         let mut components = Vec::new();
@@ -243,6 +281,60 @@ impl KnowledgeEncoder {
                 components.push(role_basis.bind(&term_hv));
             }
         }
+
+        if components.is_empty() {
+            BinaryHV::random(0)
+        } else {
+            BinaryHV::bundle(&components)
+        }
+    }
+
+    /// Encode typed role terms using the same binding algebra as stored facts.
+    ///
+    /// A fact entity is encoded as role ⊗ (token ⊗ entity type). This helper
+    /// deliberately mirrors that path so callers can compare query observations
+    /// with persisted role-bound observations without silently mixing spaces.
+    pub fn encode_role_terms(
+        &mut self,
+        role_terms: &[(SemanticRole, &str, EntityType)],
+    ) -> Vec<RoleBoundVector> {
+        let mut observations = Vec::with_capacity(role_terms.len());
+
+        for (role, term, entity_type) in role_terms {
+            let role_basis = match self.role_bases.get(role).copied() {
+                Some(basis) => basis,
+                None => continue,
+            };
+            let type_basis = self
+                .type_bases
+                .get(entity_type)
+                .copied()
+                .unwrap_or_else(|| BinaryHV::random(999));
+            let entity = self.encode_token(term);
+            let typed_entity = entity.bind(&type_basis);
+            observations.push(RoleBoundVector {
+                role: *role,
+                entity_text: (*term).to_string(),
+                vector: role_basis.bind(&typed_entity),
+            });
+        }
+
+        observations
+    }
+
+    /// Compose a query with the same role/type binding algebra used by facts.
+    ///
+    /// This returns a bundled HDC retrieval vector. Its similarity is not an
+    /// epistemic confidence estimate and is not evidence that a claim is true.
+    pub fn compose_typed_query(
+        &mut self,
+        role_terms: &[(SemanticRole, &str, EntityType)],
+    ) -> BinaryHV {
+        let components: Vec<BinaryHV> = self
+            .encode_role_terms(role_terms)
+            .into_iter()
+            .map(|observation| observation.vector)
+            .collect();
 
         if components.is_empty() {
             BinaryHV::random(0)
@@ -364,6 +456,142 @@ mod tests {
             agents[0].vector.similarity(&agents[1].vector) < 1.0,
             "distinct same-role entities must retain distinct bound vectors"
         );
+    }
+
+    #[test]
+    fn test_typed_role_query_matches_fact_encoding_algebra() {
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let fact = make_test_fact();
+        let encoding = encoder.encode_fact(&fact);
+
+        let query = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "United States",
+            EntityType::Organization,
+        )]);
+        assert_eq!(query.len(), 1);
+        let stored = encoding
+            .role_vector_observations
+            .iter()
+            .find(|observation| {
+                observation.role == SemanticRole::Agent
+                    && observation.entity_text == "United States"
+            })
+            .expect("fact encoding should retain the Agent observation");
+
+        assert_eq!(query[0].vector, stored.vector);
+        let composed = encoder.compose_typed_query(&[(
+            SemanticRole::Agent,
+            "United States",
+            EntityType::Organization,
+        )]);
+        assert_eq!(composed, stored.vector);
+    }
+
+    #[test]
+    fn test_encoder_has_basis_for_every_semantic_role() {
+        let roles = [
+            SemanticRole::Agent,
+            SemanticRole::Patient,
+            SemanticRole::Instrument,
+            SemanticRole::Context,
+            SemanticRole::Goal,
+            SemanticRole::Source,
+            SemanticRole::Destination,
+            SemanticRole::Temporal,
+            SemanticRole::Location,
+            SemanticRole::Cause,
+            SemanticRole::Result,
+            #[cfg(feature = "therapeutic")]
+            SemanticRole::TherapeuticTarget,
+            #[cfg(feature = "therapeutic")]
+            SemanticRole::ProtectiveFactor,
+            #[cfg(feature = "therapeutic")]
+            SemanticRole::RiskFactor,
+            SemanticRole::Calls,
+            SemanticRole::Implements,
+            SemanticRole::DependsOn,
+            SemanticRole::ReturnsType,
+            SemanticRole::FixedBy,
+        ];
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let terms: Vec<_> = roles
+            .iter()
+            .map(|role| (*role, "role-basis-probe", EntityType::Concept))
+            .collect();
+
+        let encoded = encoder.encode_role_terms(&terms);
+        assert_eq!(
+            encoded.len(),
+            roles.len(),
+            "every declared SemanticRole must have a role-basis vector"
+        );
+    }
+
+    #[test]
+    fn test_code_role_bases_are_independent_of_build_feature_order() {
+        let seed = 42;
+        let mut encoder = KnowledgeEncoder::with_seed(seed);
+        let code_roles = [
+            SemanticRole::Calls,
+            SemanticRole::Implements,
+            SemanticRole::DependsOn,
+            SemanticRole::ReturnsType,
+            SemanticRole::FixedBy,
+        ];
+        let terms: Vec<_> = code_roles
+            .iter()
+            .map(|role| (*role, "role-basis-probe", EntityType::Concept))
+            .collect();
+        let encoded = encoder.encode_role_terms(&terms);
+
+        // The fixed seed range for code roles and the existing Concept type
+        // basis make these vectors stable whether therapeutic variants compile.
+        let token = BinaryHV::random(fnv1a_hash("role-basis-probe"));
+        let concept_basis = BinaryHV::random(seed + 104);
+        let typed_entity = token.bind(&concept_basis);
+        for (offset, observation) in encoded.iter().enumerate() {
+            let expected = BinaryHV::random(seed + 1_000 + offset as u64)
+                .bind(&typed_entity);
+            assert_eq!(observation.vector, expected);
+        }
+    }
+
+    #[test]
+    fn test_code_entity_type_bases_are_distinct_and_feature_independent() {
+        let seed = 42;
+        let code_types = [
+            EntityType::Function,
+            EntityType::Type,
+            EntityType::Module,
+            EntityType::ErrorPattern,
+            EntityType::CodeSnippet,
+        ];
+        let mut encoder = KnowledgeEncoder::with_seed(seed);
+        let terms: Vec<_> = code_types
+            .iter()
+            .map(|entity_type| (SemanticRole::Agent, "shared-code-symbol", *entity_type))
+            .collect();
+        let encoded = encoder.encode_role_terms(&terms);
+
+        assert_eq!(encoded.len(), code_types.len());
+        for left in 0..encoded.len() {
+            for right in (left + 1)..encoded.len() {
+                assert_ne!(
+                    encoded[left].vector,
+                    encoded[right].vector,
+                    "same text under distinct code entity types must not collapse"
+                );
+            }
+        }
+
+        let token = BinaryHV::random(fnv1a_hash("shared-code-symbol"));
+        let role_basis = BinaryHV::random(seed);
+        for (offset, observation) in encoded.iter().enumerate() {
+            let type_basis = BinaryHV::random(seed + 1_100 + offset as u64);
+            let expected = role_basis.bind(&token.bind(&type_basis));
+            assert_eq!(observation.vector, expected);
+        }
     }
 
     #[test]
