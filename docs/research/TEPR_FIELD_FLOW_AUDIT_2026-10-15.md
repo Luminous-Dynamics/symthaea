@@ -101,8 +101,8 @@ A live ref comparison found that PR #7494 had advanced after the first #7499/#74
 Current exact stack:
 
 - **Parent, PR #7494:** head `ea7e3e3b6f4b48715dadd094528f3b6712c9228d`; CI `38791969017` and PR Governance `38791968929` are queued.
-- **Weighted matcher, PR #7499:** head `b716b0ec776172f69f383f6512b32a209607ef66`; compared with #7494 as one commit ahead, zero behind. CI `38793274083` is queued and PR Governance `38793274011` is pending; neither is a pass.
-- **Labeled corpus, PR #7497:** head `2d8a2c037e6d7e13d034ab081ed261089849bd90`; compared with #7499 as one commit ahead, zero behind. CI `38793372383` and PR Governance `38793372516` are queued; neither is a pass.
+- **Weighted matcher, PR #7499:** head `30ef03ddf7415aca814e573de9094b0ae1a75550`; compared with #7494 as one commit ahead, zero behind. CI `38793716049` and PR Governance `38793716600` are queued; neither is a pass.
+- **Labeled corpus, PR #7497:** head `d41ad391ea6dab5b790c530051d826817718a56f`; compared with #7499 as one commit ahead, zero behind. CI `38793743521` and PR Governance `38793743397` are queued; neither is a pass.
 
 The rebase preserves #7494's validated threshold-config API, per-term match evidence, coverage, mean matched-pair similarity, and unmatched-term reporting. #7499 changes only the assignment objective and associated regression coverage; #7497 adds the labeled synthetic micro-corpus on top. The small corpus currently has two positives and four negative-control families. It is a regression contract, not evidence of real-world semantic recall or production precision.
 
