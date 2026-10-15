@@ -41,7 +41,7 @@ pub struct KnowledgePersistence {
 ///
 /// This is separate from the legacy role-keyed map because a fact can contain
 /// multiple entities with the same semantic role.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoleVectorObservationRecord {
     pub role: SemanticRole,
     pub entity_text: String,
@@ -1014,6 +1014,7 @@ impl KnowledgePersistence {
                         is_causal: row.get(5)?,
                         role_vectors: HashMap::new(),
                         relations: Vec::new(),
+                        role_vector_observations: Vec::new(),
                         graph_fact_id,
                         initial_confidence,
                         last_accessed_cycle,
