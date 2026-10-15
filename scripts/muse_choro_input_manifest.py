@@ -101,6 +101,7 @@ def require_string_list(value: Any, label: str, allowed: set[str] | None = None)
 def validate_analysis_plan(
     scope: dict[str, Any],
     analysis_plan_root: Path = ROOT,
+    manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Verify a separately frozen, externally registered analysis-plan artifact."""
     plan = require_object(scope.get("analysis_plan"), "scope.analysis_plan")
@@ -200,6 +201,73 @@ def validate_analysis_plan(
         ):
             require_text(null_model.get(field), f"{label}.{field}")
 
+    declared_bindings = design.get("authorized_source_bindings")
+    if not isinstance(declared_bindings, list):
+        raise ManifestError("analysis-plan design.authorized_source_bindings must be a list")
+    normalized_plan_bindings: list[dict[str, Any]] = []
+    seen_binding_ids: set[str] = set()
+    for index, raw_binding in enumerate(declared_bindings):
+        label = f"analysis-plan design.authorized_source_bindings[{index}]"
+        binding = require_object(raw_binding, label)
+        binding_id = require_text(binding.get("intake_source_id"), f"{label}.intake_source_id")
+        if binding_id in seen_binding_ids:
+            raise ManifestError("analysis-plan source-binding IDs must be unique")
+        seen_binding_ids.add(binding_id)
+        file_url = require_https(binding.get("source_file_url"), f"{label}.source_file_url")
+        record_url = require_https(binding.get("source_record_url"), f"{label}.source_record_url")
+        artifact_path = Path(require_text(binding.get("artifact_path"), f"{label}.artifact_path"))
+        if artifact_path.is_absolute() or ".." in artifact_path.parts:
+            raise ManifestError(f"{label}.artifact_path must be a relative path without traversal")
+        artifact_sha = require_text(binding.get("artifact_sha256"), f"{label}.artifact_sha256")
+        if not SHA256_RE.fullmatch(artifact_sha):
+            raise ManifestError(f"{label}.artifact_sha256 must be a lowercase 64-character SHA-256")
+        artifact_bytes = binding.get("artifact_bytes")
+        if type(artifact_bytes) is not int or artifact_bytes <= 0:
+            raise ManifestError(f"{label}.artifact_bytes must be a positive integer")
+        selected_ids = require_string_list(binding.get("selected_work_ids"), f"{label}.selected_work_ids")
+        if not selected_ids:
+            raise ManifestError(f"{label}.selected_work_ids must not be empty")
+        normalized_plan_bindings.append({
+            "intake_source_id": binding_id,
+            "source_record_url": record_url,
+            "source_file_url": file_url,
+            "artifact_path": artifact_path.as_posix(),
+            "artifact_sha256": artifact_sha,
+            "artifact_bytes": artifact_bytes,
+            "selected_work_ids": selected_ids,
+        })
+    normalized_plan_bindings.sort(key=lambda row: row["intake_source_id"])
+
+    if manifest is not None:
+        manifest_sources = manifest.get("sources")
+        if not isinstance(manifest_sources, list):
+            raise ManifestError("input manifest sources must be a list")
+        if manifest_sources:
+            expected_bindings: list[dict[str, Any]] = []
+            for index, raw_entry in enumerate(manifest_sources):
+                entry = require_object(raw_entry, f"manifest sources[{index}]")
+                source_id = require_text(entry.get("intake_source_id"), "manifest intake_source_id")
+                artifact_path = Path(require_text(entry.get("artifact_path"), "manifest artifact_path"))
+                artifact_bytes = entry.get("artifact_bytes")
+                if type(artifact_bytes) is not int or artifact_bytes <= 0:
+                    raise ManifestError("manifest artifact_bytes must be a positive integer")
+                expected_bindings.append({
+                    "intake_source_id": source_id,
+                    "source_record_url": require_https(entry.get("source_record_url"), "manifest source_record_url"),
+                    "source_file_url": require_https(entry.get("source_file_url"), "manifest source_file_url"),
+                    "artifact_path": artifact_path.as_posix(),
+                    "artifact_sha256": require_text(entry.get("artifact_sha256"), "manifest artifact_sha256"),
+                    "artifact_bytes": artifact_bytes,
+                    "selected_work_ids": require_string_list(entry.get("selected_work_ids"), "manifest selected_work_ids"),
+                })
+            expected_bindings.sort(key=lambda row: row["intake_source_id"])
+            if normalized_plan_bindings != expected_bindings:
+                raise ManifestError(
+                    "analysis plan authorized_source_bindings do not exactly match source artifacts and selected works in the input manifest"
+                )
+        elif normalized_plan_bindings:
+            raise ManifestError("empty input manifest cannot bind planned source artifacts")
+
     thresholds = require_object(
         design.get("effect_and_uncertainty_thresholds"),
         "analysis-plan design.effect_and_uncertainty_thresholds",
@@ -238,6 +306,7 @@ def validate_analysis_plan(
         "registration_record_url": registration_url,
         "hypothesis_count": len(hypotheses),
         "null_model_count": len(null_models),
+        "source_binding_count": len(normalized_plan_bindings),
         "primary_outcome_count": len(design["primary_outcomes"]),
         "sensitivity_analysis_count": len(design["sensitivity_analyses"]),
     }
@@ -256,7 +325,7 @@ def review_scope_sha256(
     the digest reproducible.
     """
     scope = require_object(manifest.get("scope"), "scope")
-    analysis_plan = validate_analysis_plan(scope, analysis_plan_root)
+    analysis_plan = validate_analysis_plan(scope, analysis_plan_root, manifest)
     selected_work_ids = require_string_list(
         entry.get("selected_work_ids"), "selected_work_ids"
     )
@@ -371,13 +440,13 @@ def evaluate_manifest(
             for field in plan_fields
         ):
             try:
-                analysis_plan_summary = validate_analysis_plan(scope, analysis_plan_root)
+                analysis_plan_summary = validate_analysis_plan(scope, analysis_plan_root, manifest)
             except ManifestError as exc:
                 blockers.append(f"Analysis plan is blocked: {exc}")
         else:
             blockers.append("No hash-bound pre-registered analysis plan is declared.")
     else:
-        analysis_plan_summary = validate_analysis_plan(scope, analysis_plan_root)
+        analysis_plan_summary = validate_analysis_plan(scope, analysis_plan_root, manifest)
 
     intake_ids_seen: set[str] = set()
     artifact_hashes_seen: set[str] = set()
