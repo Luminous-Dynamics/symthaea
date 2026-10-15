@@ -52,6 +52,8 @@ Do not silently merge unlike foods. A local cultivar, wild/underutilized food, f
 
 A source name alone is not provenance. Record its exact edition, record and permitted transformation rather than inventing a citation because a food or nutrient sounds plausible.
 
+A written permission must be scoped to the right it actually grants. The source registry stores separate evidence references for assessment, cache/retention, transformation, commercial use, public fixture use and redistribution; one document reference cannot silently satisfy a different right's evidence requirement. A reference is only a pointer to evidence, not automatic proof of scope, authenticity, legal sufficiency or continued validity.
+
 ### Johannesburg/Highveld candidate-food hypothesis (not yet a planting recommendation)
 
 The South African food-based dietary guidelines organize a healthy diet across starchy foods; vegetables and fruit; dry beans, peas, lentils and soya; poultry/fish/meat/eggs; milk/maas/yoghurt; fats/oils; and water. This suggests that a garden-only optimizer will be structurally incomplete: it should plan what can be grown locally while leaving explicit supply gaps for foods/groups that require a wider cooperative, market or fortification network. [FAO summary of South African food-based dietary guidelines](https://www.fao.org/nutrition/education/food-dietary-guidelines/regions/countries/south-africa/en/).
