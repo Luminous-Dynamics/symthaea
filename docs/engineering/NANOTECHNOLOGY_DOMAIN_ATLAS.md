@@ -195,7 +195,7 @@ This is a **provisional review order**, not a computed readiness score. Select t
 6. **Independent verification and domain review.** Recompute metrics from frozen receipts and preserve failures/null results.
 7. **Only then explore physical experiments** with domain experts, reviewed protocols, safe facilities, sample traceability, controls and independent characterization. Nothing here authorizes autonomous synthesis, biological work, environmental release, medical use or lab actuation.
 
-## 7. Research references
+## 8. Research references
 
 - Majedi (2026), “Artificial intelligence in nanotechnology: current applications and future perspectives,” *Health Nanotechnology*: https://link.springer.com/article/10.1186/s44301-026-00038-4
 - Kim & Kim (2025), “Inverse design of nanophotonic devices enabled by optimization algorithms and deep learning,” *Nanophotonics*: https://doi.org/10.1515/nanoph-2024-0536
