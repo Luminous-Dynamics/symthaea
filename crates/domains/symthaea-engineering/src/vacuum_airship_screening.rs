@@ -2444,7 +2444,8 @@ mod tests {
             geometry_revision_id: "geometry/sha256:abc".into(),
             mesh_or_specimen_revision_id: "mesh-or-specimen/sha256:def".into(),
             material_model_revision_id: "material-model/v3".into(),
-            analysis_or_test_method_id: "analysis-method/nonlinear-imperfection-sensitive-v1".into(),
+            analysis_or_test_method_id:
+                "analysis-method/nonlinear-imperfection-sensitive-v1".into(),
             load_case_id: "external-pressure-sea-level/v1".into(),
             boundary_condition_profile_id: "supports-and-joints/v2".into(),
             imperfection_basis_id: "measured-imperfections/bounds-v1".into(),
