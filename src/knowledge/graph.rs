@@ -738,6 +738,7 @@ fn contains_negation(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::persistence::KnowledgePersistence;
 
     fn make_encoding(text: &str, confidence: f32) -> FactEncoding {
         FactEncoding {
@@ -831,6 +832,62 @@ mod tests {
         assert_eq!(fact.contradiction_count, 2);
         assert_eq!(fact.domain.as_deref(), Some("test"));
         assert!(fact.has_causal_relations);
+    }
+
+    #[test]
+    fn test_sqlite_round_trip_preserves_temporal_fact_state() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_temporal_state_round_trip_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let (id, _) = graph.insert(
+            make_encoding("persistent temporal fixture", 0.9),
+            7,
+            Some("test".to_string()),
+            true,
+        );
+        {
+            let fact = graph.facts.get_mut(&id).unwrap();
+            fact.confidence = 0.61;
+            fact.initial_confidence = 0.94;
+            fact.last_accessed_cycle = 29;
+            fact.corroboration_count = 5;
+            fact.contradiction_count = 2;
+        }
+        let expected_vector = graph.get_fact(id).unwrap().encoding.vector.0.to_vec();
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        assert_eq!(
+            persistence.save_facts(&graph.export_fact_records()).unwrap(),
+            1
+        );
+        let records = persistence.load_facts().unwrap();
+        assert_eq!(records.len(), 1);
+
+        let mut restored = EnhancedKnowledgeGraph::new(10);
+        restored.import_fact_record(&records[0]);
+        let fact = restored
+            .all_facts()
+            .next()
+            .expect("restored graph should have a fact");
+
+        assert_eq!(fact.encoding.source_text, "persistent temporal fixture");
+        assert_eq!(fact.encoding.vector.0.to_vec(), expected_vector);
+        assert!((fact.confidence - 0.61).abs() < f32::EPSILON);
+        assert!((fact.initial_confidence - 0.94).abs() < f32::EPSILON);
+        assert_eq!(fact.inserted_at_cycle, 7);
+        assert_eq!(fact.last_accessed_cycle, 29);
+        assert_eq!(fact.corroboration_count, 5);
+        assert_eq!(fact.contradiction_count, 2);
+        assert_eq!(fact.domain.as_deref(), Some("test"));
+        assert!(fact.has_causal_relations);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
