@@ -415,7 +415,7 @@ mod tests {
     }
 
     #[test]
-    fn integrated_scrubber_failure_accumulates_co2_without_claiming_capture() {
+    fn integrated_scrubber_failure_vetoes_planned_task_before_resource_use() {
         let report = run_integrated_eva_scenario(IntegratedEvaScenario::Co2ScrubberFailure);
         assert_eq!(
             report.mission_disposition,
@@ -428,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    fn integrated_humidity_control_failure_accumulates_water_mass() {
+    fn integrated_humidity_control_failure_vetoes_planned_task_before_resource_use() {
         let report = run_integrated_eva_scenario(IntegratedEvaScenario::HumidityControlFailure);
         assert_eq!(
             report.mission_disposition,
