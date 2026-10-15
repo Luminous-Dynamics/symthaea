@@ -317,11 +317,15 @@ impl KnowledgeManager {
             let facts = p
                 .load_facts()
                 .map_err(|e| format!("KnowledgeManager failed to load persisted facts: {e}"))?;
-            for record in &facts {
-                graph.import_fact_record(record);
+            let imported_fact_count = graph.import_fact_records(&facts);
+            if imported_fact_count != facts.len() {
+                return Err(format!(
+                    "KnowledgeManager restored {imported_fact_count} of {} persisted fact records",
+                    facts.len()
+                ));
             }
             if !facts.is_empty() {
-                tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
+                tracing::info!(count = imported_fact_count, "Knowledge: loaded facts from SQLite");
             }
 
             let edges = p.load_causal_edges().map_err(|e| {
