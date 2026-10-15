@@ -630,6 +630,26 @@ pub struct SoundFontPresetV1 {
 
 /// A single sustained or short-articulation mapping and its local availability.
 #[derive(Debug, Clone, Serialize)]
+pub struct SamplePitchCoverageV1 {
+    pub midi_note: u8,
+    pub indexed_sample_file_count: usize,
+    pub decoded_sample_file_count: usize,
+    pub failed_sample_decode_file_count: usize,
+    pub silent_sample_file_count: usize,
+    pub dynamic_strength_coverage: Vec<DynamicStrengthCoverageV1>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DynamicStrengthCoverageV1 {
+    /// Parsed and normalized filename strength; not a calibrated MIDI velocity.
+    pub normalized_dynamic_strength: f32,
+    pub indexed_sample_file_count: usize,
+    pub decoded_sample_file_count: usize,
+    pub failed_sample_decode_file_count: usize,
+    pub silent_sample_file_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct SampleDirectoryEvidenceV1 {
     pub source_library: &'static str,
     pub relative_directory: String,
@@ -644,6 +664,9 @@ pub struct SampleDirectoryEvidenceV1 {
     /// MIDI pitches absent from accepted filename metadata strictly between
     /// the observed minimum and maximum; not proof of rendered-range gaps.
     pub filename_pitch_gaps_midi_within_observed_range: Vec<u8>,
+    /// Per-pitch sample/decode/silence evidence and parsed dynamic-strength buckets.
+    /// These are filename-derived bins, not calibrated velocity layers.
+    pub pitch_coverage: Vec<SamplePitchCoverageV1>,
     /// Distinct normalized dynamic values parsed from indexed filenames; not calibrated layers.
     pub distinct_dynamic_strength_count: usize,
     /// Result of fully reading every WAV accepted by the filename indexer.
@@ -944,6 +967,28 @@ fn sample_directory_evidence(
     };
     let indexed_sample_count = bank.as_ref().map_or(0, |bank| bank.samples.len());
     let audio_audit = audit_indexed_sample_audio(bank.as_ref());
+    let pitch_coverage = audio_audit
+        .pitch_coverage
+        .iter()
+        .map(|(midi_note, pitch)| SamplePitchCoverageV1 {
+            midi_note: *midi_note,
+            indexed_sample_file_count: pitch.indexed_sample_file_count,
+            decoded_sample_file_count: pitch.decoded_sample_file_count,
+            failed_sample_decode_file_count: pitch.failed_sample_decode_file_count,
+            silent_sample_file_count: pitch.silent_sample_file_count,
+            dynamic_strength_coverage: pitch
+                .dynamic_strengths
+                .iter()
+                .map(|(strength_bits, counts)| DynamicStrengthCoverageV1 {
+                    normalized_dynamic_strength: f32::from_bits(*strength_bits),
+                    indexed_sample_file_count: counts.indexed_sample_file_count,
+                    decoded_sample_file_count: counts.decoded_sample_file_count,
+                    failed_sample_decode_file_count: counts.failed_sample_decode_file_count,
+                    silent_sample_file_count: counts.silent_sample_file_count,
+                })
+                .collect(),
+        })
+        .collect();
     let indexed_sample_content_manifest_sha256 = if hash_indexed_samples {
         match bank.as_ref() {
             Some(bank) if !bank.samples.is_empty() => {
@@ -996,6 +1041,7 @@ fn sample_directory_evidence(
         max_midi,
         distinct_pitch_count,
         filename_pitch_gaps_midi_within_observed_range,
+        pitch_coverage,
         distinct_dynamic_strength_count,
         audio_decode_status,
         decoded_sample_file_count: audio_audit.decoded_sample_file_count,
@@ -1070,6 +1116,25 @@ const MAX_REPORTED_SAMPLE_DECODE_FAILURES: usize = 20;
 const MAX_SAMPLE_DECODE_REASON_CHARS: usize = 200;
 
 #[derive(Default)]
+struct DynamicStrengthAudioAudit {
+    indexed_sample_file_count: usize,
+    decoded_sample_file_count: usize,
+    failed_sample_decode_file_count: usize,
+    silent_sample_file_count: usize,
+}
+
+#[derive(Default)]
+struct PitchAudioAudit {
+    indexed_sample_file_count: usize,
+    decoded_sample_file_count: usize,
+    failed_sample_decode_file_count: usize,
+    silent_sample_file_count: usize,
+    /// f32 positive-value bit patterns sort in numeric order, and all parsed
+    /// dynamic strengths are finite, non-negative values in [0, 1].
+    dynamic_strengths: std::collections::BTreeMap<u32, DynamicStrengthAudioAudit>,
+}
+
+#[derive(Default)]
 struct IndexedSampleAudioAudit {
     decoded_sample_file_count: usize,
     failed_sample_decode_count: usize,
@@ -1078,6 +1143,7 @@ struct IndexedSampleAudioAudit {
     silent_sample_file_count: usize,
     sample_rates: std::collections::BTreeSet<u32>,
     channel_counts: std::collections::BTreeSet<u16>,
+    pitch_coverage: std::collections::BTreeMap<u8, PitchAudioAudit>,
 }
 
 fn audit_indexed_sample_audio(bank: Option<&InstrumentBank>) -> IndexedSampleAudioAudit {
@@ -1087,17 +1153,31 @@ fn audit_indexed_sample_audio(bank: Option<&InstrumentBank>) -> IndexedSampleAud
     };
 
     for sample in &bank.samples {
+        let pitch = audit.pitch_coverage.entry(sample.midi).or_default();
+        pitch.indexed_sample_file_count += 1;
+        let dynamic_strength = pitch
+            .dynamic_strengths
+            .entry(sample.dynamic.to_bits())
+            .or_default();
+        dynamic_strength.indexed_sample_file_count += 1;
+
         match audit_one_wav(&sample.path) {
             Ok((sample_rate, channels, peak, _, _)) => {
                 audit.decoded_sample_file_count += 1;
+                pitch.decoded_sample_file_count += 1;
+                dynamic_strength.decoded_sample_file_count += 1;
                 audit.sample_rates.insert(sample_rate);
                 audit.channel_counts.insert(channels);
                 if peak <= 1e-5 {
                     audit.silent_sample_file_count += 1;
+                    pitch.silent_sample_file_count += 1;
+                    dynamic_strength.silent_sample_file_count += 1;
                 }
             }
             Err(error) => {
                 audit.failed_sample_decode_count += 1;
+                pitch.failed_sample_decode_file_count += 1;
+                dynamic_strength.failed_sample_decode_file_count += 1;
                 if audit.reported_sample_decode_failures.len()
                     < MAX_REPORTED_SAMPLE_DECODE_FAILURES
                 {
@@ -2475,6 +2555,37 @@ mod tests {
         assert_eq!(mapping.min_midi, Some(48));
         assert_eq!(mapping.max_midi, Some(69));
         assert_eq!(mapping.distinct_pitch_count, 3);
+        assert_eq!(mapping.pitch_coverage.len(), 3);
+        let c3_coverage = mapping
+            .pitch_coverage
+            .iter()
+            .find(|pitch| pitch.midi_note == 48)
+            .unwrap();
+        assert_eq!(c3_coverage.indexed_sample_file_count, 1);
+        assert_eq!(c3_coverage.decoded_sample_file_count, 1);
+        assert_eq!(c3_coverage.failed_sample_decode_file_count, 0);
+        assert_eq!(c3_coverage.silent_sample_file_count, 1);
+        assert_eq!(c3_coverage.dynamic_strength_coverage.len(), 1);
+        assert!(
+            (c3_coverage.dynamic_strength_coverage[0].normalized_dynamic_strength - 2.0 / 3.0)
+                .abs()
+                < f32::EPSILON
+        );
+
+        let d4_coverage = mapping
+            .pitch_coverage
+            .iter()
+            .find(|pitch| pitch.midi_note == 62)
+            .unwrap();
+        assert_eq!(d4_coverage.indexed_sample_file_count, 1);
+        assert_eq!(d4_coverage.decoded_sample_file_count, 0);
+        assert_eq!(d4_coverage.failed_sample_decode_file_count, 1);
+        assert_eq!(d4_coverage.dynamic_strength_coverage.len(), 1);
+        assert_eq!(
+            d4_coverage.dynamic_strength_coverage[0].normalized_dynamic_strength,
+            1.0
+        );
+
         assert_eq!(
             mapping.filename_pitch_gaps_midi_within_observed_range,
             (49u8..=61).chain(63..=68).collect::<Vec<_>>(),
