@@ -11,8 +11,12 @@ license = "AGPL-3.0-or-later"
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
 serde = { workspace = true }
+sha2 = { workspace = true }
 rand = { workspace = true }
 proptest = "1"
+
+[dev-dependencies]
+serde_json = { workspace = true }
 
 [dependencies.symtropy-physics]
 version = "0.2.1"

@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "evaluated_at_s": 100,
+  "observations": [
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "unit": "Pascal",
+      "value": 900,
+      "uncertainty_abs": 20,
+      "observed_at_s": 99,
+      "confidence": 0.99,
+      "source_id": "co2-a",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "unit": "Pascal",
+      "value": 910,
+      "uncertainty_abs": 20,
+      "observed_at_s": 99,
+      "confidence": 0.95,
+      "source_id": "co2-b",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "unit": "Pascal",
+      "value": 18000,
+      "uncertainty_abs": 100,
+      "observed_at_s": 99,
+      "confidence": 0.99,
+      "source_id": "bulk-model",
+      "source_kind": "ModelEstimate"
+    },
+    {
+      "metric": "OxygenPartialPressurePa",
+      "unit": "Pascal",
+      "value": 21000,
+      "uncertainty_abs": 100,
+      "observed_at_s": 99,
+      "confidence": 0.99,
+      "source_id": "o2-a",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "OxygenPartialPressurePa",
+      "unit": "Pascal",
+      "value": 50000,
+      "uncertainty_abs": 100,
+      "observed_at_s": 99,
+      "confidence": 0.98,
+      "source_id": "o2-b",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "CircuitPressurePa",
+      "unit": "Pascal",
+      "value": 50000,
+      "uncertainty_abs": 100,
+      "observed_at_s": 99,
+      "confidence": 0.95,
+      "source_id": "pressure-a",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "CircuitPressurePa",
+      "unit": "Pascal",
+      "value": 55000,
+      "uncertainty_abs": 100,
+      "observed_at_s": 99,
+      "confidence": 0.95,
+      "source_id": "pressure-a",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "GasTemperatureK",
+      "unit": "Kelvin",
+      "value": 289,
+      "uncertainty_abs": 0.3,
+      "observed_at_s": 90,
+      "confidence": 0.98,
+      "source_id": "gas-temp-stale",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "GasTemperatureK",
+      "unit": "Kelvin",
+      "value": 291,
+      "uncertainty_abs": 0.3,
+      "observed_at_s": 99,
+      "confidence": 0.98,
+      "source_id": "gas-temp-model",
+      "source_kind": "ModelEstimate"
+    },
+    {
+      "metric": "VentilationFlowLMin",
+      "unit": "LiterPerMinute",
+      "value": 170,
+      "uncertainty_abs": 5,
+      "observed_at_s": 101,
+      "confidence": 0.98,
+      "source_id": "flow-future",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "RelativeHumidityPercent",
+      "unit": "Pascal",
+      "value": 35,
+      "uncertainty_abs": 2,
+      "observed_at_s": 99,
+      "confidence": 0.98,
+      "source_id": "humidity-wrong-unit",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "RelativeHumidityPercent",
+      "unit": "Percent",
+      "value": 40,
+      "uncertainty_abs": 2,
+      "observed_at_s": 99,
+      "confidence": 0.2,
+      "source_id": "humidity-low-confidence",
+      "source_kind": "ModelPrediction"
+    }
+  ],
+  "expected": [
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "source_kind": "Instrument",
+      "status": "Fresh",
+      "accepted_sources": 2
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "source_kind": "ModelEstimate",
+      "status": "Fresh",
+      "accepted_sources": 1
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "source_kind": "ModelPrediction",
+      "status": "Missing",
+      "accepted_sources": 0
+    },
+    {
+      "metric": "OxygenPartialPressurePa",
+      "source_kind": "Instrument",
+      "status": "Conflicted",
+      "requires_no_point_estimate": true,
+      "accepted_sources": 2
+    },
+    {
+      "metric": "OxygenPartialPressurePa",
+      "source_kind": "ModelPrediction",
+      "status": "Missing",
+      "accepted_sources": 0
+    },
+    {
+      "metric": "CircuitPressurePa",
+      "source_kind": "Instrument",
+      "status": "Conflicted",
+      "requires_no_point_estimate": true,
+      "accepted_sources": 1
+    },
+    {
+      "metric": "GasTemperatureK",
+      "source_kind": "Instrument",
+      "status": "Stale",
+      "accepted_sources": 0
+    },
+    {
+      "metric": "GasTemperatureK",
+      "source_kind": "ModelEstimate",
+      "status": "Fresh",
+      "accepted_sources": 1
+    },
+    {
+      "metric": "VentilationFlowLMin",
+      "source_kind": "Instrument",
+      "status": "FutureDated",
+      "accepted_sources": 0
+    },
+    {
+      "metric": "RelativeHumidityPercent",
+      "source_kind": "Instrument",
+      "status": "Invalid",
+      "accepted_sources": 0
+    },
+    {
+      "metric": "RelativeHumidityPercent",
+      "source_kind": "ModelPrediction",
+      "status": "LowConfidence",
+      "accepted_sources": 0
+    }
+  ]
+}
