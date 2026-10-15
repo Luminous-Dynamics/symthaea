@@ -49,6 +49,7 @@ Python and Shell scripts for development, analysis, and benchmarking.
 
 - `benchmark-consciousness.sh` - Run consciousness benchmarks
 - `check-integration-status.sh` - Check integration status
+- `check_cargo_lock_closure.sh` - Run full `cargo metadata --locked` and emit a machine-readable lock-closure disposition. If the committed lock is stale, preserves Cargo-generated proposal bytes/patch plus metadata and toolchain hashes, restores `Cargo.lock`, and exits `FAIL_LOCK_DRIFT` before downstream qualification; never hand-edits lock contents.
 - `download-models.sh` - Download model weights
 - `integrate-phase1.sh` - Phase 1 integration
 - `run_tier_3_full_validation_overnight.sh` - Overnight validation
@@ -86,6 +87,11 @@ uv run --no-sync ruff check python/symthaea_research scripts/analyze_nixos_confi
 ./scripts/ci_check_lanes.sh core
 ./scripts/ci_check_lanes.sh python-research
 ./scripts/ci_check_lanes.sh coding-validation
+
+# Exercise the fail-closed Cargo lock-closure classifications with a stub Cargo executable
+bash tests/shell/test-cargo-lock-closure.sh
+# Run the current workspace lock gate (LOCK_CLEAN is prerequisite evidence, not a Rust test result)
+bash scripts/check_cargo_lock_closure.sh target/cargo-lock-closure
 
 # Run shell scripts
 ./scripts/benchmark-consciousness.sh
