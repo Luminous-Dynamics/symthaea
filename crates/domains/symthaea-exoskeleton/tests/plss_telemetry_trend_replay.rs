@@ -255,6 +255,9 @@ fn hash_lane(h: &mut VerifierHash, lane: &PlssTelemetryTrendLane) {
         h.option_f64(source.last_timestamp_s);
         h.option_f64(source.first_value);
         h.option_f64(source.last_value);
+        h.option_f64(source.minimum_observed_value);
+        h.option_f64(source.maximum_observed_value);
+        h.option_f64(source.maximum_deviation_from_endpoint_secant);
         h.option_f64(source.first_uncertainty_abs);
         h.option_f64(source.last_uncertainty_abs);
         h.option_f64(source.maximum_observed_gap_s);
