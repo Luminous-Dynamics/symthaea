@@ -233,6 +233,19 @@ impl ResultRow {
             self.benefit_concentration_bps
         )
     }
+
+    /// Compare every result field except the scenario label.
+    ///
+    /// This is used for null-effect controls: when a scenario disables one
+    /// mechanism, its output must match the reference scenario for policy arms
+    /// that do not use that mechanism.
+    pub fn same_outcomes_except_scenario_id(&self, other: &Self) -> bool {
+        let mut left = self.clone();
+        let mut right = other.clone();
+        left.scenario_id.clear();
+        right.scenario_id.clear();
+        left == right
+    }
 }
 
 pub const TSV_HEADER: &str = "schema_version\tscenario_id\tseed\tpolicy_id\tpopulation\tmodel_weeks\tneed_property_events_local\topportunity_property_events_local\tnon_economic_harm_events\tdisplaced_property_events\tsimulated_harm_events_total\treported_harm_events\tfalse_alarms\trobot_compromise_weeks\trobot_safety_incidents\tannualized_cost_units\tessential_access_gain_bps\tessential_access_gap_bps\tprivacy_burden_points\tbenefit_concentration_bps";
