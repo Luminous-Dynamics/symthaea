@@ -1326,6 +1326,97 @@ mod tests {
     }
 
     #[test]
+    fn test_load_facts_rejects_noncontiguous_relation_ordinals() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_relation_ordinal_gap_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![4u8; BinaryHV::BYTES],
+                source_text: "two relations".into(),
+                confidence: 0.8,
+                domain: None,
+                cycle: 1,
+                is_causal: true,
+                relations: vec![
+                    ExtractedRelation {
+                        subject: "A".into(),
+                        predicate: "caused".into(),
+                        object: "B".into(),
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::Patient,
+                        is_causal: true,
+                        is_negated: false,
+                        confidence: 0.7,
+                    },
+                    ExtractedRelation {
+                        subject: "A".into(),
+                        predicate: "did not cause".into(),
+                        object: "C".into(),
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::Patient,
+                        is_causal: true,
+                        is_negated: true,
+                        confidence: 0.6,
+                    },
+                ],
+                graph_fact_id: Some(1),
+                initial_confidence: Some(0.8),
+                last_accessed_cycle: Some(1),
+                corroboration_count: 0,
+                contradiction_count: 0,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_relations SET ordinal = 2 WHERE ordinal = 1",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("Non-contiguous relation ordinal"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_orphan_relation_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_orphan_relation_row_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence.save_facts(&[]).unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "INSERT INTO knowledge_fact_relations
+             (fact_row_id, ordinal, subject, predicate, object, subject_role, object_role,
+              is_causal, is_negated, confidence)
+             VALUES (999, 0, 'A', 'caused', 'B', 'agent', 'patient', 1, 0, 0.7)",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("Structured relation rows refer to missing fact row 999"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_load_facts_rejects_unknown_persisted_relation_role() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_unknown_relation_role_test_{}",
