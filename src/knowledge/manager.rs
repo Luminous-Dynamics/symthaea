@@ -888,6 +888,10 @@ impl KnowledgeManager {
                 similarity: r.similarity,
                 domain: None,
                 is_causal: false,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
             })
             .collect();
 
@@ -1370,6 +1374,10 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
             }])
             .unwrap();
 
@@ -1414,6 +1422,10 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
             }])
             .unwrap();
 
@@ -1457,6 +1469,10 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                initial_confidence: None,
+                last_accessed_cycle: None,
+                corroboration_count: 0,
+                contradiction_count: 0,
             }])
             .unwrap();
 
