@@ -99,7 +99,8 @@ fn validate_result(value: f64, name: &'static str) -> Result<(), ScreeningError>
 /// Conditional weakest-link calculation for a population of manufactured features.
 ///
 /// This models the probability that at least one feature exceeds a defined defect criterion when
-/// every feature has the same declared exceedance probability and all feature events are independent.
+/// every feature has the same declared exceedance probability, and all feature events are
+/// independent.
 /// It is not a shell-failure probability, and it is not an empirical estimate unless the supplied
 /// per-feature probability is supported by representative manufacturing/inspection data.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -109,7 +110,7 @@ pub struct FeatureDefectPopulationResult {
     pub probability_at_least_one_feature_exceeds_criterion: f64,
 }
 
-/// Screen how a per-feature defect-tail probability scales with the number of manufactured features.
+/// Screen how a per-feature defect-tail probability scales as the feature population grows.
 ///
 /// The identical-independent-feature assumption is strong: common-cause manufacturing drift,
 /// spatial correlation, inspection bias, and feature-to-feature heterogeneity are not represented.
@@ -3012,8 +3013,12 @@ mod tests {
         assert!(small.probability_at_least_one_feature_exceeds_criterion > 0.0);
         assert!(large.probability_at_least_one_feature_exceeds_criterion
             > small.probability_at_least_one_feature_exceeds_criterion);
-        assert!((small.probability_at_least_one_feature_exceeds_criterion - 0.02664).abs() < 0.00001);
-        assert!((large.probability_at_least_one_feature_exceeds_criterion - 0.63214).abs() < 0.00001);
+        assert!(
+            (small.probability_at_least_one_feature_exceeds_criterion - 0.02664).abs() < 0.00001
+        );
+        assert!(
+            (large.probability_at_least_one_feature_exceeds_criterion - 0.63214).abs() < 0.00001
+        );
     }
 
     #[test]
@@ -3058,8 +3063,10 @@ mod tests {
             evidence_manifest: EvidenceManifestGateState::ContentAddressed,
             vehicle_mass_ledger: VehicleMassLedgerGateState::ReconciledToMeasuredOrBuildEstimate,
             scale_transfer: ScaleTransferGateState::ValidatedAcrossRelevantScaleRange,
-            defect_population: DefectPopulationGateState::CharacterizedForTargetManufacturingPopulation,
-            defect_inspection: DefectInspectionGateState::DetectionPerformanceDemonstratedOnRepresentativeParts,
+            defect_population:
+                DefectPopulationGateState::CharacterizedForTargetManufacturingPopulation,
+            defect_inspection:
+                DefectInspectionGateState::DetectionPerformanceDemonstratedOnRepresentativeParts,
         }
     }
 
