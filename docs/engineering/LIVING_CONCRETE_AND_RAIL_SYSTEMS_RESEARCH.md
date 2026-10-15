@@ -436,6 +436,88 @@ This is a programme hypothesis and test plan only. It does not establish a new c
 - Rengaraju et al. (2025), [Environmental life cycle assessment of self-healing concrete with microcapsules and impregnated lightweight aggregates](https://doi.org/10.1016/j.jobe.2025.113105).
 - [Railway track geometry degradation: a review of prediction methods](https://doi.org/10.1016/j.rineng.2026.109583) (2026).
 
+### A15. Prove that Symthaea improves discovery—not just prediction (2026-10-15)
+
+The most important algorithmic claim to test is not “Symthaea can predict a healing percentage.” It is: **under the same real-world budget and hard constraints, does a Symthaea-guided research policy reach a reproducible, admissible engineering decision with less time, money, material or risk than competent transparent alternatives?** Treat this as a falsifiable benchmark, not an assumed advantage of HDC/CfC, active learning, physics-informed ML or digital twins.
+
+This framing builds on demonstrated closed-loop materials research: NIST describes CAMEO using Bayesian active learning with human input to guide materials exploration at a synchrotron ([Kusne et al., 2020](https://doi.org/10.1038/s41467-020-19597-w)), and its active-learning benchmark found that acquisition-policy performance varies with the search space; Expected Improvement performed best overall in the specific Fe-Co-Ni thin-film study, not universally across materials problems ([Wang et al., 2022](https://www.nist.gov/publications/benchmarking-active-learning-strategies-materials-optimization-and-discovery)). These are reasons to benchmark the policy on the target task, not to assume one acquisition method transfers to concrete.
+
+#### A15.1. Two loops, one explicit evidence boundary
+
+**Research loop:** propose a measurement/experiment → collect rights-cleared results → verify raw-data identity and provenance → update endpoint-specific evidence/model → choose the next experiment or stop.
+
+**Asset loop:** inspect/measure an existing asset → estimate condition and uncertainty → identify options that meet mandatory constraints → request authorized professional review → observe intervention and subsequent condition → independently evaluate outcome.
+
+The two loops must not collapse into a self-authorizing agent. A research model may propose an experiment; a qualified person approves it. An asset model may produce a condition/maintenance proposal; the asset owner and responsible professional retain authorization. Results cross between loops only with explicit applicability limits: laboratory specimen evidence is not field evidence, a simulated scenario is not a measurement, and maintenance-associated improvement is not causal evidence without a defensible identification design.
+
+#### A15.2. Benchmark the discovery policy against fair baselines
+
+On a fixed, documented candidate space, compare at least:
+
+1. A random-but-feasible experimental design, using the same eligibility rules.
+2. A simple domain-informed or factorial/space-filling design selected before results are seen.
+3. A transparent sequential baseline such as Bayesian Expected Improvement for continuous objectives, with feasibility constraints handled explicitly.
+4. An uncertainty- or information-driven strategy designed to discriminate declared rival hypotheses.
+5. Symthaea-guided selection, with model version, acquisition rule, inputs and decision thresholds frozen before evaluation.
+
+Where useful, include a competent human-selected design, with the selection time and available information recorded. Do not handicap the baseline by providing it less metadata, compute, expert context, budget or access to feasibility constraints. Use synthetic benchmark environments for pipeline testing, but label them synthetic; then use historical replay where leakage can be excluded and a prospective evaluation for any claim of real experimental efficiency.
+
+**Do not optimize a single “healing score.”** Apply mandatory feasibility constraints (strength, constructability, durability, biosafety and applicable owner/code requirements) first. Compare cost, carbon, repairability and other objectives only among candidates that satisfy the predeclared constraints. If the experiment is multi-objective, report the feasible set/Pareto trade-offs and assumptions, not a single scalar that conceals an unacceptable failure.
+
+#### A15.3. Decision-relevant success metrics
+
+Freeze one primary outcome and a small set of secondary metrics before test results. Possible primary metrics include:
+
+- **Cost to a reliable decision:** money, calendar time, number of specimens/experiments and material consumed until a candidate passes every hard gate and an independent reproduction/replication requirement.
+- **False-feasible rate:** fraction of candidates the policy recommends as passing mandatory constraints that fail the predefined independent check. Report severity as well as count; one severe constraint violation can matter more than average prediction error.
+- **Discovery efficiency under a fixed budget:** probability of finding at least one independently reproducible feasible candidate, or the utility of the verified feasible set, under equal experiment budgets. Include unsuccessful/null runs in the denominator.
+- **Information gain with actionability:** how often new results distinguish the predeclared rival hypotheses or change the recommended decision—not just whether a model's internal uncertainty number decreases.
+- **Prediction validity:** endpoint-specific error and interval coverage/calibration on grouped holdouts. A narrow but miscalibrated interval is not improved knowledge.
+- **Transfer and robustness:** performance when the held-out unit is a new batch, specimen lineage, study, lab, exposure regime, instrument, segment or route, whichever matches the intended claim.
+
+Do not make a “fewer experiments” claim using a retrospective candidate table that already contains the winner unless the replay simulates what was genuinely available at each decision step and avoids information leakage. Repeated measurements from the same specimen and multiple specimens from one mix batch are not independent experimental discoveries.
+
+#### A15.4. Data splits, controls and rejection tests
+
+Before any model comparison, construct the split according to the highest relevant dependency level. Hold out entire studies/labs for cross-study or inter-lab claims; hold out complete batches and parent specimens for within-programme generalization; use chronological and segment/route holdouts for rail forecasts. The source's unit and lineage fields—not the number of rows—determine what can be considered independent.
+
+The independent evaluator must recompute source-manifest digests, split membership, feasibility, primary metrics, uncertainty calibration and per-group summaries from frozen inputs and outputs. Predefine adverse slices and publish denominators so rare but consequential failures cannot disappear inside a good aggregate score.
+
+Required hostile controls include:
+- shuffled outcome labels and an identifier-only predictor;
+- repeat readings, image locations or sibling specimens leaking across train/test;
+- missing outcomes silently turned into zero or a success;
+- future maintenance events entering operational forecasts;
+- units, timepoints, comparator labels or endpoints silently swapped;
+- post hoc changes to hard thresholds, primary endpoint, acquisition method or stopping rule;
+- a deliberately out-of-domain candidate that should trigger abstention;
+- a high mean performance accompanied by a rare, severe hard-gate violation.
+
+For a concrete benchmark, reproduce a pre-specified BATH-01087 published result from original, checksummed workbook bytes before fitting a discovery model. For a rail benchmark, first validate localized-exceedance labels and sensor/position alignment; a GPS-tagged vibration stream is not itself a track-geometry ground truth label.
+
+#### A15.5. Predeclared stop/go rules
+
+- **Stop model development** if rights, source identity, units, experimental hierarchy or target definition remain unresolved; resolve the data contract first.
+- **Stop discovery claims** if the independent evaluator cannot reproduce the source baseline or negative controls detect leakage.
+- **Do not claim AI advantage** if Symthaea fails to outperform the predeclared transparent policies on the primary decision metric at equal budget, or if apparent gains vanish under study/lab/batch/route holdouts.
+- **Do not recommend a candidate** whose mandatory constraint status is unknown; return *insufficient evidence* and identify the next test that would resolve that uncertainty.
+- **Advance only with independent evidence**: a result must survive a prospective or otherwise genuinely untouched evaluation, independent metric recomputation and appropriate replication for the stated transfer claim.
+- **Keep null results.** If every candidate fails, the deliverable is a verified exclusion or a better-defined research boundary—not a fabricated winner.
+
+#### A15.6. What would count as a meaningful breakthrough?
+
+The first credible breakthrough is not a novel scalar score or a more elaborate model. It is a reproducible demonstration that the system can do at least one of the following under a fair, frozen budget: (a) reduce the cost/time to reach an independently verified feasible material choice; (b) substantially reduce false-feasible recommendations while preserving discovery rate; (c) identify which experiment distinguishes two otherwise-confounded healing mechanisms; or (d) detect localized rail-condition failures that a segment-average baseline misses, with independently validated labels and acceptable false-negative/false-alert trade-offs.
+
+Report the effect with uncertainty and failure cases. If the simple policy is just as good, keep the simple policy. This is how Symthaea can earn a role in materials and infrastructure discovery rather than assume one.
+
+This section defines a benchmark contract and research hypothesis only. It contains no experiment results, creates no new production type, and does not establish that Symthaea-guided selection currently beats any baseline.
+
+**Additional research anchors**
+- Kusne et al. (2020), [On-the-fly closed-loop materials discovery via Bayesian active learning](https://doi.org/10.1038/s41467-020-19597-w), *Nature*.
+- Wang et al. (2022), NIST, [Benchmarking Active Learning Strategies for Materials Optimization and Discovery](https://www.nist.gov/publications/benchmarking-active-learning-strategies-materials-optimization-and-discovery).
+- Hu et al. (2026), [A comprehensive review of railway track condition monitoring](https://doi.org/10.1016/j.jrst.2026.05.005), emphasizing task-driven measurement and localized defect applications.
+- Ali et al. (2026), [A Review of Self-healing Concrete: Mechanism, Performance, Techniques and Machine Learning Approaches](https://doi.org/10.1186/s40069-026-00932-2).
+
 ## B. Better railway systems
 
 ### B1. Highest-value first move: predict deterioration, not just geometry
