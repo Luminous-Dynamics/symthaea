@@ -18,6 +18,9 @@ const UPSTREAM_DOCS_COMMIT: &str = "57c71322d5a5be0a0fcdcf05592e1699b120dc79";
 const UPSTREAM_DOCS_URL: &str = "https://github.com/facebookresearch/fairchem/blob/57c71322d5a5be0a0fcdcf05592e1699b120dc79/docs/catalysts/datasets/oc22.md";
 const UPSTREAM_ARTIFACT_URL: &str = "https://dl.fbaipublicfiles.com/opencatalystproject/data/oc22/is2res_total_train_val_test_lmdbs.tar.gz";
 const UPSTREAM_REPORTED_MD5: &str = "b35dc24e99ef3aeaee6c5c949903de94";
+const MAX_UNCOMPRESSED_ARCHIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const MAX_TAR_MEMBERS: u64 = 250_000;
+const MAX_MEMBER_PATH_BYTES: usize = 16 * 1024;
 const UPSTREAM_REPORTED_LICENSE: &str = "CC BY 4.0 (as reported by upstream; verify the exact intended use and attribution)";
 
 #[derive(Debug, Parser)]
@@ -50,10 +53,14 @@ struct UpstreamSource {
 #[derive(Debug, Serialize)]
 struct ArtifactIdentity {
     filename: String,
-    byte_size: u64,
-    measured_md5: String,
+    byte_size_before_inspection: u64,
+    measured_md5_before_inspection: String,
     upstream_md5_matches: bool,
-    measured_sha256: String,
+    measured_sha256_before_inspection: String,
+    byte_size_after_inspection: u64,
+    measured_md5_after_inspection: String,
+    measured_sha256_after_inspection: String,
+    contents_unchanged_during_inspection: bool,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -90,6 +97,7 @@ struct AdmissionReceipt {
     limitations: Vec<&'static str>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 struct HashRecord {
     byte_size: u64,
     md5: String,
@@ -110,16 +118,21 @@ fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
     reject_same_input_and_output(&cli.archive, &cli.output)?;
 
-    let hashes = hash_file(&cli.archive)
+    let hashes_before = hash_file(&cli.archive)
         .with_context(|| format!("could not hash archive {}", cli.archive.display()))?;
-    let upstream_md5_matches = hashes.md5.eq_ignore_ascii_case(UPSTREAM_REPORTED_MD5);
+    let upstream_md5_matches = hashes_before.md5.eq_ignore_ascii_case(UPSTREAM_REPORTED_MD5);
 
     let inventory_result = inventory_tar_gz(&cli.archive);
     let (archive_inventory, archive_inspection_error) = match inventory_result {
         Ok(inventory) => (Some(inventory), None),
         Err(error) => (None, Some(format!("{error:#}"))),
     };
-    let status = status_for(upstream_md5_matches, archive_inventory.as_ref());
+    // Re-hash after inventory so the receipt cannot silently combine a digest
+    // from one version of a file with an inventory from a concurrently replaced file.
+    let hashes_after = hash_file(&cli.archive)
+        .with_context(|| format!("could not re-hash archive {}", cli.archive.display()))?;
+    let contents_unchanged = hashes_before == hashes_after;
+    let status = status_for(upstream_md5_matches, archive_inventory.as_ref(), contents_unchanged);
 
     let generated_at_unix_seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -146,10 +159,14 @@ fn run() -> Result<ExitCode> {
                 .and_then(|name| name.to_str())
                 .unwrap_or("<non-utf8-filename>")
                 .to_owned(),
-            byte_size: hashes.byte_size,
-            measured_md5: hashes.md5,
+            byte_size_before_inspection: hashes_before.byte_size,
+            measured_md5_before_inspection: hashes_before.md5,
             upstream_md5_matches,
-            measured_sha256: hashes.sha256,
+            measured_sha256_before_inspection: hashes_before.sha256,
+            byte_size_after_inspection: hashes_after.byte_size,
+            measured_md5_after_inspection: hashes_after.md5,
+            measured_sha256_after_inspection: hashes_after.sha256,
+            contents_unchanged_during_inspection: contents_unchanged,
         },
         archive_inventory,
         archive_inspection_error,
@@ -159,6 +176,8 @@ fn run() -> Result<ExitCode> {
             "A matching checksum and safe inventory do not establish dataset schema, split correctness, license sufficiency, scientific validity, or benchmark performance.",
             "The receipt status remains pending semantic schema/split review even when local artifact integrity checks pass.",
             "Upstream MD5 is checked for compatibility only; measured SHA-256 and byte size identify the local artifact more strongly.",
+            "The archive is hashed before and after inventory; content changes block a clean integrity status.",
+            "Decompressed bytes and tar member counts are bounded to reduce resource-exhaustion risk from malformed archives.",
         ],
     };
 
@@ -167,9 +186,9 @@ fn run() -> Result<ExitCode> {
         .with_context(|| format!("could not write receipt {}", cli.output.display()))?;
 
     println!("status={}", receipt.status);
-    println!("archive_bytes={}", receipt.artifact.byte_size);
+    println!("archive_bytes={}", receipt.artifact.byte_size_before_inspection);
     println!("upstream_md5_matches={}", receipt.artifact.upstream_md5_matches);
-    println!("sha256={}", receipt.artifact.measured_sha256);
+    println!("sha256={}", receipt.artifact.measured_sha256_before_inspection);
     println!("receipt={}", cli.output.display());
 
     match receipt.status {
@@ -177,6 +196,7 @@ fn run() -> Result<ExitCode> {
         "checksum_mismatch" => Ok(ExitCode::from(2)),
         "archive_structure_review_required" => Ok(ExitCode::from(3)),
         "archive_inspection_failed" => Ok(ExitCode::from(4)),
+        "artifact_changed_during_inspection" => Ok(ExitCode::from(5)),
         _ => {
             bail!("internal error: unexpected status {}", receipt.status)
         }
@@ -240,9 +260,29 @@ fn validate_gzip_stream(path: &Path) -> Result<()> {
     let file = File::open(path)?;
     let mut decoder = MultiGzDecoder::new(file);
     // Drain the complete compressed stream so gzip CRC/length trailers are verified,
-    // even if the tar reader below stops at tar's end-of-archive marker first.
-    io::copy(&mut decoder, &mut io::sink()).context("gzip stream failed full integrity read")?;
+    // even if the tar reader below stops at tar's end-of-archive marker first. Bound
+    // decompressed bytes to avoid an unbounded gzip-bomb scan.
+    drain_with_limit(&mut decoder, MAX_UNCOMPRESSED_ARCHIVE_BYTES)
+        .context("gzip stream failed full integrity read or exceeded the decompressed-byte budget")?;
     Ok(())
+}
+
+fn drain_with_limit<R: Read>(reader: &mut R, max_bytes: u64) -> Result<u64> {
+    let mut consumed = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = reader.read(&mut buffer)?;
+        if read == 0 {
+            return Ok(consumed);
+        }
+        let next = consumed
+            .checked_add(read as u64)
+            .ok_or_else(|| anyhow!("decompressed byte count overflow"))?;
+        if next > max_bytes {
+            bail!("decompressed data exceeds configured limit of {max_bytes} bytes");
+        }
+        consumed = next;
+    }
 }
 
 fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
@@ -255,6 +295,9 @@ fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
     let mut seen_paths = BTreeSet::new();
 
     for (index, result) in entries.enumerate() {
+        if inventory.member_count >= MAX_TAR_MEMBERS {
+            bail!("archive exceeds configured member-count limit of {MAX_TAR_MEMBERS}");
+        }
         let mut entry = result.with_context(|| format!("invalid tar entry at index {index}"))?;
         let entry_path = entry.path()?.into_owned();
         let path_text = entry_path.to_str().map(str::to_owned);
@@ -262,7 +305,9 @@ fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
             .clone()
             .unwrap_or_else(|| format!("<non-utf8-path-{index}>"));
 
-        if path_is_unsafe(&entry_path, path_text.as_deref()) {
+        if path_is_unsafe(&entry_path, path_text.as_deref())
+            || path_text.as_ref().is_some_and(|text| text.len() > MAX_MEMBER_PATH_BYTES)
+        {
             inventory.unsafe_member_paths.push(display_path.clone());
         }
         if let Some(path) = path_text.as_ref() {
@@ -294,15 +339,20 @@ fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
         }
 
         let declared_size = entry.header().size()?;
+        let previous_payload_bytes = inventory.declared_payload_bytes;
         inventory.declared_payload_bytes = inventory
             .declared_payload_bytes
             .checked_add(declared_size)
             .ok_or_else(|| anyhow!("declared archive payload size overflow"))?;
+        if inventory.declared_payload_bytes > MAX_UNCOMPRESSED_ARCHIVE_BYTES {
+            bail!("declared archive payload exceeds configured byte limit of {MAX_UNCOMPRESSED_ARCHIVE_BYTES}");
+        }
         inventory.member_count += 1;
 
         // Read every member body through the gzip/tar stack to force decompression
         // and detect truncated member payloads. Data is discarded; nothing is extracted.
-        let copied = io::copy(&mut entry, &mut io::sink())
+        let remaining_budget = MAX_UNCOMPRESSED_ARCHIVE_BYTES - previous_payload_bytes;
+        let copied = drain_with_limit(&mut entry, remaining_budget)
             .with_context(|| format!("could not stream tar member {display_path}"))?;
         if copied != declared_size {
             bail!(
@@ -348,10 +398,17 @@ fn top_level_component(path: &str) -> &str {
         .unwrap_or("<root>")
 }
 
-fn status_for(md5_matches: bool, inventory: Option<&ArchiveInventory>) -> &'static str {
+fn status_for(
+    md5_matches: bool,
+    inventory: Option<&ArchiveInventory>,
+    contents_unchanged: bool,
+) -> &'static str {
     let Some(inventory) = inventory else {
         return "archive_inspection_failed";
     };
+    if !contents_unchanged {
+        return "artifact_changed_during_inspection";
+    }
     if !md5_matches {
         return "checksum_mismatch";
     }
@@ -431,7 +488,7 @@ mod tests {
         let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
         assert!(inventory.unsafe_member_paths.iter().any(|path| path.contains("..")));
         assert!(inventory.requires_review());
-        assert_eq!(status_for(true, Some(&inventory)), "archive_structure_review_required");
+        assert_eq!(status_for(true, Some(&inventory), true), "archive_structure_review_required");
     }
 
     #[test]
@@ -445,7 +502,7 @@ mod tests {
 
         let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
         assert_eq!(inventory.duplicate_member_paths, vec!["train/repeated.txt"]);
-        assert_eq!(status_for(true, Some(&inventory)), "archive_structure_review_required");
+        assert_eq!(status_for(true, Some(&inventory), true), "archive_structure_review_required");
     }
 
     #[test]
@@ -455,7 +512,7 @@ mod tests {
         write_fixture(&archive_path, &[("train/a.txt", b"hello")]);
 
         let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
-        assert_eq!(status_for(false, Some(&inventory)), "checksum_mismatch");
+        assert_eq!(status_for(false, Some(&inventory), true), "checksum_mismatch");
     }
 
     #[test]
@@ -466,10 +523,29 @@ mod tests {
 
         let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
         assert_eq!(
-            status_for(true, Some(&inventory)),
+            status_for(true, Some(&inventory), true),
             "artifact_integrity_verified_pending_schema"
         );
-        assert_ne!(status_for(true, Some(&inventory)), "admitted");
+        assert_ne!(status_for(true, Some(&inventory), true), "admitted");
+    }
+
+    #[test]
+    fn decompressed_budget_is_enforced() {
+        let mut too_large = Cursor::new(b"123456789");
+        assert!(drain_with_limit(&mut too_large, 8).is_err());
+
+        let mut within_limit = Cursor::new(b"12345678");
+        assert_eq!(drain_with_limit(&mut within_limit, 8).expect("within budget"), 8);
+    }
+
+    #[test]
+    fn changed_artifact_during_inspection_blocks_success() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("fixture.tar.gz");
+        write_fixture(&archive_path, &[("train/a.txt", b"hello")]);
+
+        let inventory = inventory_tar_gz(&archive_path).expect("inventory");
+        assert_eq!(status_for(true, Some(&inventory), false), "artifact_changed_during_inspection");
     }
 
     #[test]
@@ -479,6 +555,6 @@ mod tests {
         fs::write(&archive_path, b"not a gzip archive").expect("write invalid fixture");
 
         assert!(inventory_tar_gz(&archive_path).is_err());
-        assert_eq!(status_for(true, None), "archive_inspection_failed");
+        assert_eq!(status_for(true, None, true), "archive_inspection_failed");
     }
 }
