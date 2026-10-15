@@ -195,7 +195,8 @@ pub struct FusedHumanMetric {
     pub status: HumanMetricStatus,
     /// None for unknown, invalid, or conflicted evidence. Never defaults to zero.
     pub value: Option<f64>,
-    /// Conservative declared-uncertainty envelope, not a calibrated statistical confidence interval.
+    /// Conservative declared-uncertainty envelope, not a calibrated statistical confidence
+    /// interval.
     pub lower_bound: Option<f64>,
     pub upper_bound: Option<f64>,
     pub confidence: Option<f64>,
