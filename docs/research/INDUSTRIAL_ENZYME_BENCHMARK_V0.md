@@ -56,6 +56,12 @@ Use DaRUS-3867 / SLAC as a separate **kinetic-analysis reproduction gate** once 
 
 A successful pilot can qualify the read/parse/unit/fit/serialization pipeline before we spend effort admitting a larger kcat corpus. It does not replace that corpus or the study/family-held-out predictive evaluation.
 
+#### Preliminary single-file calibration check (not full reproduction)
+
+An exploratory, in-memory inspection of the public mirror's [ABTS_standard_25.0C.json](https://github.com/EnzymeML/slac_modeling/blob/737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5/data/calibrations/ABTS_standard_25.0C.json) (mirror commit 737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5, Git blob ea1a3f69f5c01f6b6f7880c445833c5a733e4655) gives a narrow, checkable result. The JSON contains 30 absorbance observations across three replicate groups at concentrations from 0 to 200 µmol/L. Its embedded model specifies a zero-intercept linear calibration and an admitted range of 0–150 µmol/L (27 observations); the published slope is 0.01832986232564407, with R² = 0.9965435394942497 and RMSD = 0.05253117083141901. An independent least-squares refit of the 27 observations in that declared range returns slope 0.018329862325174823, the same R² to the displayed precision, and RMSD 0.052531170831419005 (slope difference approximately 4.7×10⁻¹³). Including the three 200 µmol/L observations instead changes the zero-intercept slope to 0.017570697786690438 and RMSD to 0.09230840071343391. **The declared calibration-range decision materially affects the fit**: the reproduction must record and verify that rule, not silently filter samples. This is a calibration-statistic smoke check only, not validation of the complete five-temperature kinetic-model pipeline or any enzyme-function prediction.
+
+The canonical DaRUS page lists CC BY 4.0 and the corresponding calibration file's MD5 c8561fe8784f956d1123bbcd52a65121. The GitHub mirror states that its data are equivalent to the DaRUS deposit, but the mirror file has **not** been byte-verified against that canonical MD5 here, nor downloaded into the workspace. Before treating the smoke check as a source-byte-reproducible result, retrieve the versioned Dataverse file, calculate SHA-256 locally, verify its canonical MD5, pin the source artifact and reproduce the fit from the downloaded bytes.
+
 ### Executable admission gate
 
 A fail-closed Rust checker is wired into the existing workspace task runner:
