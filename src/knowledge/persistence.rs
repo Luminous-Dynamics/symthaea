@@ -258,6 +258,223 @@ impl KnowledgePersistence {
         Ok(count)
     }
 
+    /// Atomically replace the persisted fact set with a complete graph snapshot.
+    ///
+    /// Unlike `save_facts`, repeated snapshots do not append duplicate copies.
+    /// The delete and inserts commit together, so any failed snapshot preserves
+    /// the previous committed fact set.
+    pub fn replace_facts_snapshot(&mut self, facts: &[FactRecord]) -> Result<usize, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let mut conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(|e| format!("Begin fact snapshot transaction: {e}"))?;
+
+        tx.execute("DELETE FROM knowledge_facts", [])
+            .map_err(|e| format!("Clear previous fact snapshot: {e}"))?;
+
+        let mut count = 0;
+        for fact in facts {
+            let cycle = i64::try_from(fact.cycle)
+                .map_err(|e| format!("Fact insertion cycle exceeds SQLite INTEGER range: {e}"))?;
+            let last_accessed_cycle = fact
+                .last_accessed_cycle
+                .map(i64::try_from)
+                .transpose()
+                .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
+
+            tx.execute(
+                "INSERT INTO knowledge_facts
+                 (vector_blob, source_text, confidence, domain, cycle, is_causal,
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params![
+                    fact.vector_bytes,
+                    fact.source_text,
+                    fact.confidence,
+                    fact.domain,
+                    cycle,
+                    fact.is_causal,
+                    fact.initial_confidence,
+                    last_accessed_cycle,
+                    fact.corroboration_count as i64,
+                    fact.contradiction_count as i64,
+                ],
+            )
+            .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
+            count += 1;
+        }
+
+        tx.commit()
+            .map_err(|e| format!("Commit fact snapshot: {e}"))?;
+        self.total_saved += count as u64;
+        Ok(count)
+    }
+
+    /// Atomically replace the complete persisted knowledge state.
+    ///
+    /// This operation owns snapshot semantics for facts, causal edges, and
+    /// ontology primitives. Unlike the legacy append/upsert methods, it removes
+    /// records that are no longer present in the live state. Every input is
+    /// validated before the transaction begins, and all three collections are
+    /// replaced in one SQLite transaction so a failed write preserves the
+    /// previous committed snapshot.
+    pub fn replace_knowledge_snapshot(
+        &mut self,
+        facts: &[FactRecord],
+        edges: &[CausalEdgeRecord],
+        ontology: &[OntologyRecord],
+    ) -> Result<(usize, usize, usize), String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        // Validate and convert every lossy SQLite INTEGER boundary before
+        // touching the database. A caller must never persist state that the
+        // strict readers would reject on the next startup.
+        let mut prepared_facts = Vec::with_capacity(facts.len());
+        for fact in facts {
+            validate_hypervector_bytes(&fact.vector_bytes, 0)
+                .map_err(|e| format!("Invalid fact snapshot vector: {e}"))?;
+            if !fact.confidence.is_finite() || !(0.0..=1.0).contains(&fact.confidence) {
+                return Err(format!(
+                    "Invalid fact snapshot confidence outside [0, 1]: {}",
+                    fact.confidence
+                ));
+            }
+            if let Some(initial_confidence) = fact.initial_confidence {
+                if !initial_confidence.is_finite()
+                    || !(0.0..=1.0).contains(&initial_confidence)
+                {
+                    return Err(format!(
+                        "Invalid fact initial confidence outside [0, 1]: {initial_confidence}"
+                    ));
+                }
+            }
+            let cycle = i64::try_from(fact.cycle)
+                .map_err(|e| format!("Fact insertion cycle exceeds SQLite INTEGER range: {e}"))?;
+            let last_accessed_cycle = fact
+                .last_accessed_cycle
+                .map(i64::try_from)
+                .transpose()
+                .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
+            prepared_facts.push((fact, cycle, last_accessed_cycle));
+        }
+
+        let mut prepared_edges = Vec::with_capacity(edges.len());
+        for edge in edges {
+            if !edge.strength.is_finite() {
+                return Err(format!(
+                    "Non-finite causal edge strength for {} -> {}",
+                    edge.cause, edge.effect
+                ));
+            }
+            let cycle = i64::try_from(edge.cycle)
+                .map_err(|e| format!("Causal-edge cycle exceeds SQLite INTEGER range: {e}"))?;
+            prepared_edges.push((edge, cycle));
+        }
+
+        let mut prepared_ontology = Vec::with_capacity(ontology.len());
+        for record in ontology {
+            validate_hypervector_bytes(&record.vector_bytes, 1)
+                .map_err(|e| format!("Invalid ontology snapshot vector: {e}"))?;
+            if !record.utility.is_finite() {
+                return Err(format!(
+                    "Non-finite ontology utility for {}: {}",
+                    record.name, record.utility
+                ));
+            }
+            let usage_count = i64::try_from(record.usage_count)
+                .map_err(|e| format!("Ontology usage count exceeds SQLite INTEGER range: {e}"))?;
+            let created_at_cycle = i64::try_from(record.created_at_cycle)
+                .map_err(|e| format!("Ontology creation cycle exceeds SQLite INTEGER range: {e}"))?;
+            let last_used_cycle = i64::try_from(record.last_used_cycle)
+                .map_err(|e| format!("Ontology last-used cycle exceeds SQLite INTEGER range: {e}"))?;
+            prepared_ontology.push((record, usage_count, created_at_cycle, last_used_cycle));
+        }
+
+        let mut conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(|e| format!("Begin knowledge snapshot transaction: {e}"))?;
+
+        tx.execute("DELETE FROM knowledge_facts", [])
+            .map_err(|e| format!("Clear fact snapshot: {e}"))?;
+        tx.execute("DELETE FROM knowledge_causal_edges", [])
+            .map_err(|e| format!("Clear causal-edge snapshot: {e}"))?;
+        tx.execute("DELETE FROM knowledge_ontology", [])
+            .map_err(|e| format!("Clear ontology snapshot: {e}"))?;
+
+        for (fact, cycle, last_accessed_cycle) in &prepared_facts {
+            tx.execute(
+                "INSERT INTO knowledge_facts
+                 (vector_blob, source_text, confidence, domain, cycle, is_causal,
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params![
+                    fact.vector_bytes,
+                    fact.source_text,
+                    fact.confidence,
+                    fact.domain,
+                    cycle,
+                    fact.is_causal,
+                    fact.initial_confidence,
+                    last_accessed_cycle,
+                    fact.corroboration_count as i64,
+                    fact.contradiction_count as i64,
+                ],
+            )
+            .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
+        }
+
+        for (edge, cycle) in &prepared_edges {
+            // The live bridge can retain multiple observations for the same
+            // (cause, effect) pair, while SQLite stores one row per pair. Match
+            // the legacy upsert contract: the later observation replaces the row.
+            tx.execute(
+                "INSERT OR REPLACE INTO knowledge_causal_edges
+                 (cause, effect, strength, is_inhibitory, cycle)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![
+                    edge.cause,
+                    edge.effect,
+                    edge.strength,
+                    edge.is_inhibitory,
+                    cycle,
+                ],
+            )
+            .map_err(|e| format!("Insert causal-edge snapshot row: {e}"))?;
+        }
+
+        for (record, usage_count, created_at_cycle, last_used_cycle) in &prepared_ontology {
+            tx.execute(
+                "INSERT INTO knowledge_ontology
+                 (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    record.name,
+                    record.vector_bytes,
+                    usage_count,
+                    record.utility,
+                    created_at_cycle,
+                    last_used_cycle,
+                    record.is_a_parent,
+                ],
+            )
+            .map_err(|e| format!("Insert ontology snapshot row: {e}"))?;
+        }
+
+        tx.commit()
+            .map_err(|e| format!("Commit knowledge snapshot: {e}"))?;
+        self.total_saved += (facts.len() + edges.len() + ontology.len()) as u64;
+        Ok((facts.len(), edges.len(), ontology.len()))
+    }
+
     /// Load all fact records from the database.
     pub fn load_facts(&mut self) -> Result<Vec<FactRecord>, String> {
         if !self.is_configured() {
@@ -902,6 +1119,274 @@ mod tests {
         assert_eq!(records[0].last_accessed_cycle, None);
         assert_eq!(records[0].corroboration_count, 0);
         assert_eq!(records[0].contradiction_count, 0);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_complete_snapshot_removes_stale_edges_and_ontology_records() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_complete_snapshot_replace_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            vector_bytes: vec![7u8; BinaryHV::BYTES],
+            source_text: "live fact".into(),
+            confidence: 0.8,
+            domain: Some("test".into()),
+            cycle: 7,
+            is_causal: true,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(8),
+            corroboration_count: 2,
+            contradiction_count: 1,
+        };
+        let stale_edge = CausalEdgeRecord {
+            cause: "stale-sentinel-cause".into(),
+            effect: "stale-sentinel-effect".into(),
+            strength: 0.7,
+            is_inhibitory: false,
+            cycle: 1,
+        };
+        let stale_primitive = OntologyRecord {
+            name: "stale-sentinel-primitive".into(),
+            vector_bytes: vec![9u8; BinaryHV::BYTES],
+            usage_count: 2,
+            utility: 0.4,
+            created_at_cycle: 1,
+            last_used_cycle: 2,
+            is_a_parent: None,
+        };
+
+        let duplicate_edge = CausalEdgeRecord {
+            strength: -0.8,
+            is_inhibitory: true,
+            ..stale_edge.clone()
+        };
+        assert_eq!(
+            persistence
+                .replace_knowledge_snapshot(
+                    &[fact.clone()],
+                    &[stale_edge, duplicate_edge],
+                    &[stale_primitive],
+                )
+                .unwrap(),
+            (1, 2, 1)
+        );
+        let deduplicated_edges = persistence.load_causal_edges().unwrap();
+        assert_eq!(
+            deduplicated_edges.len(),
+            1,
+            "duplicate in-memory cause/effect pairs share one persisted row"
+        );
+        assert_eq!(deduplicated_edges[0].strength, -0.8);
+        assert!(deduplicated_edges[0].is_inhibitory);
+
+        let replacement_fact = FactRecord {
+            source_text: "replacement live fact".into(),
+            ..fact
+        };
+        assert_eq!(
+            persistence
+                .replace_knowledge_snapshot(&[replacement_fact], &[], &[])
+                .unwrap(),
+            (1, 0, 0)
+        );
+
+        let facts = persistence.load_facts().unwrap();
+        let edges = persistence.load_causal_edges().unwrap();
+        let ontology = persistence.load_ontology().unwrap();
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].source_text, "replacement live fact");
+        assert!(edges.is_empty(), "removed causal edges must not reappear after restart");
+        assert!(
+            ontology.is_empty(),
+            "pruned ontology primitives must not reappear after restart"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_complete_snapshot_rolls_back_all_tables_on_insert_failure() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_complete_snapshot_rollback_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let old_fact = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "old fact".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 3,
+            is_causal: false,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(4),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let old_edge = CausalEdgeRecord {
+            cause: "old cause".into(),
+            effect: "old effect".into(),
+            strength: 0.5,
+            is_inhibitory: false,
+            cycle: 3,
+        };
+        let old_primitive = OntologyRecord {
+            name: "old primitive".into(),
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            usage_count: 1,
+            utility: 0.5,
+            created_at_cycle: 1,
+            last_used_cycle: 2,
+            is_a_parent: None,
+        };
+        persistence
+            .replace_knowledge_snapshot(&[old_fact], &[old_edge], &[old_primitive])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TRIGGER reject_snapshot_primitive
+             BEFORE INSERT ON knowledge_ontology
+             WHEN NEW.name = 'reject-snapshot'
+             BEGIN
+                 SELECT RAISE(ABORT, 'injected snapshot insert failure');
+             END;",
+        )
+        .unwrap();
+        drop(conn);
+
+        let new_fact = FactRecord {
+            vector_bytes: vec![3u8; BinaryHV::BYTES],
+            source_text: "new fact that must roll back".into(),
+            confidence: 0.7,
+            domain: None,
+            cycle: 10,
+            is_causal: false,
+            initial_confidence: Some(0.7),
+            last_accessed_cycle: Some(10),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let new_edge = CausalEdgeRecord {
+            cause: "new cause".into(),
+            effect: "new effect".into(),
+            strength: 0.6,
+            is_inhibitory: false,
+            cycle: 10,
+        };
+        let rejected_primitive = OntologyRecord {
+            name: "reject-snapshot".into(),
+            vector_bytes: vec![4u8; BinaryHV::BYTES],
+            usage_count: 1,
+            utility: 0.2,
+            created_at_cycle: 10,
+            last_used_cycle: 10,
+            is_a_parent: None,
+        };
+
+        let error = persistence
+            .replace_knowledge_snapshot(&[new_fact], &[new_edge], &[rejected_primitive])
+            .unwrap_err();
+        assert!(error.contains("injected snapshot insert failure"), "{error}");
+
+        let facts = persistence.load_facts().unwrap();
+        let edges = persistence.load_causal_edges().unwrap();
+        let ontology = persistence.load_ontology().unwrap();
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].source_text, "old fact");
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].cause, "old cause");
+        assert_eq!(ontology.len(), 1);
+        assert_eq!(ontology[0].name, "old primitive");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_fact_snapshot_replacement_does_not_accumulate_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_snapshot_repeat_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let fact = FactRecord {
+            vector_bytes: vec![7u8; BinaryHV::BYTES],
+            source_text: "snapshot fixture".into(),
+            confidence: 0.8,
+            domain: Some("test".into()),
+            cycle: 7,
+            is_causal: false,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(8),
+            corroboration_count: 2,
+            contradiction_count: 1,
+        };
+
+        assert_eq!(persistence.replace_facts_snapshot(&[fact.clone()]).unwrap(), 1);
+        assert_eq!(persistence.replace_facts_snapshot(&[fact]).unwrap(), 1);
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].source_text, "snapshot fixture");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_transaction_rollback() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_rollback_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let existing = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "existing fixture".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 3,
+            is_causal: false,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(4),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        persistence.replace_facts_snapshot(&[existing]).unwrap();
+
+        let invalid = FactRecord {
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            source_text: "range fixture".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: u64::MAX,
+            is_causal: false,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(4),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        assert!(persistence.replace_facts_snapshot(&[invalid]).is_err());
+
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].source_text, "existing fixture");
 
         let _ = std::fs::remove_dir_all(&dir);
     }

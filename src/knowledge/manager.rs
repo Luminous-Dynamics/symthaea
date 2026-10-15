@@ -777,7 +777,10 @@ impl KnowledgeManager {
 
     /// Persist current knowledge state to SQLite.
     ///
-    /// Saves all facts and causal edges. No-op if persistence is not configured.
+    /// Atomically replaces persisted facts, causal edges, and ontology primitives.
+    ///
+    /// No-op if persistence is not configured. On failure, SQLite keeps the
+    /// previous committed snapshot intact.
     pub fn persist_snapshot(&mut self) {
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
@@ -787,20 +790,17 @@ impl KnowledgeManager {
                 .map(|(cause, effect, strength)| CausalEdgeRecord {
                     cause,
                     effect,
+                    is_inhibitory: strength < 0.0,
                     strength,
-                    is_inhibitory: false,
                     cycle: 0,
                 })
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
-            if let Err(e) = p.save_facts(&facts) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
-            }
-            if let Err(e) = p.save_causal_edges(&edges) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
-            }
-            if let Err(e) = p.save_ontology(&ontology_records) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save ontology");
+            if let Err(e) = p.replace_knowledge_snapshot(&facts, &edges, &ontology_records) {
+                tracing::warn!(
+                    error = %e,
+                    "Knowledge persistence: failed to atomically replace complete knowledge snapshot"
+                );
             }
         }
     }
@@ -2015,6 +2015,95 @@ mod tests {
     }
 
     /// Processing interval: facts only extracted on-interval
+    #[test]
+    fn test_persist_snapshot_does_not_duplicate_existing_facts() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_idempotent_snapshot_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db").to_string_lossy().to_string();
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path),
+            ..Default::default()
+        };
+        let mut mgr = KnowledgeManager::new(config);
+        mgr.bootstrap_entities();
+        mgr.process("Sanctions caused oil shortage.", 1);
+        // Repeated observations can produce multiple in-memory edges with the
+        // same database key; snapshot persistence must handle that intentionally.
+        mgr.process("Sanctions caused oil shortage.", 2);
+
+        // Seed stale persisted records that are absent from the live manager.
+        // A full snapshot must remove these, not merely upsert current records.
+        {
+            let persistence = mgr.persistence.as_mut().expect("persistence configured");
+            persistence
+                .save_causal_edges(&[CausalEdgeRecord {
+                    cause: "stale-sentinel-cause".into(),
+                    effect: "stale-sentinel-effect".into(),
+                    strength: 0.7,
+                    is_inhibitory: false,
+                    cycle: 0,
+                }])
+                .unwrap();
+            persistence
+                .save_ontology(&[OntologyRecord {
+                    name: "stale-sentinel-primitive".into(),
+                    vector_bytes: vec![9u8; BinaryHV::BYTES],
+                    usage_count: 1,
+                    utility: 0.3,
+                    created_at_cycle: 0,
+                    last_used_cycle: 0,
+                    is_a_parent: None,
+                }])
+                .unwrap();
+        }
+
+        mgr.persist_snapshot();
+        let persistence = mgr.persistence.as_mut().expect("persistence configured");
+        let first = persistence
+            .load_facts()
+            .expect("first snapshot should load");
+        assert_eq!(first.len(), mgr.graph().len());
+
+        let first_edges = persistence
+            .load_causal_edges()
+            .expect("first causal snapshot should load");
+        assert!(
+            !first_edges.iter().any(|edge| edge.cause == "stale-sentinel-cause"),
+            "stale causal edges must be removed by the full snapshot"
+        );
+        let first_ontology = persistence
+            .load_ontology()
+            .expect("first ontology snapshot should load");
+        assert!(
+            !first_ontology.iter().any(|record| record.name == "stale-sentinel-primitive"),
+            "pruned ontology primitives must be removed by the full snapshot"
+        );
+
+        mgr.persist_snapshot();
+        let persistence = mgr.persistence.as_mut().expect("persistence configured");
+        let second = persistence
+            .load_facts()
+            .expect("second snapshot should load");
+        assert_eq!(second.len(), first.len());
+        assert_eq!(second.len(), mgr.graph().len());
+        assert_eq!(
+            persistence.load_causal_edges().unwrap().len(),
+            first_edges.len(),
+            "repeated full snapshots must not accumulate causal edges"
+        );
+        assert_eq!(
+            persistence.load_ontology().unwrap().len(),
+            first_ontology.len(),
+            "repeated full snapshots must not accumulate ontology primitives"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_processing_interval() {
         let config = KnowledgeManagerConfig {
