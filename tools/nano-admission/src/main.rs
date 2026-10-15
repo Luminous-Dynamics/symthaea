@@ -1,0 +1,474 @@
+use anyhow::{Context, Result, anyhow, bail};
+use clap::Parser;
+use flate2::read::GzDecoder;
+use md5::{Digest, Md5};
+use serde::Serialize;
+use sha2::Sha256;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs::{self, File};
+use std::io::{self, Read};
+use std::path::{Component, Path, PathBuf};
+use std::process::ExitCode;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tar::Archive;
+
+const DATASET_NAME: &str = "Open Catalyst 2022 (OC22)";
+const DATASET_TASK: &str = "IS2RE-Total / IS2RS combined archive";
+const UPSTREAM_DOCS_COMMIT: &str = "57c71322d5a5be0a0fcdcf05592e1699b120dc79";
+const UPSTREAM_DOCS_URL: &str = "https://github.com/facebookresearch/fairchem/blob/57c71322d5a5be0a0fcdcf05592e1699b120dc79/docs/catalysts/datasets/oc22.md";
+const UPSTREAM_ARTIFACT_URL: &str = "https://dl.fbaipublicfiles.com/opencatalystproject/data/oc22/is2res_total_train_val_test_lmdbs.tar.gz";
+const UPSTREAM_REPORTED_MD5: &str = "b35dc24e99ef3aeaee6c5c949903de94";
+const UPSTREAM_REPORTED_LICENSE: &str = "CC BY 4.0 (as reported by upstream; verify the exact intended use and attribution)";
+
+#[derive(Debug, Parser)]
+#[command(
+    name = "nano-admission-verifier",
+    version,
+    about = "Hash and inventory a local OC22 IS2RE-Total archive without extracting it"
+)]
+struct Cli {
+    /// Path to the locally downloaded OC22 .tar.gz archive.
+    #[arg(long, value_name = "PATH")]
+    archive: PathBuf,
+
+    /// Destination for the JSON receipt. Does not have to be inside the repository.
+    #[arg(long, value_name = "PATH", default_value = "oc22-artifact-integrity.json")]
+    output: PathBuf,
+}
+
+#[derive(Debug, Serialize)]
+struct UpstreamSource {
+    dataset: &'static str,
+    task: &'static str,
+    documentation_url: &'static str,
+    documentation_commit: &'static str,
+    artifact_url: &'static str,
+    upstream_reported_md5: &'static str,
+    upstream_reported_dataset_license: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct ArtifactIdentity {
+    filename: String,
+    byte_size: u64,
+    measured_md5: String,
+    upstream_md5_matches: bool,
+    measured_sha256: String,
+}
+
+#[derive(Debug, Default, Serialize)]
+struct ArchiveInventory {
+    member_count: u64,
+    regular_file_count: u64,
+    directory_count: u64,
+    declared_payload_bytes: u64,
+    top_level_member_counts: BTreeMap<String, u64>,
+    duplicate_member_paths: Vec<String>,
+    unsafe_member_paths: Vec<String>,
+    special_member_entries: Vec<String>,
+    payload_bytes_fully_streamed: bool,
+}
+
+impl ArchiveInventory {
+    fn requires_review(&self) -> bool {
+        !self.duplicate_member_paths.is_empty()
+            || !self.unsafe_member_paths.is_empty()
+            || !self.special_member_entries.is_empty()
+            || !self.payload_bytes_fully_streamed
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct AdmissionReceipt {
+    schema_version: &'static str,
+    status: &'static str,
+    generated_at_unix_seconds: u64,
+    upstream: UpstreamSource,
+    artifact: ArtifactIdentity,
+    archive_inventory: Option<ArchiveInventory>,
+    archive_inspection_error: Option<String>,
+    limitations: Vec<&'static str>,
+}
+
+struct HashRecord {
+    byte_size: u64,
+    md5: String,
+    sha256: String,
+}
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(code) => code,
+        Err(error) => {
+            eprintln!("nano-admission-verifier: {error:#}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run() -> Result<ExitCode> {
+    let cli = Cli::parse();
+    reject_same_input_and_output(&cli.archive, &cli.output)?;
+
+    let hashes = hash_file(&cli.archive)
+        .with_context(|| format!("could not hash archive {}", cli.archive.display()))?;
+    let upstream_md5_matches = hashes.md5.eq_ignore_ascii_case(UPSTREAM_REPORTED_MD5);
+
+    let inventory_result = inventory_tar_gz(&cli.archive);
+    let (archive_inventory, archive_inspection_error) = match inventory_result {
+        Ok(inventory) => (Some(inventory), None),
+        Err(error) => (None, Some(format!("{error:#}"))),
+    };
+    let status = status_for(upstream_md5_matches, archive_inventory.as_ref());
+
+    let generated_at_unix_seconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let receipt = AdmissionReceipt {
+        schema_version: "nano-artifact-admission-v1",
+        status,
+        generated_at_unix_seconds,
+        upstream: UpstreamSource {
+            dataset: DATASET_NAME,
+            task: DATASET_TASK,
+            documentation_url: UPSTREAM_DOCS_URL,
+            documentation_commit: UPSTREAM_DOCS_COMMIT,
+            artifact_url: UPSTREAM_ARTIFACT_URL,
+            upstream_reported_md5: UPSTREAM_REPORTED_MD5,
+            upstream_reported_dataset_license: UPSTREAM_REPORTED_LICENSE,
+        },
+        artifact: ArtifactIdentity {
+            filename: cli
+                .archive
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("<non-utf8-filename>")
+                .to_owned(),
+            byte_size: hashes.byte_size,
+            measured_md5: hashes.md5,
+            upstream_md5_matches,
+            measured_sha256: hashes.sha256,
+        },
+        archive_inventory,
+        archive_inspection_error,
+        limitations: vec![
+            "This tool performs no network access and does not download the artifact.",
+            "This tool never extracts archive members and never executes archive content.",
+            "A matching checksum and safe inventory do not establish dataset schema, split correctness, license sufficiency, scientific validity, or benchmark performance.",
+            "The receipt status remains pending semantic schema/split review even when local artifact integrity checks pass.",
+            "Upstream MD5 is checked for compatibility only; measured SHA-256 and byte size identify the local artifact more strongly.",
+        ],
+    };
+
+    let output = serde_json::to_vec_pretty(&receipt).context("could not serialize receipt")?;
+    fs::write(&cli.output, output)
+        .with_context(|| format!("could not write receipt {}", cli.output.display()))?;
+
+    println!("status={}", receipt.status);
+    println!("archive_bytes={}", receipt.artifact.byte_size);
+    println!("upstream_md5_matches={}", receipt.artifact.upstream_md5_matches);
+    println!("sha256={}", receipt.artifact.measured_sha256);
+    println!("receipt={}", cli.output.display());
+
+    match receipt.status {
+        "artifact_integrity_verified_pending_schema" => Ok(ExitCode::SUCCESS),
+        "checksum_mismatch" => Ok(ExitCode::from(2)),
+        "archive_structure_review_required" => Ok(ExitCode::from(3)),
+        "archive_inspection_failed" => Ok(ExitCode::from(4)),
+        _ => {
+            bail!("internal error: unexpected status {}", receipt.status)
+        }
+    }
+}
+
+fn reject_same_input_and_output(input: &Path, output: &Path) -> Result<()> {
+    if input == output {
+        bail!("input archive and receipt output cannot be the same path");
+    }
+    if output.exists() {
+        let input_canonical = fs::canonicalize(input)
+            .with_context(|| format!("could not resolve input path {}", input.display()))?;
+        let output_canonical = fs::canonicalize(output)
+            .with_context(|| format!("could not resolve output path {}", output.display()))?;
+        if input_canonical == output_canonical {
+            bail!("input archive and receipt output resolve to the same file");
+        }
+    }
+    Ok(())
+}
+
+fn hash_file(path: &Path) -> Result<HashRecord> {
+    let file = File::open(path)?;
+    let mut reader = io::BufReader::new(file);
+    let mut md5 = Md5::new();
+    let mut sha256 = Sha256::new();
+    let mut byte_size = 0_u64;
+    let mut buffer = [0_u8; 1024 * 1024];
+
+    loop {
+        let read = reader.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        byte_size = byte_size
+            .checked_add(read as u64)
+            .ok_or_else(|| anyhow!("archive byte size overflow"))?;
+        md5.update(&buffer[..read]);
+        sha256.update(&buffer[..read]);
+    }
+
+    Ok(HashRecord {
+        byte_size,
+        md5: lower_hex(&md5.finalize()),
+        sha256: lower_hex(&sha256.finalize()),
+    })
+}
+
+fn lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
+fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
+    let file = File::open(path)?;
+    let decoder = GzDecoder::new(file);
+    let mut archive = Archive::new(decoder);
+    let entries = archive.entries().context("not a readable tar archive inside gzip stream")?;
+    let mut inventory = ArchiveInventory::default();
+    let mut seen_paths = BTreeSet::new();
+
+    for (index, result) in entries.enumerate() {
+        let mut entry = result.with_context(|| format!("invalid tar entry at index {index}"))?;
+        let entry_path = entry.path()?.into_owned();
+        let path_text = entry_path.to_str().map(str::to_owned);
+        let display_path = path_text
+            .clone()
+            .unwrap_or_else(|| format!("<non-utf8-path-{index}>"));
+
+        if path_is_unsafe(&entry_path, path_text.as_deref()) {
+            inventory.unsafe_member_paths.push(display_path.clone());
+        }
+        if let Some(path) = path_text.as_ref() {
+            if !seen_paths.insert(path.clone()) {
+                inventory.duplicate_member_paths.push(path.clone());
+            }
+        } else {
+            inventory.unsafe_member_paths.push(display_path.clone());
+        }
+
+        let top_level = path_text
+            .as_deref()
+            .map(top_level_component)
+            .unwrap_or("<non-utf8>");
+        *inventory
+            .top_level_member_counts
+            .entry(top_level.to_owned())
+            .or_insert(0) += 1;
+
+        let entry_type = entry.header().entry_type();
+        if entry_type.is_file() {
+            inventory.regular_file_count += 1;
+        } else if entry_type.is_dir() {
+            inventory.directory_count += 1;
+        } else {
+            inventory
+                .special_member_entries
+                .push(format!("{display_path} (tar type 0x{:02x})", entry_type.as_byte()));
+        }
+
+        let declared_size = entry.header().size()?;
+        inventory.declared_payload_bytes = inventory
+            .declared_payload_bytes
+            .checked_add(declared_size)
+            .ok_or_else(|| anyhow!("declared archive payload size overflow"))?;
+        inventory.member_count += 1;
+
+        // Read every member body through the gzip/tar stack to force decompression
+        // and detect truncated member payloads. Data is discarded; nothing is extracted.
+        let copied = io::copy(&mut entry, &mut io::sink())
+            .with_context(|| format!("could not stream tar member {display_path}"))?;
+        if copied != declared_size {
+            bail!(
+                "tar member {display_path} yielded {copied} bytes, header declared {declared_size}"
+            );
+        }
+    }
+
+    inventory.duplicate_member_paths.sort();
+    inventory.unsafe_member_paths.sort();
+    inventory.special_member_entries.sort();
+    inventory.payload_bytes_fully_streamed = true;
+    Ok(inventory)
+}
+
+fn path_is_unsafe(path: &Path, text: Option<&str>) -> bool {
+    if path.is_absolute()
+        || path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir | Component::RootDir))
+    {
+        return true;
+    }
+
+    let Some(text) = text else {
+        return true;
+    };
+    let normalized = text.replace('\\', "/");
+    let has_windows_drive_prefix = normalized.as_bytes().get(1) == Some(&b':')
+        && normalized
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphabetic);
+
+    normalized.starts_with('/')
+        || has_windows_drive_prefix
+        || normalized.split('/').any(|component| component == "..")
+}
+
+fn top_level_component(path: &str) -> &str {
+    path.split(['/', '\\'])
+        .find(|component| !component.is_empty() && *component != ".")
+        .unwrap_or("<root>")
+}
+
+fn status_for(md5_matches: bool, inventory: Option<&ArchiveInventory>) -> &'static str {
+    let Some(inventory) = inventory else {
+        return "archive_inspection_failed";
+    };
+    if !md5_matches {
+        return "checksum_mismatch";
+    }
+    if inventory.requires_review() {
+        return "archive_structure_review_required";
+    }
+    "artifact_integrity_verified_pending_schema"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
+    use std::io::Cursor;
+    use tar::{Builder, Header};
+
+    fn write_fixture(path: &Path, members: &[(&str, &[u8])]) {
+        let file = File::create(path).expect("create fixture file");
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut builder = Builder::new(encoder);
+
+        for (name, bytes) in members {
+            let mut header = Header::new_gnu();
+            header.set_size(bytes.len() as u64);
+            header.set_mode(0o644);
+            header.set_uid(0);
+            header.set_gid(0);
+            header.set_mtime(0);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, *name, Cursor::new(*bytes))
+                .expect("append fixture member");
+        }
+
+        builder
+            .into_inner()
+            .expect("finish tar")
+            .finish()
+            .expect("finish gzip");
+    }
+
+    #[test]
+    fn hash_implementation_matches_published_test_vectors() {
+        assert_eq!(lower_hex(&Md5::digest(b"abc")), "900150983cd24fb0d6963f7d28e17f72");
+        assert_eq!(
+            lower_hex(&Sha256::digest(b"abc")),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn inventories_members_and_streams_payloads_without_extracting() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("fixture.tar.gz");
+        write_fixture(
+            &archive_path,
+            &[("train/a.txt", b"hello"), ("valid/b.txt", b"world")],
+        );
+
+        let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
+        assert_eq!(inventory.member_count, 2);
+        assert_eq!(inventory.regular_file_count, 2);
+        assert_eq!(inventory.declared_payload_bytes, 10);
+        assert_eq!(inventory.top_level_member_counts.get("train"), Some(&1));
+        assert_eq!(inventory.top_level_member_counts.get("valid"), Some(&1));
+        assert!(inventory.payload_bytes_fully_streamed);
+        assert!(!inventory.requires_review());
+    }
+
+    #[test]
+    fn traversal_path_requires_review() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("traversal.tar.gz");
+        write_fixture(&archive_path, &[("../outside.txt", b"no extraction")]);
+
+        let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
+        assert!(inventory.unsafe_member_paths.iter().any(|path| path.contains("..")));
+        assert!(inventory.requires_review());
+        assert_eq!(status_for(true, Some(&inventory)), "archive_structure_review_required");
+    }
+
+    #[test]
+    fn duplicate_paths_require_review() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("duplicate.tar.gz");
+        write_fixture(
+            &archive_path,
+            &[("train/repeated.txt", b"first"), ("train/repeated.txt", b"second")],
+        );
+
+        let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
+        assert_eq!(inventory.duplicate_member_paths, vec!["train/repeated.txt"]);
+        assert_eq!(status_for(true, Some(&inventory)), "archive_structure_review_required");
+    }
+
+    #[test]
+    fn checksum_mismatch_never_promotes_to_admitted() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("fixture.tar.gz");
+        write_fixture(&archive_path, &[("train/a.txt", b"hello")]);
+
+        let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
+        assert_eq!(status_for(false, Some(&inventory)), "checksum_mismatch");
+    }
+
+    #[test]
+    fn valid_checksum_still_stops_before_schema_admission() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("fixture.tar.gz");
+        write_fixture(&archive_path, &[("train/a.txt", b"hello")]);
+
+        let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
+        assert_eq!(
+            status_for(true, Some(&inventory)),
+            "artifact_integrity_verified_pending_schema"
+        );
+        assert_ne!(status_for(true, Some(&inventory)), "admitted");
+    }
+
+    #[test]
+    fn invalid_gzip_or_tar_is_reported_as_inspection_failure() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("not-an-archive.tar.gz");
+        fs::write(&archive_path, b"not a gzip archive").expect("write invalid fixture");
+
+        assert!(inventory_tar_gz(&archive_path).is_err());
+        assert_eq!(status_for(true, None), "archive_inspection_failed");
+    }
+}
