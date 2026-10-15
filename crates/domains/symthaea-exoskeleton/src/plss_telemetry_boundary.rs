@@ -14,7 +14,7 @@ use crate::plss_telemetry::{
     PlssTelemetryMetric, PlssTelemetrySourceKind, PlssTelemetryUnit,
 };
 use crate::plss_telemetry_trend::{
-    PlssTelemetrySourceTrend, PlssTelemetryTrendReport, PlssTelemetryTrendReceipt,
+    PlssTelemetryTrendReport, PlssTelemetryTrendReceipt,
     PlssTelemetryTrendStatus, TrendEvidenceLevel, verify_plss_telemetry_trend_receipt,
 };
 
@@ -135,7 +135,10 @@ pub fn project_plss_telemetry_boundaries(
     trend_report: &PlssTelemetryTrendReport,
     trend_receipt: &PlssTelemetryTrendReceipt,
     boundaries: &[PlssTelemetryBoundary],
-) -> Result<(PlssTelemetryBoundaryReport, PlssTelemetryBoundaryReceipt), PlssTelemetryBoundaryError> {
+) -> Result<
+    (PlssTelemetryBoundaryReport, PlssTelemetryBoundaryReceipt),
+    PlssTelemetryBoundaryError,
+> {
     if !verify_plss_telemetry_trend_receipt(trend_report, trend_receipt) {
         return Err(PlssTelemetryBoundaryError::InvalidTrendReceipt);
     }
@@ -300,7 +303,11 @@ fn project_one(
         return projection;
     };
     projection.lane_status = Some(lane.status);
-    let Some(source) = lane.source_trends.iter().find(|source| source.source_id == boundary.source_id) else {
+    let Some(source) = lane
+        .source_trends
+        .iter()
+        .find(|source| source.source_id == boundary.source_id)
+    else {
         return projection;
     };
     projection.source_trend_status = Some(source.status);
@@ -324,7 +331,13 @@ fn project_one(
         return projection;
     }
 
-    let (Some(last_value), Some(last_uncertainty), Some(rate), Some(rate_lower), Some(rate_upper)) = (
+    let (
+        Some(last_value),
+        Some(last_uncertainty),
+        Some(rate),
+        Some(rate_lower),
+        Some(rate_upper),
+    ) = (
         source.last_value,
         source.last_uncertainty_abs,
         source.rate_per_s,
@@ -576,7 +589,9 @@ fn projection_status_tag(status: PlssBoundaryProjectionStatus) -> &'static str {
         PlssBoundaryProjectionStatus::CandidateWithinHorizon => "candidate_within_horizon",
         PlssBoundaryProjectionStatus::CandidateBeyondHorizon => "candidate_beyond_horizon",
         PlssBoundaryProjectionStatus::AlreadyBeyondBoundary => "already_beyond_boundary",
-        PlssBoundaryProjectionStatus::BoundaryWithinCurrentUncertainty => "boundary_within_current_uncertainty",
+        PlssBoundaryProjectionStatus::BoundaryWithinCurrentUncertainty => {
+            "boundary_within_current_uncertainty"
+        },
         PlssBoundaryProjectionStatus::MovingAway => "moving_away",
         PlssBoundaryProjectionStatus::DirectionUncertain => "direction_uncertain",
         PlssBoundaryProjectionStatus::InsufficientEvidence => "insufficient_evidence",
@@ -626,7 +641,9 @@ mod tests {
         }
     }
 
-    fn trends(observations: &[PlssTelemetryObservation]) -> (PlssTelemetryTrendReport, PlssTelemetryTrendReceipt) {
+    fn trends(
+        observations: &[PlssTelemetryObservation],
+    ) -> (PlssTelemetryTrendReport, PlssTelemetryTrendReceipt) {
         analyze_plss_telemetry_trends_with_receipt(
             observations,
             PlssTelemetryTrendConfig::simulation_reference(),
@@ -634,7 +651,11 @@ mod tests {
         ).unwrap()
     }
 
-    fn boundary(direction: PlssBoundaryDirection, threshold: f64, horizon: f64) -> PlssTelemetryBoundary {
+    fn boundary(
+        direction: PlssBoundaryDirection,
+        threshold: f64,
+        horizon: f64,
+    ) -> PlssTelemetryBoundary {
         PlssTelemetryBoundary {
             metric: PlssTelemetryMetric::CircuitCo2PartialPressurePa,
             source_kind: PlssTelemetrySourceKind::Instrument,
@@ -646,7 +667,10 @@ mod tests {
         }
     }
 
-    fn project(observations: &[PlssTelemetryObservation], target: PlssTelemetryBoundary) -> PlssTelemetryBoundaryProjection {
+    fn project(
+        observations: &[PlssTelemetryObservation],
+        target: PlssTelemetryBoundary,
+    ) -> PlssTelemetryBoundaryProjection {
         let (report, receipt) = trends(observations);
         project_plss_telemetry_boundaries(&report, &receipt, &[target])
             .unwrap().0.projections.remove(0)
@@ -770,7 +794,11 @@ mod tests {
         ]);
         report.lanes[0].status = PlssTelemetryTrendStatus::Conflicted;
         assert_eq!(
-            project_plss_telemetry_boundaries(&report, &receipt, &[boundary(PlssBoundaryDirection::Upper, 500.0, 60.0)]),
+            project_plss_telemetry_boundaries(
+                &report,
+                &receipt,
+                &[boundary(PlssBoundaryDirection::Upper, 500.0, 60.0)],
+            ),
             Err(PlssTelemetryBoundaryError::InvalidTrendReceipt)
         );
     }
@@ -810,8 +838,11 @@ mod tests {
         ]);
         let a = boundary(PlssBoundaryDirection::Upper, 500.0, 60.0);
         let b = boundary(PlssBoundaryDirection::Upper, 550.0, 60.0);
-        let (out_a, receipt_a) = project_plss_telemetry_boundaries(&report, &receipt, &[a.clone(), b.clone()]).unwrap();
-        let (out_b, receipt_b) = project_plss_telemetry_boundaries(&report, &receipt, &[b, a]).unwrap();
+        let (out_a, receipt_a) =
+            project_plss_telemetry_boundaries(&report, &receipt, &[a.clone(), b.clone()])
+                .unwrap();
+        let (out_b, receipt_b) =
+            project_plss_telemetry_boundaries(&report, &receipt, &[b, a]).unwrap();
         assert_eq!(out_a, out_b);
         assert_eq!(receipt_a, receipt_b);
         assert!(verify_plss_telemetry_boundary_receipt(&out_a, &receipt_a));
