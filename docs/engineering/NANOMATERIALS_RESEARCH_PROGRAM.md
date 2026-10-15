@@ -212,6 +212,8 @@ This is retrospective label masking: the dataset's DFT labels already exist, but
 
 ### Admission checklist
 
+The exact per-system data contract is specified in [NANOMATERIALS_OC22_PAIR_MANIFEST.schema.json](./NANOMATERIALS_OC22_PAIR_MANIFEST.schema.json). It separates artifact identity, provider-reported versus observed counts, split reconciliation, initial-input/relaxed-target pairs, and independent-review status. It is a documentation-level schema, not a data admission result or new production runtime type.
+
 Execute [NANO-001A #7455](https://github.com/Luminous-Dynamics/symthaea/issues/7455) before implementing model comparison:
 1. Retrieve the pinned source documentation and record its commit and access date.
 2. Download the archive and mapping to temporary research storage; verify upstream MD5, compute SHA-256 and exact byte size, and preserve those results in the manifest.
