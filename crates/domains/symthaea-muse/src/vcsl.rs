@@ -72,6 +72,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Which sample library provides an instrument. VCSL (keyboards, harps,
 /// mallets, sax, organ) is complemented by VSCO2 Community Edition (also
@@ -533,7 +534,38 @@ pub struct InstrumentCapabilityInventoryV1 {
     pub vcsl_root: AssetRootEvidenceV1,
     pub vsco2_root: AssetRootEvidenceV1,
     pub soundfont: Option<SoundFontEvidenceV1>,
+    /// Present only when the caller explicitly opts into FluidSynth runtime
+    /// rendering with --fluidsynth. Header matches and rendered output remain
+    /// separate evidence dimensions.
+    pub fluidsynth_probe: Option<FluidSynthRuntimeProbeV1>,
     pub instruments: Vec<InstrumentCapabilityV1>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FluidSynthRuntimeProbeV1 {
+    pub status: &'static str,
+    pub binary_name: String,
+    pub soundfont_sha256: String,
+    pub requested_program_count: usize,
+    pub rendered_non_silent_count: usize,
+    pub programs: Vec<FluidSynthProgramProbeV1>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FluidSynthProgramProbeV1 {
+    pub bank: u16,
+    pub program_0_based: u8,
+    pub soundfont_header_preset_names: Vec<String>,
+    /// Statuses include skipped_no_bank0_header_match, fluidsynth_exit_nonzero,
+    /// fluidsynth_success_without_output_wav, output_wav_decode_failed,
+    /// rendered_silent and rendered_non_silent.
+    pub status: &'static str,
+    pub command_exit_code: Option<i32>,
+    pub sample_rate: Option<u32>,
+    pub channels: Option<u16>,
+    pub frames: Option<u64>,
+    pub peak_absolute_sample: Option<f32>,
+    pub rms: Option<f32>,
 }
 
 /// Evidence for one library root. The digest binds sorted relative WAV paths
@@ -629,6 +661,25 @@ pub fn capability_inventory(
     vsco2_root: &Path,
     soundfont_path: Option<&Path>,
 ) -> std::io::Result<InstrumentCapabilityInventoryV1> {
+    capability_inventory_with_fluidsynth(vcsl_root, vsco2_root, soundfont_path, None)
+}
+
+/// Build the same inventory with optional, explicit FluidSynth rendering.
+/// Passing a binary requests real subprocess probes; no SoundFont or binary
+/// is discovered implicitly, so default inventory remains side-effect free.
+pub fn capability_inventory_with_fluidsynth(
+    vcsl_root: &Path,
+    vsco2_root: &Path,
+    soundfont_path: Option<&Path>,
+    fluidsynth_path: Option<&Path>,
+) -> std::io::Result<InstrumentCapabilityInventoryV1> {
+    if fluidsynth_path.is_some() && soundfont_path.is_none() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "FluidSynth runtime probes require --soundfont",
+        ));
+    }
+
     const INSTRUMENTS: [Instrument; 42] = [
         Instrument::Piano,
         Instrument::PianoPP,
@@ -711,6 +762,19 @@ pub fn capability_inventory(
         .ok()
         .filter(|value| !value.trim().is_empty());
 
+    let fluidsynth_probe = match (fluidsynth_path, soundfont_path, soundfont.as_ref()) {
+        (Some(binary), Some(soundfont_file), Some(evidence)) => Some(
+            probe_fluidsynth_programs(
+                binary,
+                soundfont_file,
+                &evidence.sha256,
+                &evidence.preset_inventory,
+                INSTRUMENTS.iter().copied().map(Instrument::gm_program),
+            )?,
+        ),
+        _ => None,
+    };
+
     Ok(InstrumentCapabilityInventoryV1 {
         schema_version: "muse-instrument-capability-inventory-v1",
         source_revision,
@@ -718,6 +782,7 @@ pub fn capability_inventory(
         vcsl_root: vcsl_evidence,
         vsco2_root: vsco2_evidence,
         soundfont,
+        fluidsynth_probe,
         instruments,
     })
 }
@@ -827,7 +892,7 @@ fn audit_indexed_sample_audio(bank: Option<&InstrumentBank>) -> IndexedSampleAud
 
     for sample in &bank.samples {
         match audit_one_wav(&sample.path) {
-            Ok((sample_rate, channels, peak)) => {
+            Ok((sample_rate, channels, peak, _, _)) => {
                 audit.decoded_sample_file_count += 1;
                 audit.sample_rates.insert(sample_rate);
                 audit.channel_counts.insert(channels);
@@ -844,7 +909,7 @@ fn audit_indexed_sample_audio(bank: Option<&InstrumentBank>) -> IndexedSampleAud
 /// Fully consume the WAV sample iterator rather than treating a valid header
 /// as a successful decode. Invalid/truncated sample data, empty audio, invalid
 /// channel/rate metadata and non-finite float samples fail this file-level audit.
-fn audit_one_wav(path: &Path) -> std::io::Result<(u32, u16, f32)> {
+fn audit_one_wav(path: &Path) -> std::io::Result<(u32, u16, f32, f32, u64)> {
     let mut reader = hound::WavReader::open(path).map_err(|error| {
         std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string())
     })?;
@@ -862,6 +927,7 @@ fn audit_one_wav(path: &Path) -> std::io::Result<(u32, u16, f32)> {
 
     let mut sample_count = 0u64;
     let mut peak = 0.0f32;
+    let mut sum_squares = 0.0f64;
     match spec.sample_format {
         hound::SampleFormat::Int => {
             let scale = (1i64 << (spec.bits_per_sample - 1)) as f32;
@@ -869,7 +935,9 @@ fn audit_one_wav(path: &Path) -> std::io::Result<(u32, u16, f32)> {
                 let sample = sample.map_err(|error| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string())
                 })?;
-                peak = peak.max((sample as f32 / scale).abs());
+                let normalized = sample as f32 / scale;
+                peak = peak.max(normalized.abs());
+                sum_squares += f64::from(normalized) * f64::from(normalized);
                 sample_count += 1;
             }
         }
@@ -885,6 +953,7 @@ fn audit_one_wav(path: &Path) -> std::io::Result<(u32, u16, f32)> {
                     ));
                 }
                 peak = peak.max(sample.abs());
+                sum_squares += f64::from(sample) * f64::from(sample);
                 sample_count += 1;
             }
         }
@@ -895,7 +964,165 @@ fn audit_one_wav(path: &Path) -> std::io::Result<(u32, u16, f32)> {
             "WAV has no complete audio frames",
         ));
     }
-    Ok((spec.sample_rate, spec.channels, peak))
+    let frames = sample_count / u64::from(spec.channels);
+    let rms = (sum_squares / sample_count as f64).sqrt() as f32;
+    Ok((spec.sample_rate, spec.channels, peak, rms, frames))
+}
+
+static FLUIDSYNTH_PROBE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn probe_midi_bytes(program: u8, note: u8, velocity: u8) -> Vec<u8> {
+    // SMF format 0, one track, 480 PPQN at the MIDI default tempo (120 BPM).
+    // Program change + one half-second note + half-second release tail.
+    let track = [
+        0x00, 0xC0, program,       // bank-0 program change, channel 0
+        0x00, 0x90, note, velocity, // note on, channel 0
+        0x83, 0x60, 0x80, note, 0x00, // delta 480, note off
+        0x83, 0x60, 0xFF, 0x2F, 0x00, // delta 480, end of track
+    ];
+    let mut midi = Vec::with_capacity(14 + 8 + track.len());
+    midi.extend_from_slice(b"MThd");
+    midi.extend_from_slice(&6u32.to_be_bytes());
+    midi.extend_from_slice(&0u16.to_be_bytes());
+    midi.extend_from_slice(&1u16.to_be_bytes());
+    midi.extend_from_slice(&480u16.to_be_bytes());
+    midi.extend_from_slice(b"MTrk");
+    midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
+    midi.extend_from_slice(&track);
+    midi
+}
+
+fn probe_fluidsynth_programs(
+    binary: &Path,
+    soundfont_path: &Path,
+    soundfont_sha256: &str,
+    preset_inventory: &SoundFontPresetInventoryV1,
+    programs: impl Iterator<Item = u8>,
+) -> std::io::Result<FluidSynthRuntimeProbeV1> {
+    let unique_programs = programs.collect::<std::collections::BTreeSet<_>>();
+    let mut results = Vec::with_capacity(unique_programs.len());
+    let mut rendered_non_silent_count = 0usize;
+
+    for program in unique_programs {
+        let header_names = preset_inventory
+            .presets
+            .iter()
+            .filter(|preset| preset.bank == 0 && preset.program == u16::from(program))
+            .map(|preset| preset.name.clone())
+            .collect::<Vec<_>>();
+
+        if header_names.is_empty() {
+            results.push(FluidSynthProgramProbeV1 {
+                bank: 0,
+                program_0_based: program,
+                soundfont_header_preset_names: header_names,
+                status: "skipped_no_bank0_header_match",
+                command_exit_code: None,
+                sample_rate: None,
+                channels: None,
+                frames: None,
+                peak_absolute_sample: None,
+                rms: None,
+            });
+            continue;
+        }
+
+        let unique = FLUIDSYNTH_PROBE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let stem = format!("muse_fluid_probe_{}_{}_{}", std::process::id(), unique, program);
+        let temp = std::env::temp_dir();
+        let midi_path = temp.join(format!("{stem}.mid"));
+        let wav_path = temp.join(format!("{stem}.wav"));
+        std::fs::write(&midi_path, probe_midi_bytes(program, 60, 96))?;
+
+        // The -n/-i pair disables live MIDI and the shell. -F renders the
+        // supplied MIDI to a WAV file without requiring an audio device.
+        // Disable chorus/reverb to keep this small mechanical probe controlled.
+        let command_result = std::process::Command::new(binary)
+            .arg("-n")
+            .arg("-i")
+            .arg("-g")
+            .arg("0.8")
+            .arg("-o")
+            .arg("synth.reverb.active=0")
+            .arg("-o")
+            .arg("synth.chorus.active=0")
+            .arg("-T")
+            .arg("wav")
+            .arg("-F")
+            .arg(&wav_path)
+            .arg("-r")
+            .arg("22050")
+            .arg(soundfont_path)
+            .arg(&midi_path)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+
+        let _ = std::fs::remove_file(&midi_path);
+        let mut result = FluidSynthProgramProbeV1 {
+            bank: 0,
+            program_0_based: program,
+            soundfont_header_preset_names: header_names,
+            status: "fluidsynth_exit_nonzero",
+            command_exit_code: None,
+            sample_rate: None,
+            channels: None,
+            frames: None,
+            peak_absolute_sample: None,
+            rms: None,
+        };
+        match command_result {
+            Ok(status) => {
+                result.command_exit_code = status.code();
+                if status.success() {
+                    match audit_one_wav(&wav_path) {
+                        Ok((sample_rate, channels, peak, rms, frames)) => {
+                            result.sample_rate = Some(sample_rate);
+                            result.channels = Some(channels);
+                            result.frames = Some(frames);
+                            result.peak_absolute_sample = Some(peak);
+                            result.rms = Some(rms);
+                            if peak <= 1e-5 {
+                                result.status = "rendered_silent";
+                            } else {
+                                result.status = "rendered_non_silent";
+                                rendered_non_silent_count += 1;
+                            }
+                        }
+                        Err(_) => {
+                            result.status = if wav_path.is_file() {
+                                "output_wav_decode_failed"
+                            } else {
+                                "fluidsynth_success_without_output_wav"
+                            };
+                        }
+                    }
+                }
+            }
+            Err(error) => {
+                let _ = std::fs::remove_file(&wav_path);
+                return Err(std::io::Error::new(
+                    error.kind(),
+                    format!("failed to execute FluidSynth probe binary {}: {error}", binary.display()),
+                ));
+            }
+        }
+        let _ = std::fs::remove_file(&wav_path);
+        results.push(result);
+    }
+
+    Ok(FluidSynthRuntimeProbeV1 {
+        status: "fluidsynth_render_probes_completed",
+        binary_name: binary
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned(),
+        soundfont_sha256: soundfont_sha256.to_owned(),
+        requested_program_count: results.len(),
+        rendered_non_silent_count,
+        programs: results,
+    })
 }
 
 fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
