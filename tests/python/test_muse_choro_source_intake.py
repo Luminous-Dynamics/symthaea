@@ -31,6 +31,7 @@ class ChoroSourceIntakeTests(unittest.TestCase):
         declared = self.spec["alternative_source_intake"]
         self.assertEqual(declared["path"], "crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json")
         self.assertEqual(declared["schema"], self.intake["schema"])
+        self.assertEqual(declared["status"], self.intake["status"])
         for key in (
             "source_records",
             "records_rights_cleared",
@@ -38,7 +39,6 @@ class ChoroSourceIntakeTests(unittest.TestCase):
             "files_downloaded",
             "score_content_transcribed",
             "empirical_analysis_performed",
-            "status",
         ):
             with self.subTest(field=key):
                 self.assertEqual(declared[key], summary[key])
@@ -58,6 +58,10 @@ class ChoroSourceIntakeTests(unittest.TestCase):
                 "Pixinguinha": 32,
                 "Jacob do Bandolim": 31,
             },
+            "concentration_note": (
+                "The paper reports these two composers together account for more than one fifth "
+                "of the pieces."
+            ),
         }
         self.assertEqual(source["reported_study_scope"], expected_scale)
 
