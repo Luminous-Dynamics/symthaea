@@ -128,7 +128,7 @@ pub fn darcy_weisbach_head_loss(
         length_m,
         diameter_m,
         velocity_m_per_s,
-    )?;
+    );
     result_finite(loss)
 }
 
