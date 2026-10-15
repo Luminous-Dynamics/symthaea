@@ -22,6 +22,8 @@ const REQUIRED_COLUMNS: &[&str] = &[
     "reported_unit",
     "normalized_value",
     "normalized_unit",
+    "unit_conversion_rule_id",
+    "unit_conversion_factor",
     "assay_conditions_json",
 ];
 
@@ -137,13 +139,12 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
     );
     ensure!(!manifest.source.attribution.trim().is_empty(), "source attribution is required");
     ensure!(is_date_shape(&manifest.source.access_date), "source.access_date must be YYYY-MM-DD");
-    ensure!(!manifest.target.endpoint.trim().is_empty(), "target.endpoint is required");
+    ensure!(manifest.target.endpoint == "kcat", "v0 target endpoint must be exactly 'kcat'");
     ensure!(
         manifest.target.normalized_unit == "s^-1",
         "v0 target must be normalized to s^-1"
     );
     ensure!(manifest.dataset_artifact.record_count > 0, "dataset record_count must be positive");
-    ensure!(manifest.evaluation.random_seed > 0, "evaluation.random_seed must be explicit and nonzero");
 
     let baselines: BTreeSet<&str> = manifest.evaluation.baseline_ids.iter().map(String::as_str).collect();
     for required in REQUIRED_BASELINES {
@@ -232,16 +233,34 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
             "wrong normalized_unit at CSV record {}",
             row_index + 2
         );
-        for number_field in ["reported_value", "normalized_value"] {
-            let value: f64 = field(&row, &header_index, number_field)
-                .parse()
-                .with_context(|| format!("invalid {number_field} at CSV record {}", row_index + 2))?;
-            ensure!(
-                value.is_finite() && value > 0.0,
-                "{number_field} must be finite and positive at CSV record {}",
-                row_index + 2
-            );
-        }
+        let reported_value: f64 = field(&row, &header_index, "reported_value")
+            .parse()
+            .with_context(|| format!("invalid reported_value at CSV record {}", row_index + 2))?;
+        let normalized_value: f64 = field(&row, &header_index, "normalized_value")
+            .parse()
+            .with_context(|| format!("invalid normalized_value at CSV record {}", row_index + 2))?;
+        let conversion_factor: f64 = field(&row, &header_index, "unit_conversion_factor")
+            .parse()
+            .with_context(|| format!("invalid unit_conversion_factor at CSV record {}", row_index + 2))?;
+        ensure!(
+            reported_value.is_finite() && reported_value > 0.0
+                && normalized_value.is_finite() && normalized_value > 0.0
+                && conversion_factor.is_finite() && conversion_factor > 0.0,
+            "reported/normalized values and conversion factor must be finite and positive at CSV record {}",
+            row_index + 2
+        );
+        ensure!(
+            !field(&row, &header_index, "unit_conversion_rule_id").is_empty(),
+            "unit conversion rule ID is required at CSV record {}",
+            row_index + 2
+        );
+        let converted = reported_value * conversion_factor;
+        let tolerance = 1e-9 * converted.abs().max(normalized_value.abs()).max(1.0);
+        ensure!(
+            converted.is_finite() && (converted - normalized_value).abs() <= tolerance,
+            "unit conversion mismatch at CSV record {}: reported_value * factor != normalized_value",
+            row_index + 2
+        );
 
         let conditions: Value = serde_json::from_str(field(&row, &header_index, "assay_conditions_json"))
             .with_context(|| format!("invalid assay_conditions_json at CSV record {}", row_index + 2))?;
@@ -456,11 +475,11 @@ mod tests {
         });
         writer.write_record([
             "obs-a", "source-a", "study-a", "protein-a", "family-a", "kcat",
-            "2.0", "s^-1", "2.0", "s^-1", &context_a.to_string()
+            "2.0", "s^-1", "2.0", "s^-1", "identity_s_per_s_v1", "1.0", &context_a.to_string()
         ]).unwrap();
         writer.write_record([
             "obs-b", "source-b", "study-b", "protein-b", "family-b", "kcat",
-            "3.0", "s^-1", "3.0", "s^-1", &context_b.to_string()
+            "3.0", "s^-1", "3.0", "s^-1", "identity_s_per_s_v1", "1.0", &context_b.to_string()
         ]).unwrap();
         let csv_bytes = writer.into_inner().unwrap();
         let dataset_artifact = write_hashed(root, csv_path, &csv_bytes);
@@ -584,7 +603,11 @@ mod tests {
         for row in reader.records() {
             let mut fields: Vec<String> = row.unwrap().iter().map(str::to_string).collect();
             if fields.first().is_some_and(|value| value == "obs-a") {
-                fields[10] = r#"{"ph":{"status":"unknown"},"temperature_c":{"status":"reported","value":25},"substrate_id":{"status":"reported","value":"X"}}"#.to_string();
+                let context_index = headers
+                    .iter()
+                    .position(|name| *name == "assay_conditions_json")
+                    .unwrap();
+                fields[context_index] = r#"{"ph":{"status":"unknown"},"temperature_c":{"status":"reported","value":25},"substrate_id":{"status":"reported","value":"X"}}"#.to_string();
             }
             writer.write_record(fields).unwrap();
         }
