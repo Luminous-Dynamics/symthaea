@@ -22,12 +22,15 @@ Use existing scientific resources as sources and specialist tools as replaceable
 
 ## 3. Candidate sources and admission gate
 
-Sources are candidates, **not yet an admitted corpus**:
+Sources are candidates, **not yet an admitted corpus**. Separate *pipeline reproduction* from *generalization benchmarking*: a small reproducible dataset can prove the parser/fitting workflow can reproduce published analysis, but cannot by itself show that Symthaea predicts unseen enzymes.
+
+- **Recommended first pilot — DaRUS EnzymeML kinetics workflow:** https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi:10.18419/darus-3337 (DOI 10.18419/DARUS-3337, version 1.0, Max Häußler, 2023). The official repository describes raw measurement data under `data/`, a reproducible JupyterBook workflow under `book/`, and an explicit CC BY 4.0 license. This is the best current candidate for a *kinetic-analysis reproduction* lane because it preserves raw measurements and documented analysis rather than offering only precomputed target values. Its page lists 134 files and a 5.5 MB ZIP; it also says the download guestbook asks for a name, collected data and account information. **No files have been downloaded**: first inspect metadata and methods, confirm the download/access flow and required attribution, then pin exact version/file hashes. Do not store credentials, personal guestbook responses, or any files beyond what the license/access terms permit. This dataset is not assumed to provide enough distinct enzyme/family coverage for the primary generalization benchmark.
 
 - **Primary-source candidate — BRENDA:** https://www.brenda-enzymes.info/ — curated enzyme functional data. The official site identifies release **2026.1 (4 March 2026)** and CC BY 4.0; the bulk download requires active license acceptance. The official license page also warns that access to digital sequence information may entail benefit-sharing obligations under the UN Convention on Biological Diversity's multilateral mechanism, including potential monetary contributions by commercial users. Therefore **CC BY 4.0 alone is not recorded as a completed rights review**. The manifest must record actual release, accepted terms, attribution, access date and SHA-256, and a human-reviewed rights status that includes any applicable sequence-data benefit-sharing assessment. We have not downloaded or accepted the license for this workstream.
 - **STRENDA Guidelines / STRENDA DB:** https://www.beilstein-institut.de/en/projects/strenda/guidelines/ and https://www.beilstein-strenda-db.org/strenda/ — use the guidelines to inform completeness checks for enzyme identity, assay context, units, precision and replication. A reported row does not become complete or reliable merely because it appears in a database.
 - **SABIO-RK:** https://sabiork.h-its.org/webservice.jsp — its official documentation describes REST-based programmatic access to kinetic data. Treat it as a secondary source only after its relevant access, use and redistribution terms are independently cleared. Cross-source duplicates must not be treated as independent experiments.
 - **Candidate explicitly not admitted — Zenodo forward/backward kcat dataset:** https://zenodo.org/records/21241849 (DOI 10.5281/zenodo.21241849). The page describes a compact dataset compiled from BRENDA and SABIO-RK and says a newer version exists, but the page's license field is blank. It is also prefiltered to enzyme/reaction pairs with both directional kcat values, so selection bias is built into the cohort. It is **not** admitted until the author/source terms, version lineage and redistribution rights are established; convenient downloadability is not a license.
+- **Format/tooling reuse — EnzymeML-RS:** https://github.com/EnzymeML/enzymeml-rs. Before implementing any EnzymeML parser or kinetic-model types inside Symthaea, review this existing Rust project, its current API, license, schema/version support, numeric semantics, and test corpus. Prefer a narrow pinned adapter if it fits; do not create a second parser/model ontology merely because Rust integration is convenient.
 - **BioModels / SBML:** https://www.ebi.ac.uk/biomodels/ and https://sbml.org/software/ — consider later for independently sourced, published pathway or kinetic model validation. These model files are not a substitute for a consistent enzyme-assay table and should not be mixed into the initial supervised target corpus without a separate track.
 
 The BRENDA statistics page reports 94,073 turnover-number occurrences for release 2026.1. This is a source-database occurrence count, **not** the number of unique, rights-cleared, fully conditioned benchmark observations. The eligible corpus size is unknown until source admission and deduplication are complete.
@@ -45,6 +48,12 @@ The corpus is frozen only when all items below are recorded:
 
 If licensing, endpoint semantics, units, or observation lineage cannot be resolved, stop at **data-admission-unresolved**. Do not substitute an invented or silently scraped dataset.
 
+### Phase 0: reproduction pilot versus predictive benchmark
+
+Use DaRUS DARUS-3337 as a separate **kinetic-analysis reproduction gate** once its files and methods have been reviewed. The phase should: (1) enumerate only the versioned files actually needed; (2) preserve source file hashes, CC BY 4.0 attribution, EnzymeML format/schema versions and preprocessing; (3) reproduce the published workflow from raw observations using the same declared model and fitting assumptions; (4) compare derived parameters and residuals against the published outputs within predeclared tolerances; and (5) record any unreproducible steps, ambiguity or fit failure rather than silently discarding it. Report this as workflow reproducibility, not biological generalization, novel discovery or an independent laboratory replication. The access interface advertises a download guestbook, so source acquisition must be transparent and must not submit personal/account information on the user's behalf.
+
+A successful pilot can qualify the read/parse/unit/fit/serialization pipeline before we spend effort admitting a larger kcat corpus. It does not replace that corpus or the study/family-held-out predictive evaluation.
+
 ### Executable admission gate
 
 A fail-closed Rust checker is wired into the existing workspace task runner:
@@ -55,7 +64,7 @@ cargo run -p xtask -- enzyme-bench-check --manifest docs/research/ENZYME_BENCHMA
 
 Use [ENZYME_BENCHMARK_MANIFEST_TEMPLATE.json](ENZYME_BENCHMARK_MANIFEST_TEMPLATE.json) and [ENZYME_BENCHMARK_SPLITS_TEMPLATE.json](ENZYME_BENCHMARK_SPLITS_TEMPLATE.json) as non-admitted templates. They are deliberately marked/incomplete so they **must fail** until a human has cleared rights, the real files are frozen and hashed, and the split is populated. Local, rights-gated data artifacts belong in the ignored `research-data/enzyme-benchmark/` directory and must never be committed as part of this PR.
 
-The checker currently enforces: frozen-state and source-rights metadata; SHA-256 for corpus, split and preregistration; a single kcat endpoint and normalized s^-1 units; finite positive numeric values and an explicit, arithmetically consistent unit-conversion rule/factor per row; explicit reported/not-reported/not-applicable status for pH, temperature and substrate; unique observation IDs; exact record count; and row assignment against a frozen split. Three split modes are supported: `study_holdout`, `sequence_family_holdout`, and the more restrictive `joint_study_and_sequence_family_holdout`. Single-axis tracks report cross-axis overlap (for example, sequence families shared across a study-held-out split) rather than silently claiming that other dimension generalizes; joint mode rejects such overlap. This is an **admission/integrity gate**, not the metric scorer and not evidence that Symthaea has predictive value.
+The checker currently enforces: frozen-state and source-rights metadata; SHA-256 for corpus, split and preregistration; a single kcat endpoint and normalized s^-1 units; finite positive numeric values and an explicit, arithmetically consistent unit-conversion rule/factor per row; explicit reported/not-reported/not-applicable status for pH, temperature and substrate; unique observation IDs; exact record count; and row assignment against a frozen split. The DaRUS reproduction lane is deliberately separate: this checker does not yet parse EnzymeML or verify the thesis' kinetic parameter fitting, so those remain separate implementation work rather than implied support. Three split modes are supported: `study_holdout`, `sequence_family_holdout`, and the more restrictive `joint_study_and_sequence_family_holdout`. Single-axis tracks report cross-axis overlap (for example, sequence families shared across a study-held-out split) rather than silently claiming that other dimension generalizes; joint mode rejects such overlap. This is an **admission/integrity gate**, not the metric scorer and not evidence that Symthaea has predictive value.
 
 ## 4. Observation unit and missingness
 
@@ -134,11 +143,12 @@ No wet-lab execution is part of this milestone. Any later prospective experiment
 
 The new `xtask enzyme-bench-check` command verifies source admission and dataset/split/preregistration artifact integrity. It does not yet score predictions, prove full source deduplication, or independently compute benchmark metrics; those are subsequent milestones. The eventual scorer must read frozen manifests independently of the candidate generator and recompute metrics, denominators, uncertainty intervals and negative controls. Fail closed on unknown units, missing hashes, unresolved licensing, incomplete provenance or changed data/model heads.
 
-1. **Admission:** source rights, release, records, target and units are resolved; content hashes match.
-2. **Baseline reproduction:** an independent run reproduces a baseline within preregistered numerical tolerances.
-3. **Integrity:** duplicate/source/sequence leakage checks and all negative controls behave as expected.
-4. **Value test:** Symthaea's comparison against all declared baselines is measured on untouched held-out groups with uncertainty. No advantage is assumed.
-5. **Prospective follow-up (separate milestone):** only after the offline evaluation is sound, preregister a human-reviewed, low-risk experiment. Predictions and simulations must remain distinct from new physical measurements.
+1. **Kinetic workflow reproduction (separate lane):** after source/access terms are reviewed, independently reproduce the selected DaRUS analysis from the frozen raw files; check parameter estimates, residuals and units against predeclared tolerances.
+2. **Predictive-data admission:** source rights, release, records, target and units are resolved; content hashes match.
+3. **Baseline reproduction:** an independent run reproduces the declared predictive baseline within preregistered numerical tolerances.
+4. **Integrity:** duplicate/source/sequence leakage checks and all negative controls behave as expected.
+5. **Value test:** Symthaea's comparison against all declared baselines is measured on untouched held-out groups with uncertainty. No advantage is assumed.
+6. **Prospective follow-up (separate milestone):** only after the offline evaluation is sound, preregister a human-reviewed, low-risk experiment. Predictions and simulations must remain distinct from new physical measurements.
 
 Terminal statuses must include success, null result, failure, excluded, out-of-domain, and blocked/unresolved cases. A failed run or inconclusive result is retained; it is not silently removed from the denominator.
 
@@ -146,7 +156,9 @@ Terminal statuses must include success, null result, failure, excluded, out-of-d
 
 - Versioned data-admission and benchmark manifest schema (reuse current evidence/identity owners wherever possible).
 - Rust-first deterministic `xtask enzyme-bench-check` admission gate; unit tests use generated **synthetic-only** observations and do not assert biological performance.
-- Rights-cleared source admission and an independently frozen corpus/split/preregistration with exact hashes.
+- Rights-cleared DaRUS file admission and reproducible kinetic-analysis pilot, reported separately from generalization.
+- Rights-cleared source admission and an independently frozen predictive corpus/split/preregistration with exact hashes.
+- EnzymeML-RS API/license/schema audit before any parser work.
 - Independent scorer/manifest checker plus hostile tests for shuffled labels, duplicate rows, unknown units, source leakage and missing provenance.
 - A frozen report containing baseline results, confidence intervals, exclusions, runtime/resource cost and explicit limitations.
 
