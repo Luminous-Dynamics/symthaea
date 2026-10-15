@@ -26,7 +26,12 @@
         "excluded_samples": 3,
         "slope": 0.01832986232564407,
         "r2": 0.9965435394942497,
-        "rmsd": 0.05253117083141901
+        "rmsd": 0.05253117083141901,
+        "ph": 3,
+        "temperature_c": 25,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
       }
     },
     {
@@ -45,7 +50,12 @@
         "excluded_samples": 3,
         "slope": 0.01731460518695782,
         "r2": 0.9997826256275483,
-        "rmsd": 0.012440262679447662
+        "rmsd": 0.012440262679447662,
+        "ph": 3,
+        "temperature_c": 30,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
       }
     },
     {
@@ -64,7 +74,12 @@
         "excluded_samples": 3,
         "slope": 0.017977302593713523,
         "r2": 0.9961949291160336,
-        "rmsd": 0.05377164085489365
+        "rmsd": 0.05377164085489365,
+        "ph": 3,
+        "temperature_c": 35.5,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
       }
     },
     {
@@ -83,7 +98,12 @@
         "excluded_samples": 3,
         "slope": 0.019069431818646787,
         "r2": 0.9997064382973191,
-        "rmsd": 0.015898666121098373
+        "rmsd": 0.015898666121098373,
+        "ph": 3,
+        "temperature_c": 40,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
       }
     },
     {
@@ -102,7 +122,12 @@
         "excluded_samples": 3,
         "slope": 0.01805986560361547,
         "r2": 0.9977614756102724,
-        "rmsd": 0.04146734721174711
+        "rmsd": 0.04146734721174711,
+        "ph": 3,
+        "temperature_c": 45,
+        "temperature_unit": "C",
+        "wavelength_nm": 340,
+        "signal_type": "Absorbance"
       }
     }
   ]
