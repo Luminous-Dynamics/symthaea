@@ -301,6 +301,19 @@ impl EnhancedKnowledgeGraph {
         }
     }
 
+    /// Return the next graph fact ID that will be assigned.
+    pub fn next_fact_id(&self) -> FactId {
+        self.next_id
+    }
+
+    /// Restore a persisted ID allocator high-water mark without moving it backward.
+    ///
+    /// IDs that were removed before a snapshot remain retired, preventing stale
+    /// external references from accidentally identifying a later, unrelated fact.
+    pub fn ensure_next_fact_id(&mut self, reserved_next_id: FactId) {
+        self.next_id = self.next_id.max(reserved_next_id.max(1));
+    }
+
     /// Get a fact by ID
     pub fn get_fact(&self, id: FactId) -> Option<&TemporalFact> {
         self.facts.get(&id)
