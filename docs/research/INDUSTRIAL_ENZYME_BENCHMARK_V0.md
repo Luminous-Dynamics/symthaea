@@ -4,7 +4,7 @@
 **Parent research program:** [BIO-MILLENNIUM-000 #6271](https://github.com/Luminous-Dynamics/symthaea/issues/6271).  
 **Related work:** [BIO-CEM literature benchmark #5753](https://github.com/Luminous-Dynamics/symthaea/issues/5753); [Mycelix source-bound biology research commons #3327](https://github.com/Luminous-Dynamics/mycelix/issues/3327); [Symtropy deterministic engineering digital-twin boundary #1467](https://github.com/Luminous-Dynamics/symtropy/issues/1467); [Mycelix open health-aid knowledge and dossier provenance #5027](https://github.com/Luminous-Dynamics/mycelix/issues/5027).
 **Paradigm-shift roadmap:** [ENZYME_KINETICS_PARADIGM_SHIFT_ROADMAP_V0.md](ENZYME_KINETICS_PARADIGM_SHIFT_ROADMAP_V0.md) — evidence graphs, context-conditioned kinetic claims, transportability tests, uncertainty-aware abstention, and value-of-information planning.  
-**Evidence graph contract:** [ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json](ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json) — proposed hash-bound artifact, node/edge, and replay invariants; not yet enforced by the CLI.
+**Evidence graph contract:** [ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json](ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json) — node/edge, artifact, rights-reference, and replay invariants. The new [V0 verifier specification](ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md) documents the implemented structural/local-byte subset and its explicit limits; full replay and scientific-policy enforcement remain future work.
 
 ## 1. Question and non-claim
 
