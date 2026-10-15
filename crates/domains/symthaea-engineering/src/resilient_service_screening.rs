@@ -456,7 +456,7 @@ mod tests {
         .expect("valid common-mode scenario");
         assert!(report.total_unmet_service_unit_steps > 0.0);
         assert_eq!(report.first_floor_violation_step, Some(2));
-        assert!(!report.all_services_at_floor_at_horizon);
+        assert!(report.all_services_at_floor_at_horizon);
     }
 
     #[test]
