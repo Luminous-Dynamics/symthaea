@@ -72,6 +72,19 @@ Map these states to the repository's evidence model without upgrading claims aut
 
 Every candidate result should produce a durable run record containing: immutable candidate ID, source revision, configuration hash, solver/version, model fidelity, all inputs and units, boundary conditions, random seeds where relevant, outputs, uncertainty estimates, constraint violations, and artifact hashes. The independent checker should recompute cheap invariants instead of accepting the search system's own declaration that a design is valid.
 
+## Go beyond first-law efficiency: exergy and resource quality
+
+First-law closure is a necessary accounting gate, but energy efficiency alone does not quantify the *quality* of energy. One joule of electricity, one joule of high-temperature heat, and one joule of low-temperature heat are equal as energy quantities but do not have equal ability to perform useful work. For systems where heat grade and irreversibility matter, add second-law/exergy accounting after the energy ledger and boundary are established.
+
+The next thermodynamic module should:
+- Register a reference environment (at minimum ambient temperature and pressure) as part of the benchmark definition; never compare exergy efficiencies calculated against different reference states.
+- Keep exergy balance separate from first-law energy conservation. Report exergy input/output by stream, exergy destruction, and relevant system-specific second-law metrics; do not label exergy destruction as missing energy.
+- Use validated property models for composition, phase, temperature, and pressure. Chemical exergy for fuels and mixtures must not be guessed from a generic efficiency factor.
+- Add analytical reference vectors and dimensional/domain checks, then compare against an independent thermodynamic solver or published worked case before scoring real designs.
+- For stored energy and transients, model the change in stored exergy consistently with the chosen system boundary and reference state.
+
+This is a high-value research extension, not an immediate prerequisite to finishing the benchmark verifier. Recent reviews highlight that exergy formulations and reference-environment choices vary across energy-system studies, which makes explicit, harmonized definitions essential ([2026 review](https://doi.org/10.1016/j.icheatmasstransfer.2026.111119); [2025 advanced exergy / exergo-economic / exergo-environmental review](https://doi.org/10.1016/j.energy.2025.137606)). Exergy can help Symthaea identify *where* useful-work potential is destroyed; the measured or calibrated system model still has to establish whether a proposed remedy improves mission-level outcomes.
+
 ## What Symthaea should do—and not do
 
 Symthaea can contribute to candidate generation, cross-domain analogy search, parameter-space prioritization, experiment selection, anomaly explanation, and multi-objective trade-off analysis. HDC representations may help index and compare design structures; liquid dynamics and active inference may help choose the next informative evaluation. Those are hypotheses to evaluate through ablation, not presumed advantages.
@@ -126,8 +139,8 @@ A candidate cannot advance unless all relevant gates pass:
 1. Run `cargo test -p symthaea-energy-bench`, `cargo test -p symthaea-thermofluids`, and `cargo fmt --all -- --check` on the exact PR head. The authoring environment lacks Rust, so authored tests have not been executed locally.
 2. Run a JSON Schema Draft 2020-12 validator against the schema and synthetic fixture, then add a verifier integration test that applies structural and semantic validation together. Keep the independent Rust semantic verifier separate from the search logic.
 3. Strengthen manifest provenance by binding the preregistered policy/manifest digest to an immutable commit or signed append-only registry before search starts. Timestamp ordering in a manifest is not cryptographic evidence of preregistration.
-4. Add uncertainty propagation and comparison logic that preserves relevant correlations; unknown material uncertainty must make a superiority decision indeterminate rather than favorable.
-5. Reproduce at least one authoritative or measured system with a common boundary before novelty search. EPA/NREL drive schedules define demand, not by themselves a measured energy-conversion baseline; verify that the selected reference dataset contains required input/output energy channels.
+4. Reproduce at least one authoritative or measured system with a common boundary before novelty search. EPA/NREL drive schedules define demand, not by themselves a measured energy-conversion baseline; verify that the selected reference dataset contains required input/output energy channels.
+5. Add a separate exergy ledger with explicit reference environment and independently checked property methods; do not conflate exergy destruction with first-law energy loss. For decision-useful comparative claims, also add uncertainty propagation that preserves relevant correlations.
 6. Only after the benchmark verifier and reference case are reproducible should Symthaea introduce architecture generation and multi-objective optimization. Compare search strategies under equal model-evaluation budgets and preserve failed candidates as evidence.
 
 ## Research references
@@ -139,6 +152,8 @@ A candidate cannot advance unless all relevant gates pass:
 - [Machine learning techniques in thermodynamic cycle system design and control for energy harvesting](https://doi.org/10.1016/j.rser.2025.115802), *Renewable and Sustainable Energy Reviews* (2025). Survey of machine-learning work on fluids, configurations, components, dynamics, and control.
 - [Multi-objective stochastic optimization problem: a systematic literature review](https://doi.org/10.1016/j.apenergy.2025.127237), *Applied Energy* (2026). Synthesizes 572 studies published from 2018–2025, emphasizing uncertainty and conflicting objectives in energy and sustainability applications.
 - [From Pareto Front to Preferred Design: Human-in-the-Loop Preference-Guided Decision Making in Multi-Objective Energy Systems Optimization](https://www.mdpi.com/2076-3417/16/10/4966), *Applied Sciences* (2026). Reviews explicit and reproducible ways to select preferred solutions from Pareto sets, including sensitivity to changing preferences.
+- [A comprehensive review of exergy analysis in sustainable engineering systems](https://doi.org/10.1016/j.icheatmasstransfer.2026.111119), *International Communications in Heat and Mass Transfer* (2026). Reviews exergy formulations across thermal, energy, and environmental systems and highlights the importance of consistent reference states and performance definitions.
+- [Comprehensive review of methodologies and case studies in advanced exergy, exergo-economic, and exergo-environmental analyses](https://doi.org/10.1016/j.energy.2025.137606), *Energy* (2025). Reviews exergy-destruction analysis and methods for distinguishing avoidable from unavoidable losses.
 
 ## Claim discipline
 
