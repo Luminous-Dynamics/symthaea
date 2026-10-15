@@ -13,7 +13,7 @@ use symthaea_exoskeleton::plss_telemetry::{
     evaluate_plss_telemetry_with_receipt, fuse_plss_telemetry, FusedPlssTelemetryMetric,
     PlssTelemetryConfig, PlssTelemetryError, PlssTelemetryEvidenceLevel, PlssTelemetryFusionReport,
     PlssTelemetryMetric, PlssTelemetryObservation, PlssTelemetryReceipt, PlssTelemetrySourceKind,
-    PlssTelemetryStatus,
+    PlssTelemetryStatus, PLSS_TELEMETRY_METRIC_COUNT,
 };
 
 const CORPUS_JSON: &str = include_str!("fixtures/plss_telemetry_v1.json");
@@ -41,12 +41,26 @@ struct ExpectedMetric {
 fn replay_versioned_corpus_and_independently_verify_receipt() {
     let corpus: Corpus = serde_json::from_str(CORPUS_JSON).expect("fixture JSON must parse");
     assert_eq!(corpus.schema_version, 1);
+    assert_eq!(corpus.observations.len(), 12);
+    assert_eq!(corpus.expected.len(), 11);
 
     let config = PlssTelemetryConfig::simulation_reference();
     let report = fuse_plss_telemetry(&corpus.observations, corpus.evaluated_at_s, config)
         .expect("fixed corpus has a valid fusion config and evaluation time");
 
     assert_eq!(report.evidence_level, PlssTelemetryEvidenceLevel::SimulationOnly);
+    assert_eq!(
+        report.metrics.len(),
+        PLSS_TELEMETRY_METRIC_COUNT * PlssTelemetrySourceKind::ALL.len()
+    );
+    for metric in PlssTelemetryMetric::ALL {
+        for source_kind in PlssTelemetrySourceKind::ALL {
+            assert!(
+                report.metric(metric, source_kind).is_some(),
+                "missing explicit output lane for {metric:?}/{source_kind:?}"
+            );
+        }
+    }
     for expected in &corpus.expected {
         let actual = report
             .metric(expected.metric, expected.source_kind)
