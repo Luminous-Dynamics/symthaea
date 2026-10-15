@@ -594,9 +594,8 @@ pub struct InstrumentCapabilityV1 {
     /// General MIDI program number, zero based. Some instruments use a
     /// documented nearest-family approximation; this is not source identity.
     pub gm_program_0_based: u8,
-    /// The Instrument model and renderer fallback path are declared in source.
-    /// This is not a perceptual-fidelity result.
-    pub procedural_fallback_declared: bool,
+    /// Source-derived dispatch family. This does not prove audible fidelity.
+    pub procedural_renderer_path: &'static str,
     pub sustained_samples: Option<SampleDirectoryEvidenceV1>,
     pub short_articulation_samples: Option<SampleDirectoryEvidenceV1>,
     /// Names declared by an optional SoundFont at bank 0 and this instrument's
@@ -684,7 +683,7 @@ pub fn capability_inventory(
             InstrumentCapabilityV1 {
                 instrument: format!("{instrument:?}"),
                 gm_program_0_based: instrument.gm_program(),
-                procedural_fallback_declared: true,
+                procedural_renderer_path: procedural_renderer_path(instrument),
                 sustained_samples,
                 short_articulation_samples,
                 soundfont_bank0_program_matches,
@@ -705,6 +704,16 @@ pub fn capability_inventory(
         soundfont,
         instruments,
     })
+}
+
+fn procedural_renderer_path(instrument: Instrument) -> &'static str {
+    if instrument.uses_karplus_strong() {
+        "karplus_strong"
+    } else if instrument.uses_fm() {
+        "frequency_modulation"
+    } else {
+        "additive"
+    }
 }
 
 fn sample_directory_evidence(
@@ -1286,6 +1295,24 @@ mod tests {
         let second = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
 
         assert_eq!(first.instrument_count, 42);
+        let guitar = first
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "AcousticGuitar")
+            .unwrap();
+        assert_eq!(guitar.procedural_renderer_path, "karplus_strong");
+        let xylophone = first
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Xylophone")
+            .unwrap();
+        assert_eq!(xylophone.procedural_renderer_path, "frequency_modulation");
+        let violin = first
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Violin")
+            .unwrap();
+        assert_eq!(violin.procedural_renderer_path, "additive");
         assert!(!first.vcsl_root.root_present);
         assert!(!first.vsco2_root.root_present);
         assert_eq!(
