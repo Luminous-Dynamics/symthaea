@@ -9,6 +9,8 @@
 //!
 //! Schema:
 //! - knowledge_facts: row id, graph_fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal
+//! - knowledge_fact_relations: per-fact ordered subject/predicate/object records, with semantic roles,
+//!   causal/negation flags, and relation-level confidence
 //! - knowledge_causal_edges: edge_id, cause, effect, strength, inhibition/negation flags,
 //!   source text, and discovery cycle; each row is one edge observation
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
@@ -35,7 +37,8 @@ pub struct KnowledgePersistence {
     total_loaded: u64,
 }
 
-/// A serializable fact record for persistence
+/// A fact record for persistence, including the source relations that were
+/// otherwise lost when the structured extraction was bundled into an HDC vector.
 #[derive(Debug, Clone)]
 pub struct FactRecord {
     /// BinaryHV encoded as raw bytes (2048 bytes for 16,384 bits)
@@ -554,12 +557,12 @@ impl KnowledgePersistence {
 
     /// Atomically replace the complete persisted knowledge state.
     ///
-    /// This operation owns snapshot semantics for facts, causal edges, and
-    /// ontology primitives. Unlike the legacy append/upsert methods, it removes
-    /// records that are no longer present in the live state. Every input is
-    /// validated before the transaction begins, and all three collections are
-    /// replaced in one SQLite transaction so a failed write preserves the
-    /// previous committed snapshot.
+    /// This operation owns snapshot semantics for facts (including their
+    /// structured relations), causal edges, and ontology primitives. Unlike the
+    /// legacy append/upsert methods, it removes records that are no longer present
+    /// in the live state. Inputs are validated before mutation, and all related
+    /// tables are replaced in one SQLite transaction so a failed write preserves
+    /// the previous committed snapshot.
     pub fn replace_knowledge_snapshot(
         &mut self,
         facts: &[FactRecord],
