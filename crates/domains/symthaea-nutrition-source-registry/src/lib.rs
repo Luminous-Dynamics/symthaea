@@ -441,6 +441,10 @@ pub struct NutritionRegistryAssessmentV1 {
     /// Publisher-declared artifact digest and the digest of bytes actually supplied.
     pub declared_artifact_sha256: Option<String>,
     pub supplied_artifact_sha256: Option<String>,
+    /// Component digests let independent checkers locate which input changed.
+    pub manifest_sha256: Option<String>,
+    pub food_fact_sha256: Option<String>,
+    pub use_request_sha256: Option<String>,
     /// Digest of the deterministic input envelope, including supplied-byte digest.
     pub input_sha256: Option<String>,
     pub source_eligibility: Eligibility,
@@ -480,6 +484,13 @@ fn sort_json_keys(value: serde_json::Value) -> serde_json::Value {
     }
 }
 
+fn stable_json_sha256<T: Serialize>(value: &T) -> Result<String, ()> {
+    let value = serde_json::to_value(value).map_err(|_| ())?;
+    let sorted_value = sort_json_keys(value);
+    let bytes = serde_json::to_vec(&sorted_value).map_err(|_| ())?;
+    Ok(sha256_hex(&bytes))
+}
+
 fn registry_input_sha256(
     manifest: &NutritionSourceManifestV1,
     fact: &NutritionFoodFactV1,
@@ -495,10 +506,7 @@ fn registry_input_sha256(
         use_request,
         supplied_artifact_sha256,
     };
-    let value = serde_json::to_value(envelope).map_err(|_| ())?;
-    let sorted_value = sort_json_keys(value);
-    let bytes = serde_json::to_vec(&sorted_value).map_err(|_| ())?;
-    Ok(sha256_hex(&bytes))
+    stable_json_sha256(&envelope)
 }
 
 /// Returns a lowercase SHA-256 digest of exactly the supplied bytes.
@@ -520,6 +528,39 @@ pub fn assess_nutrition_source(
 ) -> NutritionRegistryAssessmentV1 {
     let mut issues = Vec::new();
     let supplied_artifact_sha256 = artifact_bytes.map(sha256_hex);
+    let manifest_sha256 = match stable_json_sha256(manifest) {
+        Ok(digest) => Some(digest),
+        Err(()) => {
+            push_issue(
+                &mut issues,
+                IssueCategory::Integrity,
+                RegistryIssueCode::InputReceiptSerializationFailed,
+            );
+            None
+        }
+    };
+    let food_fact_sha256 = match stable_json_sha256(fact) {
+        Ok(digest) => Some(digest),
+        Err(()) => {
+            push_issue(
+                &mut issues,
+                IssueCategory::Integrity,
+                RegistryIssueCode::InputReceiptSerializationFailed,
+            );
+            None
+        }
+    };
+    let use_request_sha256 = match stable_json_sha256(use_request) {
+        Ok(digest) => Some(digest),
+        Err(()) => {
+            push_issue(
+                &mut issues,
+                IssueCategory::Integrity,
+                RegistryIssueCode::InputReceiptSerializationFailed,
+            );
+            None
+        }
+    };
     let input_sha256 = match registry_input_sha256(
         manifest,
         fact,
@@ -590,6 +631,9 @@ pub fn assess_nutrition_source(
         food_fact_schema_version: fact.schema_version,
         declared_artifact_sha256: manifest.artifact_sha256.clone(),
         supplied_artifact_sha256,
+        manifest_sha256,
+        food_fact_sha256,
+        use_request_sha256,
         input_sha256,
         source_eligibility,
         license_eligibility,
@@ -1857,11 +1901,56 @@ mod tests {
         assert_eq!(result.evaluation_date, EVALUATION_DATE);
         assert_eq!(result.source_id, m.source_id);
         assert_eq!(result.source_record_id, f.source_record_id);
+        assert_eq!(result.receipt_schema_version, NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION);
+        assert!(is_canonical_sha256(result.manifest_sha256.as_deref().expect("manifest digest")));
+        assert!(is_canonical_sha256(result.food_fact_sha256.as_deref().expect("fact digest")));
+        assert!(is_canonical_sha256(result.use_request_sha256.as_deref().expect("request digest")));
+        assert_eq!(
+            result.manifest_sha256,
+            stable_json_sha256(&m).ok()
+        );
+        assert_eq!(
+            result.food_fact_sha256,
+            stable_json_sha256(&f).ok()
+        );
+        assert_eq!(
+            result.use_request_sha256,
+            stable_json_sha256(&request).ok()
+        );
         assert_eq!(result.declared_artifact_sha256, m.artifact_sha256);
         assert_eq!(
             result.supplied_artifact_sha256.as_deref(),
             Some(sha256_hex(ARTIFACT).as_str())
         );
+    }
+
+    #[test]
+    fn component_receipt_digests_change_when_their_inputs_change() {
+        let m = manifest();
+        let original_fact = fact();
+        let request = use_request();
+        let original = assess_nutrition_source(
+            &m, &original_fact, EVALUATION_DATE, &request, Some(ARTIFACT),
+        );
+
+        let mut changed_fact = original_fact.clone();
+        changed_fact.value_scaled = Some(1251);
+        let changed = assess_nutrition_source(
+            &m, &changed_fact, EVALUATION_DATE, &request, Some(ARTIFACT),
+        );
+        assert_ne!(original.food_fact_sha256, changed.food_fact_sha256);
+        assert_eq!(original.manifest_sha256, changed.manifest_sha256);
+        assert_eq!(original.use_request_sha256, changed.use_request_sha256);
+        assert_ne!(original.input_sha256, changed.input_sha256);
+
+        let mut changed_manifest = m.clone();
+        changed_manifest.permission_evidence[0].lifecycle =
+            PermissionEvidenceLifecycleV1::NeedsReview;
+        let changed = assess_nutrition_source(
+            &changed_manifest, &original_fact, EVALUATION_DATE, &request, Some(ARTIFACT),
+        );
+        assert_ne!(original.manifest_sha256, changed.manifest_sha256);
+        assert_ne!(original.input_sha256, changed.input_sha256);
     }
 
     #[test]
