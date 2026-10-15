@@ -1092,6 +1092,36 @@ mod tests {
     }
 
     #[test]
+    fn accepts_verbatim_and_normalized_parameter_value_with_unit_pair() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["nodes"].as_array_mut().unwrap().push(json!({
+            "node_id": "n_reported",
+            "type": "reported_parameter_claim",
+            "evidence_class": "source_claim",
+            "artifact_ids": []
+        }));
+        graph["parameter_claims"] = json!([{
+            "parameter_id": "p1",
+            "parameter_name": "kcat",
+            "endpoint_definition": "catalytic turnover number",
+            "value": "12.4 min^-1",
+            "unit": "min^-1",
+            "normalized_value": 0.2066667,
+            "normalized_unit": "s^-1",
+            "enzyme_form_basis": "not reported",
+            "reaction_id": "reaction-1",
+            "substrate_ids": ["substrate-1"],
+            "assay_context": {"pH": null, "temperature_c": 25.0},
+            "kinetic_equation_id": "michaelis-menten",
+            "source_or_fit_node_id": "n_reported",
+            "uncertainty_status": "reported"
+        }]);
+        let report = validate_fixture(workspace.root(), &graph).unwrap();
+        assert_eq!(report.parameter_claims, 1);
+    }
+
+    #[test]
     fn rejects_object_or_array_as_parameter_value() {
         let workspace = TempWorkspace::new();
         let mut graph = fixture(workspace.root());
