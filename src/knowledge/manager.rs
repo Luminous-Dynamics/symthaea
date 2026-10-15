@@ -685,6 +685,14 @@ impl KnowledgeManager {
         (&self.last_telemetry, &self.last_signals)
     }
 
+    /// Borrow pending contradiction alerts without consuming them.
+    ///
+    /// Context builders may inspect the same alerts while the cognitive loop
+    /// remains responsible for draining and delivering them.
+    pub fn pending_alerts(&self) -> impl Iterator<Item = &ContradictionAlert> {
+        self.pending_alerts.iter()
+    }
+
     /// Drain pending contradiction alerts
     pub fn drain_alerts(&mut self) -> Vec<ContradictionAlert> {
         self.pending_alerts.drain(..).collect()
@@ -1893,5 +1901,38 @@ mod tests {
             after_3 >= after_0,
             "Should extract on cycle 3 (on interval)"
         );
+    } 
+    #[test]
+    fn reasoning_context_counts_fact_contradictions_not_confounder_candidates() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.bootstrap_entities();
+        mgr.process("Sanctions caused an oil shortage.", 1);
+        mgr.process("Oil shortage caused inflation.", 2);
+
+        let fact_ids: Vec<u64> = mgr.graph.all_facts().map(|fact| fact.id).take(2).collect();
+        assert!(fact_ids.len() >= 2, "test requires two stored facts");
+        let first_id = fact_ids[0];
+        let second_id = fact_ids[1];
+        let first_text = mgr.graph.get_fact(first_id).unwrap().encoding.source_text.clone();
+        let second_text = mgr.graph.get_fact(second_id).unwrap().encoding.source_text.clone();
+
+        // Inject one deterministic alert so this regression does not depend on
+        // the HDC contradiction detector's similarity threshold.
+        mgr.pending_alerts.clear();
+        mgr.pending_alerts.push_back(ContradictionAlert {
+            new_fact_id: second_id,
+            existing_fact_id: first_id,
+            similarity: 0.91,
+            higher_confidence_id: first_id,
+            detected_at_cycle: 2,
+        });
+
+        let context = ReasoningContext::from_manager(&mgr, "sanctions oil inflation");
+        assert_eq!(context.epistemic_state.contradiction_count, 1);
+        assert_eq!(context.contradictions.len(), 1);
+        let description = &context.contradictions[0];
+        assert!(description.contains(&first_text));
+        assert!(description.contains(&second_text));
     }
+
 }
