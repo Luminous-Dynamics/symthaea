@@ -131,6 +131,25 @@ pub enum FoodGeographicMatch {
     Unknown,
 }
 
+/// One explicit preparation/conversion step between food states. References should
+/// resolve to reviewed method and evidence records in the source manifest.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NutritionTransformationStepV1 {
+    pub transformation_id: String,
+    pub from_food_state_id: String,
+    pub to_food_state_id: String,
+    pub method_ref: String,
+    pub evidence_ref: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FoodIdentityConfidence {
+    Reviewed,
+    Probable,
+    Unknown,
+}
+
 /// A source-attributed food fact; numeric values use an explicit integer scale.
 /// A missing value is None, never an implicit zero. This record contains no
 /// individual health or household identity.
@@ -142,6 +161,9 @@ pub struct NutritionFoodFactV1 {
     pub source_record_citation: String,
     pub food_id: String,
     pub food_description: String,
+    pub food_taxon_ref: Option<String>,
+    pub cultivar_id: Option<String>,
+    pub identity_confidence: FoodIdentityConfidence,
     pub food_state_id: String,
     pub match_quality: FoodMatchQuality,
     pub geographic_match: FoodGeographicMatch,
@@ -152,7 +174,9 @@ pub struct NutritionFoodFactV1 {
     pub value_scaled: Option<u64>,
     pub value_scale: u64,
     pub basis_grams: u64,
+    pub quality_notes: Vec<String>,
     pub transformation_applied: bool,
+    pub transformation_lineage: Vec<NutritionTransformationStepV1>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -231,6 +255,9 @@ pub enum RegistryIssueCode {
     MissingSourceCitation,
     MissingFoodId,
     MissingFoodDescription,
+    EmptyFoodTaxonReference,
+    EmptyCultivarId,
+    UnknownIdentityConfidence,
     MissingFoodState,
     MissingNutrientId,
     MissingNutrientDefinition,
@@ -238,7 +265,15 @@ pub enum RegistryIssueCode {
     ZeroBasisMass,
     UnresolvedFoodMatch,
     UnknownGeographicMatch,
-    MissingNutrientValue,
+    MissingTransformationLineage,
+    UnexpectedTransformationLineage,
+    MissingTransformationId,
+    MissingTransformationFromState,
+    MissingTransformationToState,
+    MissingTransformationMethod,
+    MissingTransformationEvidence,
+    TransformationChainMismatch,
+    TransformationOutputMismatch,
     MissingArtifactDigest,
     InvalidArtifactDigest,
     ArtifactBytesRequired,
@@ -483,6 +518,15 @@ fn validate_fact(
     );
     required_fact_field(&fact.food_id, RegistryIssueCode::MissingFoodId, issues);
     required_fact_field(&fact.food_description, RegistryIssueCode::MissingFoodDescription, issues);
+    if fact.food_taxon_ref.as_ref().is_some_and(|value| value.trim().is_empty()) {
+        push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::EmptyFoodTaxonReference);
+    }
+    if fact.cultivar_id.as_ref().is_some_and(|value| value.trim().is_empty()) {
+        push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::EmptyCultivarId);
+    }
+    if fact.identity_confidence == FoodIdentityConfidence::Unknown {
+        push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::UnknownIdentityConfidence);
+    }
     required_fact_field(&fact.food_state_id, RegistryIssueCode::MissingFoodState, issues);
     required_fact_field(&fact.nutrient_id, RegistryIssueCode::MissingNutrientId, issues);
     required_fact_field(
@@ -501,6 +545,45 @@ fn validate_fact(
     }
     if fact.geographic_match == FoodGeographicMatch::Unknown {
         push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::UnknownGeographicMatch);
+    }
+
+    if fact.transformation_applied && fact.transformation_lineage.is_empty() {
+        push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationLineage);
+    }
+    if !fact.transformation_applied && !fact.transformation_lineage.is_empty() {
+        push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::UnexpectedTransformationLineage);
+    }
+    let mut previous_output: Option<&str> = None;
+    for step in &fact.transformation_lineage {
+        if step.transformation_id.trim().is_empty() {
+            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationId);
+        }
+        if step.from_food_state_id.trim().is_empty() {
+            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationFromState);
+        }
+        if step.to_food_state_id.trim().is_empty() {
+            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationToState);
+        }
+        if step.method_ref.trim().is_empty() {
+            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationMethod);
+        }
+        if step.evidence_ref.trim().is_empty() {
+            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationEvidence);
+        }
+        if let Some(output) = previous_output {
+            if !output.is_empty()
+                && !step.from_food_state_id.trim().is_empty()
+                && output != step.from_food_state_id
+            {
+                push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::TransformationChainMismatch);
+            }
+        }
+        previous_output = Some(&step.to_food_state_id);
+    }
+    if let Some(output) = previous_output {
+        if !output.trim().is_empty() && output != fact.food_state_id {
+            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::TransformationOutputMismatch);
+        }
     }
 }
 
@@ -554,6 +637,7 @@ fn validate_artifact_digest(
 fn is_qualified_fallback(fact: &NutritionFoodFactV1) -> bool {
     fact.match_quality != FoodMatchQuality::ExactReviewedMatch
         || fact.geographic_match != FoodGeographicMatch::SouthAfricanLocal
+        || fact.identity_confidence == FoodIdentityConfidence::Probable
 }
 
 fn valid_http_uri(raw: &str) -> bool {
@@ -650,6 +734,9 @@ mod tests {
             source_record_citation: "Synthetic fixture row 001".to_owned(),
             food_id: "food:test-leaf".to_owned(),
             food_description: "Synthetic leafy food".to_owned(),
+            food_taxon_ref: Some("taxon:synthetic-leaf".to_owned()),
+            cultivar_id: None,
+            identity_confidence: FoodIdentityConfidence::Reviewed,
             food_state_id: "cooked_edible".to_owned(),
             match_quality: FoodMatchQuality::ExactReviewedMatch,
             geographic_match: FoodGeographicMatch::SouthAfricanLocal,
@@ -660,7 +747,9 @@ mod tests {
             value_scaled: Some(1250),
             value_scale: 1000,
             basis_grams: 100,
+            quality_notes: Vec::new(),
             transformation_applied: false,
+            transformation_lineage: Vec::new(),
         }
     }
 
@@ -790,6 +879,13 @@ mod tests {
         let mut m = manifest();
         let mut f = fact();
         f.transformation_applied = true;
+        f.transformation_lineage = vec![NutritionTransformationStepV1 {
+            transformation_id: "fixture:cook-001".to_owned(),
+            from_food_state_id: "raw_edible".to_owned(),
+            to_food_state_id: "cooked_edible".to_owned(),
+            method_ref: "fixture:boiling-method-001".to_owned(),
+            evidence_ref: "fixture:cooking-evidence-001".to_owned(),
+        }];
         m.permissions.transform = PermissionDecision::RequiresWrittenPermission;
         let result = assess(&m, &f, Some(ARTIFACT));
         assert_eq!(result.license_eligibility, Eligibility::Blocked);
@@ -849,10 +945,23 @@ mod tests {
     }
 
     #[test]
+    fn transformed_food_requires_an_inspectable_state_lineage() {
+        let mut f = fact();
+        f.transformation_applied = true;
+        let result = assess(&manifest(), &f, Some(ARTIFACT));
+        assert_eq!(result.data_quality_eligibility, DataQualityEligibility::Blocked);
+        assert_eq!(result.nutrition_assessability, NutritionAssessability::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::MissingTransformationLineage
+        }));
+    }
+
+    #[test]
     fn approximate_geographic_match_is_a_visible_fallback() {
         let mut f = fact();
         f.match_quality = FoodMatchQuality::RegionalMatch;
         f.geographic_match = FoodGeographicMatch::GlobalFallback;
+        f.identity_confidence = FoodIdentityConfidence::Probable;
         let result = assess(&manifest(), &f, Some(ARTIFACT));
         assert_eq!(
             result.data_quality_eligibility,
