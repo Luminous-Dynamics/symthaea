@@ -213,7 +213,10 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
     let balance_tolerance = policy.relative_balance_tolerance;
 
     if run.schema_version != EXPECTED_SCHEMA_VERSION {
-        issues.push(format!("unsupported schema_version {}; expected {EXPECTED_SCHEMA_VERSION}", run.schema_version));
+        issues.push(format!(
+            "unsupported schema_version {}; expected {EXPECTED_SCHEMA_VERSION}",
+            run.schema_version
+        ));
     }
     if [
         run.benchmark_id.as_str(),
@@ -224,12 +227,18 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         run.solver.method.as_str(),
         run.solver.version.as_str(),
     ].iter().any(|value| value.trim().is_empty()) {
-        issues.push("benchmark, mission, boundary, candidate, and solver identifiers must be non-empty".into());
+        issues.push(
+            "benchmark, mission, boundary, candidate, and solver identifiers must be non-empty"
+                .into(),
+        );
     }
     if run.evidence_class == "synthetic_fixture" && !run.not_for_decision {
         issues.push("synthetic fixtures must set not_for_decision=true".into());
     }
-    if !matches!(run.evidence_class.as_str(), "synthetic_fixture" | "published_data" | "measured" | "simulated" | "mixed") {
+    if !matches!(
+        run.evidence_class.as_str(),
+        "synthetic_fixture" | "published_data" | "measured" | "simulated" | "mixed"
+    ) {
         issues.push(format!("unsupported evidence_class {:?}", run.evidence_class));
     }
     if run.boundary.energy_unit != "J" {
@@ -241,7 +250,15 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
     if run.boundary.storage_treatment != "signed_change_in_stored_energy" {
         issues.push("storage must use signed change in stored energy".into());
     }
-    if run.boundary.upstream_scope == "custom" && run.boundary.custom_scope_definition.as_deref().unwrap_or("").trim().is_empty() {
+    if run.boundary.upstream_scope == "custom"
+        && run
+            .boundary
+            .custom_scope_definition
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .is_empty()
+    {
         issues.push("custom upstream scope requires custom_scope_definition".into());
     }
     if !valid_git_revision(&run.solver.code_revision) {
@@ -278,10 +295,15 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
     if !time_tolerance.is_finite() || time_tolerance < 0.0 {
         issues.push("time_continuity_tolerance_s must be finite and non-negative".into());
     }
-    if !policy.minimum_superiority_margin.is_finite() || !(0.0..=1.0).contains(&policy.minimum_superiority_margin) {
+    if !policy.minimum_superiority_margin.is_finite()
+        || !(0.0..=1.0).contains(&policy.minimum_superiority_margin)
+    {
         issues.push("minimum_superiority_margin must be finite and in [0, 1]".into());
     }
-    if policy.policy_id.trim().is_empty() || policy.baseline_id.trim().is_empty() || policy.selection_rule.trim().is_empty() {
+    if policy.policy_id.trim().is_empty()
+        || policy.baseline_id.trim().is_empty()
+        || policy.selection_rule.trim().is_empty()
+    {
         issues.push("policy ID, baseline ID, and selection rule must be non-empty".into());
     }
     if !run.mission.expected_duration_s.is_finite() || run.mission.expected_duration_s <= 0.0 {
@@ -305,10 +327,24 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         issues.push("uncertainty method must not be empty".into());
     }
     match run.uncertainty.correlation_model.as_str() {
-        "covariance_matrix_artifact" if run.uncertainty.covariance_matrix_artifact_id.as_deref().unwrap_or("").is_empty() => {
+        "covariance_matrix_artifact"
+            if run
+                .uncertainty
+                .covariance_matrix_artifact_id
+                .as_deref()
+                .unwrap_or("")
+                .is_empty() =>
+        {
             issues.push("covariance-matrix correlation model requires an artifact ID".into());
         }
-        "monte_carlo_propagation" if run.uncertainty.monte_carlo_artifact_id.as_deref().unwrap_or("").is_empty() => {
+        "monte_carlo_propagation"
+            if run
+                .uncertainty
+                .monte_carlo_artifact_id
+                .as_deref()
+                .unwrap_or("")
+                .is_empty() =>
+        {
             issues.push("Monte Carlo correlation model requires an artifact ID".into());
         }
         "independent" | "covariance_matrix_artifact" | "monte_carlo_propagation" | "unknown" => {}
@@ -324,21 +360,43 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
     }
     let mut artifact_ids = BTreeSet::new();
     for artifact in &run.data_provenance {
-        if artifact.artifact_id.trim().is_empty() || !artifact_ids.insert(artifact.artifact_id.as_str()) {
-            issues.push(format!("provenance artifact ID is empty or duplicated: {:?}", artifact.artifact_id));
+        if artifact.artifact_id.trim().is_empty()
+            || !artifact_ids.insert(artifact.artifact_id.as_str())
+        {
+            issues.push(format!(
+                "provenance artifact ID is empty or duplicated: {:?}",
+                artifact.artifact_id
+            ));
         }
-        if artifact.kind != "synthetic_fixture" && !artifact.sha256.as_deref().is_some_and(valid_sha256) {
-            issues.push(format!("non-synthetic artifact {:?} requires a valid SHA-256", artifact.artifact_id));
+        if artifact.kind != "synthetic_fixture"
+            && !artifact.sha256.as_deref().is_some_and(valid_sha256)
+        {
+            issues.push(format!(
+                "non-synthetic artifact {:?} requires a valid SHA-256",
+                artifact.artifact_id
+            ));
         }
         if artifact.sha256.as_deref().is_some_and(|hash| !valid_sha256(hash)) {
             issues.push(format!("artifact {:?} has malformed SHA-256", artifact.artifact_id));
         }
-        if artifact.retrieved_at.as_deref().is_some_and(|value| DateTime::parse_from_rfc3339(value).is_err()) {
-            issues.push(format!("artifact {:?} retrieved_at must be RFC 3339", artifact.artifact_id));
+        if artifact
+            .retrieved_at
+            .as_deref()
+            .is_some_and(|value| DateTime::parse_from_rfc3339(value).is_err())
+        {
+            issues.push(format!(
+                "artifact {:?} retrieved_at must be RFC 3339",
+                artifact.artifact_id
+            ));
         }
     }
 
-    let required_phases: BTreeSet<&str> = run.mission.required_phases.iter().map(String::as_str).collect();
+    let required_phases: BTreeSet<&str> = run
+        .mission
+        .required_phases
+        .iter()
+        .map(String::as_str)
+        .collect();
     let mut observed_phases = BTreeSet::new();
     let mut total_input = 0.0;
     let mut total_useful = 0.0;
@@ -350,7 +408,10 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
 
     for (position, interval) in run.intervals.iter().enumerate() {
         if interval.index != position {
-            issues.push(format!("interval index {} must equal zero-based position {position}", interval.index));
+            issues.push(format!(
+                "interval index {} must equal zero-based position {position}",
+                interval.index
+            ));
         }
         if interval.phase.trim().is_empty() {
             issues.push(format!("interval {} has an empty phase", interval.index));
@@ -364,10 +425,16 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
             }
             if let Some(end) = previous_end {
                 if (interval.start_s - end).abs() > time_tolerance {
-                    issues.push(format!("interval {} is discontinuous: starts at {}, previous interval ends at {end}", interval.index, interval.start_s));
+                    issues.push(format!(
+                        "interval {} is discontinuous: starts at {}, previous interval ends at {end}",
+                        interval.index, interval.start_s
+                    ));
                 }
             } else if interval.start_s.abs() > time_tolerance {
-                issues.push(format!("first interval must start at mission time zero, got {}", interval.start_s));
+                issues.push(format!(
+                    "first interval must start at mission time zero, got {}",
+                    interval.start_s
+                ));
             }
             previous_end = Some(interval.end_s);
         }
@@ -380,7 +447,10 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
             ("rejected_or_loss", flows.rejected_or_loss),
         ] {
             if !value.is_finite() || value < 0.0 {
-                issues.push(format!("interval {} {name} must be finite and non-negative", interval.index));
+                issues.push(format!(
+                    "interval {} {name} must be finite and non-negative",
+                    interval.index
+                ));
             }
         }
         if !flows.stored_energy_change.is_finite() {
@@ -394,13 +464,19 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
             ("stored_energy_change", interval.standard_uncertainty_j.stored_energy_change),
         ] {
             if !value.is_finite() || value < 0.0 {
-                issues.push(format!("interval {} standard uncertainty {name} must be finite and non-negative", interval.index));
+                issues.push(format!(
+                    "interval {} standard uncertainty {name} must be finite and non-negative",
+                    interval.index
+                ));
             }
         }
         if let Some(ids) = &interval.source_artifact_ids {
             for id in ids {
                 if !artifact_ids.contains(id.as_str()) {
-                    issues.push(format!("interval {} references unknown source artifact {id:?}", interval.index));
+                    issues.push(format!(
+                        "interval {} references unknown source artifact {id:?}",
+                        interval.index
+                    ));
                 }
             }
         }
@@ -418,11 +494,17 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         } else {
             let relative_error = residual.abs() / throughput;
             if !relative_error.is_finite() {
-                issues.push(format!("interval {} relative energy error is non-finite", interval.index));
+                issues.push(format!(
+                    "interval {} relative energy error is non-finite",
+                    interval.index
+                ));
             } else {
                 max_interval_error = max_interval_error.max(relative_error);
                 if relative_error > balance_tolerance {
-                    issues.push(format!("interval {} first-law error {:.6e} exceeds preregistered tolerance {:.6e}", interval.index, relative_error, balance_tolerance));
+                    issues.push(format!(
+                        "interval {} first-law error {:.6e} exceeds preregistered tolerance {:.6e}",
+                        interval.index, relative_error, balance_tolerance
+                    ));
                 }
             }
         }
@@ -448,20 +530,27 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         if last.end_s.is_finite()
             && run.mission.expected_duration_s.is_finite()
             && (last.end_s - run.mission.expected_duration_s).abs() > time_tolerance {
-            issues.push(format!("last interval ends at {}, mission duration is {}", last.end_s, run.mission.expected_duration_s));
+            issues.push(format!(
+                "last interval ends at {}, mission duration is {}",
+                last.end_s, run.mission.expected_duration_s
+            ));
         }
     }
 
     // Match the crate's cycle-level convention: storage charged and then
     // discharged within the same cycle is not counted twice as external input.
     let total_throughput = total_input + (-total_storage_change).max(0.0);
-    let aggregate_residual = total_input - total_useful - total_auxiliary - total_loss - total_storage_change;
+    let aggregate_residual =
+        total_input - total_useful - total_auxiliary - total_loss - total_storage_change;
     if !aggregate_residual.is_finite() || !total_throughput.is_finite() || total_throughput <= 0.0 {
         issues.push("aggregate energy balance is non-finite or has no throughput".into());
     } else {
         let aggregate_relative_error = aggregate_residual.abs() / total_throughput;
         if !aggregate_relative_error.is_finite() || aggregate_relative_error > balance_tolerance {
-            issues.push(format!("aggregate first-law error {:.6e} exceeds preregistered tolerance {:.6e}", aggregate_relative_error, balance_tolerance));
+            issues.push(format!(
+                "aggregate first-law error {:.6e} exceeds preregistered tolerance {:.6e}",
+                aggregate_relative_error, balance_tolerance
+            ));
         }
     }
 
@@ -482,18 +571,30 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         for (name, cached, recomputed) in [
             ("total_external_input_j", metrics.total_external_input_j, total_input),
             ("total_net_useful_output_j", metrics.total_net_useful_output_j, total_useful),
-            ("net_stored_energy_change_j", metrics.net_stored_energy_change_j, total_storage_change),
+            (
+                "net_stored_energy_change_j",
+                metrics.net_stored_energy_change_j,
+                total_storage_change,
+            ),
         ] {
             if let Some(cached) = cached {
-                if !cached.is_finite() || !approximately_equal(cached, recomputed, metric_tolerance) {
+                if !cached.is_finite()
+                    || !approximately_equal(cached, recomputed, metric_tolerance)
+                {
                     issues.push(format!("cached metric {name} does not match recomputed total"));
                 }
             }
         }
         match (metrics.net_cycle_efficiency, efficiency) {
-            (Some(cached), Some(recomputed)) if approximately_equal(cached, recomputed, metric_tolerance) => {}
-            (Some(_), _) => issues.push("cached net_cycle_efficiency is present but cannot be independently confirmed".into()),
-            (None, Some(_)) => issues.push("cached net_cycle_efficiency is missing despite charge-sustaining totals".into()),
+            (Some(cached), Some(recomputed))
+                if approximately_equal(cached, recomputed, metric_tolerance) => {}
+            (Some(_), _) => issues.push(
+                "cached net_cycle_efficiency is present but cannot be independently confirmed"
+                    .into(),
+            ),
+            (None, Some(_)) => issues.push(
+                "cached net_cycle_efficiency is missing despite charge-sustaining totals".into(),
+            ),
             (None, None) => {}
         }
         // candidate_beats_baseline is deliberately ignored: comparison requires
@@ -548,7 +649,11 @@ pub fn compare_candidates(
     if candidate.mission.mission_id != baseline.mission.mission_id
         || candidate.mission.duty_cycle_id != baseline.mission.duty_cycle_id
         || candidate.mission.required_phases != baseline.mission.required_phases
-        || !approximately_equal(candidate.mission.expected_duration_s, baseline.mission.expected_duration_s, 1e-12)
+        || !approximately_equal(
+            candidate.mission.expected_duration_s,
+            baseline.mission.expected_duration_s,
+            1e-12,
+        )
         || candidate.mission.ambient_temperature_k != baseline.mission.ambient_temperature_k
         || candidate.mission.ambient_pressure_pa != baseline.mission.ambient_pressure_pa
     {
@@ -600,7 +705,9 @@ pub fn compare_candidates(
         issues.push("candidate and baseline evaluation policies differ".into());
     }
     if cp.baseline_id != baseline.candidate.candidate_id {
-        issues.push("candidate policy baseline_id does not identify the supplied baseline candidate".into());
+        issues.push(
+            "candidate policy baseline_id does not identify the supplied baseline candidate".into(),
+        );
     }
     if candidate.uncertainty.coverage_factor != baseline.uncertainty.coverage_factor {
         issues.push("candidate and baseline uncertainty coverage factors differ".into());
@@ -635,7 +742,9 @@ pub fn compare_candidates(
         || candidate.evidence_class == "synthetic_fixture"
         || baseline.evidence_class == "synthetic_fixture"
     {
-        report.reason = Some("synthetic or not-for-decision records cannot support a comparison decision".into());
+        report.reason = Some(
+            "synthetic or not-for-decision records cannot support a comparison decision".into(),
+        );
         return Ok(report);
     }
     if candidate.evidence_class != baseline.evidence_class {
@@ -653,7 +762,8 @@ pub fn compare_candidates(
         || baseline.uncertainty.correlation_model != "independent"
     {
         report.reason = Some(
-            "uncertainty propagation is only implemented for explicitly independent primitive inputs; correlated or unknown inputs are indeterminate".into()
+            "uncertainty propagation is only implemented for explicitly independent primitive inputs; correlated or unknown inputs are indeterminate"
+                .into()
         );
         return Ok(report);
     }
@@ -661,12 +771,23 @@ pub fn compare_candidates(
         candidate_totals.net_cycle_efficiency,
         baseline_totals.net_cycle_efficiency,
     ) else {
-        report.reason = Some("one or both duty cycles are not charge-sustaining; cycle efficiency is unavailable".into());
+        report.reason = Some(
+            "one or both duty cycles are not charge-sustaining; cycle efficiency is unavailable"
+                .into(),
+        );
         return Ok(report);
     };
 
-    let candidate_u = efficiency_standard_uncertainty(candidate, candidate_totals.total_external_input_j, candidate_totals.total_net_useful_output_j)?;
-    let baseline_u = efficiency_standard_uncertainty(baseline, baseline_totals.total_external_input_j, baseline_totals.total_net_useful_output_j)?;
+    let candidate_u = efficiency_standard_uncertainty(
+        candidate,
+        candidate_totals.total_external_input_j,
+        candidate_totals.total_net_useful_output_j,
+    )?;
+    let baseline_u = efficiency_standard_uncertainty(
+        baseline,
+        baseline_totals.total_external_input_j,
+        baseline_totals.total_net_useful_output_j,
+    )?;
     let expanded_delta_u = coverage_factor * candidate_u.hypot(baseline_u);
     let difference = candidate_efficiency - baseline_efficiency;
     let lower_bound = difference - expanded_delta_u;
@@ -687,7 +808,8 @@ pub fn compare_candidates(
         ComparisonDecision::LowerBoundDoesNotClearMargin
     };
     report.reason = Some(
-        "numerical rule result only; first-order propagation assumes mutually independent standard uncertainties, and this verifier does not authenticate pre-search anchoring or physical validity".into()
+        "numerical rule result only; first-order propagation assumes mutually independent standard uncertainties, and this verifier does not authenticate pre-search anchoring or physical validity"
+            .into()
     );
     Ok(report)
 }
@@ -703,7 +825,10 @@ fn efficiency_standard_uncertainty(
 ) -> Result<f64, ValidationError> {
     if !total_input_j.is_finite() || total_input_j <= 0.0 || !total_useful_output_j.is_finite() {
         return Err(ValidationError {
-            issues: vec!["efficiency uncertainty requires finite positive total input and finite useful output".into()],
+            issues: vec![
+                "efficiency uncertainty requires finite positive total input and finite useful output"
+                    .into(),
+            ],
         });
     }
 
@@ -711,8 +836,10 @@ fn efficiency_standard_uncertainty(
     let mut input_uncertainty_j: f64 = 0.0;
     let mut output_uncertainty_j: f64 = 0.0;
     for interval in &run.intervals {
-        input_uncertainty_j = input_uncertainty_j.hypot(interval.standard_uncertainty_j.external_input);
-        output_uncertainty_j = output_uncertainty_j.hypot(interval.standard_uncertainty_j.net_useful_output);
+        input_uncertainty_j =
+            input_uncertainty_j.hypot(interval.standard_uncertainty_j.external_input);
+        output_uncertainty_j =
+            output_uncertainty_j.hypot(interval.standard_uncertainty_j.net_useful_output);
     }
     let efficiency = total_useful_output_j / total_input_j;
     let input_term = output_uncertainty_j / total_input_j;
@@ -739,11 +866,19 @@ pub fn verify_sha256(expected_lowercase_hex: &str, bytes: &[u8]) -> bool {
 }
 
 fn valid_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn valid_git_revision(value: &str) -> bool {
-    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte) || (b'A'..=b'F').contains(&byte))
+    value.len() == 40
+        && value.bytes().all(|byte| {
+            byte.is_ascii_digit()
+                || (b'a'..=b'f').contains(&byte)
+                || (b'A'..=b'F').contains(&byte)
+        })
 }
 
 fn approximately_equal(left: f64, right: f64, tolerance: f64) -> bool {
@@ -756,7 +891,9 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str =
-        include_str!("../../../../docs/research/examples/energy-conversion-benchmark.synthetic.json");
+        include_str!(
+            "../../../../docs/research/examples/energy-conversion-benchmark.synthetic.json"
+        );
 
     #[test]
     fn synthetic_fixture_closes_each_interval_and_aggregate() {
@@ -792,7 +929,12 @@ mod tests {
         let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
         run.intervals.pop();
         let error = validate_run(&run).unwrap_err();
-        assert!(error.issues.iter().any(|issue| issue.contains("required mission phase \"shutdown\" is missing")));
+        assert!(
+            error
+                .issues
+                .iter()
+                .any(|issue| issue.contains("required mission phase \"shutdown\" is missing"))
+        );
     }
 
 
@@ -802,7 +944,12 @@ mod tests {
         run.evaluation_policy.preregistered_at = "2026-10-15T02:00:00Z".into();
         run.evaluation_policy.search_started_at = "2026-10-15T01:00:00Z".into();
         let error = validate_run(&run).unwrap_err();
-        assert!(error.issues.iter().any(|issue| issue.contains("timestamped before search_started_at")));
+        assert!(
+            error
+                .issues
+                .iter()
+                .any(|issue| issue.contains("timestamped before search_started_at"))
+        );
     }
 
     #[test]
@@ -810,7 +957,12 @@ mod tests {
         let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
         run.not_for_decision = false;
         let error = validate_run(&run).unwrap_err();
-        assert!(error.issues.iter().any(|issue| issue.contains("synthetic fixtures must set not_for_decision=true")));
+        assert!(
+            error
+                .issues
+                .iter()
+                .any(|issue| issue.contains("synthetic fixtures must set not_for_decision=true"))
+        );
     }
 
     #[test]
@@ -818,7 +970,12 @@ mod tests {
         let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
         run.computed_metrics.as_mut().unwrap().total_external_input_j = Some(113.0);
         let error = validate_run(&run).unwrap_err();
-        assert!(error.issues.iter().any(|issue| issue.contains("cached metric total_external_input_j")));
+        assert!(
+            error
+                .issues
+                .iter()
+                .any(|issue| issue.contains("cached metric total_external_input_j"))
+        );
     }
 
     fn comparison_runs() -> (BenchmarkRun, BenchmarkRun) {
@@ -883,7 +1040,8 @@ mod tests {
     #[test]
     fn candidates_with_different_energy_boundaries_cannot_be_compared() {
         let (candidate, mut baseline) = comparison_runs();
-        baseline.boundary.useful_output_definition = "shaft work, not electricity at system terminals".into();
+        baseline.boundary.useful_output_definition =
+            "shaft work, not electricity at system terminals".into();
         let error = compare_candidates(&candidate, &baseline).unwrap_err();
         assert!(error.issues.iter().any(|issue| issue.contains("system boundaries differ")));
     }
