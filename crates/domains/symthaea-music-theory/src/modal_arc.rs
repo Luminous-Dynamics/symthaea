@@ -90,7 +90,8 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
                     pitch: scale.degree_pitch(degree, 4),
                     onset,
                     duration,
-                    velocity: 0.34 + 0.16 * ((repetition + 1) as f32 / stage_repetitions[0].max(1) as f32),
+                    velocity: 0.34
+                        + 0.16 * ((repetition + 1) as f32 / stage_repetitions[0].max(1) as f32),
                     role: VoiceRole::Melody,
                     emphasis: if repetition == 0 && index == 0 {
                         Emphasis::PhraseStart
@@ -115,7 +116,8 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
                     pitch: scale.degree_pitch(degree, 4),
                     onset,
                     duration,
-                    velocity: 0.52 + 0.10 * ((repetition + 1) as f32 / stage_repetitions[1].max(1) as f32),
+                    velocity: 0.52
+                        + 0.10 * ((repetition + 1) as f32 / stage_repetitions[1].max(1) as f32),
                     role: VoiceRole::Melody,
                     emphasis: if index == 0 {
                         Emphasis::PhraseStart
