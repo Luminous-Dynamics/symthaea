@@ -120,6 +120,7 @@ fn main() -> ExitCode {
 fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
     reject_same_input_and_output(&cli.archive, &cli.output)?;
+    ensure_regular_input(&cli.archive)?;
 
     // Keep one descriptor open for every pass. Re-opening by pathname for each
     // hash/parse step would allow a pathname swap to make the receipt combine
@@ -215,6 +216,15 @@ fn run() -> Result<ExitCode> {
             bail!("internal error: unexpected status {}", receipt.status)
         }
     }
+}
+
+fn ensure_regular_input(input: &Path) -> Result<()> {
+    let metadata = fs::metadata(input)
+        .with_context(|| format!("could not inspect archive input {}", input.display()))?;
+    if !metadata.is_file() {
+        bail!("archive input must resolve to a regular file: {}", input.display());
+    }
+    Ok(())
 }
 
 fn reject_same_input_and_output(input: &Path, output: &Path) -> Result<()> {
@@ -594,6 +604,12 @@ mod tests {
             .expect("finish tar")
             .finish()
             .expect("finish gzip");
+    }
+
+    #[test]
+    fn directory_is_rejected_as_an_archive_input() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        assert!(ensure_regular_input(directory.path()).is_err());
     }
 
     #[test]
