@@ -334,7 +334,7 @@ impl EnhancedKnowledgeGraph {
                         .find(|(candidate_index, _)| *candidate_index == observation_index)
                     {
                         matched_query_terms += 1;
-                        total_similarity += similarity;
+                        total_similarity += *similarity;
                     }
                 }
             }
