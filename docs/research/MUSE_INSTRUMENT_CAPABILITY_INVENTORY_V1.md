@@ -69,12 +69,16 @@ path_size_manifest_sha256 hashes sorted relative WAV paths and file sizes. It is
 
 ## Alternate style inventory
 
-The `additional_sample_styles` field records verified alternate directories separately from the instrument's default sustain and short-articulation paths. The following source-tree variants are currently catalogued:
+The `additional_sample_styles` field catalogs **42 source-verified alternate folders** separately from each instrument's default sustain and short-articulation paths. These are inventory evidence only: they do not yet make each style selectable by a render request, and a present upstream path is not proof that a machine has downloaded it or that its recordings are usable.
 
 | Instrument | Style label | Style kind | Relative directory |
 | --- | --- | --- | --- |
 | Piano / PianoPP | Kawai grand piano | alternate instrument model | `Chordophones/Zithers/Grand Piano, Kawai/Sustains` |
 | Piano / PianoPP | Knight upright piano | alternate instrument model | `Chordophones/Zithers/Upright Piano, Knight/Sustains` |
+| Piano / PianoPP | Steinway no-sustain samples | alternate articulation | `Chordophones/Zithers/Grand Piano, Steinway B/NoSus` |
+| Piano / PianoPP | Steinway release samples | release articulation | `Chordophones/Zithers/Grand Piano, Steinway B/Rel` |
+| Piano / PianoPP | Kawai release samples | release articulation | `Chordophones/Zithers/Grand Piano, Kawai/Releases` |
+| Piano / PianoPP | Knight upright piano release | release articulation | `Chordophones/Zithers/Upright Piano, Knight/Releases` |
 | Harp | Folk harp | alternate instrument model | `Chordophones/Composite Chordophones/Folk Harp` |
 | Harpsichord | English lute disposition | alternate stringing | `Chordophones/Zithers/Harpsichord, English/Sustains/Lute` |
 | Harpsichord | French harpsichord | alternate instrument model | `Chordophones/Zithers/Harpsichord, French/Sustains` |
@@ -84,14 +88,37 @@ The `additional_sample_styles` field records verified alternate directories sepa
 | Harpsichord | Unclassified harpsichord | alternate instrument model | `Chordophones/Zithers/Harpsichord, Unk/Sustains` |
 | Xylophone | Medium mallets | mallet hardness | `Idiophones/Struck Idiophones/Xylophone/Medium Mallets` |
 | Xylophone | Soft mallets | mallet hardness | `Idiophones/Struck Idiophones/Xylophone/Soft Mallets` |
+| Violin | Solo violin pizzicato | pizzicato | `Strings/Solo Violin/Pizz` |
+| Violin | Solo violin tremolo | tremolo | `Strings/Solo Violin/Trem` |
+| Viola | Viola section pizzicato | pizzicato | `Strings/Viola Section/pizz` |
+| Viola | Viola section tremolo | tremolo | `Strings/Viola Section/trem` |
+| Cello | Cello section pizzicato | pizzicato | `Strings/Cello Section/pizzT` |
+| Cello | Cello section tremolo | tremolo | `Strings/Cello Section/trem` |
+| Flute | Flute expressive vibrato | expressive vibrato | `Woodwinds/Flute/expvib` |
+| Flute | Flute non-vibrato sustain | sustain without vibrato | `Woodwinds/Flute/susNV` |
+| Oboe | Oboe vibrato | vibrato | `Woodwinds/Oboe/Vib` |
+| Bassoon | Bassoon vibrato | vibrato | `Woodwinds/Bassoon/vib` |
+| Trumpet | Trumpet harmon mute | muted | `Brass/Trumpet/harmonM-sus` |
+| Trumpet | Trumpet straight mute | muted | `Brass/Trumpet/straightM-sus` |
+| Trumpet | Trumpet non-vibrato sustain | sustain without vibrato | `Brass/Trumpet/sus` |
+| FrenchHorn | French horn muted | muted | `Brass/F Horn/mute` |
+| Saxophone | Tenor saxophone non-vibrato | sustain without vibrato | `Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato` |
+| Saxophone | Tenor saxophone staccato | staccato | `Aerophones/Reed Aerophones/Tenor Saxophone/Staccato` |
+| Organ | Pipe organ quiet | registration variant | `Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet` |
+| Organ | Pipe organ loud pedal | pedal registration | `Aerophones/Edge-blown Aerophones/Pipe Organ/Loud Pedal` |
+| Organ | Pipe organ quiet pedal | pedal registration | `Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet Pedal` |
+| Vibraphone | Vibraphone soft mallets | mallet hardness | `Idiophones/Struck Idiophones/Vibraphone/Soft Mallets` |
+| Vibraphone | Bowed vibraphone | bowed | `Idiophones/Struck Idiophones/Vibraphone/Bowed` |
+| Marimba | Balafon hard mallet | mallet hardness | `Idiophones/Struck Idiophones/Balafon/Hard Mallet` |
+| Marimba | Balafon soft mallet | mallet hardness | `Idiophones/Struck Idiophones/Balafon/Soft Mallet` |
 | UprightBass | Vibrato sustain | sustain with vibrato | `Strings/Solo Contrabass/SusVib` |
 | UprightBass | Pizzicato | pizzicato | `Strings/Solo Contrabass/Pizz` |
 | UprightBass | Tremolo | tremolo | `Strings/Solo Contrabass/Trem` |
 | Trombone | Tenor trombone vibrato | vibrato | `Brass/Tenor Trombone/vib` |
 
-These folders were confirmed in the VCSL tree at [`c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e`](https://github.com/sgossner/VCSL/tree/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e) and the VSCO-2-CE tree at [`440300901dfe9275fd84e0b7763af1f8443ae62e`](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e). A synthetic fixture checks these 15 variant mappings against representative upstream filenames and confirms the inventory emits per-directory decode and coverage evidence when the fixture is present. That test checks path/indexer compatibility, not the real corpus's decode or timbral quality.
+The folder paths were checked against [VCSL tree `c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e`](https://github.com/sgossner/VCSL/tree/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e) and [VSCO-2-CE tree `440300901dfe9275fd84e0b7763af1f8443ae62e`](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e). The deterministic fixture now checks representative filenames from all 42 folders and verifies each variant is present in the serialized inventory with one decoded WAV when the fixture is created. It tests path/indexer compatibility; it does **not** qualify actual downloaded recordings, prove musical range, or assess timbre.
 
-The style catalogue is deliberately not yet an automatic rendering policy. For example, pizzicato and tremolo are musically different articulations, not interchangeable substitutes for an ordinary sustained bass note. The next tranche should add an explicit style/articulation request in the render plan, route supported requests to these banks, and retain a deterministic fallback decision when the selected style or pitch/dynamic cell lacks usable evidence.
+The style catalogue is not yet a runtime rendering policy. In particular, pizzicato/tremolo, vibrato/non-vibrato, muted/unmuted, piano release sounds, and organ registrations are musically distinct controls, not interchangeable fallbacks. The next architectural step is to give the render plan an explicit style/articulation request, connect only supported requests to the corresponding bank, and record deterministic fallback decisions when an explicitly requested style or pitch/dynamic cell lacks usable evidence.
 
 ## Completing verified sample styles without inventing coverage
 
