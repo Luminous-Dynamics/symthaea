@@ -316,7 +316,6 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
     let mut total_auxiliary = 0.0;
     let mut total_loss = 0.0;
     let mut total_storage_change = 0.0;
-    let mut total_throughput = 0.0;
     let mut max_interval_error: f64 = 0.0;
     let mut previous_end: Option<f64> = None;
 
@@ -404,8 +403,7 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         total_auxiliary += flows.auxiliary;
         total_loss += flows.rejected_or_loss;
         total_storage_change += flows.stored_energy_change;
-        total_throughput += throughput;
-        if [total_input, total_useful, total_auxiliary, total_loss, total_storage_change, total_throughput]
+        if [total_input, total_useful, total_auxiliary, total_loss, total_storage_change]
             .iter().any(|value| !value.is_finite()) {
             issues.push("aggregate energy sum overflowed".into());
             break;
@@ -425,6 +423,9 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         }
     }
 
+    // Match the crate's cycle-level convention: storage charged and then
+    // discharged within the same cycle is not counted twice as external input.
+    let total_throughput = total_input + (-total_storage_change).max(0.0);
     let aggregate_residual = total_input - total_useful - total_auxiliary - total_loss - total_storage_change;
     if !aggregate_residual.is_finite() || !total_throughput.is_finite() || total_throughput <= 0.0 {
         issues.push("aggregate energy balance is non-finite or has no throughput".into());
@@ -525,6 +526,7 @@ mod tests {
         assert!((report.total_auxiliary_j - 6.1).abs() < 1e-12);
         assert!((report.total_rejected_or_loss_j - 70.2).abs() < 1e-12);
         assert_eq!(report.net_stored_energy_change_j, 0.0);
+        assert_eq!(report.total_energy_throughput_j, 112.0);
         assert!(report.aggregate_residual_j.abs() < 1e-12);
         assert_eq!(report.net_cycle_efficiency, Some(35.7 / 112.0));
     }
@@ -543,6 +545,16 @@ mod tests {
         run.intervals.pop();
         let error = validate_run(&run).unwrap_err();
         assert!(error.issues.iter().any(|issue| issue.contains("required mission phase \"shutdown\" is missing")));
+    }
+
+
+    #[test]
+    fn policy_timestamp_must_precede_search_start() {
+        let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
+        run.evaluation_policy.preregistered_at = "2026-10-15T02:00:00Z".into();
+        run.evaluation_policy.search_started_at = "2026-10-15T01:00:00Z".into();
+        let error = validate_run(&run).unwrap_err();
+        assert!(error.issues.iter().any(|issue| issue.contains("timestamped before search_started_at")));
     }
 
     #[test]
