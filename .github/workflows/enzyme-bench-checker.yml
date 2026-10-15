@@ -5,6 +5,7 @@ on:
     paths:
       - "xtask/src/enzyme_bench.rs"
       - "xtask/src/enzyme_calibration.rs"
+      - "xtask/src/enzyme_evidence_graph.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
       - "Cargo.toml"
@@ -12,6 +13,7 @@ on:
       - "docs/research/INDUSTRIAL_ENZYME_BENCHMARK_V0.md"
       - "docs/research/ENZYME_KINETICS_PARADIGM_SHIFT_ROADMAP_V0.md"
       - "docs/research/ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json"
+      - "docs/research/ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md"
       - "docs/research/KCAT_ADMISSION_PROFILE_V0.json"
       - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
       - ".github/workflows/enzyme-bench-checker.yml"
@@ -20,6 +22,7 @@ on:
     paths:
       - "xtask/src/enzyme_bench.rs"
       - "xtask/src/enzyme_calibration.rs"
+      - "xtask/src/enzyme_evidence_graph.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
       - "Cargo.toml"
@@ -27,6 +30,7 @@ on:
       - "docs/research/INDUSTRIAL_ENZYME_BENCHMARK_V0.md"
       - "docs/research/ENZYME_KINETICS_PARADIGM_SHIFT_ROADMAP_V0.md"
       - "docs/research/ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json"
+      - "docs/research/ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md"
       - "docs/research/KCAT_ADMISSION_PROFILE_V0.json"
       - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
       - ".github/workflows/enzyme-bench-checker.yml"
