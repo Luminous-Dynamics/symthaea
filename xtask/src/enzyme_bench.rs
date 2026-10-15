@@ -48,6 +48,8 @@ const OPTIONAL_METADATA_FIELDS: &[&str] = &[
     "buffer_system",
     "assay_pressure",
     "replicate_count",
+    "independent_experiment_count",
+    "replicate_structure",
     "measurement_precision",
     "detection_limit",
     "reaction_equation",
@@ -497,13 +499,14 @@ fn record_optional_metadata_coverage(
             continue;
         };
         let status = object.get("status").and_then(Value::as_str).unwrap_or("");
-        let has_value = object.get("value").is_some_and(|value| !value.is_null());
-        let value_absent = !has_value;
+        let value = object.get("value").filter(|value| !value.is_null());
         match status {
-            "reported" if has_value => counts.reported += 1,
-            "not_reported" if value_absent => counts.not_reported += 1,
+            "reported" if value.is_some_and(|value| optional_metadata_value_is_valid(field, value)) => {
+                counts.reported += 1
+            }
+            "not_reported" if value.is_none() => counts.not_reported += 1,
             "not_applicable"
-                if value_absent
+                if value.is_none()
                     && object
                         .get("reason")
                         .and_then(Value::as_str)
@@ -513,6 +516,54 @@ fn record_optional_metadata_coverage(
             }
             _ => counts.invalid += 1,
         }
+    }
+}
+
+/// A typed coverage audit: validate the shape and basic plausibility of supplied metadata,
+/// not the scientific truth of the value or the quality of the underlying experiment.
+fn optional_metadata_value_is_valid(field: &str, value: &Value) -> bool {
+    let nonempty_string = |candidate: &Value| {
+        candidate.as_str().is_some_and(|text| !text.trim().is_empty())
+    };
+    let numeric_with_unit = |candidate: &Value, allow_zero: bool| {
+        let Some(object) = candidate.as_object() else {
+            return false;
+        };
+        let number = object.get("value").and_then(Value::as_f64);
+        number.is_some_and(|number| {
+            number.is_finite() && if allow_zero { number >= 0.0 } else { number > 0.0 }
+        }) && object.get("unit").is_some_and(nonempty_string)
+    };
+
+    match field {
+        "enzyme_purity" | "buffer_system" | "replicate_structure" | "reaction_equation" => {
+            nonempty_string(value)
+        }
+        "enzyme_concentration" | "assay_pressure" => numeric_with_unit(value, false),
+        "replicate_count" | "independent_experiment_count" => {
+            value.as_u64().is_some_and(|count| count > 0)
+        }
+        "measurement_precision" => {
+            let Some(object) = value.as_object() else {
+                return false;
+            };
+            object.get("measure").is_some_and(nonempty_string)
+                && object.get("value").and_then(Value::as_f64).is_some_and(|number| number.is_finite() && number >= 0.0)
+                && object.get("unit").is_some_and(nonempty_string)
+        }
+        "detection_limit" => numeric_with_unit(value, true),
+        "analysis_method" => {
+            let Some(object) = value.as_object() else {
+                return false;
+            };
+            ["software", "version", "method"]
+                .iter()
+                .all(|key| object.get(*key).is_some_and(nonempty_string))
+        }
+        "raw_measurement_data" => value
+            .as_str()
+            .is_some_and(|url| is_valid_https_url(url) && !url.trim().is_empty()),
+        _ => false,
     }
 }
 
@@ -844,6 +895,23 @@ mod tests {
     }
 
     #[test]
+    fn reported_optional_metadata_requires_field_specific_shapes() {
+        assert!(!optional_metadata_value_is_valid("enzyme_purity", &json!("  ")));
+        assert!(optional_metadata_value_is_valid("enzyme_purity", &json!("95% by SDS-PAGE")));
+        assert!(!optional_metadata_value_is_valid("enzyme_concentration", &json!({"value":0,"unit":"mg/mL"})));
+        assert!(optional_metadata_value_is_valid("enzyme_concentration", &json!({"value":2.5,"unit":"mg/mL"})));
+        assert!(!optional_metadata_value_is_valid("assay_pressure", &json!({"value":101.3})));
+        assert!(!optional_metadata_value_is_valid("replicate_count", &json!(0)));
+        assert!(!optional_metadata_value_is_valid("independent_experiment_count", &json!(-1)));
+        assert!(optional_metadata_value_is_valid("replicate_structure", &json!("three independent enzyme preparations")));
+        assert!(!optional_metadata_value_is_valid("measurement_precision", &json!({"measure":"SD","value":-0.1,"unit":"s^-1"})));
+        assert!(!optional_metadata_value_is_valid("detection_limit", &json!({"value":0.2,"unit":""})));
+        assert!(!optional_metadata_value_is_valid("analysis_method", &json!({"software":"fit"})));
+        assert!(!optional_metadata_value_is_valid("raw_measurement_data", &json!("file:///etc/passwd")));
+        assert!(optional_metadata_value_is_valid("raw_measurement_data", &json!("https://example.org/raw-data.csv")));
+    }
+
+    #[test]
     fn metadata_coverage_separates_missingness_from_invalid_statuses() {
         let mut coverage = empty_metadata_coverage();
         let row_a = json!({
@@ -852,6 +920,8 @@ mod tests {
             "buffer_system": {"status":"not_applicable", "reason":"not specified in source record"},
             "assay_pressure": {"status":"reported", "value":{"value":101.325,"unit":"kPa"}},
             "replicate_count": {"status":"reported", "value":3},
+            "independent_experiment_count": {"status":"reported", "value":2},
+            "replicate_structure": {"status":"reported", "value":"two independent enzyme preparations"},
             "measurement_precision": {"status":"not_reported", "value":null},
             "detection_limit": {"status":"not_applicable", "reason":"positive kcat estimate reported"},
             "reaction_equation": {"status":"unknown", "value":"A -> B"},
@@ -873,6 +943,8 @@ mod tests {
         assert_eq!(coverage["buffer_system"].unrecorded, 1);
         assert_eq!(coverage["assay_pressure"].reported, 1);
         assert_eq!(coverage["replicate_count"].reported, 1);
+        assert_eq!(coverage["independent_experiment_count"].reported, 1);
+        assert_eq!(coverage["replicate_structure"].reported, 1);
         assert_eq!(coverage["measurement_precision"].not_reported, 1);
         assert_eq!(coverage["detection_limit"].not_applicable, 1);
         assert_eq!(coverage["reaction_equation"].invalid, 1);
