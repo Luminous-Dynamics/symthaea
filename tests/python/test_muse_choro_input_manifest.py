@@ -482,12 +482,12 @@ class ChoroInputManifestTests(unittest.TestCase):
                 report["blockers"],
             )
 
-    def test_selected_work_change_invalidates_rights_review_scope(self) -> None:
+    def test_selection_basis_change_invalidates_rights_review_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
             manifest, approval = approved_fixture(root)
-            manifest["sources"][0]["selected_work_ids"] = ["another synthetic work"]
+            manifest["sources"][0]["selection_basis"] = "changed after rights review"
             mpath = root / "manifest.json"
             apath = root / "approval.json"
             raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
@@ -507,6 +507,12 @@ class ChoroInputManifestTests(unittest.TestCase):
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
             manifest, approval = approved_fixture(root)
             manifest["sources"][0]["source_record_url"] = "https://example.org/unrelated-record"
+            plan_path = root / "synthetic-analysis-plan.json"
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["design"]["authorized_source_bindings"][0]["source_record_url"] = "https://example.org/unrelated-record"
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode()
+            plan_path.write_bytes(plan_bytes)
+            manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
             mpath = root / "manifest.json"
             apath = root / "approval.json"
             raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
@@ -560,6 +566,12 @@ class ChoroInputManifestTests(unittest.TestCase):
             (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
             manifest, approval = approved_fixture(root)
             manifest["sources"][0]["intake_source_id"] = "not-in-source-intake"
+            plan_path = root / "synthetic-analysis-plan.json"
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["design"]["authorized_source_bindings"][0]["intake_source_id"] = "not-in-source-intake"
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode()
+            plan_path.write_bytes(plan_bytes)
+            manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
             mpath = root / "manifest.json"
             apath = root / "approval.json"
             raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
