@@ -2445,6 +2445,104 @@ mod tests {
     }
 
     #[test]
+    fn test_relation_constrained_search_abstains_on_incomplete_role_coverage() {
+        let mut graph = EnhancedKnowledgeGraph::new(4);
+        let mut encoder = KnowledgeEncoder::with_seed(51);
+        let query = encoder.encode_role_terms(&[
+            (SemanticRole::Agent, "Worker A", EntityType::Organization),
+            (SemanticRole::Patient, "Queue B", EntityType::Concept),
+        ]);
+        let mut encoding = make_encoding("only one query role", 0.7);
+        encoding.role_vector_observations = vec![query[0].clone()];
+        graph.insert(encoding, 1, None, false);
+
+        let report = graph.search_role_observations_with_relation_constraints(
+            &query,
+            &[],
+            4,
+            2,
+            RoleObservationSearchConfig::new(0.99).unwrap(),
+        );
+        assert_eq!(
+            report.decision,
+            RelationConstrainedQueryDecision::AbstainNoCandidateMeetsPolicy
+        );
+        assert_eq!(report.candidates.len(), 1);
+        assert_eq!(report.candidates[0].retrieval.coverage, 0.5);
+        assert_eq!(report.candidates[0].decision, RelationConstraintDecision::Abstain);
+        assert!(report.candidates[0].abstention_reasons.contains(
+            &RelationConstraintAbstentionReason::IncompleteRoleCoverage
+        ));
+    }
+
+    #[test]
+    fn test_explicit_policy_can_allow_review_with_partial_relation_coverage() {
+        use super::super::extraction::{EntityType, ExtractedRelation, SemanticRole};
+
+        let mut graph = EnhancedKnowledgeGraph::new(4);
+        let mut encoder = KnowledgeEncoder::with_seed(52);
+        let query = encoder.encode_role_terms(&[
+            (SemanticRole::Agent, "Service A", EntityType::Organization),
+            (SemanticRole::Patient, "Service B", EntityType::Organization),
+        ]);
+        let mut encoding = make_encoding("one of two relations", 0.7);
+        encoding.role_vector_observations = query.clone();
+        encoding.relations = vec![ExtractedRelation {
+            subject: "Service A".into(),
+            predicate: "prevents".into(),
+            object: "Service B".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+            confidence: 0.9,
+        }];
+        graph.insert(encoding, 1, None, false);
+
+        let constraints = [
+            RelationObservationQuery {
+                subject: "Service A".into(),
+                predicate: "prevents".into(),
+                object: "Service B".into(),
+                subject_role: SemanticRole::Agent,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: false,
+            },
+            RelationObservationQuery {
+                subject: "Service A".into(),
+                predicate: "causes".into(),
+                object: "Service B".into(),
+                subject_role: SemanticRole::Agent,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: false,
+            },
+        ];
+        let policy = RelationConstraintSearchPolicy::new(1.0, 0.5, false).unwrap();
+        let report = graph.search_role_observations_with_relation_constraints_and_policy(
+            &query,
+            &constraints,
+            4,
+            2,
+            RoleObservationSearchConfig::new(0.99).unwrap(),
+            policy,
+        );
+        assert_eq!(
+            report.decision,
+            RelationConstrainedQueryDecision::EligibleCandidatesAvailable
+        );
+        assert_eq!(report.candidates.len(), 1);
+        assert!(!report.candidates[0].constraints_satisfied);
+        assert_eq!(report.candidates[0].relation_coverage, 0.5);
+        assert_eq!(
+            report.candidates[0].decision,
+            RelationConstraintDecision::EligibleForReview
+        );
+        assert!(report.candidates[0].abstention_reasons.is_empty());
+    }
+
+    #[test]
     fn test_confidence_decay() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
