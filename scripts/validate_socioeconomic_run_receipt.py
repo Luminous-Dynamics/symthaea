@@ -10,6 +10,7 @@ import copy
 import hashlib
 import json
 import math
+import re
 import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -23,13 +24,14 @@ SCHEMA_PATH = DOCS / "SYM-FIN-SYS-016_run_receipt_v1.schema.json"
 FIXTURE_PATH = DOCS / "SYM-FIN-SYS-016_run_receipt_example_v1.json"
 NEGATIVE_PATH = DOCS / "SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json"
 REGISTRY_PATH = DOCS / "SYM-FIN-SYS-016_scenario_registry_v1.json"
+ARTIFACT_MANIFEST_PATH = DOCS / "SYM-FIN-SYS-016_artifact_manifest_v1.json"
 
 EXPECTED_NEGATIVE_CORPUS_SCHEMA = (
     "civos.socioeconomic_interoperability.run_receipt_negative_controls.v1"
 )
 EXPECTED_NEGATIVE_CONTROL_LAYERS = {
     **{f"SRC-NEG-{number:03d}": "json_schema" for number in range(1, 11)},
-    **{f"SRC-SEM-{number:03d}": "semantic_check" for number in range(1, 15)},
+    **{f"SRC-SEM-{number:03d}": "semantic_check" for number in range(1, 17)},
 }
 EXPECTED_NEGATIVE_CONTROL_FIELDS = {
     "id",
@@ -120,13 +122,226 @@ def build_metric_catalog(raw_metrics: Any) -> dict[str, str]:
     return catalog
 
 
+
+SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+EXPECTED_SOURCE_ARTIFACTS = {
+    "scenario_registry_v1": "docs/research/finance/SYM-FIN-SYS-016_scenario_registry_v1.json",
+    "run_receipt_schema_v1": "docs/research/finance/SYM-FIN-SYS-016_run_receipt_v1.schema.json",
+    "run_receipt_negative_controls_v1": "docs/research/finance/SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json",
+    "run_receipt_validator": "scripts/validate_socioeconomic_run_receipt.py",
+    "run_receipt_validator_tests": "scripts/test_validate_socioeconomic_run_receipt.py",
+    "run_receipt_requirements": "scripts/socioeconomic_run_receipt_requirements.txt",
+    "symthaea_ci_workflow": ".github/workflows/ci.yml",
+    "receipt_contract_workflow": ".github/workflows/socioeconomic-run-receipt.yml",
+}
+SOURCE_ARTIFACT_FIELDS = {"artifact_id", "path", "role", "digest"}
+DIGEST_BINDING_FIELDS = {
+    "binding_id", "receipt_pointer", "claimed_digest", "availability",
+    "verification_status", "source_artifact_id", "reason",
+}
+
+
+def exact_sha256(data: bytes) -> str:
+    """Hash exact bytes; never hash a display string or parsed JSON value."""
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def json_pointer_get(document: Any, pointer: str) -> Any:
+    if not isinstance(pointer, str) or not pointer.startswith("/"):
+        raise ValidationFailure(f"invalid JSON Pointer: {pointer!r}")
+    pieces = [part.replace("~1", "/").replace("~0", "~") for part in pointer[1:].split("/")]
+    cursor = document
+    for piece in pieces:
+        if isinstance(cursor, list):
+            if not piece.isdecimal():
+                raise ValidationFailure(f"JSON Pointer array index is not a non-negative integer: {pointer}")
+            index = int(piece)
+            if index >= len(cursor):
+                raise ValidationFailure(f"JSON Pointer array index is out of range: {pointer}")
+            cursor = cursor[index]
+        elif isinstance(cursor, dict) and piece in cursor:
+            cursor = cursor[piece]
+        else:
+            raise ValidationFailure(f"JSON Pointer does not resolve: {pointer}")
+    return cursor
+
+
+def receipt_digest_pointers(value: Any, pointer: str = "") -> set[str]:
+    """List every SHA-256 value in the receipt, excluding the manifest's own root binding."""
+    found: set[str] = set()
+    if isinstance(value, dict):
+        for key, child in value.items():
+            escaped = key.replace("~", "~0").replace("/", "~1")
+            found.update(receipt_digest_pointers(child, f"{pointer}/{escaped}"))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found.update(receipt_digest_pointers(child, f"{pointer}/{index}"))
+    elif isinstance(value, str) and SHA256_RE.fullmatch(value):
+        if pointer != "/run/artifact_manifest_digest":
+            found.add(pointer)
+    return found
+
+
+def source_artifact_errors(
+    manifest: dict[str, Any], root: Path = ROOT
+) -> tuple[list[str], dict[str, str]]:
+    """Require the pinned source-artifact set and re-hash each file's exact bytes."""
+    errors: list[str] = []
+    actual_digests: dict[str, str] = {}
+    if not isinstance(manifest, dict):
+        return ["artifact manifest root must be an object"], actual_digests
+    expected_root_fields = {
+        "schema", "status", "claim_ceiling", "hash_policy", "source_artifacts",
+        "digest_bindings", "binding_policy",
+    }
+    if set(manifest) != expected_root_fields:
+        errors.append("artifact manifest root fields do not match the v1 contract")
+    if manifest.get("schema") != "civos.socioeconomic_interoperability.artifact_manifest.v1":
+        errors.append("artifact manifest schema identifier is invalid")
+    if manifest.get("status") != "research":
+        errors.append("artifact manifest must remain research-only")
+    if manifest.get("claim_ceiling") != "synthetic_deterministic_only":
+        errors.append("artifact manifest claim ceiling is invalid")
+    if manifest.get("hash_policy") != "sha256_exact_utf8_bytes_v1":
+        errors.append("artifact manifest hash policy is invalid")
+    expected_policy = {
+        "unknown_bindings": "reject",
+        "missing_source_artifacts": "reject",
+        "unavailable_run_artifacts": "explicitly_unverified_only",
+        "production_authority": "none",
+    }
+    if manifest.get("binding_policy") != expected_policy:
+        errors.append("artifact manifest binding policy differs from the v1 contract")
+    entries = manifest.get("source_artifacts")
+    if not isinstance(entries, list):
+        return errors + ["source_artifacts must be an array"], actual_digests
+    seen_ids: set[str] = set()
+    seen_paths: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != SOURCE_ARTIFACT_FIELDS:
+            errors.append("source artifact entry has missing or unknown fields")
+            continue
+        artifact_id, path_text = entry["artifact_id"], entry["path"]
+        if not isinstance(artifact_id, str) or not artifact_id:
+            errors.append("source artifact ID must be a non-empty string")
+            continue
+        if not isinstance(path_text, str) or not path_text:
+            errors.append(f"{artifact_id}: source path must be a non-empty string")
+            continue
+        if artifact_id in seen_ids:
+            errors.append(f"{artifact_id}: duplicate source artifact ID")
+            continue
+        if path_text in seen_paths:
+            errors.append(f"{path_text}: duplicate source artifact path")
+            continue
+        seen_ids.add(artifact_id)
+        seen_paths.add(path_text)
+        if EXPECTED_SOURCE_ARTIFACTS.get(artifact_id) != path_text:
+            errors.append(f"{artifact_id}: path does not match the pinned v1 source-artifact contract")
+        relative = Path(path_text)
+        if relative.is_absolute() or ".." in relative.parts:
+            errors.append(f"{artifact_id}: path must be a safe repository-relative path")
+            continue
+        path = root / relative
+        try:
+            resolved = path.resolve()
+            resolved.relative_to(root.resolve())
+            exact_bytes = resolved.read_bytes()
+        except (OSError, ValueError) as exc:
+            errors.append(f"{artifact_id}: source file is missing or escapes repository root: {exc}")
+            continue
+        actual = exact_sha256(exact_bytes)
+        declared = entry.get("digest")
+        if not isinstance(declared, str) or not SHA256_RE.fullmatch(declared):
+            errors.append(f"{artifact_id}: source digest must be sha256 plus 64 lowercase hex characters")
+            continue
+        actual_digests[artifact_id] = actual
+        if actual != declared:
+            errors.append(f"{artifact_id}: digest does not match exact source-file bytes")
+    if seen_ids != set(EXPECTED_SOURCE_ARTIFACTS):
+        errors.append(
+            "source artifact ID set mismatch; missing="
+            f"{sorted(set(EXPECTED_SOURCE_ARTIFACTS) - seen_ids)}, unexpected="
+            f"{sorted(seen_ids - set(EXPECTED_SOURCE_ARTIFACTS))}"
+        )
+    return errors, actual_digests
+
+
+def digest_binding_errors(
+    manifest: dict[str, Any],
+    record: dict[str, Any],
+    expected_manifest_digest: str,
+    source_digests: dict[str, str],
+) -> list[str]:
+    """Require exactly one typed manifest binding per receipt SHA-256 field."""
+    errors: list[str] = []
+    if record.get("run", {}).get("artifact_manifest_digest") != expected_manifest_digest:
+        errors.append("artifact_manifest_digest does not match exact manifest bytes")
+    bindings = manifest.get("digest_bindings")
+    if not isinstance(bindings, list):
+        return errors + ["digest_bindings must be an array"]
+    expected_pointers = receipt_digest_pointers(record)
+    seen_ids: set[str] = set()
+    seen_pointers: set[str] = set()
+    for entry in bindings:
+        if not isinstance(entry, dict) or set(entry) != DIGEST_BINDING_FIELDS:
+            errors.append("digest binding entry has missing or unknown fields")
+            continue
+        binding_id, pointer = entry.get("binding_id"), entry.get("receipt_pointer")
+        if not isinstance(binding_id, str) or not binding_id:
+            errors.append("digest binding ID must be a non-empty string")
+            continue
+        if not isinstance(pointer, str) or not pointer.startswith("/"):
+            errors.append(f"{binding_id}: receipt_pointer must be an absolute JSON Pointer")
+            continue
+        if binding_id in seen_ids:
+            errors.append(f"{binding_id}: duplicate digest binding ID")
+            continue
+        if pointer in seen_pointers:
+            errors.append(f"{pointer}: duplicate digest binding")
+            continue
+        seen_ids.add(binding_id)
+        seen_pointers.add(pointer)
+        try:
+            actual_value = json_pointer_get(record, pointer)
+        except ValidationFailure as exc:
+            errors.append(f"{binding_id}: {exc}")
+            continue
+        claimed = entry.get("claimed_digest")
+        if not isinstance(claimed, str) or not SHA256_RE.fullmatch(claimed):
+            errors.append(f"{binding_id}: claimed_digest is not a valid SHA-256 value")
+        elif claimed != actual_value:
+            errors.append(f"{binding_id}: claimed_digest differs from the receipt value")
+        availability, status = entry.get("availability"), entry.get("verification_status")
+        source_id, reason = entry.get("source_artifact_id"), entry.get("reason")
+        if pointer == "/run/scenario_registry_digest":
+            if (availability != "repository_bytes" or status != "verified_bytes"
+                or source_id != "scenario_registry_v1" or reason is not None
+                or claimed != source_digests.get("scenario_registry_v1")):
+                errors.append("scenario registry digest is not bound to verified exact repository bytes")
+        elif (availability != "unavailable" or status != "unverified"
+              or source_id is not None or not isinstance(reason, str) or not reason.strip()):
+            errors.append(
+                f"{binding_id}: unavailable run artifact must be explicitly unverified with a reason"
+            )
+    if seen_pointers != expected_pointers:
+        errors.append(
+            "digest binding pointer set mismatch; missing="
+            f"{sorted(expected_pointers - seen_pointers)}, unexpected="
+            f"{sorted(seen_pointers - expected_pointers)}"
+        )
+    return errors
+
+
 def semantic_errors(
     record: dict[str, Any], expected_registry_digest: str, known_scenario_ids: set[str],
-    metric_catalog: dict[str, str]
+    metric_catalog: dict[str, str], manifest: dict[str, Any],
+    expected_manifest_digest: str, source_digests: dict[str, str]
 ) -> list[str]:
     errors: list[str] = []
     if record["run"]["scenario_registry_digest"] != expected_registry_digest:
         errors.append("scenario_registry_digest does not match the exact scenario registry bytes")
+    errors.extend(digest_binding_errors(manifest, record, expected_manifest_digest, source_digests))
     if record["run"]["scenario_id"] not in known_scenario_ids:
         errors.append("scenario_id is not declared by the scenario registry")
 
@@ -229,6 +444,14 @@ def main() -> int:
     fixture = load_json(FIXTURE_PATH)
     negative_corpus = load_json(NEGATIVE_PATH)
     scenario_registry = load_json(REGISTRY_PATH)
+    artifact_manifest = load_json(ARTIFACT_MANIFEST_PATH)
+    source_failures, source_digests = source_artifact_errors(artifact_manifest)
+    if source_failures:
+        print("FAIL: artifact manifest source files:")
+        for failure in source_failures:
+            print(f"  - {failure}")
+        return 1
+    expected_manifest_digest = exact_sha256(ARTIFACT_MANIFEST_PATH.read_bytes())
     if not isinstance(scenario_registry, dict) or (
         scenario_registry.get("schema") != "civos.socioeconomic_interoperability.scenario.v1"
         or scenario_registry.get("status") != "research"
@@ -263,7 +486,7 @@ def main() -> int:
             print(f"  - {error}")
         return 1
 
-    positive_semantics = semantic_errors(fixture, expected_registry_digest, known_scenario_ids, metric_catalog)
+    positive_semantics = semantic_errors(fixture, expected_registry_digest, known_scenario_ids, metric_catalog, artifact_manifest, expected_manifest_digest, source_digests)
     if positive_semantics:
         print("FAIL: positive example violates semantic invariants:")
         for error in positive_semantics:
@@ -364,7 +587,7 @@ def main() -> int:
             if errors:
                 failures.append(f"{case_id}: semantic control was already rejected at schema layer: {errors[0]}")
             else:
-                found = semantic_errors(mutated, expected_registry_digest, known_scenario_ids, metric_catalog)
+                found = semantic_errors(mutated, expected_registry_digest, known_scenario_ids, metric_catalog, artifact_manifest, expected_manifest_digest, source_digests)
                 if not found:
                     failures.append(f"{case_id}: invalid mutation unexpectedly passed semantic checks")
 
@@ -376,8 +599,8 @@ def main() -> int:
     # cannot become smaller or silently move semantic cases into JSON Schema.
     if checked_schema != 10:
         failures.append(f"expected 10 schema-level controls to be checked, got {checked_schema}")
-    if checked_semantic != 14:
-        failures.append(f"expected 14 semantic controls to be checked, got {checked_semantic}")
+    if checked_semantic != 16:
+        failures.append(f"expected 16 semantic controls to be checked, got {checked_semantic}")
 
     if failures:
         print("FAIL: run receipt negative controls:")
@@ -386,9 +609,9 @@ def main() -> int:
         return 1
 
     print(
-        "PASS: schema definition valid; positive fixture valid; "
+        "PASS: source artifact bytes match manifest; schema definition valid; positive fixture valid; 
         f"{checked_schema} schema-level and {checked_semantic} semantic negative controls rejected; "
-        "required v1 control IDs intact; scenario digest, scenario ID, and metric IDs/dimensions are bound to the registry."
+        "required v1 control IDs intact; manifest and source bytes verified; unavailable run-artifact digests explicitly remain unverified; scenario ID and metric semantics are registry-bound."
     )
     print("Claim boundary: synthetic deterministic research fixture only; no production or economic effects.")
     return 0
