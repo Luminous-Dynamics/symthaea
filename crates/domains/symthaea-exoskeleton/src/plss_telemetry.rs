@@ -9,6 +9,7 @@
 //! nominal value. No actuator, life-support, or alert-command interface exists.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const PLSS_TELEMETRY_METRIC_COUNT: usize = 6;
 
@@ -473,8 +474,8 @@ pub struct PlssTelemetryReceipt {
     pub rejected_future_dated_observations: usize,
     pub excluded_stale_observations: usize,
     pub excluded_low_confidence_observations: usize,
-    pub input_digest_fnv1a64: String,
-    pub result_digest_fnv1a64: String,
+    pub input_digest_sha256: String,
+    pub result_digest_sha256: String,
 }
 
 /// Evaluate and produce a deterministic receipt tied to a caller-supplied,
@@ -504,24 +505,21 @@ pub fn evaluate_plss_telemetry_with_receipt(
         rejected_future_dated_observations: report.rejected_future_dated_observations,
         excluded_stale_observations: report.excluded_stale_observations,
         excluded_low_confidence_observations: report.excluded_low_confidence_observations,
-        input_digest_fnv1a64: digest_input_observations(observations),
-        result_digest_fnv1a64: digest_fusion_report(&report),
+        input_digest_sha256: digest_input_observations(observations),
+        result_digest_sha256: digest_fusion_report(&report),
     };
     Ok((report, receipt))
 }
 
-struct StableFnv1a64(u64);
+struct StableSha256(Sha256);
 
-impl StableFnv1a64 {
+impl StableSha256 {
     fn new() -> Self {
-        Self(0xcbf2_9ce4_8422_2325)
+        Self(Sha256::new())
     }
 
     fn write_raw(&mut self, bytes: &[u8]) {
-        for byte in bytes {
-            self.0 ^= u64::from(*byte);
-            self.0 = self.0.wrapping_mul(0x0000_0100_0000_01b3);
-        }
+        self.0.update(bytes);
     }
 
     fn write_u64(&mut self, value: u64) {
@@ -552,7 +550,9 @@ impl StableFnv1a64 {
     }
 
     fn finish(self) -> String {
-        format!("fnv1a64:{:016x}", self.0)
+        let digest = self.0.finalize();
+        let encoded = digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+        format!("sha256:{encoded}")
     }
 }
 
@@ -570,7 +570,8 @@ fn digest_input_observations(observations: &[PlssTelemetryObservation]) -> Strin
             .then(left.confidence.total_cmp(&right.confidence))
     });
 
-    let mut hash = StableFnv1a64::new();
+    let mut hash = StableSha256::new();
+    hash.write_str("symthaea.plss.telemetry.input.v1");
     hash.write_usize(canonical.len());
     for observation in &canonical {
         hash.write_str(&format!("{:?}", observation.metric));
@@ -586,7 +587,8 @@ fn digest_input_observations(observations: &[PlssTelemetryObservation]) -> Strin
 }
 
 fn digest_fusion_report(report: &PlssTelemetryFusionReport) -> String {
-    let mut hash = StableFnv1a64::new();
+    let mut hash = StableSha256::new();
+    hash.write_str("symthaea.plss.telemetry.result.v1");
     hash.write_f64(report.evaluated_at_s);
     hash.write_str(&format!("{:?}", report.evidence_level));
     hash.write_f64(report.config.maximum_observation_age_s);
@@ -911,6 +913,16 @@ mod tests {
     }
 
     #[test]
+    fn sha256_implementation_matches_standard_test_vector() {
+        let mut hash = StableSha256::new();
+        hash.write_raw(b"abc");
+        assert_eq!(
+            hash.finish(),
+            "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
     fn receipt_is_reproducible_and_input_order_independent() {
         let a = observation(
             PlssTelemetryMetric::RelativeHumidityPercent,
@@ -947,10 +959,10 @@ mod tests {
         .unwrap();
         assert_eq!(first.source_revision, revision);
         assert_eq!(first.input_observation_count, 2);
-        assert_eq!(first.input_digest_fnv1a64, second.input_digest_fnv1a64);
-        assert_eq!(first.result_digest_fnv1a64, second.result_digest_fnv1a64);
-        assert!(first.input_digest_fnv1a64.starts_with("fnv1a64:"));
-        assert!(first.result_digest_fnv1a64.starts_with("fnv1a64:"));
+        assert_eq!(first.input_digest_sha256, second.input_digest_sha256);
+        assert_eq!(first.result_digest_sha256, second.result_digest_sha256);
+        assert!(first.input_digest_sha256.starts_with("sha256:"));
+        assert!(first.result_digest_sha256.starts_with("sha256:"));
     }
 
     #[test]
