@@ -1497,7 +1497,6 @@ mod tests {
                 cycle: 1,
                 is_causal: false,
                 role_vectors: std::collections::HashMap::new(),
-                role_vector_observations: Vec::new(),
                 relations: Vec::new(),
                 role_vector_observations: Vec::new(),
 
@@ -1551,7 +1550,6 @@ mod tests {
                 cycle: 1,
                 is_causal: false,
                 role_vectors: std::collections::HashMap::new(),
-                role_vector_observations: Vec::new(),
                 relations: Vec::new(),
                 role_vector_observations: Vec::new(),
 
@@ -1606,7 +1604,6 @@ mod tests {
                 cycle: 1,
                 is_causal: false,
                 role_vectors: std::collections::HashMap::new(),
-                role_vector_observations: Vec::new(),
                 relations: Vec::new(),
                 role_vector_observations: Vec::new(),
 
