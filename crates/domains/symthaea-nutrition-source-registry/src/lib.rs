@@ -457,6 +457,10 @@ pub struct NutritionRegistryAssessmentV1 {
     pub use_request_sha256: Option<String>,
     /// Digest of the deterministic input envelope, including supplied-byte digest.
     pub input_sha256: Option<String>,
+    /// Digest of the complete decision receipt with this field omitted. This is an
+    /// unkeyed consistency digest, not a signature or proof of publisher identity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision_sha256: Option<String>,
     pub source_eligibility: Eligibility,
     pub license_eligibility: Eligibility,
     pub data_quality_eligibility: DataQualityEligibility,
@@ -634,7 +638,7 @@ pub fn assess_nutrition_source(
         NutritionAssessability::Assessable
     };
 
-    NutritionRegistryAssessmentV1 {
+    let mut assessment = NutritionRegistryAssessmentV1 {
         receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
         canonicalization_profile: NutritionCanonicalizationProfileV1::SortedSerdeJsonV1,
         evaluation_date: evaluation_date.to_owned(),
@@ -648,13 +652,20 @@ pub fn assess_nutrition_source(
         food_fact_sha256,
         use_request_sha256,
         input_sha256,
+        decision_sha256: None,
         source_eligibility,
         license_eligibility,
         data_quality_eligibility,
         artifact_integrity,
         nutrition_assessability,
         issues,
-    }
+    };
+    // Hash all reported receipt fields except decision_sha256 itself. A verifier
+    // recomputes this by omitting the field, then compares the result with the
+    // published digest. This detects inconsistencies but does not authenticate
+    // who produced the receipt.
+    assessment.decision_sha256 = stable_json_sha256(&assessment).ok();
+    assessment
 }
 
 fn validate_source_metadata(
@@ -1909,6 +1920,9 @@ mod tests {
             &m, &f, EVALUATION_DATE, &request, Some(ARTIFACT),
         );
         assert_eq!(result.input_sha256, repeated.input_sha256);
+        assert_eq!(result.decision_sha256, repeated.decision_sha256);
+        let decision_digest = result.decision_sha256.as_deref().expect("decision digest exists");
+        assert!(is_canonical_sha256(decision_digest));
         let digest = result.input_sha256.as_deref().expect("receipt digest exists");
         assert!(is_canonical_sha256(digest));
         assert_eq!(result.evaluation_date, EVALUATION_DATE);
@@ -1949,6 +1963,35 @@ mod tests {
             result.supplied_artifact_sha256.as_deref(),
             Some(sha256_hex(ARTIFACT).as_str())
         );
+    }
+
+    #[test]
+    fn decision_receipt_digest_binds_reported_outcome_and_is_recomputable() {
+        let result = assess_nutrition_source(
+            &manifest(),
+            &fact(),
+            EVALUATION_DATE,
+            &use_request(),
+            Some(ARTIFACT),
+        );
+        let mut digest_input = result.clone();
+        digest_input.decision_sha256 = None;
+        assert_eq!(result.decision_sha256, stable_json_sha256(&digest_input).ok());
+
+        let mut tampered = result.clone();
+        tampered.source_eligibility = Eligibility::Blocked;
+        tampered.decision_sha256 = None;
+        let tampered_digest = stable_json_sha256(&tampered).ok();
+        assert_ne!(result.decision_sha256, tampered_digest);
+
+        let mut tampered_issue = result;
+        tampered_issue.issues.push(RegistryIssueV1 {
+            category: IssueCategory::Integrity,
+            code: RegistryIssueCode::InputReceiptSerializationFailed,
+        });
+        let published_digest = tampered_issue.decision_sha256.clone();
+        tampered_issue.decision_sha256 = None;
+        assert_ne!(published_digest, stable_json_sha256(&tampered_issue).ok());
     }
 
     #[test]
