@@ -29,6 +29,12 @@ pub enum ScreeningError {
     InvalidInterval(&'static str),
     /// A peak-to-mean load multiplier was less than one.
     FactorBelowOne(&'static str),
+    /// A scenario set is empty.
+    EmptyScenarioSet,
+    /// A required scenario metadata identifier is blank.
+    EmptyIdentifier(&'static str),
+    /// Scenario identifiers must be unique within one set.
+    DuplicateScenarioId,
 }
 
 impl fmt::Display for ScreeningError {
@@ -44,6 +50,11 @@ impl fmt::Display for ScreeningError {
             },
             Self::FactorBelowOne(name) => {
                 write!(f, "{name} must be greater than or equal to one")
+            },
+            Self::EmptyScenarioSet => write!(f, "at least one load-path scenario is required"),
+            Self::EmptyIdentifier(name) => write!(f, "{name} must not be blank"),
+            Self::DuplicateScenarioId => {
+                write!(f, "scenario_id values must be unique within the scenario set")
             },
         }
     }
@@ -948,6 +959,117 @@ pub fn screen_bounded_load_path_demand(
         mean_compressive_load_per_effective_path_upper_bound_n,
         factor_scaled_load_path_demand_lower_bound_n,
         factor_scaled_load_path_demand_upper_bound_n,
+    })
+}
+
+/// One coherent, explicitly declared load-path case.
+///
+/// Keep resultant, path count, and concentration factor from the same geometry/load/imperfection
+/// case together here. IDs are carried for auditability but are not authenticated by this module.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoadPathDemandScenario {
+    /// Unique identifier for this exact scenario within a submitted set.
+    pub scenario_id: String,
+    /// Immutable analysis or evidence-manifest reference for this scenario.
+    pub evidence_record_id: String,
+    /// Total compressive resultant for this scenario, newtons.
+    pub total_compressive_resultant_n: f64,
+    /// Effective load-path count for this same scenario; must be positive.
+    pub effective_load_path_count: f64,
+    /// Peak-to-mean concentration factor for this same scenario; must be >= 1.
+    pub peak_to_mean_load_factor: f64,
+}
+
+/// Calculated demand paired with the source identifiers for a single coherent scenario.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoadPathScenarioDemandResult {
+    pub scenario_id: String,
+    pub evidence_record_id: String,
+    pub demand: LoadPathDemandResult,
+}
+
+/// Demand envelope across only the coherent scenarios supplied by the caller.
+///
+/// This is not a bound on unmodeled geometries, defect fields, or operating conditions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoadPathScenarioSetResult {
+    pub evaluated_scenario_count: usize,
+    pub scenario_results: Vec<LoadPathScenarioDemandResult>,
+    pub minimum_factor_scaled_demand_among_scenarios_n: f64,
+    pub minimum_scenario_id: String,
+    pub maximum_factor_scaled_demand_among_scenarios_n: f64,
+    pub maximum_scenario_id: String,
+}
+
+/// Evaluate each supplied joint scenario without combining marginal extrema from different cases.
+///
+/// Unlike screen_bounded_load_path_demand, this function preserves dependence between the total
+/// resultant, effective path count, and concentration factor by evaluating each coherent tuple.
+/// The reported envelope covers the listed scenarios only; it offers no coverage guarantee for
+/// cases or imperfections that were not supplied. Scenario IDs must be unique and both identifiers
+/// must be non-blank. Identifier checks improve traceability but do not authenticate source records.
+pub fn screen_load_path_scenario_set(
+    scenarios: &[LoadPathDemandScenario],
+) -> Result<LoadPathScenarioSetResult, ScreeningError> {
+    if scenarios.is_empty() {
+        return Err(ScreeningError::EmptyScenarioSet);
+    }
+
+    let mut seen_ids: Vec<&str> = Vec::with_capacity(scenarios.len());
+    let mut scenario_results = Vec::with_capacity(scenarios.len());
+    for scenario in scenarios {
+        if scenario.scenario_id.trim().is_empty() {
+            return Err(ScreeningError::EmptyIdentifier("scenario_id"));
+        }
+        if scenario.evidence_record_id.trim().is_empty() {
+            return Err(ScreeningError::EmptyIdentifier("evidence_record_id"));
+        }
+        if seen_ids.iter().any(|id| *id == scenario.scenario_id.as_str()) {
+            return Err(ScreeningError::DuplicateScenarioId);
+        }
+        seen_ids.push(scenario.scenario_id.as_str());
+
+        let demand = screen_load_path_demand(LoadPathDemandRequest {
+            total_compressive_resultant_n: scenario.total_compressive_resultant_n,
+            effective_load_path_count: scenario.effective_load_path_count,
+            assumed_peak_to_mean_load_factor: scenario.peak_to_mean_load_factor,
+        })?;
+        scenario_results.push(LoadPathScenarioDemandResult {
+            scenario_id: scenario.scenario_id.clone(),
+            evidence_record_id: scenario.evidence_record_id.clone(),
+            demand,
+        });
+    }
+
+    let mut minimum_index = 0;
+    let mut maximum_index = 0;
+    for index in 1..scenario_results.len() {
+        let demand = scenario_results[index].demand.factor_scaled_peak_load_path_demand_n;
+        if demand < scenario_results[minimum_index].demand.factor_scaled_peak_load_path_demand_n {
+            minimum_index = index;
+        }
+        if demand > scenario_results[maximum_index].demand.factor_scaled_peak_load_path_demand_n {
+            maximum_index = index;
+        }
+    }
+
+    let minimum_factor_scaled_demand_among_scenarios_n = scenario_results[minimum_index]
+        .demand
+        .factor_scaled_peak_load_path_demand_n;
+    let minimum_scenario_id = scenario_results[minimum_index].scenario_id.clone();
+    let maximum_factor_scaled_demand_among_scenarios_n = scenario_results[maximum_index]
+        .demand
+        .factor_scaled_peak_load_path_demand_n;
+    let maximum_scenario_id = scenario_results[maximum_index].scenario_id.clone();
+    let evaluated_scenario_count = scenario_results.len();
+
+    Ok(LoadPathScenarioSetResult {
+        evaluated_scenario_count,
+        scenario_results,
+        minimum_factor_scaled_demand_among_scenarios_n,
+        minimum_scenario_id,
+        maximum_factor_scaled_demand_among_scenarios_n,
+        maximum_scenario_id,
     })
 }
 
@@ -2501,6 +2623,95 @@ mod tests {
         assert_eq!(
             result.unwrap_err(),
             ScreeningError::NonFiniteResult("mean load-path upper bound")
+        );
+    }
+
+    #[test]
+    fn coherent_load_path_scenarios_preserve_correlations_and_identify_extrema() {
+        let scenarios = [
+            LoadPathDemandScenario {
+                scenario_id: "geometry-A/imperfection-1".into(),
+                evidence_record_id: "analysis-record-A".into(),
+                total_compressive_resultant_n: 1_000.0,
+                effective_load_path_count: 10.0,
+                peak_to_mean_load_factor: 1.1,
+            },
+            LoadPathDemandScenario {
+                scenario_id: "geometry-B/imperfection-2".into(),
+                evidence_record_id: "analysis-record-B".into(),
+                total_compressive_resultant_n: 2_000.0,
+                effective_load_path_count: 40.0,
+                peak_to_mean_load_factor: 1.3,
+            },
+        ];
+        let result = screen_load_path_scenario_set(&scenarios).unwrap();
+        assert_eq!(result.evaluated_scenario_count, 2);
+        assert_eq!(result.scenario_results[0].scenario_id, "geometry-A/imperfection-1");
+        assert_eq!(result.scenario_results[0].evidence_record_id, "analysis-record-A");
+        assert_eq!(result.scenario_results[0].demand.factor_scaled_peak_load_path_demand_n, 110.0);
+        assert_eq!(result.scenario_results[1].demand.factor_scaled_peak_load_path_demand_n, 65.0);
+        assert_eq!(result.minimum_factor_scaled_demand_among_scenarios_n, 65.0);
+        assert_eq!(result.minimum_scenario_id, "geometry-B/imperfection-2");
+        assert_eq!(result.maximum_factor_scaled_demand_among_scenarios_n, 110.0);
+        assert_eq!(result.maximum_scenario_id, "geometry-A/imperfection-1");
+    }
+
+    #[test]
+    fn coherent_load_path_scenario_set_rejects_empty_input() {
+        assert_eq!(
+            screen_load_path_scenario_set(&[]).unwrap_err(),
+            ScreeningError::EmptyScenarioSet
+        );
+    }
+
+    #[test]
+    fn coherent_load_path_scenario_set_rejects_blank_identifiers() {
+        let blank_scenario = [LoadPathDemandScenario {
+            scenario_id: "  ".into(),
+            evidence_record_id: "analysis-record".into(),
+            total_compressive_resultant_n: 1.0,
+            effective_load_path_count: 1.0,
+            peak_to_mean_load_factor: 1.0,
+        }];
+        assert_eq!(
+            screen_load_path_scenario_set(&blank_scenario).unwrap_err(),
+            ScreeningError::EmptyIdentifier("scenario_id")
+        );
+
+        let blank_evidence = [LoadPathDemandScenario {
+            scenario_id: "scenario-1".into(),
+            evidence_record_id: "".into(),
+            total_compressive_resultant_n: 1.0,
+            effective_load_path_count: 1.0,
+            peak_to_mean_load_factor: 1.0,
+        }];
+        assert_eq!(
+            screen_load_path_scenario_set(&blank_evidence).unwrap_err(),
+            ScreeningError::EmptyIdentifier("evidence_record_id")
+        );
+    }
+
+    #[test]
+    fn coherent_load_path_scenario_set_rejects_duplicate_scenario_ids() {
+        let scenarios = [
+            LoadPathDemandScenario {
+                scenario_id: "same-id".into(),
+                evidence_record_id: "record-A".into(),
+                total_compressive_resultant_n: 1.0,
+                effective_load_path_count: 1.0,
+                peak_to_mean_load_factor: 1.0,
+            },
+            LoadPathDemandScenario {
+                scenario_id: "same-id".into(),
+                evidence_record_id: "record-B".into(),
+                total_compressive_resultant_n: 2.0,
+                effective_load_path_count: 2.0,
+                peak_to_mean_load_factor: 1.0,
+            },
+        ];
+        assert_eq!(
+            screen_load_path_scenario_set(&scenarios).unwrap_err(),
+            ScreeningError::DuplicateScenarioId
         );
     }
 
