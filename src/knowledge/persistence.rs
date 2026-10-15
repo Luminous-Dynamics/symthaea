@@ -709,6 +709,88 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    fn snapshot_test_record(source_text: &str, cycle: u64) -> FactRecord {
+        FactRecord {
+            vector_bytes: vec![cycle as u8; 2048],
+            source_text: source_text.to_string(),
+            confidence: 0.8,
+            domain: Some("test".into()),
+            cycle,
+            is_causal: false,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(cycle + 1),
+            corroboration_count: 2,
+            contradiction_count: 1,
+        }
+    }
+
+    #[test]
+    fn test_replace_facts_snapshot_is_idempotent_and_replaces_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_replace_fact_snapshot_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        persistence
+            .save_facts(&[snapshot_test_record("old fact", 1)])
+            .unwrap();
+        let snapshot = [snapshot_test_record("current fact", 7)];
+        assert_eq!(persistence.replace_facts_snapshot(&snapshot).unwrap(), 1);
+        assert_eq!(persistence.replace_facts_snapshot(&snapshot).unwrap(), 1);
+
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1, "repeated snapshots must not duplicate facts");
+        assert_eq!(loaded[0].source_text, "current fact");
+        assert_eq!(loaded[0].cycle, 7);
+
+        assert_eq!(persistence.replace_facts_snapshot(&[]).unwrap(), 0);
+        assert!(
+            persistence.load_facts().unwrap().is_empty(),
+            "an empty graph snapshot must clear the persisted fact set"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_failed_fact_snapshot_preserves_previous_committed_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_failed_fact_snapshot_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        persistence
+            .replace_facts_snapshot(&[snapshot_test_record("committed fact", 3)])
+            .unwrap();
+
+        let invalid_snapshot = [
+            snapshot_test_record("would be partial", 4),
+            snapshot_test_record("invalid cycle", u64::MAX),
+        ];
+        let err = persistence
+            .replace_facts_snapshot(&invalid_snapshot)
+            .unwrap_err();
+        assert!(err.contains("SQLite INTEGER range"), "unexpected error: {err}");
+
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(
+            loaded[0].source_text, "committed fact",
+            "a failed snapshot must not erase or partially replace committed data"
+        );
+        assert_eq!(loaded[0].cycle, 3);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_unconfigured() {
         let mut p = KnowledgePersistence::default();
