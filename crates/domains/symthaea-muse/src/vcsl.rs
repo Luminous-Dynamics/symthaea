@@ -1110,6 +1110,10 @@ fn probe_fluidsynth_programs(
         let temp = std::env::temp_dir();
         let midi_path = temp.join(format!("{stem}.mid"));
         let wav_path = temp.join(format!("{stem}.wav"));
+        // A previous process may have crashed before cleanup while reusing a
+        // PID; a stale WAV must never qualify as this invocation's evidence.
+        let _ = std::fs::remove_file(&wav_path);
+        let _ = std::fs::remove_file(&midi_path);
         std::fs::write(&midi_path, probe_midi_bytes(program, 60, 96))?;
 
         // The -n/-i pair disables live MIDI and the shell. -F renders the
