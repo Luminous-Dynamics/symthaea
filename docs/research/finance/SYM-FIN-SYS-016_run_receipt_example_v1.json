@@ -11,7 +11,9 @@
     "random_seed": 314159,
     "world_seed_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
     "model_version": "symthaea-civos-sim-v1",
-    "environment_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    "environment_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "shock_schedule_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "agent_model_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
   },
   "profiles": {
     "regime_assignments": [
@@ -24,6 +26,16 @@
         "community_id": "community-b",
         "regime_id": "mutual_credit",
         "profile_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      {
+        "community_id": "community-c",
+        "regime_id": "debt_equity_market",
+        "profile_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "community_id": "community-d",
+        "regime_id": "commons_polycentric",
+        "profile_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
       }
     ],
     "bridge_profiles": [
