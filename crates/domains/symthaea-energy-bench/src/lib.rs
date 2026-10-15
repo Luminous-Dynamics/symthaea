@@ -562,12 +562,12 @@ mod tests {
     #[test]
     fn discharge_does_not_produce_naive_cycle_efficiency() {
         let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
-        run.intervals[2].energy_j.stored_energy_change = -3.0;
-        run.intervals[2].energy_j.rejected_or_loss = 10.7;
         run.intervals[0].energy_j.stored_energy_change = 0.0;
         run.intervals[0].energy_j.rejected_or_loss = 8.5;
+        run.computed_metrics.as_mut().unwrap().net_stored_energy_change_j = Some(-2.0);
+        run.computed_metrics.as_mut().unwrap().net_cycle_efficiency = None;
         let report = validate_run(&run).unwrap();
-        assert_eq!(report.net_stored_energy_change_j, -3.0);
+        assert_eq!(report.net_stored_energy_change_j, -2.0);
         assert_eq!(report.net_cycle_efficiency, None);
     }
 }
