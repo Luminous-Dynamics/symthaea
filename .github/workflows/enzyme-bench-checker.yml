@@ -1,0 +1,38 @@
+name: Enzyme benchmark admission checker
+
+on:
+  pull_request:
+    paths:
+      - "xtask/src/enzyme_bench.rs"
+      - "xtask/src/main.rs"
+      - "xtask/Cargo.toml"
+      - ".github/workflows/enzyme-bench-checker.yml"
+  push:
+    branches: [main]
+    paths:
+      - "xtask/src/enzyme_bench.rs"
+      - "xtask/src/main.rs"
+      - "xtask/Cargo.toml"
+      - ".github/workflows/enzyme-bench-checker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enzyme-bench-checker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admission-unit-tests:
+    name: Enzyme benchmark admission unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Test xtask admission checker (synthetic fixtures only)
+        run: cargo test -p xtask --bin xtask
