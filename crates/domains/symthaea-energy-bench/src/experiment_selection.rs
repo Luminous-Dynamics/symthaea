@@ -16,7 +16,7 @@ pub enum ResourceBasis {
     DirectCost,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ResourceCost {
     pub basis: ResourceBasis,
     /// Canonical unit registered by the queue policy, such as "s", "rig-hour",
