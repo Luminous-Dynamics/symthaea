@@ -1,0 +1,46 @@
+name: Thermofluids Reference Model
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-thermofluids/**"
+      - ".github/workflows/thermofluids-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thermofluids-reference-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-reference-tests:
+    name: Isolated thermofluids tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      # The current root workspace has an unrelated missing-manifest member.
+      # Copy this zero-dependency crate outside that workspace so its own
+      # formatting, compilation, unit tests, and doctests can still be tested.
+      - name: Stage crate outside root workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$(mktemp -d)"
+          echo "THERMOFLUIDS_STAGE=$target/symthaea-thermofluids" >> "$GITHUB_ENV"
+          mkdir -p "$target/symthaea-thermofluids"
+          cp -R crates/domains/symthaea-thermofluids/. "$target/symthaea-thermofluids/"
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path "$THERMOFLUIDS_STAGE/Cargo.toml" --check
+
+      - name: Run unit and documentation tests
+        run: cargo test --manifest-path "$THERMOFLUIDS_STAGE/Cargo.toml"
