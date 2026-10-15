@@ -552,6 +552,13 @@ pub struct FluidSynthRuntimeProbeV1 {
     pub soundfont_sha256: String,
     pub requested_program_count: usize,
     pub rendered_non_silent_count: usize,
+    pub probe_note_midi: u8,
+    pub probe_velocity: u8,
+    pub sample_rate_hz: u32,
+    pub reverb_disabled: bool,
+    pub chorus_disabled: bool,
+    /// Stable argument template; temp paths and the executable's full path are excluded.
+    pub command_template: &'static str,
     pub programs: Vec<FluidSynthProgramProbeV1>,
 }
 
@@ -568,6 +575,8 @@ pub struct FluidSynthProgramProbeV1 {
     pub sample_rate: Option<u32>,
     pub channels: Option<u16>,
     pub frames: Option<u64>,
+    /// Hash of the exact output WAV bytes, when an output file was produced and readable.
+    pub output_wav_sha256: Option<String>,
     pub peak_absolute_sample: Option<f32>,
     pub rms: Option<f32>,
 }
@@ -1089,6 +1098,7 @@ fn probe_fluidsynth_programs(
                 sample_rate: None,
                 channels: None,
                 frames: None,
+                output_wav_sha256: None,
                 peak_absolute_sample: None,
                 rms: None,
             });
@@ -1136,6 +1146,7 @@ fn probe_fluidsynth_programs(
             sample_rate: None,
             channels: None,
             frames: None,
+            output_wav_sha256: None,
             peak_absolute_sample: None,
             rms: None,
         };
@@ -1143,6 +1154,9 @@ fn probe_fluidsynth_programs(
             Ok(status) => {
                 result.command_exit_code = status.code();
                 if status.success() {
+                    if wav_path.is_file() {
+                        result.output_wav_sha256 = sha256_file(&wav_path).ok();
+                    }
                     match audit_one_wav(&wav_path) {
                         Ok((sample_rate, channels, peak, rms, frames)) => {
                             result.sample_rate = Some(sample_rate);
@@ -1194,6 +1208,12 @@ fn probe_fluidsynth_programs(
         soundfont_sha256: soundfont_sha256.to_owned(),
         requested_program_count: results.len(),
         rendered_non_silent_count,
+        probe_note_midi: 60,
+        probe_velocity: 96,
+        sample_rate_hz: 22050,
+        reverb_disabled: true,
+        chorus_disabled: true,
+        command_template: "-n -i -g 0.8 -o synth.reverb.active=0 -o synth.chorus.active=0 -T wav -F <output.wav> -r 22050 <soundfont.sf2> <probe.mid>",
         programs: results,
     })
 }
@@ -1917,6 +1937,11 @@ mod tests {
         assert_eq!(probe.binary_version.as_deref(), Some("fake-fluidsynth fixture 1"));
         assert_eq!(probe.binary_sha256, sha256_file(&fake_binary).unwrap());
         assert_eq!(probe.soundfont_sha256, evidence.sha256);
+        assert_eq!(probe.probe_note_midi, 60);
+        assert_eq!(probe.probe_velocity, 96);
+        assert_eq!(probe.sample_rate_hz, 22050);
+        assert!(probe.reverb_disabled && probe.chorus_disabled);
+        assert!(probe.command_template.contains("<probe.mid>"));
         assert_eq!(probe.requested_program_count, 2);
         assert_eq!(probe.rendered_non_silent_count, 1);
         assert_eq!(probe.programs[0].program_0_based, 0);
@@ -1926,6 +1951,11 @@ mod tests {
         assert!(probe.programs[0].frames.unwrap() > 0);
         assert!(probe.programs[0].peak_absolute_sample.unwrap() > 1e-5);
         assert!(probe.programs[0].rms.unwrap() > 0.0);
+        assert_eq!(
+            probe.programs[0].output_wav_sha256.as_deref(),
+            Some(sha256_file(&output_fixture).unwrap().as_str()),
+            "receipt preserves the exact rendered WAV bytes"
+        );
         assert_eq!(probe.programs[1].program_0_based, 24);
         assert_eq!(probe.programs[1].status, "skipped_no_bank0_header_match");
         assert_eq!(probe.programs[1].command_exit_code, None);
