@@ -32,7 +32,7 @@ Source IDs are sorted and result metrics use a fixed metric/provenance order. Re
 
 ## Versioned adversarial corpus
 
-The fixture `crates/domains/symthaea-exoskeleton/tests/fixtures/plss_telemetry_v1.json` is the v1 corpus. It contains controlled examples of:
+The fixture `crates/domains/symthaea-exoskeleton/tests/fixtures/plss_telemetry_v1.json` is the v1 corpus: 12 observations, 11 exact metric/provenance outcome expectations, and a fixed schema version. Replay asserts all 18 metric/provenance result lanes (six metrics × three provenance classes) are emitted, pins accepted-source and invalid/future/stale/low-confidence counts, and requires conflicted outputs to contain no point estimate or uncertainty bounds. The fixture covers:
 
 - agreeing CO2 instruments kept separate from a widely different model estimate;
 - conflicting oxygen instruments with no fused point estimate;
