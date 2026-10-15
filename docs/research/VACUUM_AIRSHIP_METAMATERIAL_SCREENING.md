@@ -318,15 +318,18 @@ Use this function as a transparent handoff to a geometry-specific member/joint a
 
 ### Require exact scope alignment before comparing capacity evidence
 
-The bounded pressure screen now has a scope-aware wrapper, `assess_scoped_external_pressure_bounds`. A pressure-capacity record is compared only when five immutable scope identifiers match the requested case:
+The bounded pressure screen now has a scope-aware wrapper, `assess_scoped_external_pressure_bounds`. A pressure-capacity record is compared only when eight immutable scope identifiers match the requested case:
 
-- geometry revision (prefer an exact mesh/CAD artifact ID or content hash);
-- material / laminate model revision;
+- geometry revision (prefer an exact CAD/as-built scan ID or content hash);
+- mesh revision or physical specimen/build revision;
+- material / laminate model or tested material/batch revision;
+- exact analysis solver/settings or physical test method/instrumentation procedure;
 - load-case definition;
-- boundary-condition and support profile; and
-- imperfection basis (measured geometry, a documented envelope, or a justified imperfection set).
+- boundary-condition and support profile;
+- imperfection basis (spatial field, mode family, and bounded defect set); and
+- capacity basis (the output quantity and method used to derive the allowable, including the distinction between an eigenvalue, a nonlinear limit load, and a test-derived allowable).
 
-This addresses a gap in a bare provenance-ID check: a pressure-capacity record might exist and have non-empty metadata while describing a different geometry, laminate, load case, support condition or perfect-geometry model. A matching string is not authentication, but an explicit mismatch is enough reason to block the comparison. Missing or blank scope values return `ScopeIncomplete`; unequal fields return `ScopeMismatch`. No capacity stays unknown, and a no-demand pressure envelope does not require an irrelevant capacity-scope record.
+This addresses a gap in a bare provenance-ID check: a pressure-capacity record might exist and have non-empty metadata while describing a different geometry, mesh/specimen, laminate, analysis/test method, load case, support condition, imperfection field, or capacity derivation. A matching string is not authentication, but an explicit mismatch is enough reason to block the comparison. Missing or blank scope values return `ScopeIncomplete`; unequal fields return `ScopeMismatch`. No capacity stays unknown, and a no-demand pressure envelope does not require an irrelevant capacity-scope record.
 
 The identifiers should point to immutable manifests, not hand-written labels. A future evidence manifest should bind exact hashes for geometry, mesh, material/batch data, solver version and settings, convergence sequence, imperfection fields, boundary conditions, load profile, output quantity, reviewer/test receipt, and the decision record. If any scoped artifact changes, the capacity result should be treated as a different evidence item until its applicability is re-established.
 
