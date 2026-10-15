@@ -138,6 +138,9 @@ def validate_analysis_plan(
     if require_text(plan_document.get("plan_id"), "analysis-plan file plan_id") != plan_id:
         raise ManifestError("scope.analysis_plan.plan_id does not match the plan file")
 
+    if require_text(plan_document.get("status"), "analysis-plan file status") != "registered":
+        raise ManifestError("analysis plan top-level status must be 'registered'")
+
     preregistration = require_object(
         plan_document.get("pre_registration"),
         "analysis-plan file pre_registration",
