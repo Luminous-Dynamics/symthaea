@@ -1523,6 +1523,11 @@ mod tests {
         assert_eq!(edges[0].cause, "old cause");
         assert_eq!(ontology.len(), 1);
         assert_eq!(ontology[0].name, "old primitive");
+        assert_eq!(
+            persistence.load_next_graph_fact_id().unwrap(),
+            Some(2),
+            "failed replacement must preserve the prior committed allocator state"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
