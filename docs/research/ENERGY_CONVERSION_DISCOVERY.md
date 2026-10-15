@@ -72,6 +72,12 @@ Map these states to the repository's evidence model without upgrading claims aut
 
 Every candidate result should produce a durable run record containing: immutable candidate ID, source revision, configuration hash, solver/version, model fidelity, all inputs and units, boundary conditions, random seeds where relevant, outputs, uncertainty estimates, constraint violations, and artifact hashes. The independent checker should recompute cheap invariants instead of accepting the search system's own declaration that a design is valid.
 
+## Paradigm shift: optimization must be evidence constrained
+
+The first optimization milestone should not maximize the point-estimate efficiency. It should maximize *validated improvement under a registered evidence rule*. The verifier's new comparison function calculates first-order uncertainty in charge-sustaining cycle efficiency only when channel, interval, and candidate/baseline uncertainties are explicitly declared mutually independent. It labels a result as supported only when the conservative lower bound of the efficiency difference exceeds a preregistered absolute margin. Unknown/correlated cases are indeterminate rather than silently treated as independent.
+
+This is an intentionally narrow baseline. NIST's law of propagation of uncertainty combines standard uncertainties and covariances; the JCGM GUM suite also defines distribution propagation using Monte Carlo methods. These references support expanding beyond this approximation when common calibration errors, shared sensors, or nonlinear/low-denominator ratio models matter ([NIST TN 1297](https://www.nist.gov/pml/nist-technical-note-1297/nist-tn-1297-appendix-law-propagation-uncertainty), [JCGM 101](https://www.bipm.org/en/doi/10.59161/jcgm101-2008)). The current comparator is model-level evidence and does not validate the real-world fidelity of either system.
+
 ## Go beyond first-law efficiency: exergy and resource quality
 
 First-law closure is a necessary accounting gate, but energy efficiency alone does not quantify the *quality* of energy. One joule of electricity, one joule of high-temperature heat, and one joule of low-temperature heat are equal as energy quantities but do not have equal ability to perform useful work. For systems where heat grade and irreversibility matter, add second-law/exergy accounting after the energy ledger and boundary are established.
@@ -138,10 +144,11 @@ A candidate cannot advance unless all relevant gates pass:
 
 1. Run `cargo test -p symthaea-energy-bench`, `cargo test -p symthaea-thermofluids`, and `cargo fmt --all -- --check` on the exact PR head. The authoring environment lacks Rust, so authored tests have not been executed locally.
 2. Run a JSON Schema Draft 2020-12 validator against the schema and synthetic fixture, then add a verifier integration test that applies structural and semantic validation together. Keep the independent Rust semantic verifier separate from the search logic.
-3. Strengthen manifest provenance by binding the preregistered policy/manifest digest to an immutable commit or signed append-only registry before search starts. Timestamp ordering in a manifest is not cryptographic evidence of preregistration.
-4. Reproduce at least one authoritative or measured system with a common boundary before novelty search. EPA/NREL drive schedules define demand, not by themselves a measured energy-conversion baseline; verify that the selected reference dataset contains required input/output energy channels.
-5. Add a separate exergy ledger with explicit reference environment and independently checked property methods; do not conflate exergy destruction with first-law energy loss. For decision-useful comparative claims, also add uncertainty propagation that preserves relevant correlations.
-6. Only after the benchmark verifier and reference case are reproducible should Symthaea introduce architecture generation and multi-objective optimization. Compare search strategies under equal model-evaluation budgets and preserve failed candidates as evidence.
+3. Extend comparison uncertainty beyond the current independent-input approximation: implement validated covariance-matrix propagation or deterministic, seeded Monte Carlo distribution propagation, including shared calibration and baseline/candidate correlations. Preserve `Indeterminate` whenever required correlation information is absent.
+4. Strengthen manifest provenance by binding the preregistered policy/manifest digest to an immutable commit or signed append-only registry before search starts. Timestamp ordering in a manifest is not cryptographic evidence of preregistration.
+5. Reproduce at least one authoritative or measured system with a common boundary before novelty search. EPA/NREL drive schedules define demand, not by themselves a measured energy-conversion baseline; verify that the selected reference dataset contains required input/output energy channels.
+6. Add a separate exergy ledger with explicit reference environment and independently checked property methods; do not conflate exergy destruction with first-law energy loss.
+7. Only after schema+semantic validation, an uncertainty-aware comparison, and a reference case are reproducible should Symthaea introduce architecture generation and multi-objective optimization. Compare search strategies under equal model-evaluation budgets and preserve failed candidates as evidence.
 
 ## Research references
 
