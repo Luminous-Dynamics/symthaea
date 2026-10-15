@@ -259,7 +259,7 @@ fn hash_lane(h: &mut VerifierHash, lane: &PlssTelemetryTrendLane) {
         h.option_f64(source.last_uncertainty_abs);
         h.option_f64(source.maximum_observed_gap_s);
         h.option_f64(source.temporal_coverage_fraction);
-        h.option_f64(source.change_over_window);
+        h.option_f64(source.change_over_observed_span);
         h.option_f64(source.rate_per_s);
         h.option_f64(source.rate_lower_bound_per_s);
         h.option_f64(source.rate_upper_bound_per_s);
