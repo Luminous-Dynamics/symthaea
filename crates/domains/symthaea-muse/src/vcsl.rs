@@ -635,6 +635,9 @@ pub struct SoundFontPresetV1 {
 pub struct SamplePitchCoverageV1 {
     /// MIDI note number parsed from the indexed filenames, not a measured pitch.
     pub midi_note: u8,
+    /// Conservative machine-readable classification derived from the counts below.
+    /// This denotes decoding/silence evidence only, not musical quality.
+    pub audio_evidence_status: &'static str,
     /// Number of indexed WAV files carrying this filename pitch.
     pub indexed_sample_file_count: usize,
     /// Indexed files that the complete WAV decode audit consumed successfully.
@@ -652,6 +655,8 @@ pub struct SamplePitchCoverageV1 {
 pub struct DynamicStrengthCoverageV1 {
     /// Parsed and normalized filename strength; not a calibrated MIDI velocity.
     pub normalized_dynamic_strength: f32,
+    /// Conservative machine-readable classification derived from file counts.
+    pub audio_evidence_status: &'static str,
     pub indexed_sample_file_count: usize,
     pub decoded_sample_file_count: usize,
     pub failed_sample_decode_file_count: usize,
@@ -903,6 +908,35 @@ fn filename_pitch_gaps_midi_within_observed_range(
         .collect()
 }
 
+/// A conservative classifier based only on full-decode and mechanical silence evidence.
+/// It must never be interpreted as a timbral or musical-quality score.
+fn sample_audio_evidence_status(
+    indexed: usize,
+    decoded: usize,
+    failed: usize,
+    silent: usize,
+) -> &'static str {
+    if indexed == 0 {
+        "no_indexed_samples"
+    } else if decoded == 0 {
+        if failed > 0 {
+            "all_indexed_samples_failed_decode"
+        } else {
+            "no_decoded_samples"
+        }
+    } else if silent >= decoded {
+        if failed > 0 {
+            "decoded_samples_silent_and_other_samples_failed"
+        } else {
+            "decoded_silent_only"
+        }
+    } else if silent > 0 || failed > 0 {
+        "mixed_silent_non_silent_or_decode_failures"
+    } else {
+        "non_silent_decoded_sample_present"
+    }
+}
+
 fn procedural_renderer_path(instrument: Instrument) -> &'static str {
     if instrument.uses_karplus_strong() {
         "karplus_strong"
@@ -981,6 +1015,12 @@ fn sample_directory_evidence(
         .iter()
         .map(|(midi_note, pitch)| SamplePitchCoverageV1 {
             midi_note: *midi_note,
+            audio_evidence_status: sample_audio_evidence_status(
+                pitch.indexed_sample_file_count,
+                pitch.decoded_sample_file_count,
+                pitch.failed_sample_decode_file_count,
+                pitch.silent_sample_file_count,
+            ),
             indexed_sample_file_count: pitch.indexed_sample_file_count,
             decoded_sample_file_count: pitch.decoded_sample_file_count,
             failed_sample_decode_file_count: pitch.failed_sample_decode_file_count,
@@ -990,6 +1030,12 @@ fn sample_directory_evidence(
                 .iter()
                 .map(|(strength_bits, counts)| DynamicStrengthCoverageV1 {
                     normalized_dynamic_strength: f32::from_bits(*strength_bits),
+                    audio_evidence_status: sample_audio_evidence_status(
+                        counts.indexed_sample_file_count,
+                        counts.decoded_sample_file_count,
+                        counts.failed_sample_decode_file_count,
+                        counts.silent_sample_file_count,
+                    ),
                     indexed_sample_file_count: counts.indexed_sample_file_count,
                     decoded_sample_file_count: counts.decoded_sample_file_count,
                     failed_sample_decode_file_count: counts.failed_sample_decode_file_count,
@@ -2573,6 +2619,15 @@ mod tests {
         assert_eq!(mapping.max_midi, Some(69));
         assert_eq!(mapping.distinct_pitch_count, 3);
         assert_eq!(mapping.pitch_coverage.len(), 3);
+        let a4_coverage = mapping
+            .pitch_coverage
+            .iter()
+            .find(|pitch| pitch.midi_note == 69)
+            .unwrap();
+        assert_eq!(
+            a4_coverage.audio_evidence_status,
+            "non_silent_decoded_sample_present"
+        );
         let c3_coverage = mapping
             .pitch_coverage
             .iter()
@@ -2582,7 +2637,12 @@ mod tests {
         assert_eq!(c3_coverage.decoded_sample_file_count, 1);
         assert_eq!(c3_coverage.failed_sample_decode_file_count, 0);
         assert_eq!(c3_coverage.silent_sample_file_count, 1);
+        assert_eq!(c3_coverage.audio_evidence_status, "decoded_silent_only");
         assert_eq!(c3_coverage.dynamic_strength_coverage.len(), 1);
+        assert_eq!(
+            c3_coverage.dynamic_strength_coverage[0].audio_evidence_status,
+            "decoded_silent_only"
+        );
         assert!(
             (c3_coverage.dynamic_strength_coverage[0].normalized_dynamic_strength - 2.0 / 3.0)
                 .abs()
@@ -2597,7 +2657,15 @@ mod tests {
         assert_eq!(d4_coverage.indexed_sample_file_count, 1);
         assert_eq!(d4_coverage.decoded_sample_file_count, 0);
         assert_eq!(d4_coverage.failed_sample_decode_file_count, 1);
+        assert_eq!(
+            d4_coverage.audio_evidence_status,
+            "all_indexed_samples_failed_decode"
+        );
         assert_eq!(d4_coverage.dynamic_strength_coverage.len(), 1);
+        assert_eq!(
+            d4_coverage.dynamic_strength_coverage[0].audio_evidence_status,
+            "all_indexed_samples_failed_decode"
+        );
         assert_eq!(
             d4_coverage.dynamic_strength_coverage[0].normalized_dynamic_strength,
             1.0
