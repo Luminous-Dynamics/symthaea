@@ -12,7 +12,8 @@ It is not a food database, a nutrient calculator, a license attorney, a publishe
 - Source manifests are versioned and dated; expired, future-dated, revoked, withdrawn or review-required sources block use.
 - Retaining source-derived records requires cache permission and a canonical lower-case SHA-256 plus the exact source-artifact bytes. A digest-shaped string by itself is not proof: verification recomputes SHA-256 over the supplied bytes.
 - If a declared digest is supplied without its bytes, its integrity is Unverified and numeric use is blocked. Without a declared digest and with no retained artifact, the result explicitly says NoDigestClaimed, not Verified.
-- Fact records bind source ID, source record/citation, food identity/state, nutrient definition, unit, integer scale and basis mass. A missing nutrient value is NotAssessable rather than zero.
+- Fact records bind source ID/record/citation, food identity, taxon/cultivar references when relevant, identity confidence, preparation state, nutrient definition, unit, integer scale and basis mass. A missing nutrient value is NotAssessable rather than zero.
+- Every declared preparation/conversion keeps a step-by-step state chain with method and evidence references. A transformed value without lineage, or a chain that does not end in the declared food state, is blocked.
 - Approximate/geographic fallback rows are visibly QualifiedFallback. Unresolved food matches and unknown geographic matches block.
 - Synthetic rows return SyntheticFixtureOnly and cannot be misrepresented as empirical source data.
 
