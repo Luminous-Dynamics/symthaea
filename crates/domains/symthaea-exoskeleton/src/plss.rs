@@ -24,10 +24,10 @@ pub struct PlssConfig {
     pub primary_o2_l: f64,
     pub secondary_o2_l: f64,
     pub ventilation_flow_l_min: f64,
-    /// Maximum CO2 capture rate in L CO2-equivalent/min at declared reference conditions.
-    /// This is separate from ventilation throughput and remains simulation-only.
+    /// Maximum CO2 capture rate, in L CO2-equivalent/min on the metabolic model's
+    /// implicit gas-volume basis. This is a synthetic proxy, not a pressure estimate.
     pub co2_scrubber_removal_rate_l_min: f64,
-    /// Finite total cartridge capacity in L CO2-equivalent at the same reference conditions.
+    /// Finite total cartridge capacity in the same CO2-equivalent bookkeeping units.
     pub co2_scrubber_capacity_l: f64,
     /// Maximum water-vapor condensation/removal rate, g water/min.
     pub humidity_removal_rate_g_min: f64,
@@ -84,8 +84,8 @@ impl PlssConfig {
 pub struct PlssState {
     pub primary_o2_remaining_l: f64,
     pub secondary_o2_remaining_l: f64,
-    /// Unremoved CO2 generation as gas-equivalent liters at declared reference
-    /// conditions; this is not a partial-pressure or exposure estimate.
+    /// Unremoved CO2 generation on the metabolic model's implicit gas-volume
+    /// basis. No free-volume/temperature/pressure conversion is performed.
     pub co2_burden_l: f64,
     pub co2_scrubber_capacity_remaining_l: f64,
     /// Water vapor awaiting removal, represented as water mass in grams.
