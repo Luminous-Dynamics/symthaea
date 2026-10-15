@@ -639,7 +639,7 @@ mod tests {
     }
 
     #[test]
-    fn scrubber_exhaustion_during_segment_returns_after_accounting_for_co2() {
+    fn insufficient_sorbent_capacity_vetoes_segment_before_work() {
         let mut mission = IntegratedEvaMission::simulation_reference();
         mission
             .plss_mut_for_fault_injection()
@@ -647,14 +647,15 @@ mod tests {
             .co2_scrubber_capacity_remaining_l = 0.10;
         let report = mission.run(&[one_hour_work(0.0)]);
         assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
-        assert!(report.totals.oxygen_consumed_l > 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+        assert_eq!(report.totals.elapsed_s, 0.0);
         let plss = mission.plss_mut_for_fault_injection();
-        assert_eq!(plss.state().co2_scrubber_capacity_remaining_l, 0.0);
-        assert!(plss.state().co2_burden_l > 0.0);
+        assert_eq!(plss.state().co2_scrubber_capacity_remaining_l, 0.10);
+        assert_eq!(plss.state().co2_burden_l, 0.0);
     }
 
     #[test]
-    fn condensate_collector_exhaustion_returns_after_accounting_for_vapor() {
+    fn insufficient_condensate_capacity_vetoes_segment_before_work() {
         let mut mission = IntegratedEvaMission::simulation_reference();
         mission
             .plss_mut_for_fault_injection()
@@ -666,10 +667,11 @@ mod tests {
             600.0,
         )]);
         assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
-        assert!(report.totals.oxygen_consumed_l > 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+        assert_eq!(report.totals.elapsed_s, 0.0);
         let plss = mission.plss_mut_for_fault_injection();
-        assert_eq!(plss.state().humidity_collector_capacity_remaining_g, 0.0);
-        assert!(plss.state().humidity_vapor_burden_g > 0.0);
+        assert_eq!(plss.state().humidity_collector_capacity_remaining_g, 0.10);
+        assert_eq!(plss.state().humidity_vapor_burden_g, 0.0);
     }
 
     #[test]
