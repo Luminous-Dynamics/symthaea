@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 INTAKE = ROOT / "crates/domains/symthaea-muse/CHORO_SOURCE_INTAKE_V1.json"
 MANIFEST_TEMPLATE = ROOT / "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_MANIFEST_V1.json"
 APPROVAL_TEMPLATE = ROOT / "crates/domains/symthaea-muse/CHORO_APPROVED_INPUT_APPROVAL_V1.json"
+PLAN_TEMPLATE = ROOT / "crates/domains/symthaea-muse/CHORO_PRE_REGISTERED_ANALYSIS_PLAN_V1.json"
 import sys
 sys.path.insert(0, str(ROOT / "scripts"))
 from muse_choro_input_manifest import (  # noqa: E402
@@ -202,6 +203,23 @@ class ChoroInputManifestTests(unittest.TestCase):
         self.assertIn("concrete_design_required_fields", contract)
         self.assertIn("authorized_source_bindings[]", contract["concrete_design_required_fields"])
         self.assertIn("sha256", contract["scope_analysis_plan_required_fields"])
+
+    def test_checked_in_plan_template_cannot_authorize_empirical_work(self) -> None:
+        plan = json.loads(PLAN_TEMPLATE.read_text(encoding="utf-8"))
+        manifest = json.loads(MANIFEST_TEMPLATE.read_text(encoding="utf-8"))
+        self.assertEqual(plan["status"], "template_not_registered")
+        self.assertEqual(plan["pre_registration"]["status"], "not_registered")
+        for key in ("hypotheses_frozen", "null_models_frozen", "thresholds_frozen"):
+            self.assertIs(plan["pre_registration"][key], False)
+        self.assertEqual(plan["design"]["hypotheses"], [])
+        self.assertEqual(plan["design"]["null_models"], [])
+        self.assertEqual(plan["design"]["authorized_source_bindings"], [])
+        self.assertEqual(manifest["sources"], [])
+        self.assertIsNone(manifest["scope"]["analysis_plan"]["sha256"])
+        self.assertIsNone(manifest["scope"]["analysis_plan"]["registered_on"])
+        report = evaluate_manifest(MANIFEST_TEMPLATE, APPROVAL_TEMPLATE, INTAKE)
+        self.assertFalse(report["authorized"])
+        self.assertEqual(report["authorization_status"], "blocked")
 
     def test_analysis_plan_digest_rejects_on_disk_tampering(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
