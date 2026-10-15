@@ -640,6 +640,8 @@ mod tests {
         }
     }
 
+    // The fixture values and publisher are synthetic. The asserted evidence class
+    // exercises the declared-source branch only; this test does not authenticate data.
     fn fact() -> NutritionFoodFactV1 {
         NutritionFoodFactV1 {
             schema_version: NUTRITION_SOURCE_SCHEMA_VERSION,
@@ -763,6 +765,24 @@ mod tests {
         assert!(result.issues.iter().any(|issue| {
             issue.code == RegistryIssueCode::RedistributionNotPermitted
         }));
+    }
+
+    #[test]
+    fn no_digest_claim_is_explicit_when_data_are_not_retained() {
+        let mut m = manifest();
+        m.artifact_sha256 = None;
+        let mut use_case = use_request();
+        use_case.retain_source_data = false;
+        let result = assess_nutrition_source(
+            &m,
+            &fact(),
+            EVALUATION_DATE,
+            &use_case,
+            None,
+        );
+        assert_eq!(result.artifact_integrity, ArtifactIntegrity::NoDigestClaimed);
+        assert_eq!(result.nutrition_assessability, NutritionAssessability::Assessable);
+        assert!(result.issues.is_empty());
     }
 
     #[test]
