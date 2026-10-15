@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+HELPER="$ROOT/scripts/check_cargo_lock_closure.sh"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT HUP INT TERM
+
+fail() {
+  echo "FAIL: $*" >&2
+  exit 1
+}
+
+setup_case() {
+  local case_root="$1"
+  mkdir -p "$case_root/bin"
+  cd "$case_root"
+  git init --quiet
+  git config user.name "Cargo lock closure test"
+  git config user.email "cargo-lock-test@example.invalid"
+  printf '[workspace]\n' > Cargo.toml
+  printf 'committed-lock\n' > Cargo.lock
+  git add Cargo.toml Cargo.lock
+  git commit --quiet -m "fixture base"
+
+  cat > "$case_root/bin/fake-cargo" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "-V" || "${1:-}" == "--version" ]]; then
+  echo "cargo 1.96.0 (test stub)"
+  exit 0
+fi
+[[ "${1:-}" == "metadata" ]] || exit 99
+locked=0
+for arg in "$@"; do
+  [[ "$arg" == "--locked" ]] && locked=1
+done
+mode="${CARGO_STUB_MODE:-drift}"
+lock="$(cat Cargo.lock)"
+case "$mode" in
+  clean)
+    if [[ "$locked" == "1" && "$lock" == "committed-lock" ]]; then
+      printf '{"stub":true}\n'
+      exit 0
+    fi
+    echo "unexpected clean-mode Cargo call" >&2
+    exit 98
+    ;;
+  drift)
+    if [[ "$locked" == "1" && "$lock" == "proposed-lock" ]]; then
+      printf '{"stub":true}\n'
+      exit 0
+    fi
+    if [[ "$locked" == "1" ]]; then
+      echo "cannot update lock file because --locked was passed" >&2
+      exit 101
+    fi
+    printf 'proposed-lock\n' > Cargo.lock
+    printf '{"stub":true}\n'
+    exit 0
+    ;;
+  resolution)
+    echo "synthetic dependency resolution failure" >&2
+    exit 101
+    ;;
+  *)
+    echo "unknown stub mode" >&2
+    exit 97
+    ;;
+esac
+FAKE
+  chmod +x "$case_root/bin/fake-cargo"
+}
+
+clean_root="$TMP/clean"
+setup_case "$clean_root"
+CARGO_LOCK_CLOSURE_ROOT="$clean_root" CARGO_BIN="$clean_root/bin/fake-cargo" CARGO_STUB_MODE=clean \
+  bash "$HELPER" target/cargo-lock-closure > "$TMP/clean.stdout"
+grep -q '"classification": "LOCK_CLEAN"' "$clean_root/target/cargo-lock-closure/report.json" \
+  || fail "clean lock was not classified LOCK_CLEAN"
+[[ "$(cat "$clean_root/Cargo.lock")" == "committed-lock" ]] || fail "clean lock was altered"
+
+drift_root="$TMP/drift"
+setup_case "$drift_root"
+set +e
+CARGO_LOCK_CLOSURE_ROOT="$drift_root" CARGO_BIN="$drift_root/bin/fake-cargo" CARGO_STUB_MODE=drift \
+  bash "$HELPER" target/cargo-lock-closure > "$TMP/drift.stdout" 2> "$TMP/drift.stderr"
+drift_status=$?
+set -e
+[[ "$drift_status" -eq 1 ]] || fail "lock drift should exit 1, got $drift_status"
+grep -q '"classification": "FAIL_LOCK_DRIFT"' "$drift_root/target/cargo-lock-closure/report.json" \
+  || fail "lock drift was not classified FAIL_LOCK_DRIFT"
+[[ "$(cat "$drift_root/Cargo.lock")" == "committed-lock" ]] || fail "helper did not restore the committed lock"
+[[ "$(cat "$drift_root/target/cargo-lock-closure/proposed-Cargo.lock")" == "proposed-lock" ]] \
+  || fail "Cargo-generated proposed lock was not retained"
+[[ -s "$drift_root/target/cargo-lock-closure/Cargo.lock.patch" ]] || fail "lock diff was not retained"
+[[ -z "$(git -C "$drift_root" diff --name-only)" ]] || fail "helper left a tracked worktree change"
+
+resolution_root="$TMP/resolution"
+setup_case "$resolution_root"
+set +e
+CARGO_LOCK_CLOSURE_ROOT="$resolution_root" CARGO_BIN="$resolution_root/bin/fake-cargo" CARGO_STUB_MODE=resolution \
+  bash "$HELPER" target/cargo-lock-closure > "$TMP/resolution.stdout" 2> "$TMP/resolution.stderr"
+resolution_status=$?
+set -e
+[[ "$resolution_status" -eq 2 ]] || fail "resolution failure should exit 2, got $resolution_status"
+grep -q '"classification": "FAIL_METADATA_OR_RESOLUTION"' "$resolution_root/target/cargo-lock-closure/report.json" \
+  || fail "resolution failure was not classified separately"
+[[ "$(cat "$resolution_root/Cargo.lock")" == "committed-lock" ]] || fail "resolution failure altered the committed lock"
+
+echo "PASS: Cargo lock-closure helper preserves clean locks, captures Cargo-generated drift, restores the checkout, and distinguishes resolution failures"
