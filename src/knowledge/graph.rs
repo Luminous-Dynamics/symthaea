@@ -1008,6 +1008,15 @@ mod tests {
         assert!((partial_result.similarity - 0.5).abs() < f32::EPSILON);
         assert!((partial_result.confidence - 0.99).abs() < f32::EPSILON);
         assert!(results[0].similarity > partial_result.similarity);
+
+        let mut wrong_role = query[0].clone();
+        wrong_role.role = SemanticRole::Patient;
+        assert!(
+            graph
+                .search_role_observations(&[wrong_role], 10, 4)
+                .is_empty(),
+            "a vector tagged with the wrong semantic role must not match"
+        );
     }
 
     #[test]
