@@ -1,166 +1,254 @@
-# Complementary Cognitive Architectures: Research and Evaluation Plan
+# Complementary Runtime Architecture: Typed Evidence + Predictive HDC
 
-**Status:** Proposal for experimentally falsifiable prototypes; no architecture is declared superior yet.  
+**Status:** architecture proposal; not yet implemented or benchmarked.  
 **Date:** 2026-10-15  
-**Scope:** Public Symthaea research, with evidence and simulation responsibilities for Mycelix and Symtropy.
+**Purpose:** define a genuinely complementary runtime architecture for Symthaea without duplicating the SYM-ARCH-002 experiment infrastructure.
 
 ## Executive recommendation
 
-Do not replace Symthaea's HDC + liquid-dynamics foundation with another fashionable monolith. Build **complementary, swappable architectures around a shared task/evidence contract**, then compare them under equal budgets. The leading candidate to prototype is a three-part design:
+Keep Symthaea's HDC and continuous-time dynamics as useful mechanisms, but stop treating one shared hypervector space as the universal source of truth for every kind of information. Prototype a **Typed Evidence and Predictive Runtime (TEPR)** in which:
 
-1. **Semantic-compositional representation:** retain HDC/VSA for binding, bundling, similarity, and compact associative cues.
-2. **Explicit predictive world state:** maintain typed variables, temporal state, and causal/relational structures where exact relations or counterfactuals matter; use CfC/LTC dynamics for suitable sequence state, not as a universal memory.
-3. **Verifier and resource-aware coordinator:** route work among memory, prediction, causal analysis, planning, and exact tools; track uncertainty and ask for independent verification when the evidence is weak.
+- HDC/VSA is the associative and semantic *index* for related concepts, approximate retrieval, role–filler composition, and noisy cues.
+- A typed evidence store is the authority for exact entity identity, relations, quantities, units, source, time, and contradiction status.
+- Existing CfC/LTC components maintain and predict appropriate temporal state; they are not assumed to replace episodic memory or causal models.
+- A resource-bounded coordinator chooses the least expensive reasoning path likely to meet the task's required quality.
+- Independent validators check exact claims, constraints, provenance, and proposed actions where suitable checkers exist.
+- Episodic, semantic, and procedural memory remain distinct but linked through evidence identifiers.
 
-This is a testable engineering hypothesis, not a claim that the architecture is generally superior or that its internals establish consciousness.
+The hypothesis is not that symbolic systems are inherently superior, nor that every task needs all of these layers. The hypothesis is that **separating fuzzy association from typed truth conditions and evidence** may improve exactness and recoverability while preserving the benefits of HDC. It must be tested against simpler controls.
 
-## Why this direction
+## Critical context: do not duplicate SYM-ARCH-002
 
-Symthaea already has substantial proposals and implementations around a unified HDC substrate, a cognitive workspace, causal reasoning, temporal dynamics, predictive self-modeling, and substrate independence. The main opportunity is to test their boundaries and interactions rather than create a competing all-encompassing design.
+Symthaea already has a staged, separate experiment program for stronger continual-compositional validation:
 
-Useful local starting points:
+- [Issue #55 — SYM-ARCH-002 plan](https://github.com/Luminous-Dynamics/symthaea/issues/55)
+- [PR #57 — SYM-ARCH-002A experimental core](https://github.com/Luminous-Dynamics/symthaea/pull/57)
+- [PR #58 — hierarchical statistics and power planning](https://github.com/Luminous-Dynamics/symthaea/pull/58)
+- [PR #65 — online acquisition and resource measurement](https://github.com/Luminous-Dynamics/symthaea/pull/65)
+- [PR #66 — multiplicity-safe analysis plans](https://github.com/Luminous-Dynamics/symthaea/pull/66)
 
-- [Unified architecture proposal](../architecture/UNIFIED_ARCHITECTURE_PROPOSAL.md)
-- [Cognitive self-model design](../architecture/COGNITIVE_SELF_MODEL.md)
-- [Unified causal-understanding benchmark](../../src/benchmarks/unified_causal_understanding.rs)
-- [HDC substrate-independence module](../../crates/core/symthaea-core/src/hdc/substrate_independence.rs)
+**Status snapshot checked 2026-10-15:** #57 was open and not a draft; #58, #65, and #66 were open drafts. This document neither assumes they have merged nor depends on their not-yet-landed code APIs.
 
-The Cognitive Self-Model document specifically recommends extending existing `PredictiveSelfModel` machinery instead of creating a duplicative parallel abstraction. Follow that principle across the whole experiment: inventory first, adapt interfaces second, add a new component only when the existing one demonstrably cannot satisfy the required contract.
+SYM-ARCH-002 already proposes an evaluation core, stronger continual-learning controls, factorial mechanism ablations, task-free drift, deeper compositionality, and irregular-time stress tests. We should reuse that program's frozen data/seed identities, uncertainty methods, prequential measurements, resource accounting, and multiplicity control when eligible. Do not create a second bootstrap stack, change SYM-ARCH-001's frozen result, or call a mechanism-level result an end-to-end cognitive-architecture result.
 
-## Repository-grounded starting inventory (checked 2026-10-15)
+### What SYM-ARCH-001 has already taught us
 
-This is a source inventory, not a claim that the complete cognitive integration or research hypotheses are validated.
+The frozen [SYM-ARCH-001 result](https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/SYM_ARCH_001_RESULT_2026-08-25.md) was **NEGATIVE** for the tested 512-dimensional HDC-LTC-Hebbian candidate under its preregistered joint retention/composition/reversal criterion. It lost to the strongest controls by -0.2969 retention, -0.2539 held-out composition, and -0.4863 reversal-final accuracy. The simple online linear-SGD control had the best retention and compositional scores in that experiment; vanilla HDC led the reversal-final score. Low forgetting alone was not sufficient evidence of continual-learning strength.
 
-- `crates/core/symthaea-core/src/hdc/binary_hv.rs` defines `BinaryHV` as a 16,384-bit vector backed by 2,048 bytes and documents deterministic seeded vectors. This is a concrete baseline for associative operations and bit-packed storage.
-- `src/consciousness/dynamics/predictive_self.rs` defines `PredictiveSelfModel` and configuration for history depth, horizons, prediction-error thresholds, counterfactuals, and prospective memory. It is the first candidate to reuse for prediction-error experiments.
-- `src/cognitive_loop/self_model_tier.rs` already groups predictive self, narrative self, meta-cognition, and attention-schema subsystems behind independent configuration flags. An additional generic self-model manager would risk duplication.
-- `src/benchmarks/unified_causal_understanding.rs` contains a causal-discovery architecture organized around HDC encoding, interventional invariance, and directional integration. Treat it as an existing causal path to inspect, not proof that the whole causal workload suite or its scientific claims are validated.
-- `docs/architecture/UNIFIED_ARCHITECTURE_PROPOSAL.md` proposes a common cognitive-module protocol and workspace flow. A proposal document is not evidence that every module currently implements the proposed protocol end to end.
+The narrow conclusion is that the tested bundle did not outperform its controls on that task and rule. It does not condemn HDC or CfC generally. The post-hoc diagnosis points toward factorizing mechanisms and designing complementary, task-appropriate systems—not increasing complexity or tuning a losing bundle after the fact.
 
-Before implementation, map actual call sites, feature flags, typed outputs, current tests, and ownership of each subsystem. In particular, define whether an experiment is evaluating a module in isolation, one cognitive-cycle integration, or an end-to-end task; do not mix those levels in one score.
+## Proposed architecture
 
-## Candidate architecture families
+~~~text
+                         REQUEST / SENSOR EVENTS
+                                  |
+                                  v
+                     [1. Typed Event Intake]
+                     timestamp · source · rights
+                     schema · payload identity
+                                  |
+                                  v
+               +------------------+------------------+
+               |                                     |
+               v                                     v
+    [2a. Typed Evidence Store]             [2b. HDC Semantic Index]
+    entities / relations / units            associative and fuzzy retrieval
+    source/time / validity / conflicts       concept cues / compositions
+               |                                     |
+               +------------------+------------------+
+                                  |
+                                  v
+                    [3. Predictive Temporal State]
+                    HDC-CfC/LTC where it fits
+                    state age · horizon · surprise
+                                  |
+                                  v
+                    [4. Bounded Work Coordinator]
+                      fast → medium → deep path
+                      latency / memory / compute budget
+                                  |
+                 +----------------+----------------+
+                 |                |                |
+                 v                v                v
+            retrieve/query   causal/planning   exact tool/solver
+                 |                |                |
+                 +----------------+----------------+
+                                  |
+                                  v
+                     [5. Independent Validation]
+                     evidence · types/units · checks
+                     verified / supported / unresolved
+                                  |
+                                  v
+                      [6. Guarded Action Proposal]
+                      preconditions · budget · rollback
+                                  |
+                                  v
+                    [7. Outcome + Memory Feedback]
+                    pre-update score / source trace
+                    episodic capture / consolidation
+~~~
 
-These are complementary hypotheses, not mutually exclusive products. Initially, compare each as a separate configuration against the current baseline. Combination experiments come only after each individual contribution is measurable.
+This is a logical design, not a claim that these seven layers already exist as one integrated runtime.
 
-| Candidate | Core idea | Best-fit hypothesis | Main failure mode to test |
-|---|---|---|---|
-| **A. Hierarchical multi-timescale loop** | Fast reflex/monitoring path, medium-timescale HDC + CfC state, slower planning and consolidation; events can trigger extra computation | Improves responsiveness on irregular streams and long tasks without running every subsystem at full rate | Stale slow-state, oscillation between levels, missed events |
-| **B. Dual representation: HDC + typed relational/causal state** | HDC handles compositional cues and associative recall; typed graphs/tables carry exact entities, relations, units, and causal assumptions | Improves multi-hop relational and counterfactual tasks without sacrificing useful similarity-based retrieval | Representation disagreement; lossy or untraceable conversion between spaces |
-| **C. Three-store memory** | Separate episodic traces, consolidated semantic knowledge, and procedural skills; every stored item has source/time/confidence metadata | Improves long-horizon recall, adaptation, and provenance-sensitive retrieval | Memory pollution, catastrophic interference, stale or contradictory facts |
-| **D. Sparse specialist / workspace routing** | Existing modules submit structured bids; a coordinator selects the smallest sufficient set of specialists under latency and energy budgets | Improves cost per successful task and limits irrelevant module work | Router starvation, hidden coordination costs, unstable specialist monopolies |
-| **E. Predictive self-model + calibrated uncertainty** | Predict expected outcome/confidence, score prediction errors, calibrate reliability, and trigger review or abstention | Improves error detection, confidence calibration, and adaptation after regime shifts | Self-referential feedback loops; apparent calibration without external truth |
-| **F. Verified symbolic/tool sidecar** | For exact domains, convert typed claims to executable constraints, solvers, tests, or proof checkers; retain source-bound output receipts | Improves exact math, code, units, engineering constraints, and safety-critical calculations | Invalid translation from semantic intent to formal problem; checker coverage gaps |
-| **G. Multi-hypothesis causal planner** | Generate a bounded set of competing explanations/actions, test counterfactual predictions, then select using an explicit objective and constraints | Improves ambiguous diagnosis, scientific design, and planning under uncertainty | Correlated hypotheses, combinatorial blow-up, shared blind spots |
-| **H. Event-driven hybrid runtime** | Run cheap monitors continuously; wake heavier components on change, novelty, uncertainty, deadlines, or explicit requests | Reduces average energy and tail latency on sparse or mostly quiet workloads | Missed wake-up conditions, starvation, noisy events causing thrashing |
+### 1. Typed event intake
 
-### What may be superior, and where
+Every observation enters through a versioned envelope with at least:
 
-A plausible **superior candidate for long-horizon, tool-using, embodied tasks** is the combination of A + B + C + D + E + F: multiscale control, dual representations, tiered memory, sparse routing, calibrated uncertainty, and independent verification.
+- event time and receive/record time;
+- source identity and source location/reference;
+- payload or observation digest when stable content hashing is appropriate;
+- modality and schema version;
+- privacy/permission label;
+- extraction method and extraction confidence, kept separate from source reliability.
 
-A smaller **superior candidate for embedded devices** may instead be A + B + H with bounded memory and a local verifier. A scientific-reasoning profile may emphasize B + C + E + F + G. We should not assume a single configuration wins across all workloads.
+Keep event time distinct from record time. A newly received report about an old event should not silently overwrite what the system knew at an earlier time. An invalid timestamp, failed parse, unknown unit, or missing source should remain visible rather than receive a plausible default.
 
-The design principle is: **share protocols and evidence, not necessarily internal representations**. Forcing all facts, causal structures, plans, motor state, and uncertainty into one undifferentiated hypervector may make interoperability convenient while obscuring types, units, provenance, and exact relational structure.
+### 2. Dual representation: HDC index plus typed evidence
 
-## Proposed component contracts
+**HDC is a retrieval/indexing layer, not the database of record.** Each vector or composed representation points to stable entity/evidence IDs. Similarity proposes candidates; it does not prove equality, entailment, causal direction, or source authenticity.
 
-Keep the interfaces small enough for existing Rust modules to adopt incrementally. These names are conceptual until matched to the real codebase; they are not a request to duplicate existing types.
+Typed facts should preserve subject, predicate, object/value, unit, valid-time interval, record-time interval, source reference, derivation lineage, confidence semantics, and status. Useful statuses include *observed*, *derived*, *hypothesis*, *contradicted*, *superseded*, and *unresolved*. The implementation should reuse existing knowledge encoding and causal components where their contracts fit, rather than add another competing graph or truth store.
 
-- **InputEnvelope:** payload reference, modality, event time, received time, source/provenance, sensitivity/permission label.
-- **StateSnapshot:** versioned state plus the time horizon and assumptions it covers.
-- **Prediction:** target, predicted value/distribution, horizon, assumptions, uncertainty, and expected verification method.
-- **EvidenceItem:** observation or result, source identity, content hash where appropriate, timestamp, transformations, and confidence basis.
-- **ActionProposal:** intended effect, preconditions, predicted outcome, resource estimate, reversibility, and required checks.
-- **VerificationResult:** pass/fail/inconclusive, checker identity/version, exact inputs, diagnostics, and limitations.
-- **Budget:** deadline, compute/energy/memory ceilings, and permitted specialist calls.
+The bridge between the two representations must be explicit and testable:
 
-All module calls should expose failures explicitly. A missing prediction, failed tool, timeout, numerical error, or incomplete evidence must not silently become a confident answer. Each output should preserve the distinction between observation, inference, hypothesis, and verified result.
+- Each HDC-indexed item resolves to an existing typed record or a declared hypothesis ID.
+- Deleting or revoking evidence invalidates the associated index entries and dependent derived claims.
+- A near match is never promoted to an exact identity without a typed identity-resolution step.
+- Contradictory records can coexist with separate provenance; do not average mutually exclusive facts into one vector and lose the disagreement.
+- A similarity score is not automatically a probability or calibrated confidence.
 
-## Evaluation design
+### 3. Predictive temporal state, not universal memory
 
-### Baselines and controls
+Use the existing HDC-LTC/CfC implementation for temporal state that benefits from continuous-time evolution and variable sampling intervals. Preserve a clear separation between a state prediction and the observed event. Every prediction should state its horizon, assumptions, source-state version, and measurable target.
 
-Use the current integrated HDC + liquid-dynamics pipeline as baseline (B0). Add the simplest alternative needed for each task (for example, HDC-only retrieval for memory tasks or a conventional recurrent/temporal baseline for sequence prediction). Then run B1–B8 as independent ablations before testing combinations.
+Do not assume CfC should own all temporal storage: its original research presents an efficient approximate closed-form model and notes limitations, including possible vanishing-gradient issues for long dependencies and the fact that CfC approximations do not necessarily retain the invertibility of ODE flows. Compare mixed-memory and simpler baselines on the workload rather than assuming continuous-time dynamics always help.
 
-Preserve negative controls:
+### 4. Separate memory by job
 
-- **Fixed router vs. resource-aware router**
-- **No uncertainty feedback vs. calibrated uncertainty**
-- **One representation vs. dual representation**
-- **Single-store vs. tiered memory**
-- **No verifier vs. independent verifier**
-- **Fixed-rate vs. event-triggered scheduling**
-- **Shuffled or source-mismatched evidence** to confirm provenance checks detect the mismatch
-- **Budget-matched simpler baseline** to prevent attributing gains to merely spending more compute
+Use three linked memory roles:
 
-Freeze dataset splits, seeds, baseline configurations, scoring rules, and stopping conditions before interpreting results. Keep development and held-out sets separate. Do not use the same scenarios for design iteration and final generalization claims.
+- **Episodic:** what happened, when, in what context, and what was observed before/after an action.
+- **Semantic:** consolidated facts, concepts, relations, and rules, each with sources, freshness, uncertainty, and invalidation links.
+- **Procedural:** how to carry out a task, including preconditions, resource bounds, test fixtures, failure modes, and postconditions.
 
-### Workload suite
+Consolidation should create derived records with lineage; it must not delete the original evidence by default. Recency and similarity are retrieval features, not proof of current truth. Memory eviction should be explicit and auditable, and privacy/retention policies must override ordinary importance scoring.
 
-1. **Associative retrieval:** noisy cues, distractors, compositional bindings, and memory growth. Score precision/recall and latency.
-2. **Irregular temporal prediction:** variable time gaps, missing observations, regime shifts, and long gaps. Score predictive error and calibration by horizon.
-3. **Causal and counterfactual reasoning:** interventions distinguishable from correlations, plus known ground-truth causal graphs. Score intervention/counterfactual accuracy.
-4. **Relational and unit-sensitive engineering:** multi-step constraints, dimensional analysis, exact arithmetic, and inconsistent inputs. Score exact correctness and checker acceptance.
-5. **Long-horizon memory:** episodic recall, conflicting updates, delayed queries, and provenance-sensitive questions. Score retrieval quality, stale-memory errors, and source attribution.
-6. **Uncertainty under distribution shift:** held-out regimes, ambiguous cases, out-of-distribution inputs, and abstention opportunities. Score Brier/log loss when appropriate, expected calibration error with bin definitions frozen in advance, selective risk, and coverage.
-7. **Resource-bounded embodied control:** deterministic simulated tasks with deadlines, sensor delays, and actuator constraints. Score goal completion, constraint violations, latency, memory, and energy where hardware measurements are available.
-8. **Fault injection:** corrupted messages, unavailable specialists, timeout, inconsistent state versions, and checker failure. Score safe fallback behavior and evidence preservation.
+### 5. Resource-bounded coordinator
 
-Report task metrics separately. Do not collapse correctness, uncertainty, speed, energy, and safety into one convenient scalar without showing the underlying trade-offs.
+Route work using a small policy over task class, uncertainty, novelty, source conflict, deadline, and estimated tool/resource cost.
 
-### Performance and evidence metrics
+- **Fast path:** cached exact answer, high-confidence associative retrieval, deterministic simple transform.
+- **Medium path:** typed relation traversal, unit-aware calculation, temporal prediction, or focused causal query.
+- **Deep path:** bounded competing hypotheses, simulation, a dedicated solver, specialist modules, or a human review request.
 
-For each exact commit/configuration, record:
+Each escalation should be triggered by a recorded reason. Budgets must cap specialist calls, time, memory, and action scope. Include starvation prevention (ageing/priority bounds) so recurring easy work cannot indefinitely suppress urgent or rare tasks. Keep a fixed-routing control and a run-everything control to isolate whether the coordinator actually saves resources.
 
-- Task-level quality and per-case outcomes, not just averages.
-- Median and p95 end-to-end latency, throughput, and deadline misses.
-- Peak resident memory and memory traffic where measurable.
-- Energy per successful task/cognitive cycle on physical hardware; identify the measurement method and uncertainty.
-- Confidence calibration, abstention coverage, and selective error rate.
-- Recovery and degradation under injected faults.
-- Component call counts, data movement, and overhead introduced by orchestration.
-- Reproducibility identifiers: commit SHA, configuration hash, seeds, data/split checksums, tool versions, machine/accelerator identity, and raw result paths.
+The policy can eventually adapt from measured quality/cost feedback, but an adaptive router must never tune itself on the held-out confirmatory set. Adaptive selection and its training data belong in the experiment manifest.
 
-A faster kernel is not an end-to-end improvement if transfers, conversions, or scheduling make the complete task slower. Simulated energy is a model result, not measured energy. Queued, skipped, cancelled, or stale CI results are not passing evidence.
+### 6. Independent verification and abstention
 
-## Cross-project division of work
+Before a claim is marked verified, use the strongest applicable independent checker:
 
-### Symthaea
+- type and unit checks for quantities;
+- deterministic arithmetic or interval bounds for calculations;
+- constraint/solver checks for formalized engineering problems;
+- source and timestamp checks for sourced facts;
+- test or proof checkers where the claim has a formal contract;
+- simulation plus separate safety envelope checks for modelled actions.
 
-Own task semantics, cognitive-module adapters, benchmark tasks, reference implementations, ablations, runtime routing, and final interpretation. Reuse existing causal, temporal, memory, workspace, and predictive-self-model code after an implementation-level inventory.
+Verification status must be multidimensional: whether a check ran, what claim/inputs it covered, exact checker/version, output, and known limits. A checker pass means the claim satisfied that checker—not that the entire answer or world-model is true. When the original claim cannot be formalized or a verifier fails, the system should label the result *supported*, *hypothesis*, or *inconclusive*, or abstain, instead of silently lowering a threshold.
 
-### Symtropy
+### 7. Actions as typed contracts
 
-Symtropy's current README describes an N-dimensional Bevy physics engine with configurable metric-coupled forces/friction and energy budgets, plus embodied robotics/world-bridge work. That makes it a plausible place to test consequences of candidate controllers in physical simulations and explicit resource constraints.
+An action proposal should contain the intended effect, evidence supporting it, preconditions, resource bounds, expected outcome, hazard constraints, reversibility, and postcondition check. The actuator path should validate the contract and permissions independently from the component that generated the plan. After execution, score the prediction before updating the responsible model; retain failure cases and runtime context.
 
-Do **not** assume this automatically supplies a validated model of CPU/GPU energy draw, chip thermals, cognitive scheduling latency, or neuromorphic dynamics. Those require explicit component models and calibration. Label simulations as simulations, measure residual error against physical runs where possible, and do not let a simulated advantage override an actual workload benchmark. Treat Phi-driven motor authority as one experimental control mapping, not a validated universal law.
+## Why this may outperform a single-representation design
 
-### Mycelix
+The potential advantage comes from **placing each type of information in the representation best suited to it**:
 
-A future integration could coordinate experiment identity, data permissions, contributor attribution, and result receipts. However, Mycelix's current README explicitly describes the project as pre-alpha research and warns that unit-test coverage is not equivalent to real multi-agent integration or deployment readiness. Therefore, treat this as a proposed integration contract—not an existing, qualified provenance service.
+| Need | Preferred representation/mechanism | Why |
+|---|---|---|
+| Fuzzy associative cueing | HDC/VSA | Composition and similarity under noisy/incomplete cues |
+| Exact identity and relationships | Typed entity/relation records | Explicit identity, relation types, and schema constraints |
+| Variable-rate temporal evolution | CfC/LTC when suited | Time-aware state updates without requiring every interval to be a fixed discrete step |
+| Long-lived experience | Episodic records | Exact sequence and context remain recoverable |
+| Reusable knowledge | Semantic store with lineage | Consolidation does not erase sources or contradictions |
+| Safe exact outputs | Independent tool/constraint verifier | Checkable guarantees are separate from heuristic plausibility |
+| Efficient execution | Bounded coordinator | Spend more compute only where observed need justifies it |
 
-For the first experiment, retain reproducibility through Git commit IDs, checksummed inputs/splits, frozen config, tool versions, and result artifacts in the repository or CI. Add a Mycelix adapter only after the specific capability and its adversarial/integration tests are identified and qualified. A stored or signed receipt helps establish provenance; it does not prove scientific correctness.
+The key is not simply adding a symbolic database beside Symthaea. It is preventing information loss and inappropriate authority transfers at the boundaries: fuzzy similarity must not become fact; derived belief must not become observation; a model prediction must not become evidence; and successful validation of one property must not certify an entire plan.
 
-Keep these responsibilities separate so that each system can be tested independently. Cross-repository integration should be introduced through versioned, narrow contracts rather than direct dependence on internal types.
+## Evaluation plan that complements SYM-ARCH-002
 
-## Research basis and cautions
+Do not run a claim-bearing experiment until the underlying interfaces and the relevant SYM-ARCH-002 measurement/provenance components are accepted into a suitable integration target. First build a source-derived inventory and deterministic component tests. Then preregister a separate **system-level integration** experiment; it should not overload SYM-ARCH-002's frozen learner-mechanism campaign.
 
-- Hasani et al., **“Closed-form continuous-time neural networks,”** *Nature Machine Intelligence* (2022): [paper](https://www.nature.com/articles/s42256-022-00556-7). Provides evidence that CfC-style models can model time-series dynamics efficiently; it does not show that CfC should own all memory or reasoning.
-- Vergés et al., **“Classification using hyperdimensional computing: a review with comparative analysis,”** *Artificial Intelligence Review* (2025): [paper](https://link.springer.com/article/10.1007/s10462-025-11181-2). Reviews HDC/VSA composition and classification; benchmark results remain task-dependent.
-- **“Hyper-dimensional computing architectures for AI applications,”** *Results in Engineering* (2026): [paper](https://doi.org/10.1016/j.rineng.2026.109589). Reviews architecture and hardware options, including scalability and implementation trade-offs.
-- Hodson et al., **“The empirical status of predictive coding and active inference,”** *Neuroscience & Biobehavioral Reviews* (2024): [PubMed record](https://pubmed.ncbi.nlm.nih.gov/38030100/). Finds promising results but emphasizes that stronger comparisons against alternative models are required.
-- van Zwol et al., **“Predictive Coding Networks and Inference Learning: Tutorial and Survey,”** *ACM Computing Surveys* (2026): [DOI](https://doi.org/10.1145/3797870). Useful for implementation variants; not evidence that a specific predictive-coding integration will improve Symthaea.
+### First component tests
 
-Neuroscience-inspired architectures are design inspiration, not proof of biological equivalence, sentience, or causal adequacy. Predictive coding, active inference, integrated information, or self-model scores must not serve as substitutes for task-level validation.
+1. **Evidence resolution:** every HDC candidate resolves to a typed record; corrupt/duplicate/missing IDs fail closed.
+2. **Contradiction preservation:** two incompatible facts with different sources/time remain separately retrievable; no lossy averaging hides the conflict.
+3. **Temporal correctness:** old event time and new receive time remain distinct; stale records do not masquerade as current.
+4. **Units and constraints:** unknown or incompatible units cannot pass exact verification; known-answer arithmetic/constraint fixtures are correct.
+5. **Source lineage:** derived statements preserve transitive source links; revoking one source invalidates dependent results.
+6. **Router determinism:** identical frozen state and request yield the same route; budget exhaustion yields an explicit degraded/inconclusive response.
+7. **Prequential feedback:** prediction and latency are recorded before update; the current item cannot be scored using information learned from its label first.
+8. **Faults:** missing verifier, timeout, corrupt event, conflicting state versions, and unavailable specialist produce explicit non-pass outcomes rather than fabricated success.
 
-## Execution order
+### Later end-to-end tasks
 
-1. **Inventory:** map current implementations and contracts for workspace/attention, HDC, CfC/LTC, causal reasoning, memory, predictive self-model, uncertainty, and verifiers. Mark each as implemented, proposed, tested, or unknown.
-2. **Select three discriminating tasks:** associative retrieval, irregular temporal prediction, and counterfactual reasoning. Add exact-tool verification as a fourth task only if the repository already has a runnable path.
-3. **Freeze baseline and protocol:** store a machine-readable task/config schema and a result format before tuning.
-4. **Add one ablation at a time:** demonstrate the individual contribution of dual representations, multi-timescale routing, and uncertainty-triggered verification.
-5. **Combine only proven components:** use a fixed compute budget and include orchestration overhead.
-6. **Independent verification:** have a separate checker validate manifests, split identity, metric calculations, and exact-head provenance before results are described as passing.
-7. **Promote cautiously:** integrate a configuration only when it beats the relevant baseline on its predeclared target without unacceptable regressions on latency, resource use, calibration, or safety constraints.
+- **Source-sensitive long-horizon recall:** answer which source stated a fact, when it applied, and whether it was superseded.
+- **Contradictory evolving world:** preserve multiple reports, resolve by permitted evidence rules, and surface unresolved conflict when resolution is impossible.
+- **Irregular-time sensor response:** identical semantic stream under jitter, long gaps, and dropped observations, comparing timestamp-aware and fixed-step controls.
+- **Multi-step engineering query:** bind concepts to typed quantities, calculate/check constraints, then provide source and checker receipts.
+- **Tool-using plan:** produce preconditions, validate a plan, execute in deterministic simulation, compare predicted with observed outcome, and safely recover from injected failures.
+- **Compute-budget challenge:** compare fixed routing, always-run-all, and adaptive routing under matched budgets; report quality-cost Pareto fronts and deadline misses.
 
-**First deliverable:** a source-derived architecture inventory plus a small, deterministic comparative harness. Do not start with new hardware, new consciousness metrics, or a wholesale rewrite. The initial aim is to learn which architectural differences change observable capability, and under what cost.
+### Primary measures
+
+Keep each outcome distinct:
+
+- exact-task correctness and constraint violations;
+- source attribution and contradiction detection;
+- calibration, abstention coverage, and selective error;
+- p50/p95 end-to-end and component latency;
+- specialist calls, bytes moved, memory footprint, and persistent-state size;
+- energy only when measured on declared physical hardware;
+- performance by scenario, not just overall means;
+- fault recovery and failure containment.
+
+Controls must include HDC-only retrieval where relevant, typed lookup without HDC, fixed routing, no-verifier, no-provenance, stale/shuffled evidence, and a budget-matched simple baseline. If a negative control passes or a known-answer oracle fails, the result is INCONCLUSIVE until the experiment is repaired. Do not fold all metrics into one scalar and hide trade-offs.
+
+## Execution sequence
+
+1. **Now:** keep this design proposal separate from runtime changes and the SYM-ARCH-002 mechanism study. Use it to define interfaces and target failure modes.
+2. **After suitable experiment infrastructure is merged and the target base is explicit:** add pure Rust typed evidence/temporal contracts and unit tests, reusing existing knowledge/causal modules after call-site review.
+3. **Next:** implement a read-only HDC-to-evidence resolver and tests for stale/missing/conflicted identities. Do not yet route external actions through it.
+4. **Then:** add a budget-limited read-only coordinator with fixed-routing and always-run-all controls.
+5. **Then:** add verification adapters for only the domains with independent checkers already available.
+6. **Finally:** preregister and execute system-level experiments with separate task/split/configuration identities, paired or hierarchical uncertainty as appropriate, resource traces, negative controls, and exact-head provenance.
+
+Stop or simplify the design if typed records alone solve the target task, if the HDC index adds cost without retrieval value, if the router does not improve the quality/resource trade-off, or if provenance and verification overhead causes unacceptable latency.
+
+## Research basis
+
+The literature supports investigating the *combination* of representations and explicit routing, but does not establish this specific Symthaea architecture as superior:
+
+- Hasani et al., [“Closed-form continuous-time neural networks,” *Nature Machine Intelligence* (2022)](https://www.nature.com/articles/s42256-022-00556-7). CfC can be efficient on suitable time-series/irregular-time tasks; the authors discuss limitations and cases where other models are better suited.
+- Vergés et al., [“Classification using hyperdimensional computing: a review with comparative analysis” (2025)](https://link.springer.com/article/10.1007/s10462-025-11181-2). HDC/VSA provides compositional representations, but task-specific comparisons remain necessary.
+- DeLong, Fernández Mir, and Fleuriot, [“Neurosymbolic AI for Reasoning Over Knowledge Graphs: A Survey,” *IEEE TNNLS* (2025)](https://doi.org/10.1109/TNNLS.2024.3420218). Reviews logically informed embeddings, embeddings with logical constraints, and rule-learning approaches and their trade-offs.
+- Liu, Wang, and Tong, [“Neural-Symbolic Reasoning over Knowledge Graphs: A Survey from a Query Perspective” (2025)](https://doi.org/10.1145/3748239.3748249). Provides a complementary view organized around knowledge-graph query/reasoning types.
+- Ding et al., [“BEST-Route: Adaptive LLM Routing with Test-Time Optimal Compute,” ICML/PMLR (2025)](https://proceedings.mlr.press/v267/ding25d.html). Demonstrates a cost/quality trade-off for adaptive model routing in its tested workloads; these results are motivation, not a performance forecast for Symthaea's specialist modules.
+- Hodson, Mehta, and Smith, [“The empirical status of predictive coding and active inference” (2024)](https://pubmed.ncbi.nlm.nih.gov/38030100/). Emphasizes that predictive/active-inference accounts require comparison with alternatives.
+
+These papers support researching heterogeneous representations, exact relation systems, temporal models, and adaptive routing. They do not prove that the proposed combination is more intelligent, conscious, safe, or efficient. Only controlled experiments on declared tasks can establish the relevant engineering advantages.
+
+## Acceptance criteria for this proposal
+
+This document is useful only if it narrows implementation and experimentation rather than adding another grand architecture. The proposal should advance to code only when:
+
+- each new responsibility has a named owner and does not duplicate an existing module;
+- interfaces preserve source identity, time, units, contradiction, and failure states;
+- HDC is used for what similarity/composition are suited to, not treated as proof;
+- routing and verification costs are measured end to end;
+- system-level tests remain separate from mechanism-level SYM-ARCH-002 tests;
+- no architecture win is declared from a proposal, synthetic smoke test, unmerged code, or queued CI.
