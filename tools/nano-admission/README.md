@@ -27,9 +27,9 @@ The JSON receipt embeds the pinned source-document commit, advertised artifact U
 - Members are never extracted or executed.
 - Archive path traversal, absolute paths, duplicate member names, and non-regular/non-directory entries are recorded as review blockers.
 - The compressed stream is hashed separately from the declared tar payload bytes. Member bodies are read fully so decompression/truncation errors are not hidden by merely listing headers.
-- Gzip decompression, tar member count, cumulative UTF-8 member-path metadata, individual member path lengths, and stored diagnostic path text are bounded (2 GiB expanded stream, 100,000 members, 32 MiB cumulative member-path byte budget, 4 KiB individual path limit, 200-character diagnostic prefix). Top-level inventory keys for overlong components collapse to a bounded sentinel.
+- Compressed input size, gzip decompression, tar member count, cumulative UTF-8 member-path metadata, individual member path lengths, and stored diagnostic path text are bounded (512 MiB compressed input, 2 GiB expanded stream, 100,000 members, 32 MiB cumulative member-path byte budget, 4 KiB individual path limit, 200-character diagnostic prefix). Top-level inventory keys for overlong components collapse to a bounded sentinel.
 - A single read-only file handle is reused for initial hashing, gzip validation, tar inventory, and final hashing, preventing a pathname replacement from switching the inspected object between passes. Changed in-place content blocks a clean status. This remains a mutation check, not an OS-level immutable-file guarantee.
-- A matching checksum does not verify LMDB schema, train/validation/test counts, units, ID/OOD mapping, structural chemistry, or licensing for a separate model checkpoint.
+- The upstream-published MD5 is a legacy compatibility/identity check, not a cryptographic authenticity proof. A matching MD5 does not verify LMDB schema, train/validation/test counts, units, ID/OOD mapping, structural chemistry, or licensing for a separate model checkpoint.
 - The receipt cannot state an admitted result. Its best status is artifact_integrity_verified_pending_schema; NANO-001A and NANO-001C remain independent gates.
 - The archive is expected to remain in local temporary research storage and must not be committed or mirrored from this utility.
 
