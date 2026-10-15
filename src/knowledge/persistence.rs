@@ -1950,10 +1950,10 @@ mod tests {
             CausalEdgeRecord {
                 cause: "diplomacy".into(),
                 effect: "war".into(),
-                strength: -0.6,
+                strength: 0.6,
                 is_inhibitory: true,
                 is_negated: false,
-                source_text: String::new(),
+                source_text: "diplomacy prevented war".into(),
                 cycle: 2,
             },
         ];
