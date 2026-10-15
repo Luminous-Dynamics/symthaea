@@ -36,7 +36,7 @@ SX-026 emits source-separated endpoint-rate envelopes, explicit coverage/gaps, u
 
 The boundary receipt binds the input trend-result digest, caller-supplied source revision, canonical boundary set, each projection/status/output, and counts using domain-separated SHA-256 hashes. Numeric values are represented by little-endian IEEE-754 f64 bits, strings are UTF-8 with explicit byte lengths, and boundary definitions are canonically sorted before hashing. The replay test reimplements the digest encoding independently.
 
-Fingerprints reveal input/output changes; they are not signatures and do not authenticate sensors, prove that a threshold revision is truthful, or attest to a deployed binary.
+Fingerprints reveal input/output changes; they are not signatures and do not authenticate sensors, prove that a threshold revision is truthful, or attest to a deployed binary. The fixture's source-revision value is synthetic, used only to exercise deterministic receipt binding; it is not a source-code commit identifier.
 
 ## Versioned replay corpus
 
