@@ -285,7 +285,7 @@ pub fn fuse_human_state(
                 saw_stale = true;
                 continue;
             }
-            if observation.confidence < config.minimum_confidence {
+            if observation.confidence < config.minimum_confidence || observation.confidence <= 0.0 {
                 excluded_low_confidence += 1;
                 saw_low_confidence = true;
                 continue;
@@ -355,15 +355,13 @@ pub fn fuse_human_state(
         let mut lower = accepted[0].value - accepted[0].uncertainty_abs;
         let mut upper = accepted[0].value + accepted[0].uncertainty_abs;
         let mut conservative_confidence = accepted[0].confidence;
+        let mut invalid_weight = false;
         for item in accepted.iter().skip(1) {
             let next_weight = total_weight + item.confidence;
             if !next_weight.is_finite() || next_weight <= 0.0 {
                 rejected_invalid += accepted.len();
-                fused_metrics.push(FusedHumanMetric::unknown(
-                    metric,
-                    HumanMetricStatus::Invalid,
-                ));
-                continue;
+                invalid_weight = true;
+                break;
             }
             estimate = estimate * (total_weight / next_weight)
                 + item.value * (item.confidence / next_weight);
@@ -371,6 +369,13 @@ pub fn fuse_human_state(
             lower = lower.min(item.value - item.uncertainty_abs);
             upper = upper.max(item.value + item.uncertainty_abs);
             conservative_confidence = conservative_confidence.min(item.confidence);
+        }
+        if invalid_weight {
+            fused_metrics.push(FusedHumanMetric::unknown(
+                metric,
+                HumanMetricStatus::Invalid,
+            ));
+            continue;
         }
 
         // Derived overflow is invalid evidence, not a reason to emit infinity.
