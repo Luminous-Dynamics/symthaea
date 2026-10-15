@@ -818,7 +818,7 @@ mod tests {
     fn make_encoding(text: &str, confidence: f32) -> FactEncoding {
         FactEncoding {
             vector: BinaryHV::random(crate::knowledge::encoding::fnv1a_hash(text)),
-            role_vectors: HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             source_text: text.to_string(),
             confidence,
