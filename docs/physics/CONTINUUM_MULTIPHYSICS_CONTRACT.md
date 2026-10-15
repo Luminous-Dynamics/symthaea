@@ -148,7 +148,7 @@ OpenModelica documents the [Functional Mock-up Interface (FMI)](https://openmode
 
 ## 9. First implementation sequence
 
-The first code slice is proposed in [Symthaea PR #7448](https://github.com/Luminous-Dynamics/symthaea/pull/7448): an adiabatic, lumped-conductor Joule-heating reference model with explicit energy accounting. Its test cases are authored but have **not yet been run at the exact PR head**; this is a starting oracle, not a validation pass or a spatial multiphysics solver.
+The first applied-solver tranche is proposed in [Symthaea PR #7448](https://github.com/Luminous-Dynamics/symthaea/pull/7448): additive checked entry points for Reynolds number, Bernoulli head, Darcy-Weisbach loss, continuity, Carnot efficiency, Fourier conduction, Newton cooling, and engine work, plus an adiabatic and constant-conductance lumped Joule-heating model with signed ambient energy exchange. Reynolds number now uses speed magnitude so reversing flow direction cannot make it negative. Tests are authored but have **not yet been confirmed passing at the exact PR head**; these are checked/reference primitives, not a validated CFD/EM solver.
 
 At the energy evidence-ingestion boundary, [Mycelix PR #5025](https://github.com/Luminous-Dynamics/mycelix/pull/5025) separately proposes fail-closed checks for non-finite kWh quantities, reporting periods, meter readings, and trade windows; its tests also remain unrun.
 
