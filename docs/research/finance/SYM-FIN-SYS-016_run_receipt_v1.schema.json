@@ -41,7 +41,8 @@
         "model_version",
         "environment_digest",
         "shock_schedule_digest",
-        "agent_model_digest"
+        "agent_model_digest",
+        "artifact_manifest_digest"
       ],
       "properties": {
         "run_id": {
@@ -86,6 +87,9 @@
           "$ref": "#/$defs/digest"
         },
         "agent_model_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_manifest_digest": {
           "$ref": "#/$defs/digest"
         }
       }
