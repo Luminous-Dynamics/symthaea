@@ -72,7 +72,7 @@ The intended architecture is a **capability floor with bounded actions**, not a 
 - Mycelix keeps evidence status and origin orthogonal; five authored regression tests cover synthetic-origin policy, obligation, delivery-claim, verification-result, and dispute-reassessment barriers. Caller-supplied origin remains an explicit provenance limitation.
 - Delivery claims must name the provider fixed by the request. This checks logical identity in the reference model, not a cryptographic signature.
 - Symthaea receipt loading rejects duplicate JSON object keys and Python's non-standard `NaN` / `Infinity` constants before schema or semantic validation.
-- Eight standard-library unit tests cover strict JSON parsing and metric-catalog semantics, including unknown metric IDs and schema-valid but incorrect metric dimensions. The validator pins all 24 negative-control IDs with a 10/14 schema/semantic split; it recomputes the scenario-registry SHA-256 from exact repository bytes and checks both scenario IDs and metric ID/dimension pairs against that registry. Other digest-shaped receipt fields still need binding to their source artifacts.
+- Eleven standard-library unit tests cover strict JSON parsing and metric-catalog semantics, including unknown metric IDs and schema-valid but incorrect metric dimensions. The validator pins all 26 negative-control IDs with a 10/16 schema/semantic split; it recomputes the scenario-registry SHA-256 from exact repository bytes and checks both scenario IDs and metric ID/dimension pairs against that registry. Other digest-shaped receipt fields still need binding to their source artifacts.
 - Neither track is qualified by this note. Authored tests are not passing tests. CI must run against the exact final head.
 
 ## Acceptance gates before integration
@@ -96,3 +96,5 @@ This note is a testable research direction, not a claim that the proposed system
 ## Benchmark targets
 
 The research lab now has a staged qualification contract: receipt controls; exact-byte artifact provenance; deterministic replay; accounting/capacity/authority invariants; cross-regime common-seed experiments; adversarial recovery; and pinned-runner performance budgets. See [SYM-FIN-SYS-016_BENCHMARK_TARGETS.md](SYM-FIN-SYS-016_BENCHMARK_TARGETS.md). The 12,000-run baseline/shock campaign, 16,800-run directed interoperability campaign and performance thresholds are proposed future targets, not completed benchmarks.
+
+The artifact manifest intentionally excludes itself and the receipt fixture to avoid circular hashing. The receipt records the exact-byte manifest digest; the manifest hashes source inputs used to validate the receipt and records unavailable run-artifact digests as unverified. This is an identity/completeness check, not a signature, issuer-authentication or physical-truth proof.
