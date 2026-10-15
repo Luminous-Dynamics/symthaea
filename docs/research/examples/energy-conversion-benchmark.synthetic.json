@@ -9,7 +9,11 @@
     "platform": "synthetic energy-conversion system",
     "duty_cycle_id": "fixture-3660s",
     "expected_duration_s": 3660,
-    "required_phases": ["startup", "loaded", "shutdown"]
+    "required_phases": [
+      "startup",
+      "loaded",
+      "shutdown"
+    ]
   },
   "boundary": {
     "boundary_id": "fixture-system-boundary-v1",
@@ -54,7 +58,9 @@
         "rejected_or_loss": 0.05,
         "stored_energy_change": 0.1
       },
-      "source_artifact_ids": ["synthetic-values"]
+      "source_artifact_ids": [
+        "synthetic-values"
+      ]
     },
     {
       "index": 1,
@@ -75,7 +81,9 @@
         "rejected_or_loss": 0.5,
         "stored_energy_change": 0.2
       },
-      "source_artifact_ids": ["synthetic-values"]
+      "source_artifact_ids": [
+        "synthetic-values"
+      ]
     },
     {
       "index": 2,
@@ -96,7 +104,9 @@
         "rejected_or_loss": 0.05,
         "stored_energy_change": 0.1
       },
-      "source_artifact_ids": ["synthetic-values"]
+      "source_artifact_ids": [
+        "synthetic-values"
+      ]
     }
   ],
   "uncertainty": {
@@ -129,5 +139,15 @@
     "The example efficiency is arithmetic over invented values and has no physical or comparative evidentiary value.",
     "A verifier must independently check interval continuity, interval ordering and uniqueness, required phase presence, first-law closure for each interval and aggregate totals, stored-energy closure, and consistency of the cached computed metrics.",
     "An uncertainty-aware superiority claim requires a declared propagation method and correlation treatment, plus comparable baseline evidence."
-  ]
+  ],
+  "evaluation_policy": {
+    "policy_id": "synthetic-fixture-policy-v1",
+    "registered_before_search": true,
+    "preregistered_at": "2026-10-15T00:00:00Z",
+    "relative_balance_tolerance": 1e-9,
+    "time_continuity_tolerance_s": 1e-9,
+    "minimum_superiority_margin": 0.05,
+    "baseline_id": "none-synthetic-only",
+    "selection_rule": "No decision permitted: fixture exists only to validate schema and verifier behavior."
+  }
 }
