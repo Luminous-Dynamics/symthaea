@@ -43,6 +43,7 @@ jobs:
           scenario_file="$(jq -r '.scenario_file' "$manifest")"
           jq -e '
             .suite_id == "SYM-LIFE-CIVIC-REFERENCE-001" and
+            .corresponding_mycelix_corpus == "MYC-LIFE-CIVIC-APPLICABILITY-001@0.5.0" and
             .version == "0.4.0" and
             .status == "research_fixture" and
             .scenario_file == "docs/research/life-civic/reference-scenarios.json" and

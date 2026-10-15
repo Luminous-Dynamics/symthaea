@@ -3,13 +3,14 @@
   "version": "0.4.0",
   "status": "research_fixture",
   "scenario_file": "docs/research/life-civic/reference-scenarios.json",
-  "scenario_git_blob_sha1": "585cc046f3c4b88feaa0f6e30cca156ad4ba5618",
+  "scenario_git_blob_sha1": "f93d01a1832c991e9284c7e7ad92a90a40e5776f",
   "digest_semantics": "Git blob SHA-1 binds exact repository object bytes for drift detection. It is not a signature, source-authenticity proof, or independent collision-resistant trust claim.",
   "claim_ceiling": [
     "The scenario document is a pinned reference input for this branch revision.",
     "Shape and boundary checks do not measure Symthaea reasoning accuracy.",
     "City newsroom examples are synthetic summaries of attributed publisher claims; they are not captured observations or independent verification.",
-    "Survey-precision scenario presence does not constitute statistical analysis or benchmark qualification."
+    "Survey-precision scenario presence does not constitute statistical analysis or benchmark qualification.",
+    "Corresponding Mycelix corpus version is a declared reference pointer, not proof of matching qualification or execution."
   ],
   "prohibited_inferences": [
     "benchmark passed",

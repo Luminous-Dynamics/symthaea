@@ -2,7 +2,7 @@
   "suite_id": "SYM-LIFE-CIVIC-REFERENCE-001",
   "version": "0.4.0",
   "status": "research_fixture",
-  "corresponding_mycelix_corpus": "MYC-LIFE-CIVIC-APPLICABILITY-001@0.1.0",
+  "corresponding_mycelix_corpus": "MYC-LIFE-CIVIC-APPLICABILITY-001@0.5.0",
   "purpose": "Test Symthaea's evidence-aware reasoning and proposed handoff boundary. Version 0.4.0 adds an explicit survey-precision control: response-rate diagnostics, indicator-specific uncertainty and national-to-local transfer claims must remain distinct; the suite is a research fixture, not a benchmark result.",
   "required_outputs": [
     "claim_classes",
