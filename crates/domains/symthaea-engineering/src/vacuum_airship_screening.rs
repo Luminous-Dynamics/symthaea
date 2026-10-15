@@ -532,6 +532,68 @@ pub fn screen_cargo_fit(request: CargoFitRequest) -> Result<CargoFitResult, Scre
     })
 }
 
+/// External-pressure force resultants for a spherical shell's great-circle cut.
+///
+/// This applies the ideal equilibrium relation C = Δp · πR² to a perfect sphere. It yields the
+/// total compressive resultant transmitted across a great-circle section, not the load on one
+/// lattice member and not a buckling prediction. Real member loads depend on topology, joint
+/// stiffness, imperfections, boundary conditions and load redistribution.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SphericalPressureLoadRequest {
+    /// Reference outer radius, metres.
+    pub radius_m: f64,
+    /// External absolute pressure, Pa.
+    pub external_pressure_pa: f64,
+    /// Internal absolute pressure, Pa.
+    pub internal_pressure_pa: f64,
+}
+
+/// Pressure load across a great-circle section under ideal spherical equilibrium.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SphericalPressureLoadResult {
+    /// Signed exterior minus interior pressure, Pa.
+    pub differential_pressure_pa: f64,
+    /// Applied positive external-pressure differential, Pa; zero for non-compressive cases.
+    pub positive_external_differential_pa: f64,
+    /// Idealized area of the great-circle cut, m².
+    pub great_circle_area_m2: f64,
+    /// Ideal compressive resultant across that cut, newtons; zero if external pressure does not exceed internal pressure.
+    pub great_circle_compressive_resultant_n: f64,
+}
+
+/// Calculate the global pressure resultant that the structural topology must transfer.
+///
+/// This helps convert a pressure requirement into a structural-load scale for subsequent analysis.
+/// It does not distribute the resultant across members or prove any material/structure is capable
+/// of resisting it.
+pub fn screen_spherical_pressure_load(
+    request: SphericalPressureLoadRequest,
+) -> Result<SphericalPressureLoadResult, ScreeningError> {
+    validate_positive(request.radius_m, "radius_m")?;
+    validate_non_negative(request.external_pressure_pa, "external_pressure_pa")?;
+    validate_non_negative(request.internal_pressure_pa, "internal_pressure_pa")?;
+
+    let differential_pressure_pa =
+        request.external_pressure_pa - request.internal_pressure_pa;
+    let positive_external_differential_pa = differential_pressure_pa.max(0.0);
+    let great_circle_area_m2 = std::f64::consts::PI * request.radius_m.powi(2);
+    let great_circle_compressive_resultant_n =
+        positive_external_differential_pa * great_circle_area_m2;
+    validate_result(differential_pressure_pa, "pressure differential")?;
+    validate_result(great_circle_area_m2, "great-circle area")?;
+    validate_result(
+        great_circle_compressive_resultant_n,
+        "great-circle compressive resultant",
+    )?;
+
+    Ok(SphericalPressureLoadResult {
+        differential_pressure_pa,
+        positive_external_differential_pa,
+        great_circle_area_m2,
+        great_circle_compressive_resultant_n,
+    })
+}
+
 /// An externally sourced pressure-capacity declaration plus the references needed to audit it.
 ///
 /// The caller must supply a conservative allowable pressure for the exact applicable design
@@ -952,6 +1014,47 @@ mod tests {
             result.unwrap_err(),
             ScreeningError::NonFiniteInput("usable_cargo_volume_m3")
         );
+    }
+
+    #[test]
+    fn twenty_metre_radius_sea_level_pressure_cut_load_is_about_127_meganewtons() {
+        let result = screen_spherical_pressure_load(SphericalPressureLoadRequest {
+            radius_m: 20.0,
+            external_pressure_pa: 101_325.0,
+            internal_pressure_pa: 0.0,
+        })
+        .unwrap();
+        assert!((result.great_circle_compressive_resultant_n - 127_573_000.0).abs() < 100_000.0);
+    }
+
+    #[test]
+    fn pressure_resultant_scales_with_radius_squared() {
+        let small = screen_spherical_pressure_load(SphericalPressureLoadRequest {
+            radius_m: 20.0,
+            external_pressure_pa: 101_325.0,
+            internal_pressure_pa: 0.0,
+        })
+        .unwrap();
+        let large = screen_spherical_pressure_load(SphericalPressureLoadRequest {
+            radius_m: 40.0,
+            external_pressure_pa: 101_325.0,
+            internal_pressure_pa: 0.0,
+        })
+        .unwrap();
+        assert!((large.great_circle_compressive_resultant_n / small.great_circle_compressive_resultant_n - 4.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn positive_internal_overpressure_produces_no_external_compressive_resultant() {
+        let result = screen_spherical_pressure_load(SphericalPressureLoadRequest {
+            radius_m: 20.0,
+            external_pressure_pa: 90_000.0,
+            internal_pressure_pa: 101_325.0,
+        })
+        .unwrap();
+        assert_eq!(result.positive_external_differential_pa, 0.0);
+        assert_eq!(result.great_circle_compressive_resultant_n, 0.0);
+        assert_eq!(result.differential_pressure_pa, -11_325.0);
     }
 
     #[test]
