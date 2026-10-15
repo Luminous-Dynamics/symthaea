@@ -858,7 +858,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_manifest_symlink_or_path_escape_outside_workspace() {
+    fn rejects_manifest_path_outside_workspace() {
         let root = fixture_root();
         let value = make_manifest(&root);
         let external_manifest = root.with_extension("outside-manifest.json");
