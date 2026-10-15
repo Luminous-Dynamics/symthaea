@@ -426,6 +426,13 @@ impl VcslLibrary {
         let vsco2_root: PathBuf = std::env::var_os("SYMTHAEA_VSCO2_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|| root.join("../vsco2-ce"));
+        Self::load_from_roots(root, &vsco2_root)
+    }
+
+    /// Load from explicit library roots. Kept separate from environment-driven
+    /// loading so tests can prove mappings without mutating process environment
+    /// or depending on a developer's sample-library installation.
+    fn load_from_roots(root: &Path, vsco2_root: &Path) -> Option<Self> {
         let mut banks = HashMap::new();
         let mut staccato_banks = HashMap::new();
         for instrument in [
@@ -456,7 +463,7 @@ impl VcslLibrary {
             if let Some((source, sub)) = sample_subdir(instrument) {
                 let base = match source {
                     SampleSource::Vcsl => root,
-                    SampleSource::Vsco2 => &vsco2_root,
+                    SampleSource::Vsco2 => vsco2_root,
                 };
                 if let Some(bank) = InstrumentBank::index(&base.join(sub)) {
                     banks.insert(instrument, bank);
@@ -465,7 +472,7 @@ impl VcslLibrary {
             if let Some((source, sub)) = staccato_subdir(instrument) {
                 let base = match source {
                     SampleSource::Vcsl => root,
-                    SampleSource::Vsco2 => &vsco2_root,
+                    SampleSource::Vsco2 => vsco2_root,
                 };
                 if let Some(bank) = InstrumentBank::index(&base.join(sub)) {
                     staccato_banks.insert(instrument, bank);
@@ -2033,36 +2040,132 @@ mod tests {
     }
 
     #[test]
-    fn wave2_instruments_deliberately_have_no_bank_pending_disk_verification() {
-        // Harpsichord/Tuba/Trombone/Duduk/ChoirOoh/Xylophone were added
-        // while neither `data/samples/vcsl` nor `data/samples/vsco2-ce`
-        // existed on disk in this environment, and this module's own doc
-        // comments didn't already establish real subdirectories for any of
-        // them (unlike the Viola/Oboe/Bassoon/French Horn/Vibraphone
-        // additions, which WERE verified before mapping) — so, per the
-        // Timpani precedent, they stay unmapped rather than guessed. This
-        // test still runs (and would still pass) if the library later
-        // appears on disk, since these instruments simply aren't in
-        // `sample_subdir`/`staccato_subdir` at all.
-        let Some(lib) = local_library() else {
-            eprintln!("VCSL not on disk — skipping");
-            return;
-        };
-        for instrument in [
-            Instrument::Harpsichord,
-            Instrument::Tuba,
-            Instrument::Trombone,
-            Instrument::Duduk,
-            Instrument::ChoirOoh,
-            Instrument::Xylophone,
-        ] {
-            assert!(
-                lib.bank(instrument).is_none(),
-                "{instrument:?} deliberately unmapped pending real on-disk verification"
+    fn verified_wave2_mappings_index_sustain_and_brass_staccato_samples() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-wave2-mapping-fixture-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let vcsl_root = root.join("data/samples/vcsl");
+        let vsco2_root = root.join("data/samples/vsco2-ce");
+
+        fn write_fixture_wav(path: &Path, amplitude: i16) {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            let spec = hound::WavSpec {
+                channels: 1,
+                sample_rate: 22050,
+                bits_per_sample: 16,
+                sample_format: hound::SampleFormat::Int,
+            };
+            let mut writer = hound::WavWriter::create(path, spec).unwrap();
+            for index in 0..256 {
+                writer.write_sample(if index % 2 == 0 {
+                    amplitude
+                } else {
+                    -amplitude
+                }).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+
+        let samples = [
+            (
+                Instrument::Harpsichord,
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Harpsichord, English/Sustains/Normal",
+                "ZuckermannKitHarpsi_Normal_Sus_C4_rr1.wav",
+                60.0,
+                0.7,
+            ),
+            (
+                Instrument::Xylophone,
+                SampleSource::Vcsl,
+                "Idiophones/Struck Idiophones/Xylophone/Hard Mallets",
+                "Xylo_Hard_C4_ff_01_far.wav",
+                60.0,
+                1.0,
+            ),
+            (
+                Instrument::Tuba,
+                SampleSource::Vsco2,
+                "Brass/Tuba/sus",
+                "Tuba3_sus_C3_v2_rr1_Sum.wav",
+                48.0,
+                1.0,
+            ),
+            (
+                Instrument::Trombone,
+                SampleSource::Vsco2,
+                "Brass/Tenor Trombone/sus",
+                "Trombone_sus_C3_v2_rr1_Sum.wav",
+                48.0,
+                1.0,
+            ),
+        ];
+
+        for (instrument, source, relative_dir, filename, _midi, _velocity) in samples {
+            let library_root = match source {
+                SampleSource::Vcsl => &vcsl_root,
+                SampleSource::Vsco2 => &vsco2_root,
+            };
+            write_fixture_wav(&library_root.join(relative_dir).join(filename), 8000);
+            assert_eq!(
+                sample_subdir(instrument),
+                Some((source, relative_dir)),
+                "source mapping for {instrument:?} should stay explicit"
             );
         }
-    }
 
+        write_fixture_wav(
+            &vsco2_root
+                .join("Brass/Tuba/stac")
+                .join("Tuba3_stac_C3_v2_rr1_Sum.wav"),
+            8000,
+        );
+        write_fixture_wav(
+            &vsco2_root
+                .join("Brass/Tenor Trombone/stac")
+                .join("Trombone_stac_C3_v2_rr1_Sum.wav"),
+            8000,
+        );
+
+        assert_eq!(
+            staccato_subdir(Instrument::Tuba),
+            Some((SampleSource::Vsco2, "Brass/Tuba/stac"))
+        );
+        assert_eq!(
+            staccato_subdir(Instrument::Trombone),
+            Some((SampleSource::Vsco2, "Brass/Tenor Trombone/stac"))
+        );
+
+        let library = VcslLibrary::load_from_roots(&vcsl_root, &vsco2_root)
+            .expect("four real-source mappings should load from the controlled fixture");
+        for (instrument, _source, _relative_dir, _filename, midi, velocity) in samples {
+            assert!(
+                library.can_play(instrument, midi, velocity),
+                "{instrument:?} should select its indexed real sample in the fixture"
+            );
+            assert!(library.bank(instrument).is_some());
+        }
+        for instrument in [Instrument::Tuba, Instrument::Trombone] {
+            assert!(
+                library.staccato_bank(instrument).is_some(),
+                "{instrument:?} should load its real short articulation"
+            );
+            assert!(
+                library
+                    .staccato_bank(instrument)
+                    .unwrap()
+                    .pick(48.0, 1.0, 0)
+                    .is_some()
+            );
+        }
+
+        // These two still lack a matching sample set in either inspected source.
+        assert!(sample_subdir(Instrument::Duduk).is_none());
+        assert!(sample_subdir(Instrument::ChoirOoh).is_none());
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn staccato_banks_index_for_the_lead_instruments() {
         let vsco2 = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../data/samples/vsco2-ce");
