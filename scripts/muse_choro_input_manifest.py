@@ -101,7 +101,7 @@ def require_string_list(value: Any, label: str, allowed: set[str] | None = None)
 def validate_analysis_plan(
     scope: dict[str, Any],
     analysis_plan_root: Path = ROOT,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """Verify a separately frozen, externally registered analysis-plan artifact."""
     plan = require_object(scope.get("analysis_plan"), "scope.analysis_plan")
     plan_id = require_text(plan.get("plan_id"), "scope.analysis_plan.plan_id")
