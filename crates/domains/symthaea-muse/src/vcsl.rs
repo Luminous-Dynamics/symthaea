@@ -545,6 +545,10 @@ pub struct InstrumentCapabilityInventoryV1 {
 pub struct FluidSynthRuntimeProbeV1 {
     pub status: &'static str,
     pub binary_name: String,
+    /// First non-empty line from fluidsynth --version; null if unsupported or unsuccessful.
+    pub binary_version: Option<String>,
+    /// SHA-256 of the resolved executable bytes, not of its shared libraries.
+    pub binary_sha256: String,
     pub soundfont_sha256: String,
     pub requested_program_count: usize,
     pub rendered_non_silent_count: usize,
@@ -969,6 +973,48 @@ fn audit_one_wav(path: &Path) -> std::io::Result<(u32, u16, f32, f32, u64)> {
     Ok((spec.sample_rate, spec.channels, peak, rms, frames))
 }
 
+fn resolve_executable(binary: &Path) -> std::io::Result<PathBuf> {
+    let has_path_component = binary.is_absolute()
+        || binary
+            .components()
+            .any(|component| !matches!(component, std::path::Component::Normal(_)));
+    let resolved = if binary.is_absolute() || has_path_component {
+        binary.to_path_buf()
+    } else {
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+            .map(|directory| directory.join(binary))
+            .find(|candidate| candidate.is_file())
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("FluidSynth executable not found on PATH: {}", binary.display()),
+                )
+            })?
+    };
+    if !resolved.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("FluidSynth executable is not a file: {}", resolved.display()),
+        ));
+    }
+    Ok(resolved)
+}
+
+fn sha256_file(path: &Path) -> std::io::Result<String> {
+    use std::io::Read as _;
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(hex_digest(hasher.finalize()))
+}
+
 static FLUIDSYNTH_PROBE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn probe_midi_bytes(program: u8, note: u8, velocity: u8) -> Vec<u8> {
@@ -999,6 +1045,26 @@ fn probe_fluidsynth_programs(
     preset_inventory: &SoundFontPresetInventoryV1,
     programs: impl Iterator<Item = u8>,
 ) -> std::io::Result<FluidSynthRuntimeProbeV1> {
+    let resolved_binary = resolve_executable(binary)?;
+    let binary_sha256 = sha256_file(&resolved_binary)?;
+    let version_output = std::process::Command::new(&resolved_binary)
+        .arg("--version")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output()?;
+    let version_text = if version_output.status.success() {
+        let stdout = String::from_utf8_lossy(&version_output.stdout);
+        let stderr = String::from_utf8_lossy(&version_output.stderr);
+        stdout
+            .lines()
+            .chain(stderr.lines())
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .map(|line| line.chars().take(200).collect::<String>())
+    } else {
+        None
+    };
+
     let unique_programs = programs.collect::<std::collections::BTreeSet<_>>();
     let mut results = Vec::with_capacity(unique_programs.len());
     let mut rendered_non_silent_count = 0usize;
@@ -1037,7 +1103,7 @@ fn probe_fluidsynth_programs(
         // The -n/-i pair disables live MIDI and the shell. -F renders the
         // supplied MIDI to a WAV file without requiring an audio device.
         // Disable chorus/reverb to keep this small mechanical probe controlled.
-        let command_result = std::process::Command::new(binary)
+        let command_result = std::process::Command::new(&resolved_binary)
             .arg("-n")
             .arg("-i")
             .arg("-g")
@@ -1113,11 +1179,13 @@ fn probe_fluidsynth_programs(
 
     Ok(FluidSynthRuntimeProbeV1 {
         status: "fluidsynth_render_probes_completed",
-        binary_name: binary
+        binary_name: resolved_binary
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .into_owned(),
+        binary_version: version_text,
+        binary_sha256,
         soundfont_sha256: soundfont_sha256.to_owned(),
         requested_program_count: results.len(),
         rendered_non_silent_count,
@@ -1822,7 +1890,7 @@ mod tests {
         // without pretending CI has a real SoundFont or installed FluidSynth.
         let fake_binary = root.join("fake-fluidsynth");
         let script = format!(
-            "#!/bin/sh\nout=''\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-F\" ]; then shift; out=\"$1\"; fi\n  shift\ndone\ncp \"{}\" \"$out\"\n",
+            "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 'fake-fluidsynth fixture 1'; exit 0; fi\nout=''\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-F\" ]; then shift; out=\"$1\"; fi\n  shift\ndone\ncp \"{}\" \"$out\"\n",
             output_fixture.display()
         );
         std::fs::write(&fake_binary, script).unwrap();
@@ -1840,6 +1908,9 @@ mod tests {
         .unwrap();
 
         assert_eq!(probe.status, "fluidsynth_render_probes_completed");
+        assert_eq!(probe.binary_name, "fake-fluidsynth");
+        assert_eq!(probe.binary_version.as_deref(), Some("fake-fluidsynth fixture 1"));
+        assert_eq!(probe.binary_sha256, sha256_file(&fake_binary).unwrap());
         assert_eq!(probe.requested_program_count, 2);
         assert_eq!(probe.rendered_non_silent_count, 1);
         assert_eq!(probe.programs[0].program_0_based, 0);
