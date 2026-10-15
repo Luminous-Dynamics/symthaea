@@ -917,19 +917,24 @@ fn sample_audio_evidence_status(
     failed: usize,
     silent: usize,
 ) -> &'static str {
-    if indexed == 0 {
+    // Every indexed file must be either fully decoded or counted as a decode
+    // failure; silence can only be counted among decoded files. Refuse to
+    // silently classify impossible evidence if these accounting invariants break.
+    if decoded.checked_add(failed) != Some(indexed)
+        || decoded > indexed
+        || failed > indexed
+        || silent > decoded
+    {
+        "inconsistent_audio_evidence_counts"
+    } else if indexed == 0 {
         "no_indexed_samples"
     } else if decoded == 0 {
-        if failed > 0 {
-            "all_indexed_samples_failed_decode"
-        } else {
-            "no_decoded_samples"
-        }
+        "all_indexed_samples_failed_decode"
     } else {
         let has_silent = silent > 0;
         let has_non_silent = silent < decoded;
         match (has_silent, has_non_silent, failed > 0) {
-            (false, false, _) => "decode_count_inconsistent",
+            (false, false, _) => "inconsistent_audio_evidence_counts",
             (true, false, true) => "decoded_silent_and_other_samples_failed",
             (true, false, false) => "decoded_silent_only",
             (true, true, true) => "mixed_silent_non_silent_and_decode_failures",
@@ -2123,6 +2128,8 @@ mod tests {
     fn sample_audio_evidence_status_is_conservative_and_exhaustive() {
         let cases = [
             (0, 0, 0, 0, "no_indexed_samples"),
+            (3, 1, 1, 0, "inconsistent_audio_evidence_counts"),
+            (2, 1, 1, 2, "inconsistent_audio_evidence_counts"),
             (2, 0, 2, 0, "all_indexed_samples_failed_decode"),
             (1, 0, 0, 0, "no_decoded_samples"),
             (2, 2, 0, 2, "decoded_silent_only"),
