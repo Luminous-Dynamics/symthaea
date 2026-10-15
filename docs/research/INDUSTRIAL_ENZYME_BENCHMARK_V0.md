@@ -98,6 +98,27 @@ cargo run -p xtask -- enzyme-calibration-check \
 
 The command fails closed on byte-hash mismatch, unsupported equation, duplicate sample IDs, mixed concentration units, invalid declared range, or disagreement between the recomputed fit and embedded slope/R²/RMSD.
 
+#### Kinetic-pipeline checkpoints from the related 30-condition thesis dataset
+
+The related [DaRUS-3337 thesis dataset](https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi%3A10.18419%2FDARUS-3337) and its [SLAC characterization chapter](https://haeussma.github.io/masterthesis/scenarios/SLAC_kinetic_characterization.html) describe a *broader* experiment than the five-temperature calibration subset above. Keep these source versions and scopes separate until their specific OMEX/data-file lineage is verified.
+
+The chapter's reported design comprises 30 kinetic assays across pH 3.0–5.5 and 25–45 °C, initial ABTS concentrations of 0–200 µM, no-enzyme controls, two measurement wavelengths (340 nm for ABTS and 420 nm for oxidized product), and a 15-minute time course with more than 100,000 individual absorbance readings. The reproducible transform is therefore not just a calibration-line fit: map photometer exports to the expected measurement/species IDs, subtract the control-derived blank, apply the *matching pH-and-temperature* standards at the correct wavelength, and do not extrapolate beyond calibration bounds.
+
+The thesis reports a 3.2 absorbance cutoff for calibration points. Its usable upper concentration boundary is pH-dependent: 150 µM at pH 3.0, 3.5 and 5.5, and 175 µM at the other pH values. The five JSON files in the DaRUS-3867 smoke check are the pH-3 calibration files across five temperatures; they do **not** verify the other pH-dependent curves in the 30-condition thesis dataset. The thesis' calibration sample list, calibration-range cutoff, and observations dropped because absorbance was out of range should be reproduced as declared rules and recorded as counts/reasons, not reconstructed by guesswork.
+
+A second, independent step in the broad workflow estimates a per-assay product signal factor (k), because no direct product calibration was available. The source models mass balance as (S_t + kP_t - S_0) (using its control measurements) and chooses (k) to minimize time-course slopes. That factor is a fitted mass-balance parameter—not a unit conversion and not permission to rescale product until the kinetic model looks good. Preserve the source's bounds, residual definition, fitting algorithm and per-assay values as a separate artifact. The chapter flags problematic mass balance at pH 4.0/45 °C and pH 4.5/35 °C, where intended substrate conditions were not achieved and estimated parameters were high uncertainty.
+
+For model reproduction, the chapter ultimately selects **irreversible Michaelis–Menten with time-dependent enzyme inactivation**. It excluded product-inhibition models after negative calculated product concentrations, and substrate-inhibition models when AIC worsened and parameter standard deviations exceeded 100%. For the pH 3.0 / 25 °C example, the chapter reports the following reference results:
+
+| Model | AIC | (K_m) (µM) | (k_{cat}) (s⁻¹) | Inactivation (k_i) (s⁻¹) |
+|---|---:|---:|---:|---:|
+| Irreversible Michaelis–Menten, no time-dependent inactivation | −162 | 35.473 (5.52% relative uncertainty) | 0.308 (2.07%) | — |
+| Irreversible Michaelis–Menten with time-dependent inactivation | −476 | 35.137 (3.00%) | 0.460 (1.95%) | 0.001 (4.47%) |
+
+These are values reported in the *related thesis*, not a claim that the current Rust implementation has reproduced them or that this table alone validates the DaRUS-3867 OMEX model. The chapter reports that omitting inactivation underestimates (k_{cat}) by about 33%. That provides a strong future regression test: reproduce the source-selected model and uncertainty treatment, and retain the no-inactivation fit as a prespecified ablation rather than silently using whichever model looks best. It also reports excluding unreliable rows (including pH 4.0/45 °C, pH 4.5/35 °C, and pH 5.5/35 °C) after diagnosing boundary hits, mass-balance outliers, or unestimable uncertainty. Those exclusions must be explicit, frozen, and counted.
+
+**Recommended sequence:** qualify the five-file pH-3 calibration replay first; next reproduce each available temperature-specific OMEX kinetic fit for that same source version; only then expand to the thesis' broader 30-condition pipeline with per-pH calibrations, control corrections, product-factor estimation, model comparison, and explicit failed-fit accounting. Do not blend the two dataset versions or use the reported (k_{cat}) table as validation until the matching raw measurements, OMEX model and exact analysis revision have been pinned.
+
 ### Executable admission gate
 
 A fail-closed Rust checker is wired into the existing workspace task runner:
