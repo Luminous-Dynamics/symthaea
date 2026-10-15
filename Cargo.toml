@@ -20,6 +20,9 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # Source-only placeholder (src/lib.rs without Cargo.toml); do not include it
+    # through the crates/core/* glob until the package manifest is restored.
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
