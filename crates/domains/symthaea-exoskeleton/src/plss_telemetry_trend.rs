@@ -202,11 +202,6 @@ pub fn analyze_plss_telemetry_trends(
                     saw_invalid = true;
                     continue;
                 }
-                if observation.confidence < config.minimum_confidence || observation.confidence <= 0.0 {
-                    excluded_low_confidence += 1;
-                    saw_low_confidence = true;
-                    continue;
-                }
                 if observation.observed_at_s > config.window_end_s {
                     rejected_future += 1;
                     saw_future = true;
@@ -215,6 +210,11 @@ pub fn analyze_plss_telemetry_trends(
                 if observation.observed_at_s < config.window_start_s {
                     excluded_window += 1;
                     saw_outside = true;
+                    continue;
+                }
+                if observation.confidence < config.minimum_confidence || observation.confidence <= 0.0 {
+                    excluded_low_confidence += 1;
+                    saw_low_confidence = true;
                     continue;
                 }
                 accepted_count += 1;
