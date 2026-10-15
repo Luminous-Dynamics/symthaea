@@ -21,13 +21,27 @@ use symthaea_core::hdc::unified_hv::{BinaryHV, HDC_DIMENSION};
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+/// One entity-specific semantic-role binding within an encoded fact.
+///
+/// This is a collection, not a map: distinct entities may share a semantic role
+/// and must not overwrite one another during encoding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoleBinding {
+    pub role: SemanticRole,
+    /// Surface text identifying the entity this vector encodes.
+    pub entity_text: String,
+    /// Role-bound entity/type vector, before it is bundled into the fact vector.
+    pub vector: BinaryHV,
+}
+
 /// An HDC-encoded fact ready for storage and similarity search
 #[derive(Debug, Clone)]
 pub struct FactEncoding {
     /// The composite hypervector representing this fact
     pub vector: BinaryHV,
-    /// Role-specific sub-vectors for compositional queries
-    pub role_vectors: HashMap<SemanticRole, BinaryHV>,
+    /// Entity-specific role bindings for compositional queries. Multiple entities
+    /// may share a role, so bindings are retained as an ordered collection.
+    pub role_vectors: Vec<RoleBinding>,
     /// Structured source relations retained independently of the bundled vector.
     ///
     /// HDC bundling is a lossy retrieval representation; predicates, negation and
@@ -152,7 +166,7 @@ impl KnowledgeEncoder {
     /// The encoding binds each entity's vector with its semantic role basis,
     /// then bundles all role-bound vectors into a single fact representation.
     pub fn encode_fact(&mut self, fact: &ExtractedFact) -> FactEncoding {
-        let mut role_vectors = HashMap::new();
+        let mut role_vectors = Vec::new();
         let mut components = Vec::new();
 
         // Encode each entity with its role
@@ -172,7 +186,11 @@ impl KnowledgeEncoder {
                 if let Some(role_basis) = self.role_bases.get(role) {
                     // role_bound = role_basis ⊗ entity_typed
                     let role_bound = role_basis.bind(&entity_typed);
-                    role_vectors.insert(*role, role_bound.clone());
+                    role_vectors.push(RoleBinding {
+                        role: *role,
+                        entity_text: entity.text.clone(),
+                        vector: role_bound.clone(),
+                    });
                     components.push(role_bound);
                 }
             }
