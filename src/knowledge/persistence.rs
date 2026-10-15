@@ -489,15 +489,17 @@ impl KnowledgePersistence {
 
         let mut prepared_edges = Vec::with_capacity(edges.len());
         for edge in edges {
-            if !edge.strength.is_finite() {
+            if !edge.strength.is_finite() || edge.strength.abs() > 1.0 {
                 return Err(format!(
-                    "Non-finite causal edge strength for {} -> {}",
-                    edge.cause, edge.effect
+                    "Invalid causal edge strength outside [-1, 1] for {} -> {}: {}",
+                    edge.cause, edge.effect, edge.strength
                 ));
             }
             let cycle = i64::try_from(edge.cycle)
                 .map_err(|e| format!("Causal-edge cycle exceeds SQLite INTEGER range: {e}"))?;
-            prepared_edges.push((edge, cycle));
+            let strength = edge.strength.abs();
+            let is_inhibitory = edge.is_inhibitory || edge.strength < 0.0;
+            prepared_edges.push((edge, cycle, strength, is_inhibitory));
         }
 
         let mut prepared_ontology = Vec::with_capacity(ontology.len());
@@ -555,19 +557,21 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
         }
 
-        for (edge, cycle) in &prepared_edges {
-            // The live bridge can retain multiple observations for the same
-            // (cause, effect) pair, while SQLite stores one row per pair. Match
-            // the legacy upsert contract: the later observation replaces the row.
+        for (edge, cycle, strength, is_inhibitory) in &prepared_edges {
+            // Unlike the legacy save API, a full snapshot preserves every edge
+            // observation, including same-pair observations with distinct source
+            // text, negation, inhibitory polarity, or discovery cycle.
             tx.execute(
-                "INSERT OR REPLACE INTO knowledge_causal_edges
-                 (cause, effect, strength, is_inhibitory, cycle)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO knowledge_causal_edges
+                 (cause, effect, strength, is_inhibitory, is_negated, source_text, cycle)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     edge.cause,
                     edge.effect,
-                    edge.strength,
-                    edge.is_inhibitory,
+                    strength,
+                    is_inhibitory,
+                    edge.is_negated,
+                    edge.source_text,
                     cycle,
                 ],
             )
@@ -704,15 +708,33 @@ impl KnowledgePersistence {
 
         let mut count = 0;
         for edge in edges {
+            if !edge.strength.is_finite() || edge.strength.abs() > 1.0 {
+                return Err(format!(
+                    "Invalid causal edge strength outside [-1, 1] for {} -> {}: {}",
+                    edge.cause, edge.effect, edge.strength
+                ));
+            }
+            let cycle = i64::try_from(edge.cycle)
+                .map_err(|e| format!("Causal-edge cycle exceeds SQLite INTEGER range: {e}"))?;
+            // Preserve the historical upsert-by-pair behavior of this legacy API.
+            // The complete snapshot API below preserves repeated observations.
             conn.execute(
-                "INSERT OR REPLACE INTO knowledge_causal_edges (cause, effect, strength, is_inhibitory, cycle)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "DELETE FROM knowledge_causal_edges WHERE cause = ?1 AND effect = ?2",
+                rusqlite::params![edge.cause, edge.effect],
+            )
+            .map_err(|e| format!("Replace existing causal edge: {e}"))?;
+            conn.execute(
+                "INSERT INTO knowledge_causal_edges
+                 (cause, effect, strength, is_inhibitory, is_negated, source_text, cycle)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     edge.cause,
                     edge.effect,
-                    edge.strength,
-                    edge.is_inhibitory,
-                    edge.cycle as i64,
+                    edge.strength.abs(),
+                    edge.is_inhibitory || edge.strength < 0.0,
+                    edge.is_negated,
+                    edge.source_text,
+                    cycle,
                 ],
             )
             .map_err(|e| e.to_string())?;
@@ -736,19 +758,29 @@ impl KnowledgePersistence {
 
         let mut stmt = conn
             .prepare(
-                "SELECT cause, effect, strength, is_inhibitory, cycle FROM knowledge_causal_edges",
+                "SELECT cause, effect, strength, is_inhibitory, is_negated, source_text, cycle
+                 FROM knowledge_causal_edges ORDER BY edge_id",
             )
             .map_err(|e| e.to_string())?;
 
         let edges: Vec<CausalEdgeRecord> = stmt
             .query_map([], |row| {
                 let strength = decode_finite_f32(row.get(2)?, 2, "causal strength")?;
-                let cycle = decode_nonnegative_counter(row.get(4)?, 4, "causal-edge cycle")?;
+                if strength < 0.0 || strength > 1.0 {
+                    return Err(invalid_column_data(
+                        2,
+                        rusqlite::types::Type::Real,
+                        format!("persisted causal strength outside [0, 1]: {strength}"),
+                    ));
+                }
+                let cycle = decode_nonnegative_counter(row.get(6)?, 6, "causal-edge cycle")?;
                 Ok(CausalEdgeRecord {
                     cause: row.get(0)?,
                     effect: row.get(1)?,
                     strength,
                     is_inhibitory: row.get(3)?,
+                    is_negated: row.get(4)?,
+                    source_text: row.get(5)?,
                     cycle,
                 })
             })
