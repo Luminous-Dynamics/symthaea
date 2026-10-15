@@ -269,20 +269,66 @@ impl IntegratedEvaMission {
             };
         }
 
-        // A known-failed critical atmosphere-control path is not treated as
-        // safe merely because this reduced-order model can continue calculating.
-        // This is a mission-planning disposition only; it does not command hardware.
+        // Use the no-assist workload as a conservative planning estimate so
+        // a mobility-power shortfall cannot make the planned atmosphere load
+        // look artificially small. This is a reference model, not physiology validation.
+        let Some(planned_metabolism) = self.metabolic.estimate(HumanWorkload {
+            positive_mechanical_power_w: segment.gross_positive_mechanical_power_w,
+            negative_mechanical_power_w: segment.negative_mechanical_power_w,
+        }) else {
+            return self.abort_segment(segment, EvaMissionAbortReason::InvalidMetabolicState);
+        };
+        let planned_minutes = segment.duration_s / 60.0;
+        let planned_co2_l = planned_metabolism.co2_l_min * planned_minutes;
+        let planned_humidity_g = segment.humidity_generation_g_per_min * planned_minutes;
+        if !planned_minutes.is_finite()
+            || !planned_co2_l.is_finite()
+            || !planned_humidity_g.is_finite()
+        {
+            return self.abort_segment(segment, EvaMissionAbortReason::InvalidMetabolicState);
+        }
+
+        // A known-failed path, residual burden, insufficient removal rate, or
+        // inadequate capacity vetoes the planned segment. This is a mission-
+        // planning recommendation only; it does not command physical hardware.
         let plss_state = self.plss.state();
         let plss_config = self.plss.config();
+        let ventilation_factor = match plss_state.ventilation {
+            crate::plss::PlssPathState::Available => 1.0,
+            crate::plss::PlssPathState::Degraded => 0.6,
+            crate::plss::PlssPathState::Failed => 0.0,
+        };
+        let co2_scrubber_factor = match plss_state.co2_scrubber {
+            crate::plss::PlssPathState::Available => 1.0,
+            crate::plss::PlssPathState::Degraded => 0.5,
+            crate::plss::PlssPathState::Failed => 0.0,
+        };
+        let humidity_control_factor = match plss_state.humidity_control {
+            crate::plss::PlssPathState::Available => 1.0,
+            crate::plss::PlssPathState::Degraded => 0.5,
+            crate::plss::PlssPathState::Failed => 0.0,
+        };
+        let effective_co2_rate =
+            plss_config.co2_scrubber_removal_rate_l_min * ventilation_factor * co2_scrubber_factor;
+        let effective_humidity_rate =
+            plss_config.humidity_removal_rate_g_min * ventilation_factor * humidity_control_factor;
         let co2_path_unavailable = plss_state.co2_scrubber == crate::plss::PlssPathState::Failed
+            || !plss_state.co2_burden_l.is_finite()
+            || plss_state.co2_burden_l > 0.0
             || !plss_state.co2_scrubber_capacity_remaining_l.is_finite()
             || plss_state.co2_scrubber_capacity_remaining_l <= 0.0
-            || plss_config.co2_scrubber_removal_rate_l_min <= 0.0;
+            || !effective_co2_rate.is_finite()
+            || effective_co2_rate < planned_metabolism.co2_l_min
+            || plss_state.co2_scrubber_capacity_remaining_l < planned_co2_l;
         let humidity_path_unavailable =
             plss_state.humidity_control == crate::plss::PlssPathState::Failed
+                || !plss_state.humidity_vapor_burden_g.is_finite()
+                || plss_state.humidity_vapor_burden_g > 0.0
                 || !plss_state.humidity_collector_capacity_remaining_g.is_finite()
                 || plss_state.humidity_collector_capacity_remaining_g <= 0.0
-                || plss_config.humidity_removal_rate_g_min <= 0.0;
+                || !effective_humidity_rate.is_finite()
+                || effective_humidity_rate < segment.humidity_generation_g_per_min
+                || plss_state.humidity_collector_capacity_remaining_g < planned_humidity_g;
         if co2_path_unavailable || humidity_path_unavailable {
             return EvaMissionSegmentReport {
                 name: segment.name.clone(),
@@ -411,9 +457,11 @@ impl IntegratedEvaMission {
         let plss_config = self.plss.config();
         if plss_state.co2_scrubber == crate::plss::PlssPathState::Failed
             || plss_state.co2_scrubber_capacity_remaining_l <= 0.0
+            || plss_state.co2_burden_l > 0.0
             || plss_config.co2_scrubber_removal_rate_l_min <= 0.0
             || plss_state.humidity_control == crate::plss::PlssPathState::Failed
             || plss_state.humidity_collector_capacity_remaining_g <= 0.0
+            || plss_state.humidity_vapor_burden_g > 0.0
             || plss_config.humidity_removal_rate_g_min <= 0.0
         {
             disposition = disposition.max(EvaMissionDisposition::ReturnToSafeHaven);
