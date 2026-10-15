@@ -17,7 +17,7 @@ const PAIRS: [((f64, f64), (f64, f64)); 10] = [
     ((0.0, 179.9), (0.0, -179.9)), // short antimeridian crossing
     ((89.9, 45.0), (89.9, -135.0)), // high-latitude
     ((-65.33345275784633, -60.105346073003815),
-     (65.33345223272934, 119.89465306676738)), // nearly antipodal
+     (65.33345223272934, 119.89565306676738)), // nearly antipodal but finite on unpatched baseline
     ((-33.8688, 151.2093), (35.6762, 139.6503)), // Sydney -> Tokyo
     ((0.0, 0.0), (0.0, 90.0)), // quarter equator
     ((90.0, 0.0), (-90.0, 0.0)), // pole to pole
