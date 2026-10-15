@@ -315,6 +315,163 @@ impl KnowledgePersistence {
         Ok(count)
     }
 
+    /// Atomically replace the complete persisted knowledge state.
+    ///
+    /// This operation owns snapshot semantics for facts, causal edges, and
+    /// ontology primitives. Unlike the legacy append/upsert methods, it removes
+    /// records that are no longer present in the live state. Every input is
+    /// validated before the transaction begins, and all three collections are
+    /// replaced in one SQLite transaction so a failed write preserves the
+    /// previous committed snapshot.
+    pub fn replace_knowledge_snapshot(
+        &mut self,
+        facts: &[FactRecord],
+        edges: &[CausalEdgeRecord],
+        ontology: &[OntologyRecord],
+    ) -> Result<(usize, usize, usize), String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        // Validate and convert every lossy SQLite INTEGER boundary before
+        // touching the database. A caller must never persist state that the
+        // strict readers would reject on the next startup.
+        let mut prepared_facts = Vec::with_capacity(facts.len());
+        for fact in facts {
+            validate_hypervector_bytes(&fact.vector_bytes, 0)
+                .map_err(|e| format!("Invalid fact snapshot vector: {e}"))?;
+            if !fact.confidence.is_finite() || !(0.0..=1.0).contains(&fact.confidence) {
+                return Err(format!(
+                    "Invalid fact snapshot confidence outside [0, 1]: {}",
+                    fact.confidence
+                ));
+            }
+            if let Some(initial_confidence) = fact.initial_confidence {
+                if !initial_confidence.is_finite()
+                    || !(0.0..=1.0).contains(&initial_confidence)
+                {
+                    return Err(format!(
+                        "Invalid fact initial confidence outside [0, 1]: {initial_confidence}"
+                    ));
+                }
+            }
+            let cycle = i64::try_from(fact.cycle)
+                .map_err(|e| format!("Fact insertion cycle exceeds SQLite INTEGER range: {e}"))?;
+            let last_accessed_cycle = fact
+                .last_accessed_cycle
+                .map(i64::try_from)
+                .transpose()
+                .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
+            prepared_facts.push((fact, cycle, last_accessed_cycle));
+        }
+
+        let mut prepared_edges = Vec::with_capacity(edges.len());
+        for edge in edges {
+            if !edge.strength.is_finite() {
+                return Err(format!(
+                    "Non-finite causal edge strength for {} -> {}",
+                    edge.cause, edge.effect
+                ));
+            }
+            let cycle = i64::try_from(edge.cycle)
+                .map_err(|e| format!("Causal-edge cycle exceeds SQLite INTEGER range: {e}"))?;
+            prepared_edges.push((edge, cycle));
+        }
+
+        let mut prepared_ontology = Vec::with_capacity(ontology.len());
+        for record in ontology {
+            validate_hypervector_bytes(&record.vector_bytes, 1)
+                .map_err(|e| format!("Invalid ontology snapshot vector: {e}"))?;
+            if !record.utility.is_finite() {
+                return Err(format!(
+                    "Non-finite ontology utility for {}: {}",
+                    record.name, record.utility
+                ));
+            }
+            let usage_count = i64::try_from(record.usage_count)
+                .map_err(|e| format!("Ontology usage count exceeds SQLite INTEGER range: {e}"))?;
+            let created_at_cycle = i64::try_from(record.created_at_cycle)
+                .map_err(|e| format!("Ontology creation cycle exceeds SQLite INTEGER range: {e}"))?;
+            let last_used_cycle = i64::try_from(record.last_used_cycle)
+                .map_err(|e| format!("Ontology last-used cycle exceeds SQLite INTEGER range: {e}"))?;
+            prepared_ontology.push((record, usage_count, created_at_cycle, last_used_cycle));
+        }
+
+        let mut conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(|e| format!("Begin knowledge snapshot transaction: {e}"))?;
+
+        tx.execute("DELETE FROM knowledge_facts", [])
+            .map_err(|e| format!("Clear fact snapshot: {e}"))?;
+        tx.execute("DELETE FROM knowledge_causal_edges", [])
+            .map_err(|e| format!("Clear causal-edge snapshot: {e}"))?;
+        tx.execute("DELETE FROM knowledge_ontology", [])
+            .map_err(|e| format!("Clear ontology snapshot: {e}"))?;
+
+        for (fact, cycle, last_accessed_cycle) in &prepared_facts {
+            tx.execute(
+                "INSERT INTO knowledge_facts
+                 (vector_blob, source_text, confidence, domain, cycle, is_causal,
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params![
+                    fact.vector_bytes,
+                    fact.source_text,
+                    fact.confidence,
+                    fact.domain,
+                    cycle,
+                    fact.is_causal,
+                    fact.initial_confidence,
+                    last_accessed_cycle,
+                    fact.corroboration_count as i64,
+                    fact.contradiction_count as i64,
+                ],
+            )
+            .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
+        }
+
+        for (edge, cycle) in &prepared_edges {
+            tx.execute(
+                "INSERT INTO knowledge_causal_edges
+                 (cause, effect, strength, is_inhibitory, cycle)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![
+                    edge.cause,
+                    edge.effect,
+                    edge.strength,
+                    edge.is_inhibitory,
+                    cycle,
+                ],
+            )
+            .map_err(|e| format!("Insert causal-edge snapshot row: {e}"))?;
+        }
+
+        for (record, usage_count, created_at_cycle, last_used_cycle) in &prepared_ontology {
+            tx.execute(
+                "INSERT INTO knowledge_ontology
+                 (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    record.name,
+                    record.vector_bytes,
+                    usage_count,
+                    record.utility,
+                    created_at_cycle,
+                    last_used_cycle,
+                    record.is_a_parent,
+                ],
+            )
+            .map_err(|e| format!("Insert ontology snapshot row: {e}"))?;
+        }
+
+        tx.commit()
+            .map_err(|e| format!("Commit knowledge snapshot: {e}"))?;
+        self.total_saved += (facts.len() + edges.len() + ontology.len()) as u64;
+        Ok((facts.len(), edges.len(), ontology.len()))
+    }
+
     /// Load all fact records from the database.
     pub fn load_facts(&mut self) -> Result<Vec<FactRecord>, String> {
         if !self.is_configured() {
