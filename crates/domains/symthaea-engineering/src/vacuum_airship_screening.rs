@@ -916,7 +916,8 @@ fn validate_bounds(
 /// A declared interval for qualified external-pressure capacity plus audit references.
 ///
 /// Non-empty identifiers establish only metadata completeness: this screen cannot authenticate
-/// the artifacts, establish that the allowable is qualified, or validate that the evidence applies.
+/// the artifacts, establish that the allowable is qualified, or validate that the evidence
+/// applies.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PressureCapacityBoundsRecord {
     /// Lower/upper independently sourced allowable external differential pressure, Pa.
@@ -989,7 +990,7 @@ pub enum PressureBoundsAssessment {
 /// For independent bounded inputs, the signed differential lies in
 /// [external.min - internal.max, external.max - internal.min]. Positive demand is the maximum
 /// of that differential and zero. This function compares bounds only; it performs no shell
-/// analysis and must not be used to turn an unqualified prediction into qualified capacity.
+/// analysis and must not turn an unqualified prediction into qualified capacity.
 pub fn assess_external_pressure_bounds(
     request: ExternalPressureBoundsRequest,
 ) -> Result<PressureBoundsAssessment, ScreeningError> {
@@ -1689,7 +1690,13 @@ mod tests {
             internal_pressure_pa: 0.0,
         })
         .unwrap();
-        assert!((large.great_circle_compressive_resultant_n / small.great_circle_compressive_resultant_n - 4.0).abs() < 1e-12);
+        assert!(
+            (large.great_circle_compressive_resultant_n
+                / small.great_circle_compressive_resultant_n
+                - 4.0)
+                .abs()
+                < 1e-12
+        );
     }
 
     #[test]
@@ -1924,7 +1931,12 @@ mod tests {
             Some(pressure_capacity_bounds(105_000.0, 120_000.0)),
         )).unwrap();
         match result {
-            PressureBoundsAssessment::DeclaredCapacityBoundsComparison { status, minimum_positive_demand_pa, maximum_positive_demand_pa, .. } => {
+            PressureBoundsAssessment::DeclaredCapacityBoundsComparison {
+                status,
+                minimum_positive_demand_pa,
+                maximum_positive_demand_pa,
+                ..
+            } => {
                 assert_eq!(status, CapacityBoundsStatus::DeclaredCapacityCoversDemandBounds);
                 assert_eq!(minimum_positive_demand_pa, 98_000.0);
                 assert_eq!(maximum_positive_demand_pa, 102_000.0);
