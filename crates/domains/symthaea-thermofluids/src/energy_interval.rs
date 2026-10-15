@@ -47,7 +47,7 @@ pub struct EnergyIntervalReport {
 pub enum EnergyIntervalError {
     /// An input, flow, stored-energy change, or tolerance is NaN or infinite.
     NonFiniteInput,
-    /// Output, auxiliary consumption, or rejected/lost energy cannot be negative.
+    /// External input, output, auxiliary consumption, or rejected/lost energy cannot be negative.
     NegativeEnergyFlow,
     /// Relative tolerance must be finite and non-negative.
     InvalidTolerance,
@@ -63,7 +63,7 @@ impl std::fmt::Display for EnergyIntervalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NonFiniteInput => f.write_str("all energy flows and tolerance must be finite"),
-            Self::NegativeEnergyFlow => f.write_str("output, auxiliary, and loss energy flows cannot be negative"),
+            Self::NegativeEnergyFlow => f.write_str("input, output, auxiliary, and loss energy flows cannot be negative"),
             Self::InvalidTolerance => f.write_str("relative tolerance must be finite and non-negative"),
             Self::NoEnergyThroughput => f.write_str("interval must contain external input or net storage discharge"),
             Self::NumericOverflow => f.write_str("summing interval energy flows overflowed"),
@@ -101,7 +101,8 @@ impl EnergyIntervalBalance {
         if flows.iter().any(|value| !value.is_finite()) {
             return Err(EnergyIntervalError::NonFiniteInput);
         }
-        if self.net_useful_output_energy_j < 0.0
+        if self.input_energy_j < 0.0
+            || self.net_useful_output_energy_j < 0.0
             || self.auxiliary_energy_j < 0.0
             || self.rejected_or_loss_energy_j < 0.0
         {
@@ -241,6 +242,18 @@ mod tests {
         };
         assert_eq!(
             negative_output.evaluate(1e-6),
+            Err(EnergyIntervalError::NegativeEnergyFlow)
+        );
+
+        let negative_input = EnergyIntervalBalance {
+            input_energy_j: -1.0,
+            net_useful_output_energy_j: 0.0,
+            auxiliary_energy_j: 0.0,
+            rejected_or_loss_energy_j: 0.0,
+            stored_energy_change_j: 0.0,
+        };
+        assert_eq!(
+            negative_input.evaluate(1e-6),
             Err(EnergyIntervalError::NegativeEnergyFlow)
         );
 
