@@ -250,7 +250,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             plan_path = root / "synthetic-analysis-plan.json"
             plan = json.loads(plan_path.read_text(encoding="utf-8"))
             plan["design"]["hypotheses"] = []
-            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\\n").encode()
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode()
             plan_path.write_bytes(plan_bytes)
             manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
             manifest_path = root / "manifest.json"
@@ -274,7 +274,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             plan["design"]["authorized_source_bindings"][0]["selected_work_ids"] = [
                 "a different fabricated work"
             ]
-            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\\n").encode()
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode()
             plan_path.write_bytes(plan_bytes)
             manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
             manifest_path = root / "manifest.json"
@@ -297,7 +297,7 @@ class ChoroInputManifestTests(unittest.TestCase):
             plan_path = root / "synthetic-analysis-plan.json"
             plan = json.loads(plan_path.read_text(encoding="utf-8"))
             plan["design"]["null_models"] = []
-            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\\n").encode()
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode()
             plan_path.write_bytes(plan_bytes)
             manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
             manifest_path = root / "manifest.json"
