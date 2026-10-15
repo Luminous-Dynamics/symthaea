@@ -74,6 +74,31 @@
       "registered_on",
       "registration_record_url"
     ],
-    "analysis_plan_contract": "For any non-empty source list, scope.analysis_plan must identify an exact repository-relative JSON plan whose on-disk SHA-256 matches the manifest. The plan file must have pre_registration.status=registered, hypotheses_frozen=true, null_models_frozen=true, thresholds_frozen=true, an ISO registered_on date, and an HTTPS registration_record_url. Date and URL must match the manifest. Rights-review scope digests bind this exact plan identity and digest; rights review and independent approval must not predate plan registration. The checked-in analysis-plan template is intentionally not registered and cannot authorize analysis."
+    "analysis_plan_contract": "For any non-empty source list, scope.analysis_plan must identify an exact repository-relative JSON plan whose on-disk SHA-256 matches the manifest. The plan file must use schema muse-choro-preregistered-analysis-plan-v1; set pre_registration.status=registered and hypotheses_frozen/null_models_frozen/thresholds_frozen=true; and provide an ISO registered_on date plus HTTPS registration_record_url identical to manifest values. Its design must include source_version_pin and study_question; non-empty inclusion_criteria, exclusion_criteria, primary_outcomes and sensitivity_analyses; at least one hypothesis with unique id, statement, primary_test, unit_of_analysis and falsification_rule; at least one null model with unique id, description, preserved_properties, randomization_or_permutation and unit_of_resampling; explicit effect_size_rule, uncertainty_rule and decision_rule; and multiplicity_correction, missing_data_policy, split_strategy and deviation_policy. Boolean freeze flags alone are insufficient. Rights-review scope digests bind this exact plan identity/content digest; rights review and independent approval must not predate plan registration. This checker validates bytes and recorded fields, not scientific adequacy or the truth of an external registration. The checked-in analysis-plan template is intentionally not registered and cannot authorize analysis.",
+    "concrete_design_required_fields": [
+      "source_version_pin",
+      "study_question",
+      "inclusion_criteria",
+      "exclusion_criteria",
+      "hypotheses[].id",
+      "hypotheses[].statement",
+      "hypotheses[].primary_test",
+      "hypotheses[].unit_of_analysis",
+      "hypotheses[].falsification_rule",
+      "null_models[].id",
+      "null_models[].description",
+      "null_models[].preserved_properties",
+      "null_models[].randomization_or_permutation",
+      "null_models[].unit_of_resampling",
+      "primary_outcomes",
+      "sensitivity_analyses",
+      "effect_and_uncertainty_thresholds.effect_size_rule",
+      "effect_and_uncertainty_thresholds.uncertainty_rule",
+      "effect_and_uncertainty_thresholds.decision_rule",
+      "multiplicity_correction",
+      "missing_data_policy",
+      "split_strategy",
+      "deviation_policy"
+    ]
   }
 }
