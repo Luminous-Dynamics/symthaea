@@ -9,6 +9,7 @@ description = "Verify and inventory a local OC22 IS2RE-Total archive without ext
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
+libc = { workspace = true }
 flate2 = "=1.1.9"
 md-5 = "=0.10.6"
 serde = { workspace = true }
