@@ -104,7 +104,7 @@ Never infer an instrument mapping from register, VoiceRole, cultural label, or G
 
 After this path-derived inventory is qualified:
 
-1. Capture runtime preset enumeration via FluidSynth's preset API or a carefully parsed diagnostic, so bank/program selection is tied to the engine's runtime view rather than just the static SoundFont header.
+1. Capture runtime preset enumeration from the loaded FluidSynth instance, not only the static SoundFont header. The official API exposes preset iteration (`fluid_sfont_iteration_start` / `fluid_sfont_iteration_next`) and preset identity getters for name, bank, and program; keep this behind an optional engine capability so a machine without libfluidsynth can still generate the static inventory. Compare runtime-enumerated slots with the RIFF `phdr` header and preserve ambiguous duplicate-slot evidence. Reference: [FluidSynth SoundFont Loader API](https://www.fluidsynth.org/api/group__soundfont__loader.html).
 2. Compare repeated renders for byte equality and tolerant signal similarity under pinned executable/SoundFont identity; retain hashes as receipts rather than assuming hashes alone prove audible determinism.
 3. Add note-range, dynamic-layer and articulation coverage from real, decoded files rather than assuming one sample equals full support.
 4. Add a drum-number-aware index and dedicated percussion semantics instead of forcing percussion into pitched-note matching.
