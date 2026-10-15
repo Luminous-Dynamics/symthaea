@@ -50,7 +50,12 @@ fn replay_versioned_corpus_and_independently_verify_receipt() {
     for expected in &corpus.expected {
         let actual = report
             .metric(expected.metric, expected.source_kind)
-            .unwrap_or_else(|| panic!("missing result for {:?}/{:?}", expected.metric, expected.source_kind));
+            .unwrap_or_else(|| {
+                panic!(
+                    "missing result for {:?}/{:?}",
+                    expected.metric, expected.source_kind
+                )
+            });
         assert_eq!(
             actual.status, expected.status,
             "unexpected status for {:?}/{:?}",
