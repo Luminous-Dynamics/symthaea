@@ -40,6 +40,8 @@ Get the codebase running and understand the architecture. Rust experience helpfu
 
 **Start here: [Research Overview](research/README.md)**
 
+Also see [Nutrition-Aware Reasoning and Local Food Planning](research/NUTRITION_AWARE_REASONING_AND_LOCAL_FOOD_PLANNING_V1.md) for the source-grounded nutrition and local food-production research contract.
+
 Understand the theoretical foundations and empirical findings behind Symthaea.
 
 **Then explore:**
