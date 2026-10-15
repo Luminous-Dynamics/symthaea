@@ -2,7 +2,7 @@
 **Status:** research synthesis and first-pass screening; not a validated engineering design, cost estimate, life-support design, or investment recommendation  
 **As of:** 2026-10-15  
 **Proposed home:** Symthaea engineering research  
-**Related work:** [Vacuum-airship metamaterial screening](./VACUUM_AIRSHIP_METAMATERIAL_SCREENING.md)
+**Related work:** [Vacuum-airship metamaterial screening](https://github.com/Luminous-Dynamics/symthaea/blob/research/vacuum-airship-screening-v1/docs/research/VACUUM_AIRSHIP_METAMATERIAL_SCREENING.md)
 
 ## Executive decision
 
@@ -413,3 +413,22 @@ The order can change when evidence or a concrete customer makes a different expe
 
 ---
 *Research status: hypotheses and first-pass arithmetic only. Each study must progress through explicit evidence gates before any readiness or deployment claim.*
+
+
+## Implementation update — deterministic service continuity screen
+
+A first Rust implementation now exists at [`symthaea_engineering::resilient_service_screening`](../../crates/domains/symthaea-engineering/src/resilient_service_screening.rs). It models essential services, directed dependencies, capacity disruptions and linear recovery, and reports service traces, cumulative unmet service, service-floor violations and stable recovery.
+
+The abstraction is deliberately narrow: dependencies transmit the weakest upstream fulfillment fraction; simultaneous capacity factors multiply; there are no inferred failure probabilities. It supports deterministic arithmetic and causal-direction tests, not prediction of real-world outage likelihood.
+
+See the [resilience benchmarks and acceptance gates](./RESILIENT_SYSTEMS_BENCHMARKS.md) for the B0–B5 ladder, RS-01–RS-14 scenario catalog, metamorphic controls and calibration requirements.
+
+### New acceptance targets
+
+- **Correctness:** nominal sufficient-capacity case has zero deficit; malformed scenarios fail explicitly.
+- **Redundancy honesty:** independent source loss may retain the floor only when modeled residual capacity is sufficient; common-mode loss must remove that credit.
+- **Monotonicity:** greater disruption severity and slower recovery must not reduce simulated unmet service; extra nominal capacity must not worsen fulfillment.
+- **Recovery honesty:** report stable recovery only after the final violation; if recovery is outside the modeled horizon, report it as unknown.
+- **Validation:** calibrate against observed service outage/recovery traces before making real-world predictions. Proposed target is at least three observed cases, with at least one held-out event and a simple baseline comparison.
+
+These are model-quality gates, not safety certification. Local environment lacked `cargo` and `rustc`, so the added Rust tests are authored but have not been executed locally. The current-head Actions status must be reported separately; skipped workflows are not passes.
