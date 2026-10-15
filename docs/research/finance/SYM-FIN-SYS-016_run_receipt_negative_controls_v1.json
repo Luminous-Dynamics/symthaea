@@ -1,0 +1,69 @@
+{
+  "schema": "civos.socioeconomic_interoperability.run_receipt_negative_controls.v1",
+  "status": "research_fixture",
+  "base_fixture": "SYM-FIN-SYS-016_run_receipt_example_v1.json",
+  "expected_result": "each mutation must be rejected by JSON Schema 2020-12 validation",
+  "claim_ceiling": "These are schema-level rejection cases, not evidence of an executed validator or a security proof.",
+  "cases": [
+    {
+      "id": "SRC-NEG-001",
+      "description": "A simulation receipt claims to be a real-world observation.",
+      "pointer": "/authority_boundary/is_real_world_observation",
+      "replacement_value": true
+    },
+    {
+      "id": "SRC-NEG-002",
+      "description": "A simulation receipt claims permission to authorize real actions.",
+      "pointer": "/authority_boundary/can_authorize_real_actions",
+      "replacement_value": true
+    },
+    {
+      "id": "SRC-NEG-003",
+      "description": "A simulation receipt claims permission to reserve real resources.",
+      "pointer": "/authority_boundary/can_reserve_real_resources",
+      "replacement_value": true
+    },
+    {
+      "id": "SRC-NEG-004",
+      "description": "A simulation receipt claims it can settle real assets.",
+      "pointer": "/authority_boundary/can_settle_real_assets",
+      "replacement_value": true
+    },
+    {
+      "id": "SRC-NEG-005",
+      "description": "A simulation receipt claims production-ledger import is allowed.",
+      "pointer": "/authority_boundary/production_ledger_import_allowed",
+      "replacement_value": true
+    },
+    {
+      "id": "SRC-NEG-006",
+      "description": "The record attempts to broaden its evidence claim ceiling.",
+      "pointer": "/claim_ceiling",
+      "replacement_value": "deployment_ready"
+    },
+    {
+      "id": "SRC-NEG-007",
+      "description": "A simulated event attempts to declare a real payment effect.",
+      "pointer": "/events/0/external_effect",
+      "replacement_value": "payment_sent"
+    },
+    {
+      "id": "SRC-NEG-008",
+      "description": "A profile assigns an unknown socioeconomic regime.",
+      "pointer": "/profiles/regime_assignments/0/regime_id",
+      "replacement_value": "unbounded_optimal_economy"
+    },
+    {
+      "id": "SRC-NEG-009",
+      "description": "A profile digest has no valid SHA-256 identity prefix and length.",
+      "pointer": "/profiles/regime_assignments/0/profile_digest",
+      "replacement_value": "sha256:bad"
+    },
+    {
+      "id": "SRC-NEG-010",
+      "description": "A record tries to add an undeclared, potentially authority-bearing field.",
+      "pointer": "/authority_boundary/decision_authority",
+      "replacement_value": "simulator"
+    }
+  ]
+}
