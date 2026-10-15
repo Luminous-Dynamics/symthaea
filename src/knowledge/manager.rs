@@ -1394,6 +1394,7 @@ mod tests {
         let mut encoding = FactEncoding {
             vector: symthaea_core::hdc::binary_hv::BinaryHV::random(81),
             role_vectors: std::collections::HashMap::new(),
+            role_vector_observations: Vec::new(),
             relations: Vec::new(),
             source_text: "role-vector manager restart fixture".into(),
             confidence: 0.9,
@@ -1496,7 +1497,10 @@ mod tests {
                 cycle: 1,
                 is_causal: false,
                 role_vectors: std::collections::HashMap::new(),
+                role_vector_observations: Vec::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1547,7 +1551,10 @@ mod tests {
                 cycle: 1,
                 is_causal: false,
                 role_vectors: std::collections::HashMap::new(),
+                role_vector_observations: Vec::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1599,7 +1606,10 @@ mod tests {
                 cycle: 1,
                 is_causal: false,
                 role_vectors: std::collections::HashMap::new(),
+                role_vector_observations: Vec::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
