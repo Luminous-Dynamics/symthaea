@@ -630,7 +630,7 @@ mod tests {
             fuse_human_state(&inputs, 100.0, HumanStateConfig::simulation_reference()).unwrap();
         assert_eq!(
             report.metric(HumanMetric::RespiratoryRateBpm).unwrap().status,
-            HumanMetricStatus::InsufficientEvidence
+            HumanMetricStatus::Invalid
         );
         assert_eq!(report.metric(HumanMetric::RespiratoryRateBpm).unwrap().value, None);
         assert_eq!(report.rejected_future_dated_observations, 1);
