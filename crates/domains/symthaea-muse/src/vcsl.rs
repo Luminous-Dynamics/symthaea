@@ -2089,15 +2089,15 @@ mod tests {
                 Instrument::Tuba,
                 SampleSource::Vsco2,
                 "Brass/Tuba/sus",
-                "Tuba3_sus_C3_v2_rr1_Sum.wav",
-                48.0,
+                "Tuba3_sus_A#0_v2_rr1_Mid.wav",
+                22.0,
                 1.0,
             ),
             (
                 Instrument::Trombone,
                 SampleSource::Vsco2,
                 "Brass/Tenor Trombone/sus",
-                "Trombone_sus_C3_v2_rr1_Sum.wav",
+                "tenortbn_sus_C3_v2_1.wav",
                 48.0,
                 1.0,
             ),
@@ -2119,13 +2119,13 @@ mod tests {
         write_fixture_wav(
             &vsco2_root
                 .join("Brass/Tuba/stac")
-                .join("Tuba3_stac_C3_v2_rr1_Sum.wav"),
+                .join("Tuba3_stac_A#0_v2_rr1_Sum.wav"),
             8000,
         );
         write_fixture_wav(
             &vsco2_root
                 .join("Brass/Tenor Trombone/stac")
-                .join("Trombone_stac_C3_v2_rr1_Sum.wav"),
+                .join("tenortbn_stac_D3_v2_rr1.wav"),
             8000,
         );
 
@@ -2147,7 +2147,9 @@ mod tests {
             );
             assert!(library.bank(instrument).is_some());
         }
-        for instrument in [Instrument::Tuba, Instrument::Trombone] {
+        for (instrument, midi) in
+            [(Instrument::Tuba, 22.0), (Instrument::Trombone, 50.0)]
+        {
             assert!(
                 library.staccato_bank(instrument).is_some(),
                 "{instrument:?} should load its real short articulation"
@@ -2156,7 +2158,7 @@ mod tests {
                 library
                     .staccato_bank(instrument)
                     .unwrap()
-                    .pick(48.0, 1.0, 0)
+                    .pick(midi, 1.0, 0)
                     .is_some()
             );
         }
