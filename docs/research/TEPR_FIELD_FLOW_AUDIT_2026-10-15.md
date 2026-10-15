@@ -237,3 +237,40 @@ This is a strict structural consistency check over stored extraction fields. It 
 
 PR #7522 exact head is `3bc72174e36f6e6f8970ad1e82a8b52830171ba1`, based on PR #7508 head `62738165a3831425aab13c8d04f04b72cf4a0b4e`. CI [38809536591](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809536591) and PR Governance [38809536570](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809536570) are **queued**, not passing; tests have not been run locally. The PR was reported mergeable at this inspection, but that does not imply workflow success or stack readiness for the default branch.
 
+## Evidence-aware abstention follow-up (2026-10-16)
+
+Public [PR #7522](https://github.com/Luminous-Dynamics/symthaea/pull/7522) now adds policy-gated abstention to the relation-constraint audit.
+
+### Implementation contract
+
+- `RelationConstraintSearchPolicy` validates role/relation coverage thresholds as finite values in [0, 1]. The default requires 100% query-role coverage and all requested relation constraints.
+- Each candidate is marked `EligibleForReview` or `Abstain`, with explicit reasons for insufficient role coverage, insufficient relation coverage, and missing required relations.
+- The overall report distinguishes `AbstainNoCandidates` from `AbstainNoCandidateMeetsPolicy`. No candidates is not silently turned into a low similarity score.
+- An explicit lenient policy can allow partial relation coverage; in that case the result still preserves `constraints_satisfied = false`. Eligibility means only that the configured review gate passed, not that a claim is true.
+- Existing search APIs and the default `KnowledgeManager::do_search` path remain unchanged.
+
+### Research grounding
+
+Zhang and Wu's 2026 *Evidence Sufficiency Benchmark* uses five evidence conditions: full support, partial support, irrelevant evidence, absent context, and conflicting evidence. In their evaluated models, conflicting evidence produced high over-answer rates; the paper argues that answer accuracy alone misses failures to recognize insufficiency ([article/DOI](https://doi.org/10.32604/cmc.2026.086343)). The direct Symthaea implication is to separately evaluate supported, partially supported, irrelevant, missing, and contradictory evidence conditions, and to report both correct retrieval and inappropriate eligibility/over-acceptance. The paper does not validate this Rust implementation or justify any calibrated probability claim.
+
+### New tests and exact-head status
+
+Authored regression coverage includes reversed relation direction, predicate mismatch, negation flips, semantic-role flips, missing relations, duplicated constraints, invalid policy thresholds, no-candidate abstention, no-candidate-meets-policy, incomplete entity-role coverage, and explicitly configured partial-evidence review. These tests **have not been run locally**.
+
+The inspected exact stack is:
+
+- PR #7494 — head `9706c3bca0c8a1edda0e7ac2d5b2941f74795dbd`.
+- PR #7499 — head `47da1742f20bc14bbe4b49aa45dbdf930ca03793`.
+- PR #7508 — head `62738165a3831425aab13c8d04f04b72cf4a0b4e`.
+- PR #7522 — head `3386fc8a5941bf12a30d10621f5e3dc708d65bdd`, based on #7508 at the exact head above; comparison is five commits ahead and zero behind.
+
+For #7522 exact head `3386fc8a5941bf12a30d10621f5e3dc708d65bdd`, CI [38815464906](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38815464906) is **queued** and PR Governance [38815464960](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38815464960) is **pending**. Neither is a pass. This PR was reported mergeable at inspection, which does not qualify runtime behavior.
+
+### Provenance boundary — intentionally not solved by this PR
+
+The current persistent `FactRecord` carries source text and cycle metadata but does not include authenticated source-record IDs, publisher identity, source version/digest, publication time, event time, access time, review state, or reuse/license state. Relation constraints therefore audit structure, not source provenance. Do not treat `EligibleForReview` as a source-verified fact or feed it directly into Mycelix evidence claims. A follow-on provenance schema must define the authoritative source-record owner, versioning and SQLite migration behavior, and fail-closed rules before those claims can be made.
+
+### Next benchmark tranche
+
+Use the ESB-style evidence strata with counterfactuals generated from a canonical source example and split by source/family to prevent leakage. Report: eligible-candidate precision; false-eligibility rate under irrelevant, absent, and conflicting evidence; abstention recall/precision; evidence-level behavioral calibration; relation-constraint coverage; role coverage; and selective risk versus coverage. Fix any operating thresholds on the development partition and publish held-out confidence intervals. Keep vector similarity, extraction confidence, and source provenance as separate signals and separate claim types.
+
