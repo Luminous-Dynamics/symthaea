@@ -61,6 +61,20 @@ jobs:
       - name: Test admission, calibration, evidence-graph, and synthetic falsification fixtures
         run: cargo test -p xtask --bin xtask
 
+      - name: Execute synthetic model-falsification report and assert its contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/enzyme_model_falsification_v0.json"
+          cargo run -p xtask -- enzyme-model-falsification --out "$report"
+          jq -e '
+            .schema_version == 1 and
+            .status == "synthetic_fixture_passed" and
+            .parameter_recovery.fixture_gate_passed == true and
+            .model_discrimination_design.selected_condition == 100.0 and
+            .km_design_proxy.selected_condition == 2.0
+          ' "$report" >/dev/null
+
       - name: Fetch pinned CC BY calibration references (temporary runner workspace only)
         shell: bash
         run: |
