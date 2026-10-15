@@ -554,6 +554,24 @@ pub fn compare_candidates(
     {
         issues.push("candidate and baseline missions or operating conditions differ".into());
     }
+    if candidate.intervals.len() != baseline.intervals.len()
+        || candidate.intervals.iter().zip(&baseline.intervals).any(|(left, right)| {
+            left.index != right.index
+                || left.phase != right.phase
+                || !approximately_equal(
+                    left.start_s,
+                    right.start_s,
+                    cp_time_tolerance(candidate),
+                )
+                || !approximately_equal(
+                    left.end_s,
+                    right.end_s,
+                    cp_time_tolerance(candidate),
+                )
+        })
+    {
+        issues.push("candidate and baseline interval schedules differ".into());
+    }
     let cb = &candidate.boundary;
     let bb = &baseline.boundary;
     if cb.boundary_id != bb.boundary_id
@@ -669,9 +687,13 @@ pub fn compare_candidates(
         ComparisonDecision::LowerBoundDoesNotClearMargin
     };
     report.reason = Some(
-        "first-order propagation using declared independent standard uncertainties; this is model-level evidence only, not physical validation".into()
+        "numerical rule result only; first-order propagation assumes mutually independent standard uncertainties, and this verifier does not authenticate pre-search anchoring or physical validity".into()
     );
     Ok(report)
+}
+
+fn cp_time_tolerance(run: &BenchmarkRun) -> f64 {
+    run.evaluation_policy.time_continuity_tolerance_s
 }
 
 fn efficiency_standard_uncertainty(
