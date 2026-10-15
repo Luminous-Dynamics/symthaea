@@ -152,6 +152,20 @@ impl KnowledgeEncoder {
             type_bases.insert(*etype, BinaryHV::random(seed + 100 + i as u64));
         }
 
+        // Code-oriented entity types use a dedicated seed range. Keep every
+        // historical type seed above unchanged, and do not let feature-gated
+        // therapeutic types affect these newer code/type distinctions.
+        let code_entity_types = [
+            EntityType::Function,
+            EntityType::Type,
+            EntityType::Module,
+            EntityType::ErrorPattern,
+            EntityType::CodeSnippet,
+        ];
+        for (offset, entity_type) in code_entity_types.iter().enumerate() {
+            type_bases.insert(*entity_type, BinaryHV::random(seed + 1_100 + offset as u64));
+        }
+
         Self {
             role_bases,
             type_bases,
@@ -539,6 +553,43 @@ mod tests {
         for (offset, observation) in encoded.iter().enumerate() {
             let expected = BinaryHV::random(seed + 1_000 + offset as u64)
                 .bind(&typed_entity);
+            assert_eq!(observation.vector, expected);
+        }
+    }
+
+    #[test]
+    fn test_code_entity_type_bases_are_distinct_and_feature_independent() {
+        let seed = 42;
+        let code_types = [
+            EntityType::Function,
+            EntityType::Type,
+            EntityType::Module,
+            EntityType::ErrorPattern,
+            EntityType::CodeSnippet,
+        ];
+        let mut encoder = KnowledgeEncoder::with_seed(seed);
+        let terms: Vec<_> = code_types
+            .iter()
+            .map(|entity_type| (SemanticRole::Agent, "shared-code-symbol", *entity_type))
+            .collect();
+        let encoded = encoder.encode_role_terms(&terms);
+
+        assert_eq!(encoded.len(), code_types.len());
+        for left in 0..encoded.len() {
+            for right in (left + 1)..encoded.len() {
+                assert_ne!(
+                    encoded[left].vector,
+                    encoded[right].vector,
+                    "same text under distinct code entity types must not collapse"
+                );
+            }
+        }
+
+        let token = BinaryHV::random(fnv1a_hash("shared-code-symbol"));
+        let role_basis = BinaryHV::random(seed);
+        for (offset, observation) in encoded.iter().enumerate() {
+            let type_basis = BinaryHV::random(seed + 1_100 + offset as u64);
+            let expected = role_basis.bind(&token.bind(&type_basis));
             assert_eq!(observation.vector, expected);
         }
     }
