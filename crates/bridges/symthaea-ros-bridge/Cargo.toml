@@ -24,8 +24,10 @@ symthaea-telemetry-grpc = { path = "../symthaea-telemetry-grpc" }
 symthaea-consciousness-equation = { path = "../../domains/symthaea-consciousness-equation" }
 tokio = { workspace = true }
 
-# Note: rclrs and other ROS2 crates require a ROS2 environment (Humble/Iron/Jazzy)
-# and are typically added via nix-ros-overlay or system-level colcon builds.
+# ROS 2 distro/OS intent, qualification levels, and CI sequence live in ROS2_SUPPORT.md.
+# The optional binding has not been qualified for a distro merely by appearing here:
+# test rclrs + generated message types against the exact ROS 2 distro, OS image, RMW,
+# architecture, and Rust toolchain before advertising support.
 rclrs = { version = "0.4", optional = true }
 sensor_msgs = { path = "ros_msgs/sensor_msgs", optional = true }
 trajectory_msgs = { path = "ros_msgs/trajectory_msgs", optional = true }
