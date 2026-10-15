@@ -915,6 +915,18 @@ mod tests {
     }
 
     #[test]
+    fn retention_requires_cache_permission() {
+        let mut m = manifest();
+        m.permissions.cache = PermissionDecision::Denied;
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert_eq!(result.nutrition_assessability, NutritionAssessability::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::CacheNotPermitted
+        }));
+    }
+
+    #[test]
     fn transform_requires_explicit_permission() {
         let mut m = manifest();
         let mut f = fact();
@@ -981,6 +993,34 @@ mod tests {
         }));
         assert!(result.issues.iter().any(|issue| {
             issue.code == RegistryIssueCode::UnresolvedFoodMatch
+        }));
+    }
+
+    #[test]
+    fn transformation_chain_must_connect_each_preparation_state() {
+        let mut f = fact();
+        f.transformation_applied = true;
+        f.transformation_lineage = vec![
+            NutritionTransformationStepV1 {
+                transformation_id: "fixture:step-001".to_owned(),
+                from_food_state_id: "raw_edible".to_owned(),
+                to_food_state_id: "boiled_edible".to_owned(),
+                method_ref: "fixture:method-001".to_owned(),
+                evidence_ref: "fixture:evidence-001".to_owned(),
+            },
+            NutritionTransformationStepV1 {
+                transformation_id: "fixture:step-002".to_owned(),
+                from_food_state_id: "raw_edible".to_owned(),
+                to_food_state_id: "cooked_edible".to_owned(),
+                method_ref: "fixture:method-002".to_owned(),
+                evidence_ref: "fixture:evidence-002".to_owned(),
+            },
+        ];
+        let result = assess(&manifest(), &f, Some(ARTIFACT));
+        assert_eq!(result.data_quality_eligibility, DataQualityEligibility::Blocked);
+        assert_eq!(result.nutrition_assessability, NutritionAssessability::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::TransformationChainMismatch
         }));
     }
 
