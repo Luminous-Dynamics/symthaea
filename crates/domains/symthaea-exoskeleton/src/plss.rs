@@ -24,10 +24,10 @@ pub struct PlssConfig {
     pub primary_o2_l: f64,
     pub secondary_o2_l: f64,
     pub ventilation_flow_l_min: f64,
-    /// Maximum CO2 capture rate, in L CO2-equivalent/min on the metabolic model's
-    /// implicit gas-volume basis. This is a synthetic proxy, not a pressure estimate.
+    /// Maximum CO2 capture rate in reference-condition L/min. Reference pressure
+    /// and temperature are explicit below; the rate remains synthetic/unvalidated.
     pub co2_scrubber_removal_rate_l_min: f64,
-    /// Finite total cartridge capacity in the same CO2-equivalent bookkeeping units.
+    /// Finite cartridge capacity in the same reference-condition CO2-equivalent liters.
     pub co2_scrubber_capacity_l: f64,
     /// Ideal-gas circuit state: free gas volume, m^3. Synthetic reference only.
     pub circuit_free_volume_m3: f64,
@@ -114,8 +114,9 @@ impl PlssConfig {
 pub struct PlssState {
     pub primary_o2_remaining_l: f64,
     pub secondary_o2_remaining_l: f64,
-    /// Unremoved CO2 generation on the metabolic model's implicit gas-volume
-    /// basis. No free-volume/temperature/pressure conversion is performed.
+    /// Excess CO2 above the synthetic initial bulk-circuit condition, as reference-
+    /// condition liters. Its derived pressure is a well-mixed ideal-gas estimate,
+    /// not inspired CO2 or a measured exposure.
     pub co2_burden_l: f64,
     pub co2_scrubber_capacity_remaining_l: f64,
     /// Water vapor awaiting removal, represented as water mass in grams.
