@@ -2,25 +2,171 @@
   "schema": "symthaea.plss.telemetry.boundary.v1",
   "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "observations": [
-    {"metric":"CircuitCo2PartialPressurePa","unit":"Pascal","value":200.0,"uncertainty_abs":1.0,"observed_at_s":0.0,"confidence":0.95,"source_id":"sensor-a","source_kind":"Instrument"},
-    {"metric":"CircuitCo2PartialPressurePa","unit":"Pascal","value":300.0,"uncertainty_abs":1.0,"observed_at_s":30.0,"confidence":0.95,"source_id":"sensor-a","source_kind":"Instrument"},
-    {"metric":"CircuitCo2PartialPressurePa","unit":"Pascal","value":400.0,"uncertainty_abs":1.0,"observed_at_s":60.0,"confidence":0.95,"source_id":"sensor-a","source_kind":"Instrument"}
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "unit": "Pascal",
+      "value": 200,
+      "uncertainty_abs": 1,
+      "observed_at_s": 0,
+      "confidence": 0.95,
+      "source_id": "sensor-a",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "unit": "Pascal",
+      "value": 300,
+      "uncertainty_abs": 1,
+      "observed_at_s": 30,
+      "confidence": 0.95,
+      "source_id": "sensor-a",
+      "source_kind": "Instrument"
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "unit": "Pascal",
+      "value": 400,
+      "uncertainty_abs": 1,
+      "observed_at_s": 60,
+      "confidence": 0.95,
+      "source_id": "sensor-a",
+      "source_kind": "Instrument"
+    }
   ],
   "boundaries": [
-    {"metric":"CircuitCo2PartialPressurePa","source_kind":"Instrument","source_id":"sensor-a","direction":"Upper","threshold_value":500.0,"threshold_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","maximum_projection_horizon_s":60.0},
-    {"metric":"CircuitCo2PartialPressurePa","source_kind":"Instrument","source_id":"sensor-a","direction":"Upper","threshold_value":500.0,"threshold_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","maximum_projection_horizon_s":10.0},
-    {"metric":"CircuitCo2PartialPressurePa","source_kind":"Instrument","source_id":"sensor-a","direction":"Upper","threshold_value":399.0,"threshold_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","maximum_projection_horizon_s":60.0},
-    {"metric":"CircuitCo2PartialPressurePa","source_kind":"Instrument","source_id":"sensor-a","direction":"Upper","threshold_value":400.5,"threshold_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","maximum_projection_horizon_s":60.0},
-    {"metric":"CircuitCo2PartialPressurePa","source_kind":"Instrument","source_id":"sensor-a","direction":"Lower","threshold_value":100.0,"threshold_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","maximum_projection_horizon_s":60.0},
-    {"metric":"CircuitCo2PartialPressurePa","source_kind":"Instrument","source_id":"sensor-z","direction":"Upper","threshold_value":500.0,"threshold_revision":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","maximum_projection_horizon_s":60.0}
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "source_kind": "Instrument",
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 500,
+      "threshold_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "maximum_projection_horizon_s": 60
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "source_kind": "Instrument",
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 500,
+      "threshold_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "maximum_projection_horizon_s": 10
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "source_kind": "Instrument",
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 399,
+      "threshold_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "maximum_projection_horizon_s": 60
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "source_kind": "Instrument",
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 400.5,
+      "threshold_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "maximum_projection_horizon_s": 60
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "source_kind": "Instrument",
+      "source_id": "sensor-a",
+      "direction": "Lower",
+      "threshold_value": 100,
+      "threshold_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "maximum_projection_horizon_s": 60
+    },
+    {
+      "metric": "CircuitCo2PartialPressurePa",
+      "source_kind": "Instrument",
+      "source_id": "sensor-z",
+      "direction": "Upper",
+      "threshold_value": 500,
+      "threshold_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "maximum_projection_horizon_s": 60
+    },
+    {
+      "metric": "OxygenPartialPressurePa",
+      "source_kind": "Instrument",
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 2000,
+      "threshold_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "maximum_projection_horizon_s": 60
+    }
   ],
   "expected": [
-    {"source_id":"sensor-a","direction":"Upper","threshold_value":399.0,"maximum_projection_horizon_s":60.0,"status":"AlreadyBeyondBoundary","earliest_candidate_crossing_after_last_sample_s":null,"latest_candidate_crossing_after_last_sample_s":null},
-    {"source_id":"sensor-a","direction":"Upper","threshold_value":400.5,"maximum_projection_horizon_s":60.0,"status":"BoundaryWithinCurrentUncertainty","earliest_candidate_crossing_after_last_sample_s":null,"latest_candidate_crossing_after_last_sample_s":null},
-    {"source_id":"sensor-a","direction":"Upper","threshold_value":500.0,"maximum_projection_horizon_s":10.0,"status":"CandidateBeyondHorizon","earliest_candidate_crossing_after_last_sample_s":29.4059405940594,"latest_candidate_crossing_after_last_sample_s":30.6060606060606},
-    {"source_id":"sensor-a","direction":"Upper","threshold_value":500.0,"maximum_projection_horizon_s":60.0,"status":"CandidateWithinHorizon","earliest_candidate_crossing_after_last_sample_s":29.4059405940594,"latest_candidate_crossing_after_last_sample_s":30.6060606060606},
-    {"source_id":"sensor-a","direction":"Lower","threshold_value":100.0,"maximum_projection_horizon_s":60.0,"status":"MovingAway","earliest_candidate_crossing_after_last_sample_s":null,"latest_candidate_crossing_after_last_sample_s":null},
-    {"source_id":"sensor-z","direction":"Upper","threshold_value":500.0,"maximum_projection_horizon_s":60.0,"status":"MissingSource","earliest_candidate_crossing_after_last_sample_s":null,"latest_candidate_crossing_after_last_sample_s":null}
+    {
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 399,
+      "maximum_projection_horizon_s": 60,
+      "status": "AlreadyBeyondBoundary",
+      "earliest_candidate_crossing_after_last_sample_s": null,
+      "latest_candidate_crossing_after_last_sample_s": null
+    },
+    {
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 400.5,
+      "maximum_projection_horizon_s": 60,
+      "status": "BoundaryWithinCurrentUncertainty",
+      "earliest_candidate_crossing_after_last_sample_s": null,
+      "latest_candidate_crossing_after_last_sample_s": null
+    },
+    {
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 500,
+      "maximum_projection_horizon_s": 10,
+      "status": "CandidateBeyondHorizon",
+      "earliest_candidate_crossing_after_last_sample_s": 29.4059405940594,
+      "latest_candidate_crossing_after_last_sample_s": 30.6060606060606
+    },
+    {
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 500,
+      "maximum_projection_horizon_s": 60,
+      "status": "CandidateWithinHorizon",
+      "earliest_candidate_crossing_after_last_sample_s": 29.4059405940594,
+      "latest_candidate_crossing_after_last_sample_s": 30.6060606060606
+    },
+    {
+      "source_id": "sensor-a",
+      "direction": "Lower",
+      "threshold_value": 100,
+      "maximum_projection_horizon_s": 60,
+      "status": "MovingAway",
+      "earliest_candidate_crossing_after_last_sample_s": null,
+      "latest_candidate_crossing_after_last_sample_s": null
+    },
+    {
+      "source_id": "sensor-z",
+      "direction": "Upper",
+      "threshold_value": 500,
+      "maximum_projection_horizon_s": 60,
+      "status": "MissingSource",
+      "earliest_candidate_crossing_after_last_sample_s": null,
+      "latest_candidate_crossing_after_last_sample_s": null
+    },
+    {
+      "source_id": "sensor-a",
+      "direction": "Upper",
+      "threshold_value": 2000,
+      "maximum_projection_horizon_s": 60,
+      "status": "MissingSource",
+      "earliest_candidate_crossing_after_last_sample_s": null,
+      "latest_candidate_crossing_after_last_sample_s": null
+    }
   ],
-  "expected_counts": {"boundary_count":6,"candidate_count":2,"direction_uncertain_count":0,"blocked_count":4}
+  "expected_counts": {
+    "boundary_count": 7,
+    "candidate_count": 2,
+    "direction_uncertain_count": 0,
+    "blocked_count": 5
+  }
 }
