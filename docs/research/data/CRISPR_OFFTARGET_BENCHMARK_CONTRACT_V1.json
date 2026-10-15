@@ -1,0 +1,200 @@
+{
+  "schema_version": "1.0.0",
+  "record_type": "research_benchmark_contract",
+  "benchmark_id": "CRISPR-OT-001",
+  "title": "CRISPR-Cas9 off-target prediction and budgeted evidence triage",
+  "status": "planning_only",
+  "authored_on": "2026-10-15",
+  "authority_ceiling": "Literature-derived research contract only; no biological, clinical, safety, or experimental authority",
+  "scope": {
+    "mode": "retrospective_computational_reanalysis",
+    "no_wet_lab_execution": true,
+    "no_clinical_recommendations": true,
+    "no_autonomous_experiment_execution": true
+  },
+  "sources": [
+    {
+      "source_id": "Kaufmann-2026-OffTarget-Benchmark",
+      "doi": "10.1177/10430342261466407",
+      "article_url": "https://journals.sagepub.com/doi/10.1177/10430342261466407",
+      "first_published": "2026-07-26",
+      "public_reproduction_repository": "https://github.com/maren-ha/OffTargetPredictionBenchmark",
+      "reproduction_repository_observed_commit": "e82954897a77e95df46370923e9a5213ed7b1e19",
+      "zenodo_record": "https://zenodo.org/records/20627722",
+      "declared_code_license": "MIT (pyproject.toml)",
+      "dataset_rights_status": "not_yet_audited",
+      "exact_artifact_digests_status": "not_downloaded_or_verified",
+      "permitted_use_status": "blocked_pending_source_artifact_rights_review",
+      "note": "The companion code reproduces analysis from standardized tool outputs; it does not rerun every tool in its native environment. Code license is not automatically a data license."
+    },
+    {
+      "source_id": "Kinney-2026-UNCOVERseq",
+      "doi": "10.1038/s41467-026-74623-7",
+      "article_url": "https://www.nature.com/articles/s41467-026-74623-7",
+      "correction_doi": "10.1038/s41467-026-78544-3",
+      "article_correction_date": "2026-10-12",
+      "reported_inter_method_benchmark_metrics": {
+        "analytical_sensitivity_percent": 97.6,
+        "precision_percent": 78,
+        "guide_rnas_used_for_these_comparative_calculations": 2
+      },
+      "data_use_restriction": "Non-commercial research only; commercial predictive-model training/development, gene-editing tool design, and commercial software integration are prohibited without prior written permission",
+      "project_data_use_status": "blocked_until_written_permission_for_intended_use",
+      "allowed_current_use": "Literature context only; do not ingest restricted study data or use it for model development without written permission",
+      "note": "Published metrics are context-specific and must not be generalized across editors, cells, assays, or modalities."
+    }
+  ],
+  "reported_reference_counts": {
+    "raw_sequence_resolved_observations": 3827,
+    "guide_cas9_combinations": 26,
+    "raw_observations_at_or_above_indel_threshold_percent": 0.1,
+    "raw_positive_observations": 383,
+    "collapsed_standard_tool_sites": 1806,
+    "collapsed_standard_tool_positive_sites": 118,
+    "no_bulge_ml_sites": 1768,
+    "no_bulge_ml_positive_sites": 114,
+    "sequence_reconstruction_matches": 3824,
+    "sequence_reconstruction_total": 3827,
+    "pre_seed_native_search_union_unique_sites": 324375,
+    "positives_missing_before_seed_at_guide_sequence_chromosome_level": 46,
+    "raw_positive_records_represented_by_missing_sites": 53,
+    "coordinate_resolved_rows_added_for_positive_seed": 66,
+    "final_post_seed_universe_count": "must_be_reconstructed_from_exact_source_artifact"
+  },
+  "metric_planes": [
+    {
+      "id": "nomination_coverage",
+      "definition": "Whether a native genome-wide search method nominates measured positive sites before any positive seeding",
+      "required_metrics": [
+        "positive_site_coverage",
+        "uncaptured_positive_count",
+        "per-guide_coverage",
+        "unknown_reference_limitations"
+      ]
+    },
+    {
+      "id": "conditional_ranking",
+      "definition": "Ranking performance conditional on one exact, declared candidate universe; report whether validated positives were seeded",
+      "required_metrics": [
+        "recall_at_k",
+        "precision_at_k",
+        "false_negative_count",
+        "pr_auc_when_valid",
+        "per-guide_metrics",
+        "candidate_universe_identity"
+      ]
+    },
+    {
+      "id": "experimental_detection",
+      "definition": "Analytical sensitivity/precision of an experimental nomination/confirmation method under its exact assay and study conditions",
+      "required_metrics": [
+        "study_context",
+        "assay_identity",
+        "confirmed_reference_definition",
+        "sensitivity",
+        "precision",
+        "replication_and_limits"
+      ]
+    },
+    {
+      "id": "decision_budget",
+      "definition": "Candidate-site review burden required to achieve preregistered ranking/recall criteria",
+      "required_metrics": [
+        "slots_at_fixed_recall",
+        "recall_at_fixed_slots",
+        "precision_tradeoff",
+        "group_uncertainty",
+        "runtime_compute"
+      ]
+    }
+  ],
+  "initial_gates": [
+    {
+      "id": "G0_source_rights_identity",
+      "required": true,
+      "pass_conditions": [
+        "source generation and exact artifacts pinned",
+        "dataset/model rights reviewed separately from code license",
+        "artifact bytes and SHA-256 recorded",
+        "unresolved rights block use"
+      ]
+    },
+    {
+      "id": "G1_cohort_reconstruction",
+      "required": true,
+      "pass_conditions": [
+        "reconstruct 3827/383 raw observation anchors",
+        "reconstruct 1806/118 collapsed standard cohort",
+        "reconstruct 1768/114 no-bulge ML cohort",
+        "record pre-seed and post-seed universes distinctly",
+        "explain all exclusions and transformations"
+      ]
+    },
+    {
+      "id": "G2_independent_metric_reconstruction",
+      "required": true,
+      "pass_conditions": [
+        "recompute metrics from pinned artifacts",
+        "reconcile complete output census",
+        "reported rounded publication metrics within 1.0 percentage point where applicable",
+        "exact count comparisons when exact outputs exist",
+        "negative controls fail closed"
+      ]
+    },
+    {
+      "id": "G3_group_holdout",
+      "required": true,
+      "pass_conditions": [
+        "hold out complete guide/Cas9 groups where cohort supports this",
+        "no prohibited group overlap",
+        "report cluster-aware uncertainty",
+        "do not describe 26 guide groups as broad generalization"
+      ]
+    },
+    {
+      "id": "G4_symthaea_incrementality",
+      "required": true,
+      "pass_conditions": [
+        "hold specialist model fixed in ablation",
+        "same candidate universe and budget across comparators",
+        "preregister the primary outcome",
+        "report null or inconclusive if interval does not support improvement"
+      ]
+    },
+    {
+      "id": "G5_independent_cohort",
+      "required_for_cross_dataset_claims": true,
+      "pass_conditions": [
+        "at least one independent cohort with explicit permitted use",
+        "no restricted data ingestion absent written permission",
+        "complete provenance and group-aware evaluation"
+      ]
+    }
+  ],
+  "aspirational_engineering_targets": {
+    "target_status": "proposed_not_validated_not_a_clinical_standard",
+    "primary_impact_alternatives": [
+      {
+        "id": "equal_budget_recall",
+        "target": "At least +5 absolute percentage points in macro Recall@K vs best fair baseline on preregistered held-out guide/Cas9 groups",
+        "caveat": "Must report precision and false negatives; requires a group-aware uncertainty interval."
+      },
+      {
+        "id": "equal_recall_budget",
+        "target": "At least 20% fewer candidate review slots to achieve the baseline's preregistered recall target",
+        "caveat": "Candidate slots are a review-burden proxy, not measured laboratory cost or treatment-price reduction."
+      }
+    ],
+    "inferential_rule": "Describe improvement as demonstrated only if the preregistered interval excludes no improvement; otherwise report inconclusive/null.",
+    "external_generalization": "Require at least one independent, use-permitted cohort before claiming robustness across datasets.",
+    "safety_rule": "No model score, rank improvement, or cryptographic receipt implies a guide, editor, or therapy is safe."
+  },
+  "validation_status": {
+    "data_downloaded": false,
+    "artifact_hashes_verified": false,
+    "source_cohort_reproduced": false,
+    "published_metrics_recomputed": false,
+    "benchmark_executed": false,
+    "symthaea_improvement_demonstrated": false
+  }
+}
