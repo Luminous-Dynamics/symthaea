@@ -238,12 +238,9 @@ impl KnowledgeEncoder {
     /// not reproduce the type-bound role vectors stored for facts.
     /// Prefer compose_typed_query / encode_role_terms for role-aware search.
     ///
-    /// Example: to find "who sanctioned Iran?", call:
+    /// Example: search facts where Iran is the Patient:
     /// ```rust,ignore
-    /// let query = encoder.compose_query(&[
-    ///     (SemanticRole::Patient, "Iran"),
-    ///     (SemanticRole::Agent, "sanctions"),
-    /// ]);
+    /// let query = encoder.compose_query(&[(SemanticRole::Patient, "Iran")]);
     /// ```
     pub fn compose_query(&mut self, role_terms: &[(SemanticRole, &str)]) -> BinaryHV {
         let mut components = Vec::new();
