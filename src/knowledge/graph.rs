@@ -862,13 +862,19 @@ mod tests {
         let expected_vector = graph.get_fact(id).unwrap().encoding.vector.0.to_vec();
 
         let mut persistence = KnowledgePersistence::new(&db_path);
-        assert_eq!(persistence.save_facts(&graph.export_fact_records()).unwrap(), 1);
+        assert_eq!(
+            persistence.save_facts(&graph.export_fact_records()).unwrap(),
+            1
+        );
         let records = persistence.load_facts().unwrap();
         assert_eq!(records.len(), 1);
 
         let mut restored = EnhancedKnowledgeGraph::new(10);
         restored.import_fact_record(&records[0]);
-        let fact = restored.all_facts().next().expect("restored graph should have a fact");
+        let fact = restored
+            .all_facts()
+            .next()
+            .expect("restored graph should have a fact");
 
         assert_eq!(fact.encoding.source_text, "persistent temporal fixture");
         assert_eq!(fact.encoding.vector.0.to_vec(), expected_vector);
