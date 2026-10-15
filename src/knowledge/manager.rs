@@ -23,8 +23,10 @@
 use super::adaptive_ontology::{AdaptiveOntology, AdaptiveOntologyConfig};
 use super::causal_bridge::{CausalEdge, CausalKnowledgeBridge};
 use super::encoding::KnowledgeEncoder;
-use super::extraction::{EntityType, KnowledgeExtractor};
-use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
+use super::extraction::{EntityType, KnowledgeExtractor, SemanticRole};
+use super::graph::{
+    ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult, RoleObservationSearchResult,
+};
 use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord};
 use super::reasoning_context::{KnowledgeQueryResult, ReasoningContext};
 use std::collections::VecDeque;
@@ -780,6 +782,19 @@ impl KnowledgeManager {
     /// Search the knowledge graph with a pre-composed HDC query
     pub fn search_with_vector(&mut self, query: &BinaryHV, k: usize) -> Vec<FactSearchResult> {
         self.graph.search(query, k, self.current_cycle)
+    }
+
+    /// Search exact role/entity observations retained with each fact.
+    ///
+    /// Unlike HDC similarity search, this lookup is grounded in observed entity
+    /// text and semantic role. It supports multiple entities sharing one role and
+    /// reports partial coverage; it does not infer synonyms or paraphrases.
+    pub fn search_by_role_observations(
+        &self,
+        role_terms: &[(SemanticRole, &str)],
+        k: usize,
+    ) -> Vec<RoleObservationSearchResult> {
+        self.graph.search_role_observations(role_terms, k)
     }
 
     /// Trace causal chains from a starting concept
