@@ -20,6 +20,7 @@ pub struct PlssTelemetryTrendConfig {
     pub window_end_s: f64,
     pub maximum_gap_s: f64,
     pub minimum_samples: usize,
+    pub minimum_confidence: f64,
     pub minimum_coverage_fraction: f64,
     /// Used only to flag disagreement between separate sources' final readings.
     /// These are software tolerances, not human atmosphere limits.
@@ -33,6 +34,7 @@ impl PlssTelemetryTrendConfig {
             window_end_s: 60.0,
             maximum_gap_s: 30.0,
             minimum_samples: 3,
+            minimum_confidence: 0.70,
             minimum_coverage_fraction: 0.50,
             cross_source_tolerances: PlssTelemetryTolerances {
                 co2_partial_pressure_pa: 250.0,
@@ -54,6 +56,8 @@ impl PlssTelemetryTrendConfig {
             && self.maximum_gap_s > 0.0
             && self.minimum_samples >= 2
             && self.minimum_samples <= 1_000_000
+            && self.minimum_confidence.is_finite()
+            && (0.0..=1.0).contains(&self.minimum_confidence)
             && self.minimum_coverage_fraction.is_finite()
             && (0.0..=1.0).contains(&self.minimum_coverage_fraction)
             && [
@@ -75,6 +79,7 @@ pub enum PlssTelemetryTrendStatus {
     Conflicted,
     InsufficientEvidence,
     Missing,
+    LowConfidence,
     Invalid,
     FutureDated,
     OutOfWindow,
@@ -122,6 +127,7 @@ pub struct PlssTelemetryTrendReport {
     pub rejected_invalid_observations: usize,
     pub rejected_future_dated_observations: usize,
     pub excluded_out_of_window_observations: usize,
+    pub excluded_low_confidence_observations: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -149,6 +155,7 @@ pub struct PlssTelemetryTrendReceipt {
     pub rejected_invalid_observations: usize,
     pub rejected_future_dated_observations: usize,
     pub excluded_out_of_window_observations: usize,
+    pub excluded_low_confidence_observations: usize,
     pub input_digest_sha256: String,
     pub result_digest_sha256: String,
     /// Binds the revision and both fingerprints to all counts; not a signature.
@@ -172,6 +179,7 @@ pub fn analyze_plss_telemetry_trends(
     let mut rejected_invalid = 0;
     let mut rejected_future = 0;
     let mut excluded_window = 0;
+    let mut excluded_low_confidence = 0;
     let mut accepted_count = 0;
     let mut lanes = Vec::with_capacity(PLSS_TELEMETRY_METRIC_COUNT * PlssTelemetrySourceKind::ALL.len());
 
@@ -182,6 +190,7 @@ pub fn analyze_plss_telemetry_trends(
             let mut saw_invalid = false;
             let mut saw_future = false;
             let mut saw_outside = false;
+            let mut saw_low_confidence = false;
 
             for observation in observations
                 .iter()
@@ -191,6 +200,11 @@ pub fn analyze_plss_telemetry_trends(
                 if !observation.is_valid() {
                     rejected_invalid += 1;
                     saw_invalid = true;
+                    continue;
+                }
+                if observation.confidence < config.minimum_confidence || observation.confidence <= 0.0 {
+                    excluded_low_confidence += 1;
+                    saw_low_confidence = true;
                     continue;
                 }
                 if observation.observed_at_s > config.window_end_s {
@@ -219,11 +233,12 @@ pub fn analyze_plss_telemetry_trends(
             }
 
             let status = if source_trends.is_empty() {
-                match (saw_invalid, saw_future, saw_outside, saw_any) {
-                    (true, false, false, true) => PlssTelemetryTrendStatus::Invalid,
-                    (false, true, false, true) => PlssTelemetryTrendStatus::FutureDated,
-                    (false, false, true, true) => PlssTelemetryTrendStatus::OutOfWindow,
-                    (false, false, false, false) => PlssTelemetryTrendStatus::Missing,
+                match (saw_invalid, saw_future, saw_outside, saw_low_confidence, saw_any) {
+                    (true, false, false, false, true) => PlssTelemetryTrendStatus::Invalid,
+                    (false, true, false, false, true) => PlssTelemetryTrendStatus::FutureDated,
+                    (false, false, true, false, true) => PlssTelemetryTrendStatus::OutOfWindow,
+                    (false, false, false, true, true) => PlssTelemetryTrendStatus::LowConfidence,
+                    (false, false, false, false, false) => PlssTelemetryTrendStatus::Missing,
                     _ => PlssTelemetryTrendStatus::InsufficientEvidence,
                 }
             } else if source_trends.iter().any(|trend| trend.status == PlssTelemetryTrendStatus::Conflicted)
@@ -249,6 +264,7 @@ pub fn analyze_plss_telemetry_trends(
         rejected_invalid_observations: rejected_invalid,
         rejected_future_dated_observations: rejected_future,
         excluded_out_of_window_observations: excluded_window,
+        excluded_low_confidence_observations: excluded_low_confidence,
     })
 }
 
@@ -423,6 +439,7 @@ pub fn analyze_plss_telemetry_trends_with_receipt(
         rejected_invalid_observations: report.rejected_invalid_observations,
         rejected_future_dated_observations: report.rejected_future_dated_observations,
         excluded_out_of_window_observations: report.excluded_out_of_window_observations,
+        excluded_low_confidence_observations: report.excluded_low_confidence_observations,
         input_digest_sha256: digest_trend_input(observations),
         result_digest_sha256: digest_trend_report(&report),
         receipt_digest_sha256: String::new(),
@@ -486,6 +503,7 @@ fn digest_trend_report(report: &PlssTelemetryTrendReport) -> String {
     h.f64(report.config.window_end_s);
     h.f64(report.config.maximum_gap_s);
     h.usize(report.config.minimum_samples);
+    h.f64(report.config.minimum_confidence);
     h.f64(report.config.minimum_coverage_fraction);
     h.f64(report.config.cross_source_tolerances.co2_partial_pressure_pa);
     h.f64(report.config.cross_source_tolerances.oxygen_partial_pressure_pa);
@@ -498,6 +516,7 @@ fn digest_trend_report(report: &PlssTelemetryTrendReport) -> String {
     h.usize(report.rejected_invalid_observations);
     h.usize(report.rejected_future_dated_observations);
     h.usize(report.excluded_out_of_window_observations);
+    h.usize(report.excluded_low_confidence_observations);
     for lane in &report.lanes {
         h.string(&format!("{:?}", lane.metric));
         h.string(&format!("{:?}", lane.source_kind));
@@ -531,6 +550,7 @@ fn digest_trend_receipt(receipt: &PlssTelemetryTrendReceipt) -> String {
     h.usize(receipt.rejected_invalid_observations);
     h.usize(receipt.rejected_future_dated_observations);
     h.usize(receipt.excluded_out_of_window_observations);
+    h.usize(receipt.excluded_low_confidence_observations);
     h.string(&receipt.input_digest_sha256);
     h.string(&receipt.result_digest_sha256);
     h.finish()
@@ -680,6 +700,22 @@ mod tests {
         assert_eq!(a.input_digest_sha256, b.input_digest_sha256);
         assert_ne!(a.result_digest_sha256, b.result_digest_sha256);
         assert_ne!(a.receipt_digest_sha256, b.receipt_digest_sha256);
+    }
+
+    #[test]
+    fn low_confidence_samples_do_not_influence_trend() {
+        let mut cfg = config();
+        cfg.minimum_confidence = 0.7;
+        let mut low = obs(PlssTelemetryMetric::GasTemperatureK, 900.0, 60.0, "a");
+        low.confidence = 0.2;
+        let report = analyze_plss_telemetry_trends(&[
+            obs(PlssTelemetryMetric::GasTemperatureK, 290.0, 0.0, "a"),
+            obs(PlssTelemetryMetric::GasTemperatureK, 291.0, 30.0, "a"),
+            low,
+        ], cfg).unwrap();
+        assert_eq!(report.excluded_low_confidence_observations, 1);
+        assert_eq!(report.lane(PlssTelemetryMetric::GasTemperatureK, PlssTelemetrySourceKind::Instrument).unwrap().source_trends[0].last_value, Some(291.0));
+        assert_eq!(report.lane(PlssTelemetryMetric::GasTemperatureK, PlssTelemetrySourceKind::Instrument).unwrap().status, PlssTelemetryTrendStatus::InsufficientEvidence);
     }
 
     #[test]
