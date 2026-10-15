@@ -15,7 +15,7 @@
 //!
 //! Science: Kanerva (2009) HDC, Plate (2003) Holographic Reduced Representations
 
-use super::extraction::{EntityType, ExtractedFact, SemanticRole};
+use super::extraction::{EntityType, ExtractedFact, ExtractedRelation, SemanticRole};
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::{BinaryHV, HDC_DIMENSION};
 
@@ -28,6 +28,11 @@ pub struct FactEncoding {
     pub vector: BinaryHV,
     /// Role-specific sub-vectors for compositional queries
     pub role_vectors: HashMap<SemanticRole, BinaryHV>,
+    /// Structured source relations retained independently of the bundled vector.
+    ///
+    /// HDC bundling is a lossy retrieval representation; predicates, negation and
+    /// per-relation confidence remain available for audit and persistence here.
+    pub relations: Vec<ExtractedRelation>,
     /// Source fact text (for human readability)
     pub source_text: String,
     /// Encoding confidence (extraction confidence × encoding quality)
@@ -192,6 +197,7 @@ impl KnowledgeEncoder {
         FactEncoding {
             vector,
             role_vectors,
+            relations: fact.relations.clone(),
             source_text: fact.source_text.clone(),
             confidence: fact.confidence,
         }
