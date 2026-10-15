@@ -5,7 +5,8 @@
 **Strategy:** [Paradigm-shift roadmap](./NANOMATERIALS_PARADIGM_SHIFT_ROADMAP.md)  
 **Portfolio:** [Nanotechnology frontier portfolio](./NANOTECHNOLOGY_FRONTIER_PORTFOLIO.md)  
 **OC22 track:** [Evidence-bounded research program](./NANOMATERIALS_RESEARCH_PROGRAM.md)  
-**Tracking issue:** NANO-003 (closed-loop policy evaluation)
+**Tracking issue:** [NANO-003](https://github.com/Luminous-Dynamics/symthaea/issues/7519) (closed-loop policy evaluation)
+**Run manifest contract:** [NANOTECHNOLOGY_CLOSED_LOOP_RUN_MANIFEST.schema.json](./NANOTECHNOLOGY_CLOSED_LOOP_RUN_MANIFEST.schema.json)
 
 ## 1. Decision
 
@@ -31,7 +32,7 @@ The external repository describes:
 - trajectory and summary outputs for reproducible comparisons;
 - an MIT code license.
 
-The repository currently declares Python >=3.12 and a substantial dependency set (ASE, MACE-Torch, ORB models, Materials Project API, and optional remote experiment/LLM/logging tools among them). We should therefore **reuse it as an isolated research benchmark, not adopt it as a Symthaea production dependency**. Its current moving main branch is not a valid run identity: implementation must freeze an exact upstream commit and all model/data/config identities before the first scored run.
+The repository currently declares Python >=3.12 and a substantial dependency set (ASE, MACE-Torch, ORB models, Materials Project API, and optional remote experiment/LLM/logging tools among them). We should therefore **reuse it as an isolated research benchmark, not adopt it as a Symthaea production dependency**. The source audit pinned the current upstream review snapshot to commit `bffda0c9a1fa1904b35c0ef67b455881c975df86` and recorded key blob SHAs below. Use the immutable commit in experiment configs; never cite the moving main branch as the run identity.
 
 ### Initial immutable source pin
 
@@ -46,6 +47,8 @@ The public MADE repository's current main ref was resolved during the source aud
 | Analytic oracle config | [analytic.yaml](https://github.com/diffractivelabs/MADE/blob/bffda0c9a1fa1904b35c0ef67b455881c975df86/configs/oracle/analytic.yaml), blob `0c77cf0197293f6f20c3ca0c2a803144441d2cdc` |
 
 A source-level review confirms that the metric implementation has code for area under the discovery curve (cumulative discoveries versus query count, integrated trapezoidally), enhancement factor (proposal discoveries relative to baseline at matched query points, with an implementation cap), and acceleration factor (relative queries needed to reach a target discovery count). **Do not assume the README's listed mSUN metric is implemented by the same metrics module**: search the pinned runner/notebooks and record the exact calculation site before using or reporting it.
+
+The machine-readable [run-manifest schema](./NANOTECHNOLOGY_CLOSED_LOOP_RUN_MANIFEST.schema.json) describes the required experiment identity, query accounting, controls and independent-check receipt. Its JSON syntax was re-parsed after commit; full JSON Schema conformance has not yet been run through an independent validator.
 
 These are immutable review identifiers, not a declaration that dependencies installed, artifacts downloaded, or any benchmark ran successfully.
 
