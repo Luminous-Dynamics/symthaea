@@ -10,6 +10,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "docs/research/INDUSTRIAL_ENZYME_BENCHMARK_V0.md"
+      - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
       - ".github/workflows/enzyme-bench-checker.yml"
   push:
     branches: [main]
@@ -21,6 +22,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "docs/research/INDUSTRIAL_ENZYME_BENCHMARK_V0.md"
+      - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
       - ".github/workflows/enzyme-bench-checker.yml"
   workflow_dispatch:
 
