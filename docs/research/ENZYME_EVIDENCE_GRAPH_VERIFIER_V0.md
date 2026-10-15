@@ -47,4 +47,4 @@ The command's current success message therefore means **the submitted graph pass
 
 ## Adversarial tests
 
-The unit-test fixtures are synthetic, never sourced biological observations. Regression cases include valid local hashes plus metadata-only remote links, dangling references, directed cycles, tampered bytes, attempted use of unacquired remote data in a successful transformation, evidence class/type mismatch, missing output-artifact linkage, missing failure reason, a null result with inputs but no output node, invalid uncertainty status, workspace path traversal, and required frozen-graph hash pinning.
+The unit-test fixtures are synthetic, never sourced biological observations. Regression cases include valid local hashes plus metadata-only remote links, dangling references, directed cycles, tampered bytes, attempted use of unacquired remote data in a successful transformation, evidence class/type mismatch, missing output-artifact linkage, missing failure reason, a null result with inputs but no output node, invalid uncertainty status, workspace path traversal and symlink escape, malformed transformation fingerprints, and required frozen-graph hash pinning.
