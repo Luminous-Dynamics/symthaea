@@ -5,6 +5,8 @@
 
 This profile makes the ROS 2 bridge's platform intent explicit. It is not a statement that the optional `rclrs` dependency, message bindings, simulator integration, or physical hardware path has passed on any distro/OS combination.
 
+**Relationship to the existing robotics roadmap:** this document owns distro/OS support policy only. Continue to use [Universal Embodiment v2 qualification and dependency gates (#1288)](https://github.com/Luminous-Dynamics/symthaea/issues/1288) and its existing simulator/ROS/HIL issue train for implementation and qualification. This file does not introduce a parallel simulator or HIL qualification program.
+
 ## Recommended distribution policy
 
 | ROS 2 distribution | Official support horizon | Bridge policy | Evidence still required |
