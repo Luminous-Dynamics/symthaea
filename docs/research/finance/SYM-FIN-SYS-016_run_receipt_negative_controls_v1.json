@@ -147,6 +147,13 @@
       "description": "The power-oracle flag is true although the independent power oracle control is absent.",
       "pointer": "/evaluation/power_oracle_applied",
       "replacement_value": true
+    },
+    {
+      "id": "SRC-SEM-011",
+      "description": "The receipt provides a digest-shaped value that does not identify the exact scenario-registry bytes.",
+      "pointer": "/run/scenario_registry_digest",
+      "replacement_value": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "validation_layer": "semantic_check"
     }
   ]
 }
