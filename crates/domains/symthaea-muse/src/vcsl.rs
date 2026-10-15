@@ -2096,6 +2096,53 @@ mod tests {
     }
 
     #[test]
+    fn inventory_bounds_and_orders_sample_decode_failure_diagnostics() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-instrument-inventory-decode-failures-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let vcsl_root = root.join("vcsl");
+        let vsco2_root = root.join("vsco2-ce");
+        let harp_dir =
+            vcsl_root.join("Chordophones/Composite Chordophones/Concert Harp");
+        std::fs::create_dir_all(&harp_dir).unwrap();
+
+        for index in 0..23 {
+            let path = harp_dir.join(format!("Harp_C4_vl1_rr{index:02}.wav"));
+            std::fs::write(path, b"not a wav").unwrap();
+        }
+
+        let inventory = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
+        let harp = inventory
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Harp")
+            .unwrap();
+        let mapping = harp.sustained_samples.as_ref().unwrap();
+
+        assert_eq!(mapping.indexed_sample_count, 23);
+        assert_eq!(mapping.failed_sample_decode_count, 23);
+        assert_eq!(mapping.reported_sample_decode_failures.len(), 20);
+        assert_eq!(mapping.omitted_sample_decode_failure_count, 3);
+        assert_eq!(
+            mapping.reported_sample_decode_failures.first().unwrap().file_name,
+            "Harp_C4_vl1_rr00.wav"
+        );
+        assert_eq!(
+            mapping.reported_sample_decode_failures.last().unwrap().file_name,
+            "Harp_C4_vl1_rr19.wav"
+        );
+        assert!(mapping.reported_sample_decode_failures.iter().all(|failure| {
+            failure.reason.chars().count() <= MAX_SAMPLE_DECODE_REASON_CHARS
+                && !failure.file_name.contains('/')
+                && !failure.file_name.contains('\\')
+        }));
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn inventory_counts_only_files_accepted_by_the_declared_indexer() {
         let root = std::env::temp_dir().join(format!(
             "muse-instrument-inventory-present-{}",
