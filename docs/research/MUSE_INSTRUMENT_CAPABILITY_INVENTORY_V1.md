@@ -11,10 +11,11 @@ Muse has multiple kinds of instrument support that must not be conflated:
 3. a declared mapping to a sample-library directory;
 4. sample files on disk whose names the current indexer can interpret;
 5. a real SoundFont file identified by its content hash;
-6. the ability of a particular preset/articulation/range to render correctly;
-7. evidence that the resulting sound is musically convincing.
+6. preset names/bank/program values parsed from its RIFF SoundFont preset-header table;
+7. the ability of a particular preset/articulation/range to render correctly;
+8. evidence that the resulting sound is musically convincing.
 
-The first inventory CLI records the first five levels that can be established directly from source and local filesystem evidence. It does **not** claim that a file can decode, that a SoundFont contains a desired preset, or that an instrument sounds realistic. Preset-level SoundFont probing and audio-quality evaluation remain follow-on work.
+The inventory CLI records source and filesystem evidence plus structurally parsed SoundFont preset headers. It does **not** certify full SoundFont validity, FluidSynth loadability, sample-zone presence, note-range coverage, or perceptual realism. Those remain separate gates.
 
 ## Running the inventory
 
@@ -46,9 +47,9 @@ Missing optional asset roots are a valid observation and are reported as unavail
 - gm_program_0_based is Muse's output mapping, not an asserted original source-patch identity. Some instruments use documented nearest-family approximations because General MIDI does not have exact names for all instruments.
 - sustained_samples and short_articulation_samples report the mapped library, relative mapping directory, whether the directory exists, and how many WAV filenames are accepted by the current sample indexer.
 - vcsl_root and vsco2_root record root presence, number of recursively discovered lowercase .wav files, and a deterministic path_size_manifest_sha256.
-- soundfont, when requested, records the file name, byte size, and SHA-256 of the SoundFont bytes.
+- soundfont, when requested, records the file name, byte size, and SHA-256 of the SoundFont bytes, plus parsed preset-header names, bank/program values, bank count, and duplicate bank/program slots.
 
-path_size_manifest_sha256 hashes sorted relative WAV paths and file sizes. It is a compact layout/inventory digest, **not** a content digest; changing audio bytes while preserving each file path and size will not change it. indexed_sample_count establishes filename/indexer compatibility only; it does not prove WAV decoding, sample quality, pitch coverage, velocity-layer coverage, or successful audible rendering. The SoundFont hash proves which file was inspected, not which presets that SoundFont can render.
+path_size_manifest_sha256 hashes sorted relative WAV paths and file sizes. It is a compact layout/inventory digest, **not** a content digest; changing audio bytes while preserving each file path and size will not change it. indexed_sample_count establishes filename/indexer compatibility only; it does not prove WAV decoding, sample quality, pitch coverage, velocity-layer coverage, or successful audible rendering. The preset table is parsed from the RIFF/sfbk pdta/phdr chunk, including the terminal EOP-record check; invalid containers, chunk boundaries, empty preset names and out-of-range program values fail closed. The parsed table reports what the file declares. It does not prove that the SoundFont's sample chunks or instrument zones are complete, that libfluidsynth will load it, or that any program can render audible output. The SoundFont SHA-256 proves the byte identity of the file that was indexed.
 
 The inventory intentionally contains no absolute root paths and no wall-clock timestamp. With the same source revision, roots' relative path/size manifests, optional SoundFont bytes, and environment-free values, its JSON is deterministic.
 
@@ -64,7 +65,8 @@ Keep the following status dimensions separate when consuming the inventory:
 | Does the mapped directory exist locally? | Filesystem observation in this receipt |
 | Can the current indexer index files? | indexed_sample_count > 0; decode still unproven |
 | Which SoundFont file was inspected? | Optional content SHA-256 |
-| Does that SoundFont contain a requested preset? | Not answered by v1; needs an explicit preset-query stage |
+| Does its preset-header table declare a bank/program/name? | Parsed RIFF SoundFont preset headers |
+| Does the SoundFont actually render that preset? | Not answered by header parsing; requires FluidSynth load/render evidence |
 | Is the audible rendering convincing? | Independent audio/render and listening evaluation |
 
 Never infer an instrument mapping from register, VoiceRole, cultural label, or GM number alone. A mapped sustained articulation does not imply a mapped staccato articulation, and a known sample directory does not imply complete pitch or dynamic coverage. Timpani remains unmapped in the pitched-sample indexer because the repository documents its source filenames as drum-number-based rather than scientific-pitch-based.
@@ -79,7 +81,7 @@ Never infer an instrument mapping from register, VoiceRole, cultural label, or G
 
 After this path-derived inventory is qualified:
 
-1. Query an actual FluidSynth SoundFont for its available bank/program/preset tuples and record the exact SoundFont digest with the result.
+1. Cross-check parsed header entries against FluidSynth's runtime preset listing and a deterministic render probe; keep the parser and renderer evidence separate.
 2. Add note-range, dynamic-layer and articulation coverage from real, inspected files rather than assuming one sample equals full support.
 3. Add a drum-number-aware index and dedicated percussion semantics instead of forcing percussion into pitched-note matching.
 4. Add import → instrumentation sidecar → MIDI export → re-import fixtures for patch, bank, channel, part identity and instrument-change preservation.
