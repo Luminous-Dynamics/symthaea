@@ -889,17 +889,17 @@ mod tests {
         encoding.role_vectors = vec![
             RoleBinding {
                 role: SemanticRole::Agent,
-                entity_text: "Alice".into(),
+                entity_text: Some("Alice".into()),
                 vector: alice,
             },
             RoleBinding {
                 role: SemanticRole::Agent,
-                entity_text: "Bob".into(),
+                entity_text: Some("Bob".into()),
                 vector: bob,
             },
             RoleBinding {
                 role: SemanticRole::Patient,
-                entity_text: "Project".into(),
+                entity_text: Some("Project".into()),
                 vector: patient,
             },
         ];
@@ -908,8 +908,8 @@ mod tests {
         let exported = graph.export_fact_records();
         assert_eq!(exported.len(), 1);
         assert_eq!(exported[0].role_vectors.len(), 3);
-        assert_eq!(exported[0].role_vectors[0].entity_text, "Alice");
-        assert_eq!(exported[0].role_vectors[1].entity_text, "Bob");
+        assert_eq!(exported[0].role_vectors[0].entity_text.as_deref(), Some("Alice"));
+        assert_eq!(exported[0].role_vectors[1].entity_text.as_deref(), Some("Bob"));
         assert_eq!(exported[0].role_vectors[0].role, SemanticRole::Agent);
         assert_eq!(exported[0].role_vectors[1].role, SemanticRole::Agent);
 
