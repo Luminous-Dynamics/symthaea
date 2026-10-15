@@ -429,15 +429,15 @@ fn status_for(
     inventory: Option<&ArchiveInventory>,
     contents_unchanged: bool,
 ) -> &'static str {
-    let Some(inventory) = inventory else {
-        return "archive_inspection_failed";
-    };
     if !contents_unchanged {
         return "artifact_changed_during_inspection";
     }
     if !md5_matches {
         return "checksum_mismatch";
     }
+    let Some(inventory) = inventory else {
+        return "archive_inspection_failed";
+    };
     if inventory.requires_review() {
         return "archive_structure_review_required";
     }
@@ -553,6 +553,11 @@ mod tests {
 
         let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
         assert_eq!(status_for(false, Some(&inventory), true), "checksum_mismatch");
+    }
+
+    #[test]
+    fn checksum_mismatch_is_reported_even_when_archive_inspection_fails() {
+        assert_eq!(status_for(false, None, true), "checksum_mismatch");
     }
 
     #[test]
