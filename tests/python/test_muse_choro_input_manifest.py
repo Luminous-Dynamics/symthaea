@@ -38,6 +38,37 @@ def approved_fixture(analysis_plan_root: Path) -> tuple[dict, dict]:
             "null_models_frozen": True,
             "thresholds_frozen": True,
         },
+        "design": {
+            "source_version_pin": "synthetic fixture only; no corpus source",
+            "study_question": "Does the synthetic metric distinguish the fabricated pattern from its null?",
+            "inclusion_criteria": ["fabricated fixture row with complete labels"],
+            "exclusion_criteria": ["malformed or missing synthetic labels"],
+            "hypotheses": [{
+                "id": "SYNTH-H1",
+                "statement": "The metric differs between the fabricated positive fixture and null.",
+                "primary_test": "compare fixed synthetic metric values",
+                "unit_of_analysis": "one fabricated synthetic fixture",
+                "falsification_rule": "no difference or reversed direction",
+            }],
+            "null_models": [{
+                "id": "SYNTH-NULL-1",
+                "description": "A fabricated counterexample with disrupted ordering.",
+                "preserved_properties": "fixture item count and value multiset",
+                "randomization_or_permutation": "one fixed counterexample transformation",
+                "unit_of_resampling": "whole fabricated fixture",
+            }],
+            "primary_outcomes": ["difference in synthetic metric value"],
+            "sensitivity_analyses": ["repeat with a second fabricated fixed seed"],
+            "effect_and_uncertainty_thresholds": {
+                "effect_size_rule": "report the signed difference without inferential generalization",
+                "uncertainty_rule": "not applicable to this structural validator fixture",
+                "decision_rule": "fixture validation only; no corpus claim",
+            },
+            "multiplicity_correction": "one synthetic primary comparison",
+            "missing_data_policy": "reject missing labels; no imputation",
+            "split_strategy": "no training split; a single fabricated fixture only",
+            "deviation_policy": "record deviations and do not reinterpret fixture results as empirical evidence",
+        },
     }
     plan_bytes = (json.dumps(plan_document, indent=2, sort_keys=True) + "\n").encode()
     (analysis_plan_root / "synthetic-analysis-plan.json").write_bytes(plan_bytes)
@@ -178,6 +209,50 @@ class ChoroInputManifestTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(
                 ManifestError, "analysis plan SHA-256 does not match the exact on-disk plan bytes"
+            ):
+                evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
+
+    def test_analysis_plan_requires_concrete_hypotheses(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture(root)
+            plan_path = root / "synthetic-analysis-plan.json"
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["design"]["hypotheses"] = []
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\\n").encode()
+            plan_path.write_bytes(plan_bytes)
+            manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
+            manifest_path = root / "manifest.json"
+            approval_path = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            manifest_path.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            approval_path.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ManifestError, "analysis-plan design.hypotheses must contain at least one concrete hypothesis"
+            ):
+                evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
+
+    def test_analysis_plan_requires_concrete_null_models(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture(root)
+            plan_path = root / "synthetic-analysis-plan.json"
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["design"]["null_models"] = []
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\\n").encode()
+            plan_path.write_bytes(plan_bytes)
+            manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
+            manifest_path = root / "manifest.json"
+            approval_path = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\\n").encode()
+            manifest_path.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            approval_path.write_text(json.dumps(approval, indent=2) + "\\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ManifestError, "analysis-plan design.null_models must contain at least one concrete null model"
             ):
                 evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
 
