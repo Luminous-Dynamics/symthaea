@@ -274,3 +274,20 @@ The current persistent `FactRecord` carries source text and cycle metadata but d
 
 Use the ESB-style evidence strata with counterfactuals generated from a canonical source example and split by source/family to prevent leakage. Report: eligible-candidate precision; false-eligibility rate under irrelevant, absent, and conflicting evidence; abstention recall/precision; evidence-level behavioral calibration; relation-constraint coverage; role coverage; and selective risk versus coverage. Fix any operating thresholds on the development partition and publish held-out confidence intervals. Keep vector similarity, extraction confidence, and source provenance as separate signals and separate claim types.
 
+## Contradictory-polarity guard (2026-10-16)
+
+A code-level review found that per-candidate relation satisfaction was insufficient: a positive record could be mechanically eligible even when the graph also contained a directly opposing negated record. PR #7522 now adds a graph-wide polarity conflict scan for each requested relation:
+
+- A conflict requires matching normalized subject, predicate, object, subject/object roles, and causal status, with opposite `is_negated` values.
+- Conflict records include the query index, conflicting graph fact ID, stored relation index, directed relation text, original source text, and both polarity flags.
+- Conflict evidence is sorted deterministically by query index, stable fact ID, and stored relation index.
+- By default, any such conflict changes the query-level result to `AbstainConflictingEvidence` and marks candidates as `Abstain`, even when a positive candidate otherwise matches all constraints.
+- `RelationConstraintSearchPolicy::with_abstain_on_conflicting_evidence(false)` exists as an explicit permissive override for review workflows; conflict records remain present in the report.
+- Missing role candidates do not suppress conflict reporting when relation constraints were supplied.
+
+The matching is deliberately narrow: it detects exact structural opposition in polarity, not arbitrary logical contradiction, synonym entailment, temporal conflict, or source credibility. Source text is surfaced for inspection, but source identity and authenticity are still not represented in the persistent fact contract. A conflict means “the stored graph contains opposing observations,” not “either observation is true.”
+
+Additional tests are authored for a fully matching positive candidate coexisting with an otherwise identical negated record, and for explicit abstention when no role candidate is available. The tests have **not** been executed locally. PR #7522 exact head is `f55ee0caddf1d2f27e52db8477072617a93b4653`; CI status for that exact head must be checked independently before qualification. The existing default retrieval path remains unchanged.
+
+This guard is motivated by the evidence sufficiency distinction between full support, partial support, irrelevant evidence, missing context, and conflicting evidence described by Zhang and Wu (2026, [DOI: 10.32604/cmc.2026.086343](https://doi.org/10.32604/cmc.2026.086343)). Their benchmark supports adding conflict-specific evaluation; it does not validate this structural rule or its false-positive rate.
+
