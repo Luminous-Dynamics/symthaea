@@ -737,6 +737,37 @@ mod tests {
     }
 
     #[test]
+    fn rejects_artifact_symlink_escape_even_when_external_bytes_match_hash() {
+        use std::os::unix::fs::symlink;
+
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        let external = root.with_extension("outside.csv");
+        let external_bytes = b"not in the benchmark workspace";
+        fs::write(&external, external_bytes).unwrap();
+        symlink(&external, root.join("data/escape.csv")).unwrap();
+        value["dataset_artifact"]["path"] = json!("data/escape.csv");
+        value["dataset_artifact"]["sha256"] =
+            json!(format!("{:x}", Sha256::digest(external_bytes)));
+
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let error = validate(&root, &parsed).unwrap_err().to_string();
+        assert!(error.contains("escapes workspace root through a symlink"));
+        fs::remove_file(external).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn access_date_must_be_a_real_calendar_date() {
+        assert!(is_date_shape("2026-10-15"));
+        assert!(is_date_shape("2024-02-29"));
+        assert!(!is_date_shape("2026-02-29"));
+        assert!(!is_date_shape("2026-04-31"));
+        assert!(!is_date_shape("2026-13-01"));
+        assert!(!is_date_shape("0000-01-01"));
+    }
+
+    #[test]
     fn rejects_uncleared_rights_even_when_license_is_named() {
         let root = fixture_root();
         let mut value = make_manifest(&root);
