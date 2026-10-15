@@ -3,7 +3,7 @@
 **Status:** research proposal; not a validated platform or a claim of novel scientific discovery.  
 **Scope:** a Rust-first, provenance-preserving route from published enzyme measurements to reproducible kinetic claims and honest prediction.  
 **Related work:** [Industrial Enzyme Benchmark V0](INDUSTRIAL_ENZYME_BENCHMARK_V0.md), [kcat admission profile](KCAT_ADMISSION_PROFILE_V0.json), [SLAC calibration reference manifest](SLAC_CALIBRATION_REFERENCE_MANIFEST.json).  
-**Machine-readable companion:** [ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json](ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json) defines proposed node/edge types and the hash-bound transformation-chain invariants for a future independent verifier.
+**Machine-readable companion:** [ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json](ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json) defines the graph contract. The initial [Rust verifier](ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md) now checks structural/provenance invariants and locally acquired bytes; it does not yet replay kinetics or establish scientific validity.
 
 ## Executive thesis
 
@@ -22,6 +22,17 @@ The pinned SLAC calibration smoke check exercises five calibration JSON artifact
 The related thesis' time-course analysis also illustrates why stage boundaries matter: calibration, blank/control correction, deriving concentrations, estimating rates, and fitting a kinetic model are distinct transformations. A matching final parameter does not prove that the raw-signal pathway was reproduced. A model with omitted time-dependent inactivation can produce a materially different fitted kcat; this reported example should become a future, source-matched regression test only after the exact raw data, model, and analysis lineage are pinned.
 
 A 2026 bioRxiv preprint on enzyme-engineering benchmarks raises a related concern: aggregation across heterogeneous assay conditions can inflate apparent generalization. It is a preprint and should be treated as a motivating hypothesis, not definitive consensus. This roadmap addresses the concern directly by separating task types and requiring increasingly difficult holdouts.
+
+## Existing work and the genuine opportunity
+
+We must not claim that a new kinetic predictor, uncertainty estimation, or out-of-distribution testing is itself novel:
+
+- **EnzymeML already addresses interoperable, FAIR representations** of reaction conditions, time courses, kinetic models and estimated parameters, including data flow between experimental and modeling software ([EnzymeML, Nature Methods, 2023](https://www.nature.com/articles/s41592-022-01763-1)). This project should compose with EnzymeML/SBML rather than invent a competing biochemical document format.
+- **CatPred already predicts in-vitro kcat, Km and Ki and explicitly addresses dataset standardization, dissimilar-sequence evaluation and uncertainty quantification** ([Nature Communications, published 28 February 2025](https://www.nature.com/articles/s41467-025-57215-9)). These are established neighboring capabilities, not an originality claim for this work.
+- **EnzyArena (2026 bioRxiv preprint) argues that pooling unmatched assay conditions can inflate apparent generalization** and benchmarks campaign-matched data, with a prospective 150-mutant comparison reported by its authors ([preprint](https://www.biorxiv.org/content/10.64898/2026.03.29.715152v2)). Because this is a preprint, its conclusions need independent review; nevertheless, it strongly motivates matched-condition evaluation and prospective utility checks.
+- **Over-parameterized kinetic models can be non-identifiable**, so the system should report identifiability and parameter uncertainty rather than reward fit complexity ([AppliedChem, 9 April 2026](https://www.mdpi.com/2673-9623/6/2/25)).
+
+The credible differentiation to investigate is an *evidence compiler*: connect exact raw-data bytes through each declared calibration, control correction, unit conversion, rate extraction, model fit and uncertainty analysis; retain every failure/exclusion; then separately evaluate prediction under stricter study/family/protocol holdouts and whether a decision beats simple baselines. That is a testable research objective, not a claim that an end-to-end implementation or advantage exists today.
 
 ## Seven paradigm shifts
 
