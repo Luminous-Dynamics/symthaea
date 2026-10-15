@@ -94,6 +94,15 @@ PR #7494 currently at `7a49df0e864b17be41d4a3c658cd44bcb6a4c3b3`; its CI run [38
 
 This is intentionally a synthetic micro-corpus, not a representative natural-language benchmark. It can enforce deterministic matching invariants and catch regressions, but it does not establish realistic precision/recall, semantic generalization, threshold calibration, or production relevance. Before enabling this retrieval path by default, the next required experiment is a versioned, independently labeled real corpus with negative sampling, a documented split, and comparisons against the existing legacy query path.
 
+### External corpus research before scaling the evaluator
+
+Two candidate families were inspected through their maintainer repositories:
+
+- [Re-DocRED](https://github.com/tonytan48/Re-DocRED) reports revising 4,053 documents to add missing relation triples and address logical inconsistencies and coreference errors; its repository supplies an MIT license and its README documents the revised train/dev/test split. The remaining caveat is that any benchmark still has annotation assumptions and its test split must remain sealed during threshold tuning.
+- [Re²-DocRED](https://github.com/klassessg/re2-docred) is the 2026 revision release; its README describes combining Re-DocRED, DocGNRE and REDFM-derived material and publishes the assembled dataset under CC BY-SA 4.0, with upstream licenses identified separately. Any use must preserve dataset-level attribution/share-alike obligations and review source-specific terms.
+
+Re-DocRED is the better first *candidate* for an offline relation-extraction evaluation, because its maintainer explicitly targets DocRED false negatives; it is **not** a drop-in role-retrieval benchmark. Relations such as knowledge-base predicates cannot be mapped automatically to the encoder's event-semantic Agent/Patient roles. A defensible adapter must preserve original head/tail direction and type labels, define any role mapping per benchmark task, prevent document leakage across splits, retain source IDs, and distinguish extraction errors from retrieval-ranking errors. Do not vendor the data into this repository until file-level licensing/attribution and data acquisition have been reviewed. This source review has not downloaded, transformed or run either corpus.
+
 ## Mycelix handoff boundary — schema-derived mapping (2026-10-15)
 
 Reviewed the current open contract branches directly:
