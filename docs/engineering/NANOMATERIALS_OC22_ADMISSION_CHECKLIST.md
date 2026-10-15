@@ -40,7 +40,7 @@
 
 ## 3. Required admission outputs
 
-The admission run should emit an immutable, machine-readable manifest and a human-readable audit report. The manifest should include:
+The admission run should emit an immutable, machine-readable manifest and a human-readable audit report. Use the repository contract in [NANOMATERIALS_OC22_PAIR_MANIFEST.schema.json](./NANOMATERIALS_OC22_PAIR_MANIFEST.schema.json) for the source artifacts, split inventory, per-SID input/target pairs, independent checks, and explicit unresolved/excluded states. This is a document-level evidence contract, not a production runtime type and not proof that any manifest values are true. The manifest should include:
 
 - manifest schema/version and exact Symthaea source commit;
 - upstream docs source commit, retrieval timestamp, artifact URL, published license, dataset-paper citation and required attribution;
