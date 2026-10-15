@@ -92,7 +92,7 @@ pub struct SuitInteropPolicy {
     pub required_environments: BTreeSet<SuitOperatingEnvironment>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SuitInteropFindingStatus {
     CompatibleUnderPolicy,
     MissingPeerInterface,
@@ -708,6 +708,17 @@ mod tests {
         let (report, _) = evaluate_suit_interoperability(&left, &right, &policy()).unwrap();
         assert!(report.findings.iter().any(|finding| {
             finding.status == SuitInteropFindingStatus::SchemaDigestMismatch
+        }));
+        assert_eq!(report.status, SuitInteropReportStatus::RequiredInterfacesBlocked);
+    }
+
+    #[test]
+    fn pressure_and_grounding_interfaces_are_not_treated_as_substitutable() {
+        let (left, mut right) = pair();
+        right.endpoints[0].kind = SuitInterfaceKind::PressureBoundary;
+        let (report, _) = evaluate_suit_interoperability(&left, &right, &policy()).unwrap();
+        assert!(report.findings.iter().any(|finding| {
+            finding.status == SuitInteropFindingStatus::InterfaceKindMismatch
         }));
         assert_eq!(report.status, SuitInteropReportStatus::RequiredInterfacesBlocked);
     }
