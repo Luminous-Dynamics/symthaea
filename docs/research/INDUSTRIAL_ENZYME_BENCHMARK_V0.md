@@ -56,22 +56,23 @@ Use DaRUS-3867 / SLAC as a separate **kinetic-analysis reproduction gate** once 
 
 A successful pilot can qualify the read/parse/unit/fit/serialization pipeline before we spend effort admitting a larger kcat corpus. It does not replace that corpus or the study/family-held-out predictive evaluation.
 
-#### Preliminary single-file calibration check (not full reproduction)
+#### Five-temperature calibration fit and checksum reproduction (not full kinetic-model reproduction)
 
-An exploratory, in-memory inspection of the public mirror's [ABTS_standard_25.0C.json](https://github.com/EnzymeML/slac_modeling/blob/737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5/data/calibrations/ABTS_standard_25.0C.json) (mirror commit 737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5, Git blob ea1a3f69f5c01f6b6f7880c445833c5a733e4655) gives a narrow, checkable result. The JSON contains 30 absorbance observations across three replicate groups at concentrations from 0 to 200 µmol/L. Its embedded model specifies a zero-intercept linear calibration and an admitted range of 0–150 µmol/L (27 observations); the published slope is 0.01832986232564407, with R² = 0.9965435394942497 and RMSD = 0.05253117083141901. An independent least-squares refit of the 27 observations in that declared range returns slope 0.018329862325174823, the same R² to the displayed precision, and RMSD 0.052531170831419005 (slope difference approximately 4.7×10⁻¹³). Including the three 200 µmol/L observations instead changes the zero-intercept slope to 0.017570697786690438 and RMSD to 0.09230840071343391. **The declared calibration-range decision materially affects the fit**: the reproduction must record and verify that rule, not silently filter samples. This is a calibration-statistic smoke check only, not validation of the complete five-temperature kinetic-model pipeline or any enzyme-function prediction.
+I checked the five temperature-specific calibration JSON files in the public mirror at a single immutable repository commit [737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5](https://github.com/EnzymeML/slac_modeling/commit/737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5). These were retrieved through the repository API and inspected in memory; none of the files was saved into the workspace.
 
-The canonical DaRUS page lists CC BY 4.0 and the corresponding calibration file's MD5 c8561fe8784f956d1123bbcd52a65121. The 5,054-byte ASCII JSON body returned by the pinned GitHub mirror was hashed in memory and its MD5 **matches the DaRUS value exactly**. This is a strong cross-repository byte-consistency check for this file, though MD5 is not collision-resistant and is not the benchmark's integrity hash. The file was not saved into the workspace, and no source-artifact SHA-256 has been frozen in the benchmark manifest. Formal admission still requires fetching the canonical DaRUS version, calculating SHA-256 over the actual bytes, recording the pinned source artifact, and replaying the fit from the locally verified bytes.
+For each file, I computed MD5 over the returned 7-bit ASCII payload and compared it with the file-level MD5 published by the canonical DaRUS record. All five matched. I then independently refit the declared zero-intercept linear equation, `signal = a × concentration`, including only samples within the embedded calibration range (0–150 µmol/L inclusive). Each file contains 30 samples, with 27 selected and the three 200 µmol/L samples excluded by the stated rule.
 
-The new Rust command is wired into `xtask` as an explicit, hash-pinned replay gate. After the canonical, rights-cleared calibration file is acquired into the ignored local research directory, compute its byte hash and run:
+| Calibration file | Bytes | Canonical / computed MD5 | Refit slope | Refit R² | Refit RMSD |
+|---|---:|---|---:|---:|---:|
+| ABTS_standard_25.0C.json | 5,054 | `c8561fe8784f956d1123bbcd52a65121` ✓ | 0.018329862325174823 | 0.9965435394942497 | 0.052531170831419005 |
+| ABTS_standard_30.0C.json | 5,052 | `b9b51ddcd76bf1ee8dcb5c08f258b7a2` ✓ | 0.017314605186480186 | 0.9997826256275483 | 0.012440262679447662 |
+| ABTS_standard_35.5C.json | 5,050 | `38e7b2be4eb40a383eec57efa319e897` ✓ | 0.017977302593240093 | 0.9961949291160336 | 0.05377164085489366 |
+| ABTS_standard_40.0C.json | 5,054 | `7ffcd2249695adb526afe06eee28066b` ✓ | 0.019069431818181815 | 0.9997064382973191 | 0.01589866612109839 |
+| ABTS_standard_45.0C.json | 5,052 | `e1960a2f3cfeabb71e291ae4967b6e91` ✓ | 0.018059865603146853 | 0.9977614756102724 | 0.04146734721174711 |
 
-```sh
-sha256sum research-data/enzyme-benchmark/ABTS_standard_25.0C.json
-cargo run -p xtask -- enzyme-calibration-check \
-  --input research-data/enzyme-benchmark/ABTS_standard_25.0C.json \
-  --sha256 REPLACE_WITH_THE_SHA256_FROM_SHA256SUM
-```
+Across all five files, the independently fitted slopes differ from the embedded reported slopes by less than 4.8×10⁻¹³. The R² values match at the reported precision; RMSD differs only by floating-point rounding (no more than about 1.8×10⁻¹⁷ in these results). These are calibration statistics from the published JSON metadata/data, not new experimental findings. They demonstrate why the declared concentration window must be honored: the 25 °C file alone shows that including the three 200 µmol/L observations changes its zero-intercept slope from 0.018329862325174823 to 0.017570697786690438 and raises RMSD from 0.052531170831419005 to 0.09230840071343391.
 
-The command fails closed if the source hash, equation, sample IDs, concentration-unit consistency, declared range, fitted slope, R² or RMSD disagree. Six synthetic unit tests cover successful range-aware reproduction and rejection of a wrong hash, source-fit disagreement, duplicate sample IDs, mixed concentration units, and a reversed declared range. These tests use toy fixtures; the public calibration file has **not yet** been run through this Rust command because its bytes have not been staged locally.
+The official DaRUS record identifies version 1.0, reports CC BY 4.0, documents raw absorption data plus calibration JSON and EnzymeML `.omex` files across 25–45 °C, and lists the canonical file checksums. The mirror README states its data are equivalent to the DaRUS deposit. This is a useful cross-repository byte-consistency check; MD5 is not collision-resistant and is not the benchmark integrity hash. No SHA-256 values have been frozen for the source files, and the new Rust command has **not** yet been run against these files because none was saved locally. Formal replay still requires obtaining the canonical/versioned files through the authorized download path, computing SHA-256 on the actual local bytes, adding a source manifest, and running the Rust command on those bytes. This work does **not** yet reproduce absorbance extraction, calibration generation from raw readings, the EnzymeML kinetic fit, all five temperature-dependent kinetic models, or any enzyme-function prediction.
 
 ### Executable admission gate
 
