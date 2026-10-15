@@ -25,8 +25,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: socioeconomic-run-receipt-${{ github.event.pull_request.head.ref || github.ref }}
-  cancel-in-progress: false
+  group: socioeconomic-run-receipt-${{ github.event.pull_request.head.ref || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  # New heads supersede stale automatic runs; deliberate manual runs are isolated.
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
   validate-contract:
