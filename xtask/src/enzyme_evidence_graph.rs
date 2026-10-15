@@ -83,6 +83,16 @@ const UNCERTAINTY_STATUSES: &[&str] = &[
     "not_applicable",
 ];
 
+const GRAPH_STATUSES: &[&str] = &["draft", "frozen"];
+const RIGHTS_STATUSES: &[&str] = &[
+    "approved_for_this_use",
+    "review_pending",
+    "restricted",
+    "rejected",
+    "unknown",
+];
+const ACQUISITION_STATUSES: &[&str] = &["available", "not_acquired"];
+
 #[derive(Debug, Deserialize)]
 struct EvidenceGraph {
     schema_version: u32,
@@ -260,8 +270,9 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
     ensure!(graph.schema_version == 1, "unsupported evidence graph schema_version");
     ensure!(!graph.graph_id.trim().is_empty(), "graph_id must be nonempty");
     ensure!(
-        matches!(graph.status.as_str(), "draft" | "frozen"),
-        "graph status must be 'draft' or 'frozen'"
+        GRAPH_STATUSES.contains(&graph.status.as_str()),
+        "graph status must be one of {:?}",
+        GRAPH_STATUSES
     );
 
     let rights_by_id = unique_index(
@@ -273,10 +284,7 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
         ensure!(!rights.license_id.trim().is_empty(), "rights record {} has empty license_id", rights.rights_record_id);
         ensure!(!rights.attribution.trim().is_empty(), "rights record {} has empty attribution", rights.rights_record_id);
         ensure!(
-            matches!(
-                rights.status.as_str(),
-                "approved_for_this_use" | "review_pending" | "restricted" | "rejected" | "unknown"
-            ),
+            RIGHTS_STATUSES.contains(&rights.status.as_str()),
             "rights record {} has unsupported status '{}'",
             rights.rights_record_id,
             rights.status
@@ -333,6 +341,12 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
             rights_review_unresolved += 1;
         }
 
+        ensure!(
+            ACQUISITION_STATUSES.contains(&artifact.acquisition_status.as_str()),
+            "artifact {} has unsupported acquisition_status '{}'",
+            artifact.artifact_id,
+            artifact.acquisition_status
+        );
         let verified = match artifact.acquisition_status.as_str() {
             "available" => {
                 let relative_path = safe_relative_path(&artifact.locator)
@@ -1028,6 +1042,92 @@ mod tests {
     fn validate_fixture(root: &Path, value: &Value) -> Result<Report> {
         let graph: EvidenceGraph = serde_json::from_value(value.clone())?;
         validate_graph(root, &graph)
+    }
+
+    #[test]
+    fn rust_policy_vocabularies_match_the_machine_readable_contract() {
+        let contract: Value = serde_json::from_str(include_str!(
+            "../../docs/research/ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json"
+        ))
+        .unwrap();
+
+        let contract_nodes: BTreeSet<(String, String)> = contract["node_types"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|node| (
+                node["type"].as_str().unwrap().to_owned(),
+                node["evidence_class"].as_str().unwrap().to_owned()
+            ))
+            .collect();
+        let rust_nodes: BTreeSet<(String, String)> = NODE_TYPES
+            .iter()
+            .map(|(node_type, evidence_class)| ((*node_type).to_owned(), (*evidence_class).to_owned()))
+            .collect();
+        assert_eq!(rust_nodes, contract_nodes, "Rust node/evidence-class policy drifted from contract");
+
+        let contract_edges: BTreeSet<String> = contract["edge_types"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|edge| edge["type"].as_str().unwrap().to_owned())
+            .collect();
+        let rust_edges: BTreeSet<String> = EDGE_TYPES.iter().map(|value| (*value).to_owned()).collect();
+        assert_eq!(rust_edges, contract_edges, "Rust edge vocabulary drifted from contract");
+
+        let contract_roles: BTreeSet<String> = contract["artifact_record"]["role_values"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let rust_roles: BTreeSet<String> = ARTIFACT_ROLES.iter().map(|value| (*value).to_owned()).collect();
+        assert_eq!(rust_roles, contract_roles, "Rust artifact-role vocabulary drifted from contract");
+
+        let contract_statuses: BTreeSet<String> = contract["graph_instance_v0"]["graph_status_values"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let rust_statuses: BTreeSet<String> = GRAPH_STATUSES.iter().map(|value| (*value).to_owned()).collect();
+        assert_eq!(rust_statuses, contract_statuses, "Rust graph statuses drifted from contract");
+
+        let contract_rights: BTreeSet<String> = contract["graph_instance_v0"]["rights_status_values"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let rust_rights: BTreeSet<String> = RIGHTS_STATUSES.iter().map(|value| (*value).to_owned()).collect();
+        assert_eq!(rust_rights, contract_rights, "Rust rights statuses drifted from contract");
+
+        let contract_acquisition: BTreeSet<String> = contract["graph_instance_v0"]["acquisition_status_values"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let rust_acquisition: BTreeSet<String> = ACQUISITION_STATUSES.iter().map(|value| (*value).to_owned()).collect();
+        assert_eq!(rust_acquisition, contract_acquisition, "Rust artifact acquisition states drifted from contract");
+
+        let contract_terminal: BTreeSet<String> = contract["transformation_record"]["terminal_status_values"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let rust_terminal: BTreeSet<String> = TERMINAL_STATUSES.iter().map(|value| (*value).to_owned()).collect();
+        assert_eq!(rust_terminal, contract_terminal, "Rust transformation terminal statuses drifted from contract");
+
+        let contract_uncertainty: BTreeSet<String> = contract["parameter_claim_record"]["uncertainty_status_values"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let rust_uncertainty: BTreeSet<String> = UNCERTAINTY_STATUSES.iter().map(|value| (*value).to_owned()).collect();
+        assert_eq!(rust_uncertainty, contract_uncertainty, "Rust parameter uncertainty statuses drifted from contract");
     }
 
     #[test]
