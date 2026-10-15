@@ -313,6 +313,7 @@ fn projection_status_tag(status: PlssBoundaryProjectionStatus) -> &'static str {
             "boundary_within_current_uncertainty"
         },
         PlssBoundaryProjectionStatus::MovingAway => "moving_away",
+        PlssBoundaryProjectionStatus::NotApproaching => "not_approaching",
         PlssBoundaryProjectionStatus::DirectionUncertain => "direction_uncertain",
         PlssBoundaryProjectionStatus::InsufficientEvidence => "insufficient_evidence",
         PlssBoundaryProjectionStatus::Conflicted => "conflicted",
