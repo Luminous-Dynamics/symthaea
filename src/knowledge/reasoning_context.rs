@@ -29,7 +29,7 @@ pub struct ReasoningContext {
     pub relevant_facts: Vec<GroundedFact>,
     /// Causal chains traced from entities in the query
     pub causal_chains: Vec<CausalChain>,
-    /// Active contradictions that should modulate confidence
+    /// Pending factual contradiction alerts represented by their source facts.
     pub contradictions: Vec<String>,
     /// Overall epistemic state
     pub epistemic_state: EpistemicState,
@@ -76,7 +76,7 @@ pub struct EpistemicState {
     pub uncertainty: f64,
     /// How novel the current input is (0-1)
     pub novelty: f64,
-    /// How many contradictions are active
+    /// How many contradiction alerts are pending consumption by the cognitive loop
     pub contradiction_count: usize,
     /// Whether we have any grounded knowledge about this topic
     pub has_grounding: bool,
@@ -146,7 +146,27 @@ impl ReasoningContext {
     pub fn from_manager(manager: &KnowledgeManager, query: &str) -> Self {
         let signals = manager.signals();
         let search_results = manager.last_search_results();
-        let alerts: &[(); 0] = &[]; // Alerts are drained separately
+        // Inspect pending alerts without consuming them; the cognitive loop still
+        // owns delivery through KnowledgeManager::drain_alerts().
+        let alerts: Vec<String> = manager
+            .pending_alerts()
+            .map(|alert| {
+                let new_fact = manager.graph().get_fact(alert.new_fact_id);
+                let existing_fact = manager.graph().get_fact(alert.existing_fact_id);
+                match (new_fact, existing_fact) {
+                    (Some(new_fact), Some(existing_fact)) => format!(
+                        "Contradiction alert: '{}' conflicts with '{}' (similarity {:.2})",
+                        new_fact.encoding.source_text,
+                        existing_fact.encoding.source_text,
+                        alert.similarity,
+                    ),
+                    _ => format!(
+                        "Contradiction alert references unavailable fact record(s)                          (new={}, existing={}, similarity {:.2})",
+                        alert.new_fact_id, alert.existing_fact_id, alert.similarity,
+                    ),
+                }
+            })
+            .collect();
 
         // 1. Convert search results to grounded facts
         let relevant_facts: Vec<GroundedFact> = search_results
@@ -186,7 +206,7 @@ impl ReasoningContext {
         };
 
         // 4. Generate natural language summary
-        let summary = generate_summary(&relevant_facts, &causal_chains, &epistemic_state);
+        let mut summary = generate_summary(&relevant_facts, &causal_chains, &epistemic_state);
 
         // 5. Counterfactual necessity for causal chain roots
         let counterfactuals: Vec<(String, f32)> = causal_chains
@@ -200,15 +220,15 @@ impl ReasoningContext {
             .collect();
 
         // 6. Detect confounders between causal chain roots (Pearl backdoor criterion)
-        let mut contradictions: Vec<String> = Vec::new();
+        let mut confounders: Vec<String> = Vec::new();
         let chain_roots: Vec<&str> = causal_chains.iter().map(|c| c.root.as_str()).collect();
         for i in 0..chain_roots.len() {
             for j in (i + 1)..chain_roots.len() {
                 let confounders = manager.detect_confounders(chain_roots[i], chain_roots[j]);
                 for (confounder, strength) in &confounders {
                     if *strength > thresholds::KNOWLEDGE_CONFOUNDER_STRENGTH_THRESHOLD {
-                        contradictions.push(format!(
-                            "Confounder: '{}' (strength {:.2}) may cause both '{}' and '{}'",
+                        confounders.push(format!(
+                            "'{}' (strength {:.2}) may cause both '{}' and '{}'",
                             confounder, strength, chain_roots[i], chain_roots[j]
                         ));
                     }
@@ -216,13 +236,15 @@ impl ReasoningContext {
             }
         }
 
-        let mut epistemic_state = epistemic_state;
-        epistemic_state.contradiction_count = contradictions.len();
+        if !confounders.is_empty() {
+            summary.push_str(" | Potential confounders: ");
+            summary.push_str(&confounders.join("; "));
+        }
 
         Self {
             relevant_facts,
             causal_chains,
-            contradictions,
+            contradictions: alerts,
             epistemic_state,
             summary,
             analogies: Vec::new(), // Populated by cycle.rs analogical transfer
@@ -341,7 +363,7 @@ fn generate_summary(
     }
     if epistemic.contradiction_count > 0 {
         parts.push(format!(
-            "ALERT: {} active contradiction(s) detected.",
+            "ALERT: {} pending contradiction alert(s).",
             epistemic.contradiction_count,
         ));
     }
