@@ -18767,6 +18767,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-nutrition-source-registry"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "url",
+]
+
+[[package]]
 name = "symthaea-exoskeleton"
 version = "0.1.0"
 dependencies = [
