@@ -308,7 +308,7 @@ This matrix is a research triage aid, not a data schema or a claim that the stud
 
 ### A12. Dataset admission queue and next-experiment order (2026-10-15)
 
-This is a source-admission triage table, not a scientific result. **Downloadable/open access is not by itself a reuse license**, and a paper's open-access licence does not automatically license unpublished source data. Preserve the status distinctions below; do not download for modelling, train on, redistribute or publish derived extracts from a rights-unresolved source until permission is documented.
+This is a source-admission triage table, not a scientific result. **Downloadable/open access is not by itself a reuse license**, and a paper's open-access licence does not automatically license unpublished source data. For records whose rendered license field is blank, use `license_scope_unresolved`: that is a metadata/rights clarification gate, **not** a conclusion that all reuse is forbidden and not a presumption of permission. Zenodo's current help says public records require a license and describes CC BY 4.0 as the default, so a blank rendered field is anomalous and should be checked against the specific record/version and depositor. Until clarified, don't treat the source as cleared for training, redistribution or derived publication.
 
 | Source | Endpoint relevance | Current access/rights finding | Next allowed action |
 |---|---|---|---|
@@ -332,6 +332,37 @@ This is a source-admission triage table, not a scientific result. **Downloadable
 6. Model only after provenance, units, specimen grouping, endpoints and negative controls are independently checked. Missing inputs remain missing; source summaries are literature priors, not results reproduced by Symthaea.
 
 No source file was retrieved and analysed for this admission update. This section changes source prioritization and claim boundaries only; it adds no production types, data schema, benchmark score or material recommendation.
+
+### A13. Download-failure ledger and dimensional-consistency gate (2026-10-15)
+
+This section separates an access-tool failure from source unavailability or rights restriction. It records what was attempted; it does not claim that the data owners removed access.
+
+#### Bath spreadsheet retrieval attempts
+
+The official [BATH-01087 archive page](https://researchdata.bath.ac.uk/1087/) exposes the 12 MB workbook at the link target `https://researchdata.bath.ac.uk/1087/4/Data%20Set%20AEA%20Manuscript%20Feb2022%20IJR.xlsx` and explicitly labels it CC BY 4.0. Following the archive's file link in the browser tool returned **HTTP/tool error 400: unsupported XLSX content type**. A separate direct-download attempt from the execution container failed before HTTP transfer with a DNS resolution error. These failures establish only that these retrieval paths/tools did not deliver workbook bytes in this session; they do not show that the archive file is missing, access-restricted, corrupt, or unlicensed. No workbook checksum was computed and no sheet/cell/result was inspected.
+
+The [BATH-00448 archive](https://researchdata.bath.ac.uk/448/) similarly exposes `https://researchdata.bath.ac.uk/448/1/Data.xlsx`, licensed CC BY 4.0, but the browser tool returned the same unsupported-XLSX-content-type error. Its [official 2-page data documentation](https://researchdata.bath.ac.uk/448/3/Data_documentation.pdf) was retrievable. Next attempt should use a normal file-capable HTTP client or browser download path, save the original bytes outside Git, and calculate SHA-256 locally. If that environment remains unavailable, ask Bath Research Data Service for an alternate delivery URL or repository export rather than treating a search result or derived conversion as the source file.
+
+#### Worked dimensional check: BATH-00448 documentation
+
+The archive's documentation, at lines 16–20 of the PDF, states that 1350 g of sand divided by a loose bulk density of 1660 g/cm³ gives a sand volume of 0.813 cm³, and lists the loose bulk densities of coated perlite with nutrients (CPN) and with spores (CPS) as 665 g/cm³ and 625 g/cm³. Taken literally, those density magnitudes are physically implausible for loose mineral aggregates. The documentation is therefore not safe to use as a numerically trusted unit source without reconciliation.
+
+A **hypothesis for author/steward verification only**, not an accepted correction: if the intended density units were kg/m³, then (1350\,\mathrm{g}=1.350\,\mathrm{kg}) and
+`1.350 kg / (1660 kg·m⁻³) = 0.00081325 m³ ≈ 813 cm³ = 0.813 L`.
+That differs by a factor of 1000 from the printed volume of 0.813 cm³. The CPN/CPS numerical densities would likewise have plausible-looking scale as kg/m³ rather than g/cm³, but plausibility alone cannot prove the intended units. Do **not** silently patch a workbook, use these reconstructed units in model input, or publish derived mix quantities before the paper and/or data steward confirms the density units, target volume unit and exact source workbook version. Record the answer with the source/version and any correction history.
+
+#### Admission states for repeatable work
+
+Use a small, reviewable status vocabulary in the existing source manifest (no new production schema implied):
+- `metadata_seen`: an official landing page or citation was reviewed;
+- `license_scope_unresolved`: the relevant file/reuse terms are not unambiguously established for the proposed purpose;
+- `download_attempt_failed_tooling`: the request failed at the client/tool layer;
+- `bytes_retrieved_unverified`: a file exists locally but expected digest, format and source identity are not verified;
+- `bytes_verified`: exact source identity and recorded checksum were independently verified from local bytes;
+- `schema_audited`: sheets/columns, units, identifiers, missingness and formula provenance have been inventoried;
+- `analysis_reproduced`: a frozen, cited calculation reproduces a named source result within a predeclared tolerance and with experimental units intact.
+
+These are sequential audit states, not a new evidence type. Later states do not erase unresolved rights, and a checksum only validates byte identity—not correctness of the original measurement. Do not claim a state from a citation or file listing alone.
 
 ## B. Better railway systems
 
