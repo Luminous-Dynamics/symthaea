@@ -629,16 +629,25 @@ pub struct SoundFontPresetV1 {
 }
 
 /// A single sustained or short-articulation mapping and its local availability.
+/// Per-observed-pitch evidence row. Counts cover every filename accepted by
+/// the indexer, even if its WAV later fails decoding.
 #[derive(Debug, Clone, Serialize)]
 pub struct SamplePitchCoverageV1 {
+    /// MIDI note number parsed from the indexed filenames, not a measured pitch.
     pub midi_note: u8,
+    /// Number of indexed WAV files carrying this filename pitch.
     pub indexed_sample_file_count: usize,
+    /// Indexed files that the complete WAV decode audit consumed successfully.
     pub decoded_sample_file_count: usize,
+    /// Indexed files that failed the complete WAV decode audit.
     pub failed_sample_decode_file_count: usize,
+    /// Fully decoded files with peak absolute normalized amplitude <= 1e-5.
     pub silent_sample_file_count: usize,
+    /// Parsed normalized dynamic buckets for this pitch, sorted by strength.
     pub dynamic_strength_coverage: Vec<DynamicStrengthCoverageV1>,
 }
 
+/// Per-pitch outcome counts for one distinct normalized filename dynamic value.
 #[derive(Debug, Clone, Serialize)]
 pub struct DynamicStrengthCoverageV1 {
     /// Parsed and normalized filename strength; not a calibrated MIDI velocity.
