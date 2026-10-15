@@ -8,16 +8,18 @@
 //!     --soundfont /path/to/soundfont.sf2 \
 //!     --fluidsynth /path/to/fluidsynth
 //!
-//! Runtime render probes are opt-in and require --soundfont. Missing optional sample roots are recorded as unavailable evidence. The
-//! path/size manifest digest does not hash WAV content; an optional SoundFont
-//! file is content-hashed. A nonzero exit means the inventory could not be
-//! produced faithfully (for example, an unreadable root or missing SoundFont).
+//! Runtime render probes are opt-in and require --soundfont. Use
+//! --hash-indexed-samples to content-fingerprint WAV files accepted by Muse's
+//! filename indexer; this adds disk I/O. Missing sample roots are unavailable
+//! evidence. The root path/size manifest remains lightweight and does not hash
+//! WAV content. A nonzero exit means the inventory could not be produced
+//! faithfully (for example, an unreadable root or missing SoundFont).
 
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
-use symthaea_muse::vcsl::capability_inventory_with_fluidsynth;
+use symthaea_muse::vcsl::capability_inventory_with_options;
 
 fn main() {
     if let Err(error) = run() {
@@ -39,6 +41,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut vsco2_root = default_vsco2;
     let mut soundfont_path = None;
     let mut fluidsynth_path = None;
+    let mut hash_indexed_samples = false;
     let mut args = env::args().skip(1);
 
     while let Some(argument) = args.next() {
@@ -67,13 +70,16 @@ fn run() -> Result<(), Box<dyn Error>> {
                         .ok_or("--fluidsynth requires an executable path or command name")?,
                 ));
             }
+            "--hash-indexed-samples" => {
+                hash_indexed_samples = true;
+            }
             "--help" | "-h" => {
                 println!(
                     "Usage: muse_instrument_inventory [--vcsl-root PATH] \
-                     [--vsco2-root PATH] [--soundfont FILE] [--fluidsynth PATH]\n\
+                     [--vsco2-root PATH] [--soundfont FILE] [--fluidsynth PATH] [--hash-indexed-samples]\n\
                      Emits JSON to stdout. Missing sample roots are unavailable. \
                      --fluidsynth enables per-program offline render probes and \
-                     requires --soundfont."
+                     requires --soundfont. --hash-indexed-samples hashes indexed WAV bytes and adds disk I/O."
                 );
                 return Ok(());
             }
@@ -81,11 +87,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let inventory = capability_inventory_with_fluidsynth(
+    let inventory = capability_inventory_with_options(
         &vcsl_root,
         &vsco2_root,
         soundfont_path.as_deref(),
         fluidsynth_path.as_deref(),
+        hash_indexed_samples,
     )?;
     println!("{}", serde_json::to_string_pretty(&inventory)?);
     Ok(())
