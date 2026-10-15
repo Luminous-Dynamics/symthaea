@@ -422,7 +422,7 @@ mod tests {
             ("observable", Box::new(|p| p.measurable_observable.clear())),
             ("competing hypotheses", Box::new(|p| p.competing_hypotheses.clear())),
             (
-                "prior registration",
+                "registered before observing",
                 Box::new(|p| p.registered_before_observation = false),
             ),
             (
