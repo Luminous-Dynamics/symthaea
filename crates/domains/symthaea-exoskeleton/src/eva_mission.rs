@@ -563,6 +563,68 @@ mod tests {
     }
 
     #[test]
+    fn failed_co2_scrubber_vetoes_planned_task_before_resource_use() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .co2_scrubber = crate::plss::PlssPathState::Failed;
+        let report = mission.run(&[one_hour_work(0.0)]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+        assert_eq!(report.totals.mobility_energy_wh, 0.0);
+    }
+
+    #[test]
+    fn failed_humidity_control_vetoes_planned_task_before_resource_use() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .humidity_control = crate::plss::PlssPathState::Failed;
+        let report = mission.run(&[one_hour_work(0.0)]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+        assert_eq!(report.totals.mobility_energy_wh, 0.0);
+    }
+
+    #[test]
+    fn scrubber_exhaustion_during_segment_returns_after_accounting_for_co2() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .co2_scrubber_capacity_remaining_l = 0.10;
+        let report = mission.run(&[one_hour_work(0.0)]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert!(report.totals.oxygen_consumed_l > 0.0);
+        let plss = mission.plss_mut_for_fault_injection();
+        assert_eq!(plss.state().co2_scrubber_capacity_remaining_l, 0.0);
+        assert!(plss.state().co2_burden_l > 0.0);
+    }
+
+    #[test]
+    fn condensate_collector_exhaustion_returns_after_accounting_for_vapor() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .plss_mut_for_fault_injection()
+            .state_mut_for_fault_injection()
+            .humidity_collector_capacity_remaining_g = 0.10;
+        let report = mission.run(&[EvaMissionSegment::lunar_reference(
+            "humidity-limited",
+            EvaMissionPhase::SurfaceWork,
+            600.0,
+        )]);
+        assert_eq!(report.disposition, EvaMissionDisposition::ReturnToSafeHaven);
+        assert!(report.totals.oxygen_consumed_l > 0.0);
+        let plss = mission.plss_mut_for_fault_injection();
+        assert_eq!(plss.state().humidity_collector_capacity_remaining_g, 0.0);
+        assert!(plss.state().humidity_vapor_burden_g > 0.0);
+    }
+
+    #[test]
     fn radiation_alert_vetoes_task_before_resource_use() {
         let mut mission = IntegratedEvaMission::simulation_reference();
         let mut s = EvaMissionSegment::lunar_reference("solar-event", EvaMissionPhase::Contingency, 600.0);
