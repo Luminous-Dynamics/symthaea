@@ -854,6 +854,103 @@ pub fn screen_load_path_demand(
     })
 }
 
+/// Bounded total load, effective-path count and concentration factor for load-path screening.
+///
+/// Bounds are deterministic assumptions, not probability distributions. All interval endpoints
+/// must be justified independently; the function does not infer paths or concentration from CAD.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoundedLoadPathDemandRequest {
+    /// Lower/upper total compressive resultant, newtons.
+    pub total_compressive_resultant_n: ScalarBounds,
+    /// Lower/upper effective number of load paths; both must be positive.
+    pub effective_load_path_count: ScalarBounds,
+    /// Lower/upper peak-to-mean concentration multiplier; both must be >= 1.
+    pub peak_to_mean_load_factor: ScalarBounds,
+}
+
+/// Deterministic envelope for mean and factor-scaled load-path demand.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoundedLoadPathDemandResult {
+    pub mean_compressive_load_per_effective_path_lower_bound_n: f64,
+    pub mean_compressive_load_per_effective_path_upper_bound_n: f64,
+    /// Lower arithmetic endpoint over all independent declared input intervals.
+    pub factor_scaled_load_path_demand_lower_bound_n: f64,
+    /// Upper arithmetic endpoint over all independent declared input intervals.
+    /// This remains a caller-bound-dependent estimate, not a verified peak member force.
+    pub factor_scaled_load_path_demand_upper_bound_n: f64,
+}
+
+/// Propagate declared uncertainty bounds through the load-path arithmetic.
+///
+/// The minimum uses the minimum resultant, maximum path count, and minimum multiplier. The maximum
+/// uses the maximum resultant, minimum path count, and maximum multiplier. This is a conservative
+/// endpoint calculation only for the supplied independent intervals; if inputs are correlated, the
+/// user must supply joint bounds or analyze the correlations separately. The upper endpoint is not
+/// a shell capacity or validated maximum force.
+pub fn screen_bounded_load_path_demand(
+    request: BoundedLoadPathDemandRequest,
+) -> Result<BoundedLoadPathDemandResult, ScreeningError> {
+    validate_bounds(
+        request.total_compressive_resultant_n,
+        "total_compressive_resultant_n",
+        true,
+    )?;
+    validate_bounds(
+        request.effective_load_path_count,
+        "effective_load_path_count",
+        false,
+    )?;
+    validate_bounds(
+        request.peak_to_mean_load_factor,
+        "peak_to_mean_load_factor",
+        true,
+    )?;
+    if request.peak_to_mean_load_factor.min < 1.0 {
+        return Err(ScreeningError::FactorBelowOne("peak_to_mean_load_factor"));
+    }
+
+    let mean_compressive_load_per_effective_path_lower_bound_n =
+        request.total_compressive_resultant_n.min
+            / request.effective_load_path_count.max;
+    let mean_compressive_load_per_effective_path_upper_bound_n =
+        request.total_compressive_resultant_n.max
+            / request.effective_load_path_count.min;
+    let factor_scaled_load_path_demand_lower_bound_n =
+        mean_compressive_load_per_effective_path_lower_bound_n
+            * request.peak_to_mean_load_factor.min;
+    let factor_scaled_load_path_demand_upper_bound_n =
+        mean_compressive_load_per_effective_path_upper_bound_n
+            * request.peak_to_mean_load_factor.max;
+
+    for (name, value) in [
+        (
+            "mean load-path lower bound",
+            mean_compressive_load_per_effective_path_lower_bound_n,
+        ),
+        (
+            "mean load-path upper bound",
+            mean_compressive_load_per_effective_path_upper_bound_n,
+        ),
+        (
+            "factor-scaled load-path lower bound",
+            factor_scaled_load_path_demand_lower_bound_n,
+        ),
+        (
+            "factor-scaled load-path upper bound",
+            factor_scaled_load_path_demand_upper_bound_n,
+        ),
+    ] {
+        validate_result(value, name)?;
+    }
+
+    Ok(BoundedLoadPathDemandResult {
+        mean_compressive_load_per_effective_path_lower_bound_n,
+        mean_compressive_load_per_effective_path_upper_bound_n,
+        factor_scaled_load_path_demand_lower_bound_n,
+        factor_scaled_load_path_demand_upper_bound_n,
+    })
+}
+
 /// An externally sourced pressure-capacity declaration plus the references needed to audit it.
 ///
 /// The caller must supply a conservative allowable pressure for the exact applicable design
@@ -2286,6 +2383,124 @@ mod tests {
         assert_eq!(
             result.unwrap_err(),
             ScreeningError::NonFiniteResult("mean compressive load per effective path")
+        );
+    }
+
+    #[test]
+    fn bounded_load_path_screen_propagates_all_declared_input_bounds() {
+        let result = screen_bounded_load_path_demand(BoundedLoadPathDemandRequest {
+            total_compressive_resultant_n: ScalarBounds {
+                min: 100_000.0,
+                max: 120_000.0,
+            },
+            effective_load_path_count: ScalarBounds { min: 10.0, max: 20.0 },
+            peak_to_mean_load_factor: ScalarBounds { min: 1.0, max: 1.5 },
+        })
+        .unwrap();
+        assert_eq!(result.mean_compressive_load_per_effective_path_lower_bound_n, 5_000.0);
+        assert_eq!(result.mean_compressive_load_per_effective_path_upper_bound_n, 12_000.0);
+        assert_eq!(result.factor_scaled_load_path_demand_lower_bound_n, 5_000.0);
+        assert_eq!(result.factor_scaled_load_path_demand_upper_bound_n, 18_000.0);
+    }
+
+    #[test]
+    fn bounded_load_path_equal_intervals_match_scalar_screen() {
+        let scalar = screen_load_path_demand(LoadPathDemandRequest {
+            total_compressive_resultant_n: 90_000.0,
+            effective_load_path_count: 15.0,
+            assumed_peak_to_mean_load_factor: 1.4,
+        })
+        .unwrap();
+        let bounded = screen_bounded_load_path_demand(BoundedLoadPathDemandRequest {
+            total_compressive_resultant_n: ScalarBounds { min: 90_000.0, max: 90_000.0 },
+            effective_load_path_count: ScalarBounds { min: 15.0, max: 15.0 },
+            peak_to_mean_load_factor: ScalarBounds { min: 1.4, max: 1.4 },
+        })
+        .unwrap();
+        assert_eq!(
+            bounded.mean_compressive_load_per_effective_path_lower_bound_n,
+            scalar.mean_compressive_load_per_effective_path_n
+        );
+        assert_eq!(
+            bounded.factor_scaled_load_path_demand_upper_bound_n,
+            scalar.factor_scaled_peak_load_path_demand_n
+        );
+    }
+
+    #[test]
+    fn bounded_load_path_screen_keeps_zero_resultant_zero() {
+        let result = screen_bounded_load_path_demand(BoundedLoadPathDemandRequest {
+            total_compressive_resultant_n: ScalarBounds { min: 0.0, max: 0.0 },
+            effective_load_path_count: ScalarBounds { min: 1.0, max: 100.0 },
+            peak_to_mean_load_factor: ScalarBounds { min: 1.0, max: 2.0 },
+        })
+        .unwrap();
+        assert_eq!(result.factor_scaled_load_path_demand_lower_bound_n, 0.0);
+        assert_eq!(result.factor_scaled_load_path_demand_upper_bound_n, 0.0);
+    }
+
+    #[test]
+    fn bounded_load_path_screen_rejects_reversed_resultant_bounds() {
+        let result = screen_bounded_load_path_demand(BoundedLoadPathDemandRequest {
+            total_compressive_resultant_n: ScalarBounds { min: 10.0, max: 9.0 },
+            effective_load_path_count: ScalarBounds { min: 1.0, max: 2.0 },
+            peak_to_mean_load_factor: ScalarBounds { min: 1.0, max: 1.0 },
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::InvalidInterval("total_compressive_resultant_n")
+        );
+    }
+
+    #[test]
+    fn bounded_load_path_screen_rejects_zero_minimum_path_count() {
+        let result = screen_bounded_load_path_demand(BoundedLoadPathDemandRequest {
+            total_compressive_resultant_n: ScalarBounds { min: 1.0, max: 2.0 },
+            effective_load_path_count: ScalarBounds { min: 0.0, max: 2.0 },
+            peak_to_mean_load_factor: ScalarBounds { min: 1.0, max: 1.0 },
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::MustBePositive("effective_load_path_count")
+        );
+    }
+
+    #[test]
+    fn bounded_load_path_screen_rejects_factor_interval_below_one() {
+        let result = screen_bounded_load_path_demand(BoundedLoadPathDemandRequest {
+            total_compressive_resultant_n: ScalarBounds { min: 1.0, max: 2.0 },
+            effective_load_path_count: ScalarBounds { min: 1.0, max: 2.0 },
+            peak_to_mean_load_factor: ScalarBounds { min: 0.9, max: 1.2 },
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::FactorBelowOne("peak_to_mean_load_factor")
+        );
+    }
+
+    #[test]
+    fn bounded_load_path_screen_rejects_non_finite_factor_endpoint() {
+        let result = screen_bounded_load_path_demand(BoundedLoadPathDemandRequest {
+            total_compressive_resultant_n: ScalarBounds { min: 1.0, max: 2.0 },
+            effective_load_path_count: ScalarBounds { min: 1.0, max: 2.0 },
+            peak_to_mean_load_factor: ScalarBounds { min: 1.0, max: f64::INFINITY },
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::NonFiniteInput("peak_to_mean_load_factor")
+        );
+    }
+
+    #[test]
+    fn bounded_load_path_screen_rejects_derived_load_overflow() {
+        let result = screen_bounded_load_path_demand(BoundedLoadPathDemandRequest {
+            total_compressive_resultant_n: ScalarBounds { min: 1.0, max: f64::MAX },
+            effective_load_path_count: ScalarBounds { min: 0.5, max: 1.0 },
+            peak_to_mean_load_factor: ScalarBounds { min: 1.0, max: 2.0 },
+        });
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::NonFiniteResult("mean load-path upper bound")
         );
     }
 
