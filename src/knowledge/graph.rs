@@ -13,6 +13,7 @@
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
 use super::encoding::{FactEncoding, RoleBoundVector};
+use super::extraction::SemanticRole;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
