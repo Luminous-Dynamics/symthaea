@@ -421,7 +421,7 @@ The desired output is a **Civilization Mechanism Map**, not a winning ideology.
 
 ## 16. Versioned run receipt and semantic export boundary
 
-The machine-readable run receipt is defined in [`SYM-FIN-SYS-016_run_receipt_v1.schema.json`](SYM-FIN-SYS-016_run_receipt_v1.schema.json). An illustrative shape is in [`SYM-FIN-SYS-016_run_receipt_example_v1.json`](SYM-FIN-SYS-016_run_receipt_example_v1.json); schema-level and cross-field rejection cases are in [`SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json`](SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json). The test-only [validator](../../../scripts/validate_socioeconomic_run_receipt.py) checks both layers in the focused GitHub Actions workflow.
+The machine-readable run receipt is defined in [`SYM-FIN-SYS-016_run_receipt_v1.schema.json`](SYM-FIN-SYS-016_run_receipt_v1.schema.json). An illustrative shape is in [`SYM-FIN-SYS-016_run_receipt_example_v1.json`](SYM-FIN-SYS-016_run_receipt_example_v1.json); schema-level and cross-field rejection cases are in [`SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json`](SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json). The test-only [validator](../../../scripts/validate_socioeconomic_run_receipt.py) checks both layers. A small job in the existing `.github/workflows/ci.yml` is deliberately not draft-gated; a separate focused workflow is also included for subsequent maintenance/dispatch.
 
 A receipt binds:
 
@@ -458,4 +458,4 @@ Keep the following relations machine-visible:
 
 ### Evidence status
 
-The schema, illustrative fixture, negative-control corpus and test-only validator are reference artifacts. The focused workflow pins the JSON Schema validator dependencies and is configured to run against the exact pull-request head. Until that exact-head workflow completes successfully, the schema/fixture pair is not qualified as a validated interchange format. The example metrics are synthetic placeholders, not observed results and not evidence for the efficacy of any regime.
+The schema, illustrative fixture, negative-control corpus and test-only validator are reference artifacts. Exact validator dependency versions are pinned. The draft-PR-capable job in the existing CI workflow checks out the exact pull-request head; the standalone workflow is retained for future maintenance/dispatch. Until one of these exact-head executions completes successfully, the schema/fixture pair is not qualified as a validated interchange format. The example metrics are synthetic placeholders, not observed results and not evidence for the efficacy of any regime.
