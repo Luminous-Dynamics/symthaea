@@ -390,7 +390,11 @@ fn compare_findings(left: &SuitInteropFinding, right: &SuitInteropFinding) -> st
         .cmp(&right.component_id)
         .then(left.endpoint_id.cmp(&right.endpoint_id))
         .then(left.interface_id.cmp(&right.interface_id))
+        .then(left.interface_kind.cmp(&right.interface_kind))
+        .then(left.role.cmp(&right.role))
+        .then(left.required.cmp(&right.required))
         .then(left.peer_component_id.cmp(&right.peer_component_id))
+        .then(left.peer_endpoint_id.cmp(&right.peer_endpoint_id))
         .then(left.status.cmp(&right.status))
 }
 
@@ -813,6 +817,25 @@ mod tests {
         let mut changed = right.clone();
         changed.endpoints[0].contract_revision = "v2".to_string();
         assert!(!verify_suit_interop_receipt(&left, &changed, &p, &report_a, &receipt_a));
+    }
+
+    #[test]
+    fn absence_of_required_consumer_interfaces_is_not_a_compatibility_pass() {
+        let mut offered = endpoint(
+            "optional-diagnostic-data",
+            SuitInterfaceRole::Provider,
+            SuitInterfaceKind::TelemetryAndData,
+        );
+        offered.required = false;
+        let left = manifest("optional-provider", vec![offered]);
+        let right = manifest("unconnected-component", vec![]);
+        let (report, _) = evaluate_suit_interoperability(&left, &right, &policy()).unwrap();
+        assert_eq!(
+            report.status,
+            SuitInteropReportStatus::NoRequiredInterfacesToVerify
+        );
+        assert_eq!(report.required_interface_count, 0);
+        assert!(!report.represents_physical_qualification);
     }
 
     #[test]
