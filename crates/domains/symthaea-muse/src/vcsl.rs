@@ -599,6 +599,11 @@ pub struct InstrumentCapabilityV1 {
     pub procedural_fallback_declared: bool,
     pub sustained_samples: Option<SampleDirectoryEvidenceV1>,
     pub short_articulation_samples: Option<SampleDirectoryEvidenceV1>,
+    /// Names declared by an optional SoundFont at bank 0 and this instrument's
+    /// selected GM program. None means no SoundFont was supplied; Some(empty)
+    /// means the inspected header table had no exact bank/program match.
+    /// A match is still not evidence that the preset will render successfully.
+    pub soundfont_bank0_program_matches: Option<Vec<String>>,
 }
 
 /// Build a deterministic capability snapshot from the current source mappings
@@ -665,12 +670,24 @@ pub fn capability_inventory(
                 sample_directory_evidence(instrument, false, vcsl_root, vsco2_root);
             let short_articulation_samples =
                 sample_directory_evidence(instrument, true, vcsl_root, vsco2_root);
+            let soundfont_bank0_program_matches = soundfont.as_ref().map(|evidence| {
+                evidence
+                    .preset_inventory
+                    .presets
+                    .iter()
+                    .filter(|preset| {
+                        preset.bank == 0 && preset.program == instrument.gm_program() as u16
+                    })
+                    .map(|preset| preset.name.clone())
+                    .collect()
+            });
             InstrumentCapabilityV1 {
                 instrument: format!("{instrument:?}"),
                 gm_program_0_based: instrument.gm_program(),
                 procedural_fallback_declared: true,
                 sustained_samples,
                 short_articulation_samples,
+                soundfont_bank0_program_matches,
             }
         })
         .collect::<Vec<_>>();
@@ -1415,6 +1432,34 @@ mod tests {
         assert!(presets.presets.iter().any(|preset| {
             preset.name == "Percussion" && preset.bank == 128 && preset.program == 0
         }));
+        let piano = inventory
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Piano")
+            .unwrap();
+        assert_eq!(
+            piano.soundfont_bank0_program_matches.as_deref(),
+            Some(&["Grand Piano".to_owned()][..])
+        );
+        let violin = inventory
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Violin")
+            .unwrap();
+        assert_eq!(
+            violin.soundfont_bank0_program_matches.as_deref(),
+            Some(&["Alternate Violin".to_owned(), "Violin".to_owned()][..])
+        );
+        let xylophone = inventory
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Xylophone")
+            .unwrap();
+        assert_eq!(
+            xylophone.soundfont_bank0_program_matches.as_deref(),
+            Some(&[][..]),
+            "a missing program is different from not inspecting a SoundFont"
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 
