@@ -35,6 +35,17 @@ Sources:
 
 These are **starting points for simulation and requirements review**. Mars-specific items in particular remain hypotheses until tied to a declared mission scenario, engineering evidence and actual program requirements. The list is not an official standards matrix and does not claim any variant is safe for its named role.
 
+## Scope boundary: EVA is one suit family, not every pressure suit
+
+The eight profiles in this tranche are EVA configurations. They should not be treated as a universal taxonomy for every crew-worn survival system. Launch-and-entry survival suits, intravehicular emergency/escape suits, and EVA suits operate in different vehicle interfaces, duration assumptions and use cases. For example, a crew survival/launch-entry suit may depend on vehicle-fed interfaces and have no EVA-style portable life-support backpack; making the current EVA common-foundation list mandatory for every class would encode the wrong abstraction.
+
+The next platform layer should therefore type the **suit family** separately from the **mission/task profile**:
+- **Launch and entry survival:** vehicle-compatible breathing/pressure support, seat/restraint compatibility, emergency egress and post-landing survival interfaces.
+- **Intravehicular emergency / escape:** cabin-depressurization contingency, vehicle emergency interfaces, restraint/egress, and constrained-duration survival.
+- **EVA:** portable life support or an explicit umbilical variant, pressure-boundary integrity, thermal management, mobility appropriate to the environment, and contingency/rescue requirements.
+
+These are research categories, not an assertion that all missions use the same pressure-suit type. Each family needs its own required safety foundation and evidence policy. Shared communications, sensors, data contracts, fit records or service connectors can be standardized where interface control and validation justify it, without sharing a physical subsystem merely for architectural neatness.
+
 ## Common foundation vs. specialized capability
 
 The evaluator currently defines a small common foundation for every profile:
