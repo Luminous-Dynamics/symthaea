@@ -3227,10 +3227,22 @@ mod tests {
     fn inspection_escape_population_scales_with_feature_count() {
         let small = screen_inspection_escape_population(270, 0.0001, 0.9).unwrap();
         let large = screen_inspection_escape_population(10_000, 0.0001, 0.9).unwrap();
-        assert!((small.per_feature_probability_of_undetected_critical_defect - 0.00001).abs() < 1e-15);
-        assert!((small.probability_at_least_one_critical_defect_escapes - 0.002696).abs() < 0.000001);
-        assert!((large.probability_at_least_one_critical_defect_escapes - 0.095163).abs() < 0.000001);
-        assert!(large.expected_undetected_critical_defect_count > small.expected_undetected_critical_defect_count);
+        assert!(
+            (small.per_feature_probability_of_undetected_critical_defect - 0.00001).abs()
+                < 1e-15
+        );
+        assert!(
+            (small.probability_at_least_one_critical_defect_escapes - 0.002696).abs()
+                < 0.000001
+        );
+        assert!(
+            (large.probability_at_least_one_critical_defect_escapes - 0.095163).abs()
+                < 0.000001
+        );
+        assert!(
+            large.expected_undetected_critical_defect_count
+                > small.expected_undetected_critical_defect_count
+        );
     }
 
     #[test]
@@ -3305,9 +3317,14 @@ mod tests {
             ScalarBounds { min: 0.8, max: 0.95 },
         )
         .unwrap();
-        let expected_lower = -1_000.0_f64.mul_add(0.0, (1.0_f64 - 0.00005_f64).powi(0));
-        let _ = expected_lower;
-        assert!(result.probability_at_least_one_critical_defect_escapes_lower_bound > 0.0);
+        assert!(
+            (result.probability_at_least_one_critical_defect_escapes_lower_bound - 0.048772).abs()
+                < 0.000001
+        );
+        assert!(
+            (result.probability_at_least_one_critical_defect_escapes_upper_bound - 0.864935).abs()
+                < 0.000001
+        );
         assert!(result.probability_at_least_one_critical_defect_escapes_upper_bound
             > result.probability_at_least_one_critical_defect_escapes_lower_bound);
         assert!((result.expected_undetected_critical_defect_count_lower_bound - 0.05).abs() < 1e-12);
