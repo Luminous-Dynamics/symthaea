@@ -27,7 +27,7 @@ The JSON receipt embeds the pinned source-document commit, advertised artifact U
 - Members are never extracted or executed.
 - Archive path traversal, absolute paths, duplicate member names, and non-regular/non-directory entries are recorded as review blockers.
 - The compressed stream is hashed separately from the declared tar payload bytes. Member bodies are read fully so decompression/truncation errors are not hidden by merely listing headers.
-- Gzip decompression, tar member count, member path lengths, and stored diagnostic path text are bounded (2 GiB expanded stream, 100,000 members, 4 KiB path limit, 200-character diagnostic prefix) to limit resource exhaustion from malformed archives.
+- Gzip decompression, tar member count, cumulative UTF-8 member-path metadata, individual member path lengths, and stored diagnostic path text are bounded (2 GiB expanded stream, 100,000 members, 32 MiB cumulative member-path byte budget, 4 KiB individual path limit, 200-character diagnostic prefix). Top-level inventory keys for overlong components collapse to a bounded sentinel.
 - The compressed artifact is hashed before and after inventory; changed content blocks a clean status. This is a mutation check, not an OS-level immutable-file guarantee.
 - A matching checksum does not verify LMDB schema, train/validation/test counts, units, ID/OOD mapping, structural chemistry, or licensing for a separate model checkpoint.
 - The receipt cannot state an admitted result. Its best status is artifact_integrity_verified_pending_schema; NANO-001A and NANO-001C remain independent gates.
