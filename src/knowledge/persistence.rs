@@ -1964,6 +1964,15 @@ mod tests {
 
         let loaded = p.load_causal_edges().unwrap();
         assert_eq!(loaded.len(), 2);
+        assert_eq!(loaded[0].cause, "sanctions");
+        assert_eq!(loaded[0].strength, 0.8);
+        assert!(!loaded[0].is_inhibitory);
+        assert_eq!(loaded[0].cycle, 1);
+        assert_eq!(loaded[1].cause, "diplomacy");
+        assert_eq!(loaded[1].strength, 0.6);
+        assert!(loaded[1].is_inhibitory);
+        assert_eq!(loaded[1].source_text, "diplomacy prevented war");
+        assert_eq!(loaded[1].cycle, 2);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
