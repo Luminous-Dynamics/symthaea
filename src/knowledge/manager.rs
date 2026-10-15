@@ -1375,7 +1375,7 @@ mod tests {
 
     #[test]
     fn test_manager_restart_preserves_role_vectors() {
-        use crate::knowledge::encoding::FactEncoding;
+        use crate::knowledge::encoding::{FactEncoding, RoleBinding};
         use crate::knowledge::extraction::SemanticRole;
 
         let dir = std::env::temp_dir().join(format!(
@@ -1393,23 +1393,23 @@ mod tests {
         let mut manager = KnowledgeManager::try_new(config.clone()).unwrap();
         let mut encoding = FactEncoding {
             vector: symthaea_core::hdc::binary_hv::BinaryHV::random(81),
-            role_vectors: std::collections::HashMap::new(),
+            role_vectors: Vec::new(),
             relations: Vec::new(),
             source_text: "role-vector manager restart fixture".into(),
             confidence: 0.9,
         };
-        encoding
-            .role_vectors
-            .insert(
-                SemanticRole::Agent,
-                symthaea_core::hdc::binary_hv::BinaryHV::random(82),
-            );
-        encoding
-            .role_vectors
-            .insert(
-                SemanticRole::Patient,
-                symthaea_core::hdc::binary_hv::BinaryHV::random(83),
-            );
+        encoding.role_vectors = vec![
+            RoleBinding {
+                role: SemanticRole::Agent,
+                entity_text: "Alice".into(),
+                vector: symthaea_core::hdc::binary_hv::BinaryHV::random(82),
+            },
+            RoleBinding {
+                role: SemanticRole::Agent,
+                entity_text: "Bob".into(),
+                vector: symthaea_core::hdc::binary_hv::BinaryHV::random(83),
+            },
+        ];
         let (fact_id, _) = manager
             .graph
             .insert(encoding.clone(), 7, Some("test".into()), false);
@@ -1495,7 +1495,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
-                role_vectors: std::collections::HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
@@ -1546,7 +1546,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
-                role_vectors: std::collections::HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
@@ -1598,7 +1598,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
-                role_vectors: std::collections::HashMap::new(),
+                role_vectors: Vec::new(),
                 relations: Vec::new(),
                 graph_fact_id: None,
                 initial_confidence: None,
