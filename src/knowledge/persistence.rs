@@ -1458,6 +1458,8 @@ mod tests {
             is_causal: false,
             relations: Vec::new(),
             role_vectors: HashMap::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(1),
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(1),
@@ -1520,6 +1522,8 @@ mod tests {
             is_causal: false,
             relations: Vec::new(),
             role_vectors: HashMap::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(1),
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(1),
@@ -1583,6 +1587,8 @@ mod tests {
                 is_negated: true,
                 confidence: 0.73,
             }],
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(17),
             initial_confidence: Some(0.88),
             last_accessed_cycle: Some(15),
@@ -1640,6 +1646,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(1),
             initial_confidence: Some(0.8),
             last_accessed_cycle: Some(1),
@@ -1668,6 +1676,8 @@ mod tests {
                 is_negated: false,
                 confidence: 1.2,
             }],
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(2),
             initial_confidence: Some(0.7),
             last_accessed_cycle: Some(2),
@@ -1730,6 +1740,8 @@ mod tests {
                         confidence: 0.6,
                     },
                 ],
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: Some(1),
                 initial_confidence: Some(0.8),
                 last_accessed_cycle: Some(1),
@@ -1810,6 +1822,8 @@ mod tests {
                     is_negated: false,
                     confidence: 0.7,
                 }],
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1853,6 +1867,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1898,6 +1914,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1940,6 +1958,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -1979,6 +1999,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: Some(1),
                 initial_confidence: Some(0.9),
                 last_accessed_cycle: Some(1),
@@ -2018,6 +2040,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
@@ -2056,6 +2080,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: Some(0.9),
                 last_accessed_cycle: Some(3),
@@ -2254,6 +2280,8 @@ mod tests {
             is_causal: true,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(8),
@@ -2364,6 +2392,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(5),
             initial_confidence: Some(0.8),
             last_accessed_cycle: Some(1),
@@ -2383,6 +2413,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(7),
             initial_confidence: Some(0.7),
             last_accessed_cycle: Some(2),
@@ -2445,6 +2477,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(1),
             initial_confidence: Some(0.8),
             last_accessed_cycle: Some(1),
@@ -2460,6 +2494,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(2),
             initial_confidence: Some(0.4),
             last_accessed_cycle: Some(2),
@@ -2513,6 +2549,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
@@ -2562,6 +2600,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: None,
             initial_confidence: Some(0.7),
             last_accessed_cycle: Some(10),
@@ -2629,6 +2669,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(8),
@@ -2664,6 +2706,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
@@ -2681,6 +2725,8 @@ mod tests {
             is_causal: false,
             role_vectors: HashMap::new(),
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
@@ -2723,6 +2769,8 @@ mod tests {
                 is_causal: false,
                 role_vectors: HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: Some(0.95),
                 last_accessed_cycle: Some(42),
@@ -2738,6 +2786,8 @@ mod tests {
                 is_causal: true,
                 role_vectors: HashMap::new(),
                 relations: Vec::new(),
+                role_vector_observations: Vec::new(),
+
                 graph_fact_id: None,
                 initial_confidence: Some(0.85),
                 last_accessed_cycle: Some(44),
