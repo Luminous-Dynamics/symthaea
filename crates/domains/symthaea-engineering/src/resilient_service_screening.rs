@@ -625,4 +625,75 @@ mod tests {
         assert_eq!(report.last_floor_violation_step, Some(6));
         assert_eq!(report.stable_recovery_step, Some(7));
     }
+
+    #[test]
+    fn empty_model_and_zero_horizon_fail_closed() {
+        assert!(matches!(
+            screen_service_continuity(&[], &[], &config(3, 0.8)),
+            Err(ScreeningError::EmptyServiceSet)
+        ));
+        assert!(matches!(
+            screen_service_continuity(&single_service(1.0), &[], &config(0, 0.8)),
+            Err(ScreeningError::ZeroHorizon)
+        ));
+    }
+
+    #[test]
+    fn duplicate_service_and_dependency_ids_fail_closed() {
+        let duplicate_ids = vec![
+            EssentialService::new("power", 1.0, 1.0, Vec::<String>::new()),
+            EssentialService::new("power", 1.0, 1.0, Vec::<String>::new()),
+        ];
+        assert!(matches!(
+            screen_service_continuity(&duplicate_ids, &[], &config(3, 0.8)),
+            Err(ScreeningError::DuplicateServiceId(_))
+        ));
+
+        let repeated_dependency =
+            vec![EssentialService::new("water", 1.0, 1.0, ["power", "power"]),
+                 EssentialService::new("power", 1.0, 1.0, Vec::<String>::new())];
+        assert!(matches!(
+            screen_service_continuity(&repeated_dependency, &[], &config(3, 0.8)),
+            Err(ScreeningError::DuplicateDependency { .. })
+        ));
+    }
+
+    #[test]
+    fn negative_capacity_and_unknown_disruption_target_fail_closed() {
+        let negative_capacity = vec![EssentialService::new(
+            "power",
+            1.0,
+            -0.1,
+            Vec::<String>::new(),
+        )];
+        assert!(matches!(
+            screen_service_continuity(&negative_capacity, &[], &config(3, 0.8)),
+            Err(ScreeningError::InvalidCapacity(_))
+        ));
+        let unknown_target = CapacityDisruption::new("unknown", 1, 2, 0.0);
+        assert!(matches!(
+            screen_service_continuity(&single_service(1.0), &[unknown_target], &config(3, 0.8)),
+            Err(ScreeningError::UnknownDisruptionService(_))
+        ));
+    }
+
+    #[test]
+    fn disruption_must_start_inside_horizon() {
+        let outside = CapacityDisruption::new("power", 3, 2, 0.0);
+        assert!(matches!(
+            screen_service_continuity(&single_service(1.0), &[outside], &config(3, 0.8)),
+            Err(ScreeningError::DisruptionStartsOutsideHorizon(_))
+        ));
+    }
+
+    #[test]
+    fn disruption_capacity_factor_must_be_in_unit_interval() {
+        for factor in [-0.01, 1.01, f64::NAN, f64::INFINITY] {
+            let invalid = CapacityDisruption::new("power", 1, 2, factor);
+            assert!(matches!(
+                screen_service_continuity(&single_service(1.0), &[invalid], &config(3, 0.8)),
+                Err(ScreeningError::InvalidDisruptionFactor(_))
+            ));
+        }
+    }
 }
