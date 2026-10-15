@@ -533,17 +533,24 @@ impl EnhancedKnowledgeGraph {
     /// receive a fresh ID that does not collide with facts already imported.
     pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
         if record.vector_bytes.len() != symthaea_core::hdc::unified_hv::BinaryHV::BYTES
-            || record.role_vectors.values().any(|bytes| bytes.len() != symthaea_core::hdc::unified_hv::BinaryHV::BYTES)
+            || record
+                .role_vectors
+                .values()
+                .any(|bytes| bytes.len() != symthaea_core::hdc::unified_hv::BinaryHV::BYTES)
         {
             return;
         }
         let mut arr = [0u8; 2048];
         arr.copy_from_slice(&record.vector_bytes);
-        let role_vectors = record.role_vectors.iter().map(|(role, bytes)| {
-            let mut role_arr = [0u8; symthaea_core::hdc::unified_hv::BinaryHV::BYTES];
-            role_arr.copy_from_slice(bytes);
-            (*role, symthaea_core::hdc::binary_hv::BinaryHV(role_arr))
-        }).collect();
+        let role_vectors = record
+            .role_vectors
+            .iter()
+            .map(|(role, bytes)| {
+                let mut role_arr = [0u8; symthaea_core::hdc::unified_hv::BinaryHV::BYTES];
+                role_arr.copy_from_slice(bytes);
+                (*role, symthaea_core::hdc::binary_hv::BinaryHV(role_arr))
+            })
+            .collect();
         let encoding = super::encoding::FactEncoding {
             vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
             role_vectors,
@@ -609,7 +616,12 @@ impl EnhancedKnowledgeGraph {
             .map(|f| super::persistence::FactRecord {
                 vector_bytes: f.encoding.vector.0.to_vec(),
                 relations: f.encoding.relations.clone(),
-                role_vectors: f.encoding.role_vectors.iter().map(|(role, vector)| (*role, vector.0.to_vec())).collect(),
+                role_vectors: f
+                    .encoding
+                    .role_vectors
+                    .iter()
+                    .map(|(role, vector)| (*role, vector.0.to_vec()))
+                    .collect(),
                 source_text: f.encoding.source_text.clone(),
                 confidence: f.confidence,
                 domain: f.domain.clone(),
@@ -860,20 +872,33 @@ mod tests {
     #[test]
     fn test_persistence_records_preserve_role_vectors() {
         use crate::knowledge::extraction::SemanticRole;
+
         let mut graph = EnhancedKnowledgeGraph::new(10);
         let mut encoding = make_encoding("role-vector persistence fixture", 0.9);
-        encoding.role_vectors.insert(SemanticRole::Agent, BinaryHV::random(71));
-        encoding.role_vectors.insert(SemanticRole::Patient, BinaryHV::random(72));
+        encoding
+            .role_vectors
+            .insert(SemanticRole::Agent, BinaryHV::random(71));
+        encoding
+            .role_vectors
+            .insert(SemanticRole::Patient, BinaryHV::random(72));
         let (id, _) = graph.insert(encoding, 4, Some("test".into()), false);
+
         let exported = graph.export_fact_records();
         assert_eq!(exported.len(), 1);
         let expected = graph.get_fact(id).unwrap().encoding.role_vectors.clone();
         for (role, vector) in &expected {
-            assert_eq!(exported[0].role_vectors.get(role).unwrap(), &vector.0.to_vec());
+            assert_eq!(
+                exported[0].role_vectors.get(role).unwrap(),
+                &vector.0.to_vec()
+            );
         }
+
         let mut restored = EnhancedKnowledgeGraph::new(10);
         restored.import_fact_record(&exported[0]);
-        assert_eq!(restored.get_fact(id).unwrap().encoding.role_vectors, expected);
+        assert_eq!(
+            restored.get_fact(id).unwrap().encoding.role_vectors,
+            expected
+        );
     }
 
     #[test]
