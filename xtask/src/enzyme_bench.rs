@@ -102,6 +102,10 @@ pub struct CheckReport {
     pub test_studies: usize,
     pub train_sequence_families: usize,
     pub test_sequence_families: usize,
+    /// Sequence-family overlap across train/test in a study-held-out track.
+    pub cross_split_families: usize,
+    /// Study overlap across train/test in a sequence-family-held-out track.
+    pub cross_split_studies: usize,
 }
 
 pub fn check(workspace_root: &Path, manifest_path: &Path) -> Result<()> {
@@ -111,12 +115,14 @@ pub fn check(workspace_root: &Path, manifest_path: &Path) -> Result<()> {
         .with_context(|| format!("parse manifest {}", manifest_path.display()))?;
     let report = validate(workspace_root, &manifest)?;
     println!(
-        "ENZYME_BENCH_ADMISSION=PASS observations={} train_studies={} test_studies={} train_families={} test_families={} target={}",
+        "ENZYME_BENCH_ADMISSION=PASS observations={} train_studies={} test_studies={} train_families={} test_families={} cross_split_families={} cross_split_studies={} target={}",
         report.observations,
         report.train_studies,
         report.test_studies,
         report.train_sequence_families,
         report.test_sequence_families,
+        report.cross_split_families,
+        report.cross_split_studies,
         manifest.target.endpoint
     );
     Ok(())
@@ -162,20 +168,35 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
     let split: SplitManifest =
         serde_json::from_slice(&split_bytes).context("parse split manifest JSON")?;
     ensure!(split.schema_version == 1, "unsupported split manifest schema_version");
-    ensure!(
-        split.split_mode == "joint_study_and_sequence_family_holdout",
-        "split_mode must explicitly be joint study and sequence-family holdout"
-    );
+    let train_studies = unique_allow_empty(split.train_study_ids, "train_study_ids")?;
+    let test_studies = unique_allow_empty(split.test_study_ids, "test_study_ids")?;
+    let train_families =
+        unique_allow_empty(split.train_sequence_family_ids, "train_sequence_family_ids")?;
+    let test_families =
+        unique_allow_empty(split.test_sequence_family_ids, "test_sequence_family_ids")?;
 
-    let train_studies = unique_nonempty(split.train_study_ids, "train_study_ids")?;
-    let test_studies = unique_nonempty(split.test_study_ids, "test_study_ids")?;
-    let train_families = unique_nonempty(split.train_sequence_family_ids, "train_sequence_family_ids")?;
-    let test_families = unique_nonempty(split.test_sequence_family_ids, "test_sequence_family_ids")?;
-    ensure!(train_studies.is_disjoint(&test_studies), "study leakage: train/test study IDs overlap");
-    ensure!(
-        train_families.is_disjoint(&test_families),
-        "sequence-family leakage: train/test family IDs overlap"
-    );
+    match split.split_mode.as_str() {
+        "study_holdout" => {
+            ensure!(!train_studies.is_empty() && !test_studies.is_empty(), "study_holdout requires train and test studies");
+            ensure!(train_families.is_empty() && test_families.is_empty(), "study_holdout must not claim a family partition");
+            ensure!(train_studies.is_disjoint(&test_studies), "study leakage: train/test study IDs overlap");
+        }
+        "sequence_family_holdout" => {
+            ensure!(!train_families.is_empty() && !test_families.is_empty(), "sequence_family_holdout requires train and test families");
+            ensure!(train_studies.is_empty() && test_studies.is_empty(), "sequence_family_holdout must not claim a study partition");
+            ensure!(train_families.is_disjoint(&test_families), "sequence-family leakage: train/test family IDs overlap");
+        }
+        "joint_study_and_sequence_family_holdout" => {
+            ensure!(!train_studies.is_empty() && !test_studies.is_empty(), "joint holdout requires train and test studies");
+            ensure!(!train_families.is_empty() && !test_families.is_empty(), "joint holdout requires train and test families");
+            ensure!(train_studies.is_disjoint(&test_studies), "study leakage: train/test study IDs overlap");
+            ensure!(
+                train_families.is_disjoint(&test_families),
+                "sequence-family leakage: train/test family IDs overlap"
+            );
+        }
+        other => bail!("unsupported split_mode: {other}"),
+    }
 
     let mut reader = csv::ReaderBuilder::new()
         .flexible(false)
@@ -274,19 +295,31 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         let in_test_study = test_studies.contains(study);
         let in_train_family = train_families.contains(family);
         let in_test_family = test_families.contains(family);
+        let (in_train, in_test) = match split.split_mode.as_str() {
+            "study_holdout" => (in_train_study, in_test_study),
+            "sequence_family_holdout" => (in_train_family, in_test_family),
+            "joint_study_and_sequence_family_holdout" => {
+                ensure!(
+                    in_train_study ^ in_test_study,
+                    "study absent from or duplicated across frozen splits: {study}"
+                );
+                ensure!(
+                    in_train_family ^ in_test_family,
+                    "sequence family absent from or duplicated across frozen splits: {family}"
+                );
+                ensure!(
+                    in_train_study == in_train_family,
+                    "study/family split mismatch at observation {observation_id}"
+                );
+                (in_train_study, in_test_study)
+            }
+            _ => unreachable!("split mode validated above"),
+        };
         ensure!(
-            in_train_study ^ in_test_study,
-            "study absent from or duplicated across frozen splits: {study}"
+            in_train ^ in_test,
+            "observation {observation_id} is absent from or duplicated across frozen splits"
         );
-        ensure!(
-            in_train_family ^ in_test_family,
-            "sequence family absent from or duplicated across frozen splits: {family}"
-        );
-        ensure!(
-            in_train_study == in_train_family,
-            "study/family split mismatch at observation {observation_id}"
-        );
-        if in_train_study {
+        if in_train {
             observed_train_studies.insert(study.to_string());
             observed_train_families.insert(family.to_string());
         } else {
@@ -303,29 +336,50 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         observations
     );
     ensure!(observations > 0, "dataset contains no observations");
-    ensure!(
-        observed_train_studies == train_studies,
-        "train_study_ids contains unused or absent studies"
-    );
-    ensure!(
-        observed_test_studies == test_studies,
-        "test_study_ids contains unused or absent studies"
-    );
-    ensure!(
-        observed_train_families == train_families,
-        "train_sequence_family_ids contains unused or absent families"
-    );
-    ensure!(
-        observed_test_families == test_families,
-        "test_sequence_family_ids contains unused or absent families"
-    );
+    match split.split_mode.as_str() {
+        "study_holdout" => {
+            ensure!(observed_train_studies == train_studies, "train_study_ids contains unused or absent studies");
+            ensure!(observed_test_studies == test_studies, "test_study_ids contains unused or absent studies");
+        }
+        "sequence_family_holdout" => {
+            ensure!(
+                observed_train_families == train_families,
+                "train_sequence_family_ids contains unused or absent families"
+            );
+            ensure!(
+                observed_test_families == test_families,
+                "test_sequence_family_ids contains unused or absent families"
+            );
+        }
+        "joint_study_and_sequence_family_holdout" => {
+            ensure!(observed_train_studies == train_studies, "train_study_ids contains unused or absent studies");
+            ensure!(observed_test_studies == test_studies, "test_study_ids contains unused or absent studies");
+            ensure!(
+                observed_train_families == train_families,
+                "train_sequence_family_ids contains unused or absent families"
+            );
+            ensure!(
+                observed_test_families == test_families,
+                "test_sequence_family_ids contains unused or absent families"
+            );
+        }
+        _ => unreachable!("split mode validated above"),
+    }
+    let cross_split_families = observed_train_families.intersection(&observed_test_families).count();
+    let cross_split_studies = observed_train_studies.intersection(&observed_test_studies).count();
+    if split.split_mode == "joint_study_and_sequence_family_holdout" {
+        ensure!(cross_split_families == 0, "joint holdout contains cross-split sequence families");
+        ensure!(cross_split_studies == 0, "joint holdout contains cross-split study IDs");
+    }
 
     Ok(CheckReport {
         observations,
-        train_studies: train_studies.len(),
-        test_studies: test_studies.len(),
-        train_sequence_families: train_families.len(),
-        test_sequence_families: test_families.len(),
+        train_studies: observed_train_studies.len(),
+        test_studies: observed_test_studies.len(),
+        train_sequence_families: observed_train_families.len(),
+        test_sequence_families: observed_test_families.len(),
+        cross_split_families,
+        cross_split_studies,
     })
 }
 
@@ -402,8 +456,7 @@ fn safe_workspace_path(root: &Path, relative: &str) -> Result<PathBuf> {
     Ok(root.join(path))
 }
 
-fn unique_nonempty(values: Vec<String>, label: &str) -> Result<BTreeSet<String>> {
-    ensure!(!values.is_empty(), "{label} must not be empty");
+fn unique_allow_empty(values: Vec<String>, label: &str) -> Result<BTreeSet<String>> {
     let original_len = values.len();
     let mut result = BTreeSet::new();
     for value in values {
@@ -546,7 +599,9 @@ mod tests {
                 train_studies: 1,
                 test_studies: 1,
                 train_sequence_families: 1,
-                test_sequence_families: 1
+                test_sequence_families: 1,
+                cross_split_families: 0,
+                cross_split_studies: 0
             }
         );
         fs::remove_dir_all(root).unwrap();
