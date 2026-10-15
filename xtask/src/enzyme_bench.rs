@@ -60,6 +60,9 @@ const OPTIONAL_METADATA_FIELDS: &[&str] = &[
     "reaction_equation",
     "analysis_method",
     "raw_measurement_data",
+    "raw_measurement_data_sha256",
+    "initial_rate_method",
+    "controls_description",
 ];
 
 #[derive(Debug, Deserialize)]
@@ -136,6 +139,15 @@ pub struct CheckReport {
     pub cross_split_studies: usize,
     /// Descriptive STRENDA-inspired metadata coverage; this is not a data-quality score.
     pub metadata_coverage: BTreeMap<String, MetadataCoverage>,
+    /// Nested candidate counts under the proposed kcat admission profile; not an admission result.
+    pub kcat_evidence_tiers: KcatEvidenceTiers,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct KcatEvidenceTiers {
+    pub context_qualified: usize,
+    pub primary_comparison_candidates: usize,
+    pub kinetic_reproduction_candidates: usize,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -186,6 +198,13 @@ pub fn check(workspace_root: &Path, manifest_path: &Path) -> Result<()> {
         report.cross_split_families,
         report.cross_split_studies,
         manifest.target.endpoint
+    );
+    println!(
+        "ENZYME_KCAT_EVIDENCE_TIERS observations={} context_qualified={} primary_comparison_candidates={} kinetic_reproduction_candidates={}",
+        report.observations,
+        report.kcat_evidence_tiers.context_qualified,
+        report.kcat_evidence_tiers.primary_comparison_candidates,
+        report.kcat_evidence_tiers.kinetic_reproduction_candidates
     );
     for (field_name, coverage) in &report.metadata_coverage {
         println!(
@@ -295,6 +314,7 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
     let mut observed_train_families = BTreeSet::new();
     let mut observed_test_families = BTreeSet::new();
     let mut metadata_coverage = empty_metadata_coverage();
+    let mut kcat_evidence_tiers = KcatEvidenceTiers::default();
     let mut observations = 0usize;
 
     for (row_index, row) in reader.records().enumerate() {
@@ -406,6 +426,15 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         validate_condition(&conditions, "temperature_c", row_index + 2)?;
         validate_condition(&conditions, "substrate_id", row_index + 2)?;
         record_optional_metadata_coverage(&conditions, &mut metadata_coverage);
+        if is_context_qualified(&conditions) {
+            kcat_evidence_tiers.context_qualified += 1;
+            if is_primary_comparison_candidate(&conditions) {
+                kcat_evidence_tiers.primary_comparison_candidates += 1;
+                if is_kinetic_reproduction_candidate(&conditions) {
+                    kcat_evidence_tiers.kinetic_reproduction_candidates += 1;
+                }
+            }
+        }
 
         let study = field(&row, &header_index, "source_study_id");
         let family = field(&row, &header_index, "sequence_family_id");
@@ -506,7 +535,120 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         cross_split_families,
         cross_split_studies,
         metadata_coverage,
+        kcat_evidence_tiers,
     })
+}
+
+fn metadata_field_is_reported(conditions: &Value, field: &str) -> bool {
+    conditions
+        .as_object()
+        .and_then(|object| object.get(field))
+        .and_then(Value::as_object)
+        .and_then(|object| {
+            let status = object.get("status").and_then(Value::as_str)?;
+            let value = object.get("value").filter(|value| !value.is_null())?;
+            (status == "reported" && optional_metadata_value_is_valid(field, value)).then_some(())
+        })
+        .is_some()
+}
+
+fn metadata_field_is_reasoned_not_applicable(conditions: &Value, field: &str) -> bool {
+    conditions
+        .as_object()
+        .and_then(|object| object.get(field))
+        .and_then(Value::as_object)
+        .is_some_and(|object| {
+            object.get("status").and_then(Value::as_str) == Some("not_applicable")
+                && object.get("value").is_none_or(Value::is_null)
+                && object
+                    .get("reason")
+                    .and_then(Value::as_str)
+                    .is_some_and(|reason| !reason.trim().is_empty())
+        })
+}
+
+fn metadata_field_is_reported_or_reasoned_na(conditions: &Value, field: &str) -> bool {
+    metadata_field_is_reported(conditions, field)
+        || metadata_field_is_reasoned_not_applicable(conditions, field)
+}
+
+fn core_condition_is_reported(conditions: &Value, field: &str) -> bool {
+    let Some(object) = conditions.as_object().and_then(|object| object.get(field)).and_then(Value::as_object) else {
+        return false;
+    };
+    if object.get("status").and_then(Value::as_str) != Some("reported") {
+        return false;
+    }
+    let Some(value) = object.get("value").filter(|value| !value.is_null()) else {
+        return false;
+    };
+    match field {
+        "ph" | "temperature_c" => value.as_f64().is_some_and(f64::is_finite),
+        "substrate_id" => value.as_str().is_some_and(|value| !value.trim().is_empty()),
+        _ => false,
+    }
+}
+
+fn is_context_qualified(conditions: &Value) -> bool {
+    core_condition_is_reported(conditions, "ph")
+        && core_condition_is_reported(conditions, "temperature_c")
+        && core_condition_is_reported(conditions, "substrate_id")
+        && metadata_field_is_reported(conditions, "enzyme_form")
+        && metadata_field_is_reported(conditions, "substrate_concentration_range")
+        && metadata_field_is_reported(conditions, "reaction_equation")
+        && metadata_field_is_reported(conditions, "kinetic_equation")
+        && metadata_field_is_reported_or_reasoned_na(conditions, "assay_pressure")
+        && if metadata_field_is_reported(conditions, "buffer_system") {
+            metadata_field_is_reported(conditions, "buffer_concentration")
+        } else {
+            metadata_field_is_reasoned_not_applicable(conditions, "buffer_system")
+                && metadata_field_is_reasoned_not_applicable(conditions, "buffer_concentration")
+        }
+}
+
+fn is_primary_comparison_candidate(conditions: &Value) -> bool {
+    is_context_qualified(conditions)
+        && metadata_field_is_reported(conditions, "enzyme_purity")
+        && metadata_field_is_reported(conditions, "enzyme_concentration")
+        && metadata_field_has_molar_concentration(conditions, "enzyme_concentration")
+        && metadata_field_is_reported(conditions, "replicate_count")
+        && metadata_field_is_reported(conditions, "independent_experiment_count")
+        && metadata_field_is_reported(conditions, "replicate_structure")
+        && metadata_field_is_reported(conditions, "measurement_precision")
+        && metadata_field_is_reported(conditions, "analysis_method")
+}
+
+fn is_kinetic_reproduction_candidate(conditions: &Value) -> bool {
+    is_primary_comparison_candidate(conditions)
+        && metadata_field_is_reported(conditions, "raw_measurement_data")
+        && metadata_field_is_reported(conditions, "raw_measurement_data_sha256")
+        && metadata_field_is_reported(conditions, "initial_rate_method")
+        && metadata_field_is_reported(conditions, "controls_description")
+}
+
+fn metadata_field_has_molar_concentration(conditions: &Value, field: &str) -> bool {
+    let unit = conditions
+        .as_object()
+        .and_then(|object| object.get(field))
+        .and_then(Value::as_object)
+        .and_then(|object| object.get("value"))
+        .and_then(Value::as_object)
+        .and_then(|value| value.get("unit"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let normalized = unit
+        .trim()
+        .replace('μ', "u")
+        .replace('µ', "u")
+        .replace(' ', "")
+        .to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "m" | "mol/l" | "moll-1" | "mol/liter" | "mol/litre"
+            | "mm" | "mmol/l" | "mmoll-1"
+            | "um" | "umol/l" | "umoll-1"
+            | "nm" | "nmol/l" | "nmoll-1"
+    )
 }
 
 fn empty_metadata_coverage() -> BTreeMap<String, MetadataCoverage> {
@@ -612,6 +754,10 @@ fn optional_metadata_value_is_valid(field: &str, value: &Value) -> bool {
         "raw_measurement_data" => value
             .as_str()
             .is_some_and(|url| is_valid_https_url(url) && !url.trim().is_empty()),
+        "raw_measurement_data_sha256" => value
+            .as_str()
+            .is_some_and(|digest| digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())),
+        "initial_rate_method" | "controls_description" => nonempty_string(value),
         _ => false,
     }
 }
@@ -1029,6 +1175,45 @@ mod tests {
         assert!(optional_metadata_value_is_valid("kinetic_equation", &json!("Michaelis-Menten; initial rate vs substrate concentration")));
         assert!(!optional_metadata_value_is_valid("enzyme_form", &json!(" ")));
         assert!(optional_metadata_value_is_valid("buffer_concentration", &json!({"value":50,"unit":"mmol/L"})));
+    }
+
+    #[test]
+    fn evidence_tiers_are_nested_and_require_context_and_raw_replay_evidence() {
+        let mut context = json!({
+            "ph":{"status":"reported","value":7.0},
+            "temperature_c":{"status":"reported","value":25.0},
+            "substrate_id":{"status":"reported","value":"substrate-x"},
+            "enzyme_form":{"status":"reported","value":"homodimer; kcat relative to dimer"},
+            "substrate_concentration_range":{"status":"reported","value":{"lower":0.0,"upper":2.0,"unit":"mM"}},
+            "reaction_equation":{"status":"reported","value":"S + O2 -> P"},
+            "kinetic_equation":{"status":"reported","value":"Michaelis-Menten; initial rate as a function of [S]"},
+            "buffer_system":{"status":"reported","value":"50 mM phosphate buffer"},
+            "buffer_concentration":{"status":"reported","value":{"value":50.0,"unit":"mM"}},
+            "assay_pressure":{"status":"not_applicable","reason":"ambient atmospheric pressure"}
+        });
+        assert!(is_context_qualified(&context));
+        assert!(!is_primary_comparison_candidate(&context));
+        assert!(!is_kinetic_reproduction_candidate(&context));
+
+        let object = context.as_object_mut().unwrap();
+        object.insert("enzyme_purity".to_string(),json!({"status":"reported","value":"apparently homogeneous by PAGE"}));
+        object.insert("enzyme_concentration".to_string(),json!({"status":"reported","value":{"value":0.5,"unit":"uM"}}));
+        object.insert("replicate_count".to_string(),json!({"status":"reported","value":3}));
+        object.insert("independent_experiment_count".to_string(),json!({"status":"reported","value":3}));
+        object.insert("replicate_structure".to_string(),json!({"status":"reported","value":"three independent preparations"}));
+        object.insert("measurement_precision".to_string(),json!({"status":"reported","value":{"measure":"SD","value":0.02,"unit":"s^-1"}}));
+        object.insert("analysis_method".to_string(),json!({"status":"reported","value":{"software":"fit-tool","version":"1.2.0","method":"nonlinear least squares"}}));
+        assert!(is_primary_comparison_candidate(&context));
+        assert!(!is_kinetic_reproduction_candidate(&context));
+
+        object.insert("raw_measurement_data".to_string(),json!({"status":"reported","value":"https://example.org/raw.csv"}));
+        object.insert("raw_measurement_data_sha256".to_string(),json!({"status":"reported","value":"a".repeat(64)}));
+        object.insert("initial_rate_method".to_string(),json!({"status":"reported","value":"linear slope over preregistered initial window"}));
+        object.insert("controls_description".to_string(),json!({"status":"reported","value":"blank and no-enzyme controls applied"}));
+        assert!(is_kinetic_reproduction_candidate(&context));
+
+        object.insert("enzyme_concentration".to_string(),json!({"status":"reported","value":{"value":0.5,"unit":"mg/mL"}}));
+        assert!(!is_primary_comparison_candidate(&context));
     }
 
     #[test]
