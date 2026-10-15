@@ -91,4 +91,14 @@ The E1 gate remains: reproduce at least one authoritative or measured reference 
 
 ## Implementation boundary
 
-This document and schema define a contract, not a completed verifier. The current symthaea-thermofluids::energy_interval API accepts already integrated joule quantities and checks first-law closure; it does not parse these JSON manifests, check interval timeline coverage, verify hashes, derive uncertainty intervals, or automatically integrate raw sensor time series. Those capabilities must be implemented and independently tested before claiming the benchmark pipeline is automated or physically validated.
+The standalone `symthaea-energy-bench` crate now implements an initial independent semantic verifier for parsed v1 records. It checks required mission phases, timeline continuity and duration, time-ordered interval indices, finite/non-negative flow and uncertainty values, per-interval first-law closure, aggregate closure, charge-sustaining storage before exposing net cycle efficiency, basic provenance IDs/hash syntax, stale cached totals, and preregistration timestamp ordering. Its SHA-256 helper checks exact bytes supplied by the caller.
+
+Run the targeted tests with `cargo test -p symthaea-energy-bench`. The workspace must also pass `cargo fmt --all -- --check`. Neither command was executable in the current authoring environment because a Rust toolchain was absent; do not treat authored tests or queued CI as passes.
+
+Important limits remain:
+- Apply the published JSON Schema (Draft 2020-12) separately. The Rust typed parser ignores unknown fields, so semantic validation does not replace schema validation.
+- URI resolution, artifact-byte retrieval, and immutable pre-search policy anchoring are caller responsibilities. A self-reported timestamp/boolean cannot prove preregistration without an independently verifiable commit or signed append-only registry.
+- Uncertainty values and the declared method are recorded, but uncertainty distributions/correlations are not propagated by this crate.
+- The crate does not integrate raw sensor data, validate a solver's physical fidelity, decide superiority between two candidates, or replace engineering/hardware validation.
+
+The benchmark pipeline is therefore more than a record contract, but it is not yet an automated end-to-end physically validated discovery system.
