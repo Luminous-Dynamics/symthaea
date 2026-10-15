@@ -186,8 +186,8 @@ pub fn screen_buoyancy(request: BuoyancyRequest) -> Result<BuoyancyResult, Scree
 }
 
 /// Geometry-based mass budget for an idealized spherical envelope.
-////
-//// The radius is used for both enclosed volume and pressure-boundary surface area. This is a
+///
+/// The radius is used for both enclosed volume and pressure-boundary surface area. This is a
 //// thin-envelope screening approximation: it ignores thickness-induced volume/area differences,
 //// local appendages, deformation, and the mass of structural supports unless the caller includes
 //// those in `fixed_non_envelope_vehicle_mass_kg`.
@@ -534,7 +534,9 @@ mod tests {
 
         // For a spherical shell with no other mass or payload:
         // (rho * 4/3*pi*R^3) / (4*pi*R^2) = rho*R/3.
-        assert!((result.maximum_envelope_areal_density_kg_m2 - (1.225 * 20.0 / 3.0)).abs() < 1e-12);
+        assert!(
+            (result.maximum_envelope_areal_density_kg_m2 - (1.225 * 20.0 / 3.0)).abs() < 1e-12
+        );
     }
 
     #[test]
@@ -548,7 +550,9 @@ mod tests {
         })
         .unwrap();
 
-        assert!((result.maximum_envelope_mass_kg - (41_050.14400690663 - 15_000.0)).abs() < 1e-6);
+        assert!(
+            (result.maximum_envelope_mass_kg - (41_050.14400690663 - 15_000.0)).abs() < 1e-6
+        );
         assert!(result.maximum_envelope_areal_density_kg_m2 < 8.166666666666667);
     }
 
