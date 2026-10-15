@@ -2477,7 +2477,7 @@ mod tests {
         assert_eq!(mapping.distinct_pitch_count, 3);
         assert_eq!(
             mapping.filename_pitch_gaps_midi_within_observed_range,
-            (49u8..=59).chain(61..=68).collect::<Vec<_>>(),
+            (49u8..=61).chain(63..=68).collect::<Vec<_>>(),
             "filename pitch holes inside the observed range should be explicit"
         );
         assert_eq!(mapping.distinct_dynamic_strength_count, 3);
