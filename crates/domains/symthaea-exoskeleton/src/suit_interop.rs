@@ -405,8 +405,9 @@ fn clean_identifier(value: &str) -> bool {
 fn valid_sha256(value: &str) -> bool {
     value.len() == 71
         && value.starts_with("sha256:")
-        && value[7..].bytes().all(|byte| byte.is_ascii_hexdigit())
-        && value[7..] == value[7..].to_ascii_lowercase()
+        && value[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 struct HashWriter(Sha256);
