@@ -306,6 +306,22 @@ For example, a hypothetical demand bound of 98–102 kPa and a hypothetical decl
 
 Use demand bounds tied to an explicit operating envelope (altitude, weather, internal pressure and transients) and capacity bounds from geometry-specific, independently reviewed nonlinear analysis and relevant physical tests. A linear eigenvalue or perfect-geometry result must not be presented as a qualified allowable without an applicable and justified methodology.
 
+### Require exact scope alignment before comparing capacity evidence
+
+The bounded pressure screen now has a scope-aware wrapper, `assess_scoped_external_pressure_bounds`. A pressure-capacity record is compared only when five immutable scope identifiers match the requested case:
+
+- geometry revision (prefer an exact mesh/CAD artifact ID or content hash);
+- material / laminate model revision;
+- load-case definition;
+- boundary-condition and support profile; and
+- imperfection basis (measured geometry, a documented envelope, or a justified imperfection set).
+
+This addresses a gap in a bare provenance-ID check: a pressure-capacity record might exist and have non-empty metadata while describing a different geometry, laminate, load case, support condition or perfect-geometry model. A matching string is not authentication, but an explicit mismatch is enough reason to block the comparison. Missing or blank scope values return `ScopeIncomplete`; unequal fields return `ScopeMismatch`. No capacity stays unknown, and a no-demand pressure envelope does not require an irrelevant capacity-scope record.
+
+The identifiers should point to immutable manifests, not hand-written labels. A future evidence manifest should bind exact hashes for geometry, mesh, material/batch data, solver version and settings, convergence sequence, imperfection fields, boundary conditions, load profile, output quantity, reviewer/test receipt, and the decision record. If any scoped artifact changes, the capacity result should be treated as a different evidence item until its applicability is re-established.
+
+This is deliberately an applicability gate, not an evidence authenticator. The Rust module cannot establish that referenced objects exist, that hashes correspond to the claimed content, that the reviewer was independent, or that a numerical allowable reflects real failure. Those requirements remain external provenance-verification and physical-validation gates.
+
 ### Expand geometry search beyond a smooth sphere—but keep the loads honest
 
 Compare the spherical reference against at least two distinct families:
