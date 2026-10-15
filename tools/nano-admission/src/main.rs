@@ -18,6 +18,7 @@ const UPSTREAM_DOCS_COMMIT: &str = "57c71322d5a5be0a0fcdcf05592e1699b120dc79";
 const UPSTREAM_DOCS_URL: &str = "https://github.com/facebookresearch/fairchem/blob/57c71322d5a5be0a0fcdcf05592e1699b120dc79/docs/catalysts/datasets/oc22.md";
 const UPSTREAM_ARTIFACT_URL: &str = "https://dl.fbaipublicfiles.com/opencatalystproject/data/oc22/is2res_total_train_val_test_lmdbs.tar.gz";
 const UPSTREAM_REPORTED_MD5: &str = "b35dc24e99ef3aeaee6c5c949903de94";
+const MAX_COMPRESSED_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_UNCOMPRESSED_ARCHIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_TAR_MEMBERS: u64 = 100_000;
 const MAX_MEMBER_PATH_BYTES: usize = 4 * 1024;
@@ -125,6 +126,15 @@ fn run() -> Result<ExitCode> {
     // hashes for one file with an inventory from another.
     let mut archive_file = File::open(&cli.archive)
         .with_context(|| format!("could not open archive {}", cli.archive.display()))?;
+    let compressed_size = archive_file
+        .metadata()
+        .context("could not inspect opened archive metadata")?
+        .len();
+    if compressed_size > MAX_COMPRESSED_ARCHIVE_BYTES {
+        bail!(
+            "compressed archive exceeds configured byte limit of {MAX_COMPRESSED_ARCHIVE_BYTES}"
+        );
+    }
     let hashes_before = hash_open_file(&mut archive_file)
         .with_context(|| format!("could not hash archive {}", cli.archive.display()))?;
     let upstream_md5_matches = hashes_before.md5.eq_ignore_ascii_case(UPSTREAM_REPORTED_MD5);
@@ -264,9 +274,7 @@ fn hash_open_file(file: &mut File) -> Result<HashRecord> {
         if read == 0 {
             break;
         }
-        byte_size = byte_size
-            .checked_add(read as u64)
-            .ok_or_else(|| anyhow!("archive byte size overflow"))?;
+        byte_size = next_compressed_byte_total(byte_size, read)?;
         md5.update(&buffer[..read]);
         sha256.update(&buffer[..read]);
     }
@@ -276,6 +284,16 @@ fn hash_open_file(file: &mut File) -> Result<HashRecord> {
         md5: lower_hex(&md5.finalize()),
         sha256: lower_hex(&sha256.finalize()),
     })
+}
+
+fn next_compressed_byte_total(current: u64, chunk_len: usize) -> Result<u64> {
+    let next = current
+        .checked_add(chunk_len as u64)
+        .ok_or_else(|| anyhow!("archive byte size overflow"))?;
+    if next > MAX_COMPRESSED_ARCHIVE_BYTES {
+        bail!("compressed archive exceeds configured byte limit of {MAX_COMPRESSED_ARCHIVE_BYTES}");
+    }
+    Ok(next)
 }
 
 fn lower_hex(bytes: &[u8]) -> String {
@@ -322,8 +340,9 @@ fn inventory_if_checksum_matches(
     file: &mut File,
     upstream_md5_matches: bool,
 ) -> (Option<ArchiveInventory>, Option<String>) {
-    // Do not parse an archive that fails the upstream-published checksum. It is
-    // untrusted input until the expected artifact identity matches.
+    // Do not parse an archive that fails the upstream-published MD5 compatibility
+    // check. A matching MD5 is not a cryptographic authenticity proof; archive
+    // parsing remains bounded and no member is extracted or executed.
     if !upstream_md5_matches {
         return (
             None,
@@ -645,6 +664,16 @@ mod tests {
         let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
         assert_eq!(inventory.duplicate_member_paths, vec!["train/repeated.txt"]);
         assert_eq!(status_for(true, Some(&inventory), true), "archive_structure_review_required");
+    }
+
+    #[test]
+    fn compressed_archive_size_budget_is_enforced() {
+        assert_eq!(
+            next_compressed_byte_total(MAX_COMPRESSED_ARCHIVE_BYTES - 8, 8)
+                .expect("at limit"),
+            MAX_COMPRESSED_ARCHIVE_BYTES
+        );
+        assert!(next_compressed_byte_total(MAX_COMPRESSED_ARCHIVE_BYTES, 1).is_err());
     }
 
     #[test]
