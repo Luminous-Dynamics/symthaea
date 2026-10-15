@@ -888,10 +888,6 @@ impl KnowledgeManager {
                 similarity: r.similarity,
                 domain: None,
                 is_causal: false,
-                initial_confidence: None,
-                last_accessed_cycle: None,
-                corroboration_count: 0,
-                contradiction_count: 0,
             })
             .collect();
 
