@@ -1839,6 +1839,11 @@ mod tests {
         let results = mgr.search_with_role_terms(&terms, 5);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].matched_query_terms, 2);
+        assert_eq!(results[0].matches.len(), 2);
+        assert_eq!(results[0].matches[0].query_entity_text, "United States");
+        assert_eq!(results[0].matches[0].observed_entity_text, "United States");
+        assert_eq!(results[0].matches[1].query_entity_text, "European Union");
+        assert_eq!(results[0].matches[1].observed_entity_text, "European Union");
         assert!((results[0].similarity - 1.0).abs() < f32::EPSILON);
         assert!((results[0].confidence - 0.4).abs() < f32::EPSILON);
 
@@ -1895,6 +1900,13 @@ mod tests {
         assert_eq!(before.len(), 1);
         assert_eq!(before[0].fact_id, fact_id);
         assert_eq!(before[0].matched_query_terms, 3);
+        assert_eq!(before[0].matches.len(), 3);
+        assert_eq!(before[0].matches[0].query_entity_text, "United States");
+        assert_eq!(before[0].matches[0].observed_entity_text, "United States");
+        assert_eq!(before[0].matches[1].query_entity_text, "European Union");
+        assert_eq!(before[0].matches[1].observed_entity_text, "European Union");
+        assert_eq!(before[0].matches[2].query_entity_text, "Iran");
+        assert_eq!(before[0].matches[2].observed_entity_text, "Iran");
         assert!((before[0].similarity - 1.0).abs() < f32::EPSILON);
         assert!((before[0].confidence - 0.73).abs() < f32::EPSILON);
 
@@ -1906,6 +1918,7 @@ mod tests {
         assert_eq!(after.len(), before.len());
         assert_eq!(after[0].fact_id, before[0].fact_id);
         assert_eq!(after[0].matched_query_terms, before[0].matched_query_terms);
+        assert_eq!(after[0].matches, before[0].matches);
         assert!((after[0].similarity - before[0].similarity).abs() < f32::EPSILON);
         assert!((after[0].confidence - before[0].confidence).abs() < f32::EPSILON);
 
