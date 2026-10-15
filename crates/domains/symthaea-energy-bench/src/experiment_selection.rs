@@ -382,6 +382,107 @@ mod tests {
     }
 
     #[test]
+    fn output_is_invariant_to_input_order_for_eligible_and_rejected_proposals() {
+        let valid_a = proposal(
+            "alpha",
+            DecisionRelevance::DiscriminatesCompetingModels,
+            0.5,
+            10.0,
+        );
+        let valid_b = proposal(
+            "beta",
+            DecisionRelevance::CanFalsifyFavoredHypothesis,
+            0.2,
+            3.0,
+        );
+        let mut rejected = proposal(
+            "rejected",
+            DecisionRelevance::Exploratory,
+            0.4,
+            1.0,
+        );
+        rejected.provenance_plan_complete = false;
+
+        let forward = rank_experiments(
+            &policy(),
+            &[valid_a.clone(), rejected.clone(), valid_b.clone()],
+        )
+        .unwrap();
+        let reverse = rank_experiments(&policy(), &[valid_b, rejected, valid_a]).unwrap();
+
+        assert_eq!(forward, reverse);
+        assert_eq!(forward.eligible[0].proposal.experiment_id, "beta");
+        assert_eq!(forward.rejected[0].experiment_id, "rejected");
+    }
+
+    #[test]
+    fn every_hard_gate_is_independently_enforced() {
+        let cases: Vec<(&str, Box<dyn Fn(&mut ExperimentProposal)>)> = vec![
+            ("decision question", Box::new(|p| p.decision_question.clear())),
+            ("observable", Box::new(|p| p.measurable_observable.clear())),
+            ("competing hypotheses", Box::new(|p| p.competing_hypotheses.clear())),
+            (
+                "prior registration",
+                Box::new(|p| p.registered_before_observation = false),
+            ),
+            (
+                "safety review",
+                Box::new(|p| p.safety_review = SafetyReview::Rejected),
+            ),
+            (
+                "operating envelope",
+                Box::new(|p| p.operating_envelope_registered = false),
+            ),
+            (
+                "abort criteria",
+                Box::new(|p| p.abort_criteria_registered = false),
+            ),
+            (
+                "provenance",
+                Box::new(|p| p.provenance_plan_complete = false),
+            ),
+            (
+                "uncertainty reduction",
+                Box::new(|p| p.expected_uncertainty_reduction_fraction = f64::NAN),
+            ),
+            (
+                "resource basis",
+                Box::new(|p| p.estimated_resource_cost.basis = ResourceBasis::RigTime),
+            ),
+            (
+                "resource unit",
+                Box::new(|p| p.estimated_resource_cost.unit_id = "USD-cent".into()),
+            ),
+            (
+                "resource cost",
+                Box::new(|p| p.estimated_resource_cost.amount = 0.0),
+            ),
+        ];
+
+        for (expected_reason, corrupt) in cases {
+            let mut invalid = proposal(
+                "invalid-case",
+                DecisionRelevance::CanFalsifyFavoredHypothesis,
+                0.4,
+                3.0,
+            );
+            corrupt(&mut invalid);
+            let report = rank_experiments(&policy(), &[invalid]).unwrap();
+
+            assert!(report.eligible.is_empty(), "gate not enforced: {expected_reason}");
+            assert_eq!(report.rejected.len(), 1);
+            assert!(
+                report.rejected[0]
+                    .reasons
+                    .iter()
+                    .any(|reason| reason.to_lowercase().contains(&expected_reason)),
+                "expected reason {expected_reason:?}, got {:?}",
+                report.rejected[0].reasons,
+            );
+        }
+    }
+
+    #[test]
     fn rejects_unregistered_queue_policy() {
         let mut unregistered = policy();
         unregistered.registered_before_queue_generation = false;
