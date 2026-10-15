@@ -61,7 +61,7 @@ fn replay_versioned_corpus_and_independently_verify_receipt() {
             "unexpected status for {:?}/{:?}",
             expected.metric, expected.source_kind
         );
-        assert!(
+        assert_eq!(
             actual.accepted_source_count, expected.accepted_sources,
             "accepted source count mismatch for {:?}/{:?}",
             expected.metric, expected.source_kind
