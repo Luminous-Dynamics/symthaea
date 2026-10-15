@@ -6,7 +6,7 @@ use serde::Serialize;
 use sha2::Sha256;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -120,15 +120,21 @@ fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
     reject_same_input_and_output(&cli.archive, &cli.output)?;
 
-    let hashes_before = hash_file(&cli.archive)
+    // Keep one descriptor open for every pass. Re-opening by pathname for each
+    // hash/parse step would allow a pathname swap to make the receipt combine
+    // hashes for one file with an inventory from another.
+    let mut archive_file = File::open(&cli.archive)
+        .with_context(|| format!("could not open archive {}", cli.archive.display()))?;
+    let hashes_before = hash_open_file(&mut archive_file)
         .with_context(|| format!("could not hash archive {}", cli.archive.display()))?;
     let upstream_md5_matches = hashes_before.md5.eq_ignore_ascii_case(UPSTREAM_REPORTED_MD5);
 
     let (archive_inventory, archive_inspection_error) =
-        inventory_if_checksum_matches(&cli.archive, upstream_md5_matches);
-    // Re-hash after inventory so the receipt cannot silently combine a digest
-    // from one version of a file with an inventory from a concurrently replaced file.
-    let hashes_after = hash_file(&cli.archive)
+        inventory_if_checksum_matches(&mut archive_file, upstream_md5_matches);
+    // Re-hash the same opened file after inventory so in-place content changes
+    // during inspection block a clean receipt. This still is not an OS-level
+    // immutable-file guarantee against a writer that mutates and restores bytes.
+    let hashes_after = hash_open_file(&mut archive_file)
         .with_context(|| format!("could not re-hash archive {}", cli.archive.display()))?;
     let contents_unchanged = hashes_before == hashes_after;
     let status = status_for(upstream_md5_matches, archive_inventory.as_ref(), contents_unchanged);
@@ -244,9 +250,10 @@ fn write_receipt_new(path: &Path, bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn hash_file(path: &Path) -> Result<HashRecord> {
-    let file = File::open(path)?;
-    let mut reader = io::BufReader::new(file);
+fn hash_open_file(file: &mut File) -> Result<HashRecord> {
+    file.seek(SeekFrom::Start(0))
+        .context("could not rewind archive before hashing")?;
+    let mut reader = io::BufReader::new(&mut *file);
     let mut md5 = Md5::new();
     let mut sha256 = Sha256::new();
     let mut byte_size = 0_u64;
@@ -281,9 +288,10 @@ fn lower_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn validate_gzip_stream(path: &Path) -> Result<()> {
-    let file = File::open(path)?;
-    let mut decoder = MultiGzDecoder::new(file);
+fn validate_gzip_stream_open(file: &mut File) -> Result<()> {
+    file.seek(SeekFrom::Start(0))
+        .context("could not rewind archive before gzip validation")?;
+    let mut decoder = MultiGzDecoder::new(&mut *file);
     // Drain the complete compressed stream so gzip CRC/length trailers are verified,
     // even if the tar reader below stops at tar's end-of-archive marker first. Bound
     // decompressed bytes to avoid an unbounded gzip-bomb scan.
@@ -311,7 +319,7 @@ fn drain_with_limit<R: Read>(reader: &mut R, max_bytes: u64) -> Result<u64> {
 }
 
 fn inventory_if_checksum_matches(
-    path: &Path,
+    file: &mut File,
     upstream_md5_matches: bool,
 ) -> (Option<ArchiveInventory>, Option<String>) {
     // Do not parse an archive that fails the upstream-published checksum. It is
@@ -322,16 +330,22 @@ fn inventory_if_checksum_matches(
             Some("Archive inspection skipped because the upstream-published MD5 did not match.".to_owned()),
         );
     }
-    match inventory_tar_gz(path) {
+    match inventory_tar_gz_open(file) {
         Ok(inventory) => (Some(inventory), None),
         Err(error) => (None, Some(format!("{error:#}"))),
     }
 }
 
 fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
-    validate_gzip_stream(path)?;
-    let file = File::open(path)?;
-    let decoder = MultiGzDecoder::new(file);
+    let mut file = File::open(path)?;
+    inventory_tar_gz_open(&mut file)
+}
+
+fn inventory_tar_gz_open(file: &mut File) -> Result<ArchiveInventory> {
+    validate_gzip_stream_open(file)?;
+    file.seek(SeekFrom::Start(0))
+        .context("could not rewind archive before tar inventory")?;
+    let decoder = MultiGzDecoder::new(&mut *file);
     let mut archive = Archive::new(decoder);
     let entries = archive.entries().context("not a readable tar archive inside gzip stream")?;
     let mut inventory = ArchiveInventory::default();
@@ -683,7 +697,8 @@ mod tests {
         let archive_path = directory.path().join("not-an-archive.tar.gz");
         fs::write(&archive_path, b"attacker-controlled bytes").expect("write invalid fixture");
 
-        let (inventory, error) = inventory_if_checksum_matches(&archive_path, false);
+        let mut archive_file = File::open(&archive_path).expect("open invalid fixture");
+        let (inventory, error) = inventory_if_checksum_matches(&mut archive_file, false);
         assert!(inventory.is_none());
         assert!(error.expect("skip reason").contains("inspection skipped"));
         assert_eq!(status_for(false, None, true), "checksum_mismatch");
