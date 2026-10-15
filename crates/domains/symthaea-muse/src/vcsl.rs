@@ -586,6 +586,13 @@ pub struct SampleDirectoryEvidenceV1 {
     /// Number of WAV files whose filenames are accepted by the current
     /// sample indexer. This does not prove that file decoding will succeed.
     pub indexed_sample_count: usize,
+    /// MIDI-note coverage observed from accepted filenames, not rendered range.
+    pub min_midi: Option<u8>,
+    pub max_midi: Option<u8>,
+    pub distinct_pitch_count: usize,
+    /// Distinct normalized dynamic values parsed from the indexed filenames.
+    /// This is not a count of calibrated acoustic velocity layers.
+    pub distinct_dynamic_strength_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -738,16 +745,41 @@ fn sample_directory_evidence(
     };
     let directory = root.join(relative_directory);
     let directory_present = directory.is_dir();
-    let indexed_sample_count = if directory_present {
-        InstrumentBank::index(&directory).map_or(0, |bank| bank.samples.len())
+    let bank = if directory_present {
+        InstrumentBank::index(&directory)
     } else {
-        0
+        None
     };
+    let indexed_sample_count = bank.as_ref().map_or(0, |bank| bank.samples.len());
+    let min_midi = bank
+        .as_ref()
+        .and_then(|bank| bank.samples.iter().map(|sample| sample.midi).min());
+    let max_midi = bank
+        .as_ref()
+        .and_then(|bank| bank.samples.iter().map(|sample| sample.midi).max());
+    let distinct_pitch_count = bank.as_ref().map_or(0, |bank| {
+        bank.samples
+            .iter()
+            .map(|sample| sample.midi)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+    });
+    let distinct_dynamic_strength_count = bank.as_ref().map_or(0, |bank| {
+        bank.samples
+            .iter()
+            .map(|sample| sample.dynamic.to_bits())
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    });
     Some(SampleDirectoryEvidenceV1 {
         source_library: source_name,
         relative_directory: relative_directory.to_owned(),
         directory_present,
         indexed_sample_count,
+        min_midi,
+        max_midi,
+        distinct_pitch_count,
+        distinct_dynamic_strength_count,
     })
 }
 
@@ -1436,6 +1468,10 @@ mod tests {
         let mapping = harp.sustained_samples.as_ref().unwrap();
         assert!(mapping.directory_present);
         assert_eq!(mapping.indexed_sample_count, 1);
+        assert_eq!(mapping.min_midi, Some(69));
+        assert_eq!(mapping.max_midi, Some(69));
+        assert_eq!(mapping.distinct_pitch_count, 1);
+        assert_eq!(mapping.distinct_dynamic_strength_count, 1);
 
         let soundfont_evidence = inventory.soundfont.as_ref().unwrap();
         assert_eq!(soundfont_evidence.file_name, "fixture.sf2");
