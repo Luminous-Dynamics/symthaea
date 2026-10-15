@@ -84,6 +84,8 @@ pub struct IntegratedEvaScenarioReport {
     pub oxygen_consumed_l: f64,
     /// CO2-equivalent residual burden in the simulation's declared reference volume units.
     pub co2_burden_l: f64,
+    /// Estimated uniform bulk-circuit CO2 partial pressure, Pa; not inspired PICO2.
+    pub bulk_circuit_co2_partial_pressure_pa: Option<f64>,
     /// Water-vapor burden, represented as grams of water in the reduced-order model.
     pub humidity_vapor_burden_g: f64,
     pub co2_scrubber_capacity_remaining_l: f64,
@@ -274,6 +276,7 @@ pub fn run_integrated_eva_scenario(
 
     let (
         co2_burden_l,
+        bulk_circuit_co2_partial_pressure_pa,
         humidity_vapor_burden_g,
         co2_scrubber_capacity_remaining_l,
         humidity_collector_capacity_remaining_g,
@@ -282,6 +285,7 @@ pub fn run_integrated_eva_scenario(
         let state = plss.state();
         (
             state.co2_burden_l,
+            plss.circuit_co2_partial_pressure_pa(),
             state.humidity_vapor_burden_g,
             state.co2_scrubber_capacity_remaining_l,
             state.humidity_collector_capacity_remaining_g,
@@ -300,6 +304,7 @@ pub fn run_integrated_eva_scenario(
         service_available,
         oxygen_consumed_l: mission_report.totals.oxygen_consumed_l,
         co2_burden_l,
+        bulk_circuit_co2_partial_pressure_pa,
         humidity_vapor_burden_g,
         co2_scrubber_capacity_remaining_l,
         humidity_collector_capacity_remaining_g,
@@ -389,6 +394,7 @@ mod tests {
             let report = run_integrated_eva_scenario(scenario);
             assert_eq!(report.scenario, scenario);
             assert_eq!(report.evidence, ExosuitEvidenceLevel::Simulation);
+            assert!(report.bulk_circuit_co2_partial_pressure_pa.is_some());
             assert!(!report.approximation_notes.is_empty());
         }
     }
