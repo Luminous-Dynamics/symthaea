@@ -75,6 +75,8 @@ pub struct NutritionSourceManifestV1 {
     pub permissions: SourcePermissionsV1,
     /// SHA-256 of the exact upstream artifact bytes, lower-case hexadecimal.
     pub artifact_sha256: Option<String>,
+    /// Date on which this source artifact/record was retrieved or acquired.
+    pub retrieved_on: String,
     pub reviewed_on: String,
     pub review_valid_until: String,
     pub lifecycle: SourceLifecycle,
@@ -242,6 +244,8 @@ pub enum RegistryIssueCode {
     MissingLicenseId,
     InvalidEvaluationDate,
     InvalidReviewedOn,
+    InvalidRetrievedOn,
+    SourceRetrievedInFuture,
     InvalidReviewValidUntil,
     ReviewWindowInverted,
     ReviewNotYetEffective,
@@ -401,9 +405,21 @@ fn validate_source_metadata(
         push_issue(issues, IssueCategory::Source, RegistryIssueCode::InvalidTermsUri);
     }
 
+    let retrieved = parse_date(&manifest.retrieved_on);
+    if retrieved.is_none() {
+        push_issue(issues, IssueCategory::Source, RegistryIssueCode::InvalidRetrievedOn);
+    }
+
     match parse_date(evaluation_date) {
         None => push_issue(issues, IssueCategory::Source, RegistryIssueCode::InvalidEvaluationDate),
         Some(as_of) => {
+            if retrieved.is_some_and(|retrieved_on| retrieved_on > as_of) {
+                push_issue(
+                    issues,
+                    IssueCategory::Source,
+                    RegistryIssueCode::SourceRetrievedInFuture,
+                );
+            }
             let reviewed = parse_date(&manifest.reviewed_on);
             let until = parse_date(&manifest.review_valid_until);
             if reviewed.is_none() {
@@ -457,15 +473,23 @@ fn validate_permissions(
     issues: &mut Vec<RegistryIssueV1>,
 ) {
     let p = &manifest.permissions;
-    let decisions = [
-        p.use_for_assessment,
-        p.cache,
-        p.transform,
-        p.redistribute,
-        p.commercial_use,
-        p.public_fixture,
-    ];
-    if decisions.iter().any(|decision| decision.requires_permission_reference())
+    let mut used_permissions = vec![p.use_for_assessment];
+    if use_request.retains_source_data() {
+        used_permissions.push(p.cache);
+    }
+    if fact.transformation_applied || use_request.transform_record {
+        used_permissions.push(p.transform);
+    }
+    if use_request.commercial_use {
+        used_permissions.push(p.commercial_use);
+    }
+    if use_request.public_fixture {
+        used_permissions.push(p.public_fixture);
+        used_permissions.push(p.redistribute);
+    }
+    if used_permissions
+        .iter()
+        .any(|decision| decision.requires_permission_reference())
         && manifest
             .permission_reference
             .as_deref()
@@ -473,7 +497,11 @@ fn validate_permissions(
             .trim()
             .is_empty()
     {
-        push_issue(issues, IssueCategory::License, RegistryIssueCode::PermissionReferenceMissing);
+        push_issue(
+            issues,
+            IssueCategory::License,
+            RegistryIssueCode::PermissionReferenceMissing,
+        );
     }
     if !p.use_for_assessment.is_granted() {
         push_issue(issues, IssueCategory::License, RegistryIssueCode::AssessmentUseNotPermitted);
@@ -765,6 +793,7 @@ mod tests {
             permission_reference: None,
             permissions: allowed_permissions(),
             artifact_sha256: Some(sha256_hex(ARTIFACT)),
+            retrieved_on: "2026-01-02".to_owned(),
             reviewed_on: "2026-01-01".to_owned(),
             review_valid_until: "2027-01-01".to_owned(),
             lifecycle: SourceLifecycle::Active,
@@ -787,7 +816,7 @@ mod tests {
             food_state_id: "cooked_edible".to_owned(),
             match_quality: FoodMatchQuality::ExactReviewedMatch,
             geographic_match: FoodGeographicMatch::SouthAfricanLocal,
-            evidence_class: EvidenceClass::NationalFoodCompositionTable,
+            evidence_class: EvidenceClass::SyntheticFixture,
             nutrient_id: "iron".to_owned(),
             nutrient_definition_ref: "nutrient-definition:iron-v1".to_owned(),
             unit: NutrientUnit::Milligrams,
@@ -824,7 +853,10 @@ mod tests {
         assert_eq!(result.license_eligibility, Eligibility::Eligible);
         assert_eq!(result.data_quality_eligibility, DataQualityEligibility::ExactMatch);
         assert_eq!(result.artifact_integrity, ArtifactIntegrity::Verified);
-        assert_eq!(result.nutrition_assessability, NutritionAssessability::Assessable);
+        assert_eq!(
+            result.nutrition_assessability,
+            NutritionAssessability::SyntheticFixtureOnly
+        );
         assert!(result.issues.is_empty());
     }
 
@@ -869,6 +901,19 @@ mod tests {
         assert!(result.issues.iter().any(|issue| {
             issue.code == RegistryIssueCode::AssessmentUseNotPermitted
         }));
+    }
+
+    #[test]
+    fn unrelated_permission_requirement_does_not_block_current_use() {
+        let mut m = manifest();
+        m.permissions.transform = PermissionDecision::RequiresWrittenPermission;
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Eligible);
+        assert_eq!(
+            result.nutrition_assessability,
+            NutritionAssessability::SyntheticFixtureOnly
+        );
+        assert!(result.issues.is_empty());
     }
 
     #[test]
@@ -917,7 +962,10 @@ mod tests {
             None,
         );
         assert_eq!(result.artifact_integrity, ArtifactIntegrity::NoDigestClaimed);
-        assert_eq!(result.nutrition_assessability, NutritionAssessability::Assessable);
+        assert_eq!(
+            result.nutrition_assessability,
+            NutritionAssessability::SyntheticFixtureOnly
+        );
         assert!(result.issues.is_empty());
     }
 
@@ -971,6 +1019,17 @@ mod tests {
         assert_eq!(result.license_eligibility, Eligibility::Blocked);
         assert!(result.issues.iter().any(|issue| {
             issue.code == RegistryIssueCode::TransformationNotPermitted
+        }));
+    }
+
+    #[test]
+    fn future_retrieval_date_blocks_source_record() {
+        let mut m = manifest();
+        m.retrieved_on = "2026-10-16".to_owned();
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.source_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::SourceRetrievedInFuture
         }));
     }
 
@@ -1077,8 +1136,19 @@ mod tests {
         );
         assert_eq!(
             result.nutrition_assessability,
-            NutritionAssessability::QualifiedFallback
+            NutritionAssessability::SyntheticFixtureOnly
         );
+    }
+
+    #[test]
+    fn malformed_retrieval_date_blocks_source_record() {
+        let mut m = manifest();
+        m.retrieved_on = "2026-2-1".to_owned();
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.source_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::InvalidRetrievedOn
+        }));
     }
 
     #[test]
@@ -1116,7 +1186,7 @@ mod tests {
         let mut m = manifest();
         m.reviewed_on = "2026-1-1".to_owned();
         m.artifact_sha256 = Some("A".repeat(64));
-        let result = assess(&m, &fact(), EVALUATION_DATE, Some(ARTIFACT));
+        let result = assess(&m, &fact(), Some(ARTIFACT));
         assert_eq!(result.source_eligibility, Eligibility::Blocked);
         assert_eq!(result.artifact_integrity, ArtifactIntegrity::Invalid);
         assert!(result.issues.iter().any(|issue| {
