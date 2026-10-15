@@ -23,6 +23,8 @@ pub enum ScreeningError {
     MustBeNonNegative(&'static str),
     /// Arithmetic overflowed while deriving a result.
     NonFiniteResult(&'static str),
+    /// A fraction was outside the inclusive interval [0, 1].
+    FractionOutOfRange(&'static str),
 }
 
 impl fmt::Display for ScreeningError {
@@ -32,6 +34,7 @@ impl fmt::Display for ScreeningError {
             Self::MustBePositive(name) => write!(f, "{name} must be greater than zero"),
             Self::MustBeNonNegative(name) => write!(f, "{name} must be non-negative"),
             Self::NonFiniteResult(name) => write!(f, "derived {name} is not finite"),
+            Self::FractionOutOfRange(name) => write!(f, "{name} must be within [0, 1]"),
         }
     }
 }
@@ -532,6 +535,176 @@ pub fn screen_cargo_fit(request: CargoFitRequest) -> Result<CargoFitResult, Scre
     })
 }
 
+/// Registered measurements from a structural recovery cycling test.
+///
+/// Deformation metrics must be computed from registered full-field shape scans against the same
+/// baseline, not from visual inspection or one diameter alone. Stiffness values must use the same
+/// declared test method and units before/after cycling.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ElasticRecoveryObservation {
+    /// RMS magnitude of full-field displacement at maximum prescribed load, metres.
+    pub peak_deformation_rms_m: f64,
+    /// RMS magnitude of residual displacement after unload, metres.
+    pub residual_deformation_rms_m: f64,
+    /// Maximum measured surface deviation from baseline after unload, metres.
+    pub max_residual_surface_deviation_m: f64,
+    /// Bound on absolute metrology error for maximum residual surface deviation, metres.
+    pub metrology_uncertainty_m: f64,
+    /// Pre-cycle tangent stiffness under the declared test method, N/m.
+    pub pre_cycle_stiffness_n_per_m: f64,
+    /// Post-cycle tangent stiffness under the same test method, N/m.
+    pub post_cycle_stiffness_n_per_m: f64,
+    /// Number of completed load/unload cycles before post-cycle measurements.
+    pub cycle_count: u32,
+}
+
+/// Pre-registered geometric and stiffness criteria for a specific recovery test.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ElasticRecoveryCriteria {
+    /// Maximum permissible post-unload surface deviation, metres.
+    pub max_residual_surface_deviation_m: f64,
+    /// Minimum acceptable retained stiffness as a fraction of pre-cycle stiffness.
+    pub min_stiffness_retention_fraction: f64,
+}
+
+/// Result for a declared test criterion, with uncertainty represented explicitly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryGate {
+    /// The measured uncertainty interval satisfies the criterion.
+    Pass,
+    /// The measured uncertainty interval clearly violates the criterion.
+    Fail,
+    /// Measurement uncertainty overlaps the acceptance boundary.
+    Indeterminate,
+}
+
+/// Metric-only result of an elastic shape-recovery test.
+///
+/// Passing this gate means only that this specimen met its pre-registered shape/stiffness
+/// recovery criteria for the tested load history. It does not demonstrate pressure capacity,
+/// fatigue life, damage tolerance, airworthiness, or suitability for flight.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ElasticRecoveryResult {
+    /// One minus residual RMS deformation divided by peak RMS deformation.
+    /// Negative values are preserved if permanent residual deformation exceeds peak deformation.
+    pub shape_recovery_fraction: f64,
+    /// Post-cycle stiffness divided by pre-cycle stiffness.
+    pub stiffness_retention_fraction: f64,
+    /// Conservative lower bound on maximum residual surface deviation, metres.
+    pub residual_deviation_lower_bound_m: f64,
+    /// Conservative upper bound on maximum residual surface deviation, metres.
+    pub residual_deviation_upper_bound_m: f64,
+    pub shape_recovery_gate: RecoveryGate,
+    pub stiffness_retention_gate: RecoveryGate,
+    /// Combined result for recovery metrics only; it is not a structural safety gate.
+    pub overall_recovery_gate: RecoveryGate,
+    pub cycle_count: u32,
+}
+
+/// Evaluate post-load shape recovery and stiffness retention against frozen acceptance criteria.
+pub fn assess_elastic_recovery(
+    observation: ElasticRecoveryObservation,
+    criteria: ElasticRecoveryCriteria,
+) -> Result<ElasticRecoveryResult, ScreeningError> {
+    validate_positive(
+        observation.peak_deformation_rms_m,
+        "peak_deformation_rms_m",
+    )?;
+    validate_non_negative(
+        observation.residual_deformation_rms_m,
+        "residual_deformation_rms_m",
+    )?;
+    validate_non_negative(
+        observation.max_residual_surface_deviation_m,
+        "max_residual_surface_deviation_m",
+    )?;
+    validate_non_negative(
+        observation.metrology_uncertainty_m,
+        "metrology_uncertainty_m",
+    )?;
+    validate_positive(
+        observation.pre_cycle_stiffness_n_per_m,
+        "pre_cycle_stiffness_n_per_m",
+    )?;
+    validate_positive(
+        observation.post_cycle_stiffness_n_per_m,
+        "post_cycle_stiffness_n_per_m",
+    )?;
+    if observation.cycle_count == 0 {
+        return Err(ScreeningError::MustBePositive("cycle_count"));
+    }
+    validate_non_negative(
+        criteria.max_residual_surface_deviation_m,
+        "max_residual_surface_deviation_m",
+    )?;
+    validate_non_negative(
+        criteria.min_stiffness_retention_fraction,
+        "min_stiffness_retention_fraction",
+    )?;
+    if criteria.min_stiffness_retention_fraction > 1.0 {
+        return Err(ScreeningError::FractionOutOfRange(
+            "min_stiffness_retention_fraction",
+        ));
+    }
+
+    let shape_recovery_fraction = 1.0
+        - observation.residual_deformation_rms_m / observation.peak_deformation_rms_m;
+    let stiffness_retention_fraction =
+        observation.post_cycle_stiffness_n_per_m / observation.pre_cycle_stiffness_n_per_m;
+    let residual_deviation_lower_bound_m = (observation.max_residual_surface_deviation_m
+        - observation.metrology_uncertainty_m)
+        .max(0.0);
+    let residual_deviation_upper_bound_m = observation.max_residual_surface_deviation_m
+        + observation.metrology_uncertainty_m;
+    for (name, value) in [
+        ("shape recovery fraction", shape_recovery_fraction),
+        ("stiffness retention fraction", stiffness_retention_fraction),
+        ("residual deviation lower bound", residual_deviation_lower_bound_m),
+        ("residual deviation upper bound", residual_deviation_upper_bound_m),
+    ] {
+        validate_result(value, name)?;
+    }
+
+    let shape_recovery_gate =
+        if residual_deviation_upper_bound_m <= criteria.max_residual_surface_deviation_m {
+            RecoveryGate::Pass
+        } else if residual_deviation_lower_bound_m
+            > criteria.max_residual_surface_deviation_m
+        {
+            RecoveryGate::Fail
+        } else {
+            RecoveryGate::Indeterminate
+        };
+    let stiffness_retention_gate =
+        if stiffness_retention_fraction >= criteria.min_stiffness_retention_fraction {
+            RecoveryGate::Pass
+        } else {
+            RecoveryGate::Fail
+        };
+    let overall_recovery_gate = if shape_recovery_gate == RecoveryGate::Fail
+        || stiffness_retention_gate == RecoveryGate::Fail
+    {
+        RecoveryGate::Fail
+    } else if shape_recovery_gate == RecoveryGate::Indeterminate
+        || stiffness_retention_gate == RecoveryGate::Indeterminate
+    {
+        RecoveryGate::Indeterminate
+    } else {
+        RecoveryGate::Pass
+    };
+
+    Ok(ElasticRecoveryResult {
+        shape_recovery_fraction,
+        stiffness_retention_fraction,
+        residual_deviation_lower_bound_m,
+        residual_deviation_upper_bound_m,
+        shape_recovery_gate,
+        stiffness_retention_gate,
+        overall_recovery_gate,
+        cycle_count: observation.cycle_count,
+    })
+}
+
 /// External-pressure force resultants for a spherical shell's great-circle cut.
 ///
 /// This applies the ideal equilibrium relation C = Δp · πR² to a perfect sphere. It yields the
@@ -1013,6 +1186,106 @@ mod tests {
         assert_eq!(
             result.unwrap_err(),
             ScreeningError::NonFiniteInput("usable_cargo_volume_m3")
+        );
+    }
+
+    fn recovery_observation() -> ElasticRecoveryObservation {
+        ElasticRecoveryObservation {
+            peak_deformation_rms_m: 0.010,
+            residual_deformation_rms_m: 0.0001,
+            max_residual_surface_deviation_m: 0.0002,
+            metrology_uncertainty_m: 0.00005,
+            pre_cycle_stiffness_n_per_m: 100_000.0,
+            post_cycle_stiffness_n_per_m: 98_000.0,
+            cycle_count: 100,
+        }
+    }
+
+    fn recovery_criteria() -> ElasticRecoveryCriteria {
+        ElasticRecoveryCriteria {
+            max_residual_surface_deviation_m: 0.0005,
+            min_stiffness_retention_fraction: 0.95,
+        }
+    }
+
+    #[test]
+    fn elastic_recovery_passes_only_declared_geometry_and_stiffness_gates() {
+        let result =
+            assess_elastic_recovery(recovery_observation(), recovery_criteria()).unwrap();
+        assert!((result.shape_recovery_fraction - 0.99).abs() < 1e-12);
+        assert!((result.stiffness_retention_fraction - 0.98).abs() < 1e-12);
+        assert_eq!(result.shape_recovery_gate, RecoveryGate::Pass);
+        assert_eq!(result.stiffness_retention_gate, RecoveryGate::Pass);
+        assert_eq!(result.overall_recovery_gate, RecoveryGate::Pass);
+    }
+
+    #[test]
+    fn recovery_shape_gate_is_indeterminate_when_metrology_overlaps_tolerance() {
+        let observation = ElasticRecoveryObservation {
+            max_residual_surface_deviation_m: 0.0005,
+            metrology_uncertainty_m: 0.0001,
+            ..recovery_observation()
+        };
+        let result = assess_elastic_recovery(observation, recovery_criteria()).unwrap();
+        assert_eq!(result.shape_recovery_gate, RecoveryGate::Indeterminate);
+        assert_eq!(result.overall_recovery_gate, RecoveryGate::Indeterminate);
+    }
+
+    #[test]
+    fn recovered_shape_cannot_hide_stiffness_loss() {
+        let observation = ElasticRecoveryObservation {
+            post_cycle_stiffness_n_per_m: 80_000.0,
+            ..recovery_observation()
+        };
+        let result = assess_elastic_recovery(observation, recovery_criteria()).unwrap();
+        assert_eq!(result.shape_recovery_gate, RecoveryGate::Pass);
+        assert_eq!(result.stiffness_retention_gate, RecoveryGate::Fail);
+        assert_eq!(result.overall_recovery_gate, RecoveryGate::Fail);
+    }
+
+    #[test]
+    fn residual_deformation_larger_than_peak_keeps_negative_recovery_metric() {
+        let observation = ElasticRecoveryObservation {
+            residual_deformation_rms_m: 0.020,
+            ..recovery_observation()
+        };
+        let result = assess_elastic_recovery(observation, recovery_criteria()).unwrap();
+        assert!(result.shape_recovery_fraction < 0.0);
+    }
+
+    #[test]
+    fn recovery_test_rejects_zero_peak_deformation() {
+        let observation = ElasticRecoveryObservation {
+            peak_deformation_rms_m: 0.0,
+            ..recovery_observation()
+        };
+        assert_eq!(
+            assess_elastic_recovery(observation, recovery_criteria()).unwrap_err(),
+            ScreeningError::MustBePositive("peak_deformation_rms_m")
+        );
+    }
+
+    #[test]
+    fn recovery_test_rejects_stiffness_retention_threshold_above_one() {
+        let criteria = ElasticRecoveryCriteria {
+            min_stiffness_retention_fraction: 1.01,
+            ..recovery_criteria()
+        };
+        assert_eq!(
+            assess_elastic_recovery(recovery_observation(), criteria).unwrap_err(),
+            ScreeningError::FractionOutOfRange("min_stiffness_retention_fraction")
+        );
+    }
+
+    #[test]
+    fn recovery_test_rejects_zero_cycles() {
+        let observation = ElasticRecoveryObservation {
+            cycle_count: 0,
+            ..recovery_observation()
+        };
+        assert_eq!(
+            assess_elastic_recovery(observation, recovery_criteria()).unwrap_err(),
+            ScreeningError::MustBePositive("cycle_count")
         );
     }
 
