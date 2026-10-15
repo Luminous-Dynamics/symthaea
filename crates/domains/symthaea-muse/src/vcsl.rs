@@ -71,8 +71,8 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 
 /// Which sample library provides an instrument. VCSL (keyboards, harps,
 /// mallets, sax, organ) is complemented by VSCO2 Community Edition (also
@@ -1171,7 +1171,10 @@ fn probe_fluidsynth_programs(
                 let _ = std::fs::remove_file(&wav_path);
                 return Err(std::io::Error::new(
                     error.kind(),
-                    format!("failed to execute FluidSynth probe binary {}: {error}", binary.display()),
+                    format!(
+                        "failed to execute FluidSynth probe binary {}: {error}",
+                        binary.display()
+                    ),
                 ));
             }
         }
