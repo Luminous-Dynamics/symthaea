@@ -306,6 +306,16 @@ For example, a hypothetical demand bound of 98–102 kPa and a hypothetical decl
 
 Use demand bounds tied to an explicit operating envelope (altitude, weather, internal pressure and transients) and capacity bounds from geometry-specific, independently reviewed nonlinear analysis and relevant physical tests. A linear eigenvalue or perfect-geometry result must not be presented as a qualified allowable without an applicable and justified methodology.
 
+### Translate the global resultant into explicit load-path demand
+
+The Rust API now includes `screen_load_path_demand`, a generic arithmetic bridge from the spherical great-circle compressive resultant to a declared effective load-path count. It reports an equal-share reference load and a second, factor-scaled value using an explicitly supplied peak-to-mean concentration factor. Neither value is a member capacity or a validated maximum.
+
+This separation is intentional: load-path count and load concentration vary with topology, joint stiffness, boundary conditions and spatial imperfections. The function does not infer either one from radius or from an architecture label; the caller must provide a justified count and concentration factor, and the output cannot be used as a substitute for a structural model.
+
+For context, Toli's 2026 kenemostat paper gives the approximate effective great-circle crossing count (n_{eff}=30f/\pi), yielding the mean load estimate (F=p\pi^2R^2/(30f)). For its modeled 20 m circumradius, frequency-3 case at 101.3 kPa, the paper reports a 4.44 MN analytical estimate and 4.82 MN mean from its beam-element FEA (about 8.6% higher), plus a peak-to-mean ratio of 1.32. Applying 1.32 to the analytical estimate gives about 5.87 MN, while applying it to the reported FEA mean gives about 6.36 MN. Those are values for that paper's idealized model—not transferable factors, qualified allowables, or predictions for this repository's candidates. Source: [Toli, *Aerospace Science and Technology* 177(C), 112799 (2026)](https://doi.org/10.1016/j.ast.2026.112799).
+
+Use this function as a transparent handoff to a geometry-specific member/joint analysis. For actual design ranking, record the load-path derivation, full spatial imperfection set, as-built configuration, and force distribution from the qualified model; compare the estimate against a physical subassembly before raising confidence in the model.
+
 ### Require exact scope alignment before comparing capacity evidence
 
 The bounded pressure screen now has a scope-aware wrapper, `assess_scoped_external_pressure_bounds`. A pressure-capacity record is compared only when five immutable scope identifiers match the requested case:
@@ -351,4 +361,4 @@ The screening code should remain the quick-rejection layer. Candidate search may
 
 ## Known exclusions
 
-This first tranche does not perform topology optimization, constitutive modelling, composite failure analysis, finite-element analysis, uncertainty quantification, leak-rate prediction, atmospheric flight dynamics, active control, regulatory certification, or airworthiness determination. Positive arithmetic payload allowance alone is not evidence of a viable vehicle.
+This first tranche does not perform topology optimization, constitutive modelling, composite failure analysis, finite-element analysis, member-load distribution from geometry, uncertainty quantification beyond the declared scalar intervals, leak-rate prediction, atmospheric flight dynamics, active control, regulatory certification, or airworthiness determination. Positive arithmetic payload allowance alone is not evidence of a viable vehicle.
