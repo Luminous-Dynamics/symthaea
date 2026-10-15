@@ -1423,6 +1423,83 @@ mod tests {
     }
 
     #[test]
+    fn test_fact_only_snapshot_does_not_lower_allocator_high_water() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_only_allocator_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let prior = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "prior fact".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+            graph_fact_id: Some(5),
+            initial_confidence: Some(0.8),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        persistence
+            .replace_knowledge_snapshot(&[prior], &[], &[], 12)
+            .unwrap();
+
+        let replacement = FactRecord {
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            source_text: "fact-only replacement".into(),
+            confidence: 0.7,
+            domain: None,
+            cycle: 2,
+            is_causal: false,
+            graph_fact_id: Some(7),
+            initial_confidence: Some(0.7),
+            last_accessed_cycle: Some(2),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        persistence.replace_facts_snapshot(&[replacement]).unwrap();
+
+        assert_eq!(
+            persistence.load_next_graph_fact_id().unwrap(),
+            Some(12),
+            "fact-only snapshots must not lower the globally committed ID high-water mark"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_next_graph_fact_id_rejects_corrupt_allocator_metadata() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_corrupt_fact_allocator_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence.save_facts(&[]).unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO knowledge_metadata (key, value)
+             VALUES ('next_graph_fact_id', 0)",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_next_graph_fact_id().unwrap_err();
+        assert!(error.contains("Invalid persisted next graph fact ID"), "{error}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_allocator_high_water_survives_removal_of_highest_fact() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_fact_allocator_high_water_test_{}",
