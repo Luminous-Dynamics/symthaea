@@ -300,6 +300,7 @@
     "Parameter-claim uncertainty-status vocabulary and source/fit-node reference checks.",
     "External exact-byte SHA-256 pin requirement for frozen graph inputs.",
     "Successful transformations may use and publish only artifacts whose linked rights record declares approved_for_this_use; this is enforcement of a recorded status, not legal adjudication.",
-    "Parameter claim source values must be a JSON number or non-empty verbatim string; optional normalized_value and normalized_unit must appear together, and normalized_value is numeric."
+    "Parameter claim source values must be a JSON number or non-empty verbatim string; optional normalized_value and normalized_unit must appear together, and normalized_value is numeric.",
+    "Parameter claims require at least one unique substrate ID; missing substrate identity must be represented explicitly rather than as an empty list."
   ]
 }
