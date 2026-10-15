@@ -291,3 +291,15 @@ Additional tests are authored for a fully matching positive candidate coexisting
 
 This guard is motivated by the evidence sufficiency distinction between full support, partial support, irrelevant evidence, missing context, and conflicting evidence described by Zhang and Wu (2026, [DOI: 10.32604/cmc.2026.086343](https://doi.org/10.32604/cmc.2026.086343)). Their benchmark supports adding conflict-specific evaluation; it does not validate this structural rule or its false-positive rate.
 
+### Follow-up exact-head refinement: conflict-aware abstention (2026-10-16)
+
+PR #7522 advanced from `f55ee0caddf1d2f27e52db8477072617a93b4653` to exact current head `f93d564113cb1cc505be0568ff8c06214a22b4fc`.
+
+The final refinement adds:
+- Stable ordering for polarity-conflict records by query index, graph fact ID, and relation ordinal.
+- Original stored source text on each conflict record (still not authenticated source provenance).
+- Conflict detection even when no role-vector candidate is returned, so an empty candidate list cannot erase contradictory relation observations.
+- A tested-by-source explicit permissive override API for workflows that need to inspect rather than automatically abstain on conflicts. This override keeps `conflicting_evidence` visible; it does not resolve the contradiction.
+
+Additional regression tests are authored for no-role-hit conflict reporting and for the opt-in permissive override. They have **not** run locally. On exact head `f93d564113cb1cc505be0568ff8c06214a22b4fc`, CI [38815984209](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38815984209) is **pending** and PR Governance [38815984217](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38815984217) is **queued**. Neither is a pass; all qualification remains pending exact-head completion.
+
