@@ -255,6 +255,26 @@ A small auxiliary source is Paine et al. (2017), [University of Bath BATH-00448]
 
 **Claim ceiling:** these openly licensed lab datasets permit a reproducible evidence audit, but not a claim of field readiness, long-term durability, ecological safety, suitability for road/rail assets or a universal microbial-concrete recipe. No workbook has been downloaded or analysed as part of this metadata review. Execution is tracked in [BIO-CEM-001A3 #7471](https://github.com/Luminous-Dynamics/symthaea/issues/7471); this section creates no new production schema.
 
+### A10. Non-biological comparator: self-healing via large clinker particles
+
+A March 2026 open-access study by Wang et al. proposes a compatible, non-living autogenous-healing route by partially replacing fine cement with larger clinker particles. This is an important comparator for the microbial programme because it may avoid carrier survival, viability, inoculum and environmental-persistence questions. It is **not automatically lower-carbon or better overall**.
+
+Source: Wang et al. (2026), *A mechanistic study of a novel self-healing concept for cement enabled by large clinker particles: Recovery of transport properties and microstructure characteristics*, *Construction and Building Materials* 516, 145707, DOI https://doi.org/10.1016/j.conbuildmat.2026.145707. The publication page labels it open access under a Creative Commons licence.
+
+**What the source reports after 56 days (literature prior, not Symthaea reproduction):**
+- Particle-size families included 40–60 μm, 60–90 μm and 0.5–1.0 mm; the study varied partial-replacement contents from 20% to 40% by mass.
+- For the 40–90 μm variants, reported recovery rates were approximately 67.0–67.6% for initial water absorption, 83.2–83.4% for secondary water absorption, and 78.6–82.6% for gas permeability, compared with 46.2%, 49.5% and 64.1% for the control, respectively.
+- The study reports surface cracks starting near 200 μm narrowing to roughly 20–60 μm, and internal crack widths of 57–111 μm by XCT for the highlighted sizes.
+- XCT and microstructural analyses support the study's proposed mechanism of continued hydration from residual unhydrated clinker. These are study-specific findings, not a general guarantee of crack-depth sealing or mechanical recovery in a different mix.
+
+The authors also explicitly note a **carbon trade-off**: replacing cement with clinker may increase the clinker factor, particularly in cements with high supplementary-cementitious-material content. They argue that possible service-life extension could offset that impact, but this is conditional on field durability, actual mix chemistry, repair frequency, manufacturing/transport burdens, and the functional unit. Do not assert a climate benefit without a transparent whole-life comparison and sensitivity analysis for assumed service-life extension.
+
+**Common comparator requirements:** compare this family against the conventional/autogenous baseline, internal curing or crack-width control, non-living repair systems and microbial candidates only after harmonizing initial crack width, curing and healing conditions, conditioning and test methods. Keep initial/secondary absorption and gas permeability as different outcomes. Also measure fresh-state properties, intact compressive/flexural strength, post-healing mechanical properties where appropriate, durability through cycling, material quantities and emissions. The paper's reported outcome percentages cannot be directly pooled with the BATH-01087 dataset's different protocol or treated as additional independent observations.
+
+Use mandatory feasibility gates for the intended application. No amount of sealing performance compensates for a violation of required strength, workability, durability, or owner/standard criteria. Only candidates that pass those hard gates may enter multiobjective comparison for lifecycle cost, emissions, repairability and maintenance burden.
+
+Cross-mechanism comparator design and lifecycle assumptions are tracked in [BIO-CEM-001A4 #7488](https://github.com/Luminous-Dynamics/symthaea/issues/7488). This literature addition creates no material ontology, carbon-accounting schema or production type; reuse canonical MAT/FIELD/SE-OBS/SE-SEM/ENG-EVID owners and record source-level claims separately from measured data.
+
 ## B. Better railway systems
 
 ### B1. Highest-value first move: predict deterioration, not just geometry
@@ -448,6 +468,7 @@ This recent review highlights strain persistence, genetic stability, horizontal 
 
 20. Justo-Reinoso et al. (2022), University of Bath Research Data Archive, “Air-entraining admixtures as a protection method for bacterial spores in self-healing cementitious composites: Healing evaluation of early and later-age cracks,” BATH-01087; data record lists CC BY 4.0 for all three Excel files. https://doi.org/10.15125/BATH-01087. Related publication: https://doi.org/10.1016/j.conbuildmat.2022.126877
 21. Paine et al. (2017), University of Bath Research Data Archive, “Dataset for application of expanded perlite encapsulated bacteria and growth media for self-healing concrete,” BATH-00448; workbook and data documentation list CC BY 4.0. https://doi.org/10.15125/BATH-00448
+22. Wang et al. (2026), “A mechanistic study of a novel self-healing concept for cement enabled by large clinker particles: Recovery of transport properties and microstructure characteristics,” *Construction and Building Materials*, 516, 145707. https://doi.org/10.1016/j.conbuildmat.2026.145707
 
 ## Claim ceiling
 
