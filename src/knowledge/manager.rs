@@ -327,6 +327,12 @@ impl KnowledgeManager {
             if !facts.is_empty() {
                 tracing::info!(count = imported_fact_count, "Knowledge: loaded facts from SQLite");
             }
+            if let Some(reserved_next_id) = p
+                .load_next_graph_fact_id()
+                .map_err(|e| format!("KnowledgeManager failed to load fact ID allocator: {e}"))?
+            {
+                graph.ensure_next_fact_id(reserved_next_id);
+            }
 
             let edges = p.load_causal_edges().map_err(|e| {
                 format!("KnowledgeManager failed to load persisted causal edges: {e}")
@@ -800,7 +806,13 @@ impl KnowledgeManager {
                 })
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
-            if let Err(e) = p.replace_knowledge_snapshot(&facts, &edges, &ontology_records) {
+            let next_graph_fact_id = self.graph.next_fact_id();
+            if let Err(e) = p.replace_knowledge_snapshot(
+                &facts,
+                &edges,
+                &ontology_records,
+                next_graph_fact_id,
+            ) {
                 tracing::warn!(
                     error = %e,
                     "Knowledge persistence: failed to atomically replace complete knowledge snapshot"
