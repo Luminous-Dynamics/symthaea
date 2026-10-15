@@ -2229,6 +2229,7 @@ mod tests {
         }
 
         write_wav(&sample_path, 4000);
+        let original_sample_size = std::fs::metadata(&sample_path).unwrap().len();
         let first = capability_inventory_with_options(
             &vcsl_root,
             &vsco2_root,
@@ -2278,7 +2279,11 @@ mod tests {
 
         // Keep the WAV frame count and byte length fixed while changing audio.
         write_wav(&sample_path, 9000);
-        assert_eq!(std::fs::metadata(&sample_path).unwrap().len(), 44 + 256 * 2);
+        assert_eq!(
+            std::fs::metadata(&sample_path).unwrap().len(),
+            original_sample_size,
+            "fixture changes audio payload without changing file size"
+        );
         let changed = capability_inventory_with_options(
             &vcsl_root,
             &vsco2_root,
