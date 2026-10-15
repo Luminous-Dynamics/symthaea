@@ -222,3 +222,18 @@ All checks above were **not passing** at this audit update. Queued/pending are n
 
 The most useful conceptual advance remains to treat retrieval as **constraint verification with explicit failure states**, not merely ranking: predicates, argument direction, negation, source/version/time constraints, and abstention should be independently represented and scored. Begin with metamorphic negative controls that hold the entity pair constant while flipping only predicate, direction, polarity, or entity type. Publish each family as separate cases and split by source/family before threshold selection so derived counterfactual negatives cannot leak across development and held-out sets. Compare role-HDC retrieval against lexical and conventional structural baselines over the same candidate universe. Until those results exist, do not change the production default or label retrieval similarity as truth, source authenticity, or calibrated probability.
 
+## Relation-constraint audit follow-up (2026-10-15)
+
+Public [PR #7522](https://github.com/Luminous-Dynamics/symthaea/pull/7522) adds an explicit relation-constraint audit on top of the retrieval-evaluation stack:
+
+- Query constraints include subject, predicate, object, subject/object roles, causal flag, and negation.
+- Matching requires directed subject/object identity, predicate equality after case/whitespace normalization, equal roles, and equal causal/negation flags. No predicate synonym or causal-entailment inference is attempted.
+- Results separate role-HDC retrieval from constraint audit with `relation_coverage`, stored relation matches, explicit unmatched constraints, and `constraints_satisfied`.
+- Candidates failing structural constraints remain inspectable but rank after fully satisfying candidates. Callers must check the explicit satisfaction flag rather than treating a high vector similarity as sufficient.
+- Distinct query constraints require distinct stored relation observations; a single stored relation cannot satisfy a duplicate constraint twice.
+- Two regression tests cover reversed direction, wrong predicate, negation flip, role flip, absent relation, and duplicate constraint multiplicity.
+
+This is a strict structural consistency check over stored extraction fields. It is not evidence that an extraction is correct, that a source is authentic, or that a causal claim is true. It does not yet preserve/verify source identity, publisher, source version, publication/event/access times, or provenance constraints at query time. The default `do_search` path remains unchanged.
+
+PR #7522 exact head is `3bc72174e36f6e6f8970ad1e82a8b52830171ba1`, based on PR #7508 head `62738165a3831425aab13c8d04f04b72cf4a0b4e`. CI [38809536591](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809536591) and PR Governance [38809536570](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38809536570) are **queued**, not passing; tests have not been run locally. The PR was reported mergeable at this inspection, but that does not imply workflow success or stack readiness for the default branch.
+
