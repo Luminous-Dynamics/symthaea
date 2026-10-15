@@ -6,8 +6,9 @@
 //!     --vcsl-root data/samples/vcsl \
 //!     --vsco2-root data/samples/vsco2-ce \
 //!     --soundfont /path/to/soundfont.sf2
+//!     --fluidsynth /path/to/fluidsynth
 //!
-//! Missing optional sample roots are recorded as unavailable evidence. The
+//! Runtime render probes are opt-in and require --soundfont. Missing optional sample roots are recorded as unavailable evidence. The
 //! path/size manifest digest does not hash WAV content; an optional SoundFont
 //! file is content-hashed. A nonzero exit means the inventory could not be
 //! produced faithfully (for example, an unreadable root or missing SoundFont).
@@ -16,7 +17,7 @@ use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
-use symthaea_muse::vcsl::capability_inventory;
+use symthaea_muse::vcsl::capability_inventory_with_fluidsynth;
 
 fn main() {
     if let Err(error) = run() {
@@ -37,6 +38,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut vcsl_root = default_vcsl;
     let mut vsco2_root = default_vsco2;
     let mut soundfont_path = None;
+    let mut fluidsynth_path = None;
     let mut args = env::args().skip(1);
 
     while let Some(argument) = args.next() {
@@ -59,12 +61,19 @@ fn run() -> Result<(), Box<dyn Error>> {
                         .ok_or("--soundfont requires a file path")?,
                 ));
             }
+            "--fluidsynth" => {
+                fluidsynth_path = Some(PathBuf::from(
+                    args.next()
+                        .ok_or("--fluidsynth requires an executable path or command name")?,
+                ));
+            }
             "--help" | "-h" => {
                 println!(
                     "Usage: muse_instrument_inventory [--vcsl-root PATH] \
-                     [--vsco2-root PATH] [--soundfont FILE]\n\
-                     Emits deterministic JSON to stdout. Missing sample roots \
-                     are reported as unavailable."
+                     [--vsco2-root PATH] [--soundfont FILE] [--fluidsynth PATH]\n\
+                     Emits JSON to stdout. Missing sample roots are unavailable. \
+                     --fluidsynth enables per-program offline render probes and \
+                     requires --soundfont."
                 );
                 return Ok(());
             }
@@ -72,10 +81,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let inventory = capability_inventory(
+    let inventory = capability_inventory_with_fluidsynth(
         &vcsl_root,
         &vsco2_root,
         soundfont_path.as_deref(),
+        fluidsynth_path.as_deref(),
     )?;
     println!("{}", serde_json::to_string_pretty(&inventory)?);
     Ok(())
