@@ -660,6 +660,12 @@ mod tests {
         let mut source = CausalKnowledgeBridge::new(10);
         source.add_edge(original.clone());
 
+        // The legacy tuple API intentionally omits negated relations. The typed
+        // persistence export must retain them instead of inheriting that filter.
+        assert!(
+            source.export_edges().is_empty(),
+            "legacy reasoning export still filters explicitly negated observations"
+        );
         let exported = source.export_edge_records();
         assert_eq!(exported.len(), 1);
         assert_eq!(exported[0].cause, original.cause);
