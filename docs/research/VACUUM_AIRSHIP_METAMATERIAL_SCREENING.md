@@ -280,6 +280,8 @@ The result also reports the payload-span contribution from each input interval s
 
 For a reference sphere with radius 20 m, one deliberately hypothetical example uses air density 1.20–1.25 kg/m³, internal density 0–0.01 kg/m³, structural-system areal mass 4–5 kg/m², and fixed non-structural mass 14–18 tonnes. The resulting payload mass interval is approximately **−3.26 to +7.78 tonnes**. This is an example of the method, not a prediction: those mass bounds have not been sourced or validated, and the assumed structure has no demonstrated external-pressure capacity.
 
+For this illustrative set, the interval width decomposes into approximately **1.68 tonnes** from ambient-air density, **0.34 tonnes** from internal-gas density, **5.03 tonnes** from structural-system areal mass, and **4.00 tonnes** from fixed vehicle mass. Within these assumed ranges, structural-system areal mass is the largest contributor, followed by fixed-system mass. That points to a concrete first data task: construct and bound a component-complete structural/system mass ledger. It does not indicate which failure mode controls pressure capacity.
+
 The resulting MassBudgetStatus is one of:
 
 - RobustlyNonNegative: all input combinations in the declared bounds give non-negative payload allowance.
