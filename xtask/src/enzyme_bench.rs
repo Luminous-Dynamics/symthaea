@@ -724,6 +724,18 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unit_conversion_factor_without_matching_reviewed_rule() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        let dataset_bytes = rewrite_csv_field(&root, "obs-a", "unit_conversion_factor", "2.0");
+        value["dataset_artifact"]["sha256"] = json!(format!("{:x}", Sha256::digest(&dataset_bytes)));
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let error = validate(&root, &parsed).unwrap_err().to_string();
+        assert!(error.contains("unit conversion factor does not match reported_unit"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn rejects_study_and_family_leakage() {
         let root = fixture_root();
         let mut value = make_manifest(&root);
