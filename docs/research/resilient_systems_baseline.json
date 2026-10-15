@@ -1,0 +1,226 @@
+{
+  "schema_version": "1.0.0",
+  "as_of": "2026-10-15",
+  "status": "illustrative_screening_not_validated",
+  "purpose": "Shared starting assumptions for the resilient-systems feasibility portfolio. Values below are scenario assumptions, not certified requirements.",
+  "common_metrics": [
+    "essential_service_deficit_by_service_and_time",
+    "probability_and_duration_below_service_floor",
+    "time_to_first_service_floor_violation",
+    "time_to_recover",
+    "median_and_95th_percentile_loss_and_recovery",
+    "lifecycle_cost_energy_emissions_and_material_throughput",
+    "repair_labour_and_spare_parts_burden",
+    "critical_dependencies_and_substitution_lead_time",
+    "evidence_quality_and_validation_scale"
+  ],
+  "settlement_100_people_730_days": {
+    "population": 100,
+    "duration_days": 730,
+    "person_days": 73000,
+    "food": {
+      "daily_kcal_per_person_scenario": {
+        "minimum": 2300,
+        "maximum": 3035,
+        "status": "planning_range",
+        "note": "The upper value is drawn from a specific NASA crew habitability requirement context, not a universal human requirement.",
+        "source": "https://www.nasa.gov/reference/7-0-habitability-functions-vol-2/"
+      },
+      "total_kcal_over_period": {
+        "minimum": 167900000,
+        "maximum": 221555000
+      },
+      "edible_food_energy_density_kcal_per_kg_assumption": {
+        "minimum": 3000,
+        "maximum": 4000
+      },
+      "derived_edible_mass_tonnes_screening_range": {
+        "minimum_approx": 42,
+        "maximum_approx": 74
+      },
+      "excluded": [
+        "packaging",
+        "spoilage_and_reserve",
+        "processing_and_cooking",
+        "dietary_diversity_and_medical_diets",
+        "micronutrient_provisioning",
+        "agricultural_equipment_and_inputs"
+      ]
+    },
+    "electricity": {
+      "unit": "kWh_per_person_day",
+      "scenarios": [
+        {
+          "kwh_per_person_day": 5,
+          "site_mwh_per_day": 0.5,
+          "site_mwh_over_730_days": 365
+        },
+        {
+          "kwh_per_person_day": 10,
+          "site_mwh_per_day": 1.0,
+          "site_mwh_over_730_days": 730
+        },
+        {
+          "kwh_per_person_day": 20,
+          "site_mwh_per_day": 2.0,
+          "site_mwh_over_730_days": 1460
+        }
+      ],
+      "status": "illustrative_demand_scenarios_not_a_standard",
+      "excluded": [
+        "separate_thermal_energy_balance",
+        "hourly_peak_power_sizing",
+        "conversion_losses",
+        "reserve_margin",
+        "battery_aging_and_temperature_derating",
+        "industrial_process_loads_unless_explicitly_added"
+      ]
+    },
+    "water": {
+      "unit": "litres_per_person_day_gross_throughput",
+      "scenarios": [
+        {
+          "litres_per_person_day": 50,
+          "site_m3_per_day": 5,
+          "gross_m3_over_730_days": 3650
+        },
+        {
+          "litres_per_person_day": 100,
+          "site_m3_per_day": 10,
+          "gross_m3_over_730_days": 7300
+        }
+      ],
+      "illustrative_recovery_fraction": 0.9,
+      "idealized_makeup_m3_over_730_days": {
+        "minimum": 365,
+        "maximum": 730
+      },
+      "note": "The idealized makeup range assumes 90% recovery of the entire modeled water throughput. It is not a settlement design guarantee; rejects, leakage, contamination, irrigation and process losses, cleaning, and quality requirements require explicit balances.",
+      "source_context": "NASA reports approximately 90% recovery in its space-station water recovery system; do not transfer the value uncritically.",
+      "source": "https://www.nasa.gov/reference/environmental-control-and-life-support-systems-eclss/"
+    }
+  },
+  "transport_comparison": {
+    "comparison_boundary": "same cargo, origin-destination, deadline, safety/service level, pickup, handling, transshipment, return leg, and outage scenarios",
+    "modes_to_compare": [
+      "rail",
+      "inland_or_coastal_water",
+      "road_freight",
+      "conventional_aviation",
+      "helium_or_hot_air_airship_where_fit",
+      "vacuum_airship_as_speculative_high_risk_branch",
+      "hybrid_multimodal_chains"
+    ],
+    "required_outputs": [
+      "door_to_door_cost_per_tonne",
+      "energy_and_lifecycle_ghg_per_tonne_kilometre",
+      "delivery_time_distribution",
+      "deadline_reliability",
+      "serviceable_payload_fraction",
+      "fleet_utilization_and_deadheading",
+      "weather_and_handling_downtime",
+      "infrastructure_and_maintenance_burden"
+    ],
+    "rule": "Do not rank modes using cruise energy or nominal payload alone."
+  },
+  "self_repairing_structures": {
+    "comparison_arms": [
+      "baseline_inspection_and_maintenance",
+      "redundancy_and_modular_replacement",
+      "sensing_plus_repair_access",
+      "combined_architecture_with_self_healing_material"
+    ],
+    "required_evidence": [
+      "damage_detection_probability_by_type_and_location",
+      "false_negative_and_false_alarm_rates",
+      "residual_capacity_before_repair",
+      "verified_property_recovery_after_repair",
+      "repeatability_over_damage_repair_cycles",
+      "added_mass_energy_consumables_and_maintenance"
+    ],
+    "safety_rule": "Do not credit recovered load capacity or pressure integrity without representative tests of that specific property."
+  },
+  "lunar_industry": {
+    "candidate_first_services": [
+      "robotic_site_preparation_and_regolith_movement",
+      "qualified_noncritical_local_repair_parts_and_tooling",
+      "oxygen_or_other_resource_extraction",
+      "regolith_derived_construction_feedstock"
+    ],
+    "required_break_even": [
+      "lifetime_delivered_plant_mass_and_support",
+      "power_generation_storage_and_distribution",
+      "spares_consumables_and_maintenance",
+      "usable_yield_reject_rate_and_quality",
+      "missions_served_and_product_demand",
+      "imported_mass_cost_and_risk_avoided"
+    ],
+    "rule": "Terrestrial simulant demonstration is not lunar qualification; a local commodity is not free merely because feedstock is local."
+  },
+  "community_microfactory": {
+    "pilot_catalog_size_range": [50, 100],
+    "initial_parts_selected_after_screening": 10,
+    "part_tiers": {
+      "tier_1": "non-safety-critical jigs, covers, fixtures, spacers and low-consequence fit/function replacements",
+      "tier_2": "mechanical/electrical parts requiring documented strength, heat, chemical, dimensional or electrical tests",
+      "tier_3": "safety-critical or process-qualified parts that must not be treated as equivalent without formal qualification"
+    },
+    "required_outputs": [
+      "time_to_repair_and_stockout_losses_avoided",
+      "full_lifecycle_cost",
+      "quality_escape_rate_and_rework",
+      "power_feedstock_and_operator_dependency",
+      "machine_utilization",
+      "process_and_inspection_traceability"
+    ]
+  },
+  "supply_network": {
+    "horizon_months": 24,
+    "scenarios": [
+      "random_single_node_outage",
+      "targeted_high_centrality_or_high_throughput_node_loss",
+      "sole_qualified_source_loss",
+      "correlated_regional_supplier_loss",
+      "shared_power_or_communications_failure",
+      "demand_underload_and_overload",
+      "shipping_interruption_plus_low_inventory",
+      "repair_skill_or_crew_unavailability"
+    ],
+    "required_model_layers": [
+      "physical_supply",
+      "transport_and_logistics",
+      "energy",
+      "communications_and_software",
+      "skills_and_maintenance",
+      "qualification_and_compliance"
+    ],
+    "rule": "Nominal supplier count is not true redundancy when suppliers share upstream dependencies."
+  },
+  "minimum_viable_civilization": {
+    "capability_floors": [
+      "safe_water_and_sanitation",
+      "sufficient_diverse_nutrition",
+      "safe_shelter_and_thermal_conditions",
+      "essential_energy",
+      "basic_healthcare_and_medicine_continuity",
+      "communications_education_and_knowledge",
+      "repair_manufacturing_tools_and_skills",
+      "logistics_and_external_support",
+      "legitimate_governance_accountability_and_rights",
+      "ecological_limits_and_fair_distribution"
+    ],
+    "optimization": "Pareto_frontier_not_single_weighted_resilience_score",
+    "rule": "Aggregate service averages may not conceal a subgroup falling below a required capability floor."
+  },
+  "proposed_stress_tests": {
+    "settlement_power_outage_days": [3, 14, 30],
+    "network_study_horizon_months": 24,
+    "negative_controls": [
+      "remove_the_supposed_redundant_source",
+      "introduce_a_shared_upstream_dependency",
+      "set_repair_time_to_infinity",
+      "reduce_a_critical_part_quality_below_acceptance",
+      "apply_a_correlated_regional_shock"
+    ]
+  }
+}
