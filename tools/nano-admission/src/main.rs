@@ -344,37 +344,44 @@ fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
         let mut entry = result.with_context(|| format!("invalid tar entry at index {index}"))?;
         // Keep the tar crate's Cow<Path> borrowed where possible; do not force
         // an allocation before checking an attacker-controlled member path length.
-        let entry_path = entry.path()?;
-        let path_text = entry_path.to_str();
-        if let Some(path) = path_text {
-            inventory.member_path_bytes_inspected = next_member_path_byte_total(
-                inventory.member_path_bytes_inspected,
-                path.len(),
-            )?;
-        }
-        let display_path = path_text
-            .map(bounded_member_display)
-            .unwrap_or_else(|| format!("<non-utf8-path-{index}>"));
+        // Convert only bounded diagnostic/index values to owned strings, then drop
+        // the path borrow before reading the member body mutably.
+        let (display_path, path_is_unsafe, normalized_path, top_level) = {
+            let entry_path = entry.path()?;
+            let path_text = entry_path.to_str();
+            if let Some(path) = path_text {
+                inventory.member_path_bytes_inspected = next_member_path_byte_total(
+                    inventory.member_path_bytes_inspected,
+                    path.len(),
+                )?;
+            }
+            let display_path = path_text
+                .map(bounded_member_display)
+                .unwrap_or_else(|| format!("<non-utf8-path-{index}>"));
+            let path_is_unsafe = path_is_unsafe(&entry_path, path_text)
+                || path_text.is_some_and(|text| text.len() > MAX_MEMBER_PATH_BYTES);
+            let normalized_path =
+                path_text.filter(|text| text.len() <= MAX_MEMBER_PATH_BYTES)
+                    .and_then(normalized_member_path);
+            let top_level = path_text
+                .map(bounded_top_level_component)
+                .unwrap_or("<non-utf8>")
+                .to_owned();
+            (display_path, path_is_unsafe, normalized_path, top_level)
+        };
 
-        let path_is_unsafe = path_is_unsafe(&entry_path, path_text)
-            || path_text.is_some_and(|text| text.len() > MAX_MEMBER_PATH_BYTES);
         if path_is_unsafe {
             inventory.unsafe_member_paths.push(display_path.clone());
         }
-        if let Some(path) = path_text.filter(|text| text.len() <= MAX_MEMBER_PATH_BYTES) {
-            if let Some(normalized_path) = normalized_member_path(path) {
-                if !seen_paths.insert(normalized_path.clone()) {
-                    inventory.duplicate_member_paths.push(normalized_path);
-                }
+        if let Some(normalized_path) = normalized_path {
+            if !seen_paths.insert(normalized_path.clone()) {
+                inventory.duplicate_member_paths.push(normalized_path);
             }
         }
 
-        let top_level = path_text
-            .map(bounded_top_level_component)
-            .unwrap_or("<non-utf8>");
         *inventory
             .top_level_member_counts
-            .entry(top_level.to_owned())
+            .entry(top_level)
             .or_insert(0) += 1;
 
         let entry_type = entry.header().entry_type();
