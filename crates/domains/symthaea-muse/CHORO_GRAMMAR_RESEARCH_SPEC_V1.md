@@ -40,6 +40,13 @@ The research repository is [DCMLab/choro, pinned to commit fe409c62deed50fc7f4b0
 
 Passing the research contract does not itself create a composer route or justify a claim of authenticity.
 
+## Why the preregistration contract is this explicit
+
+The [Open Science Framework's registration guidance](https://help.osf.io/article/330-welcome-to-registrations) describes preregistration as a timestamped, read-only plan submitted before data collection or analysis, and recommends stating hypotheses and variables, statistical tests and decision criteria, exclusions, outcomes, contingencies and deviations. The Choro contract translates those principles into fields that can be inspected mechanically; freeze booleans alone are not sufficient. The gate checks the local plan bytes and recorded metadata but does **not** independently verify that an external registration URL is truthful, immutable or actually available.
+
+The 2 June 2026 open-access survey [*Recent advances in music generation: methods, evaluation, and challenges*](https://doi.org/10.1007/s10462-026-11582-x) notes that no single objective metric adequately covers music-generation quality. It distinguishes symbolic outcomes such as tonality, rhythm and structure from audio-level properties such as timbre, transients and perceptual quality, and recommends complementary evaluation dimensions. Accordingly, this pilot keeps symbolic corpus findings, runtime behavior, rendered audio and practitioner/listener review as distinct evidence layers rather than collapsing them into one score.
+
+
 
 The synthetic harness is run by `scripts/muse_choro_synthetic_harness.py --check` and tested by `tests/python/test_muse_choro_synthetic_harness.py`. Its report is explicitly labelled non-empirical; no corpus rows, audio or transcriptions are used.
 
