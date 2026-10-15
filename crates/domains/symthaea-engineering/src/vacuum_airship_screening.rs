@@ -185,6 +185,104 @@ pub fn screen_buoyancy(request: BuoyancyRequest) -> Result<BuoyancyResult, Scree
     })
 }
 
+/// Geometry-based mass budget for an idealized spherical envelope.
+////
+//// The radius is used for both enclosed volume and pressure-boundary surface area. This is a
+//// thin-envelope screening approximation: it ignores thickness-induced volume/area differences,
+//// local appendages, deformation, and the mass of structural supports unless the caller includes
+//// those in `fixed_non_envelope_vehicle_mass_kg`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SphericalEnvelopeBudgetRequest {
+    /// Reference radius of the spherical pressure boundary, metres.
+    pub radius_m: f64,
+    /// Ambient air density at the declared operating condition, kg/m³.
+    pub ambient_air_density_kg_m3: f64,
+    /// Interior gas density at the same reference condition, kg/m³; use 0 for ideal vacuum.
+    pub internal_gas_density_kg_m3: f64,
+    /// All non-envelope, non-payload mass, including frame, joints, propulsion and systems, kg.
+    pub fixed_non_envelope_vehicle_mass_kg: f64,
+    /// Desired payload mass, kg.
+    pub target_payload_mass_kg: f64,
+}
+
+/// Signed upper bound for the spherical envelope's remaining mass budget.
+///
+/// A negative `maximum_envelope_mass_kg` or areal density means the target is already impossible
+/// before an envelope is added. A non-negative value only passes arithmetic bookkeeping; it does
+/// not imply the envelope can resist external pressure.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SphericalEnvelopeBudgetResult {
+    /// Idealized enclosed volume, m³.
+    pub enclosed_volume_m3: f64,
+    /// Idealized pressure-boundary area, m².
+    pub envelope_surface_area_m2: f64,
+    /// Ideal net buoyant mass before vehicle mass is subtracted, kg.
+    pub net_buoyant_mass_kg: f64,
+    /// Declared mass of all non-envelope vehicle components, kg.
+    pub fixed_non_envelope_vehicle_mass_kg: f64,
+    /// Declared target payload mass, kg.
+    pub target_payload_mass_kg: f64,
+    /// Maximum mass left for the entire envelope and its directly attached layers, kg.
+    pub maximum_envelope_mass_kg: f64,
+    /// Maximum mean envelope areal mass, kg/m²; signed so infeasibility is preserved.
+    pub maximum_envelope_areal_density_kg_m2: f64,
+}
+
+/// Determine the mass ceiling available to a spherical pressure envelope.
+///
+/// This is useful for quickly rejecting candidate materials/architectures that exceed the
+/// buoyancy budget. It cannot establish a minimum required thickness or pressure capacity.
+pub fn screen_spherical_envelope_budget(
+    request: SphericalEnvelopeBudgetRequest,
+) -> Result<SphericalEnvelopeBudgetResult, ScreeningError> {
+    validate_positive(request.radius_m, "radius_m")?;
+    validate_positive(
+        request.ambient_air_density_kg_m3,
+        "ambient_air_density_kg_m3",
+    )?;
+    validate_non_negative(
+        request.internal_gas_density_kg_m3,
+        "internal_gas_density_kg_m3",
+    )?;
+    validate_non_negative(
+        request.fixed_non_envelope_vehicle_mass_kg,
+        "fixed_non_envelope_vehicle_mass_kg",
+    )?;
+    validate_non_negative(request.target_payload_mass_kg, "target_payload_mass_kg")?;
+
+    let enclosed_volume_m3 = sphere_volume_m3(request.radius_m)?;
+    let envelope_surface_area_m2 =
+        4.0 * std::f64::consts::PI * request.radius_m.powi(2);
+    validate_result(envelope_surface_area_m2, "envelope surface area")?;
+
+    let net_buoyant_mass_kg = (request.ambient_air_density_kg_m3
+        - request.internal_gas_density_kg_m3)
+        * enclosed_volume_m3;
+    validate_result(net_buoyant_mass_kg, "net buoyant mass")?;
+
+    let maximum_envelope_mass_kg = net_buoyant_mass_kg
+        - request.fixed_non_envelope_vehicle_mass_kg
+        - request.target_payload_mass_kg;
+    validate_result(maximum_envelope_mass_kg, "maximum envelope mass")?;
+
+    let maximum_envelope_areal_density_kg_m2 =
+        maximum_envelope_mass_kg / envelope_surface_area_m2;
+    validate_result(
+        maximum_envelope_areal_density_kg_m2,
+        "maximum envelope areal density",
+    )?;
+
+    Ok(SphericalEnvelopeBudgetResult {
+        enclosed_volume_m3,
+        envelope_surface_area_m2,
+        net_buoyant_mass_kg,
+        fixed_non_envelope_vehicle_mass_kg: request.fixed_non_envelope_vehicle_mass_kg,
+        target_payload_mass_kg: request.target_payload_mass_kg,
+        maximum_envelope_mass_kg,
+        maximum_envelope_areal_density_kg_m2,
+    })
+}
+
 /// An externally sourced pressure-capacity declaration plus the references needed to audit it.
 ///
 /// The caller must supply a conservative allowable pressure for the exact applicable design
@@ -420,6 +518,68 @@ mod tests {
         assert_eq!(
             result.unwrap_err(),
             ScreeningError::NonFiniteInput("ambient_air_density_kg_m3")
+        );
+    }
+
+    #[test]
+    fn twenty_metre_vacuum_sphere_has_8_1667_kg_m2_envelope_ceiling_before_other_mass() {
+        let result = screen_spherical_envelope_budget(SphericalEnvelopeBudgetRequest {
+            radius_m: 20.0,
+            ambient_air_density_kg_m3: 1.225,
+            internal_gas_density_kg_m3: 0.0,
+            fixed_non_envelope_vehicle_mass_kg: 0.0,
+            target_payload_mass_kg: 0.0,
+        })
+        .unwrap();
+
+        // For a spherical shell with no other mass or payload:
+        // (rho * 4/3*pi*R^3) / (4*pi*R^2) = rho*R/3.
+        assert!((result.maximum_envelope_areal_density_kg_m2 - (1.225 * 20.0 / 3.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn fixed_vehicle_mass_and_target_payload_reduce_envelope_budget() {
+        let result = screen_spherical_envelope_budget(SphericalEnvelopeBudgetRequest {
+            radius_m: 20.0,
+            ambient_air_density_kg_m3: 1.225,
+            internal_gas_density_kg_m3: 0.0,
+            fixed_non_envelope_vehicle_mass_kg: 10_000.0,
+            target_payload_mass_kg: 5_000.0,
+        })
+        .unwrap();
+
+        assert!((result.maximum_envelope_mass_kg - (41_050.14400690663 - 15_000.0)).abs() < 1e-6);
+        assert!(result.maximum_envelope_areal_density_kg_m2 < 8.166666666666667);
+    }
+
+    #[test]
+    fn envelope_budget_preserves_infeasible_negative_mass_ceiling() {
+        let result = screen_spherical_envelope_budget(SphericalEnvelopeBudgetRequest {
+            radius_m: 1.0,
+            ambient_air_density_kg_m3: 1.0,
+            internal_gas_density_kg_m3: 0.0,
+            fixed_non_envelope_vehicle_mass_kg: 100.0,
+            target_payload_mass_kg: 1.0,
+        })
+        .unwrap();
+
+        assert!(result.maximum_envelope_mass_kg < 0.0);
+        assert!(result.maximum_envelope_areal_density_kg_m2 < 0.0);
+    }
+
+    #[test]
+    fn negative_target_payload_is_rejected() {
+        let result = screen_spherical_envelope_budget(SphericalEnvelopeBudgetRequest {
+            radius_m: 1.0,
+            ambient_air_density_kg_m3: 1.0,
+            internal_gas_density_kg_m3: 0.0,
+            fixed_non_envelope_vehicle_mass_kg: 0.0,
+            target_payload_mass_kg: -1.0,
+        });
+
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::MustBeNonNegative("target_payload_mass_kg")
         );
     }
 
