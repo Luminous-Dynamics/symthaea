@@ -1450,7 +1450,7 @@ mod tests {
             strength: 0.7,
             is_inhibitory: false,
             is_negated: false,
-            source_text: String::new(),
+            source_text: "affirmative source observation".into(),
             cycle: 1,
         };
         let stale_primitive = OntologyRecord {
@@ -1464,8 +1464,11 @@ mod tests {
         };
 
         let duplicate_edge = CausalEdgeRecord {
-            strength: -0.8,
+            strength: 0.8,
             is_inhibitory: true,
+            is_negated: true,
+            source_text: "negated inhibitory source observation".into(),
+            cycle: 2,
             ..stale_edge.clone()
         };
         assert_eq!(
@@ -1479,14 +1482,26 @@ mod tests {
                 .unwrap(),
             (1, 2, 1)
         );
-        let deduplicated_edges = persistence.load_causal_edges().unwrap();
+        let persisted_observations = persistence.load_causal_edges().unwrap();
         assert_eq!(
-            deduplicated_edges.len(),
-            1,
-            "duplicate in-memory cause/effect pairs share one persisted row"
+            persisted_observations.len(),
+            2,
+            "complete snapshots must retain repeated same-pair observations"
         );
-        assert_eq!(deduplicated_edges[0].strength, -0.8);
-        assert!(deduplicated_edges[0].is_inhibitory);
+        assert_eq!(
+            persisted_observations[0].source_text,
+            "affirmative source observation"
+        );
+        assert!(!persisted_observations[0].is_negated);
+        assert!(!persisted_observations[0].is_inhibitory);
+        assert_eq!(persisted_observations[1].strength, 0.8);
+        assert!(persisted_observations[1].is_inhibitory);
+        assert!(persisted_observations[1].is_negated);
+        assert_eq!(
+            persisted_observations[1].source_text,
+            "negated inhibitory source observation"
+        );
+        assert_eq!(persisted_observations[1].cycle, 2);
 
         let replacement_fact = FactRecord {
             source_text: "replacement live fact".into(),
