@@ -83,7 +83,7 @@ It must not silently turn an HDC distance, Phi metric, confidence score, fluent 
 Use established, version-pinned external tools and datasets for calculations that need chemistry-specific physics. Depending on the exact question, the eventual toolchain may involve density-functional theory, established machine-learned interatomic potentials, molecular dynamics, or a materials data service. The selected method must document its approximation, parameterization, supported chemistry, and applicability domain.
 
 Possible tooling to evaluate—not dependencies chosen by this proposal:
-- [Open Catalyst Project / OC20 / OC22](https://opencatalystproject.org/) for an open catalyst-surface benchmark and reference labels.
+- [Open Catalyst Project / OC22](https://opencatalystproject.org/) is the frozen first data-admission target for relaxed total-energy label-efficiency; [OC20](https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/datasets/oc20.md) is a later, separate adsorption-energy benchmark.
 - [LAMMPS](https://docs.lammps.org/stable/) for supported molecular/materials dynamics with declared interatomic potentials.
 - [Atomic Simulation Environment (ASE)](https://docs.ase-lib.org/) as a research environment for setting up atomistic calculations and invoking calculators.
 - DFT engines such as Quantum ESPRESSO or CP2K if the target study, license, and compute budget justify them.
@@ -104,57 +104,68 @@ Mycelix should link source-rights decisions, dataset releases, review/replicatio
 
 Mycelix governance can decide whether a community funds or prioritizes a study; a vote does not establish that a model is accurate, a material is safe, or a result is physically true. Do not create a second materials registry, measurement ledger or scientific truth oracle.
 
-## 4. First proving domain: catalyst-surface data efficiency
+## 4. First proving domain: OC22 oxide-electrocatalyst energy benchmark
+
+### Why this dataset first
+
+Select the published Open Catalyst 2022 (OC22) **Initial Structure to Relaxed Total Energy (IS2RE-Total)** task for the first admission and label-efficiency qualification. It is a tractable way to exercise the data/provenance/split pipeline before paying the much larger cost of broader atomistic benchmarks.
+
+The FairChem OC22 dataset documentation snapshot currently identified at commit `57c71322d5a5be0a0fcdcf05592e1699b120dc79` reports:
+- approximately 62,000 oxide systems;
+- IS2RE-Total archive containing train, validation, and test sets with in-distribution and out-of-distribution splits;
+- compressed archive of approximately 109 MB and expanded size of approximately 424 MB;
+- upstream MD5 for the IS2RE-Total archive: `b35dc24e99ef3aeaee6c5c949903de94`;
+- metadata mapping artifact upstream MD5: `13dc06c6510346d8a7f614d5b26c8ffa`;
+- dataset license stated as CC BY 4.0. The FairChem code/tooling license is separate (MIT in the dataset repository).
+
+Sources and exact artifact paths are frozen for the admission checklist in [NANO-001A #7455](https://github.com/Luminous-Dynamics/symthaea/issues/7455):
+- [OC22 dataset docs at pinned source commit](https://github.com/facebookresearch/fairchem/blob/57c71322d5a5be0a0fcdcf05592e1699b120dc79/docs/catalysts/datasets/oc22.md)
+- [IS2RE-Total archive](https://dl.fbaipublicfiles.com/opencatalystproject/data/oc22/is2res_total_train_val_test_lmdbs.tar.gz)
+- [OC22 metadata mapping](https://dl.fbaipublicfiles.com/opencatalystproject/data/oc22/oc22_metadata.pkl)
+- [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)
+- [OC22 dataset repository](https://github.com/Open-Catalyst-Project/Open-Catalyst-Dataset)
+
+**Admission is not yet complete.** The source page and advertised checksums have been researched, but the data files have not been downloaded or independently checked in this workstream. The source document, access date, exact byte count, SHA-256, split counts, and rights/attribution record must be frozen during admission. Upstream MD5 is only a compatibility/integrity check—not a collision-resistant artifact identity.
+
+### Critical claim boundary
+
+OC22 IS2RE-Total supplies DFT-derived total energies for initial structures and their relaxed outcomes. **Total energy is not catalyst activity, adsorption energy, reaction free energy, selectivity, durability, or synthesizeability.** Energies across different compositions/system sizes are not a valid generic catalyst ranking. This first benchmark qualifies data integrity and simulated label-efficient *total-energy prediction* only. A later OC20 adsorption-energy task, and ultimately application-specific validation, are required before making adsorption-energy or catalyst-performance claims.
 
 ### Research question
 
-On a version-pinned, rights-cleared slice of OC20/OC22—or an explicitly justified alternative admitted under the same rules—does a Symthaea-assisted acquisition/selection policy improve the amount of useful scientific information obtained from a fixed label or compute budget compared with simpler policies?
+After admission, test whether a Symthaea-assisted acquisition policy improves **label efficiency for predicting relaxed OC22 total energies** under a fixed label budget, compared with random selection and a declared descriptor-based acquisition baseline.
 
-This first test is about **candidate/data selection**, not about claiming that Symthaea has invented a new catalyst or trained a state-of-the-art atomistic potential.
+This is retrospective label masking: the dataset's DFT labels already exist, but the selector/predictor must behave as though only the acquired training labels are available. It can test selection strategy under the dataset's assumptions. It does not demonstrate real DFT-cost savings, synthesis efficiency, or wet-lab performance.
 
-OC20/OC22 are relevant because the Open Catalyst Project provides open datasets and benchmark tasks built around catalyst structures and DFT-derived calculations. The published dataset license and required attribution must be checked for the exact release and artifact used. The data repository's software license does not automatically settle the license of every external model weight, calculator, or downstream artifact.
+### Scope decision
 
-### Task selection gate
+- Use the published **IS2RE-Total** task, not the 20 GB S2EF-Total archive or optional 34 GB trajectory archive, for the first pipeline qualification.
+- Preserve the official train/validation/test and ID/OOD partitions. Never reinterpret the held-out test data as an acquisition pool.
+- Keep official-split results distinct from any later chemistry-family or material-family holdout.
+- Use a pinned, isolated FairChem reader/data-conversion tool only if needed to read the upstream LMDB; pin its source revision, dependencies, license, and command. It is not a production Symthaea dependency.
+- Export only a rights-reviewed compact manifest and machine-readable records needed by the Rust-first benchmark/verifier; do not commit raw OC22 data or re-host the upstream archive.
+- Defer OC20 because its documented full IS2RE archive is substantially larger (about 8.1 GB compressed / 97 GB expanded) and its adsorption-energy target is a different scientific task. Treat OC20 as a later domain-specific benchmark, not a substitute silently swapped into this experiment.
 
-Before modeling:
-1. Inspect the exact available release, license, task definitions, labels, official splits, known baselines, data schema, download size, and required attribution.
-2. Choose one declared task and one primary target. Keep the official task/split result distinct from any additional domain-shift experiment.
-3. Document why the target is scientifically useful for the specified surface/reaction class. Do not assume that a lower adsorption energy is universally better; catalytic usefulness is reaction-dependent and may require a defined energy window or multiple descriptors.
-4. Define the unit of selection: a structure, a structure/trajectory, or another canonical observation unit. Explicitly state whether initial and relaxed structures share identity.
-5. Freeze the dataset release, license evidence, source URL, content hashes, normalization, exclusions, unit conversions, seed, label budget, compute budget, and split manifest before inspecting held-out results.
+### Admission checklist
 
-If no suitable rights-cleared, reproducible dataset slice or compatible baseline can be established, record `data_access_unresolved` or `baseline_unavailable` and stop the accuracy claim. Do not silently switch datasets, targets, or splits after seeing results.
+Execute [NANO-001A #7455](https://github.com/Luminous-Dynamics/symthaea/issues/7455) before implementing model comparison:
+1. Retrieve the pinned source documentation and record its commit and access date.
+2. Download the archive and mapping to temporary research storage; verify upstream MD5, compute SHA-256 and exact byte size, and preserve those results in the manifest.
+3. Inspect archive layout and task/split metadata with the upstream reader; independently count examples and labels per official split.
+4. Verify finite values, stated units, structure/label alignment, duplicate IDs, related trajectories/materials, missing/invalid structures, and official ID/OOD semantics.
+5. Freeze source rights, attribution/citation, dataset artifact identity, software/runtime identity, transformations, exclusion list, and output manifest schema.
+6. Stop on unresolved rights, checksum mismatch, unknown units, ambiguous split membership, hidden-label exposure, or missing structural lineage. Do not produce a benchmark accuracy claim if any gate fails.
 
-### Acquisition-policy comparison
+### Selector comparison
 
-Where the chosen task supports it, compare at minimum:
-1. **Random selection**, with frozen seeds and repeated trials.
-2. **Declared simple baseline**, such as a documented descriptor/nearest-neighbor strategy.
-3. **Established reference baseline**, such as a compatible model or acquisition policy from the selected benchmark.
-4. **Symthaea-assisted selection**, with the HDC/features, policy, scoring, candidate diversity rule, abstention policy and resource ceiling specified before held-out evaluation.
+Keep downstream predictor family, structure representation, training protocol, available label budget, compute budget, and evaluation sets fixed while comparing:
+1. deterministic random acquisition over repeated frozen seeds;
+2. a simple declared descriptor/diversity selector;
+3. Symthaea-assisted acquisition with its HDC/feature construction, scoring policy, diversity/abstention behavior, and resource ceiling frozen before the held-out run.
 
-Keep the downstream predictor/model family and label budget comparable across acquisition strategies. When precomputed labels are used to simulate label acquisition, labels from the evaluation partition must remain hidden from the selector and every fitted transform until the final evaluation. Simulated acquisition over an existing corpus demonstrates label-efficiency under that corpus's assumptions; it does not prove wet-lab efficiency or that new structures can be synthesized.
+Do not assume HDC similarity is a physical energy or chemically meaningful geometry by default. The structure encoder and its invariances must be defined and tested; if that encoder is not ready, the first deliverable is data admission plus simple-baseline reproduction, not a manufactured Symthaea result. A reference atomistic potential or pretrained model may be used only as an explicitly versioned downstream predictor shared across acquisition arms.
 
-### Leakage and negative controls
-
-The independent split auditor should inspect, as applicable:
-- exact and near-duplicate atomic configurations;
-- structure relaxations and trajectory frames derived from a common initial structure;
-- shared slabs, surface families, compositions, adsorbates, or reaction families;
-- shared parent calculation or dataset lineage;
-- normalization/statistics fit using held-out records;
-- tuning, feature engineering or early stopping informed by test labels;
-- re-used or near-identical material structures spanning train and test.
-
-Retain the dataset's standard official splits and report their results separately. Add chemically meaningful group holdouts for generalization only if group definitions can be justified and frozen; do not relabel a custom holdout as the official benchmark.
-
-Required negative controls:
-- random ranking/selection;
-- shuffled-target or shuffled-label control;
-- simple, intentionally weak baseline;
-- a diagnostic split known to be leakage-sensitive, labelled as a diagnostic rather than a generalization result.
-
-The shuffle control must not produce credible predictive or acquisition value. If it does, treat the benchmark as invalid until the leak or implementation error is explained. Distinct IDs alone are not evidence of independent samples.
+Required controls: label shuffling, random acquisition, candidate-count reconciliation, train/validation/test isolation, structure/trajectory grouping and an independent metric checker. If a shuffled-label run appears predictive or the selector can see hidden labels, invalidate the result.
 
 ## 5. Metrics and evidence contract
 
@@ -269,8 +280,10 @@ Never describe a queued CI job as passed. Never claim compilation or tests that 
 ## 10. References
 
 1. ACS Nano (2025), *Artificial Intelligence for Materials Discovery, Development, and Optimization*: https://pubs.acs.org/doi/10.1021/acsnano.5c04200
-2. Open Catalyst Project, datasets and project background: https://opencatalystproject.org/
-3. Open Catalyst Dataset repository, dataset workflow and license notes: https://github.com/Open-Catalyst-Project/Open-Catalyst-Dataset
+2. Open Catalyst Project, project background: https://opencatalystproject.org/
+3. FairChem OC22 dataset documentation at pinned source commit 57c71322d5a5be0a0fcdcf05592e1699b120dc79: https://github.com/facebookresearch/fairchem/blob/57c71322d5a5be0a0fcdcf05592e1699b120dc79/docs/catalysts/datasets/oc22.md
+4. Open Catalyst Dataset repository, dataset workflow, and separate tooling license: https://github.com/Open-Catalyst-Project/Open-Catalyst-Dataset
+5. OC22 CC BY 4.0 license text: https://creativecommons.org/licenses/by/4.0/
 4. NIST, *Nanotechnology Measurement Protocols* (page updated 13 July 2026): https://www.nist.gov/mml/nanotechnology-measurement-protocols
 5. Ren et al., *Autonomous experiments using active learning and AI*, Nature Reviews Materials (2023): https://www.nature.com/articles/s41578-023-00588-4
 6. LAMMPS stable documentation (30 September 2026): https://docs.lammps.org/stable/
