@@ -1075,6 +1075,34 @@ mod tests {
         assert!(error.contains("uncertainty_status"));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlink_escape_even_when_external_bytes_match_the_declared_hash() {
+        use std::os::unix::fs::symlink;
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let outside = workspace.root().parent().unwrap().join(format!("symthaea-enzyme-outside-{nonce}.bin"));
+        let bytes = b"external bytes with matching metadata";
+        fs::write(&outside, bytes).unwrap();
+        symlink(&outside, workspace.root().join("artifacts/leak.bin")).unwrap();
+        graph["artifacts"][0]["locator"] = json!("artifacts/leak.bin");
+        graph["artifacts"][0]["sha256"] = json!(sha256(bytes));
+        graph["artifacts"][0]["byte_length"] = json!(bytes.len());
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        let _ = fs::remove_file(&outside);
+        assert!(error.contains("escapes workspace root through a symlink"));
+    }
+
+    #[test]
+    fn rejects_malformed_transformation_fingerprint() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["transformations"][0]["code_sha256"] = json!("not-a-sha256");
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("code_sha256 is invalid"));
+    }
+
     #[test]
     fn rejects_workspace_escape_via_parent_traversal() {
         assert!(safe_relative_path("../outside.json").is_err());
