@@ -64,8 +64,14 @@ pub struct FactRecord {
 pub struct CausalEdgeRecord {
     pub cause: String,
     pub effect: String,
+    /// Non-negative causal strength; inhibition is represented separately.
     pub strength: f32,
     pub is_inhibitory: bool,
+    /// Whether the source explicitly negated this relation.
+    pub is_negated: bool,
+    /// Text from the source that produced this edge observation.
+    pub source_text: String,
+    /// Cycle when this observation was discovered.
     pub cycle: u64,
 }
 
@@ -877,12 +883,14 @@ impl KnowledgePersistence {
                 graph_fact_id INTEGER
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
+                edge_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cause TEXT NOT NULL,
                 effect TEXT NOT NULL,
                 strength REAL NOT NULL,
                 is_inhibitory INTEGER NOT NULL DEFAULT 0,
-                cycle INTEGER NOT NULL,
-                PRIMARY KEY (cause, effect)
+                is_negated INTEGER NOT NULL DEFAULT 0,
+                source_text TEXT NOT NULL DEFAULT '',
+                cycle INTEGER NOT NULL
             );
             CREATE TABLE IF NOT EXISTS knowledge_ontology (
                 name TEXT PRIMARY KEY,
@@ -901,6 +909,51 @@ impl KnowledgePersistence {
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
         )
         .map_err(|e| format!("Schema init: {e}"))?;
+
+        // The legacy causal table has PRIMARY KEY(cause, effect), which collapses
+        // repeated observations and cannot retain negation or source text. Migrate it
+        // once to an observation table with a surrogate key. Legacy signed strengths
+        // encoded inhibition; normalize to non-negative magnitude plus an explicit flag.
+        let edge_columns = {
+            let mut stmt = conn
+                .prepare("PRAGMA table_info(knowledge_causal_edges)")
+                .map_err(|e| format!("Inspect knowledge_causal_edges schema: {e}"))?;
+            let rows = stmt
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(|e| format!("Query knowledge_causal_edges schema: {e}"))?;
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("Collect knowledge_causal_edges schema: {e}"))?
+        };
+        if !edge_columns.iter().any(|column| column == "edge_id") {
+            conn.execute_batch(
+                "BEGIN IMMEDIATE;
+                 ALTER TABLE knowledge_causal_edges RENAME TO knowledge_causal_edges_legacy;
+                 CREATE TABLE knowledge_causal_edges (
+                     edge_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     cause TEXT NOT NULL,
+                     effect TEXT NOT NULL,
+                     strength REAL NOT NULL,
+                     is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                     is_negated INTEGER NOT NULL DEFAULT 0,
+                     source_text TEXT NOT NULL DEFAULT '',
+                     cycle INTEGER NOT NULL
+                 );
+                 INSERT INTO knowledge_causal_edges
+                     (cause, effect, strength, is_inhibitory, is_negated, source_text, cycle)
+                 SELECT cause, effect, ABS(strength),
+                        CASE WHEN is_inhibitory != 0 OR strength < 0 THEN 1 ELSE 0 END,
+                        0, '', cycle
+                 FROM knowledge_causal_edges_legacy;
+                 DROP TABLE knowledge_causal_edges_legacy;
+                 COMMIT;",
+            )
+            .map_err(|e| format!("Migrate causal edge observations: {e}"))?;
+        }
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_causal_edges_pair
+             ON knowledge_causal_edges(cause, effect);",
+        )
+        .map_err(|e| format!("Index causal edge observations: {e}"))?;
 
         // Additive migration preserves pre-existing rows. NULL on initial confidence
         // and last-access cycle means the legacy schema never recorded those values.
