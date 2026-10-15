@@ -5,6 +5,7 @@
 **Current prerequisite:** [NANO-001 evidence-bounded discovery program](./NANOMATERIALS_RESEARCH_PROGRAM.md)  
 **Paradigm shifts:** [NANOMATERIALS_PARADIGM_SHIFT_ROADMAP.md](./NANOMATERIALS_PARADIGM_SHIFT_ROADMAP.md)
 **Closed-loop benchmark protocol:** [NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md](./NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md) — use the ICML 2026 MADE benchmark as a separate, bounded test of discovery-policy value; it does not replace OC22.
+**Domain atlas:** [NANOTECHNOLOGY_DOMAIN_ATLAS.md](./NANOTECHNOLOGY_DOMAIN_ATLAS.md) — 20 nanotechnology domains, domain-specific physics/evidence requirements, and a readiness-gated pilot shortlist.
 
 ## 1. Strategic thesis
 
