@@ -894,13 +894,21 @@ fn parse_soundfont_preset_headers(
     let (phdr_start, phdr_size) = preset_header_data
         .ok_or_else(|| invalid_soundfont("SoundFont has no pdta/phdr preset-header table"))?;
     const PRESET_HEADER_BYTES: u32 = 38;
-    if phdr_size < PRESET_HEADER_BYTES * 2 || phdr_size % PRESET_HEADER_BYTES != 0 {
+    if phdr_size < PRESET_HEADER_BYTES || phdr_size % PRESET_HEADER_BYTES != 0 {
         return Err(invalid_soundfont(
             "pdta/phdr size is invalid or omits the required terminal EOP record",
         ));
     }
 
     let records = phdr_size / PRESET_HEADER_BYTES;
+    // Keep parsing bounded even when pointed at an adversarial multi-gigabyte
+    // file whose phdr chunk is syntactically large but unreasonable.
+    const MAX_PRESET_HEADERS: u32 = 1_000_000;
+    if records > MAX_PRESET_HEADERS {
+        return Err(invalid_soundfont(format!(
+            "pdta/phdr contains {records} records, exceeding the parser budget"
+        )));
+    }
     let mut presets = Vec::with_capacity(records.saturating_sub(1) as usize);
     for index in 0..records {
         let mut record = [0u8; PRESET_HEADER_BYTES as usize];
