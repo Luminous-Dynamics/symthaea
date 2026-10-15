@@ -56,7 +56,9 @@ pub use extraction::{
 };
 pub use graph::{
     ConstrainedRoleAwareSearchResult, ContradictionAlert, EnhancedKnowledgeGraph, FactId,
-    RelationConstraintMatch, RelationObservationQuery, RoleAwareSearchResult,
+    RelationConstrainedQueryDecision, RelationConstrainedSearchReport,
+    RelationConstraintAbstentionReason, RelationConstraintDecision, RelationConstraintMatch,
+    RelationConstraintSearchPolicy, RelationObservationQuery, RoleAwareSearchResult,
     RoleObservationMatch, RoleObservationSearchConfig, TemporalFact,
 };
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
