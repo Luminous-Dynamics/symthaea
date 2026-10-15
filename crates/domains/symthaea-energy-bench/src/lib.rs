@@ -532,6 +532,14 @@ mod tests {
     }
 
     #[test]
+    fn non_closing_interval_is_rejected_even_if_totals_are_cached() {
+        let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
+        run.intervals[1].energy_j.rejected_or_loss -= 1.0;
+        let error = validate_run(&run).unwrap_err();
+        assert!(error.issues.iter().any(|issue| issue.contains("first-law error")));
+    }
+
+    #[test]
     fn timeline_gaps_are_rejected() {
         let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
         run.intervals[1].start_s += 1.0;
