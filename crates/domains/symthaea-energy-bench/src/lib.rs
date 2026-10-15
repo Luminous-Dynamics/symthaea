@@ -47,6 +47,8 @@ pub struct Mission {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Boundary {
     pub boundary_id: String,
+    pub input_definition: String,
+    pub useful_output_definition: String,
     pub auxiliary_treatment: String,
     pub storage_treatment: String,
     pub upstream_scope: String,
@@ -149,6 +151,33 @@ pub struct VerifiedTotals {
     pub aggregate_residual_j: f64,
     pub maximum_interval_relative_balance_error: f64,
     pub net_cycle_efficiency: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ComparisonDecision {
+    /// The declared expanded-uncertainty lower bound exceeds the preregistered margin.
+    ImprovementSupportedWithinDeclaredUncertainty,
+    /// The estimated advantage did not clear the preregistered margin.
+    NoImprovementDemonstrated,
+    /// Evidence or uncertainty assumptions are insufficient for a decision.
+    Indeterminate,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EfficiencyComparison {
+    pub decision: ComparisonDecision,
+    pub evidence_class: String,
+    pub candidate_efficiency: Option<f64>,
+    pub baseline_efficiency: Option<f64>,
+    pub candidate_standard_uncertainty: Option<f64>,
+    pub baseline_standard_uncertainty: Option<f64>,
+    pub estimated_efficiency_difference: Option<f64>,
+    pub expanded_difference_uncertainty: Option<f64>,
+    pub conservative_lower_bound: Option<f64>,
+    /// Absolute efficiency fraction (e.g. 0.02 means two percentage points).
+    pub required_superiority_margin: f64,
+    pub coverage_factor: f64,
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -486,6 +515,192 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
     } else {
         Err(ValidationError { issues })
     }
+}
+
+/// Compare a candidate against its registered baseline using first-order
+/// uncertainty propagation under an explicit *independent-input* assumption.
+///
+/// The comparison is intentionally conservative: it returns Indeterminate when
+/// either record is a synthetic/not-for-decision fixture, cycle efficiency is
+/// unavailable, or the manifest does not declare independent uncertainty inputs.
+/// That declaration assumes the energy-channel and interval standard uncertainties
+/// are mutually independent within each run and between candidate and baseline.
+/// If common sensors, calibration, ambient conditions, or model parameters induce
+/// correlation, provide a covariance/Monte Carlo model in a future implementation;
+/// do not use this independent-input result.
+///
+/// This function compares two already-integrated cycle records; it is not a
+/// physical validation and does not establish real-world superiority.
+pub fn compare_candidates(
+    candidate: &BenchmarkRun,
+    baseline: &BenchmarkRun,
+) -> Result<EfficiencyComparison, ValidationError> {
+    let candidate_totals = validate_run(candidate)?;
+    let baseline_totals = validate_run(baseline)?;
+    let mut issues = Vec::new();
+
+    if candidate.candidate.candidate_id == baseline.candidate.candidate_id {
+        issues.push("candidate and baseline must have different candidate IDs".into());
+    }
+    if candidate.benchmark_id != baseline.benchmark_id {
+        issues.push("candidate and baseline benchmark_id differ".into());
+    }
+    if candidate.mission.mission_id != baseline.mission.mission_id
+        || candidate.mission.duty_cycle_id != baseline.mission.duty_cycle_id
+        || candidate.mission.required_phases != baseline.mission.required_phases
+        || !approximately_equal(candidate.mission.expected_duration_s, baseline.mission.expected_duration_s, 1e-12)
+        || candidate.mission.ambient_temperature_k != baseline.mission.ambient_temperature_k
+        || candidate.mission.ambient_pressure_pa != baseline.mission.ambient_pressure_pa
+    {
+        issues.push("candidate and baseline missions or operating conditions differ".into());
+    }
+    let cb = &candidate.boundary;
+    let bb = &baseline.boundary;
+    if cb.boundary_id != bb.boundary_id
+        || cb.input_definition != bb.input_definition
+        || cb.useful_output_definition != bb.useful_output_definition
+        || cb.auxiliary_treatment != bb.auxiliary_treatment
+        || cb.storage_treatment != bb.storage_treatment
+        || cb.upstream_scope != bb.upstream_scope
+        || cb.custom_scope_definition != bb.custom_scope_definition
+        || cb.energy_unit != bb.energy_unit
+    {
+        issues.push("candidate and baseline system boundaries differ".into());
+    }
+
+    let cp = &candidate.evaluation_policy;
+    let bp = &baseline.evaluation_policy;
+    if cp.policy_id != bp.policy_id
+        || cp.preregistered_at != bp.preregistered_at
+        || cp.search_started_at != bp.search_started_at
+        || cp.relative_balance_tolerance != bp.relative_balance_tolerance
+        || cp.time_continuity_tolerance_s != bp.time_continuity_tolerance_s
+        || cp.minimum_superiority_margin != bp.minimum_superiority_margin
+        || cp.selection_rule != bp.selection_rule
+        || cp.baseline_id != bp.baseline_id
+    {
+        issues.push("candidate and baseline evaluation policies differ".into());
+    }
+    if cp.baseline_id != baseline.candidate.candidate_id {
+        issues.push("candidate policy baseline_id does not identify the supplied baseline candidate".into());
+    }
+    if candidate.uncertainty.coverage_factor != baseline.uncertainty.coverage_factor {
+        issues.push("candidate and baseline uncertainty coverage factors differ".into());
+    }
+    if candidate.uncertainty.quantity_type != baseline.uncertainty.quantity_type {
+        issues.push("candidate and baseline uncertainty quantity types differ".into());
+    }
+
+    if !issues.is_empty() {
+        return Err(ValidationError { issues });
+    }
+
+    let coverage_factor = candidate.uncertainty.coverage_factor;
+    let required_margin = cp.minimum_superiority_margin;
+    let mut report = EfficiencyComparison {
+        decision: ComparisonDecision::Indeterminate,
+        evidence_class: candidate.evidence_class.clone(),
+        candidate_efficiency: candidate_totals.net_cycle_efficiency,
+        baseline_efficiency: baseline_totals.net_cycle_efficiency,
+        candidate_standard_uncertainty: None,
+        baseline_standard_uncertainty: None,
+        estimated_efficiency_difference: None,
+        expanded_difference_uncertainty: None,
+        conservative_lower_bound: None,
+        required_superiority_margin: required_margin,
+        coverage_factor,
+        reason: None,
+    };
+
+    if candidate.not_for_decision
+        || baseline.not_for_decision
+        || candidate.evidence_class == "synthetic_fixture"
+        || baseline.evidence_class == "synthetic_fixture"
+    {
+        report.reason = Some("synthetic or not-for-decision records cannot support a comparison decision".into());
+        return Ok(report);
+    }
+    if candidate.evidence_class != baseline.evidence_class {
+        return Err(ValidationError {
+            issues: vec!["candidate and baseline evidence classes differ".into()],
+        });
+    }
+    if candidate.data_provenance.iter().any(|a| a.kind == "synthetic_fixture")
+        || baseline.data_provenance.iter().any(|a| a.kind == "synthetic_fixture")
+    {
+        report.reason = Some("synthetic provenance cannot support a comparison decision".into());
+        return Ok(report);
+    }
+    if candidate.uncertainty.correlation_model != "independent"
+        || baseline.uncertainty.correlation_model != "independent"
+    {
+        report.reason = Some(
+            "uncertainty propagation is only implemented for explicitly independent primitive inputs; correlated or unknown inputs are indeterminate".into()
+        );
+        return Ok(report);
+    }
+    let (Some(candidate_efficiency), Some(baseline_efficiency)) = (
+        candidate_totals.net_cycle_efficiency,
+        baseline_totals.net_cycle_efficiency,
+    ) else {
+        report.reason = Some("one or both duty cycles are not charge-sustaining; cycle efficiency is unavailable".into());
+        return Ok(report);
+    };
+
+    let candidate_u = efficiency_standard_uncertainty(candidate, candidate_totals.total_external_input_j, candidate_totals.total_net_useful_output_j)?;
+    let baseline_u = efficiency_standard_uncertainty(baseline, baseline_totals.total_external_input_j, baseline_totals.total_net_useful_output_j)?;
+    let expanded_delta_u = coverage_factor * candidate_u.hypot(baseline_u);
+    let difference = candidate_efficiency - baseline_efficiency;
+    let lower_bound = difference - expanded_delta_u;
+    if !expanded_delta_u.is_finite() || !difference.is_finite() || !lower_bound.is_finite() {
+        return Err(ValidationError {
+            issues: vec!["efficiency comparison uncertainty arithmetic overflowed".into()],
+        });
+    }
+
+    report.candidate_standard_uncertainty = Some(candidate_u);
+    report.baseline_standard_uncertainty = Some(baseline_u);
+    report.estimated_efficiency_difference = Some(difference);
+    report.expanded_difference_uncertainty = Some(expanded_delta_u);
+    report.conservative_lower_bound = Some(lower_bound);
+    report.decision = if lower_bound > required_margin {
+        ComparisonDecision::ImprovementSupportedWithinDeclaredUncertainty
+    } else {
+        ComparisonDecision::NoImprovementDemonstrated
+    };
+    report.reason = Some(
+        "first-order propagation using declared independent standard uncertainties; this is model-level evidence only, not physical validation".into()
+    );
+    Ok(report)
+}
+
+fn efficiency_standard_uncertainty(
+    run: &BenchmarkRun,
+    total_input_j: f64,
+    total_useful_output_j: f64,
+) -> Result<f64, ValidationError> {
+    if !total_input_j.is_finite() || total_input_j <= 0.0 || !total_useful_output_j.is_finite() {
+        return Err(ValidationError {
+            issues: vec!["efficiency uncertainty requires finite positive total input and finite useful output".into()],
+        });
+    }
+
+    // RSS is valid here only under the explicit independence declaration.
+    let mut input_uncertainty_j: f64 = 0.0;
+    let mut output_uncertainty_j: f64 = 0.0;
+    for interval in &run.intervals {
+        input_uncertainty_j = input_uncertainty_j.hypot(interval.standard_uncertainty_j.external_input);
+        output_uncertainty_j = output_uncertainty_j.hypot(interval.standard_uncertainty_j.net_useful_output);
+    }
+    let input_term = output_uncertainty_j / total_input_j;
+    let output_term = total_useful_output_j * input_uncertainty_j / (total_input_j * total_input_j);
+    let uncertainty = input_term.hypot(output_term);
+    if !uncertainty.is_finite() {
+        return Err(ValidationError {
+            issues: vec!["efficiency standard uncertainty overflowed".into()],
+        });
+    }
+    Ok(uncertainty)
 }
 
 /// Verify a SHA-256 digest against exact artifact bytes. URI resolution and access
