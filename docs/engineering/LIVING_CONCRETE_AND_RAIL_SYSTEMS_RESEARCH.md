@@ -360,26 +360,27 @@ Do not start a biological concrete pilot in a critical sleeper, turnout, bridge 
 7. Tumwiine et al. (2025), “On the use of self-healing materials in concrete technology: A comprehensive review of materials, mechanisms, and field applications,” *Materials Today Chemistry*, 48, 103001. https://doi.org/10.1016/j.mtchem.2025.103001
 8. “A Review of Self-healing Concrete: Mechanism, Performance, Techniques and Machine Learning Approaches” (2026), *International Journal of Concrete Structures and Materials*. https://doi.org/10.1186/s40069-026-00932-2
 9. “Addressing the need for standardization of test methods for self-healing concrete: an inter-laboratory study on concrete with macrocapsules” (2020). https://doi.org/10.1080/14686996.2020.1814117
+10. Jakubowski & Tomczak (2025), “Dataset for developing deep learning models to assess crack width and self-healing progress in concrete,” *Scientific Data*, 12, 165. Data descriptor: https://doi.org/10.1038/s41597-025-04485-z. Candidate Zenodo deposit: https://doi.org/10.5281/zenodo.14568863; exact file rights/license still require verification before use.
 
 ### Biosafety and environmental persistence
 
-10. “Molecular and Biosafety Perspectives of Bacterial Self-Healing Concrete: From Sporulation and Biomineralization to Public Health Implications” (2026 review). https://pmc.ncbi.nlm.nih.gov/articles/PMC13566579/
+11. “Molecular and Biosafety Perspectives of Bacterial Self-Healing Concrete: From Sporulation and Biomineralization to Public Health Implications” (2026 review). https://pmc.ncbi.nlm.nih.gov/articles/PMC13566579/
 
 This recent review highlights strain persistence, genetic stability, horizontal gene transfer, environmental microbiome interaction and occupational/environmental exposure as matters requiring assessment. It is a narrative review and does not itself establish field-scale exposure risk for any specific concrete formulation.
 
 ### South African rail governance and data
-11. Railway Safety Regulator, [NIIMS NextGen | Strengthening Railway Safety Through Digital Oversight](https://www.rsr.org.za/niims-nextgen-strengthening-railway-safety-through-digital-oversight/) (22 June 2026).
-12. Railway Safety Regulator, [Railway Safety Standards index](https://www.rsr.org.za/categories_rt/railway-regulatory-tools/railway-safety-standards/).
-13. Railway Safety Regulator, [Standards Development overview](https://www.rsr.org.za/wp-content/uploads/2026/03/Standards-Development.pdf) (March 2026).
+12. Railway Safety Regulator, [NIIMS NextGen | Strengthening Railway Safety Through Digital Oversight](https://www.rsr.org.za/niims-nextgen-strengthening-railway-safety-through-digital-oversight/) (22 June 2026).
+13. Railway Safety Regulator, [Railway Safety Standards index](https://www.rsr.org.za/categories_rt/railway-regulatory-tools/railway-safety-standards/).
+14. Railway Safety Regulator, [Standards Development overview](https://www.rsr.org.za/wp-content/uploads/2026/03/Standards-Development.pdf) (March 2026).
 
 ### Rail condition, detection and maintenance
-14. FRA, RR 26-01, “Track Geometry Predictions Using Point and Segment Processing.” https://railroads.fra.dot.gov/elibrary/track-geometry-predictions-using-point-and-segment-processing
-15. FRA, RR 26-02, “Implementation of Advanced Track Geometry Forecasting Models” (page updated 30 July 2026). https://railroads.fra.dot.gov/elibrary/implementation-advanced-track-geometry-forecasting-models
-16. FRA, RR 21-18, “Feasibility of Applying Model-Assisted Probability of Detection to Track Inspection.” https://railroads.fra.dot.gov/elibrary/feasibility-applying-model-assisted-probability-detection-track-inspection
-17. Network Rail, CP7 Route Services Delivery Plan Year 2 update (2025), describing predictive asset-maintenance and earthworks-insight programmes. https://www.networkrail.co.uk/wp-content/uploads/2025/07/Route-Services-CP7-Delivery-Plan-Year-2-update.pdf
+15. FRA, RR 26-01, “Track Geometry Predictions Using Point and Segment Processing.” https://railroads.fra.dot.gov/elibrary/track-geometry-predictions-using-point-and-segment-processing
+16. FRA, RR 26-02, “Implementation of Advanced Track Geometry Forecasting Models” (page updated 30 July 2026). https://railroads.fra.dot.gov/elibrary/implementation-advanced-track-geometry-forecasting-models
+17. FRA, RR 21-18, “Feasibility of Applying Model-Assisted Probability of Detection to Track Inspection.” https://railroads.fra.dot.gov/elibrary/feasibility-applying-model-assisted-probability-detection-track-inspection
+18. Network Rail, CP7 Route Services Delivery Plan Year 2 update (2025), describing predictive asset-maintenance and earthworks-insight programmes. https://www.networkrail.co.uk/wp-content/uploads/2025/07/Route-Services-CP7-Delivery-Plan-Year-2-update.pdf
 
 ### South African context
-18. South African Department of Transport, COTO Standard Specifications for Road and Bridge Works portal. Its page lists October 2020 chapter versions and states the earlier August versions were superseded. Always verify the current applicable edition and project-specific contractual requirements before using numerical limits. https://www.transport.gov.za/?page_id=1155
+19. South African Department of Transport, COTO Standard Specifications for Road and Bridge Works portal. Its page lists October 2020 chapter versions and states the earlier August versions were superseded. Always verify the current applicable edition and project-specific contractual requirements before using numerical limits. https://www.transport.gov.za/?page_id=1155
 
 ## Claim ceiling
 
