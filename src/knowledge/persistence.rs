@@ -253,17 +253,22 @@ fn insert_fact_role_vectors(
 ) -> Result<(), String> {
     for (role, vector_bytes) in role_vectors {
         validate_hypervector_bytes(vector_bytes, 2).map_err(|e| {
-            format!("Invalid role vector for {} on fact row {fact_row_id}: {e}", role.storage_key())
+            format!(
+                "Invalid role vector for {} on fact row {fact_row_id}: {e}",
+                role.storage_key()
+            )
         })?;
         conn.execute(
             "INSERT INTO knowledge_fact_role_vectors (fact_row_id, role_key, vector_blob)
              VALUES (?1, ?2, ?3)",
             rusqlite::params![fact_row_id, role.storage_key(), vector_bytes],
-        ).map_err(|e| format!("Insert fact role vector: {e}"))?;
+        )
+        .map_err(|e| format!("Insert fact role vector: {e}"))?;
     }
     Ok(())
 }
 
+fn load_fact_relations(
     conn: &rusqlite::Connection,
 ) -> Result<HashMap<i64, Vec<ExtractedRelation>>, String> {
     let mut stmt = conn
@@ -324,30 +329,49 @@ fn insert_fact_role_vectors(
 fn load_fact_role_vectors(
     conn: &rusqlite::Connection,
 ) -> Result<HashMap<i64, HashMap<SemanticRole, Vec<u8>>>, String> {
-    let mut stmt = conn.prepare(
-        "SELECT fact_row_id, role_key, vector_blob FROM knowledge_fact_role_vectors ORDER BY fact_row_id, role_key"
-    ).map_err(|e| format!("Prepare fact role vectors: {e}"))?;
-    let rows = stmt.query_map([], |row| {
-        let fact_row_id = row.get::<_, i64>(0)?;
-        let role = decode_semantic_role(row.get(1)?, 1)?;
-        let vector_bytes: Vec<u8> = row.get(2)?;
-        validate_hypervector_bytes(&vector_bytes, 2)?;
-        Ok((fact_row_id, role, vector_bytes))
-    }).map_err(|e| format!("Query fact role vectors: {e}"))?;
-    let decoded = rows.collect::<Result<Vec<_>, _>>()
+    let mut stmt = conn
+        .prepare(
+            "SELECT fact_row_id, role_key, vector_blob
+             FROM knowledge_fact_role_vectors
+             ORDER BY fact_row_id, role_key",
+        )
+        .map_err(|e| format!("Prepare fact role vectors: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let fact_row_id = row.get::<_, i64>(0)?;
+            let role = decode_semantic_role(row.get(1)?, 1)?;
+            let vector_bytes: Vec<u8> = row.get(2)?;
+            validate_hypervector_bytes(&vector_bytes, 2)?;
+            Ok((fact_row_id, role, vector_bytes))
+        })
+        .map_err(|e| format!("Query fact role vectors: {e}"))?;
+    let decoded = rows
+        .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Decode fact role vectors: {e}"))?;
+
     let mut by_fact: HashMap<i64, HashMap<SemanticRole, Vec<u8>>> = HashMap::new();
     for (fact_row_id, role, vector_bytes) in decoded {
         if fact_row_id <= 0 {
-            return Err(format!("Invalid fact row ID for persisted role vector: {fact_row_id}"));
+            return Err(format!(
+                "Invalid fact row ID for persisted role vector: {fact_row_id}"
+            ));
         }
-        if by_fact.entry(fact_row_id).or_default().insert(role, vector_bytes).is_some() {
-            return Err(format!("Duplicate persisted role vector for fact row {fact_row_id}, role {}", role.storage_key()));
+        if by_fact
+            .entry(fact_row_id)
+            .or_default()
+            .insert(role, vector_bytes)
+            .is_some()
+        {
+            return Err(format!(
+                "Duplicate persisted role vector for fact row {fact_row_id}, role {}",
+                role.storage_key()
+            ));
         }
     }
     Ok(by_fact)
 }
 
+fn decode_optional_graph_fact_id(
     value: Option<i64>,
     column_index: usize,
 ) -> rusqlite::Result<Option<u64>> {
@@ -1276,53 +1300,102 @@ mod tests {
 
     #[test]
     fn test_fact_role_vectors_round_trip_preserves_exact_bytes() {
-        let dir = std::env::temp_dir().join(format!("symthaea_role_vector_round_trip_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_role_vector_round_trip_{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let db_path = dir.join("knowledge.db");
         let mut persistence = KnowledgePersistence::new(&db_path);
+
         let mut fact = FactRecord {
-            vector_bytes: vec![0xA5; BinaryHV::BYTES], source_text: "role vector fixture".into(),
-            confidence: 0.9, domain: Some("test".into()), cycle: 1, is_causal: false,
-            relations: Vec::new(), role_vectors: HashMap::new(), graph_fact_id: Some(1),
-            initial_confidence: Some(0.9), last_accessed_cycle: Some(1),
-            corroboration_count: 0, contradiction_count: 0,
+            vector_bytes: vec![0xA5; BinaryHV::BYTES],
+            source_text: "role vector fixture".into(),
+            confidence: 0.9,
+            domain: Some("test".into()),
+            cycle: 1,
+            is_causal: false,
+            relations: Vec::new(),
+            role_vectors: HashMap::new(),
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
         };
-        fact.role_vectors.insert(SemanticRole::Agent, vec![0x5A; BinaryHV::BYTES]);
-        fact.role_vectors.insert(SemanticRole::Patient, vec![0xC3; BinaryHV::BYTES]);
+        fact.role_vectors
+            .insert(SemanticRole::Agent, vec![0x5A; BinaryHV::BYTES]);
+        fact.role_vectors
+            .insert(SemanticRole::Patient, vec![0xC3; BinaryHV::BYTES]);
+
         assert_eq!(persistence.save_facts(&[fact.clone()]).unwrap(), 1);
-        assert_eq!(persistence.load_facts().unwrap()[0].role_vectors, fact.role_vectors);
-        assert_eq!(persistence.replace_knowledge_snapshot(&[fact.clone()], &[], &[], 2).unwrap(), (1, 0, 0));
-        assert_eq!(persistence.load_facts().unwrap()[0].role_vectors, fact.role_vectors);
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].role_vectors, fact.role_vectors);
+
+        assert_eq!(
+            persistence
+                .replace_knowledge_snapshot(&[fact.clone()], &[], &[], 2)
+                .unwrap(),
+            (1, 0, 0)
+        );
+        let snapshot = persistence.load_facts().unwrap();
+        assert_eq!(snapshot[0].role_vectors, fact.role_vectors);
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn test_load_facts_rejects_corrupt_role_vector_rows() {
-        let dir = std::env::temp_dir().join(format!("symthaea_corrupt_role_vector_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_corrupt_role_vector_{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let db_path = dir.join("knowledge.db");
         let mut persistence = KnowledgePersistence::new(&db_path);
         let mut fact = FactRecord {
-            vector_bytes: vec![0; BinaryHV::BYTES], source_text: "corrupt role vector fixture".into(),
-            confidence: 0.9, domain: None, cycle: 1, is_causal: false,
-            relations: Vec::new(), role_vectors: HashMap::new(), graph_fact_id: Some(1),
-            initial_confidence: Some(0.9), last_accessed_cycle: Some(1),
-            corroboration_count: 0, contradiction_count: 0,
+            vector_bytes: vec![0; BinaryHV::BYTES],
+            source_text: "corrupt role vector fixture".into(),
+            confidence: 0.9,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+            relations: Vec::new(),
+            role_vectors: HashMap::new(),
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
         };
-        fact.role_vectors.insert(SemanticRole::Agent, vec![0x5A; BinaryHV::BYTES]);
+        fact.role_vectors
+            .insert(SemanticRole::Agent, vec![0x5A; BinaryHV::BYTES]);
         persistence.save_facts(&[fact]).unwrap();
+
         let conn = rusqlite::Connection::open(&db_path).unwrap();
-        conn.execute("UPDATE knowledge_fact_role_vectors SET vector_blob = ?1", rusqlite::params![vec![0u8; 1]]).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_role_vectors SET vector_blob = ?1",
+            rusqlite::params![vec![0u8; 1]],
+        )
+        .unwrap();
         drop(conn);
         let error = persistence.load_facts().unwrap_err();
         assert!(error.contains("invalid hypervector length"), "{error}");
+
         let conn = rusqlite::Connection::open(&db_path).unwrap();
-        conn.execute("UPDATE knowledge_fact_role_vectors SET role_key = 'future_role', vector_blob = ?1", rusqlite::params![vec![0x5Au8; BinaryHV::BYTES]]).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_role_vectors
+             SET role_key = 'future_role', vector_blob = ?1",
+            rusqlite::params![vec![0x5Au8; BinaryHV::BYTES]],
+        )
+        .unwrap();
         drop(conn);
         let error = persistence.load_facts().unwrap_err();
         assert!(error.contains("unknown persisted semantic role key"), "{error}");
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
