@@ -1117,6 +1117,97 @@ mod tests {
     }
 
     #[test]
+    fn permission_evidence_from_another_source_blocks_use() {
+        let mut m = manifest();
+        m.permission_evidence[0].source_id = "fixture:unrelated-dataset".to_owned();
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceSourceMismatch
+        }));
+    }
+
+    #[test]
+    fn duplicate_permission_evidence_identifiers_are_ambiguous() {
+        let mut m = manifest();
+        m.permission_evidence.push(m.permission_evidence[0].clone());
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceAmbiguous
+        }));
+    }
+
+    #[test]
+    fn invalid_permission_evidence_uri_blocks_use() {
+        let mut m = manifest();
+        m.permission_evidence[0].evidence_uri = "ftp://example.invalid/license".to_owned();
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceUriInvalid
+        }));
+    }
+
+    #[test]
+    fn malformed_permission_evidence_review_date_blocks_use() {
+        let mut m = manifest();
+        m.permission_evidence[0].reviewed_on = "2026-1-1".to_owned();
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceReviewedDateInvalid
+        }));
+    }
+
+    #[test]
+    fn future_permission_evidence_review_blocks_use() {
+        let mut m = manifest();
+        m.permission_evidence[0].reviewed_on = "2026-10-16".to_owned();
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceNotYetEffective
+        }));
+    }
+
+    #[test]
+    fn permission_evidence_marked_needs_review_blocks_use() {
+        let mut m = manifest();
+        m.permission_evidence[0].lifecycle = PermissionEvidenceLifecycleV1::NeedsReview;
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceNeedsReview
+        }));
+    }
+
+    #[test]
+    fn withdrawn_permission_evidence_blocks_use() {
+        let mut m = manifest();
+        m.permission_evidence[0].lifecycle = PermissionEvidenceLifecycleV1::Withdrawn;
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PermissionEvidenceWithdrawn
+        }));
+    }
+
+    #[test]
+    fn current_right_scoped_written_permission_evidence_can_pass() {
+        let mut m = manifest();
+        m.permissions.use_for_assessment = PermissionDecision::GrantedByWrittenPermission;
+        m.permission_evidence[0].basis = PermissionEvidenceBasisV1::WrittenPermission;
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Eligible);
+        assert_eq!(
+            result.nutrition_assessability,
+            NutritionAssessability::SyntheticFixtureOnly
+        );
+        assert!(result.issues.is_empty());
+    }
+
+    #[test]
     fn unresolved_nonempty_permission_reference_fails_closed() {
         let mut m = manifest();
         m.permission_references.use_for_assessment = Some("license:not-in-manifest".to_owned());
