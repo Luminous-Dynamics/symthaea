@@ -8,13 +8,14 @@
 //! 2048-byte BLOBs for efficient Hamming similarity on reload.
 //!
 //! Schema:
-//! - knowledge_facts: id, vector_blob, source_text, confidence, domain, cycle, is_causal
+//! - knowledge_facts: row id, graph_fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal
 //! - knowledge_causal_edges: cause, effect, strength, cycle
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
 use std::path::Path;
+use rusqlite::OptionalExtension;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
 /// Knowledge persistence layer backed by SQLite.
@@ -46,6 +47,8 @@ pub struct FactRecord {
     pub cycle: u64,
     /// Whether the fact contains causal relations
     pub is_causal: bool,
+    /// Stable graph-level identity; absent for rows written before this field existed.
+    pub graph_fact_id: Option<u64>,
     /// Confidence assigned at insertion; absent for rows written by older schemas.
     pub initial_confidence: Option<f32>,
     /// Last access cycle; absent for rows written by older schemas.
@@ -111,6 +114,97 @@ fn validate_hypervector_bytes(bytes: &[u8], column_index: usize) -> rusqlite::Re
             ),
         ))
     }
+}
+
+/// Persist a monotonic allocator high-water mark without lowering any value
+/// already committed by an earlier snapshot. The caller should use a transaction
+/// when this value must commit atomically with fact rows.
+fn persist_graph_fact_id_high_water(
+    conn: &rusqlite::Connection,
+    candidate_next_id: Option<u64>,
+) -> Result<(), String> {
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT value FROM knowledge_metadata WHERE key = 'next_graph_fact_id'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| format!("Read prior graph fact ID high-water mark: {e}"))?;
+    let existing = existing
+        .map(|value| {
+            u64::try_from(value)
+                .ok()
+                .filter(|id| *id > 0)
+                .ok_or_else(|| format!("Invalid persisted next graph fact ID: {value}"))
+        })
+        .transpose()?;
+    let next_id = match (existing, candidate_next_id) {
+        (Some(old), Some(candidate)) => Some(old.max(candidate)),
+        (Some(old), None) => Some(old),
+        (None, Some(candidate)) => Some(candidate),
+        (None, None) => None,
+    };
+    if let Some(next_id) = next_id {
+        if next_id == 0 {
+            return Err("Next graph fact ID must be positive".into());
+        }
+        let stored_id = i64::try_from(next_id)
+            .map_err(|e| format!("Next graph fact ID exceeds SQLite INTEGER range: {e}"))?;
+        conn.execute(
+            "INSERT OR REPLACE INTO knowledge_metadata (key, value)
+             VALUES ('next_graph_fact_id', ?1)",
+            rusqlite::params![stored_id],
+        )
+        .map_err(|e| format!("Write next graph fact ID: {e}"))?;
+    }
+    Ok(())
+}
+
+fn next_graph_fact_id_after_records(
+    facts: &[FactRecord],
+) -> Result<Option<u64>, String> {
+    facts
+        .iter()
+        .filter_map(|fact| fact.graph_fact_id)
+        .max()
+        .map(|max_id| {
+            max_id
+                .checked_add(1)
+                .ok_or_else(|| "Cannot advance allocator past maximum graph fact ID".to_string())
+        })
+        .transpose()
+}
+
+fn decode_optional_graph_fact_id(
+    value: Option<i64>,
+    column_index: usize,
+) -> rusqlite::Result<Option<u64>> {
+    value
+        .map(|id| {
+            if id > 0 {
+                Ok(id as u64)
+            } else {
+                Err(invalid_column_data(
+                    column_index,
+                    rusqlite::types::Type::Integer,
+                    format!("invalid persisted graph fact ID (must be positive): {id}"),
+                ))
+            }
+        })
+        .transpose()
+}
+
+fn encode_optional_graph_fact_id(value: Option<u64>) -> Result<Option<i64>, String> {
+    value
+        .map(|id| {
+            if id == 0 {
+                return Err("Graph fact ID must be positive".to_string());
+            }
+            i64::try_from(id)
+                .map_err(|e| format!("Graph fact ID exceeds SQLite INTEGER range: {e}"))
+        })
+        .transpose()
 }
 
 fn decode_nonnegative_counter(
@@ -230,11 +324,12 @@ impl KnowledgePersistence {
                 .map(i64::try_from)
                 .transpose()
                 .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
+            let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
             conn.execute(
                 "INSERT INTO knowledge_facts
                  (vector_blob, source_text, confidence, domain, cycle, is_causal,
-                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count, graph_fact_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 rusqlite::params![
                     fact.vector_bytes,
                     fact.source_text,
@@ -246,12 +341,15 @@ impl KnowledgePersistence {
                     last_accessed_cycle,
                     fact.corroboration_count as i64,
                     fact.contradiction_count as i64,
+                    graph_fact_id,
                 ],
             )
             .map_err(|e| e.to_string())?;
             count += 1;
         }
 
+        let candidate_next_id = next_graph_fact_id_after_records(facts)?;
+        persist_graph_fact_id_high_water(&conn, candidate_next_id)?;
         conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
 
         self.total_saved += count as u64;
@@ -286,12 +384,13 @@ impl KnowledgePersistence {
                 .map(i64::try_from)
                 .transpose()
                 .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
+            let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
 
             tx.execute(
                 "INSERT INTO knowledge_facts
                  (vector_blob, source_text, confidence, domain, cycle, is_causal,
-                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count, graph_fact_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 rusqlite::params![
                     fact.vector_bytes,
                     fact.source_text,
@@ -303,12 +402,15 @@ impl KnowledgePersistence {
                     last_accessed_cycle,
                     fact.corroboration_count as i64,
                     fact.contradiction_count as i64,
+                    graph_fact_id,
                 ],
             )
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
             count += 1;
         }
 
+        let candidate_next_id = next_graph_fact_id_after_records(facts)?;
+        persist_graph_fact_id_high_water(&tx, candidate_next_id)?;
         tx.commit()
             .map_err(|e| format!("Commit fact snapshot: {e}"))?;
         self.total_saved += count as u64;
@@ -328,6 +430,7 @@ impl KnowledgePersistence {
         facts: &[FactRecord],
         edges: &[CausalEdgeRecord],
         ontology: &[OntologyRecord],
+        next_graph_fact_id: u64,
     ) -> Result<(usize, usize, usize), String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
@@ -337,6 +440,7 @@ impl KnowledgePersistence {
         // touching the database. A caller must never persist state that the
         // strict readers would reject on the next startup.
         let mut prepared_facts = Vec::with_capacity(facts.len());
+        let mut max_graph_fact_id = 0_u64;
         for fact in facts {
             validate_hypervector_bytes(&fact.vector_bytes, 0)
                 .map_err(|e| format!("Invalid fact snapshot vector: {e}"))?;
@@ -362,8 +466,20 @@ impl KnowledgePersistence {
                 .map(i64::try_from)
                 .transpose()
                 .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
-            prepared_facts.push((fact, cycle, last_accessed_cycle));
+            let graph_fact_id = encode_optional_graph_fact_id(fact.graph_fact_id)?;
+            if let Some(id) = fact.graph_fact_id {
+                max_graph_fact_id = max_graph_fact_id.max(id);
+            }
+            prepared_facts.push((fact, cycle, last_accessed_cycle, graph_fact_id));
         }
+
+        if next_graph_fact_id == 0 || next_graph_fact_id <= max_graph_fact_id {
+            return Err(format!(
+                "Next graph fact ID {next_graph_fact_id} must be positive and greater than the highest persisted fact ID {max_graph_fact_id}"
+            ));
+        }
+        i64::try_from(next_graph_fact_id)
+            .map_err(|e| format!("Next graph fact ID exceeds SQLite INTEGER range: {e}"))?;
 
         let mut prepared_edges = Vec::with_capacity(edges.len());
         for edge in edges {
@@ -410,12 +526,12 @@ impl KnowledgePersistence {
         tx.execute("DELETE FROM knowledge_ontology", [])
             .map_err(|e| format!("Clear ontology snapshot: {e}"))?;
 
-        for (fact, cycle, last_accessed_cycle) in &prepared_facts {
+        for (fact, cycle, last_accessed_cycle, graph_fact_id) in &prepared_facts {
             tx.execute(
                 "INSERT INTO knowledge_facts
                  (vector_blob, source_text, confidence, domain, cycle, is_causal,
-                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count, graph_fact_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 rusqlite::params![
                     fact.vector_bytes,
                     fact.source_text,
@@ -427,6 +543,7 @@ impl KnowledgePersistence {
                     last_accessed_cycle,
                     fact.corroboration_count as i64,
                     fact.contradiction_count as i64,
+                    graph_fact_id,
                 ],
             )
             .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
@@ -469,10 +586,43 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Insert ontology snapshot row: {e}"))?;
         }
 
+        // Preserve the highest allocator value ever committed, including IDs of
+        // facts removed by this snapshot; never allow stale references to alias a
+        // different fact created after restart.
+        persist_graph_fact_id_high_water(&tx, Some(next_graph_fact_id))?;
         tx.commit()
             .map_err(|e| format!("Commit knowledge snapshot: {e}"))?;
         self.total_saved += (facts.len() + edges.len() + ontology.len()) as u64;
         Ok((facts.len(), edges.len(), ontology.len()))
+    }
+
+    /// Load the next graph fact ID reserved by the most recent complete snapshot.
+    ///
+    /// Returns None for legacy databases that predate allocator persistence.
+    pub fn load_next_graph_fact_id(&mut self) -> Result<Option<u64>, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let stored: Option<i64> = conn
+            .query_row(
+                "SELECT value FROM knowledge_metadata WHERE key = 'next_graph_fact_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| format!("Read next graph fact ID: {e}"))?;
+        stored
+            .map(|value| {
+                u64::try_from(value)
+                    .ok()
+                    .filter(|id| *id > 0)
+                    .ok_or_else(|| {
+                        format!("Invalid persisted next graph fact ID: {value}")
+                    })
+            })
+            .transpose()
     }
 
     /// Load all fact records from the database.
@@ -487,7 +637,8 @@ impl KnowledgePersistence {
         let mut stmt = conn
             .prepare(
                 "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal,
-                        initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count
+                        initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count,
+                        graph_fact_id
                  FROM knowledge_facts ORDER BY cycle DESC",
             )
             .map_err(|e| e.to_string())?;
@@ -510,6 +661,7 @@ impl KnowledgePersistence {
                     decode_nonnegative_u32_counter(row.get(8)?, 8, "fact corroboration count")?;
                 let contradiction_count =
                     decode_nonnegative_u32_counter(row.get(9)?, 9, "fact contradiction count")?;
+                let graph_fact_id = decode_optional_graph_fact_id(row.get(10)?, 10)?;
                 Ok(FactRecord {
                     vector_bytes,
                     source_text: row.get(1)?,
@@ -517,6 +669,7 @@ impl KnowledgePersistence {
                     domain: row.get(3)?,
                     cycle,
                     is_causal: row.get(5)?,
+                    graph_fact_id,
                     initial_confidence,
                     last_accessed_cycle,
                     corroboration_count,
@@ -720,7 +873,8 @@ impl KnowledgePersistence {
                 initial_confidence REAL,
                 last_accessed_cycle INTEGER,
                 corroboration_count INTEGER NOT NULL DEFAULT 0,
-                contradiction_count INTEGER NOT NULL DEFAULT 0
+                contradiction_count INTEGER NOT NULL DEFAULT 0,
+                graph_fact_id INTEGER
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
                 cause TEXT NOT NULL,
@@ -738,6 +892,10 @@ impl KnowledgePersistence {
                 created_at_cycle INTEGER NOT NULL,
                 last_used_cycle INTEGER NOT NULL,
                 is_a_parent TEXT
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_metadata (
+                key TEXT PRIMARY KEY NOT NULL,
+                value INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
@@ -761,6 +919,7 @@ impl KnowledgePersistence {
             ("last_accessed_cycle", "INTEGER"),
             ("corroboration_count", "INTEGER NOT NULL DEFAULT 0"),
             ("contradiction_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("graph_fact_id", "INTEGER"),
         ] {
             if !columns.iter().any(|column| column == name) {
                 conn.execute_batch(&format!(
@@ -769,6 +928,12 @@ impl KnowledgePersistence {
                 .map_err(|e| format!("Migrate knowledge_facts.{name}: {e}"))?;
             }
         }
+
+        conn.execute_batch(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_facts_graph_fact_id
+             ON knowledge_facts(graph_fact_id);",
+        )
+        .map_err(|e| format!("Create graph fact ID index: {e}"))?;
 
         self.initialized = true;
         Ok(())
@@ -799,6 +964,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -841,6 +1007,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -880,6 +1047,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -894,6 +1062,43 @@ mod tests {
 
         let error = persistence.load_facts().unwrap_err();
         assert!(error.contains("invalid persisted confidence"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_nonpositive_graph_fact_id() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_nonpositive_graph_fact_id_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                source_text: "fixture fact".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+                graph_fact_id: Some(1),
+                initial_confidence: Some(0.9),
+                last_accessed_cycle: Some(1),
+                corroboration_count: 0,
+                contradiction_count: 0,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute("UPDATE knowledge_facts SET graph_fact_id = 0", [])
+            .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("invalid persisted graph fact ID"), "{error}");
         assert_eq!(persistence.total_loaded(), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -916,6 +1121,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -951,6 +1157,7 @@ mod tests {
                 domain: None,
                 cycle: 3,
                 is_causal: false,
+                graph_fact_id: None,
                 initial_confidence: Some(0.9),
                 last_accessed_cycle: Some(3),
                 corroboration_count: 0,
@@ -1115,6 +1322,7 @@ mod tests {
         let records = persistence.load_facts().unwrap();
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].source_text, "legacy fact");
+        assert_eq!(records[0].graph_fact_id, None);
         assert_eq!(records[0].initial_confidence, None);
         assert_eq!(records[0].last_accessed_cycle, None);
         assert_eq!(records[0].corroboration_count, 0);
@@ -1141,6 +1349,7 @@ mod tests {
             domain: Some("test".into()),
             cycle: 7,
             is_causal: true,
+            graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(8),
             corroboration_count: 2,
@@ -1174,6 +1383,7 @@ mod tests {
                     &[fact.clone()],
                     &[stale_edge, duplicate_edge],
                     &[stale_primitive],
+                    2,
                 )
                 .unwrap(),
             (1, 2, 1)
@@ -1193,7 +1403,7 @@ mod tests {
         };
         assert_eq!(
             persistence
-                .replace_knowledge_snapshot(&[replacement_fact], &[], &[])
+                .replace_knowledge_snapshot(&[replacement_fact], &[], &[], 2)
                 .unwrap(),
             (1, 0, 0)
         );
@@ -1207,6 +1417,147 @@ mod tests {
         assert!(
             ontology.is_empty(),
             "pruned ontology primitives must not reappear after restart"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_fact_only_snapshot_does_not_lower_allocator_high_water() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_only_allocator_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let prior = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "prior fact".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+            graph_fact_id: Some(5),
+            initial_confidence: Some(0.8),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        persistence
+            .replace_knowledge_snapshot(&[prior], &[], &[], 12)
+            .unwrap();
+
+        let replacement = FactRecord {
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            source_text: "fact-only replacement".into(),
+            confidence: 0.7,
+            domain: None,
+            cycle: 2,
+            is_causal: false,
+            graph_fact_id: Some(7),
+            initial_confidence: Some(0.7),
+            last_accessed_cycle: Some(2),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        persistence.replace_facts_snapshot(&[replacement]).unwrap();
+
+        assert_eq!(
+            persistence.load_next_graph_fact_id().unwrap(),
+            Some(12),
+            "fact-only snapshots must not lower the globally committed ID high-water mark"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_next_graph_fact_id_rejects_corrupt_allocator_metadata() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_corrupt_fact_allocator_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence.save_facts(&[]).unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO knowledge_metadata (key, value)
+             VALUES ('next_graph_fact_id', 0)",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_next_graph_fact_id().unwrap_err();
+        assert!(error.contains("Invalid persisted next graph fact ID"), "{error}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_allocator_high_water_survives_removal_of_highest_fact() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_allocator_high_water_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let retained = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "retained fact".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.8),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let soon_removed = FactRecord {
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            source_text: "fact retired before next restart".into(),
+            confidence: 0.4,
+            domain: None,
+            cycle: 2,
+            is_causal: false,
+            graph_fact_id: Some(2),
+            initial_confidence: Some(0.4),
+            last_accessed_cycle: Some(2),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+
+        persistence
+            .replace_knowledge_snapshot(
+                &[retained.clone(), soon_removed],
+                &[],
+                &[],
+                3,
+            )
+            .unwrap();
+        // Even a stale-but-valid lower candidate must not decrease a committed
+        // allocator high-water mark.
+        persistence
+            .replace_knowledge_snapshot(&[retained], &[], &[], 2)
+            .unwrap();
+
+        let records = persistence.load_facts().unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].graph_fact_id, Some(1));
+        assert_eq!(
+            persistence.load_next_graph_fact_id().unwrap(),
+            Some(3),
+            "deleting the highest-ID fact must not lower the persisted allocator"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -1230,6 +1581,7 @@ mod tests {
             domain: None,
             cycle: 3,
             is_causal: false,
+            graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
             corroboration_count: 0,
@@ -1252,7 +1604,7 @@ mod tests {
             is_a_parent: None,
         };
         persistence
-            .replace_knowledge_snapshot(&[old_fact], &[old_edge], &[old_primitive])
+            .replace_knowledge_snapshot(&[old_fact], &[old_edge], &[old_primitive], 2)
             .unwrap();
 
         let conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -1274,6 +1626,7 @@ mod tests {
             domain: None,
             cycle: 10,
             is_causal: false,
+            graph_fact_id: None,
             initial_confidence: Some(0.7),
             last_accessed_cycle: Some(10),
             corroboration_count: 0,
@@ -1297,7 +1650,7 @@ mod tests {
         };
 
         let error = persistence
-            .replace_knowledge_snapshot(&[new_fact], &[new_edge], &[rejected_primitive])
+            .replace_knowledge_snapshot(&[new_fact], &[new_edge], &[rejected_primitive], 4)
             .unwrap_err();
         assert!(error.contains("injected snapshot insert failure"), "{error}");
 
@@ -1310,6 +1663,11 @@ mod tests {
         assert_eq!(edges[0].cause, "old cause");
         assert_eq!(ontology.len(), 1);
         assert_eq!(ontology[0].name, "old primitive");
+        assert_eq!(
+            persistence.load_next_graph_fact_id().unwrap(),
+            Some(2),
+            "failed replacement must preserve the prior committed allocator state"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1331,6 +1689,7 @@ mod tests {
             domain: Some("test".into()),
             cycle: 7,
             is_causal: false,
+            graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(8),
             corroboration_count: 2,
@@ -1363,6 +1722,7 @@ mod tests {
             domain: None,
             cycle: 3,
             is_causal: false,
+            graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
             corroboration_count: 0,
@@ -1377,6 +1737,7 @@ mod tests {
             domain: None,
             cycle: u64::MAX,
             is_causal: false,
+            graph_fact_id: None,
             initial_confidence: Some(0.9),
             last_accessed_cycle: Some(4),
             corroboration_count: 0,
@@ -1416,6 +1777,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                graph_fact_id: None,
                 initial_confidence: Some(0.95),
                 last_accessed_cycle: Some(42),
                 corroboration_count: 3,
@@ -1428,6 +1790,7 @@ mod tests {
                 domain: None,
                 cycle: 2,
                 is_causal: true,
+                graph_fact_id: None,
                 initial_confidence: Some(0.85),
                 last_accessed_cycle: Some(44),
                 corroboration_count: 4,

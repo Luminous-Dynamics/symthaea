@@ -317,11 +317,21 @@ impl KnowledgeManager {
             let facts = p
                 .load_facts()
                 .map_err(|e| format!("KnowledgeManager failed to load persisted facts: {e}"))?;
-            for record in &facts {
-                graph.import_fact_record(record);
+            let imported_fact_count = graph.import_fact_records(&facts);
+            if imported_fact_count != facts.len() {
+                return Err(format!(
+                    "KnowledgeManager restored {imported_fact_count} of {} persisted fact records",
+                    facts.len()
+                ));
             }
             if !facts.is_empty() {
-                tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
+                tracing::info!(count = imported_fact_count, "Knowledge: loaded facts from SQLite");
+            }
+            if let Some(reserved_next_id) = p
+                .load_next_graph_fact_id()
+                .map_err(|e| format!("KnowledgeManager failed to load fact ID allocator: {e}"))?
+            {
+                graph.ensure_next_fact_id(reserved_next_id);
             }
 
             let edges = p.load_causal_edges().map_err(|e| {
@@ -790,13 +800,20 @@ impl KnowledgeManager {
                 .map(|(cause, effect, strength)| CausalEdgeRecord {
                     cause,
                     effect,
+                    // The legacy tuple export encodes inhibitory edges as negative strengths.
                     is_inhibitory: strength < 0.0,
                     strength,
                     cycle: 0,
                 })
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
-            if let Err(e) = p.replace_knowledge_snapshot(&facts, &edges, &ontology_records) {
+            let next_graph_fact_id = self.graph.next_fact_id();
+            if let Err(e) = p.replace_knowledge_snapshot(
+                &facts,
+                &edges,
+                &ontology_records,
+                next_graph_fact_id,
+            ) {
                 tracing::warn!(
                     error = %e,
                     "Knowledge persistence: failed to atomically replace complete knowledge snapshot"
@@ -1370,6 +1387,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -1418,6 +1436,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,
@@ -1437,7 +1456,9 @@ mod tests {
             db_path: Some(db_path.to_string_lossy().into_owned()),
             ..KnowledgeManagerConfig::default()
         });
-        let error = result.err().expect("strict startup must reject invalid vector dimensions");
+        let error = result
+            .err()
+            .expect("strict startup must reject invalid vector dimensions");
         assert!(
             error.contains("persisted facts") && error.contains("invalid hypervector length"),
             "unexpected error context: {error}"
@@ -1465,6 +1486,7 @@ mod tests {
                 domain: Some("test".into()),
                 cycle: 1,
                 is_causal: false,
+                graph_fact_id: None,
                 initial_confidence: None,
                 last_accessed_cycle: None,
                 corroboration_count: 0,

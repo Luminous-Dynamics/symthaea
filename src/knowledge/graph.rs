@@ -301,6 +301,19 @@ impl EnhancedKnowledgeGraph {
         }
     }
 
+    /// Return the next graph fact ID that will be assigned.
+    pub fn next_fact_id(&self) -> FactId {
+        self.next_id
+    }
+
+    /// Restore a persisted ID allocator high-water mark without moving it backward.
+    ///
+    /// IDs that were removed before a snapshot remain retired, preventing stale
+    /// external references from accidentally identifying a later, unrelated fact.
+    pub fn ensure_next_fact_id(&mut self, reserved_next_id: FactId) {
+        self.next_id = self.next_id.max(reserved_next_id.max(1));
+    }
+
     /// Get a fact by ID
     pub fn get_fact(&self, id: FactId) -> Option<&TemporalFact> {
         self.facts.get(&id)
@@ -515,8 +528,11 @@ impl EnhancedKnowledgeGraph {
     // ── Persistence Support ─────────────────────────────────────────────
 
     /// Import a fact from a persistence record.
+    ///
+    /// Preserves its graph-level ID when present. Legacy records without an ID
+    /// receive a fresh ID that does not collide with facts already imported.
     pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
-        if record.vector_bytes.len() != 2048 {
+        if record.vector_bytes.len() != symthaea_core::hdc::unified_hv::BinaryHV::BYTES {
             return;
         }
         let mut arr = [0u8; 2048];
@@ -527,8 +543,20 @@ impl EnhancedKnowledgeGraph {
             source_text: record.source_text.clone(),
             confidence: record.confidence,
         };
-        let id: FactId = self.next_id;
-        self.next_id += 1;
+
+        let id = match record.graph_fact_id {
+            Some(id) if id > 0 && !self.facts.contains_key(&id) => id,
+            _ => {
+                while self.facts.contains_key(&self.next_id) {
+                    self.next_id = self.next_id.saturating_add(1);
+                }
+                let id = self.next_id;
+                self.next_id = self.next_id.saturating_add(1);
+                id
+            }
+        };
+        self.next_id = self.next_id.max(id.saturating_add(1));
+
         let fact = TemporalFact {
             id,
             encoding,
@@ -550,6 +578,22 @@ impl EnhancedKnowledgeGraph {
         self.facts.insert(id, fact);
     }
 
+    /// Import a batch without allowing legacy rows to occupy IDs that belong to
+    /// newer records carrying stable graph IDs.
+    ///
+    /// Records with explicit IDs are imported first; rows from pre-ID schemas
+    /// then receive IDs above the highest restored stable ID.
+    pub fn import_fact_records(&mut self, records: &[super::persistence::FactRecord]) -> usize {
+        let before = self.facts.len();
+        for record in records.iter().filter(|record| record.graph_fact_id.is_some()) {
+            self.import_fact_record(record);
+        }
+        for record in records.iter().filter(|record| record.graph_fact_id.is_none()) {
+            self.import_fact_record(record);
+        }
+        self.facts.len().saturating_sub(before)
+    }
+
     /// Export all facts as persistence records.
     pub fn export_fact_records(&self) -> Vec<super::persistence::FactRecord> {
         self.facts
@@ -561,6 +605,7 @@ impl EnhancedKnowledgeGraph {
                 domain: f.domain.clone(),
                 cycle: f.inserted_at_cycle,
                 is_causal: f.has_causal_relations,
+                graph_fact_id: Some(f.id),
                 initial_confidence: Some(f.initial_confidence),
                 last_accessed_cycle: Some(f.last_accessed_cycle),
                 corroboration_count: f.corroboration_count,
@@ -824,6 +869,7 @@ mod tests {
         restored.import_fact_record(&records[0]);
         let fact = restored.all_facts().next().unwrap();
 
+        assert_eq!(fact.id, id, "graph-level fact IDs must survive export/import");
         assert!((fact.confidence - 0.61).abs() < f32::EPSILON);
         assert!((fact.initial_confidence - 0.94).abs() < f32::EPSILON);
         assert_eq!(fact.inserted_at_cycle, 7);
@@ -832,6 +878,121 @@ mod tests {
         assert_eq!(fact.contradiction_count, 2);
         assert_eq!(fact.domain.as_deref(), Some("test"));
         assert!(fact.has_causal_relations);
+    }
+
+    #[test]
+    fn test_batch_import_reserves_stable_ids_before_legacy_rows() {
+        use super::super::persistence::FactRecord;
+
+        let stable = FactRecord {
+            vector_bytes: vec![1u8; 2048],
+            source_text: "stable identity".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 2,
+            is_causal: false,
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.8),
+            last_accessed_cycle: Some(2),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let legacy = FactRecord {
+            vector_bytes: vec![2u8; 2048],
+            source_text: "legacy identity".into(),
+            confidence: 0.7,
+            domain: None,
+            cycle: 9,
+            is_causal: false,
+            graph_fact_id: None,
+            initial_confidence: None,
+            last_accessed_cycle: None,
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+
+        // The legacy row comes first in the source vector to prove input ordering
+        // cannot steal a stable ID from a record written by the newer schema.
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        assert_eq!(graph.import_fact_records(&[legacy, stable]), 2);
+        assert_eq!(
+            graph.get_fact(1).unwrap().encoding.source_text,
+            "stable identity"
+        );
+        let legacy_fact = graph
+            .all_facts()
+            .find(|fact| fact.encoding.source_text == "legacy identity")
+            .unwrap();
+        assert_eq!(legacy_fact.id, 2);
+
+        let (next_id, _) = graph.insert(
+            make_encoding("new insertion after migration", 0.6),
+            10,
+            None,
+            false,
+        );
+        assert_eq!(next_id, 3, "next ID must advance beyond restored facts");
+    }
+
+    #[test]
+    fn test_deleted_fact_id_is_not_reused_after_sqlite_restart() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_id_high_water_round_trip_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let (retained_id, _) = graph.insert(
+            make_encoding("retained stable fact", 0.9),
+            1,
+            None,
+            false,
+        );
+        let (retired_id, _) = graph.insert(
+            make_encoding("retired high ID fact", 0.02),
+            2,
+            None,
+            false,
+        );
+        assert_eq!((retained_id, retired_id), (1, 2));
+        assert_eq!(graph.prune_low_confidence(0.05), 1);
+        assert!(graph.get_fact(retired_id).is_none());
+        assert_eq!(graph.next_fact_id(), 3);
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .replace_knowledge_snapshot(
+                &graph.export_fact_records(),
+                &[],
+                &[],
+                graph.next_fact_id(),
+            )
+            .unwrap();
+
+        let records = persistence.load_facts().unwrap();
+        let reserved_next_id = persistence
+            .load_next_graph_fact_id()
+            .unwrap()
+            .expect("a complete snapshot must persist the ID allocator");
+
+        let mut restored = EnhancedKnowledgeGraph::new(10);
+        assert_eq!(restored.import_fact_records(&records), 1);
+        restored.ensure_next_fact_id(reserved_next_id);
+        let (new_id, _) = restored.insert(
+            make_encoding("brand new fact after restart", 0.7),
+            3,
+            None,
+            false,
+        );
+        assert_eq!(
+            new_id, 3,
+            "the removed fact's ID must remain retired after restart"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -876,6 +1037,7 @@ mod tests {
             .next()
             .expect("restored graph should have a fact");
 
+        assert_eq!(fact.id, id, "SQLite round trip must preserve graph-level fact IDs");
         assert_eq!(fact.encoding.source_text, "persistent temporal fixture");
         assert_eq!(fact.encoding.vector.0.to_vec(), expected_vector);
         assert!((fact.confidence - 0.61).abs() < f32::EPSILON);
@@ -899,6 +1061,7 @@ mod tests {
             domain: None,
             cycle: 11,
             is_causal: false,
+            graph_fact_id: None,
             initial_confidence: None,
             last_accessed_cycle: None,
             corroboration_count: 0,
