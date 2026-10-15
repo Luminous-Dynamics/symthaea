@@ -1121,6 +1121,180 @@ mod tests {
     }
 
     #[test]
+    fn test_complete_snapshot_removes_stale_edges_and_ontology_records() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_complete_snapshot_replace_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            vector_bytes: vec![7u8; BinaryHV::BYTES],
+            source_text: "live fact".into(),
+            confidence: 0.8,
+            domain: Some("test".into()),
+            cycle: 7,
+            is_causal: true,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(8),
+            corroboration_count: 2,
+            contradiction_count: 1,
+        };
+        let stale_edge = CausalEdgeRecord {
+            cause: "stale-sentinel-cause".into(),
+            effect: "stale-sentinel-effect".into(),
+            strength: 0.7,
+            is_inhibitory: false,
+            cycle: 1,
+        };
+        let stale_primitive = OntologyRecord {
+            name: "stale-sentinel-primitive".into(),
+            vector_bytes: vec![9u8; BinaryHV::BYTES],
+            usage_count: 2,
+            utility: 0.4,
+            created_at_cycle: 1,
+            last_used_cycle: 2,
+            is_a_parent: None,
+        };
+
+        assert_eq!(
+            persistence
+                .replace_knowledge_snapshot(&[fact.clone()], &[stale_edge], &[stale_primitive])
+                .unwrap(),
+            (1, 1, 1)
+        );
+
+        let replacement_fact = FactRecord {
+            source_text: "replacement live fact".into(),
+            ..fact
+        };
+        assert_eq!(
+            persistence
+                .replace_knowledge_snapshot(&[replacement_fact], &[], &[])
+                .unwrap(),
+            (1, 0, 0)
+        );
+
+        let facts = persistence.load_facts().unwrap();
+        let edges = persistence.load_causal_edges().unwrap();
+        let ontology = persistence.load_ontology().unwrap();
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].source_text, "replacement live fact");
+        assert!(edges.is_empty(), "removed causal edges must not reappear after restart");
+        assert!(
+            ontology.is_empty(),
+            "pruned ontology primitives must not reappear after restart"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_complete_snapshot_rolls_back_all_tables_on_insert_failure() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_complete_snapshot_rollback_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let old_fact = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "old fact".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 3,
+            is_causal: false,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(4),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let old_edge = CausalEdgeRecord {
+            cause: "old cause".into(),
+            effect: "old effect".into(),
+            strength: 0.5,
+            is_inhibitory: false,
+            cycle: 3,
+        };
+        let old_primitive = OntologyRecord {
+            name: "old primitive".into(),
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            usage_count: 1,
+            utility: 0.5,
+            created_at_cycle: 1,
+            last_used_cycle: 2,
+            is_a_parent: None,
+        };
+        persistence
+            .replace_knowledge_snapshot(&[old_fact], &[old_edge], &[old_primitive])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TRIGGER reject_snapshot_primitive
+             BEFORE INSERT ON knowledge_ontology
+             WHEN NEW.name = 'reject-snapshot'
+             BEGIN
+                 SELECT RAISE(ABORT, 'injected snapshot insert failure');
+             END;",
+        )
+        .unwrap();
+        drop(conn);
+
+        let new_fact = FactRecord {
+            vector_bytes: vec![3u8; BinaryHV::BYTES],
+            source_text: "new fact that must roll back".into(),
+            confidence: 0.7,
+            domain: None,
+            cycle: 10,
+            is_causal: false,
+            initial_confidence: Some(0.7),
+            last_accessed_cycle: Some(10),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let new_edge = CausalEdgeRecord {
+            cause: "new cause".into(),
+            effect: "new effect".into(),
+            strength: 0.6,
+            is_inhibitory: false,
+            cycle: 10,
+        };
+        let rejected_primitive = OntologyRecord {
+            name: "reject-snapshot".into(),
+            vector_bytes: vec![4u8; BinaryHV::BYTES],
+            usage_count: 1,
+            utility: 0.2,
+            created_at_cycle: 10,
+            last_used_cycle: 10,
+            is_a_parent: None,
+        };
+
+        let error = persistence
+            .replace_knowledge_snapshot(&[new_fact], &[new_edge], &[rejected_primitive])
+            .unwrap_err();
+        assert!(error.contains("injected snapshot insert failure"), "{error}");
+
+        let facts = persistence.load_facts().unwrap();
+        let edges = persistence.load_causal_edges().unwrap();
+        let ontology = persistence.load_ontology().unwrap();
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].source_text, "old fact");
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].cause, "old cause");
+        assert_eq!(ontology.len(), 1);
+        assert_eq!(ontology[0].name, "old primitive");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_fact_snapshot_replacement_does_not_accumulate_rows() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_fact_snapshot_repeat_test_{}",
