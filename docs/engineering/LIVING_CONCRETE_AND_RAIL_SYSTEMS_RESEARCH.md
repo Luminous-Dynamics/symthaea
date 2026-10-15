@@ -480,6 +480,10 @@ This recent review highlights strain persistence, genetic stability, horizontal 
 22. Wang et al. (2026), “A mechanistic study of a novel self-healing concept for cement enabled by large clinker particles: Recovery of transport properties and microstructure characteristics,” *Construction and Building Materials*, 516, 145707. https://doi.org/10.1016/j.conbuildmat.2026.145707
 23. Wang & Wu (2025), “A preliminary study on an effective and simplistic self-healing concept for cement using coarse clinker particles as the healing agent,” *Cement and Concrete Research*, 193, 107859. https://doi.org/10.1016/j.cemconres.2025.107859. The article record states that data will be made available on request.
 
+### Supplemental rail sensing source (rights pending)
+
+24. Bustamante & Trincado Castán (2025), “Train track environmental data for predictive maintenance,” Zenodo dataset, 65.6 MB 40 Hz onboard inertial/environmental data with GPS-tagged samples; DOI https://doi.org/10.5281/zenodo.17607068. The current record's License field is blank and does not establish reuse rights; source use is gated pending clarification.
+
 ## Claim ceiling
 
 This plan establishes a research direction, a candidate/measurement vocabulary and falsifiable next steps only. It does not establish that any proposed bioactive concrete is safe, structurally superior, economical or field-ready; that Symthaea outperforms track-geometry forecasting baselines; or that Symtropy's existing physics engine can simulate fracture or railway dynamics adequately. Those claims require measured evidence and an independently reviewed, application-specific validation argument.
