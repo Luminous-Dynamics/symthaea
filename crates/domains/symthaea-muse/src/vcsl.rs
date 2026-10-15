@@ -1044,4 +1044,90 @@ mod tests {
         let again = bank.pick(60.0, 0.8, 7).unwrap();
         assert!(Arc::ptr_eq(&sample, &again));
     }
+
+    #[test]
+    fn inventory_separates_declared_mappings_from_missing_assets() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-instrument-inventory-missing-{}",
+            std::process::id()
+        ));
+        let vcsl_root = root.join("vcsl-missing");
+        let vsco2_root = root.join("vsco2-missing");
+        let first = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
+        let second = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
+
+        assert_eq!(first.instrument_count, 42);
+        assert!(!first.vcsl_root.root_present);
+        assert!(!first.vsco2_root.root_present);
+        assert_eq!(
+            serde_json::to_vec(&first).unwrap(),
+            serde_json::to_vec(&second).unwrap(),
+            "the same source and asset roots must produce identical JSON"
+        );
+
+        let violin = first
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Violin")
+            .unwrap();
+        let mapping = violin.sustained_samples.as_ref().unwrap();
+        assert_eq!(mapping.source_library, "vsco2_ce");
+        assert!(!mapping.directory_present);
+        assert_eq!(mapping.indexed_sample_count, 0);
+
+        let timpani = first
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Timpani")
+            .unwrap();
+        assert!(
+            timpani.sustained_samples.is_none(),
+            "unmapped assets must not be inferred from the instrument name"
+        );
+    }
+
+    #[test]
+    fn inventory_counts_only_files_accepted_by_the_declared_indexer() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-instrument-inventory-present-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let vcsl_root = root.join("vcsl");
+        let vsco2_root = root.join("vsco2-ce");
+        let harp_dir =
+            vcsl_root.join("Chordophones/Composite Chordophones/Concert Harp");
+        std::fs::create_dir_all(&harp_dir).unwrap();
+        std::fs::write(harp_dir.join("Harp_A4_vl1.wav"), []).unwrap();
+        std::fs::write(harp_dir.join("not-a-pitch-file.wav"), []).unwrap();
+        std::fs::create_dir_all(&vsco2_root).unwrap();
+        let soundfont = root.join("fixture.sf2");
+        std::fs::write(&soundfont, b"soundfont-fixture-bytes").unwrap();
+
+        let inventory = capability_inventory(&vcsl_root, &vsco2_root, Some(&soundfont)).unwrap();
+        assert!(inventory.vcsl_root.root_present);
+        assert_eq!(inventory.vcsl_root.wav_file_count, 2);
+        assert!(inventory.vcsl_root.path_size_manifest_sha256.is_some());
+        assert!(inventory.vsco2_root.root_present);
+        assert_eq!(inventory.vsco2_root.wav_file_count, 0);
+
+        let harp = inventory
+            .instruments
+            .iter()
+            .find(|item| item.instrument == "Harp")
+            .unwrap();
+        let mapping = harp.sustained_samples.as_ref().unwrap();
+        assert!(mapping.directory_present);
+        assert_eq!(mapping.indexed_sample_count, 1);
+
+        let soundfont_evidence = inventory.soundfont.as_ref().unwrap();
+        assert_eq!(soundfont_evidence.file_name, "fixture.sf2");
+        assert_eq!(soundfont_evidence.size_bytes, b"soundfont-fixture-bytes".len() as u64);
+        assert_eq!(
+            soundfont_evidence.sha256,
+            hex_digest(Sha256::digest(b"soundfont-fixture-bytes").as_slice())
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
 }
