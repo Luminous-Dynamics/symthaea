@@ -1810,9 +1810,9 @@ mod tests {
         f.value_scale = u64::MAX;
         f.basis_grams = u64::MAX;
         let encoded = serde_json::to_string(&f).expect("fact serializes");
-        assert!(encoded.contains("\\"value_scaled\\":\\"18446744073709551615\\""));
-        assert!(encoded.contains("\\"value_scale\\":\\"18446744073709551615\\""));
-        assert!(encoded.contains("\\"basis_grams\\":\\"18446744073709551615\\""));
+        assert!(encoded.contains("\"value_scaled\":\"18446744073709551615\""));
+        assert!(encoded.contains("\"value_scale\":\"18446744073709551615\""));
+        assert!(encoded.contains("\"basis_grams\":\"18446744073709551615\""));
         let decoded: NutritionFoodFactV1 =
             serde_json::from_str(&encoded).expect("fact deserializes");
         assert_eq!(decoded, f);
@@ -1823,7 +1823,7 @@ mod tests {
         let mut f = fact();
         f.value_scaled = None;
         let encoded = serde_json::to_string(&f).expect("fact serializes");
-        assert!(encoded.contains("\\"value_scaled\\":null"));
+        assert!(encoded.contains("\"value_scaled\":null));
         let decoded: NutritionFoodFactV1 =
             serde_json::from_str(&encoded).expect("fact deserializes");
         assert_eq!(decoded.value_scaled, None);
