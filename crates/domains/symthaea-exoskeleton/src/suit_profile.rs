@@ -565,7 +565,10 @@ mod tests {
 
     #[test]
     fn malformed_claim_metadata_fails_closed() {
-        let mut variant = declaration(SuitMissionProfile::OrbitalEva, SuitEvidenceLevel::BenchTested);
+        let mut variant = declaration(
+            SuitMissionProfile::OrbitalEva,
+            SuitEvidenceLevel::BenchTested,
+        );
         variant.capability_claims[0].evidence_reference = " ".into();
         assert_eq!(
             evaluate_suit_profile(
