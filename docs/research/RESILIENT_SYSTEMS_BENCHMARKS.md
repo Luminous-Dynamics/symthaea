@@ -88,7 +88,19 @@ Compare a declared reference configuration with interventions such as spare inve
 
 Require external domain review, traceable input data, uncertainty and sensitivity analysis, representative validation, documented model limitations, and a named decision owner. Life-safety, structural certification, pressure-boundary qualification, healthcare, lunar-readiness or aviation approval require their own standards and physical evidence. This screening model is not a surrogate for those processes.
 
-## 4. Initial benchmark suite
+## 4. Proposed performance and reproducibility budgets
+
+These are **unmeasured engineering targets**, not results or guaranteed requirements. Establish a named reference host and actual benchmark harness before treating them as release gates.
+
+- **Small reference case:** 100 services, up to 200 dependency edges, 20 disruption records and 730 time steps; target p95 runtime below 100 ms in a release build.
+- **Batch case:** 1,000 scenarios of that size; target completion below 60 seconds on the same host.
+- **Large screening case:** 1,000 services, up to 2,000 dependency edges and 730 steps; target one deterministic run below 2 seconds.
+- **Reproducibility:** the same Rust toolchain, binary, inputs and configuration must produce identical per-service trajectories; any intentional numerical-method change must update a versioned reference fixture.
+- **Traceability:** record CPU, OS, `rustc -Vv`, build profile, commit SHA, configuration digest, service count, dependency-edge count, disruption count, horizon and timing statistic.
+
+If the implementation misses a budget, profile it before weakening model detail. Do not reduce time resolution, discard per-service traces, skip validation or drop scenarios merely to meet a speed target. These targets should be revised using measured data from a documented reference machine before becoming normative.
+
+## 5. Initial benchmark suite
 
 Every release of the screen should include these fixed cases:
 
@@ -111,7 +123,7 @@ Every release of the screen should include these fixed cases:
 
 This first Rust tranche implements a minimal version of the model and unit tests for many of these properties. The complete RS-01–RS-14 catalog is the target coverage; cases not yet implemented must stay marked as gaps.
 
-## 5. Domain-specific benchmark targets
+## 6. Domain-specific benchmark targets
 
 ### 100 people for 730 days
 
@@ -157,7 +169,7 @@ This first Rust tranche implements a minimal version of the model and unit tests
 - Report subgroup-level service loss as well as total deficit.
 - Treat governance and rights as constraints requiring accountable human deliberation, not weights automatically optimized by a simulator.
 
-## 6. Implementation limits of the current Rust model
+## 7. Implementation limits of the current Rust model
 
 The first implementation deliberately uses a small abstraction:
 
@@ -168,7 +180,7 @@ The first implementation deliberately uses a small abstraction:
 
 It does **not** yet model queues, inventory depletion, stochastic demand, repair crews, multiple resource types in one process, spatial effects, failure probabilities, confidence intervals, or real physical laws. Those must be added only with explicit contracts and reference fixtures. The initial model is useful for testing causal direction and scenario consistency; it is not yet calibrated for predicting a community's actual outage.
 
-## 7. Research references
+## 8. Research references
 
 - Poulin, C. & Kane, M. B. (2021), [Infrastructure resilience curves: Performance measures and summary metrics](https://doi.org/10.1016/j.ress.2021.107926).
 - NIST SP 800-184, [Guide for Cybersecurity Event Recovery](https://doi.org/10.6028/NIST.SP.800-184).
