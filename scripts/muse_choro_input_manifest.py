@@ -147,6 +147,73 @@ def validate_analysis_plan(
         if preregistration.get(frozen_field) is not True:
             raise ManifestError(f"analysis plan requires pre_registration.{frozen_field} == true")
 
+    if plan_document.get("schema") != "muse-choro-preregistered-analysis-plan-v1":
+        raise ManifestError("analysis plan schema must be 'muse-choro-preregistered-analysis-plan-v1'")
+
+    design = require_object(plan_document.get("design"), "analysis-plan file design")
+    require_text(design.get("source_version_pin"), "analysis-plan design.source_version_pin")
+    require_text(design.get("study_question"), "analysis-plan design.study_question")
+
+    for list_field in (
+        "inclusion_criteria",
+        "exclusion_criteria",
+        "primary_outcomes",
+        "sensitivity_analyses",
+    ):
+        items = require_string_list(
+            design.get(list_field),
+            f"analysis-plan design.{list_field}",
+        )
+        if not items:
+            raise ManifestError(f"analysis-plan design.{list_field} must not be empty")
+
+    hypotheses = design.get("hypotheses")
+    if not isinstance(hypotheses, list) or not hypotheses:
+        raise ManifestError("analysis-plan design.hypotheses must contain at least one concrete hypothesis")
+    hypothesis_ids: set[str] = set()
+    for index, raw_hypothesis in enumerate(hypotheses):
+        label = f"analysis-plan design.hypotheses[{index}]"
+        hypothesis = require_object(raw_hypothesis, label)
+        hypothesis_id = require_text(hypothesis.get("id"), f"{label}.id")
+        if hypothesis_id in hypothesis_ids:
+            raise ManifestError("analysis-plan hypothesis IDs must be unique")
+        hypothesis_ids.add(hypothesis_id)
+        for field in ("statement", "primary_test", "unit_of_analysis", "falsification_rule"):
+            require_text(hypothesis.get(field), f"{label}.{field}")
+
+    null_models = design.get("null_models")
+    if not isinstance(null_models, list) or not null_models:
+        raise ManifestError("analysis-plan design.null_models must contain at least one concrete null model")
+    null_model_ids: set[str] = set()
+    for index, raw_null_model in enumerate(null_models):
+        label = f"analysis-plan design.null_models[{index}]"
+        null_model = require_object(raw_null_model, label)
+        null_model_id = require_text(null_model.get("id"), f"{label}.id")
+        if null_model_id in null_model_ids:
+            raise ManifestError("analysis-plan null-model IDs must be unique")
+        null_model_ids.add(null_model_id)
+        for field in (
+            "description",
+            "preserved_properties",
+            "randomization_or_permutation",
+            "unit_of_resampling",
+        ):
+            require_text(null_model.get(field), f"{label}.{field}")
+
+    thresholds = require_object(
+        design.get("effect_and_uncertainty_thresholds"),
+        "analysis-plan design.effect_and_uncertainty_thresholds",
+    )
+    for field in ("effect_size_rule", "uncertainty_rule", "decision_rule"):
+        require_text(thresholds.get(field), f"analysis-plan thresholds.{field}")
+    for field in (
+        "multiplicity_correction",
+        "missing_data_policy",
+        "split_strategy",
+        "deviation_policy",
+    ):
+        require_text(design.get(field), f"analysis-plan design.{field}")
+
     registered_on = require_date(
         preregistration.get("registered_on"),
         "analysis-plan file pre_registration.registered_on",
@@ -169,6 +236,10 @@ def validate_analysis_plan(
         "sha256": actual_hash,
         "registered_on": registered_on,
         "registration_record_url": registration_url,
+        "hypothesis_count": len(hypotheses),
+        "null_model_count": len(null_models),
+        "primary_outcome_count": len(design["primary_outcomes"]),
+        "sensitivity_analysis_count": len(design["sensitivity_analyses"]),
     }
 
 
@@ -290,7 +361,7 @@ def evaluate_manifest(
     sources = manifest.get("sources")
     if not isinstance(sources, list):
         raise ManifestError("sources must be a list")
-    analysis_plan_summary: dict[str, str] | None = None
+    analysis_plan_summary: dict[str, Any] | None = None
     if not sources:
         blockers.append("No exact source artifacts are in the approved-input manifest.")
         raw_plan = scope.get("analysis_plan")
