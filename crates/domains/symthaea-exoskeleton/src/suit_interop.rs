@@ -803,6 +803,18 @@ mod tests {
     }
 
     #[test]
+    fn two_provider_only_endpoints_are_not_compatible() {
+        let (mut left, mut right) = pair();
+        left.endpoints[0].role = SuitInterfaceRole::Provider;
+        right.endpoints[0].role = SuitInterfaceRole::Provider;
+        let (report, _) = evaluate_suit_interoperability(&left, &right, &policy()).unwrap();
+        assert!(report.findings.iter().any(|finding| {
+            finding.status == SuitInteropFindingStatus::InterfaceRoleMismatch
+        }));
+        assert_eq!(report.status, SuitInteropReportStatus::RequiredInterfacesBlocked);
+    }
+
+    #[test]
     fn manifests_are_order_invariant_and_changes_break_the_receipt() {
         let (left, right) = pair();
         let p = policy();
