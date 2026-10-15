@@ -2015,7 +2015,8 @@ mod tests {
         assert!(edges[0].source_text.is_empty());
         assert_eq!(edges[0].cycle, 9);
 
-        // The migrated schema accepts distinct observations for the same pair.
+        // The new schema can retain repeated observations, but this legacy
+        // save API deliberately keeps its historical upsert-by-pair behavior.
         persistence
             .save_causal_edges(&[
                 CausalEdgeRecord {
