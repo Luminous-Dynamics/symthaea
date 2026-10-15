@@ -124,9 +124,10 @@ A candidate cannot advance unless all relevant gates pass:
 ## Immediate follow-on engineering work
 
 1. Review the cycle formulas and tests; run `cargo test -p symthaea-thermofluids` and `cargo fmt --all -- --check` on the proposed branch. Do not report them passing until the exact commit's jobs or local logs show a pass.
-2. Extend the benchmark contract with typed quantities/units, model assumptions, system-boundary metadata, and structured error reporting.
-3. Add measured reference cases for a small number of technologies and reproduce them before optimizing.
-4. Only then introduce architecture generation and multi-objective optimization. Keep candidate generation modular so adding a solver does not silently change the benchmark contract.
+2. Use [the Energy-Conversion Benchmark Contract](ENERGY_CONVERSION_BENCHMARK_CONTRACT.md), its [JSON Schema](schemas/energy-conversion-benchmark.schema.json), and its explicitly non-evidentiary [synthetic fixture](examples/energy-conversion-benchmark.synthetic.json) as the initial record format. Implement an independent validator for interval continuity, phase coverage, source hashes, per-interval and aggregate closure, and recomputation of cached metrics.
+3. Add uncertainty propagation and comparison logic that preserves relevant correlations; unknown material uncertainty must make a superiority decision indeterminate rather than favorable.
+4. Reproduce at least one authoritative or measured system with a common boundary before novelty search. Public EPA/NREL drive schedules can define mission demand, but a drive profile alone is not a measured energy-conversion baseline; verify that the selected reference dataset supplies the required energy channels.
+5. Only after the benchmark verifier and reference case are reproducible should Symthaea introduce architecture generation and multi-objective optimization. Compare search strategies under equal model-evaluation budgets and preserve failed candidates as evidence.
 
 ## Research references
 
