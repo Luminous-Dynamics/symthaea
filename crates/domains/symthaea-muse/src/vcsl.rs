@@ -531,6 +531,8 @@ pub struct InstrumentCapabilityInventoryV1 {
     pub schema_version: &'static str,
     pub source_revision: Option<String>,
     pub instrument_count: usize,
+    /// True when indexed sample bytes were content-hashed during this inventory run.
+    pub indexed_sample_content_hashing_enabled: bool,
     pub vcsl_root: AssetRootEvidenceV1,
     pub vsco2_root: AssetRootEvidenceV1,
     pub soundfont: Option<SoundFontEvidenceV1>,
@@ -833,6 +835,7 @@ pub fn capability_inventory_with_options(
         schema_version: "muse-instrument-capability-inventory-v1",
         source_revision,
         instrument_count: instruments.len(),
+        indexed_sample_content_hashing_enabled: hash_indexed_samples,
         vcsl_root: vcsl_evidence,
         vsco2_root: vsco2_evidence,
         soundfont,
@@ -1018,7 +1021,7 @@ fn indexed_sample_content_manifest_sha256(bank: &InstrumentBank) -> std::io::Res
             ));
         }
         let file_digest = file_hasher.finalize();
-        manifest.update(file_digest);
+        manifest.update(&file_digest[..]);
     }
 
     let digest = manifest.finalize();
@@ -1954,6 +1957,7 @@ mod tests {
         let second = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
 
         assert_eq!(first.instrument_count, 42);
+        assert!(!first.indexed_sample_content_hashing_enabled);
         let guitar = first
             .instruments
             .iter()
@@ -2233,6 +2237,7 @@ mod tests {
             true,
         )
         .unwrap();
+        assert!(first.indexed_sample_content_hashing_enabled);
         let harp = first
             .instruments
             .iter()
