@@ -37,7 +37,10 @@ pub struct BenchmarkRun {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Mission {
     pub mission_id: String,
+    pub description: String,
+    pub platform: String,
     pub duty_cycle_id: String,
+    pub profile_source_uri: Option<String>,
     pub expected_duration_s: f64,
     pub ambient_temperature_k: Option<f64>,
     pub ambient_pressure_pa: Option<f64>,
@@ -647,12 +650,15 @@ pub fn compare_candidates(
         issues.push("candidate and baseline benchmark_id differ".into());
     }
     if candidate.mission.mission_id != baseline.mission.mission_id
+        || candidate.mission.description != baseline.mission.description
+        || candidate.mission.platform != baseline.mission.platform
         || candidate.mission.duty_cycle_id != baseline.mission.duty_cycle_id
+        || candidate.mission.profile_source_uri != baseline.mission.profile_source_uri
         || candidate.mission.required_phases != baseline.mission.required_phases
-        || !approximately_equal(
+        || !time_equal_within_tolerance(
             candidate.mission.expected_duration_s,
             baseline.mission.expected_duration_s,
-            1e-12,
+            candidate.evaluation_policy.time_continuity_tolerance_s,
         )
         || candidate.mission.ambient_temperature_k != baseline.mission.ambient_temperature_k
         || candidate.mission.ambient_pressure_pa != baseline.mission.ambient_pressure_pa
@@ -762,7 +768,7 @@ pub fn compare_candidates(
         || baseline.uncertainty.correlation_model != "independent"
     {
         report.reason = Some(
-            "uncertainty propagation is only implemented for explicitly independent primitive inputs; correlated or unknown inputs are indeterminate"
+            "uncertainty inputs are correlated or unknown; the independent-input approximation is not valid"
                 .into()
         );
         return Ok(report);
@@ -808,7 +814,7 @@ pub fn compare_candidates(
         ComparisonDecision::LowerBoundDoesNotClearMargin
     };
     report.reason = Some(
-        "numerical rule result only; first-order propagation assumes mutually independent standard uncertainties, and this verifier does not authenticate pre-search anchoring or physical validity"
+        "numerical rule result only; independence is assumed and pre-search anchoring/physical validity are not authenticated"
             .into()
     );
     Ok(report)
@@ -826,8 +832,7 @@ fn efficiency_standard_uncertainty(
     if !total_input_j.is_finite() || total_input_j <= 0.0 || !total_useful_output_j.is_finite() {
         return Err(ValidationError {
             issues: vec![
-                "efficiency uncertainty requires finite positive total input and finite useful output"
-                    .into(),
+                "efficiency uncertainty requires positive input and finite output".into(),
             ],
         });
     }
