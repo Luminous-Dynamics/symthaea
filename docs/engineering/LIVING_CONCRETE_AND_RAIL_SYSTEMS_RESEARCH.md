@@ -257,15 +257,22 @@ A small auxiliary source is Paine et al. (2017), [University of Bath BATH-00448]
 
 ### A10. Non-biological comparator: self-healing via large clinker particles
 
-A March 2026 open-access study by Wang et al. proposes a compatible, non-living autogenous-healing route by partially replacing fine cement with larger clinker particles. This is an important comparator for the microbial programme because it may avoid carrier survival, viability, inoculum and environmental-persistence questions. It is **not automatically lower-carbon or better overall**.
+A 2025–2026 sequence of open-access papers by Wang and colleagues proposes a compatible, non-living autogenous-healing route by partially replacing fine cement with larger clinker particles. This is an important comparator for the microbial programme because it may avoid carrier survival, viability, inoculum and environmental-persistence questions. The two papers form a linked research programme, **not independent replication by unrelated laboratories**. Neither is an openly downloadable raw-data benchmark: both article records state that data will be made available on request. They are currently literature priors until the underlying data are obtained and rights/use terms are confirmed. The experimental system is cement paste/specimens, not a full aggregate concrete element or a field-qualified bridge, pavement, sleeper or rail asset. It is **not automatically lower-carbon or better overall**.
 
 Source: Wang et al. (2026), *A mechanistic study of a novel self-healing concept for cement enabled by large clinker particles: Recovery of transport properties and microstructure characteristics*, *Construction and Building Materials* 516, 145707, DOI https://doi.org/10.1016/j.conbuildmat.2026.145707. The publication page labels it open access under a Creative Commons licence.
 
-**What the source reports after 56 days (literature prior, not Symthaea reproduction):**
+**What the two papers report (literature priors, not Symthaea reproduction):**
+
+- The 2025 preliminary paper reports that 40–60 μm clinker particle variants achieved 28-day tensile and compressive strength recovery ratios of 1.12 and 0.91, respectively, and crack-sealing widths of 300–400 μm with area healing of 83.4–94.4% after 56 days. Treat these as source-defined ratios and outcomes; do not assume the 1.12 ratio implies 112% recovery from an arbitrary baseline without checking the original equation and denominator.
+- The 2026 follow-up examines transport-property recovery and microstructure, described below. Its reported transport outcomes must remain distinct from the earlier study's strength and crack-area results; these are not automatically one common cohort or pooled effect.
 - Particle-size families included 40–60 μm, 60–90 μm and 0.5–1.0 mm; the study varied partial-replacement contents from 20% to 40% by mass.
 - For the 40–90 μm variants, reported recovery rates were approximately 67.0–67.6% for initial water absorption, 83.2–83.4% for secondary water absorption, and 78.6–82.6% for gas permeability, compared with 46.2%, 49.5% and 64.1% for the control, respectively.
 - The study reports surface cracks starting near 200 μm narrowing to roughly 20–60 μm, and internal crack widths of 57–111 μm by XCT for the highlighted sizes.
 - XCT and microstructural analyses support the study's proposed mechanism of continued hydration from residual unhydrated clinker. These are study-specific findings, not a general guarantee of crack-depth sealing or mechanical recovery in a different mix.
+
+The 2026 study's methods report cylindrical cement specimens (diameters 50 mm or 100 mm, height 30 mm), initially water-cured at 75 °C for 14 days; pre-cracks were induced by heating at 150 °C for two hours. The reported crack widths in this experiment were mostly controlled in the 80–200 μm range. This is a specialized accelerated laboratory protocol, not a direct proxy for ordinary ambient-cured concrete cracks, load-induced cracks or rail/pavement service environments.
+
+Both the 2025 and 2026 article records state **“Data will be made available on request.”** No underlying raw-data package has been identified in the sources inspected. To reproduce those published summaries, the work item must first request the source tables, experimental-unit hierarchy, protocols, and permission/terms for analysis and derived outputs. Until then, only article-level literature extraction is possible.
 
 The authors also explicitly note a **carbon trade-off**: replacing cement with clinker may increase the clinker factor, particularly in cements with high supplementary-cementitious-material content. They argue that possible service-life extension could offset that impact, but this is conditional on field durability, actual mix chemistry, repair frequency, manufacturing/transport burdens, and the functional unit. Do not assert a climate benefit without a transparent whole-life comparison and sensitivity analysis for assumed service-life extension.
 
@@ -469,6 +476,7 @@ This recent review highlights strain persistence, genetic stability, horizontal 
 20. Justo-Reinoso et al. (2022), University of Bath Research Data Archive, “Air-entraining admixtures as a protection method for bacterial spores in self-healing cementitious composites: Healing evaluation of early and later-age cracks,” BATH-01087; data record lists CC BY 4.0 for all three Excel files. https://doi.org/10.15125/BATH-01087. Related publication: https://doi.org/10.1016/j.conbuildmat.2022.126877
 21. Paine et al. (2017), University of Bath Research Data Archive, “Dataset for application of expanded perlite encapsulated bacteria and growth media for self-healing concrete,” BATH-00448; workbook and data documentation list CC BY 4.0. https://doi.org/10.15125/BATH-00448
 22. Wang et al. (2026), “A mechanistic study of a novel self-healing concept for cement enabled by large clinker particles: Recovery of transport properties and microstructure characteristics,” *Construction and Building Materials*, 516, 145707. https://doi.org/10.1016/j.conbuildmat.2026.145707
+23. Wang & Wu (2025), “A preliminary study on an effective and simplistic self-healing concept for cement using coarse clinker particles as the healing agent,” *Cement and Concrete Research*, 193, 107859. https://doi.org/10.1016/j.cemconres.2025.107859. The article record states that data will be made available on request.
 
 ## Claim ceiling
 
