@@ -768,7 +768,7 @@ pub fn compare_candidates(
         || baseline.uncertainty.correlation_model != "independent"
     {
         report.reason = Some(
-            "uncertainty inputs are correlated or unknown; the independent-input approximation is not valid"
+            "uncertainty inputs are correlated or unknown; independent approximation is invalid"
                 .into()
         );
         return Ok(report);
@@ -814,7 +814,7 @@ pub fn compare_candidates(
         ComparisonDecision::LowerBoundDoesNotClearMargin
     };
     report.reason = Some(
-        "numerical rule result only; independence is assumed and pre-search anchoring/physical validity are not authenticated"
+        "numerical result only; preregistration anchoring and physical validity are not authenticated"
             .into()
     );
     Ok(report)
