@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use md5::{Digest, Md5};
 use serde::Serialize;
 use sha2::Sha256;
@@ -236,9 +236,19 @@ fn lower_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
+fn validate_gzip_stream(path: &Path) -> Result<()> {
     let file = File::open(path)?;
-    let decoder = GzDecoder::new(file);
+    let mut decoder = MultiGzDecoder::new(file);
+    // Drain the complete compressed stream so gzip CRC/length trailers are verified,
+    // even if the tar reader below stops at tar's end-of-archive marker first.
+    io::copy(&mut decoder, &mut io::sink()).context("gzip stream failed full integrity read")?;
+    Ok(())
+}
+
+fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
+    validate_gzip_stream(path)?;
+    let file = File::open(path)?;
+    let decoder = MultiGzDecoder::new(file);
     let mut archive = Archive::new(decoder);
     let entries = archive.entries().context("not a readable tar archive inside gzip stream")?;
     let mut inventory = ArchiveInventory::default();
