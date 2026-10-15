@@ -97,3 +97,30 @@ Before admitting any ColabFit data:
 6. Where original access becomes available, compare a deterministic sample against records parsed by the pinned FairChem source reader. If exact task/split semantics cannot be established, keep this as a separate exploratory dataset with a separate contract and do not combine its scores with official OC22 results.
 
 This discovery adds a possible retrieval/conversion route, but the canonical admission state remains not_downloaded and no benchmark is authorized.
+
+
+## 8. ColabFit schema/lineage audit findings (source-level only)
+
+The public Hugging Face Viewer exposes ColabFit fields `configuration_metadata`, `configuration_metadata_id`, `configuration_labels`, `configuration_dataset_ids`, `configuration_id`, `configuration_hash`, and `structure_hash`. Visible OOD validation examples have `lmdb-system-id`, `traj-id`, and `num-adsorbates` in their configuration metadata. Some records carry both an `is2re_val_ood_*` label and an `s2ef_val_ood_*` label, with dataset IDs for both task collections. This demonstrates task-collection overlap for at least some configurations; do not count matching cross-task entries as independent systems if datasets are combined.
+
+Observed count/size values vary between the source card and automatic viewer:
+- IS2RE train: card reports 7,861,269 unique molecular configurations; viewer reports ~7,236,212 estimated rows (with a sampled/visible row count much smaller).
+- IS2RE validation-OOD: card reports 521,827 configurations; viewer shows ~521,308 rows.
+- Validation-OOD file size shown by page snapshots has differed (~2.04 GB vs ~2.44 GB).
+
+These values are not yet an admitted count/size manifest. Preserve each as a source observation, pin the exact dataset revision and file/shard identities, and compute counts from the actual frozen files. Never silently choose one aggregate value or use it as a training/evaluation denominator.
+
+The audit must reconcile:
+1. `lmdb-system-id` against OC22 `sid` on source-matched rows;
+2. `traj-id`, source metadata and structure/configuration hashes for duplicated or related structures;
+3. configuration labels and dataset IDs across IS2RE train, validation-ID, validation-OOD and parallel S2EF collections;
+4. target property, units, input structure role and whether each row is the official initial-to-relaxed-energy example;
+5. the presence of official test membership. The currently surfaced ColabFit collection lists six IS2RE/S2EF train/validation datasets and no IS2RE test collection. Until a rights-reviewed independent test set is defined and available, the ColabFit route cannot replace the official combined benchmark for the registered primary evaluation.
+
+Sources:
+- [ColabFit OC22 collection](https://huggingface.co/collections/colabfit/oc22-open-catalyst-2022-colabfit)
+- [IS2RE train card and viewer](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Train)
+- [IS2RE OOD validation card and schema/examples](https://huggingface.co/datasets/colabfit/OC22-IS2RE-Validation-out-of-domain)
+- [FairChem OC22 source contract](https://github.com/facebookresearch/fairchem/blob/main/docs/catalysts/datasets/oc22.md)
+
+No Parquet data bytes or row-level crosswalk have been independently verified. These findings are source-audit observations only; admission state remains `not_downloaded`.
