@@ -540,6 +540,7 @@ impl EnhancedKnowledgeGraph {
         let encoding = super::encoding::FactEncoding {
             vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
             role_vectors: std::collections::HashMap::new(),
+            relations: record.relations.clone(),
             source_text: record.source_text.clone(),
             confidence: record.confidence,
         };
@@ -600,6 +601,7 @@ impl EnhancedKnowledgeGraph {
             .values()
             .map(|f| super::persistence::FactRecord {
                 vector_bytes: f.encoding.vector.0.to_vec(),
+                relations: f.encoding.relations.clone(),
                 source_text: f.encoding.source_text.clone(),
                 confidence: f.confidence,
                 domain: f.domain.clone(),
@@ -789,6 +791,7 @@ mod tests {
         FactEncoding {
             vector: BinaryHV::random(crate::knowledge::encoding::fnv1a_hash(text)),
             role_vectors: HashMap::new(),
+            relations: Vec::new(),
             source_text: text.to_string(),
             confidence,
         }
