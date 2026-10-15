@@ -1357,6 +1357,21 @@ mod tests {
     }
 
     #[test]
+    fn test_query_omits_stale_search_hits() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.last_search_results.push(FactSearchResult {
+            fact_id: u64::MAX,
+            similarity: 0.9,
+            confidence: 0.9,
+        });
+
+        let result = mgr.query("stale result");
+
+        assert!(result.facts.is_empty());
+        assert_eq!(result.grounding_score, 0.0);
+    }
+
+    #[test]
     fn test_causal_processing() {
         let mut mgr = KnowledgeManager::default();
         mgr.bootstrap_entities();
