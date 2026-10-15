@@ -544,15 +544,29 @@ mod tests {
             .unwrap();
 
         let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute("UPDATE knowledge_facts SET cycle = -1", [])
+            .unwrap();
+        drop(conn);
+
+        let insertion_cycle_err = persistence.load_facts().unwrap_err();
+        assert!(
+            insertion_cycle_err.contains("Collect:"),
+            "unexpected insertion-cycle error context: {insertion_cycle_err}"
+        );
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
         conn.execute(
-            "UPDATE knowledge_facts SET last_accessed_cycle = -1",
+            "UPDATE knowledge_facts SET cycle = 3, last_accessed_cycle = -1",
             [],
         )
         .unwrap();
         drop(conn);
 
-        let err = persistence.load_facts().unwrap_err();
-        assert!(err.contains("Collect:"), "unexpected error context: {err}");
+        let last_access_err = persistence.load_facts().unwrap_err();
+        assert!(
+            last_access_err.contains("Collect:"),
+            "unexpected last-access-cycle error context: {last_access_err}"
+        );
         assert_eq!(persistence.total_loaded(), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
