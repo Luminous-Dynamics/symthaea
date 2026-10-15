@@ -265,6 +265,7 @@ impl Default for RelationConstraintSearchPolicy {
             min_role_coverage: 1.0,
             min_relation_coverage: 1.0,
             require_all_relation_constraints: true,
+            abstain_on_conflicting_evidence: true,
         }
     }
 }
