@@ -641,6 +641,9 @@ pub struct SampleDirectoryEvidenceV1 {
     pub min_midi: Option<u8>,
     pub max_midi: Option<u8>,
     pub distinct_pitch_count: usize,
+    /// MIDI pitches absent from accepted filename metadata strictly between
+    /// the observed minimum and maximum; not proof of rendered-range gaps.
+    pub filename_pitch_gaps_midi_within_observed_range: Vec<u8>,
     /// Distinct normalized dynamic values parsed from indexed filenames; not calibrated layers.
     pub distinct_dynamic_strength_count: usize,
     /// Result of fully reading every WAV accepted by the filename indexer.
@@ -844,6 +847,30 @@ pub fn capability_inventory_with_options(
     })
 }
 
+/// Return gaps in the pitch labels actually found by the current filename
+/// indexer, bounded to the observed min/max labels. This is metadata evidence
+/// only: it does not model pitch-shifting reach or assert a musically required range.
+fn filename_pitch_gaps_midi_within_observed_range(
+    bank: Option<&InstrumentBank>,
+) -> Vec<u8> {
+    let Some(bank) = bank else {
+        return Vec::new();
+    };
+    let pitches = bank
+        .samples
+        .iter()
+        .map(|sample| sample.midi)
+        .collect::<std::collections::BTreeSet<_>>();
+    let (Some(min_pitch), Some(max_pitch)) =
+        (pitches.first().copied(), pitches.last().copied())
+    else {
+        return Vec::new();
+    };
+    (min_pitch..=max_pitch)
+        .filter(|pitch| !pitches.contains(pitch))
+        .collect()
+}
+
 fn procedural_renderer_path(instrument: Instrument) -> &'static str {
     if instrument.uses_karplus_strong() {
         "karplus_strong"
@@ -951,6 +978,8 @@ fn sample_directory_evidence(
             .collect::<std::collections::BTreeSet<_>>()
             .len()
     });
+    let filename_pitch_gaps_midi_within_observed_range =
+        filename_pitch_gaps_midi_within_observed_range(bank.as_ref());
     let distinct_dynamic_strength_count = bank.as_ref().map_or(0, |bank| {
         bank.samples
             .iter()
@@ -966,6 +995,7 @@ fn sample_directory_evidence(
         min_midi,
         max_midi,
         distinct_pitch_count,
+        filename_pitch_gaps_midi_within_observed_range,
         distinct_dynamic_strength_count,
         audio_decode_status,
         decoded_sample_file_count: audio_audit.decoded_sample_file_count,
@@ -2445,6 +2475,11 @@ mod tests {
         assert_eq!(mapping.min_midi, Some(48));
         assert_eq!(mapping.max_midi, Some(69));
         assert_eq!(mapping.distinct_pitch_count, 3);
+        assert_eq!(
+            mapping.filename_pitch_gaps_midi_within_observed_range,
+            (49u8..=59).chain(61..=68).collect::<Vec<_>>(),
+            "filename pitch holes inside the observed range should be explicit"
+        );
         assert_eq!(mapping.distinct_dynamic_strength_count, 3);
         assert_eq!(mapping.audio_decode_status, "some_indexed_files_failed_decode");
         assert_eq!(mapping.decoded_sample_file_count, 2);
