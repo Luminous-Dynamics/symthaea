@@ -1401,7 +1401,7 @@ mod tests {
         drop(manager);
 
         let restored = KnowledgeManager::try_new(config).unwrap();
-        let edges = restored.causal_bridge.export_edge_records();
+        let edges = restored.causal_bridge.export_observations();
         assert_eq!(edges.len(), 1);
         assert_eq!(edges[0].cause, "ceasefire");
         assert_eq!(edges[0].effect, "escalation");
