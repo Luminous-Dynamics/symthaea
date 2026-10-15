@@ -123,11 +123,12 @@ A candidate cannot advance unless all relevant gates pass:
 
 ## Immediate follow-on engineering work
 
-1. Review the cycle formulas and tests; run `cargo test -p symthaea-thermofluids` and `cargo fmt --all -- --check` on the proposed branch. Do not report them passing until the exact commit's jobs or local logs show a pass.
-2. Use [the Energy-Conversion Benchmark Contract](ENERGY_CONVERSION_BENCHMARK_CONTRACT.md), its [JSON Schema](schemas/energy-conversion-benchmark.schema.json), and its explicitly non-evidentiary [synthetic fixture](examples/energy-conversion-benchmark.synthetic.json) as the initial record format. Implement an independent validator for interval continuity, phase coverage, source hashes, per-interval and aggregate closure, and recomputation of cached metrics.
-3. Add uncertainty propagation and comparison logic that preserves relevant correlations; unknown material uncertainty must make a superiority decision indeterminate rather than favorable.
-4. Reproduce at least one authoritative or measured system with a common boundary before novelty search. Public EPA/NREL drive schedules can define mission demand, but a drive profile alone is not a measured energy-conversion baseline; verify that the selected reference dataset supplies the required energy channels.
-5. Only after the benchmark verifier and reference case are reproducible should Symthaea introduce architecture generation and multi-objective optimization. Compare search strategies under equal model-evaluation budgets and preserve failed candidates as evidence.
+1. Run `cargo test -p symthaea-energy-bench`, `cargo test -p symthaea-thermofluids`, and `cargo fmt --all -- --check` on the exact PR head. The authoring environment lacks Rust, so authored tests have not been executed locally.
+2. Run a JSON Schema Draft 2020-12 validator against the schema and synthetic fixture, then add a verifier integration test that applies structural and semantic validation together. Keep the independent Rust semantic verifier separate from the search logic.
+3. Strengthen manifest provenance by binding the preregistered policy/manifest digest to an immutable commit or signed append-only registry before search starts. Timestamp ordering in a manifest is not cryptographic evidence of preregistration.
+4. Add uncertainty propagation and comparison logic that preserves relevant correlations; unknown material uncertainty must make a superiority decision indeterminate rather than favorable.
+5. Reproduce at least one authoritative or measured system with a common boundary before novelty search. EPA/NREL drive schedules define demand, not by themselves a measured energy-conversion baseline; verify that the selected reference dataset contains required input/output energy channels.
+6. Only after the benchmark verifier and reference case are reproducible should Symthaea introduce architecture generation and multi-objective optimization. Compare search strategies under equal model-evaluation budgets and preserve failed candidates as evidence.
 
 ## Research references
 
