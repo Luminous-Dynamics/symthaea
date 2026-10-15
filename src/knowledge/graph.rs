@@ -931,6 +931,7 @@ mod tests {
             domain: None,
             cycle: 11,
             is_causal: false,
+                    graph_fact_id: None,
             initial_confidence: None,
             last_accessed_cycle: None,
             corroboration_count: 0,
