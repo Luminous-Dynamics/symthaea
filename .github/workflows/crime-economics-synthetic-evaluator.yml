@@ -96,6 +96,9 @@ jobs:
             (.evidence_context_sources | length) == 4 and
             ([.evidence_context_sources[].source_id] | unique | length) == 4 and
             ([.evidence_context_sources[] | select(.source_id == "STATSSA-GPSJS-2025-26" and .used_as_crime_effect_parameter == false)] | length) == 1 and
+            ([.evidence_context_sources[] | select(.source_id == "STATSSA-GPSJS-2025-26") | .indicator_precision_examples[]? | select(.release == "GPSJS 2024/25" and .table == "Table 41" and .indicator_id == "household_housebreaking_experience_past_12_months" and .estimate_percent == 43.1 and .coefficient_of_variation_percent == 3 and .not_precision_for_reporting_rate_change == true)] | length) == 1 and
+            ([.evidence_context_sources[] | select(.source_id == "STATSSA-GPSJS-2025-26") | .indicator_precision_examples[]? | select(.release == "GPSJS 2025/26" and .table == "Table 41" and .indicator_id == "household_housebreaking_experience_past_12_months" and .estimate_percent == 46.0 and .coefficient_of_variation_percent == 3 and .not_precision_for_reporting_rate_change == true)] | length) == 1 and
+            ([.evidence_context_sources[] | select(.source_id == "STATSSA-GPSJS-2025-26" and .precision_scope_limits.reporting_share_change_percent_points == 4.8 and .precision_scope_limits.table_41_cvs_are_precision_for_reporting_share_change == false and .precision_scope_limits.cv_alone_establishes_statistical_significance == false and .precision_scope_limits.year_over_year_significance_established == false)] | length) == 1 and
             all(.evidence_context_sources[]; .used_as_crime_effect_parameter == false) and
             (.files | length) == 10 and
             ([.files[].path] | unique | length) == (.files | length) and
