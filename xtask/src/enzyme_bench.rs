@@ -787,6 +787,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_non_https_source_record_locator() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        let dataset_bytes = rewrite_csv_field(
+            &root,
+            "obs-a",
+            "source_record_url",
+            "http://example.invalid/source-a",
+        );
+        value["dataset_artifact"]["sha256"] = json!(format!("{:x}", Sha256::digest(&dataset_bytes)));
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let error = validate(&root, &parsed).unwrap_err().to_string();
+        assert!(error.contains("source_record_url must be HTTPS"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn rejects_uncleared_rights_even_when_license_is_named() {
         let root = fixture_root();
         let mut value = make_manifest(&root);
