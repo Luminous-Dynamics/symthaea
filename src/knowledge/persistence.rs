@@ -1255,6 +1255,19 @@ mod tests {
         assert!(relation.is_negated);
         assert!((relation.confidence - 0.73).abs() < f32::EPSILON);
 
+        let replacement = FactRecord {
+            source_text: "replacement without structured relations".into(),
+            relations: Vec::new(),
+            ..loaded[0].clone()
+        };
+        persistence.replace_facts_snapshot(&[replacement]).unwrap();
+        let replaced = persistence.load_facts().unwrap();
+        assert_eq!(replaced.len(), 1);
+        assert!(
+            replaced[0].relations.is_empty(),
+            "removed relation rows must not be reattached after fact-only replacement"
+        );
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
