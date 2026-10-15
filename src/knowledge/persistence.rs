@@ -838,7 +838,7 @@ impl KnowledgePersistence {
             facts_with_row_id.iter().map(|(id, _)| *id).collect();
         if let Some(orphan_id) = relations_by_fact
             .keys()
-            .find(|id| !fact_row_ids.contains(id))
+            .find(|id| !fact_row_ids.contains(*id))
         {
             return Err(format!(
                 "Structured relation rows refer to missing fact row {orphan_id}"
