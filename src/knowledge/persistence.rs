@@ -433,8 +433,11 @@ impl KnowledgePersistence {
         }
 
         for (edge, cycle) in &prepared_edges {
+            // The live bridge can retain multiple observations for the same
+            // (cause, effect) pair, while SQLite stores one row per pair. Match
+            // the legacy upsert contract: the later observation replaces the row.
             tx.execute(
-                "INSERT INTO knowledge_causal_edges
+                "INSERT OR REPLACE INTO knowledge_causal_edges
                  (cause, effect, strength, is_inhibitory, cycle)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
                 rusqlite::params![
