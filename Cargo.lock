@@ -12480,8 +12480,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "libc",
  "flate2",
+ "libc",
  "md-5",
  "serde",
  "serde_json",
