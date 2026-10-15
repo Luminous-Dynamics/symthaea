@@ -7,10 +7,10 @@ It is not a food database, a nutrient calculator, a license attorney, a publishe
 ## Core behavior
 
 - Rights are separate explicit decisions for assessment use, caching, transformation, redistribution, commercial use and public fixtures. Unknown, denied and unresolved written-permission requirements fail closed.
-- The source manifest records the source's declared rights; a separate SourceUseRequestV1 states what the caller intends to do. A request cannot grant itself permission.
+- The source manifest records the source's declared rights; a separate SourceUseRequestV1 states what the caller intends to do. A request cannot grant itself permission. Written-permission references are required only for rights actually exercised by the current request.
 - A granted-by-written-permission decision must reference the permission record.
 - A public fixture necessarily retains source-derived data, even if a caller omits the separate retention flag; cache permission and verified artifact bytes remain required.
-- Source manifests are versioned and dated; expired, future-dated, revoked, withdrawn or review-required sources block use.
+- Source manifests record retrieval and review dates. Future-dated retrieval, expired review windows, revoked, withdrawn or review-required sources block use.
 - Retaining source-derived records requires cache permission and a canonical lower-case SHA-256 plus the exact source-artifact bytes. A digest-shaped string by itself is not proof: verification recomputes SHA-256 over the supplied bytes.
 - If a declared digest is supplied without its bytes, its integrity is Unverified and numeric use is blocked. Without a declared digest and with no retained artifact, the result explicitly says NoDigestClaimed, not Verified.
 - Fact records bind source ID/record/citation, food identity, taxon/cultivar references when relevant, identity confidence, preparation state, nutrient definition, unit, integer scale and basis mass. A missing nutrient value is NotAssessable rather than zero.
