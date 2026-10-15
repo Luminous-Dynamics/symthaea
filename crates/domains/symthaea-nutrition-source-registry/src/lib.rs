@@ -14,6 +14,46 @@ use sha2::{Digest, Sha256};
 use url::Url;
 
 pub const NUTRITION_SOURCE_SCHEMA_VERSION: u16 = 1;
+pub const NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION: u16 = 1;
+
+fn serialize_u64_as_decimal_string<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&value.to_string())
+}
+
+fn deserialize_u64_from_decimal_string<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = String::deserialize(deserializer)?;
+    raw.parse::<u64>().map_err(serde::de::Error::custom)
+}
+
+fn serialize_option_u64_as_decimal_string<S>(
+    value: &Option<u64>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match value {
+        Some(value) => serializer.serialize_some(&value.to_string()),
+        None => serializer.serialize_none(),
+    }
+}
+
+fn deserialize_option_u64_from_decimal_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<String>::deserialize(deserializer)?
+        .map(|raw| raw.parse::<u64>().map_err(serde::de::Error::custom))
+        .transpose()
+}
 
 /// A permission decision is explicit. Unknown or conditional decisions never grant
 /// permission merely because a source is publicly visible.
@@ -238,8 +278,20 @@ pub struct NutritionFoodFactV1 {
     pub nutrient_id: String,
     pub nutrient_definition_ref: String,
     pub unit: NutrientUnit,
+    #[serde(
+        serialize_with = "serialize_option_u64_as_decimal_string",
+        deserialize_with = "deserialize_option_u64_from_decimal_string"
+    )]
     pub value_scaled: Option<u64>,
+    #[serde(
+        serialize_with = "serialize_u64_as_decimal_string",
+        deserialize_with = "deserialize_u64_from_decimal_string"
+    )]
     pub value_scale: u64,
+    #[serde(
+        serialize_with = "serialize_u64_as_decimal_string",
+        deserialize_with = "deserialize_u64_from_decimal_string"
+    )]
     pub basis_grams: u64,
     pub quality_notes: Vec<String>,
     pub transformation_applied: bool,
@@ -378,6 +430,8 @@ pub struct RegistryIssueV1 {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NutritionRegistryAssessmentV1 {
+    /// Independent version of the receipt/digest envelope schema.
+    pub receipt_schema_version: u16,
     /// Context fields make the decision receipt self-describing for replay tooling.
     pub evaluation_date: String,
     pub source_id: String,
@@ -400,7 +454,7 @@ pub struct NutritionRegistryAssessmentV1 {
 
 #[derive(Serialize)]
 struct RegistryInputEnvelopeV1<'a> {
-    schema_version: u16,
+    receipt_schema_version: u16,
     evaluation_date: &'a str,
     manifest: &'a NutritionSourceManifestV1,
     fact: &'a NutritionFoodFactV1,
@@ -434,7 +488,7 @@ fn registry_input_sha256(
     supplied_artifact_sha256: Option<String>,
 ) -> Result<String, ()> {
     let envelope = RegistryInputEnvelopeV1 {
-        schema_version: NUTRITION_SOURCE_SCHEMA_VERSION,
+        receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
         evaluation_date,
         manifest,
         fact,
@@ -528,6 +582,7 @@ pub fn assess_nutrition_source(
     };
 
     NutritionRegistryAssessmentV1 {
+        receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
         evaluation_date: evaluation_date.to_owned(),
         source_id: manifest.source_id.clone(),
         source_record_id: fact.source_record_id.clone(),
@@ -1746,6 +1801,32 @@ mod tests {
         assert!(result.issues.iter().any(|issue| {
             issue.code == RegistryIssueCode::InvalidArtifactDigest
         }));
+    }
+
+    #[test]
+    fn large_nutrient_quantities_are_decimal_strings_in_json() {
+        let mut f = fact();
+        f.value_scaled = Some(u64::MAX);
+        f.value_scale = u64::MAX;
+        f.basis_grams = u64::MAX;
+        let encoded = serde_json::to_string(&f).expect("fact serializes");
+        assert!(encoded.contains("\\"value_scaled\\":\\"18446744073709551615\\""));
+        assert!(encoded.contains("\\"value_scale\\":\\"18446744073709551615\\""));
+        assert!(encoded.contains("\\"basis_grams\\":\\"18446744073709551615\\""));
+        let decoded: NutritionFoodFactV1 =
+            serde_json::from_str(&encoded).expect("fact deserializes");
+        assert_eq!(decoded, f);
+    }
+
+    #[test]
+    fn missing_nutrient_quantity_remains_json_null() {
+        let mut f = fact();
+        f.value_scaled = None;
+        let encoded = serde_json::to_string(&f).expect("fact serializes");
+        assert!(encoded.contains("\\"value_scaled\\":null"));
+        let decoded: NutritionFoodFactV1 =
+            serde_json::from_str(&encoded).expect("fact deserializes");
+        assert_eq!(decoded.value_scaled, None);
     }
 
     #[test]
