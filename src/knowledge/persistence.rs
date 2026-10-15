@@ -15,6 +15,7 @@
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
 use std::path::Path;
+use symthaea_core::hdc::unified_hv::BinaryHV;
 
 /// Knowledge persistence layer backed by SQLite.
 ///
@@ -69,6 +70,97 @@ pub struct OntologyRecord {
     /// IS-A parent concept name, if any (NULL in SQLite when absent).
     /// Science: Quillian (1967) — semantic networks; Collins & Loftus (1975).
     pub is_a_parent: Option<String>,
+}
+
+/// Convert invalid but SQLite-decodable values into row conversion errors so loaders
+/// fail closed instead of importing semantically invalid persisted state.
+fn invalid_column_data(
+    column_index: usize,
+    column_type: rusqlite::types::Type,
+    message: impl Into<String>,
+) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(
+        column_index,
+        column_type,
+        Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            message.into(),
+        )),
+    )
+}
+
+fn validate_hypervector_bytes(bytes: &[u8], column_index: usize) -> rusqlite::Result<()> {
+    if bytes.len() == BinaryHV::BYTES {
+        Ok(())
+    } else {
+        Err(invalid_column_data(
+            column_index,
+            rusqlite::types::Type::Blob,
+            format!(
+                "invalid hypervector length: expected {} bytes, got {}",
+                BinaryHV::BYTES,
+                bytes.len()
+            ),
+        ))
+    }
+}
+
+fn decode_nonnegative_counter(
+    value: i64,
+    column_index: usize,
+    field: &str,
+) -> rusqlite::Result<u64> {
+    u64::try_from(value).map_err(|_| {
+        invalid_column_data(
+            column_index,
+            rusqlite::types::Type::Integer,
+            format!("invalid negative persisted {field}: {value}"),
+        )
+    })
+}
+
+fn decode_finite_f32(
+    value: f32,
+    column_index: usize,
+    field: &str,
+) -> rusqlite::Result<f32> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(invalid_column_data(
+            column_index,
+            rusqlite::types::Type::Real,
+            format!("non-finite persisted {field}: {value}"),
+        ))
+    }
+}
+
+fn decode_confidence(value: f32, column_index: usize) -> rusqlite::Result<f32> {
+    if value.is_finite() && (0.0..=1.0).contains(&value) {
+        Ok(value)
+    } else {
+        Err(invalid_column_data(
+            column_index,
+            rusqlite::types::Type::Real,
+            format!("invalid persisted confidence outside [0, 1]: {value}"),
+        ))
+    }
+}
+
+fn decode_finite_f64(
+    value: f64,
+    column_index: usize,
+    field: &str,
+) -> rusqlite::Result<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(invalid_column_data(
+            column_index,
+            rusqlite::types::Type::Real,
+            format!("non-finite persisted {field}: {value}"),
+        ))
+    }
 }
 
 impl Default for KnowledgePersistence {
@@ -157,12 +249,16 @@ impl KnowledgePersistence {
 
         let facts: Vec<FactRecord> = stmt
             .query_map([], |row| {
+                let vector_bytes: Vec<u8> = row.get(0)?;
+                validate_hypervector_bytes(&vector_bytes, 0)?;
+                let confidence = decode_confidence(row.get(2)?, 2)?;
+                let cycle = decode_nonnegative_counter(row.get(4)?, 4, "fact cycle")?;
                 Ok(FactRecord {
-                    vector_bytes: row.get(0)?,
+                    vector_bytes,
                     source_text: row.get(1)?,
-                    confidence: row.get(2)?,
+                    confidence,
                     domain: row.get(3)?,
-                    cycle: row.get::<_, i64>(4)? as u64,
+                    cycle,
                     is_causal: row.get(5)?,
                 })
             })
@@ -226,12 +322,15 @@ impl KnowledgePersistence {
 
         let edges: Vec<CausalEdgeRecord> = stmt
             .query_map([], |row| {
+                let strength = decode_finite_f32(row.get(2)?, 2, "causal strength")?;
+                let cycle =
+                    decode_nonnegative_counter(row.get(4)?, 4, "causal-edge cycle")?;
                 Ok(CausalEdgeRecord {
                     cause: row.get(0)?,
                     effect: row.get(1)?,
-                    strength: row.get(2)?,
+                    strength,
                     is_inhibitory: row.get(3)?,
-                    cycle: row.get::<_, i64>(4)? as u64,
+                    cycle,
                 })
             })
             .map_err(|e| e.to_string())?
@@ -304,13 +403,22 @@ impl KnowledgePersistence {
 
         let records: Vec<OntologyRecord> = stmt
             .query_map([], |row| {
+                let vector_bytes: Vec<u8> = row.get(1)?;
+                validate_hypervector_bytes(&vector_bytes, 1)?;
+                let usage_count =
+                    decode_nonnegative_counter(row.get(2)?, 2, "ontology usage count")?;
+                let utility = decode_finite_f64(row.get(3)?, 3, "ontology utility")?;
+                let created_at_cycle =
+                    decode_nonnegative_counter(row.get(4)?, 4, "ontology creation cycle")?;
+                let last_used_cycle =
+                    decode_nonnegative_counter(row.get(5)?, 5, "ontology last-used cycle")?;
                 Ok(OntologyRecord {
                     name: row.get(0)?,
-                    vector_bytes: row.get(1)?,
-                    usage_count: row.get::<_, i64>(2)? as u64,
-                    utility: row.get(3)?,
-                    created_at_cycle: row.get::<_, i64>(4)? as u64,
-                    last_used_cycle: row.get::<_, i64>(5)? as u64,
+                    vector_bytes,
+                    usage_count,
+                    utility,
+                    created_at_cycle,
+                    last_used_cycle,
                     is_a_parent: row.get(6)?,
                 })
             })
@@ -419,6 +527,178 @@ mod tests {
 
         let err = persistence.load_facts().unwrap_err();
         assert!(err.contains("Collect:"), "unexpected error context: {err}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+
+    #[test]
+    fn test_load_facts_rejects_wrong_hypervector_length() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_wrong_fact_vector_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                source_text: "fixture fact".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_facts SET vector_blob = ?1",
+            rusqlite::params![vec![0u8; 1]],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("invalid hypervector length"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_out_of_range_confidence() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_invalid_fact_confidence_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                source_text: "fixture fact".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_facts SET confidence = 1.25",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("invalid persisted confidence"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_negative_cycle() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_negative_fact_cycle_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                source_text: "fixture fact".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute("UPDATE knowledge_facts SET cycle = -1", []).unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("invalid negative persisted fact cycle"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_ontology_rejects_wrong_hypervector_length() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_wrong_ontology_vector_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_ontology(&[OntologyRecord {
+                name: "fixture primitive".into(),
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                usage_count: 1,
+                utility: 0.5,
+                created_at_cycle: 1,
+                last_used_cycle: 1,
+                is_a_parent: None,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_ontology SET vector_blob = ?1",
+            rusqlite::params![vec![0u8; BinaryHV::BYTES + 1]],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_ontology().unwrap_err();
+        assert!(error.contains("invalid hypervector length"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_causal_edges_rejects_negative_cycle() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_negative_edge_cycle_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_causal_edges(&[CausalEdgeRecord {
+                cause: "fixture cause".into(),
+                effect: "fixture effect".into(),
+                strength: -0.4,
+                is_inhibitory: true,
+                cycle: 1,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_causal_edges SET cycle = -1",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_causal_edges().unwrap_err();
+        assert!(error.contains("invalid negative persisted causal-edge cycle"), "{error}");
         assert_eq!(persistence.total_loaded(), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
