@@ -206,6 +206,7 @@ pub struct RelationConstraintSearchPolicy {
     min_role_coverage: f32,
     min_relation_coverage: f32,
     require_all_relation_constraints: bool,
+    abstain_on_conflicting_evidence: bool,
 }
 
 impl RelationConstraintSearchPolicy {
@@ -230,6 +231,7 @@ impl RelationConstraintSearchPolicy {
             min_role_coverage,
             min_relation_coverage,
             require_all_relation_constraints,
+            abstain_on_conflicting_evidence: true,
         })
     }
 
@@ -243,6 +245,17 @@ impl RelationConstraintSearchPolicy {
 
     pub fn require_all_relation_constraints(&self) -> bool {
         self.require_all_relation_constraints
+    }
+
+    pub fn abstain_on_conflicting_evidence(&self) -> bool {
+        self.abstain_on_conflicting_evidence
+    }
+
+    /// Explicitly opt out of query-level abstention on contradictory stored
+    /// polarity. This is a permissive mode for review workflows, not a default.
+    pub fn with_abstain_on_conflicting_evidence(mut self, enabled: bool) -> Self {
+        self.abstain_on_conflicting_evidence = enabled;
+        self
     }
 }
 
@@ -271,6 +284,7 @@ pub enum RelationConstraintAbstentionReason {
     IncompleteRoleCoverage,
     IncompleteRelationCoverage,
     RequiredRelationConstraintMissing,
+    ConflictingStoredEvidence,
 }
 
 /// Query-level result of relation-constrained retrieval.
@@ -279,14 +293,31 @@ pub enum RelationConstrainedQueryDecision {
     EligibleCandidatesAvailable,
     AbstainNoCandidates,
     AbstainNoCandidateMeetsPolicy,
+    AbstainConflictingEvidence,
 }
 
 /// Complete relation-constrained retrieval report, including explicit no-hit
 /// and no-eligible-candidate outcomes.
 #[derive(Debug, Clone, PartialEq)]
+/// Direct polarity conflict between a requested relation and a stored relation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelationConflictEvidence {
+    pub query_index: usize,
+    pub conflicting_fact_id: FactId,
+    pub stored_relation_index: usize,
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub query_is_negated: bool,
+    pub stored_is_negated: bool,
+}
+
 pub struct RelationConstrainedSearchReport {
     pub decision: RelationConstrainedQueryDecision,
     pub candidates: Vec<ConstrainedRoleAwareSearchResult>,
+    /// Stored relations that directly oppose the requested polarity while
+    /// preserving subject, predicate, object, roles, and causal status.
+    pub conflicting_evidence: Vec<RelationConflictEvidence>,
 }
 
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
@@ -562,6 +593,7 @@ impl EnhancedKnowledgeGraph {
             return RelationConstrainedSearchReport {
                 decision: RelationConstrainedQueryDecision::AbstainNoCandidates,
                 candidates: Vec::new(),
+                conflicting_evidence: Vec::new(),
             };
         }
 
@@ -569,6 +601,9 @@ impl EnhancedKnowledgeGraph {
         // candidates should receive the existing access-refresh side effect.
         let all_results =
             self.search_role_observations_untracked(query, self.facts.len(), config);
+        let conflicting_evidence = find_relation_conflicts(relation_constraints, self.facts.values());
+        let has_conflicting_evidence =
+            policy.abstain_on_conflicting_evidence() && !conflicting_evidence.is_empty();
         let mut constrained = Vec::with_capacity(all_results.len());
 
         for retrieval in all_results {
@@ -594,6 +629,9 @@ impl EnhancedKnowledgeGraph {
             if policy.require_all_relation_constraints() && !constraints_satisfied {
                 abstention_reasons
                     .push(RelationConstraintAbstentionReason::RequiredRelationConstraintMissing);
+            }
+            if has_conflicting_evidence {
+                abstention_reasons.push(RelationConstraintAbstentionReason::ConflictingStoredEvidence);
             }
             let decision = if abstention_reasons.is_empty() {
                 RelationConstraintDecision::EligibleForReview
@@ -642,7 +680,9 @@ impl EnhancedKnowledgeGraph {
             }
         }
 
-        let decision = if constrained.is_empty() {
+        let decision = if has_conflicting_evidence {
+            RelationConstrainedQueryDecision::AbstainConflictingEvidence
+        } else if constrained.is_empty() {
             RelationConstrainedQueryDecision::AbstainNoCandidates
         } else if constrained
             .iter()
@@ -656,6 +696,7 @@ impl EnhancedKnowledgeGraph {
         RelationConstrainedSearchReport {
             decision,
             candidates: constrained,
+            conflicting_evidence,
         }
     }
 
@@ -1388,6 +1429,47 @@ fn match_relation_constraints(
     }
 
     (matched, unmatched)
+}
+
+fn same_relation_except_polarity(
+    query: &RelationObservationQuery,
+    stored: &ExtractedRelation,
+) -> bool {
+    normalized_relation_text(&query.subject) == normalized_relation_text(&stored.subject)
+        && normalized_relation_text(&query.predicate)
+            == normalized_relation_text(&stored.predicate)
+        && normalized_relation_text(&query.object) == normalized_relation_text(&stored.object)
+        && query.subject_role == stored.subject_role
+        && query.object_role == stored.object_role
+        && query.is_causal == stored.is_causal
+        && query.is_negated != stored.is_negated
+}
+
+fn find_relation_conflicts<'a>(
+    queries: &[RelationObservationQuery],
+    facts: impl Iterator<Item = &'a TemporalFact>,
+) -> Vec<RelationConflictEvidence> {
+    let facts: Vec<&TemporalFact> = facts.collect();
+    let mut conflicts = Vec::new();
+    for (query_index, query) in queries.iter().enumerate() {
+        for fact in &facts {
+            for (stored_relation_index, stored) in fact.encoding.relations.iter().enumerate() {
+                if same_relation_except_polarity(query, stored) {
+                    conflicts.push(RelationConflictEvidence {
+                        query_index,
+                        conflicting_fact_id: fact.id,
+                        stored_relation_index,
+                        subject: stored.subject.clone(),
+                        predicate: stored.predicate.clone(),
+                        object: stored.object.clone(),
+                        query_is_negated: query.is_negated,
+                        stored_is_negated: stored.is_negated,
+                    });
+                }
+            }
+        }
+    }
+    conflicts
 }
 
 fn maximum_weight_maximum_cardinality_matching(
@@ -2277,12 +2359,21 @@ mod tests {
         assert_eq!(results.candidates.len(), 6);
         assert_eq!(
             results.decision,
-            RelationConstrainedQueryDecision::EligibleCandidatesAvailable
+            RelationConstrainedQueryDecision::AbstainConflictingEvidence
         );
+        assert!(!results.conflicting_evidence.is_empty());
+        assert!(results.conflicting_evidence.iter().any(|conflict| {
+            conflict.conflicting_fact_id == ids["negated"]
+                && !conflict.query_is_negated
+                && conflict.stored_is_negated
+        }));
         assert_eq!(results.candidates[0].retrieval.fact_id, ids["positive"]);
         assert!(results.candidates[0].constraints_satisfied);
         assert_eq!(results.candidates[0].relation_coverage, 1.0);
-        assert_eq!(results.candidates[0].decision, RelationConstraintDecision::EligibleForReview);
+        assert_eq!(results.candidates[0].decision, RelationConstraintDecision::Abstain);
+        assert!(results.candidates[0].abstention_reasons.contains(
+            &RelationConstraintAbstentionReason::ConflictingStoredEvidence
+        ));
         assert_eq!(results.candidates[0].matched_relation_constraints.len(), 1);
         assert!(results.candidates[0].unmatched_relation_constraints.is_empty());
 
@@ -2297,6 +2388,70 @@ mod tests {
             assert_eq!(result.matched_relation_constraints.len(), 0);
             assert_eq!(result.unmatched_relation_constraints.len(), 1);
         }
+    }
+
+    #[test]
+    fn test_conflicting_polarity_abstains_even_when_a_positive_candidate_matches() {
+        use super::super::extraction::{EntityType, ExtractedRelation, SemanticRole};
+
+        let mut graph = EnhancedKnowledgeGraph::new(8);
+        let mut encoder = KnowledgeEncoder::with_seed(73);
+        let query = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "Controller",
+            EntityType::Organization,
+        )]);
+        let positive = ExtractedRelation {
+            subject: "Controller".into(),
+            predicate: "blocks".into(),
+            object: "Actuator".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+            confidence: 0.8,
+        };
+        let mut positive_encoding = make_encoding("positive record", 0.7);
+        positive_encoding.role_vector_observations = query.clone();
+        positive_encoding.relations = vec![positive.clone()];
+        let (positive_id, _) = graph.insert(positive_encoding, 1, None, false);
+
+        let mut negative_encoding = make_encoding("negated record", 0.7);
+        negative_encoding.role_vector_observations = query.clone();
+        negative_encoding.relations = vec![ExtractedRelation {
+            is_negated: true,
+            ..positive
+        }];
+        let (_, negative_id) = graph.insert(negative_encoding, 1, None, false);
+
+        let constraint = RelationObservationQuery {
+            subject: "Controller".into(),
+            predicate: "blocks".into(),
+            object: "Actuator".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+        };
+        let report = graph.search_role_observations_with_relation_constraints(
+            &query,
+            &[constraint],
+            4,
+            2,
+            RoleObservationSearchConfig::new(0.99).unwrap(),
+        );
+
+        assert_eq!(report.decision, RelationConstrainedQueryDecision::AbstainConflictingEvidence);
+        assert_eq!(report.conflicting_evidence.len(), 1);
+        assert_eq!(report.conflicting_evidence[0].conflicting_fact_id, negative_id);
+        assert!(!report.conflicting_evidence[0].query_is_negated);
+        assert!(report.conflicting_evidence[0].stored_is_negated);
+        let positive_result = report.candidates.iter().find(|item| item.retrieval.fact_id == positive_id).unwrap();
+        assert!(positive_result.constraints_satisfied);
+        assert_eq!(positive_result.decision, RelationConstraintDecision::Abstain);
+        assert!(positive_result.abstention_reasons.contains(
+            &RelationConstraintAbstentionReason::ConflictingStoredEvidence
+        ));
     }
 
     #[test]
