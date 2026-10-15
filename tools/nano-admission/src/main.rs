@@ -558,6 +558,14 @@ mod tests {
     }
 
     #[test]
+    fn long_path_diagnostic_is_bounded() {
+        let long_path = "x".repeat(10_000);
+        let display = bounded_member_display(&long_path);
+        assert!(display.len() < 300);
+        assert!(display.ends_with("<truncated>"));
+    }
+
+    #[test]
     fn path_aliases_are_detected_as_duplicate_members() {
         let directory = tempfile::tempdir().expect("temporary directory");
         let archive_path = directory.path().join("aliases.tar.gz");
