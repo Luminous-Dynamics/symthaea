@@ -2734,6 +2734,148 @@ mod tests {
     }
 
     #[test]
+    fn test_conflict_is_reported_even_when_no_role_candidate_is_retrieved() {
+        use super::super::extraction::{EntityType, ExtractedRelation, SemanticRole};
+
+        let mut graph = EnhancedKnowledgeGraph::new(8);
+        let mut encoder = KnowledgeEncoder::with_seed(91);
+        let query = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "Unrelated Entity",
+            EntityType::Organization,
+        )]);
+        let positive = ExtractedRelation {
+            subject: "Controller".into(),
+            predicate: "blocks".into(),
+            object: "Actuator".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+            confidence: 0.8,
+        };
+        let mut positive_encoding = make_encoding("unrelated positive source", 0.7);
+        positive_encoding.role_vector_observations = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "Different Entity",
+            EntityType::Organization,
+        )]);
+        positive_encoding.relations = vec![positive.clone()];
+        graph.insert(positive_encoding, 1, None, false);
+
+        let mut negative_encoding = make_encoding("unrelated negated source", 0.7);
+        negative_encoding.role_vector_observations = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "Another Entity",
+            EntityType::Organization,
+        )]);
+        negative_encoding.relations = vec![ExtractedRelation {
+            is_negated: true,
+            ..positive
+        }];
+        graph.insert(negative_encoding, 1, None, false);
+
+        let constraint = RelationObservationQuery {
+            subject: "Controller".into(),
+            predicate: "blocks".into(),
+            object: "Actuator".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+        };
+        let report = graph.search_role_observations_with_relation_constraints(
+            &query,
+            &[constraint],
+            4,
+            2,
+            RoleObservationSearchConfig::new(0.99).unwrap(),
+        );
+
+        assert!(report.candidates.is_empty());
+        assert_eq!(
+            report.decision,
+            RelationConstrainedQueryDecision::AbstainConflictingEvidence
+        );
+        assert_eq!(report.conflicting_evidence.len(), 1);
+        assert_eq!(
+            report.conflicting_evidence[0].source_text,
+            "unrelated negated source"
+        );
+    }
+
+    #[test]
+    fn test_explicit_conflict_override_keeps_conflict_evidence_visible() {
+        use super::super::extraction::{EntityType, ExtractedRelation, SemanticRole};
+
+        let mut graph = EnhancedKnowledgeGraph::new(8);
+        let mut encoder = KnowledgeEncoder::with_seed(92);
+        let query = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "Controller",
+            EntityType::Organization,
+        )]);
+        let positive = ExtractedRelation {
+            subject: "Controller".into(),
+            predicate: "blocks".into(),
+            object: "Actuator".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+            confidence: 0.8,
+        };
+        let mut positive_encoding = make_encoding("positive source", 0.7);
+        positive_encoding.role_vector_observations = query.clone();
+        positive_encoding.relations = vec![positive.clone()];
+        let (positive_id, _) = graph.insert(positive_encoding, 1, None, false);
+        let mut negative_encoding = make_encoding("negated source", 0.7);
+        negative_encoding.role_vector_observations = query.clone();
+        negative_encoding.relations = vec![ExtractedRelation {
+            is_negated: true,
+            ..positive
+        }];
+        graph.insert(negative_encoding, 1, None, false);
+
+        let constraint = RelationObservationQuery {
+            subject: "Controller".into(),
+            predicate: "blocks".into(),
+            object: "Actuator".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+        };
+        let policy = RelationConstraintSearchPolicy::new(1.0, 1.0, true)
+            .unwrap()
+            .with_abstain_on_conflicting_evidence(false);
+        let report = graph.search_role_observations_with_relation_constraints_and_policy(
+            &query,
+            &[constraint],
+            4,
+            2,
+            RoleObservationSearchConfig::new(0.99).unwrap(),
+            policy,
+        );
+
+        assert_eq!(
+            report.decision,
+            RelationConstrainedQueryDecision::EligibleCandidatesAvailable
+        );
+        assert_eq!(report.conflicting_evidence.len(), 1);
+        let positive_result = report
+            .candidates
+            .iter()
+            .find(|item| item.retrieval.fact_id == positive_id)
+            .unwrap();
+        assert_eq!(
+            positive_result.decision,
+            RelationConstraintDecision::EligibleForReview
+        );
+        assert!(positive_result.abstention_reasons.is_empty());
+    }
+
+    #[test]
     fn test_confidence_decay() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
