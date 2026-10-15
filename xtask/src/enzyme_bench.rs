@@ -607,6 +607,78 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    fn rewrite_csv_field(root: &Path, observation_id: &str, field_name: &str, value: &str) -> Vec<u8> {
+        let csv_path = root.join("data/synthetic_enzyme_observations.csv");
+        let original = fs::read(&csv_path).unwrap();
+        let mut reader = csv::Reader::from_reader(original.as_slice());
+        let headers = reader.headers().unwrap().clone();
+        let observation_index = headers.iter().position(|name| name == "observation_id").unwrap();
+        let field_index = headers.iter().position(|name| name == field_name).unwrap();
+        let mut writer = csv::Writer::from_writer(Vec::new());
+        writer.write_record(&headers).unwrap();
+        for row in reader.records() {
+            let mut fields: Vec<String> = row.unwrap().iter().map(str::to_string).collect();
+            if fields[observation_index] == observation_id {
+                fields[field_index] = value.to_string();
+            }
+            writer.write_record(fields).unwrap();
+        }
+        let changed = writer.into_inner().unwrap();
+        fs::write(csv_path, &changed).unwrap();
+        changed
+    }
+
+    fn replace_split_manifest(root: &Path, manifest: &mut Value, split: Value) {
+        let bytes = serde_json::to_vec_pretty(&split).unwrap();
+        fs::write(root.join("data/splits.json"), &bytes).unwrap();
+        manifest["split_manifest_artifact"]["sha256"] =
+            json!(format!("{:x}", Sha256::digest(&bytes)));
+    }
+
+    #[test]
+    fn study_holdout_reports_family_overlap_instead_of_silently_claiming_family_generalization() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        let dataset_bytes = rewrite_csv_field(&root, "obs-b", "sequence_family_id", "family-a");
+        value["dataset_artifact"]["sha256"] = json!(format!("{:x}", Sha256::digest(&dataset_bytes)));
+        let split = json!({
+            "schema_version": 1,
+            "split_mode": "study_holdout",
+            "train_study_ids": ["study-a"],
+            "test_study_ids": ["study-b"],
+            "train_sequence_family_ids": [],
+            "test_sequence_family_ids": []
+        });
+        replace_split_manifest(&root, &mut value, split);
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let report = validate(&root, &parsed).unwrap();
+        assert_eq!(report.cross_split_families, 1);
+        assert_eq!(report.cross_split_studies, 0);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn sequence_family_holdout_reports_study_overlap_instead_of_silently_claiming_study_independence() {
+        let root = fixture_root();
+        let mut value = make_manifest(&root);
+        let dataset_bytes = rewrite_csv_field(&root, "obs-b", "source_study_id", "study-a");
+        value["dataset_artifact"]["sha256"] = json!(format!("{:x}", Sha256::digest(&dataset_bytes)));
+        let split = json!({
+            "schema_version": 1,
+            "split_mode": "sequence_family_holdout",
+            "train_study_ids": [],
+            "test_study_ids": [],
+            "train_sequence_family_ids": ["family-a"],
+            "test_sequence_family_ids": ["family-b"]
+        });
+        replace_split_manifest(&root, &mut value, split);
+        let parsed: Manifest = serde_json::from_value(value).unwrap();
+        let report = validate(&root, &parsed).unwrap();
+        assert_eq!(report.cross_split_studies, 1);
+        assert_eq!(report.cross_split_families, 0);
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn rejects_uncleared_rights_even_when_license_is_named() {
         let root = fixture_root();
