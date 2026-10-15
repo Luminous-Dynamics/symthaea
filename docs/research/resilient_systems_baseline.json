@@ -331,6 +331,33 @@
         "workflow_passed",
         "field_validated"
       ]
+    },
+    "performance_targets": {
+      "status": "proposed_unmeasured_targets",
+      "reference_case": {
+        "services": 100,
+        "dependency_edges_max": 200,
+        "disruption_records": 20,
+        "time_steps": 730,
+        "target_p95_runtime_ms": 100,
+        "build_profile": "release"
+      },
+      "batch_case": {
+        "scenario_count": 1000,
+        "target_runtime_seconds": 60
+      },
+      "large_case": {
+        "services": 1000,
+        "dependency_edges_max": 2000,
+        "time_steps": 730,
+        "target_single_run_seconds": 2
+      },
+      "requirements": [
+        "record_cpu_os_rustc_version_build_profile_commit_and_configuration_digest",
+        "preserve_per_service_traces",
+        "no_semantic_or_time_resolution_reduction_to_meet_performance_target",
+        "measure_on_documented_reference_host_before_adopting_as_release_gate"
+      ]
     }
   }
 }
