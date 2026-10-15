@@ -223,6 +223,46 @@ Evaluate by *future* time periods and held-out segments/routes; report site-leve
 
 The first prototype may use openly permitted synthetic data to validate the pipeline, but it must label those results synthetic and must not claim real-rail predictive performance from them.
 
+#### Preregistered benchmark execution contract
+
+**Data-admission gate (run before modeling):**
+1. Find an actual dataset with documented permission for the proposed use, or record **data access unresolved**. An official research report is evidence about a method, not proof that the underlying telemetry can be downloaded or redistributed.
+2. Freeze a source manifest and extraction/normalization code identity. Record licence/terms, unit definitions, coordinate/chainage semantics, segment identity, measurement channel, direction, instrument/method, calibration, missingness, quality flags, resampling, time coverage, and maintenance-history availability.
+3. If chainage/segment alignment or the meaning of a field cannot be resolved, quarantine it or mark it unresolved. Do not silently merge tracks, interpolate missing inspections into facts, or coerce unknown units to a default.
+4. Record whether maintenance events are actual retrospective events, interventions known at forecast time, or planned interventions. These are different information sets.
+
+**Two separate forecast estimands (never combine):**
+- **Operational forecast:** use only data that would have been available at the declared forecast issue time. Past maintenance can be used. Planned future work can be used only if it was recorded as known at issue time. Unexpected maintenance that occurs later must not be leaked into the predictor.
+- **Post-intervention/conditional forecast:** after an intervention actually occurs, update the state using the recorded intervention and subsequent measurement. Test whether the model correctly represents the new condition trajectory/reset. Do not describe this as forecasting the unknown intervention in advance.
+
+This distinction matters because FRA RR 26-01 says maintenance-event covariates improved forecasts but also describes the work as an initial investigation with case studies as a next research step. Reproducing that finding requires clarifying the event timing/information available in the data; it is not by itself field validation of a general predictor.
+
+**Frozen comparison plan:**
+1. Use rolling-origin evaluation in chronological order. Select training/validation/test cutoffs before model fitting; no random row split as the primary evaluation.
+2. Add whole-segment/route holdouts where source identity and population size permit; use the current qualified split/independence owners rather than a local split engine. Declare whether the claim is future-window, segment, route, region or operator transfer.
+3. Compare against persistence/last value and a simple trend baseline, then a reproducible SARIMAX and/or Prophet-style model if data shape and assumptions fit, the current owner/operator model when supplied, and only then Symthaea/HDC/CfC experiments.
+4. Define target geometry channels and forecast horizons before looking at test results. If the operationally meaningful horizon is unknown, run a labelled exploratory horizon analysis and preregister the confirmatory horizon later.
+5. Primary evaluation should include predeclared threshold-crossing detection/underprediction and warning lead time at owner-supplied, versioned limits; secondary results can include MAE/RMSE, calibration, false-alert burden and subgroup/site variation. Thresholds come from the applicable current owner/operator rules, not an AI-chosen value.
+6. Keep results separated by route/segment, asset class, inspection spacing, instrument/source, maintenance state and operating/environment regime where samples allow. Show the population and uncertainty for each slice; don't infer absent subgroup performance.
+7. Freeze predictions and target labels before the independent evaluator runs. The evaluator recomputes data checks, split membership, metrics and summaries from the frozen artifacts. It must include null/missing cases and inspect data leakage.
+
+**Mandatory hostile/negative controls:**
+- shuffled target and a source/study/segment ID-only model;
+- future actual maintenance event accidentally exposed to an operational-forecast feature;
+- duplicated/adjacent segment windows split across train and test;
+- reversed chainage/direction or mismatched units;
+- a segment whose inspection becomes stale or missing;
+- one route/instrument dominates the aggregate score while another deteriorates;
+- post-maintenance reset wrongly counted as model success or failure without recording intervention timing;
+- a model that predicts average error well but systematically under-predicts critical deterioration;
+- synthetic rows mixed into the real evaluation denominator.
+
+**Stop / advance rules:**
+- Stop data claims if access rights, source lineage, target definition, unit mapping or intervention timing remains unresolved.
+- Stop any accuracy claim if baseline replication cannot be reconciled to the described input population or if leakage controls fail.
+- Advance to a reviewable research result only if the declared held-out evaluation, uncertainty report, adverse-slice report and independent metric receipt are complete.
+- A model result may inform an inspection-priority proposal, but cannot alter allowable operating limits, suppress an inspection, authorize a speed restriction/removal, or dispatch a train. Those remain operator/authority decisions.
+
 ### B4. Cross-project contracts
 
 - **Symthaea:** canonical asset/observation identity; separate as-designed/as-built/as-operated/observed/inferred/synthetic states; predictor identity/calibration/uncertainty; condition trajectories and decisions.
