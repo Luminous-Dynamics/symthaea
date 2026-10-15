@@ -475,15 +475,24 @@ mod tests {
         let mut mgr = KnowledgeManager::default();
         mgr.bootstrap_entities();
 
-        // Insert some knowledge
-        mgr.process("Iran caused sanctions to escalate.", 1);
-        mgr.process("Sanctions caused oil shortage.", 2);
+        // A single known causal fact makes the metadata assertions unambiguous.
+        let input = "Iran caused sanctions to escalate.";
+        mgr.process(input, 1);
 
-        let ctx = ReasoningContext::from_manager(&mgr, "Iran sanctions");
-        // Context should have been assembled (may or may not be grounded
-        // depending on HDC similarity thresholds)
+        let ctx = ReasoningContext::from_manager(&mgr, input);
         assert!(ctx.epistemic_state.uncertainty >= 0.0);
         assert!(ctx.epistemic_state.uncertainty <= 1.0);
+        let grounded = ctx
+            .relevant_facts
+            .iter()
+            .find(|fact| fact.text.contains("Iran caused sanctions to escalate"))
+            .expect("reasoning context should retain the source fact text");
+        assert_eq!(grounded.domain.as_deref(), Some("geopolitics"));
+        assert!(grounded.is_causal);
+        assert!(
+            !ctx.relevant_facts.iter().any(|fact| fact.text.starts_with("fact:")),
+            "opaque graph IDs must not be presented as grounded fact text"
+        );
     }
 
     #[test]
@@ -533,6 +542,22 @@ mod tests {
         assert!(summary.contains("Known facts"));
         assert!(summary.contains("Causal chains"));
         assert!(!summary.contains("WARNING"));
+    }
+
+    #[test]
+    fn test_summary_separates_confounders_from_direct_contradictions() {
+        let epistemic = EpistemicState {
+            uncertainty: 0.2,
+            novelty: 0.1,
+            contradiction_count: 0,
+            has_grounding: true,
+            confidence_multiplier: 0.8,
+        };
+
+        let summary = generate_summary(&[], &[], &epistemic, 2);
+        assert!(summary.contains("2 potential confounder warning(s)"));
+        assert!(summary.contains("not direct contradiction alerts"));
+        assert!(!summary.contains("direct knowledge-graph contradiction(s)"));
     }
 
     #[test]
