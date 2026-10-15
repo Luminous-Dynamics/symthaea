@@ -405,7 +405,10 @@ pub fn evaluate_suit_profile(
 mod tests {
     use super::*;
 
-    fn declaration(profile: SuitMissionProfile, level: SuitEvidenceLevel) -> SuitVariantDeclaration {
+    fn declaration(
+        profile: SuitMissionProfile,
+        level: SuitEvidenceLevel,
+    ) -> SuitVariantDeclaration {
         SuitVariantDeclaration {
             variant_id: format!("research-{:?}", profile),
             hardware_revision: "prototype-r1".to_string(),
@@ -450,8 +453,13 @@ mod tests {
 
     #[test]
     fn missing_capability_is_not_interpreted_as_compatibility() {
-        let mut variant = declaration(SuitMissionProfile::LunarSurfaceEva, SuitEvidenceLevel::BenchTested);
-        variant.capability_claims.retain(|claim| claim.capability != SuitCapability::DustMitigation);
+        let mut variant = declaration(
+            SuitMissionProfile::LunarSurfaceEva,
+            SuitEvidenceLevel::BenchTested,
+        );
+        variant
+            .capability_claims
+            .retain(|claim| claim.capability != SuitCapability::DustMitigation);
         let result = evaluate_suit_profile(
             SuitMissionProfile::LunarSurfaceEva,
             &variant,
@@ -476,19 +484,34 @@ mod tests {
     #[test]
     fn evidence_for_one_capability_does_not_transfer_to_another() {
         let mut variant = declaration(SuitMissionProfile::OrbitalEva, SuitEvidenceLevel::Qualified);
-        variant.capability_claims.retain(|claim| claim.capability == SuitCapability::PressureBoundaryIntegrity);
+        variant
+            .capability_claims
+            .retain(|claim| claim.capability == SuitCapability::PressureBoundaryIntegrity);
         let result = evaluate_suit_profile(
             SuitMissionProfile::OrbitalEva,
             &variant,
             policy(SuitEvidenceLevel::Declared),
         ).unwrap();
-        assert_eq!(result.findings.iter().filter(|finding| finding.status == SuitCapabilityFindingStatus::MissingRequiredCapability).count(), SuitMissionProfile::OrbitalEva.required_capabilities().len() - 1);
+        let missing_count = result
+            .findings
+            .iter()
+            .filter(|finding| {
+                finding.status == SuitCapabilityFindingStatus::MissingRequiredCapability
+            })
+            .count();
+        assert_eq!(
+            missing_count,
+            SuitMissionProfile::OrbitalEva.required_capabilities().len() - 1
+        );
         assert!(!result.represents_hardware_qualification);
     }
 
     #[test]
     fn duplicate_capability_claims_are_explicitly_conflicted() {
-        let mut variant = declaration(SuitMissionProfile::OrbitalEva, SuitEvidenceLevel::BenchTested);
+        let mut variant = declaration(
+            SuitMissionProfile::OrbitalEva,
+            SuitEvidenceLevel::BenchTested,
+        );
         variant.capability_claims.push(variant.capability_claims[0].clone());
         let result = evaluate_suit_profile(
             SuitMissionProfile::OrbitalEva,
@@ -501,7 +524,10 @@ mod tests {
 
     #[test]
     fn declaration_order_does_not_change_findings() {
-        let variant = declaration(SuitMissionProfile::MarsSurfaceEva, SuitEvidenceLevel::BenchTested);
+        let variant = declaration(
+            SuitMissionProfile::MarsSurfaceEva,
+            SuitEvidenceLevel::BenchTested,
+        );
         let mut reversed = variant.clone();
         reversed.capability_claims.reverse();
         let first = evaluate_suit_profile(
@@ -519,7 +545,10 @@ mod tests {
 
     #[test]
     fn evidence_policy_is_explicit_and_not_selected_by_the_profile() {
-        let variant = declaration(SuitMissionProfile::LunarSurfaceEva, SuitEvidenceLevel::HumanInLoop);
+        let variant = declaration(
+            SuitMissionProfile::LunarSurfaceEva,
+            SuitEvidenceLevel::HumanInLoop,
+        );
         let permissive = evaluate_suit_profile(
             SuitMissionProfile::LunarSurfaceEva,
             &variant,
