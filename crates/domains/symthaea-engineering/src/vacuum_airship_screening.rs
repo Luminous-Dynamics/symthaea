@@ -385,7 +385,8 @@ fn wilson_score_interval(
     Ok(interval)
 }
 
-/// Derive detection and false-alarm rates from qualification counts, retaining sampling uncertainty.
+/// Derive detection and false-alarm rates from qualification counts, retaining sampling
+/// uncertainty.
 ///
 /// The trials must represent the intended manufacturing process, critical-defect class, geometry,
 /// size/orientation range, inspection method and threshold. Aggregate counts across unlike strata
@@ -3486,10 +3487,20 @@ mod tests {
         .unwrap();
         assert_eq!(result.probability_of_detection.observed_rate, 0.9);
         assert_eq!(result.false_alarm_rate.observed_rate, 0.04);
-        assert!(result.probability_of_detection.wilson_confidence_interval.min < 0.9);
-        assert!(result.probability_of_detection.wilson_confidence_interval.max > 0.9);
-        assert!(result.false_alarm_rate.wilson_confidence_interval.min < 0.04);
-        assert!(result.false_alarm_rate.wilson_confidence_interval.max > 0.04);
+        assert!(
+            (result.probability_of_detection.wilson_confidence_interval.min - 0.698966).abs()
+                < 0.000001
+        );
+        assert!(
+            (result.probability_of_detection.wilson_confidence_interval.max - 0.972134).abs()
+                < 0.000001
+        );
+        assert!(
+            (result.false_alarm_rate.wilson_confidence_interval.min - 0.011039).abs() < 0.000001
+        );
+        assert!(
+            (result.false_alarm_rate.wilson_confidence_interval.max - 0.134601).abs() < 0.000001
+        );
     }
 
     #[test]
