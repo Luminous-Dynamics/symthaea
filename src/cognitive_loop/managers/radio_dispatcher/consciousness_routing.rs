@@ -154,6 +154,29 @@ impl ConsciousnessAwareRouter {
         governance_tier: u8,
         current_cycle: u64,
     ) {
+        // Peer reports cross an untrusted network boundary. Reject invalid values
+        // before allocating state or changing the trust score; clamping malformed
+        // reports would silently turn attacker-controlled data into plausible data.
+        if !phi.is_finite()
+            || !(0.0..=1.0).contains(&phi)
+            || !consciousness_level.is_finite()
+            || !(0.0..=1.0).contains(&consciousness_level)
+            || governance_tier > 4
+        {
+            return;
+        }
+
+        // Delayed packets must not roll a peer's state backward. This is not a
+        // substitute for authenticated sequence numbers, but avoids overwriting a
+        // newer accepted sample with an obviously older cycle.
+        if self
+            .peer_phi
+            .get(&peer_id)
+            .is_some_and(|state| current_cycle < state.last_update_cycle)
+        {
+            return;
+        }
+
         let state = self
             .peer_phi
             .entry(peer_id)
@@ -718,5 +741,43 @@ impl StoreAndForward {
     /// Total reconnection events this session.
     pub fn reconnection_count(&self) -> u32 {
         self.reconnection_count
+    }
+}
+
+
+#[cfg(test)]
+mod peer_report_validation_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_non_finite_out_of_range_and_unknown_tier_reports() {
+        let mut router = ConsciousnessAwareRouter::default();
+
+        router.update_peer([1; 8], f32::NAN, 0.5, 1, 1);
+        router.update_peer([2; 8], 0.5, f32::INFINITY, 1, 1);
+        router.update_peer([3; 8], -0.01, 0.5, 1, 1);
+        router.update_peer([4; 8], 0.5, 1.01, 1, 1);
+        router.update_peer([5; 8], 0.5, 0.5, 5, 1);
+
+        assert_eq!(
+            router.peer_count(),
+            0,
+            "invalid peer reports must not allocate peer state"
+        );
+    }
+
+    #[test]
+    fn stale_cycle_cannot_overwrite_a_newer_peer_sample() {
+        let mut router = ConsciousnessAwareRouter::default();
+        let peer = [9; 8];
+
+        router.update_peer(peer, 0.8, 0.7, 2, 10);
+        router.update_peer(peer, 0.1, 0.2, 1, 9);
+
+        let accepted = router.peer_phi.get(&peer).expect("valid sample retained");
+        assert_eq!(accepted.phi, 0.8);
+        assert_eq!(accepted.consciousness_level, 0.7);
+        assert_eq!(accepted.governance_tier, 2);
+        assert_eq!(accepted.last_update_cycle, 10);
     }
 }
