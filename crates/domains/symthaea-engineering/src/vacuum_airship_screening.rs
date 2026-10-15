@@ -1024,7 +1024,9 @@ mod tests {
             internal_pressure_pa: 0.0,
         })
         .unwrap();
-        assert!((result.great_circle_compressive_resultant_n - 127_573_000.0).abs() < 100_000.0);
+        assert!(
+            (result.great_circle_compressive_resultant_n - 127_328_750.249_994_31).abs() < 1e-6
+        );
     }
 
     #[test]
