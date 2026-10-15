@@ -9,7 +9,9 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +59,20 @@ def reject_non_finite_constant(value: str) -> None:
     raise ValidationFailure(f"non-standard numeric constant is not permitted in JSON: {value}")
 
 
+def parse_finite_float(value: str) -> float:
+    """Reject numbers that overflow or underflow Python's floating-point data model."""
+    try:
+        parsed = float(value)
+        exact = Decimal(value)
+    except (ValueError, InvalidOperation) as exc:
+        raise ValidationFailure(f"invalid JSON numeric value: {value}") from exc
+    if not math.isfinite(parsed):
+        raise ValidationFailure(f"JSON numeric value overflows finite float range: {value}")
+    if parsed == 0.0 and exact != 0:
+        raise ValidationFailure(f"JSON numeric value underflows float range: {value}")
+    return parsed
+
+
 def load_json(path: Path) -> Any:
     try:
         with path.open("r", encoding="utf-8") as handle:
@@ -64,6 +80,7 @@ def load_json(path: Path) -> Any:
                 handle,
                 object_pairs_hook=reject_duplicate_object_keys,
                 parse_constant=reject_non_finite_constant,
+                parse_float=parse_finite_float,
             )
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValidationFailure) as exc:
         raise ValidationFailure(f"{path}: cannot load strict JSON: {exc}") from exc
