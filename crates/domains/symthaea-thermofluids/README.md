@@ -19,8 +19,8 @@ reference values.
   closes within an explicit relative tolerance.
 - `energy_interval` — transient interval-integrated conservation checks that
   account for changes in stored energy, plus a duty-cycle aggregator that validates
-  every interval before combining totals. It reports net cycle efficiency only when
-  stored energy finishes within the declared tolerance of its starting state.
+  every interval before combining totals. It reports net cycle efficiency only when stored energy finishes within the
+  declared tolerance of its starting state and does not show net discharge.
 
 The steady-state API assumes a steady-state boundary. Transient tests must account
 for stored energy gained or released over a clearly registered interval. Duty-cycle
