@@ -225,7 +225,11 @@ impl KnowledgeEncoder {
         }
     }
 
-    /// Create a query vector for compositional search
+    /// Create a legacy, untyped query vector for compositional search.
+    ///
+    /// This compatibility API has no EntityType parameter and therefore does
+    /// not reproduce the type-bound role vectors stored for facts.
+    /// Prefer compose_typed_query / encode_role_terms for role-aware search.
     ///
     /// Example: to find "who sanctioned Iran?", call:
     /// ```rust,ignore
@@ -243,6 +247,60 @@ impl KnowledgeEncoder {
                 components.push(role_basis.bind(&term_hv));
             }
         }
+
+        if components.is_empty() {
+            BinaryHV::random(0)
+        } else {
+            BinaryHV::bundle(&components)
+        }
+    }
+
+    /// Encode typed role terms using the same binding algebra as stored facts.
+    ///
+    /// A fact entity is encoded as role ⊗ (token ⊗ entity type). This helper
+    /// deliberately mirrors that path so callers can compare query observations
+    /// with persisted role-bound observations without silently mixing spaces.
+    pub fn encode_role_terms(
+        &mut self,
+        role_terms: &[(SemanticRole, &str, EntityType)],
+    ) -> Vec<RoleBoundVector> {
+        let mut observations = Vec::with_capacity(role_terms.len());
+
+        for (role, term, entity_type) in role_terms {
+            let role_basis = match self.role_bases.get(role).copied() {
+                Some(basis) => basis,
+                None => continue,
+            };
+            let type_basis = self
+                .type_bases
+                .get(entity_type)
+                .copied()
+                .unwrap_or_else(|| BinaryHV::random(999));
+            let entity = self.encode_token(term);
+            let typed_entity = entity.bind(&type_basis);
+            observations.push(RoleBoundVector {
+                role: *role,
+                entity_text: (*term).to_string(),
+                vector: role_basis.bind(&typed_entity),
+            });
+        }
+
+        observations
+    }
+
+    /// Compose a query with the same role/type binding algebra used by facts.
+    ///
+    /// This returns a bundled HDC retrieval vector. Its similarity is not an
+    /// epistemic confidence estimate and is not evidence that a claim is true.
+    pub fn compose_typed_query(
+        &mut self,
+        role_terms: &[(SemanticRole, &str, EntityType)],
+    ) -> BinaryHV {
+        let components: Vec<BinaryHV> = self
+            .encode_role_terms(role_terms)
+            .into_iter()
+            .map(|observation| observation.vector)
+            .collect();
 
         if components.is_empty() {
             BinaryHV::random(0)
@@ -364,6 +422,36 @@ mod tests {
             agents[0].vector.similarity(&agents[1].vector) < 1.0,
             "distinct same-role entities must retain distinct bound vectors"
         );
+    }
+
+    #[test]
+    fn test_typed_role_query_matches_fact_encoding_algebra() {
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let fact = make_test_fact();
+        let encoding = encoder.encode_fact(&fact);
+
+        let query = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "United States",
+            EntityType::Organization,
+        )]);
+        assert_eq!(query.len(), 1);
+        let stored = encoding
+            .role_vector_observations
+            .iter()
+            .find(|observation| {
+                observation.role == SemanticRole::Agent
+                    && observation.entity_text == "United States"
+            })
+            .expect("fact encoding should retain the Agent observation");
+
+        assert_eq!(query[0].vector, stored.vector);
+        let composed = encoder.compose_typed_query(&[(
+            SemanticRole::Agent,
+            "United States",
+            EntityType::Organization,
+        )]);
+        assert_eq!(composed, stored.vector);
     }
 
     #[test]
