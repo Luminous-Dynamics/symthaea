@@ -148,16 +148,22 @@ A thin independent verifier should read the frozen artifacts independently of th
 
 ### Phase 3 — Make the independent benchmark boring and trustworthy
 
-- Freeze the source rights, corpus, family/study groupings, split, target, baselines, scoring code, uncertainty methods, and negative controls before held-out labels are examined.
-- Have an independent verifier reproduce baseline metrics and all denominators.
-- Run the transportability ladder only where the corpus supports each dimension.
-- Do not claim improvement unless the confidence/uncertainty analysis and negative controls support it.
+- Freeze source rights, corpus, study/family/campaign groupings, split, target, baseline model versions, scoring code, uncertainty methods, decision metric, and negative controls before held-out labels are examined.
+- Have an independent verifier reproduce every baseline metric, exclusion, denominator, and confidence interval from the same staged artifacts.
+- Evaluate under the same assay-context/campaign groupings wherever possible; never let related replicates, re-hosted records, or measurements from the same mutagenesis campaign leak across train and test.
+- Retain the four existing transparent baselines (constant median, context-group median, descriptor k-nearest-neighbor, and Symthaea-assisted) as the first, low-cost rung. Once permissible data/model licenses and compute are checked, add a predeclared set of strong external baselines rather than selectively choosing them after seeing results: a published kinetic predictor (for example CatPred/UniKP where their intended inputs and model artifacts can be fairly reproduced), a zero-shot sequence-fitness baseline or consensus where scientifically appropriate, and random ranking for candidate-selection tasks.
+- Score both prediction and decision utility: appropriate endpoint error (including log-scale error for wide-range positive kinetics), fraction within one order of magnitude, prediction-interval coverage/calibration when intervals are produced, ranking enrichment/top-k hit rate, and cost-normalized utility. Pre-register primary metrics and guard against picking whichever metric makes a method look best.
+- Run each transportability track only where the corpus supports it. If family, protocol, or campaign metadata are inadequate, mark that track not estimable rather than laundering it into a score.
+- Do not claim improvement unless matched-split baselines, uncertainty analysis, denominators, and negative controls support it. An in-database retrospective result is not evidence of prospective utility.
+
+**Why this is stricter than a leaderboard:** CatPred already reports query-specific uncertainty and sequence-distribution transfer tests. The 2026 EnzyArena bioRxiv preprint reports that supervised kinetic-parameter predictors lose advantage on independent mutagenesis datasets and that one tested supervised predictor underperformed random selection in its 150-mutant prospective campaign, while a zero-shot sequence model ranked better. Treat that as a consequential but provisional result until peer-reviewed or independently reproduced; use it to design fair tests, not to assume a universal winner. A Symthaea result is valuable only if it earns its place in this shared, preregistered comparison.
 
 ### Phase 4 — Move to prospective value
 
 - Preregister a bounded, low-risk, human-reviewed experiment chosen for a clearly stated decision or information-value reason.
-- Freeze predictions and abstentions before observations are captured.
-- Compare the resulting decision with a predeclared baseline under the same cost and safety constraints.
+- Freeze all model versions, scores, intervals, abstentions, random seed, candidate eligibility rules, and the random-selection baseline before observations are captured.
+- Compare the resulting decision with predeclared baselines under the same assay, budget, sample size, and safety constraints; report the complete denominator and unsuccessful outcomes.
+- Prioritize decision metrics that survive the cost of testing—such as useful hits per assay budget or enrichment at a fixed experimental capacity—not only correlation or retrospective parameter error. Preserve null findings when the system does not improve outcomes.
 
 ## Exit criteria that prevent self-deception
 
