@@ -78,6 +78,11 @@ CARGO_LOCK_CLOSURE_ROOT="$clean_root" CARGO_BIN="$clean_root/bin/fake-cargo" CAR
   bash "$HELPER" target/cargo-lock-closure > "$TMP/clean.stdout"
 grep -q '"classification": "LOCK_CLEAN"' "$clean_root/target/cargo-lock-closure/report.json" \
   || fail "clean lock was not classified LOCK_CLEAN"
+grep -q '"projection_metadata_exit_code": null' "$clean_root/target/cargo-lock-closure/report.json" \
+  || fail "clean report should mark projection as not run"
+grep -q '"proposed_locked_metadata_exit_code": null' "$clean_root/target/cargo-lock-closure/report.json" \
+  || fail "clean report should mark proposed-lock validation as not run"
+[[ -s "$clean_root/target/cargo-lock-closure/toolchain.txt" ]] || fail "toolchain provenance is missing"
 [[ "$(cat "$clean_root/Cargo.lock")" == "committed-lock" ]] || fail "clean lock was altered"
 
 drift_root="$TMP/drift"
@@ -90,6 +95,10 @@ set -e
 [[ "$drift_status" -eq 1 ]] || fail "lock drift should exit 1, got $drift_status"
 grep -q '"classification": "FAIL_LOCK_DRIFT"' "$drift_root/target/cargo-lock-closure/report.json" \
   || fail "lock drift was not classified FAIL_LOCK_DRIFT"
+grep -q '"projection_metadata_exit_code": 0' "$drift_root/target/cargo-lock-closure/report.json" \
+  || fail "drift report should record successful unlocked projection"
+grep -q '"proposed_locked_metadata_exit_code": 0' "$drift_root/target/cargo-lock-closure/report.json" \
+  || fail "drift report should record successful proposed-lock validation"
 [[ "$(cat "$drift_root/Cargo.lock")" == "committed-lock" ]] || fail "helper did not restore the committed lock"
 [[ "$(cat "$drift_root/target/cargo-lock-closure/proposed-Cargo.lock")" == "proposed-lock" ]] \
   || fail "Cargo-generated proposed lock was not retained"
@@ -106,6 +115,10 @@ set -e
 [[ "$resolution_status" -eq 2 ]] || fail "resolution failure should exit 2, got $resolution_status"
 grep -q '"classification": "FAIL_METADATA_OR_RESOLUTION"' "$resolution_root/target/cargo-lock-closure/report.json" \
   || fail "resolution failure was not classified separately"
+grep -q '"projection_metadata_exit_code": 101' "$resolution_root/target/cargo-lock-closure/report.json" \
+  || fail "resolution report should preserve the projection exit code"
+grep -q '"proposed_locked_metadata_exit_code": null' "$resolution_root/target/cargo-lock-closure/report.json" \
+  || fail "resolution report should mark proposed-lock validation as not run"
 [[ "$(cat "$resolution_root/Cargo.lock")" == "committed-lock" ]] || fail "resolution failure altered the committed lock"
 
 echo "PASS: Cargo lock-closure helper preserves clean locks, captures Cargo-generated drift, restores the checkout, and distinguishes resolution failures"
