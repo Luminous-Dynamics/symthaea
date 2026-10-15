@@ -996,6 +996,51 @@ mod tests {
     }
 
     #[test]
+    fn test_snapshot_transaction_rollback() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_rollback_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let existing = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "existing fixture".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 3,
+            is_causal: false,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(4),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        persistence.replace_facts_snapshot(&[existing]).unwrap();
+
+        let invalid = FactRecord {
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            source_text: "range fixture".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: u64::MAX,
+            is_causal: false,
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(4),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        assert!(persistence.replace_facts_snapshot(&[invalid]).is_err());
+
+        let loaded = persistence.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].source_text, "existing fixture");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_unconfigured() {
         let mut p = KnowledgePersistence::default();
         assert!(!p.is_configured());
