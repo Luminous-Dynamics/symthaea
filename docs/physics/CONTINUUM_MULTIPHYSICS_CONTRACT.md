@@ -152,6 +152,8 @@ The first code slice is proposed in [Symthaea PR #7448](https://github.com/Lumin
 
 At the energy evidence-ingestion boundary, [Mycelix PR #5025](https://github.com/Luminous-Dynamics/mycelix/pull/5025) separately proposes fail-closed checks for non-finite kWh quantities, reporting periods, meter readings, and trade windows; its tests also remain unrun.
 
+For model-side reservoir and ledger integrity, [Symtropy PR #1622](https://github.com/Luminous-Dynamics/symtropy/pull/1622) hardens energy and heat updates, corrects constant-heat-capacity entropy change, and fixes the 310 K Landauer reference. It does not claim to be a spatial thermal solver or a calibrated neural-energy model.
+
 For geospatial consumers, [Sol Atlas PR #110](https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/110) adds typed run-manifest/evidence metadata, including exact-head gate semantics. This adapter makes provenance and readiness inspectable; it does not validate the underlying physics model.
 
 1. **Inventory and label maturity:** enumerate existing solver assumptions, boundary conditions, material models, and existing tests. Distinguish reference examples from validated models.
