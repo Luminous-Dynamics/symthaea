@@ -2091,6 +2091,14 @@ mod tests {
                 1.0,
             ),
             (
+                Instrument::UprightBass,
+                SampleSource::Vsco2,
+                "Strings/Solo Contrabass/SusNV",
+                "BKCtbss_SusNV_A#0_v1_rr1.wav",
+                22.0,
+                1.0,
+            ),
+            (
                 Instrument::Tuba,
                 SampleSource::Vsco2,
                 "Brass/Tuba/sus",
@@ -2129,11 +2137,21 @@ mod tests {
         );
         write_fixture_wav(
             &vsco2_root
+                .join("Strings/Solo Contrabass/Spic")
+                .join("BKCtbss_Spic_A#0_v1_rr1.wav"),
+            8000,
+        );
+        write_fixture_wav(
+            &vsco2_root
                 .join("Brass/Tenor Trombone/stac")
                 .join("tenortbn_stac_D3_v2_rr1.wav"),
             8000,
         );
 
+        assert_eq!(
+            staccato_subdir(Instrument::UprightBass),
+            Some((SampleSource::Vsco2, "Strings/Solo Contrabass/Spic"))
+        );
         assert_eq!(
             staccato_subdir(Instrument::Tuba),
             Some((SampleSource::Vsco2, "Brass/Tuba/stac"))
@@ -2152,8 +2170,11 @@ mod tests {
             );
             assert!(library.bank(instrument).is_some());
         }
-        for (instrument, midi) in
-            [(Instrument::Tuba, 22.0), (Instrument::Trombone, 50.0)]
+        for (instrument, midi) in [
+            (Instrument::UprightBass, 22.0),
+            (Instrument::Tuba, 22.0),
+            (Instrument::Trombone, 50.0),
+        ]
         {
             assert!(
                 library.staccato_bank(instrument).is_some(),
