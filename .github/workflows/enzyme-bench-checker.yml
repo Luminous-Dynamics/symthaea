@@ -71,6 +71,10 @@ jobs:
             .schema_version == 1 and
             .status == "synthetic_fixture_passed" and
             .parameter_recovery.fixture_gate_passed == true and
+            .model_selection_falsification.michaelis_menten_truth.selected_model == "michaelis_menten" and
+            .model_selection_falsification.michaelis_menten_truth.delta_bic_mm_minus_inhibition < -10.0 and
+            .model_selection_falsification.substrate_inhibition_truth.selected_model == "substrate_inhibition" and
+            .model_selection_falsification.substrate_inhibition_truth.delta_bic_mm_minus_inhibition > 10.0 and
             .model_discrimination_design.selected_condition == 100.0 and
             .km_design_proxy.selected_condition == 2.0
           ' "$report" >/dev/null
