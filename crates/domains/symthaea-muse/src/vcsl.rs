@@ -67,6 +67,8 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 use crate::instruments::Instrument;
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -518,6 +520,286 @@ pub fn library() -> Option<&'static VcslLibrary> {
             lib
         })
         .as_ref()
+}
+
+/// Source-derived sample and renderer capability snapshot. This reports
+/// declared mappings separately from observed on-disk assets: a mapping
+/// declaration alone is not evidence that a sample library is installed.
+#[derive(Debug, Clone, Serialize)]
+pub struct InstrumentCapabilityInventoryV1 {
+    pub schema_version: &'static str,
+    pub source_revision: Option<String>,
+    pub instrument_count: usize,
+    pub vcsl_root: AssetRootEvidenceV1,
+    pub vsco2_root: AssetRootEvidenceV1,
+    pub soundfont: Option<SoundFontEvidenceV1>,
+    pub instruments: Vec<InstrumentCapabilityV1>,
+}
+
+/// Evidence for one library root. The digest binds sorted relative WAV paths
+/// and file sizes, not file contents; it is a lightweight asset-layout seal.
+#[derive(Debug, Clone, Serialize)]
+pub struct AssetRootEvidenceV1 {
+    pub root_present: bool,
+    pub wav_file_count: usize,
+    pub path_size_manifest_sha256: Option<String>,
+}
+
+/// Evidence for an optional SoundFont file. Unlike the path/size manifest
+/// above, this sha256 digest is computed over the file bytes.
+#[derive(Debug, Clone, Serialize)]
+pub struct SoundFontEvidenceV1 {
+    pub file_name: String,
+    pub size_bytes: u64,
+    pub sha256: String,
+}
+
+/// A single sustained or short-articulation mapping and its local availability.
+#[derive(Debug, Clone, Serialize)]
+pub struct SampleDirectoryEvidenceV1 {
+    pub source_library: &'static str,
+    pub relative_directory: String,
+    pub directory_present: bool,
+    /// Number of WAV files whose filenames are accepted by the current
+    /// sample indexer. This does not prove that file decoding will succeed.
+    pub indexed_sample_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct InstrumentCapabilityV1 {
+    pub instrument: String,
+    /// General MIDI program number, zero based. Some instruments use a
+    /// documented nearest-family approximation; this is not source identity.
+    pub gm_program_0_based: u8,
+    /// The Instrument model and renderer fallback path are declared in source.
+    /// This is not a perceptual-fidelity result.
+    pub procedural_fallback_declared: bool,
+    pub sustained_samples: Option<SampleDirectoryEvidenceV1>,
+    pub short_articulation_samples: Option<SampleDirectoryEvidenceV1>,
+}
+
+/// Build a deterministic capability snapshot from the current source mappings
+/// and the asset roots the caller actually supplied. Missing optional libraries
+/// are represented as absent evidence rather than silently counted as coverage.
+pub fn capability_inventory(
+    vcsl_root: &Path,
+    vsco2_root: &Path,
+    soundfont_path: Option<&Path>,
+) -> std::io::Result<InstrumentCapabilityInventoryV1> {
+    const INSTRUMENTS: [Instrument; 42] = [
+        Instrument::Piano,
+        Instrument::PianoPP,
+        Instrument::Violin,
+        Instrument::Cello,
+        Instrument::Flute,
+        Instrument::Organ,
+        Instrument::ElectricPiano,
+        Instrument::Bell,
+        Instrument::AcousticGuitar,
+        Instrument::Harp,
+        Instrument::Pad,
+        Instrument::Clarinet,
+        Instrument::Trumpet,
+        Instrument::Saxophone,
+        Instrument::Marimba,
+        Instrument::Sitar,
+        Instrument::Kalimba,
+        Instrument::SawLead,
+        Instrument::Koto,
+        Instrument::Oud,
+        Instrument::Ney,
+        Instrument::UprightBass,
+        Instrument::Viola,
+        Instrument::Oboe,
+        Instrument::FrenchHorn,
+        Instrument::Bassoon,
+        Instrument::Accordion,
+        Instrument::Mandolin,
+        Instrument::Banjo,
+        Instrument::Vibraphone,
+        Instrument::Celesta,
+        Instrument::ChoirAah,
+        Instrument::StringEnsemble,
+        Instrument::ElectricBass,
+        Instrument::Timpani,
+        Instrument::MusicBox,
+        Instrument::Harpsichord,
+        Instrument::Tuba,
+        Instrument::Trombone,
+        Instrument::Duduk,
+        Instrument::ChoirOoh,
+        Instrument::Xylophone,
+    ];
+
+    let vcsl_evidence = asset_root_evidence(vcsl_root)?;
+    let vsco2_evidence = asset_root_evidence(vsco2_root)?;
+    let soundfont = soundfont_path.map(soundfont_evidence).transpose()?;
+    let instruments = INSTRUMENTS
+        .iter()
+        .copied()
+        .map(|instrument| {
+            let sustained_samples =
+                sample_directory_evidence(instrument, false, vcsl_root, vsco2_root);
+            let short_articulation_samples =
+                sample_directory_evidence(instrument, true, vcsl_root, vsco2_root);
+            InstrumentCapabilityV1 {
+                instrument: format!("{instrument:?}"),
+                gm_program_0_based: instrument.gm_program(),
+                procedural_fallback_declared: true,
+                sustained_samples,
+                short_articulation_samples,
+            }
+        })
+        .collect::<Vec<_>>();
+    let source_revision = std::env::var("SYMTHAEA_SOURCE_REV")
+        .or_else(|_| std::env::var("GITHUB_SHA"))
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+
+    Ok(InstrumentCapabilityInventoryV1 {
+        schema_version: "muse-instrument-capability-inventory-v1",
+        source_revision,
+        instrument_count: instruments.len(),
+        vcsl_root: vcsl_evidence,
+        vsco2_root: vsco2_evidence,
+        soundfont,
+        instruments,
+    })
+}
+
+fn sample_directory_evidence(
+    instrument: Instrument,
+    short_articulation: bool,
+    vcsl_root: &Path,
+    vsco2_root: &Path,
+) -> Option<SampleDirectoryEvidenceV1> {
+    let mapping = if short_articulation {
+        staccato_subdir(instrument)
+    } else {
+        sample_subdir(instrument)
+    }?;
+    let (source, relative_directory) = mapping;
+    let source_name = match source {
+        SampleSource::Vcsl => "vcsl",
+        SampleSource::Vsco2 => "vsco2_ce",
+    };
+    let root = match source {
+        SampleSource::Vcsl => vcsl_root,
+        SampleSource::Vsco2 => vsco2_root,
+    };
+    let directory = root.join(relative_directory);
+    let directory_present = directory.is_dir();
+    let indexed_sample_count = if directory_present {
+        InstrumentBank::index(&directory).map_or(0, |bank| bank.samples.len())
+    } else {
+        0
+    };
+    Some(SampleDirectoryEvidenceV1 {
+        source_library: source_name,
+        relative_directory: relative_directory.to_owned(),
+        directory_present,
+        indexed_sample_count,
+    })
+}
+
+fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
+    if !root.is_dir() {
+        return Ok(AssetRootEvidenceV1 {
+            root_present: false,
+            wav_file_count: 0,
+            path_size_manifest_sha256: None,
+        });
+    }
+
+    let mut entries = Vec::<(String, u64)>::new();
+    collect_wav_manifest(root, root, &mut entries)?;
+    entries.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+
+    let mut hasher = Sha256::new();
+    for (relative_path, size_bytes) in &entries {
+        hasher.update(relative_path.as_bytes());
+        hasher.update(b"\t");
+        hasher.update(size_bytes.to_string().as_bytes());
+        hasher.update(b"\n");
+    }
+    Ok(AssetRootEvidenceV1 {
+        root_present: true,
+        wav_file_count: entries.len(),
+        path_size_manifest_sha256: Some(hex_digest(hasher.finalize().as_slice())),
+    })
+}
+
+fn collect_wav_manifest(
+    root: &Path,
+    current: &Path,
+    output: &mut Vec<(String, u64)>,
+) -> std::io::Result<()> {
+    let mut entries = std::fs::read_dir(current)?.collect::<Result<Vec<_>, _>>()?;
+    entries.sort_unstable_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let file_type = entry.file_type()?;
+        let name = entry.file_name();
+        if file_type.is_dir() {
+            if name == ".git" || name == ".svn" {
+                continue;
+            }
+            collect_wav_manifest(root, &entry.path(), output)?;
+        } else if file_type.is_file()
+            && entry
+                .path()
+                .extension()
+                .and_then(|extension| extension.to_str())
+                == Some("wav")
+        {
+            let path = entry.path();
+            let relative = path.strip_prefix(root).unwrap_or(&path);
+            let relative_path = relative
+                .components()
+                .map(|component| component.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
+            output.push((relative_path, entry.metadata()?.len()));
+        }
+    }
+    Ok(())
+}
+
+fn soundfont_evidence(path: &Path) -> std::io::Result<SoundFontEvidenceV1> {
+    use std::io::Read as _;
+    let mut file = std::fs::File::open(path)?;
+    let size_bytes = file.metadata()?.len();
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(SoundFontEvidenceV1 {
+        file_name: path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned(),
+        size_bytes,
+        sha256: hex_digest(hasher.finalize().as_slice()),
+    })
+}
+
+fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    bytes
+        .as_ref()
+        .iter()
+        .flat_map(|byte| {
+            [
+                HEX[(byte >> 4) as usize] as char,
+                HEX[(byte & 0x0f) as usize] as char,
+            ]
+        })
+        .collect()
 }
 
 #[cfg(test)]
