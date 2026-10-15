@@ -18,13 +18,13 @@ const SCENARIOS: [&str; 10] = [
 ];
 const COHORTS: [&str; 5] = ["cohort_01", "cohort_02", "cohort_03", "cohort_04", "cohort_05"];
 const MIN_ESSENTIALS: f64 = 0.90;
-const MIN_OPPORTUNITY: f64 = 0.80;
+const MIN_LAWFUL_OPPORTUNITY_COVERAGE: f64 = 0.80;
 const MIN_FAIR_PAY: f64 = 0.80;
 const MIN_SAFE_WORK: f64 = 0.90;
-const MIN_STABILITY: f64 = 0.75;
+const MIN_WORK_STABILITY: f64 = 0.75;
 const MIN_SOCIAL_PROTECTION: f64 = 0.75;
-const MAX_ACCESS_MINUTES: f64 = 60.0;
-const MAX_GROUP_GAP: f64 = 0.15;
+const MAX_LAWFUL_ACCESS_TIME_MINUTES: f64 = 60.0;
+const MAX_COHORT_COVERAGE_GAP: f64 = 0.15;
 const MAX_INTERVAL_WIDTH: f64 = 0.20;
 const MAX_TIME_INTERVAL_WIDTH_MINUTES: f64 = 20.0;
 const MAX_EVIDENCE_AGE_DAYS: u32 = 180;
@@ -164,12 +164,12 @@ fn assess_cohort(row: &Row) -> &'static str {
     }
     let checks = [
         higher_is_better(&row.essentials, MIN_ESSENTIALS),
-        higher_is_better(&row.opportunity, MIN_OPPORTUNITY),
+        higher_is_better(&row.opportunity, MIN_LAWFUL_OPPORTUNITY_COVERAGE),
         higher_is_better(&row.pay, MIN_FAIR_PAY),
         higher_is_better(&row.safe_work, MIN_SAFE_WORK),
-        higher_is_better(&row.stability, MIN_STABILITY),
+        higher_is_better(&row.stability, MIN_WORK_STABILITY),
         higher_is_better(&row.social_protection, MIN_SOCIAL_PROTECTION),
-        lower_is_better(&row.access_time, MAX_ACCESS_MINUTES),
+        lower_is_better(&row.access_time, MAX_LAWFUL_ACCESS_TIME_MINUTES),
     ];
     if checks.contains(&"invalid") {
         return "fixture_indeterminate";
@@ -214,7 +214,7 @@ fn assess_scenario(rows: &[&Row]) -> &'static str {
     let essentials_gap = group_gap(rows, |r| &r.essentials);
     let opportunity_gap = group_gap(rows, |r| &r.opportunity);
     match (essentials_gap, opportunity_gap) {
-        (Some(essentials), Some(opportunity)) if essentials <= MAX_GROUP_GAP && opportunity <= MAX_GROUP_GAP => "fixture_pass",
+        (Some(essentials), Some(opportunity)) if essentials <= MAX_COHORT_COVERAGE_GAP && opportunity <= MAX_COHORT_COVERAGE_GAP => "fixture_pass",
         (Some(_), Some(_)) => "fixture_fail",
         _ => "fixture_indeterminate",
     }
@@ -300,7 +300,7 @@ fn run(path: &str) -> Result<(), String> {
         return Err("high mean must not hide a clearly failing cohort floor".to_string());
     }
     let job_count: Vec<&Row> = scenario_map["opportunity_without_quality"].clone();
-    if job_count.iter().any(|row| row.opportunity.low.unwrap_or(0.0) < MIN_OPPORTUNITY)
+    if job_count.iter().any(|row| row.opportunity.low.unwrap_or(0.0) < MIN_LAWFUL_OPPORTUNITY_COVERAGE)
         || assess_scenario(&job_count) != "fixture_fail"
     {
         return Err("high opportunity coverage must not compensate for poor quality dimensions".to_string());
