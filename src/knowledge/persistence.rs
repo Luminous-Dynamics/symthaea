@@ -171,12 +171,13 @@ impl KnowledgePersistence {
             return Err("No database path configured".into());
         }
 
-        let conn = self.open_connection()?;
+        let mut conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-        conn.execute_batch("BEGIN IMMEDIATE TRANSACTION")
-            .map_err(|e| e.to_string())?;
+        let tx = conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(|e| format!("Begin fact snapshot transaction: {e}"))?;
 
-        conn.execute("DELETE FROM knowledge_facts", [])
+        tx.execute("DELETE FROM knowledge_facts", [])
             .map_err(|e| format!("Clear previous fact snapshot: {e}"))?;
 
         let mut count = 0;
@@ -189,7 +190,7 @@ impl KnowledgePersistence {
                 .transpose()
                 .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
 
-            conn.execute(
+            tx.execute(
                 "INSERT INTO knowledge_facts
                  (vector_blob, source_text, confidence, domain, cycle, is_causal,
                   initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
@@ -211,7 +212,7 @@ impl KnowledgePersistence {
             count += 1;
         }
 
-        conn.execute_batch("COMMIT")
+        tx.commit()
             .map_err(|e| format!("Commit fact snapshot: {e}"))?;
         self.total_saved += count as u64;
         Ok(count)
