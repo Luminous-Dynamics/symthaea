@@ -26,6 +26,7 @@ The current implementation deliberately reports endpoint trends only. It does no
 - Identical same-time samples from one source collapse to one sample. Contradictory values from one source at the same timestamp are Conflicted; no slope or rate interval is emitted.
 - With enough valid samples, adequate observed span, and no gap exceeding the maximum, the rate is the endpoint secant rate: (last value − first value) / elapsed seconds. It is not a fitted regression trend and makes no assumption of continuous sampling between timestamps.
 - The reported lower/upper rate bounds are arithmetic endpoint envelopes computed from the two endpoint absolute uncertainties. They are not statistical confidence intervals or calibration claims.
+- Every eligible source trend also reports observed minimum/maximum and maximum deviation from the endpoint secant, so a benign start/end rate cannot hide a transient spike. This deviation is descriptive evidence, not an alarm threshold.
 - Large final disagreement between independent sources marks the aggregate lane Conflicted. Individual source histories remain separately visible for diagnosis.
 - Missing, sparse, conflict-only, invalid, future-only, out-of-window-only, and low-confidence-only lanes do not receive an invented zero rate.
 
@@ -40,6 +41,7 @@ The SHA-256 digests help identify changes and permit independent replay. They do
 The file at crates/domains/symthaea-exoskeleton/tests/fixtures/plss_telemetry_trend_v1.json is corpus v1: 21 observations and 12 exact metric/provenance expectations. It exercises:
 
 - two individually coherent CO2 sensor trends whose final readings disagree;
+- an intermediate CO2 spike that leaves the endpoint rate benign but produces a large maximum deviation diagnostic;
 - a separately retained modeled CO2 trend;
 - same-source timestamp collision with contradictory pressure readings;
 - a valid temperature trend with known endpoint rate;
