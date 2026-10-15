@@ -57,12 +57,12 @@
         },
         {
           "kwh_per_person_day": 10,
-          "site_mwh_per_day": 1.0,
+          "site_mwh_per_day": 1,
           "site_mwh_over_730_days": 730
         },
         {
           "kwh_per_person_day": 20,
-          "site_mwh_per_day": 2.0,
+          "site_mwh_per_day": 2,
           "site_mwh_over_730_days": 1460
         }
       ],
@@ -158,7 +158,10 @@
     "rule": "Terrestrial simulant demonstration is not lunar qualification; a local commodity is not free merely because feedstock is local."
   },
   "community_microfactory": {
-    "pilot_catalog_size_range": [50, 100],
+    "pilot_catalog_size_range": [
+      50,
+      100
+    ],
     "initial_parts_selected_after_screening": 10,
     "part_tiers": {
       "tier_1": "non-safety-critical jigs, covers, fixtures, spacers and low-consequence fit/function replacements",
@@ -213,7 +216,11 @@
     "rule": "Aggregate service averages may not conceal a subgroup falling below a required capability floor."
   },
   "proposed_stress_tests": {
-    "settlement_power_outage_days": [3, 14, 30],
+    "settlement_power_outage_days": [
+      3,
+      14,
+      30
+    ],
     "network_study_horizon_months": 24,
     "negative_controls": [
       "remove_the_supposed_redundant_source",
@@ -222,5 +229,108 @@
       "reduce_a_critical_part_quality_below_acceptance",
       "apply_a_correlated_regional_shock"
     ]
+  },
+  "benchmark_protocol": {
+    "status": "proposed_acceptance_gates_not_published_standards",
+    "levels": {
+      "B0_schema_fail_closed": "Reject 100% of explicitly enumerated malformed-input fixtures.",
+      "B1_deterministic_reference_fixtures": "Identical inputs reproduce identical reports; sufficient-capacity nominal fixture has zero deficit.",
+      "B2_metamorphic_and_negative_controls": [
+        "single independent source loss preserves declared service floor when residual capacity is sufficient",
+        "common-mode source loss removes redundancy credit",
+        "slower restoration does not reduce cumulative deficit",
+        "more severe capacity loss does not improve cumulative deficit",
+        "more nominal capacity does not worsen fulfillment",
+        "unknown dependency and dependency cycle fail closed",
+        "service input order does not change per-service results",
+        "recovery beyond horizon remains unknown"
+      ],
+      "B3_observed_trace_calibration": "At least 3 observed outage/recovery traces; at least 1 held-out event/window; compare with a simple baseline; pre-register domain-specific error tolerances.",
+      "B4_intervention_comparison": "Compare against a declared reference configuration; report Pareto trade-offs and test common-mode dependencies.",
+      "B5_decision_grade": "Independent domain review, traceable data, uncertainty, representative validation, and domain-specific approval."
+    },
+    "scenario_catalog": [
+      {
+        "id": "RS-01",
+        "name": "nominal_sufficient_capacity",
+        "expected": "zero_unmet_service"
+      },
+      {
+        "id": "RS-02",
+        "name": "deliberate_undersizing",
+        "expected": "deficit_without_outage"
+      },
+      {
+        "id": "RS-03",
+        "name": "single_independent_source_loss",
+        "expected": "floor_holds_if_residual_capacity_is_sufficient"
+      },
+      {
+        "id": "RS-04",
+        "name": "common_mode_source_loss",
+        "expected": "deficit_when_no_substitute_exists"
+      },
+      {
+        "id": "RS-05",
+        "name": "upstream_power_loss",
+        "expected": "declared_dependents_degrade"
+      },
+      {
+        "id": "RS-06",
+        "name": "slow_vs_fast_recovery",
+        "expected": "slower_recovery_does_not_improve_total_deficit"
+      },
+      {
+        "id": "RS-07",
+        "name": "mild_vs_severe_loss",
+        "expected": "more_severe_loss_does_not_improve_total_deficit"
+      },
+      {
+        "id": "RS-08",
+        "name": "simultaneous_disruptions",
+        "expected": "each_disruption_is_accounted_for"
+      },
+      {
+        "id": "RS-09",
+        "name": "unknown_dependency",
+        "expected": "explicit_validation_error"
+      },
+      {
+        "id": "RS-10",
+        "name": "dependency_cycle",
+        "expected": "explicit_validation_error"
+      },
+      {
+        "id": "RS-11",
+        "name": "invalid_numeric_inputs",
+        "expected": "explicit_validation_error"
+      },
+      {
+        "id": "RS-12",
+        "name": "input_order_permutation",
+        "expected": "same_per_service_results"
+      },
+      {
+        "id": "RS-13",
+        "name": "recovery_after_horizon",
+        "expected": "recovery_remains_unknown"
+      },
+      {
+        "id": "RS-14",
+        "name": "temporary_rebound_then_rebreach",
+        "expected": "stable_recovery_after_final_violation"
+      }
+    ],
+    "local_validation_status": {
+      "rust_tests_authored": 15,
+      "rust_tests_executed": false,
+      "reason": "Local tool environment did not provide cargo or rustc.",
+      "do_not_claim": [
+        "compiled",
+        "tests_passed",
+        "workflow_passed",
+        "field_validated"
+      ]
+    }
   }
 }
