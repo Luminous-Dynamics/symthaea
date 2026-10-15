@@ -32,7 +32,8 @@
     "descriptive_coverage_counters_sum_to_observation_count": true,
     "tier_counter_implemented": true,
     "profile_is_runtime_policy_source": false,
-    "row_level_tier_labels_emitted": true
+    "row_level_tier_labels_emitted": true,
+    "tier_counts_are_nested": true
   },
   "tiers": [
     {
@@ -44,6 +45,9 @@
         "reported kcat estimate is scientifically correct",
         "kinetic model was independently reproduced",
         "prediction generalizes to unseen enzymes"
+      ],
+      "classifier_checks": [
+        "The corpus-level enzyme-bench-check succeeds after rights, source identity, artifact hashes, target/unit conversion, row identity and split checks."
       ]
     },
     {
@@ -61,7 +65,22 @@
         "assay/measurement method locator and source-record locator"
       ],
       "missingness_policy": "Records lacking any core item remain in the review inventory but do not enter a comparison that assumes that item is known.",
-      "implemented_by": "enzyme-bench-check row-level tier counter"
+      "implemented_by": "enzyme-bench-check row-level tier counter",
+      "classifier_checks": [
+        "ph has status reported and a finite numeric value",
+        "temperature_c has status reported and a finite numeric value",
+        "substrate_id has status reported and a non-empty string value",
+        "enzyme_form is reported and passes the non-empty-string shape check",
+        "substrate_concentration_range is reported with finite lower >= 0, finite upper > lower, and a non-empty unit",
+        "reaction_equation and kinetic_equation are reported non-empty strings",
+        "assay_pressure is reported with a positive finite value and unit, or not_applicable with a non-empty reason",
+        "buffer_system and buffer_concentration are both reported with valid shapes, or both not_applicable with non-empty reasons"
+      ],
+      "manual_review_before_evaluation": [
+        "Verify enzyme/protein accession and source identity refer to the actual assayed catalyst.",
+        "Verify the reaction equation is chemically balanced and the substrate range is relevant to the fitted kinetic regime.",
+        "Assess pH-measurement temperature where material, buffer chemistry/components, and the assay method reference."
+      ]
     },
     {
       "id": "primary_comparison_candidate",
@@ -76,7 +95,21 @@
         "supporting parameter/model context sufficient to distinguish kcat from Vmax or specific activity"
       ],
       "missingness_policy": "Missing any additional required item excludes the record from the strict primary-comparison cohort, while retaining it for transparent secondary/sensitivity summaries.",
-      "implemented_by": "enzyme-bench-check row-level tier counter"
+      "implemented_by": "enzyme-bench-check row-level tier counter",
+      "classifier_checks": [
+        "All context_qualified checks pass",
+        "enzyme_purity is reported with a non-empty description",
+        "enzyme_concentration has a finite positive value and unit, and its unit is one of the implemented molar concentration spellings",
+        "replicate_count and independent_experiment_count are positive integer values",
+        "replicate_structure is reported and non-empty",
+        "measurement_precision has a non-empty measure, finite non-negative numeric value, and non-empty unit",
+        "analysis_method includes non-empty software, version, and method strings"
+      ],
+      "manual_review_before_evaluation": [
+        "Check whether enzyme concentration is total vs active enzyme and whether the subunit/oligomer basis is consistent.",
+        "Check that purity/preparation and uncertainty descriptions are scientifically meaningful, not merely syntactically present.",
+        "Review the kcat calculation, fitting assumptions, parameter identifiability, and source-specific model definition."
+      ]
     },
     {
       "id": "kinetic_reproduction_candidate",
@@ -93,7 +126,18 @@
         "blank/control handling description"
       ],
       "missingness_policy": "Parameter-table reproduction alone is not kinetic-pipeline reproduction.",
-      "implemented_by": "enzyme-bench-check row-level tier counter"
+      "implemented_by": "enzyme-bench-check row-level tier counter",
+      "classifier_checks": [
+        "All primary_comparison_candidate checks pass",
+        "raw_measurement_data is a syntactically valid HTTPS URL without embedded credentials",
+        "raw_measurement_data_sha256 is 64 hexadecimal characters (format only; bytes are not fetched or bound by this checker)",
+        "initial_rate_method and controls_description are reported non-empty strings"
+      ],
+      "manual_review_before_evaluation": [
+        "Fetch raw data under authorized terms and independently verify SHA-256 against the exact bytes.",
+        "Confirm units, measurement identifiers, replicate-level data, blanks/controls, assay direction/readout and initial-rate window.",
+        "Confirm fitted model, parameterization, constraints, optimizer/version/settings, numerical tolerances and failed-fit accounting."
+      ]
     }
   ],
   "field_rules": [
@@ -251,6 +295,7 @@
     "The Rust checker reports per-row aggregate tier counts, but the JSON file is not loaded as the runtime source of policy; a unit test checks that its field inventory covers all audited descriptors, and the hard-coded tier rules still require synchronized review.",
     "Tier labels are candidate classifications based on declared metadata shape and presence, not validation that values are truthful, assays are comparable in all material respects, or kinetic fits are scientifically correct.",
     "The tier classifier is implemented and reports aggregate counts, but its threshold choices still require domain review; it has not yet been validated against an independently reviewed real kcat corpus.",
-    "For raw_measurement_data_sha256, the current checker validates only a 64-character hexadecimal value and does not download the URL or prove that the digest matches its payload; the kinetic-reproduction tier is a pre-screen until an independent raw-file verifier binds URL, bytes, and digest."
+    "For raw_measurement_data_sha256, the current checker validates only a 64-character hexadecimal value and does not download the URL or prove that the digest matches its payload; the kinetic-reproduction tier is a pre-screen until an independent raw-file verifier binds URL, bytes, and digest.",
+    "The context-qualified/primary/kinetic labels are implemented as shape-and-presence pre-screens using the classifier_checks above; the manual_review_before_evaluation entries are not automatically validated."
   ]
 }
