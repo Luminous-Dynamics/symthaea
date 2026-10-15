@@ -1313,6 +1313,8 @@ mod tests {
                 effect: "fixture effect".into(),
                 strength: -0.4,
                 is_inhibitory: true,
+                is_negated: false,
+                source_text: String::new(),
                 cycle: 1,
             }])
             .unwrap();
@@ -1345,6 +1347,8 @@ mod tests {
                 effect: "fixture effect".into(),
                 strength: 0.8,
                 is_inhibitory: false,
+                is_negated: false,
+                source_text: String::new(),
                 cycle: 1,
             }])
             .unwrap();
@@ -1445,6 +1449,8 @@ mod tests {
             effect: "stale-sentinel-effect".into(),
             strength: 0.7,
             is_inhibitory: false,
+            is_negated: false,
+            source_text: String::new(),
             cycle: 1,
         };
         let stale_primitive = OntologyRecord {
@@ -1677,6 +1683,8 @@ mod tests {
             effect: "old effect".into(),
             strength: 0.5,
             is_inhibitory: false,
+            is_negated: false,
+            source_text: String::new(),
             cycle: 3,
         };
         let old_primitive = OntologyRecord {
@@ -1722,6 +1730,8 @@ mod tests {
             effect: "new effect".into(),
             strength: 0.6,
             is_inhibitory: false,
+            is_negated: false,
+            source_text: String::new(),
             cycle: 10,
         };
         let rejected_primitive = OntologyRecord {
@@ -1918,6 +1928,8 @@ mod tests {
                 effect: "oil shortage".into(),
                 strength: 0.8,
                 is_inhibitory: false,
+                is_negated: false,
+                source_text: String::new(),
                 cycle: 1,
             },
             CausalEdgeRecord {
@@ -1925,6 +1937,8 @@ mod tests {
                 effect: "war".into(),
                 strength: -0.6,
                 is_inhibitory: true,
+                is_negated: false,
+                source_text: String::new(),
                 cycle: 2,
             },
         ];
@@ -1951,6 +1965,8 @@ mod tests {
             effect: "b".into(),
             strength: 0.5,
             is_inhibitory: false,
+            is_negated: false,
+            source_text: String::new(),
             cycle: 1,
         };
 
