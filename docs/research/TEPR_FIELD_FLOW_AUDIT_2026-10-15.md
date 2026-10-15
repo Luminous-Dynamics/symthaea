@@ -86,6 +86,14 @@ A weaker exact-text-only alternative was briefly opened as [PR #7496](https://gi
 
 Tests were authored but have **not** been run locally; no local Rust checkout/toolchain is available in this authoring environment. On exact head `7a49df0e864b17be41d4a3c658cd44bcb6a4c3b3`, CI run [38778339645](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38778339645) and PR Governance run [38778339573](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38778339573) are both **queued**. Neither is a pass. The graph/manager restart-parity tests are authored regressions, not verified outcomes; real-corpus relevance calibration remains future work. This is an implementation under review, not retrieval calibration or qualification.
 
+## Deterministic role-search micro-corpus (2026-10-15)
+
+[Test PR #7497](https://github.com/Luminous-Dynamics/symthaea/pull/7497), stacked on [role-aware search PR #7494](https://github.com/Luminous-Dynamics/symthaea/pull/7494), adds a table-driven labeled micro-corpus around the public typed role-observation API. It includes a full two-Agent match and a partial one-Agent match as positive controls; wrong-role, unrelated same-role, and legacy map-only rows as negative controls. Assertions cover recall@10 over the two labeled positives, false-positive count over the three negative controls, coverage-sensitive ordering, top-1 behavior, separate similarity/confidence fields, and one-to-one assignment for duplicated query terms.
+
+PR #7494 currently at `7a49df0e864b17be41d4a3c658cd44bcb6a4c3b3`; its CI run [38778339645](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38778339645) and PR Governance run [38778339573](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38778339573) are **queued**. The current PR #7497 test head is `36dbbb6e41c8dce72b0bb8db950c20bce1ab8572`; CI [38779292944](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38779292944) and PR Governance [38779293242](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38779293242) are also **queued**. Neither PR has a qualifying pass on these reported heads, and tests have not been run locally.
+
+This is intentionally a synthetic micro-corpus, not a representative natural-language benchmark. It can enforce deterministic matching invariants and catch regressions, but it does not establish realistic precision/recall, semantic generalization, threshold calibration, or production relevance. Before enabling this retrieval path by default, the next required experiment is a versioned, independently labeled real corpus with negative sampling, a documented split, and comparisons against the existing legacy query path.
+
 ## Mycelix handoff boundary — schema-derived mapping (2026-10-15)
 
 Reviewed the current open contract branches directly:
