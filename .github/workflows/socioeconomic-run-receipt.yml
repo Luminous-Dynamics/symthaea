@@ -10,6 +10,7 @@ on:
       - "docs/research/finance/SYM-FIN-SYS-016_run_receipt_*"
       - "docs/research/finance/SYM-FIN-SYS-016_scenario_registry_v1.json"
       - "scripts/validate_socioeconomic_run_receipt.py"
+      - "scripts/test_validate_socioeconomic_run_receipt.py"
       - "scripts/socioeconomic_run_receipt_requirements.txt"
   push:
     # Also run on the working feature branch before a PR can merge this workflow.
@@ -20,6 +21,7 @@ on:
       - "docs/research/finance/SYM-FIN-SYS-016_run_receipt_*"
       - "docs/research/finance/SYM-FIN-SYS-016_scenario_registry_v1.json"
       - "scripts/validate_socioeconomic_run_receipt.py"
+      - "scripts/test_validate_socioeconomic_run_receipt.py"
       - "scripts/socioeconomic_run_receipt_requirements.txt"
   workflow_dispatch:
 
