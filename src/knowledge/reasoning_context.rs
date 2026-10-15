@@ -151,12 +151,20 @@ impl ReasoningContext {
         // 1. Convert search results to grounded facts
         let relevant_facts: Vec<GroundedFact> = search_results
             .iter()
-            .map(|r| GroundedFact {
-                text: format!("fact:{}", r.fact_id),
-                confidence: r.confidence,
-                similarity: r.similarity,
-                domain: None,
-                is_causal: false,
+            .filter_map(|result| {
+                // Resolve the search result against the graph instead of presenting
+                // an opaque ID as if it were useful grounded evidence. A stale result
+                // whose fact has been evicted must not count as grounding.
+                manager
+                    .graph()
+                    .get_fact(result.fact_id)
+                    .map(|stored| GroundedFact {
+                        text: stored.encoding.source_text.clone(),
+                        confidence: result.confidence,
+                        similarity: result.similarity,
+                        domain: stored.domain.clone(),
+                        is_causal: stored.has_causal_relations,
+                    })
             })
             .collect();
 
@@ -374,15 +382,24 @@ mod tests {
         let mut mgr = KnowledgeManager::default();
         mgr.bootstrap_entities();
 
-        // Insert some knowledge
-        mgr.process("Iran caused sanctions to escalate.", 1);
-        mgr.process("Sanctions caused oil shortage.", 2);
+        // A single known causal fact makes the metadata assertions unambiguous.
+        let input = "Iran caused sanctions to escalate.";
+        mgr.process(input, 1);
 
-        let ctx = ReasoningContext::from_manager(&mgr, "Iran sanctions");
-        // Context should have been assembled (may or may not be grounded
-        // depending on HDC similarity thresholds)
+        let ctx = ReasoningContext::from_manager(&mgr, input);
         assert!(ctx.epistemic_state.uncertainty >= 0.0);
         assert!(ctx.epistemic_state.uncertainty <= 1.0);
+        let grounded = ctx
+            .relevant_facts
+            .iter()
+            .find(|fact| fact.text.contains("Iran caused sanctions to escalate"))
+            .expect("reasoning context should retain the source fact text");
+        assert_eq!(grounded.domain.as_deref(), Some("geopolitics"));
+        assert!(grounded.is_causal);
+        assert!(
+            !ctx.relevant_facts.iter().any(|fact| fact.text.starts_with("fact:")),
+            "opaque graph IDs must not be presented as grounded fact text"
+        );
     }
 
     #[test]
