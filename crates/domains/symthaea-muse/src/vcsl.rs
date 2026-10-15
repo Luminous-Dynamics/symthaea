@@ -1477,6 +1477,9 @@ mod tests {
         assert_eq!(mapping.source_library, "vsco2_ce");
         assert!(!mapping.directory_present);
         assert_eq!(mapping.indexed_sample_count, 0);
+        assert_eq!(mapping.audio_decode_status, "mapped_directory_missing");
+        assert_eq!(mapping.decoded_sample_file_count, 0);
+        assert_eq!(mapping.failed_sample_decode_count, 0);
 
         let timpani = first
             .instruments
