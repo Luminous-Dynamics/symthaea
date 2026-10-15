@@ -39,7 +39,9 @@
         "random_seed",
         "world_seed_digest",
         "model_version",
-        "environment_digest"
+        "environment_digest",
+        "shock_schedule_digest",
+        "agent_model_digest"
       ],
       "properties": {
         "run_id": {
@@ -78,6 +80,12 @@
           "maxLength": 128
         },
         "environment_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "shock_schedule_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "agent_model_digest": {
           "$ref": "#/$defs/digest"
         }
       }
@@ -278,7 +286,8 @@
             "$ref": "#/$defs/digest"
           }
         }
-      }
+      },
+      "minItems": 1
     },
     "metrics": {
       "type": "array",
@@ -346,7 +355,8 @@
             "maxLength": 128
           }
         }
-      }
+      },
+      "minItems": 1
     },
     "evaluation": {
       "type": "object",
@@ -396,7 +406,8 @@
               "independent_power_oracle",
               "stock_flow_reconciliation"
             ]
-          }
+          },
+          "minItems": 1
         },
         "counterexamples_digest": {
           "$ref": "#/$defs/digest"
