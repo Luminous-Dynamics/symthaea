@@ -7,8 +7,8 @@ It is not a food database, a nutrient calculator, a license attorney, a publishe
 ## Core behavior
 
 - Rights are separate explicit decisions for assessment use, caching, transformation, redistribution, commercial use and public fixtures. Unknown, denied and unresolved written-permission requirements fail closed.
-- The source manifest records the source's declared rights; a separate SourceUseRequestV1 states what the caller intends to do. A request cannot grant itself permission. Written-permission references are required only for rights actually exercised by the current request.
-- A granted-by-written-permission decision must reference the permission record.
+- The source manifest records the source's declared rights; a separate SourceUseRequestV1 states what the caller intends to do. A request cannot grant itself permission. Permission-reference requirements are evaluated only for rights exercised by the current request.
+- Written-permission references are stored separately for assessment, cache/retention, transformation, commercial use, public fixtures and redistribution. Evidence for one right cannot satisfy another right's reference requirement. The referenced document still needs human review for scope, validity and legal sufficiency.
 - A public fixture necessarily retains source-derived data, even if a caller omits the separate retention flag; cache permission and verified artifact bytes remain required.
 - Source manifests record retrieval and review dates. Future-dated retrieval, expired review windows, revoked, withdrawn or review-required sources block use.
 - Retaining source-derived records requires cache permission and a canonical lower-case SHA-256 plus the exact source-artifact bytes. A digest-shaped string by itself is not proof: verification recomputes SHA-256 over the supplied bytes.
