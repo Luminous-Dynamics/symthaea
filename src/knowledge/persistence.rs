@@ -8,7 +8,7 @@
 //! 2048-byte BLOBs for efficient Hamming similarity on reload.
 //!
 //! Schema:
-//! - knowledge_facts: id, vector_blob, source_text, confidence, domain, cycle, is_causal
+//! - knowledge_facts: row id, graph_fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal
 //! - knowledge_causal_edges: cause, effect, strength, cycle
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
 //!
@@ -945,6 +945,43 @@ mod tests {
 
         let error = persistence.load_facts().unwrap_err();
         assert!(error.contains("invalid persisted confidence"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_nonpositive_graph_fact_id() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_nonpositive_graph_fact_id_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                source_text: "fixture fact".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+                graph_fact_id: Some(1),
+                initial_confidence: Some(0.9),
+                last_accessed_cycle: Some(1),
+                corroboration_count: 0,
+                contradiction_count: 0,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute("UPDATE knowledge_facts SET graph_fact_id = 0", [])
+            .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("invalid persisted graph fact ID"), "{error}");
         assert_eq!(persistence.total_loaded(), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
