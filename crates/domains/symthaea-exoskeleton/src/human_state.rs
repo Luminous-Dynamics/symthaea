@@ -585,7 +585,8 @@ mod tests {
                 HumanObservationSource::Instrument,
             ),
         ];
-        let report = fuse_human_state(&inputs, 100.0, HumanStateConfig::simulation_reference()).unwrap();
+        let report =
+            fuse_human_state(&inputs, 100.0, HumanStateConfig::simulation_reference()).unwrap();
         let fused = report.metric(HumanMetric::HeartRateBpm).unwrap();
         assert_eq!(fused.status, HumanMetricStatus::Fresh);
         assert_eq!(fused.source_ids.len(), 2);
@@ -605,7 +606,8 @@ mod tests {
                 HumanObservationSource::Instrument,
             ),
         ];
-        let report = fuse_human_state(&inputs, 100.0, HumanStateConfig::simulation_reference()).unwrap();
+        let report =
+            fuse_human_state(&inputs, 100.0, HumanStateConfig::simulation_reference()).unwrap();
         let fused = report.metric(HumanMetric::PerceivedExertion0To10).unwrap();
         assert_eq!(fused.status, HumanMetricStatus::Fresh);
         assert_eq!(fused.evidence_kind, HumanStateEvidenceKind::Estimated);
@@ -624,7 +626,8 @@ mod tests {
                 HumanObservationSource::Instrument,
             ),
         ];
-        let report = fuse_human_state(&inputs, 100.0, HumanStateConfig::simulation_reference()).unwrap();
+        let report =
+            fuse_human_state(&inputs, 100.0, HumanStateConfig::simulation_reference()).unwrap();
         assert_eq!(
             report.metric(HumanMetric::RespiratoryRateBpm).unwrap().status,
             HumanMetricStatus::InsufficientEvidence
