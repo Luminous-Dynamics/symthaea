@@ -96,6 +96,8 @@ pub struct PlssTelemetrySourceTrend {
     pub last_timestamp_s: Option<f64>,
     pub first_value: Option<f64>,
     pub last_value: Option<f64>,
+    pub first_uncertainty_abs: Option<f64>,
+    pub last_uncertainty_abs: Option<f64>,
     pub maximum_observed_gap_s: Option<f64>,
     /// Observed first-to-last span divided by the requested window duration.
     /// This is a coverage proxy, not a statement that the sensor ran continuously.
@@ -312,6 +314,8 @@ fn analyze_source_trend(
         last_timestamp_s: unique.last().map(|sample| sample.observed_at_s),
         first_value: unique.first().map(|sample| sample.value),
         last_value: unique.last().map(|sample| sample.value),
+        first_uncertainty_abs: unique.first().map(|sample| sample.uncertainty_abs),
+        last_uncertainty_abs: unique.last().map(|sample| sample.uncertainty_abs),
         maximum_observed_gap_s: None,
         temporal_coverage_fraction: None,
         change_over_window: None,
@@ -323,12 +327,12 @@ fn analyze_source_trend(
     if duplicate_conflict {
         return empty(PlssTelemetryTrendStatus::Conflicted, unique.len());
     }
-    if unique.len() < config.minimum_samples {
+    if unique.len() < 2 {
         return empty(PlssTelemetryTrendStatus::InsufficientEvidence, unique.len());
     }
 
     let first = &unique[0];
-    let last = unique.last().expect("non-empty after minimum sample check");
+    let last = unique.last().expect("at least two unique samples checked above");
     let elapsed = last.observed_at_s - first.observed_at_s;
     if !elapsed.is_finite() || elapsed <= 0.0 {
         return empty(PlssTelemetryTrendStatus::InsufficientEvidence, unique.len());
@@ -339,7 +343,8 @@ fn analyze_source_trend(
     for pair in unique.windows(2) {
         maximum_gap = maximum_gap.max(pair[1].observed_at_s - pair[0].observed_at_s);
     }
-    if !coverage.is_finite()
+    if unique.len() < config.minimum_samples
+        || !coverage.is_finite()
         || coverage < config.minimum_coverage_fraction
         || maximum_gap > config.maximum_gap_s
     {
@@ -372,6 +377,8 @@ fn analyze_source_trend(
         last_timestamp_s: Some(last.observed_at_s),
         first_value: Some(first.value),
         last_value: Some(last.value),
+        first_uncertainty_abs: Some(first.uncertainty_abs),
+        last_uncertainty_abs: Some(last.uncertainty_abs),
         maximum_observed_gap_s: Some(maximum_gap),
         temporal_coverage_fraction: Some(coverage),
         change_over_window: Some(change),
@@ -402,25 +409,10 @@ fn sources_disagree(
         eligible.iter().skip(index + 1).any(|right| {
             (left.last_value.unwrap_or(0.0) - right.last_value.unwrap_or(0.0)).abs()
                 > tolerance
-                    + last_uncertainty(left)
-                    + last_uncertainty(right)
+                    + left.last_uncertainty_abs.unwrap_or(0.0)
+                    + right.last_uncertainty_abs.unwrap_or(0.0)
         })
     })
-}
-
-fn last_uncertainty(trend: &PlssTelemetrySourceTrend) -> f64 {
-    match (trend.first_timestamp_s, trend.last_timestamp_s, trend.sample_count) {
-        (Some(_), Some(_), count) if count > 0 => trend
-            .rate_upper_bound_per_s
-            .zip(trend.rate_per_s)
-            .and_then(|(upper, rate)| {
-                trend.last_timestamp_s.zip(trend.first_timestamp_s).map(|(last, first)| {
-                    (upper - rate).abs() * (last - first).abs()
-                })
-            })
-            .unwrap_or(0.0),
-        _ => 0.0,
-    }
 }
 
 fn same_sample(left: &PlssTelemetryObservation, right: &PlssTelemetryObservation) -> bool {
@@ -550,6 +542,8 @@ fn digest_trend_report(report: &PlssTelemetryTrendReport) -> String {
             h.option_f64(source.last_timestamp_s);
             h.option_f64(source.first_value);
             h.option_f64(source.last_value);
+            h.option_f64(source.first_uncertainty_abs);
+            h.option_f64(source.last_uncertainty_abs);
             h.option_f64(source.maximum_observed_gap_s);
             h.option_f64(source.temporal_coverage_fraction);
             h.option_f64(source.change_over_window);
