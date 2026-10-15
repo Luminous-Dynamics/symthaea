@@ -276,6 +276,8 @@ The Rust screen now exposes screen_spherical_payload_bounds. For a fixed radius,
 
 The lower payload allowance uses the lowest ambient density, highest internal density, highest structural areal mass, and highest fixed mass. The upper allowance uses the opposite endpoints. These are deterministic outer bounds for all independent combinations inside those intervals, not confidence intervals and not probability-weighted forecasts.
 
+The result also reports the payload-span contribution from each input interval separately: ambient density, internal-gas density, structural-system areal mass, and fixed vehicle mass. For a fixed radius, these contributions add to the total interval width because the screening equation is affine in those inputs. This creates a useful experiment-prioritization signal: the widest contribution identifies which input bound currently dominates the arithmetic uncertainty. It does not establish which physical failure mechanism dominates, and it is only as defensible as the supplied bounds.
+
 For a reference sphere with radius 20 m, one deliberately hypothetical example uses air density 1.20–1.25 kg/m³, internal density 0–0.01 kg/m³, structural-system areal mass 4–5 kg/m², and fixed non-structural mass 14–18 tonnes. The resulting payload mass interval is approximately **−3.26 to +7.78 tonnes**. This is an example of the method, not a prediction: those mass bounds have not been sourced or validated, and the assumed structure has no demonstrated external-pressure capacity.
 
 The resulting MassBudgetStatus is one of:
