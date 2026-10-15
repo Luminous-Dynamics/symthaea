@@ -56,7 +56,7 @@
     },
     {
       "path": "tools/crime-economics-sim/src/bin/verify_viability.rs",
-      "git_blob_sha1": "5c3fe67b906eb5d2c37ecf2c4c46d6ba98e1c10e"
+      "git_blob_sha1": "7c960a0281c55fb8974a00d281a1a808fc5ebcaa"
     }
   ],
   "scenario_ids": [
