@@ -896,6 +896,8 @@ pub struct PressureCaseScope {
     pub material_model_revision_id: String,
     pub load_case_id: String,
     pub boundary_condition_profile_id: String,
+    /// ID/hash for the spatial imperfection field, mode family and bounded defect set;
+    /// a single scalar amplitude is not sufficient to identify this analysis basis.
     pub imperfection_basis_id: String,
 }
 
