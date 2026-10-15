@@ -37,6 +37,29 @@ The frozen [SYM-ARCH-001 result](https://github.com/Luminous-Dynamics/symthaea/b
 
 The narrow conclusion is that the tested bundle did not outperform its controls on that task and rule. It does not condemn HDC or CfC generally. The post-hoc diagnosis points toward factorizing mechanisms and designing complementary, task-appropriate systems—not increasing complexity or tuning a losing bundle after the fact.
 
+## Existing code inventory: extend these components, do not create a second graph
+
+Source audit checked 2026-10-15. The public repo already has several of the architecture's building blocks, but the source-derived fields also show where a complementary integration could add value.
+
+- [Knowledge extraction](https://github.com/Luminous-Dynamics/symthaea/blob/main/src/knowledge/extraction.rs) defines `ExtractedFact` with entities, predicate relations, causal/negation flags, source text, and extraction confidence. Its documented extractor is pattern-based and explicitly not full NLP.
+- [HDC knowledge encoding](https://github.com/Luminous-Dynamics/symthaea/blob/main/src/knowledge/encoding.rs) defines `FactEncoding` with a composite `BinaryHV`, role vectors, source text, and encoding confidence. In this type, the vector is an index-like representation; it does not itself carry a stable external source locator, explicit measurement unit, valid-time interval, or derivation lineage.
+- [Enhanced knowledge graph](https://github.com/Luminous-Dynamics/symthaea/blob/main/src/knowledge/graph.rs) already has `FactId`, cycle-based insertion/access metadata, confidence decay, corroboration/contradiction counters, domain tags, HDC similarity search, and contradiction alerts. This is the first graph/storage component to inspect and extend. Its cycle timestamps should not be silently treated as event-time or source publication time; its similarity ranking is not a calibrated probability.
+- [Knowledge persistence](https://github.com/Luminous-Dynamics/symthaea/blob/main/src/knowledge/persistence.rs) already persists the graph to SQLite. Its current `FactRecord` stores the vector bytes, source text, confidence, domain, insertion cycle, and causal flag; it is not yet the full typed event/evidence contract proposed here.
+- [Reasoning context](https://github.com/Luminous-Dynamics/symthaea/blob/main/src/knowledge/reasoning_context.rs) already assembles HDC matches, causal chains, contradictions/uncertainty, and context for downstream reasoning. In the inspected `from_manager` path, a search hit is presently converted into text shaped like `fact:<id>`; the integration should trace whether and where the original source text is resolved before calling the result fully grounded.
+- [Epistemic types](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-epistemic-types/src/global_ledger.rs) already define empirical (E), normative (N), and materiality (M) axes plus provenance variants. Check those types before proposing overlapping confidence/provenance enums; do not assume the levels alone establish evidence validity.
+- [Evidence plane](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/core/symthaea-evidence-plane/src/lib.rs) means a *research integrity contract*: declared experiment mechanisms versus measured counters, expectation checks, run IDs, and a non-cryptographic config identity helper. It is not a factual provenance database. Reuse it for experiment-integrity checks where appropriate; keep its identity hash away from security-sensitive use.
+- [Cognitive observation contract](https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/core/symthaea-core/src/observation.rs) is intentionally narrow and currently exposes state dimensionality only. Its own documentation says to add methods only alongside a real consumer, not speculatively. Do not expand this as a generic catch-all API.
+
+### Concrete gap to investigate first
+
+Do **not** create a new `EvidenceStore`, `KnowledgeGraph`, `FactEncoding`, or global cognitive protocol yet. First trace one concrete path:
+
+`ExtractedFact → FactEncoding → EnhancedKnowledgeGraph::insert/search → KnowledgePersistence → ReasoningContext::from_manager → actual consumer`
+
+At each boundary record which fields survive: stable IDs; entity/relation structure; source locator; source/event time vs system cycle time; quantities and units; negation; extraction confidence vs source reliability; contradiction links; and provenance/derivation lineage. Then add the smallest backward-compatible missing contract and tests for the specific lost fields. Preserve legacy paths and use adapters rather than duplicating authority.
+
+The system-level research contribution should be **faithful evidence resolution and explicit limits**, not a second graph/data model. This provides a much more falsifiable first milestone than an all-at-once architecture rewrite.
+
 ## Proposed architecture
 
 ~~~text
