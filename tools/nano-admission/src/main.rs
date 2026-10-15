@@ -122,19 +122,8 @@ fn run() -> Result<ExitCode> {
         .with_context(|| format!("could not hash archive {}", cli.archive.display()))?;
     let upstream_md5_matches = hashes_before.md5.eq_ignore_ascii_case(UPSTREAM_REPORTED_MD5);
 
-    // Do not parse an archive that fails the upstream-published checksum. It is
-    // untrusted input until the expected artifact identity matches.
-    let (archive_inventory, archive_inspection_error) = if upstream_md5_matches {
-        match inventory_tar_gz(&cli.archive) {
-            Ok(inventory) => (Some(inventory), None),
-            Err(error) => (None, Some(format!("{error:#}"))),
-        }
-    } else {
-        (
-            None,
-            Some("Archive inspection skipped because the upstream-published MD5 did not match.".to_owned()),
-        )
-    };
+    let (archive_inventory, archive_inspection_error) =
+        inventory_if_checksum_matches(&cli.archive, upstream_md5_matches);
     // Re-hash after inventory so the receipt cannot silently combine a digest
     // from one version of a file with an inventory from a concurrently replaced file.
     let hashes_after = hash_file(&cli.archive)
@@ -290,6 +279,24 @@ fn drain_with_limit<R: Read>(reader: &mut R, max_bytes: u64) -> Result<u64> {
             bail!("decompressed data exceeds configured limit of {max_bytes} bytes");
         }
         consumed = next;
+    }
+}
+
+fn inventory_if_checksum_matches(
+    path: &Path,
+    upstream_md5_matches: bool,
+) -> (Option<ArchiveInventory>, Option<String>) {
+    // Do not parse an archive that fails the upstream-published checksum. It is
+    // untrusted input until the expected artifact identity matches.
+    if !upstream_md5_matches {
+        return (
+            None,
+            Some("Archive inspection skipped because the upstream-published MD5 did not match.".to_owned()),
+        );
+    }
+    match inventory_tar_gz(path) {
+        Ok(inventory) => (Some(inventory), None),
+        Err(error) => (None, Some(format!("{error:#}"))),
     }
 }
 
@@ -561,6 +568,18 @@ mod tests {
 
         let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
         assert_eq!(status_for(false, Some(&inventory), true), "checksum_mismatch");
+    }
+
+    #[test]
+    fn checksum_mismatch_skips_parsing_untrusted_archive() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("not-an-archive.tar.gz");
+        fs::write(&archive_path, b"attacker-controlled bytes").expect("write invalid fixture");
+
+        let (inventory, error) = inventory_if_checksum_matches(&archive_path, false);
+        assert!(inventory.is_none());
+        assert!(error.expect("skip reason").contains("inspection skipped"));
+        assert_eq!(status_for(false, None, true), "checksum_mismatch");
     }
 
     #[test]
