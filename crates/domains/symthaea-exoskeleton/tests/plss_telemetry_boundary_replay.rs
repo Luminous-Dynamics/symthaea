@@ -11,7 +11,7 @@ use symthaea_exoskeleton::plss_telemetry::{
 };
 use symthaea_exoskeleton::plss_telemetry_boundary::{
     project_plss_telemetry_boundaries, PlssBoundaryDirection, PlssBoundaryProjectionStatus,
-    PlssTelemetryBoundary, PlssTelemetryBoundaryProjection, PlssTelemetryBoundaryReceipt,
+    PlssTelemetryBoundary, PlssTelemetryBoundaryReceipt,
     PlssTelemetryBoundaryReport,
 };
 use symthaea_exoskeleton::plss_telemetry_trend::{
@@ -116,8 +116,12 @@ fn input_permutation_preserves_report_and_receipt_and_tampering_is_detected() {
         PlssTelemetryTrendConfig::simulation_reference(),
         &corpus.source_revision,
     ).unwrap();
-    let (report_b, receipt_b) =
-        project_plss_telemetry_boundaries(&trend_b, &source_receipt_b, &reversed_boundaries).unwrap();
+    let (report_b, receipt_b) = project_plss_telemetry_boundaries(
+        &trend_b,
+        &source_receipt_b,
+        &reversed_boundaries,
+    )
+    .unwrap();
 
     assert_eq!(trend_a, trend_b);
     assert_eq!(source_receipt_a, source_receipt_b);
@@ -140,7 +144,12 @@ fn input_permutation_preserves_report_and_receipt_and_tampering_is_detected() {
 
 fn assert_option_close(actual: Option<f64>, expected: Option<f64>) {
     match (actual, expected) {
-        (Some(actual), Some(expected)) => assert!((actual - expected).abs() < 1.0e-9, "{actual} != {expected}"),
+        (Some(actual), Some(expected)) => {
+            assert!(
+                (actual - expected).abs() < 1.0e-9,
+                "{actual} != {expected}"
+            );
+        },
         (None, None) => {}
         (actual, expected) => panic!("Option mismatch: {actual:?} != {expected:?}"),
     }
@@ -154,19 +163,37 @@ impl IndependentHashWriter {
         value.string(domain);
         value
     }
-    fn raw(&mut self, bytes: &[u8]) { self.0.update(bytes); }
-    fn u64(&mut self, value: u64) { self.raw(&value.to_le_bytes()); }
-    fn usize(&mut self, value: usize) { self.u64(value as u64); }
-    fn f64(&mut self, value: f64) { self.u64(value.to_bits()); }
-    fn string(&mut self, value: &str) { self.usize(value.len()); self.raw(value.as_bytes()); }
+    fn raw(&mut self, bytes: &[u8]) {
+        self.0.update(bytes);
+    }
+    fn u64(&mut self, value: u64) {
+        self.raw(&value.to_le_bytes());
+    }
+    fn usize(&mut self, value: usize) {
+        self.u64(value as u64);
+    }
+    fn f64(&mut self, value: f64) {
+        self.u64(value.to_bits());
+    }
+    fn string(&mut self, value: &str) {
+        self.usize(value.len());
+        self.raw(value.as_bytes());
+    }
     fn option_f64(&mut self, value: Option<f64>) {
         match value {
-            Some(number) => { self.raw(&[1]); self.f64(number); }
+            Some(number) => {
+                self.raw(&[1]);
+                self.f64(number);
+            }
             None => self.raw(&[0]),
         }
     }
     fn finish(self) -> String {
-        format!("sha256:{}", self.0.finalize().iter().map(|byte| format!("{byte:02x}")).collect::<String>())
+        let digest = self.0.finalize();
+        format!(
+            "sha256:{}",
+            digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
+        )
     }
 }
 
@@ -282,7 +309,9 @@ fn projection_status_tag(status: PlssBoundaryProjectionStatus) -> &'static str {
         PlssBoundaryProjectionStatus::CandidateWithinHorizon => "candidate_within_horizon",
         PlssBoundaryProjectionStatus::CandidateBeyondHorizon => "candidate_beyond_horizon",
         PlssBoundaryProjectionStatus::AlreadyBeyondBoundary => "already_beyond_boundary",
-        PlssBoundaryProjectionStatus::BoundaryWithinCurrentUncertainty => "boundary_within_current_uncertainty",
+        PlssBoundaryProjectionStatus::BoundaryWithinCurrentUncertainty => {
+            "boundary_within_current_uncertainty"
+        },
         PlssBoundaryProjectionStatus::MovingAway => "moving_away",
         PlssBoundaryProjectionStatus::DirectionUncertain => "direction_uncertain",
         PlssBoundaryProjectionStatus::InsufficientEvidence => "insufficient_evidence",
@@ -303,5 +332,8 @@ fn trend_status_tag(status: PlssTelemetryTrendStatus) -> &'static str {
     }
 }
 fn option_trend_status_tag(status: Option<PlssTelemetryTrendStatus>) -> &'static str {
-    match status { Some(value) => trend_status_tag(value), None => "none" }
+    match status {
+        Some(value) => trend_status_tag(value),
+        None => "none",
+    }
 }
