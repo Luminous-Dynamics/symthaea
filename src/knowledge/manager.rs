@@ -685,7 +685,20 @@ impl KnowledgeManager {
         (&self.last_telemetry, &self.last_signals)
     }
 
-    /// Drain pending contradiction alerts
+    /// Return a non-destructive snapshot of pending contradiction alerts.
+    ///
+    /// Use this when assembling read-only reasoning context. Call `drain_alerts`
+    /// only at the explicit consumer/acknowledgement boundary; rendering context
+    /// must not silently consume alerts.
+    pub fn pending_contradiction_alerts(&self) -> Vec<ContradictionAlert> {
+        self.pending_alerts.iter().cloned().collect()
+    }
+
+    /// Drain pending contradiction alerts.
+    ///
+    /// This is destructive: use it only when the caller intends to consume the
+    /// pending queue. Read-only context assembly should use
+    /// `pending_contradiction_alerts` instead.
     pub fn drain_alerts(&mut self) -> Vec<ContradictionAlert> {
         self.pending_alerts.drain(..).collect()
     }
@@ -1326,6 +1339,28 @@ mod tests {
         assert!(telem.facts_extracted > 0);
         assert!(signals.uncertainty >= 0.0);
         assert!(signals.uncertainty <= 1.0);
+    }
+
+    #[test]
+    fn test_pending_contradiction_alerts_are_non_destructive() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.pending_alerts.push_back(ContradictionAlert {
+            new_fact_id: 10,
+            existing_fact_id: 20,
+            similarity: 0.85,
+            higher_confidence_id: 20,
+            detected_at_cycle: 7,
+        });
+
+        let snapshot = mgr.pending_contradiction_alerts();
+        assert_eq!(snapshot.len(), 1);
+        assert_eq!(snapshot[0].new_fact_id, 10);
+        assert_eq!(snapshot[0].existing_fact_id, 20);
+        assert_eq!(mgr.pending_alerts.len(), 1);
+
+        let drained = mgr.drain_alerts();
+        assert_eq!(drained.len(), 1);
+        assert!(mgr.pending_contradiction_alerts().is_empty());
     }
 
     #[test]
