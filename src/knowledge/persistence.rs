@@ -167,8 +167,8 @@ impl KnowledgePersistence {
                 })
             })
             .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Decode fact row: {e}"))?;
 
         self.total_loaded += facts.len() as u64;
         Ok(facts)
@@ -235,8 +235,8 @@ impl KnowledgePersistence {
                 })
             })
             .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Decode causal-edge row: {e}"))?;
 
         self.total_loaded += edges.len() as u64;
         Ok(edges)
@@ -463,6 +463,89 @@ mod tests {
 
         let loaded = p.load_causal_edges().unwrap();
         assert_eq!(loaded.len(), 2);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_fails_closed_on_malformed_row() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_malformed_fact_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let db_path = dir.join("knowledge.db");
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; 2048],
+                source_text: "A valid-looking source fact".into(),
+                confidence: 0.8,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        {
+            let connection = rusqlite::Connection::open(&db_path).unwrap();
+            // SQLite permits TEXT in a REAL-affinity column. This makes typed
+            // row decoding fail even though the query itself succeeds.
+            connection
+                .execute(
+                    "UPDATE knowledge_facts SET confidence = 'not-a-number'",
+                    [],
+                )
+                .unwrap();
+        }
+
+        let error = persistence
+            .load_facts()
+            .expect_err("malformed rows must fail the restore instead of disappearing");
+        assert!(error.contains("Decode fact row"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_causal_edges_fails_closed_on_malformed_row() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_malformed_edge_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let db_path = dir.join("knowledge.db");
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_causal_edges(&[CausalEdgeRecord {
+                cause: "cause".into(),
+                effect: "effect".into(),
+                strength: 0.8,
+                is_inhibitory: false,
+                cycle: 1,
+            }])
+            .unwrap();
+
+        {
+            let connection = rusqlite::Connection::open(&db_path).unwrap();
+            connection
+                .execute(
+                    "UPDATE knowledge_causal_edges SET strength = 'not-a-number'",
+                    [],
+                )
+                .unwrap();
+        }
+
+        let error = persistence.load_causal_edges().expect_err(
+            "malformed causal-edge rows must fail the restore instead of disappearing",
+        );
+        assert!(error.contains("Decode causal-edge row"), "{error}");
+        assert_eq!(persistence.total_loaded(), 0);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
