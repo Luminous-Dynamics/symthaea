@@ -54,12 +54,12 @@ Modularity is a *compatibility claim to verify*, not a default. Life-support pac
 
 `suit_profile.rs` defines:
 - eight explicit mission profiles and ordered required-capability sets;
-- capability claims keyed to implementation ID, evidence level, and evidence reference;
+- capability claims keyed to implementation ID, evidence level, evidence reference, exact variant ID, and exact hardware revision;
 - a caller-specified minimum evidence policy;
 - deterministic findings for missing capability, evidence below policy and duplicate/conflicting claims;
 - an evaluator status based only on the specified policy and declared artifacts.
 
-The maturity sequence (Declared → Simulated → BenchTested → HumanInLoop → Qualified) is an ordering for triage only. It does not auto-promote evidence, transfer evidence from one capability or variant to another, or prove the artifact referenced is genuine. Even `MeetsDeclaredEvidencePolicy` is **not** certification, mission approval or proof of operational compatibility. The evaluator has no actuator or life-support command interface.
+The maturity sequence (Declared → Simulated → BenchTested → HumanInLoop → Qualified) is an ordering for triage only. Claims are scoped to one exact variant ID and hardware revision, so reusing them against another variant/revision fails closed. The evaluator does not auto-promote evidence or prove the artifact referenced is genuine. Even `MeetsDeclaredEvidencePolicy` is **not** certification, mission approval or proof of operational compatibility. The evaluator has no actuator or life-support command interface.
 
 Run on a configured Rust workspace:
 
