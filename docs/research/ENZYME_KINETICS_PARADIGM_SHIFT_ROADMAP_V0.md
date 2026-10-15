@@ -164,6 +164,18 @@ A thin independent verifier should read the frozen artifacts independently of th
 - Reproduce blank/control handling, signal conversion, initial-rate or time-course processing, and final model fit as separately hashed stages.
 - Report stage-wise discrepancies, parameter uncertainty, model identifiability, failed fits and preregistered tolerances. Use the source's inactivation example as a preregistered regression/ablation only after its exact data and model lineage are confirmed.
 
+### Phase 2.5 — Falsify model and design logic on synthetic truth
+
+**Implemented starting point:** `xtask/src/enzyme_model_falsification.rs` adds a deterministic, synthetic-only Rust harness, exposed as `cargo run -p xtask -- enzyme-model-falsification`. It checks recovery of known Michaelis–Menten parameters with an explicit 2% fixture gate, chooses a candidate condition that maximizes separation between two fixed toy hypotheses, and separately computes a local finite-difference sensitivity proxy for Km. It emits a machine-readable JSON report and has four unit tests.
+
+This is an executable sanity fixture, not yet a statistical benchmark. It uses one fixed residual vector, a coarse parameter grid, known hypothesis parameters, and an assumed noise scale. It does not fit competing models, estimate calibrated intervals, profile likelihoods, account for physical assay constraints, or demonstrate real enzyme behavior. See [ENZYME_MODEL_FALSIFICATION_BENCHMARK_V0.md](ENZYME_MODEL_FALSIFICATION_BENCHMARK_V0.md) for the scorecard and proposed targets.
+
+- Expand to preregistered scenario matrices over parameter ranges, experimental designs, noise levels, model misspecification, and deterministic seeds.
+- Add ambiguous/non-identifiable cases where the correct result is an explicit abstention, not a forced model selection.
+- Measure nominal-interval coverage, parameter-recovery error, model discrimination balanced accuracy, false certainty, and measurement-budget efficiency independently.
+- Compare active design with uniform-random and simple sensitivity-based design under matched budgets.
+- Keep synthetic gates distinct from the later rights-cleared real-assay replay and held-out transport benchmark.
+
 ### Phase 3 — Make the independent benchmark boring and trustworthy
 
 - Freeze source rights, corpus, study/family/campaign groupings, split, target, baseline model versions, scoring code, uncertainty methods, decision metric, and negative controls before held-out labels are examined.
