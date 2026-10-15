@@ -272,6 +272,16 @@ This distinction matters because FRA RR 26-01 says maintenance-event covariates 
 - **Independent evaluator:** independently recompute data integrity, splits, metrics and report totals; code path or organization independence must be stated accurately.
 - **Operator and authority:** own allowable limits, inspection policy, maintenance actions, route safety and operational authorization.
 
+### B5. South African data and standards path
+
+For a South African deployment, the first useful conversation is likely with the asset owner/operator and the Railway Safety Regulator (RSR), not an attempt to scrape live operational data.
+
+- The RSR's [NIIMS NextGen update (22 June 2026)](https://www.rsr.org.za/niims-nextgen-strengthening-railway-safety-through-digital-oversight/) describes an Operator Asset Management Module for uploading asset registers and maintenance plans, alongside occurrence and safety oversight functions. This is a **potential authorized interoperability/source-discovery lead**, not evidence that the data are public or available to Symthaea.
+- That same RSR update says Phase 2 was planned for **1 November 2026** for Safety Permit, Audit and Inspection Management. As of 15 October 2026, this date is still in the future; do not assume those modules are live. Until an official go-live notice confirms it, operators must continue using the then-current approved processes.
+- The RSR's [railway safety standards index](https://www.rsr.org.za/categories_rt/railway-regulatory-tools/railway-safety-standards/) lists, among others, SANS 3000-2-2 for track and associated civil infrastructure and SANS 3000-2-2-1 for level crossings. Its [2026 standards-development information](https://www.rsr.org.za/wp-content/uploads/2026/03/Standards-Development.pdf) describes a modernization effort covering track infrastructure, rolling stock, signalling/telecommunications, operational principles and overhead traction equipment. Treat standards as versioned, authority-owned references; do not freeze a threshold from an old index page.
+- South African evidence should be segregated from FRA-derived methods and US data. A forecast trained on US instrumenting, track practices, maintenance records and geography is an external prior, not a locally validated model.
+- Mycelix may preserve source links, approved access terms, lineage and maintenance-event references, but must not create a competing regulator/operator asset register. Sol-Atlas may display an authorized read-only projection. Access control, purpose limitation and operator permission govern any real records.
+
 ## C. Joint opportunity: living materials for railway infrastructure
 
 Rail offers an interesting application for self-healing concrete, but the specific asset matters:
@@ -311,6 +321,11 @@ Do not start a biological concrete pilot in a critical sleeper, turnout, bridge 
 11. “Molecular and Biosafety Perspectives of Bacterial Self-Healing Concrete: From Sporulation and Biomineralization to Public Health Implications” (2026 review). https://pmc.ncbi.nlm.nih.gov/articles/PMC13566579/
 
 This recent review highlights strain persistence, genetic stability, horizontal gene transfer, environmental microbiome interaction and occupational/environmental exposure as matters requiring assessment. It is a narrative review and does not itself establish field-scale exposure risk for any specific concrete formulation.
+
+### South African rail governance and data
+11. Railway Safety Regulator, [NIIMS NextGen | Strengthening Railway Safety Through Digital Oversight](https://www.rsr.org.za/niims-nextgen-strengthening-railway-safety-through-digital-oversight/) (22 June 2026).
+12. Railway Safety Regulator, [Railway Safety Standards index](https://www.rsr.org.za/categories_rt/railway-regulatory-tools/railway-safety-standards/).
+13. Railway Safety Regulator, [Standards Development overview](https://www.rsr.org.za/wp-content/uploads/2026/03/Standards-Development.pdf) (March 2026).
 
 ### Rail condition, detection and maintenance
 6. FRA, RR 26-01, “Track Geometry Predictions Using Point and Segment Processing.” https://railroads.fra.dot.gov/elibrary/track-geometry-predictions-using-point-and-segment-processing
