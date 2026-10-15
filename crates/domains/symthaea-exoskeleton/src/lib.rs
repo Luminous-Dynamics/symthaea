@@ -35,6 +35,9 @@ pub mod full_frame;
 pub mod full_frame_environment;
 pub mod glove_benchmark;
 pub mod glove_dust;
+pub mod human_state;
+#[cfg(test)]
+mod human_state_fault_campaign;
 #[cfg(feature = "hal")]
 pub mod hal_bridge;
 pub mod integrated_adversarial_campaign;
