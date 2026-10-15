@@ -96,6 +96,11 @@ pub struct PlssTelemetrySourceTrend {
     pub last_timestamp_s: Option<f64>,
     pub first_value: Option<f64>,
     pub last_value: Option<f64>,
+    pub minimum_observed_value: Option<f64>,
+    pub maximum_observed_value: Option<f64>,
+    /// Largest absolute deviation from the straight line joining the two endpoints.
+    /// This is a descriptive excursion metric, not an alarm threshold.
+    pub maximum_deviation_from_endpoint_secant: Option<f64>,
     pub first_uncertainty_abs: Option<f64>,
     pub last_uncertainty_abs: Option<f64>,
     pub maximum_observed_gap_s: Option<f64>,
@@ -314,6 +319,9 @@ fn analyze_source_trend(
         last_timestamp_s: unique.last().map(|sample| sample.observed_at_s),
         first_value: unique.first().map(|sample| sample.value),
         last_value: unique.last().map(|sample| sample.value),
+        minimum_observed_value: unique.iter().map(|sample| sample.value).min_by(f64::total_cmp),
+        maximum_observed_value: unique.iter().map(|sample| sample.value).max_by(f64::total_cmp),
+        maximum_deviation_from_endpoint_secant: None,
         first_uncertainty_abs: unique.first().map(|sample| sample.uncertainty_abs),
         last_uncertainty_abs: unique.last().map(|sample| sample.uncertainty_abs),
         maximum_observed_gap_s: None,
@@ -345,6 +353,23 @@ fn analyze_source_trend(
     for pair in unique.windows(2) {
         maximum_gap = maximum_gap.max(pair[1].observed_at_s - pair[0].observed_at_s);
     }
+
+    let change = last.value - first.value;
+    let rate = change / elapsed;
+    if !change.is_finite() || !rate.is_finite() {
+        return empty(PlssTelemetryTrendStatus::Invalid, unique.len());
+    }
+    let mut maximum_deviation: f64 = 0.0;
+    for sample in &unique {
+        let endpoint_secant_value =
+            first.value + rate * (sample.observed_at_s - first.observed_at_s);
+        let deviation = (sample.value - endpoint_secant_value).abs();
+        if !endpoint_secant_value.is_finite() || !deviation.is_finite() {
+            return empty(PlssTelemetryTrendStatus::Invalid, unique.len());
+        }
+        maximum_deviation = maximum_deviation.max(deviation);
+    }
+
     if duplicate_conflict
         || unique.len() < config.minimum_samples
         || !coverage.is_finite()
@@ -359,20 +384,14 @@ fn analyze_source_trend(
         let mut result = empty(status, unique.len());
         result.maximum_observed_gap_s = Some(maximum_gap);
         result.temporal_coverage_fraction = Some(coverage);
+        result.maximum_deviation_from_endpoint_secant = Some(maximum_deviation);
         return result;
     }
 
-    let change = last.value - first.value;
-    let rate = change / elapsed;
     let rate_uncertainty = (first.uncertainty_abs + last.uncertainty_abs) / elapsed;
     let lower = (change - first.uncertainty_abs - last.uncertainty_abs) / elapsed;
     let upper = (change + first.uncertainty_abs + last.uncertainty_abs) / elapsed;
-    if !change.is_finite()
-        || !rate.is_finite()
-        || !rate_uncertainty.is_finite()
-        || !lower.is_finite()
-        || !upper.is_finite()
-    {
+    if !rate_uncertainty.is_finite() || !lower.is_finite() || !upper.is_finite() {
         return empty(PlssTelemetryTrendStatus::Invalid, unique.len());
     }
 
@@ -385,6 +404,9 @@ fn analyze_source_trend(
         last_timestamp_s: Some(last.observed_at_s),
         first_value: Some(first.value),
         last_value: Some(last.value),
+        minimum_observed_value: unique.iter().map(|sample| sample.value).min_by(f64::total_cmp),
+        maximum_observed_value: unique.iter().map(|sample| sample.value).max_by(f64::total_cmp),
+        maximum_deviation_from_endpoint_secant: Some(maximum_deviation),
         first_uncertainty_abs: Some(first.uncertainty_abs),
         last_uncertainty_abs: Some(last.uncertainty_abs),
         maximum_observed_gap_s: Some(maximum_gap),
@@ -550,6 +572,9 @@ fn digest_trend_report(report: &PlssTelemetryTrendReport) -> String {
             h.option_f64(source.last_timestamp_s);
             h.option_f64(source.first_value);
             h.option_f64(source.last_value);
+            h.option_f64(source.minimum_observed_value);
+            h.option_f64(source.maximum_observed_value);
+            h.option_f64(source.maximum_deviation_from_endpoint_secant);
             h.option_f64(source.first_uncertainty_abs);
             h.option_f64(source.last_uncertainty_abs);
             h.option_f64(source.maximum_observed_gap_s);
@@ -638,6 +663,30 @@ mod tests {
             .unwrap();
         assert_eq!(lane.status, PlssTelemetryTrendStatus::InsufficientEvidence);
         assert_eq!(lane.source_trends[0].rate_per_s, None);
+    }
+
+    #[test]
+    fn intermediate_spike_remains_visible_despite_benign_endpoint_rate() {
+        let report = analyze_plss_telemetry_trends(
+            &[
+                obs(PlssTelemetryMetric::CircuitCo2PartialPressurePa, 200.0, 0.0, "a"),
+                obs(PlssTelemetryMetric::CircuitCo2PartialPressurePa, 1_000.0, 30.0, "a"),
+                obs(PlssTelemetryMetric::CircuitCo2PartialPressurePa, 230.0, 60.0, "a"),
+            ],
+            config(),
+        )
+        .unwrap();
+        let lane = report
+            .lane(
+                PlssTelemetryMetric::CircuitCo2PartialPressurePa,
+                PlssTelemetrySourceKind::Instrument,
+            )
+            .unwrap();
+        assert_eq!(lane.status, PlssTelemetryTrendStatus::Fresh);
+        let trend = &lane.source_trends[0];
+        assert_eq!(trend.rate_per_s, Some(0.5));
+        assert_eq!(trend.maximum_observed_value, Some(1_000.0));
+        assert_eq!(trend.maximum_deviation_from_endpoint_secant, Some(785.0));
     }
 
     #[test]
