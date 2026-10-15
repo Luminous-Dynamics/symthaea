@@ -199,6 +199,30 @@ The initial implementation should use a small, rights-cleared local working copy
 
 Execution is tracked in [BIO-CEM-001A2 #7462](https://github.com/Luminous-Dynamics/symthaea/issues/7462), including the dataset-rights gate, grouped split requirements and explicit claim ceiling.
 
+### A9. Rights-cleared multi-endpoint starter dataset: University of Bath BATH-01087
+
+The University of Bath Research Data Archive provides a more direct, explicitly licensed alternative for a first *material-outcome* audit: Justo-Reinoso et al. (2022), [BATH-01087](https://researchdata.bath.ac.uk/1087/), associated with [the original paper](https://doi.org/10.1016/j.conbuildmat.2022.126877). The archive page explicitly marks each of its three Excel files **Creative Commons: Attribution 4.0 (CC BY 4.0)**. Record the file-level license text and attribution, cite the dataset DOI [10.15125/BATH-01087](https://doi.org/10.15125/BATH-01087), and retain a version/URL/checksum manifest. This removes the explicit license-metadata uncertainty encountered for the current krkCMd Zenodo record, although normal source/version and any embedded third-party notices still need checking.
+
+The archive describes three files:
+- **12 MB workbook** (`Data Set AEA … Feb2022 IJR.xlsx`): reported results for several figures, including tests associated with air-entraining admixtures used to encapsulate bacterial spores.
+- **112 MB workbook**: image-binarization data for healing-ratio measurement after 56 days for specimens cracked at 28 days.
+- **117 MB workbook**: the corresponding 56-day assessment for specimens cracked at 9 months.
+
+The repository description identifies potential outcome families: air content, flowability, compressive and flexural strength, image-based whole-crack healing ratio, water-penetration resistance, Raman spectroscopy and micro-bubble area/size. Confirm each variable's specimen-level availability and method against the associated publication; do not assume every endpoint is measured for every experimental unit. The 12 MB workbook is the preferred schema-audit entry point; retrieve larger files only if necessary.
+
+**Benchmark A — controlled material outcome audit:**
+1. Build a source manifest and workbook inventory (sheet names, dimensions, headers, units, formulas, controls/treatments, test method, age at cracking, healing duration, specimen/mix identity, replicates, exclusions and missingness). Reconcile worksheets to the published figures/tables and distinguish raw numeric observations from aggregated/figure-derived outputs.
+2. Establish the *true experimental unit* for every endpoint before estimating effects. If data contain specimen summaries, count specimens—not image pixels, grid lines, technical repeats or spreadsheet rows—as independent units.
+3. Predeclare separate estimands for (a) crack-area/width healing ratio, (b) compressive strength, (c) flexural strength, (d) water-penetration resistance and (e) fresh-state properties. Raman/mineralization and bubble metrics remain distinct where the actual data support valid interpretation.
+4. Compare treatment against its experiment-defined control, stratified by the experiment's actual cracking age and mixture/treatment groups. Do not combine the early- and later-age tests into one effect without a justified model. Do not pool this single research program with krkCMd: that separate dataset focuses on image-profile metrology for autogenous healing, uses different outcomes and remains under its own unresolved reuse-rights gate [#7462](https://github.com/Luminous-Dynamics/symthaea/issues/7462).
+5. Report absolute differences and uncertainty in native units as well as any relative/ratio measures; keep image closure separate from mechanical and transport outcomes. An increase in healing ratio cannot stand in for strength recovery or permeability recovery.
+6. Add hostile controls for shuffled treatment labels, treatment/control identity lost in a join, mixed units, duplicate specimen rows, missing repeats coerced to zero, image pixels counted as replicates, and a healing-ratio outcome accidentally used as a strength/permeability label.
+7. Only after the audit, compare simple and well-justified statistical baselines on documented group structure. This single-study archive cannot on its own establish cross-study generalization; HDC/CfC results remain exploratory until they beat transparent baselines on frozen, group-held-out evaluation with calibrated uncertainty and an independent recomputation.
+
+A small auxiliary source is Paine et al. (2017), [University of Bath BATH-00448](https://researchdata.bath.ac.uk/448/), which explicitly licenses its 17 kB workbook and documentation CC BY 4.0. It contains perlite particle-size data, bacterial growth/calcite productivity in three media, mortar mix designs, and initial surface absorption. Treat it as a distinct experimental programme that can inform hypothesis/context comparison, not as rows interchangeable with BATH-01087 or as direct validation of the same treatment effect.
+
+**Claim ceiling:** these openly licensed lab datasets permit a reproducible evidence audit, but not a claim of field readiness, long-term durability, ecological safety, suitability for road/rail assets or a universal microbial-concrete recipe. No workbook has been downloaded or analysed as part of this metadata review. Execution is tracked in [BIO-CEM-001A3 #7471](https://github.com/Luminous-Dynamics/symthaea/issues/7471); this section creates no new production schema.
+
 ## B. Better railway systems
 
 ### B1. Highest-value first move: predict deterioration, not just geometry
@@ -387,6 +411,11 @@ This recent review highlights strain persistence, genetic stability, horizontal 
 
 ### South African context
 19. South African Department of Transport, COTO Standard Specifications for Road and Bridge Works portal. Its page lists October 2020 chapter versions and states the earlier August versions were superseded. Always verify the current applicable edition and project-specific contractual requirements before using numerical limits. https://www.transport.gov.za/?page_id=1155
+
+### Explicitly licensed self-healing datasets for empirical follow-up
+
+20. Justo-Reinoso et al. (2022), University of Bath Research Data Archive, “Air-entraining admixtures as a protection method for bacterial spores in self-healing cementitious composites: Healing evaluation of early and later-age cracks,” BATH-01087; data record lists CC BY 4.0 for all three Excel files. https://doi.org/10.15125/BATH-01087. Related publication: https://doi.org/10.1016/j.conbuildmat.2022.126877
+21. Paine et al. (2017), University of Bath Research Data Archive, “Dataset for application of expanded perlite encapsulated bacteria and growth media for self-healing concrete,” BATH-00448; workbook and data documentation list CC BY 4.0. https://doi.org/10.15125/BATH-00448
 
 ## Claim ceiling
 
