@@ -908,8 +908,9 @@ fn filename_pitch_gaps_midi_within_observed_range(
         .collect()
 }
 
-/// A conservative classifier based only on full-decode and mechanical silence evidence.
-/// It must never be interpreted as a timbral or musical-quality score.
+/// Conservative status taxonomy based only on complete-decode counts and a
+/// mechanical peak-amplitude silence threshold. Never interpret it as timbral,
+/// perceptual, or musical-quality evidence.
 fn sample_audio_evidence_status(
     indexed: usize,
     decoded: usize,
@@ -924,16 +925,18 @@ fn sample_audio_evidence_status(
         } else {
             "no_decoded_samples"
         }
-    } else if silent >= decoded {
-        if failed > 0 {
-            "decoded_samples_silent_and_other_samples_failed"
-        } else {
-            "decoded_silent_only"
-        }
-    } else if silent > 0 || failed > 0 {
-        "mixed_silent_non_silent_or_decode_failures"
     } else {
-        "non_silent_decoded_sample_present"
+        let has_silent = silent > 0;
+        let has_non_silent = silent < decoded;
+        match (has_silent, has_non_silent, failed > 0) {
+            (false, false, _) => "decode_count_inconsistent",
+            (true, false, true) => "decoded_silent_and_other_samples_failed",
+            (true, false, false) => "decoded_silent_only",
+            (true, true, true) => "mixed_silent_non_silent_and_decode_failures",
+            (true, true, false) => "mixed_silent_and_non_silent_decoded_samples",
+            (false, true, true) => "non_silent_decoded_samples_and_decode_failures",
+            (false, true, false) => "non_silent_decoded_sample_present",
+        }
     }
 }
 
@@ -2114,6 +2117,31 @@ mod tests {
         // Round-robin/dynamic selection must be deterministic per seed.
         let again = bank.pick(60.0, 0.8, 7).unwrap();
         assert!(Arc::ptr_eq(&sample, &again));
+    }
+
+    #[test]
+    fn sample_audio_evidence_status_is_conservative_and_exhaustive() {
+        let cases = [
+            (0, 0, 0, 0, "no_indexed_samples"),
+            (2, 0, 2, 0, "all_indexed_samples_failed_decode"),
+            (1, 0, 0, 0, "no_decoded_samples"),
+            (2, 2, 0, 2, "decoded_silent_only"),
+            (3, 2, 1, 2, "decoded_silent_and_other_samples_failed"),
+            (2, 2, 0, 1, "mixed_silent_and_non_silent_decoded_samples"),
+            (3, 2, 1, 1, "mixed_silent_non_silent_and_decode_failures"),
+            (2, 1, 1, 0, "non_silent_decoded_samples_and_decode_failures"),
+            (1, 1, 0, 0, "non_silent_decoded_sample_present"),
+            (1, 1, 0, 1, "decoded_silent_only"),
+            (2, 1, 0, 0, "non_silent_decoded_sample_present"),
+        ];
+
+        for (indexed, decoded, failed, silent, expected) in cases {
+            assert_eq!(
+                sample_audio_evidence_status(indexed, decoded, failed, silent),
+                expected,
+                "counts indexed={indexed}, decoded={decoded}, failed={failed}, silent={silent}"
+            );
+        }
     }
 
     #[test]
