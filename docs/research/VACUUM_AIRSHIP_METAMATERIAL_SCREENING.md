@@ -122,6 +122,18 @@ Use **Variant A as the conservative baseline**: a triangulated geodesic frame wi
 
 My initial priority is the **hybrid**: a stiff main geodesic compression network, membrane panels supported over controlled short spans, 3D-woven/toughened material at high-gradient zones, and redundant tension bracing. Add flexibility only in locations where it provides measured benefit; avoid a globally soft shell.
 
+### Pressure load scale the frame must return from
+
+For an ideal sphere, the compressive resultant transmitted across a great-circle cut is
+
+```text
+C = max(p_external - p_internal, 0) · πR²
+```
+
+At a full sea-level differential of 101.325 kPa, this is approximately **127.33 MN at R=20 m** and **509.32 MN at R=40 m**. The latter is four times the former because this resultant scales with radius squared. These values are global section-load scales; they are not the load on any single member, which depends on the geodesic topology, member distribution, joint stiffness, cable preload, skin coupling and imperfections.
+
+The Rust screen now exposes `screen_spherical_pressure_load` to calculate that ideal resultant. Use it to establish the order of magnitude and generate solver load subjects—not to infer that an individual member can carry a particular fraction of the load or that a vessel is stable.
+
 ### Define “flexes back into shape” quantitatively
 
 Do not accept a visual impression that the sphere “looks round again.” For a frozen test article and load profile, measure all of the following:
@@ -133,6 +145,8 @@ Do not accept a visual impression that the sphere “looks round again.” For a
 5. **Capacity retention:** repeat the qualified structural capacity analysis/test after cycling. Shape recovery does not imply retained buckling capacity.
 6. **Repeatability:** repeat across independently manufactured specimens, not just multiple cycles on one unusually good sample.
 7. **Environment:** repeat under declared temperature, moisture, aging, UV/thermal-cycle and impact/damage conditions relevant to service.
+
+The code now includes `assess_elastic_recovery`, which evaluates recorded peak and residual full-field deformation, post/pre stiffness retention, residual-shape metrology uncertainty, and a pre-registered cycle count. The residual geometry gate is **Pass** only if its measurement upper bound meets the declared tolerance; **Fail** only if the lower bound exceeds tolerance; otherwise it is **Indeterminate**. A recovery metric can be negative if residual deformation exceeds peak displacement, and stiffness loss fails separately even when the skin appears to return to shape. The API checks recovery claims only—it cannot establish pressure capacity or structural safety.
 
 The acceptance thresholds are **not yet chosen**. They must be based on geometry tolerances, seal requirements and an independently justified structural safety case before test results are exposed. A sudden snap-through or unstable post-buckling event is a failure mode, not an acceptable way to flex and rebound. An evacuated-shell test can involve catastrophic implosion; subscale pressure tests require a suitably rated chamber, remote operation, exclusion controls and a separately approved test plan.
 
