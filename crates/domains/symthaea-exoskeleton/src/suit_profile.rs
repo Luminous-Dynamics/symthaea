@@ -267,7 +267,10 @@ impl SuitVariantDeclaration {
                     && !claim.applies_to_variant_id.trim().is_empty()
                     && claim.applies_to_variant_id.trim() == claim.applies_to_variant_id
                     && !claim.applies_to_hardware_revision.trim().is_empty()
-                    && claim.applies_to_hardware_revision.trim() == claim.applies_to_hardware_revision
+                    && claim.applies_to_hardware_revision.trim()
+                        == claim.applies_to_hardware_revision
+                    && claim.applies_to_variant_id == self.variant_id
+                    && claim.applies_to_hardware_revision == self.hardware_revision
             })
     }
 }
