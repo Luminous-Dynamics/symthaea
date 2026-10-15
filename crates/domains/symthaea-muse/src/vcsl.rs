@@ -2354,6 +2354,131 @@ mod tests {
             );
         }
 
+        // Explicitly exercise the alternate style folders catalogued by the
+        // inventory. File basenames were checked against pinned upstream trees.
+        let alternate_styles = [
+            (
+                Instrument::Piano,
+                "Kawai grand piano",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Grand Piano, Kawai/Sustains",
+                "GPiano_sus_C4_v2_rr1_Player.wav",
+            ),
+            (
+                Instrument::Piano,
+                "Knight upright piano",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Upright Piano, Knight/Sustains",
+                "Player_vl1_rr1_A0.wav",
+            ),
+            (
+                Instrument::Harp,
+                "Folk harp",
+                SampleSource::Vcsl,
+                "Chordophones/Composite Chordophones/Folk Harp",
+                "EWHarp_Normal_C4_v2_RR1.wav",
+            ),
+            (
+                Instrument::Harpsichord,
+                "English lute disposition",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Harpsichord, English/Sustains/Lute",
+                "ZuckermannKitHarpsi_Lute_Sus_C4_rr1.wav",
+            ),
+            (
+                Instrument::Harpsichord,
+                "French harpsichord",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Harpsichord, French/Sustains",
+                "Harpsi2_Normal_C4_rr1_Main.wav",
+            ),
+            (
+                Instrument::Harpsichord,
+                "Italian stop 1",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1",
+                "Harpsichord_stop1_A#0_1.wav",
+            ),
+            (
+                Instrument::Harpsichord,
+                "Flemish low register",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low",
+                "HarpsiRH_Low_Far_C4_rr1.wav",
+            ),
+            (
+                Instrument::Harpsichord,
+                "Flemish high register",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Harpsichord, Flemish/Sustains/High",
+                "HarpsiRH_High_Far_C#4_rr1.wav",
+            ),
+            (
+                Instrument::Harpsichord,
+                "Unclassified harpsichord",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Harpsichord, Unk/Sustains",
+                "Harpsi4_Sus_Main_C4_rr1.wav",
+            ),
+            (
+                Instrument::Xylophone,
+                "Medium mallets",
+                SampleSource::Vcsl,
+                "Idiophones/Struck Idiophones/Xylophone/Medium Mallets",
+                "Xylo_Medium_C4_ff_01_far.wav",
+            ),
+            (
+                Instrument::Xylophone,
+                "Soft mallets",
+                SampleSource::Vcsl,
+                "Idiophones/Struck Idiophones/Xylophone/Soft Mallets",
+                "Xylo_Soft_C4_ff_01_far.wav",
+            ),
+            (
+                Instrument::UprightBass,
+                "Vibrato sustain",
+                SampleSource::Vsco2,
+                "Strings/Solo Contrabass/SusVib",
+                "BKCtbss_SusVib_A#0_v1_rr1.wav",
+            ),
+            (
+                Instrument::UprightBass,
+                "Pizzicato",
+                SampleSource::Vsco2,
+                "Strings/Solo Contrabass/Pizz",
+                "BKCtbss_Pizz_A#0_v1_rr1.wav",
+            ),
+            (
+                Instrument::UprightBass,
+                "Tremolo",
+                SampleSource::Vsco2,
+                "Strings/Solo Contrabass/Trem",
+                "BKCtbss_Trem_C1_v1_rr1.wav",
+            ),
+            (
+                Instrument::Trombone,
+                "Tenor trombone vibrato",
+                SampleSource::Vsco2,
+                "Brass/Tenor Trombone/vib",
+                "tenortbn_vib_C2_v1_1.wav",
+            ),
+        ];
+        for (_instrument, style_name, source, relative_dir, filename) in alternate_styles {
+            let library_root = match source {
+                SampleSource::Vcsl => &vcsl_root,
+                SampleSource::Vsco2 => &vsco2_root,
+            };
+            write_fixture_wav(&library_root.join(relative_dir).join(filename), 8000);
+            assert!(
+                additional_sample_style_mappings(_instrument)
+                    .iter()
+                    .any(|style| style.style_name == style_name
+                        && style.source == source
+                        && style.relative_directory == relative_dir),
+                "explicit style mapping for {style_name} should match the verified source directory"
+            );
+        }
+
         let inventory =
             capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
         for (instrument, source, relative_dir, _filename, _midi, _velocity) in samples {
@@ -2380,6 +2505,58 @@ mod tests {
             let evidence = item.short_articulation_samples.as_ref().unwrap();
             assert!(evidence.directory_present);
             assert_eq!(evidence.indexed_sample_count, 1);
+        }
+
+        for instrument in [
+            Instrument::Piano,
+            Instrument::Harp,
+            Instrument::Harpsichord,
+            Instrument::Xylophone,
+            Instrument::UprightBass,
+            Instrument::Trombone,
+        ] {
+            let item = inventory
+                .instruments
+                .iter()
+                .find(|item| item.instrument == format!("{instrument:?}"))
+                .unwrap();
+            let expected_count = match instrument {
+                Instrument::Piano => 2,
+                Instrument::Harp => 1,
+                Instrument::Harpsichord => 6,
+                Instrument::Xylophone => 2,
+                Instrument::UprightBass => 3,
+                Instrument::Trombone => 1,
+                _ => unreachable!(),
+            };
+            assert_eq!(
+                item.additional_sample_styles.len(),
+                expected_count,
+                "all declared alternate styles for {instrument:?} should appear in the inventory"
+            );
+        }
+        for (instrument, style_name, source, relative_dir, _filename) in alternate_styles {
+            let item = inventory
+                .instruments
+                .iter()
+                .find(|item| item.instrument == format!("{instrument:?}"))
+                .unwrap();
+            let style = item
+                .additional_sample_styles
+                .iter()
+                .find(|style| style.style_name == style_name)
+                .unwrap_or_else(|| panic!("inventory omits {style_name} for {instrument:?}"));
+            assert_eq!(
+                style.evidence.source_library,
+                match source {
+                    SampleSource::Vcsl => "vcsl",
+                    SampleSource::Vsco2 => "vsco2_ce",
+                }
+            );
+            assert_eq!(style.evidence.relative_directory, relative_dir);
+            assert!(style.evidence.directory_present, "{style_name} should exist in fixture");
+            assert_eq!(style.evidence.indexed_sample_count, 1, "{style_name}");
+            assert_eq!(style.evidence.decoded_sample_file_count, 1, "{style_name}");
         }
 
         // These two still lack a matching sample set in either inspected source.
