@@ -88,7 +88,14 @@ pub struct SourceUseRequestV1 {
     pub retain_source_data: bool,
     pub transform_record: bool,
     pub commercial_use: bool,
+    /// Publishing a fixture necessarily retains source-derived data.
     pub public_fixture: bool,
+}
+
+impl SourceUseRequestV1 {
+    fn retains_source_data(&self) -> bool {
+        self.retain_source_data || self.public_fixture
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -471,7 +478,7 @@ fn validate_permissions(
     if !p.use_for_assessment.is_granted() {
         push_issue(issues, IssueCategory::License, RegistryIssueCode::AssessmentUseNotPermitted);
     }
-    if use_request.retain_source_data && !p.cache.is_granted() {
+    if use_request.retains_source_data() && !p.cache.is_granted() {
         push_issue(issues, IssueCategory::License, RegistryIssueCode::CacheNotPermitted);
     }
     if (fact.transformation_applied || use_request.transform_record)
@@ -634,7 +641,7 @@ fn validate_artifact_digest(
     issues: &mut Vec<RegistryIssueV1>,
 ) -> ArtifactIntegrity {
     let digest = manifest.artifact_sha256.as_deref();
-    if use_request.retain_source_data && digest.is_none() {
+    if use_request.retains_source_data() && digest.is_none() {
         push_issue(issues, IssueCategory::Integrity, RegistryIssueCode::MissingArtifactDigest);
     }
     if let Some(declared) = digest {
@@ -648,7 +655,7 @@ fn validate_artifact_digest(
                 IssueCategory::Integrity,
                 RegistryIssueCode::ArtifactDigestUnverified,
             );
-            if use_request.retain_source_data {
+            if use_request.retains_source_data() {
                 push_issue(
                     issues,
                     IssueCategory::Integrity,
@@ -664,10 +671,10 @@ fn validate_artifact_digest(
         return ArtifactIntegrity::Verified;
     }
 
-    if artifact_bytes.is_some() && use_request.retain_source_data {
+    if artifact_bytes.is_some() && use_request.retains_source_data() {
         return ArtifactIntegrity::Invalid;
     }
-    if use_request.retain_source_data {
+    if use_request.retains_source_data() {
         ArtifactIntegrity::Invalid
     } else {
         ArtifactIntegrity::NoDigestClaimed
@@ -923,6 +930,27 @@ mod tests {
         assert_eq!(result.nutrition_assessability, NutritionAssessability::Blocked);
         assert!(result.issues.iter().any(|issue| {
             issue.code == RegistryIssueCode::CacheNotPermitted
+        }));
+    }
+
+    #[test]
+    fn public_fixture_implies_retention_and_requires_verified_artifact() {
+        let mut m = manifest();
+        m.artifact_sha256 = None;
+        let mut use_case = use_request();
+        use_case.retain_source_data = false;
+        use_case.public_fixture = true;
+        let result = assess_nutrition_source(
+            &m,
+            &fact(),
+            EVALUATION_DATE,
+            &use_case,
+            None,
+        );
+        assert_eq!(result.artifact_integrity, ArtifactIntegrity::Invalid);
+        assert_eq!(result.nutrition_assessability, NutritionAssessability::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::MissingArtifactDigest
         }));
     }
 
