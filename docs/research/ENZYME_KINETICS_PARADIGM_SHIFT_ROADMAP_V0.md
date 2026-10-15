@@ -157,7 +157,7 @@ A thin independent verifier should read the frozen artifacts independently of th
 
 ### Phase 2 — Build the evidence-graph replay for one assay
 
-**Implemented starting point:** the Rust `enzyme-evidence-graph-check` now verifies graph references, endpoint typing, DAG structure, exact local artifact hashes/lengths, source-specific rights-status gates, parameter value/unit pairing, and code/configuration/environment artifact identities for successful transformations. Its regression fixtures are synthetic; this is structural integrity, not a kinetic replay.
+**Implemented starting point:** the Rust `enzyme-evidence-graph-check` verifies graph references, endpoint typing, DAG structure, exact local artifact hashes/lengths, source-specific rights-status gates, parameter value/unit pairing, strict rejection of unknown fields, artifact-reference closure, parameter-claim provenance edges (`reported_by` / `estimates`), and code/configuration/environment artifact identities for successful transformations. Regression fixtures are synthetic; this is structural integrity, not a kinetic replay, and the exact-head workflow must pass before execution is claimed.
 
 - Pin the matching raw readings, controls, calibration(s), EnzymeML/OMEX model, schema/software revisions, and source analysis.
 - Connect the acquired artifacts to transformation records and verify the exact source code, configuration, environment lock, and all intermediate outputs. Independent replay must execute the declared transforms, not merely compare hashes or re-use the producer's summary.
