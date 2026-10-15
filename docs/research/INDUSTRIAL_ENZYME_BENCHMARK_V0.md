@@ -62,6 +62,17 @@ An exploratory, in-memory inspection of the public mirror's [ABTS_standard_25.0C
 
 The canonical DaRUS page lists CC BY 4.0 and the corresponding calibration file's MD5 c8561fe8784f956d1123bbcd52a65121. The 5,054-byte ASCII JSON body returned by the pinned GitHub mirror was hashed in memory and its MD5 **matches the DaRUS value exactly**. This is a strong cross-repository byte-consistency check for this file, though MD5 is not collision-resistant and is not the benchmark's integrity hash. The file was not saved into the workspace, and no source-artifact SHA-256 has been frozen in the benchmark manifest. Formal admission still requires fetching the canonical DaRUS version, calculating SHA-256 over the actual bytes, recording the pinned source artifact, and replaying the fit from the locally verified bytes.
 
+The new Rust command is wired into `xtask` as an explicit, hash-pinned replay gate. After the canonical, rights-cleared calibration file is acquired into the ignored local research directory, compute its byte hash and run:
+
+```sh
+sha256sum research-data/enzyme-benchmark/ABTS_standard_25.0C.json
+cargo run -p xtask -- enzyme-calibration-check \
+  --input research-data/enzyme-benchmark/ABTS_standard_25.0C.json \
+  --sha256 REPLACE_WITH_THE_SHA256_FROM_SHA256SUM
+```
+
+The command fails closed if the source hash, expected equation, sample IDs/units, declared range, fitted slope, R² or RMSD disagree. Its synthetic unit tests use toy fixtures; the public calibration file has **not yet** been run through this Rust command because its bytes have not been staged locally.
+
 ### Executable admission gate
 
 A fail-closed Rust checker is wired into the existing workspace task runner:
@@ -72,7 +83,7 @@ cargo run -p xtask -- enzyme-bench-check --manifest docs/research/ENZYME_BENCHMA
 
 Use [ENZYME_BENCHMARK_MANIFEST_TEMPLATE.json](ENZYME_BENCHMARK_MANIFEST_TEMPLATE.json) and [ENZYME_BENCHMARK_SPLITS_TEMPLATE.json](ENZYME_BENCHMARK_SPLITS_TEMPLATE.json) as non-admitted templates. They are deliberately marked/incomplete so they **must fail** until a human has cleared rights, the real files are frozen and hashed, and the split is populated. Local, rights-gated data artifacts belong in the ignored `research-data/enzyme-benchmark/` directory and must never be committed as part of this PR.
 
-The checker currently enforces: frozen-state and source-rights metadata; a single source ID/release per corpus with every row checked against the reviewed manifest (multi-source pooling is intentionally blocked until rights can be reviewed per source); SHA-256 for corpus, split and preregistration; a single kcat endpoint and normalized s^-1 units; finite positive numeric values and an explicit, arithmetically consistent unit-conversion rule/factor per row; explicit reported/not-reported/not-applicable status for pH, temperature and substrate; unique observation IDs and unambiguous unique CSV column names; exact record count; and row assignment against a frozen split. The DaRUS reproduction lane is deliberately separate: this checker does not yet parse EnzymeML or verify the thesis' kinetic parameter fitting, so those remain separate implementation work rather than implied support. Three split modes are supported: `study_holdout`, `sequence_family_holdout`, and the more restrictive `joint_study_and_sequence_family_holdout`. Single-axis tracks report cross-axis overlap (for example, sequence families shared across a study-held-out split) rather than silently claiming that other dimension generalizes; joint mode rejects such overlap. This is an **admission/integrity gate**, not the metric scorer and not evidence that Symthaea has predictive value.
+The checker currently enforces: frozen-state and source-rights metadata; a single source ID/release per corpus with every row checked against the reviewed manifest (multi-source pooling is intentionally blocked until rights can be reviewed per source); SHA-256 for corpus, split and preregistration; a single kcat endpoint and normalized s^-1 units; finite positive numeric values and an explicit, arithmetically consistent unit-conversion rule/factor per row; explicit reported/not-reported/not-applicable status for pH, temperature and substrate; unique observation IDs and unambiguous unique CSV column names; exact record count; and row assignment against a frozen split. The DaRUS reproduction lane is deliberately separate: this checker still does not parse EnzymeML/OMEX or reproduce the enzyme's kinetic model. A separate `enzyme-calibration-check` command verifies a local calibration JSON's caller-supplied SHA-256 and recomputes the declared zero-intercept linear fit within the source's explicit concentration range; it is a calibration-fit check, not raw-absorbance extraction or kinetic-model validation. Three split modes are supported: `study_holdout`, `sequence_family_holdout`, and the more restrictive `joint_study_and_sequence_family_holdout`. Single-axis tracks report cross-axis overlap (for example, sequence families shared across a study-held-out split) rather than silently claiming that other dimension generalizes; joint mode rejects such overlap. This is an **admission/integrity gate**, not the metric scorer and not evidence that Symthaea has predictive value.
 
 ## 4. Observation unit and missingness
 
