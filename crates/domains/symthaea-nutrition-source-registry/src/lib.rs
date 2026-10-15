@@ -978,6 +978,7 @@ mod tests {
     #[test]
     fn a_reference_for_one_right_cannot_authorize_another_right() {
         let mut m = manifest();
+        m.permissions.use_for_assessment = PermissionDecision::GrantedByWrittenPermission;
         m.permissions.commercial_use = PermissionDecision::GrantedByWrittenPermission;
         // This reference is specifically for assessment; commercial authorization is absent.
         m.permission_references.use_for_assessment =
