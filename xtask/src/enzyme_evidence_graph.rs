@@ -1388,6 +1388,55 @@ mod tests {
     }
 
     #[test]
+    fn fit_parameter_claim_requires_estimates_edge() {
+        let fit = Node {
+            node_id: "n_fit".to_owned(),
+            node_type: "fit_run".to_owned(),
+            evidence_class: "computation".to_owned(),
+            artifact_ids: vec![],
+        };
+        let estimate = Node {
+            node_id: "n_estimate".to_owned(),
+            node_type: "reproduced_parameter_estimate".to_owned(),
+            evidence_class: "reproduced_computation".to_owned(),
+            artifact_ids: vec![],
+        };
+        let nodes = vec![fit, estimate];
+        let nodes_by_id =
+            unique_index(nodes.iter().map(|node| (node.node_id.as_str(), node)), "node_id")
+                .unwrap();
+        let claim = ParameterClaim {
+            parameter_id: "p_fit".to_owned(),
+            parameter_name: "kcat".to_owned(),
+            endpoint_definition: "catalytic turnover number".to_owned(),
+            value: json!(12.4),
+            unit: "s^-1".to_owned(),
+            normalized_value: None,
+            normalized_unit: None,
+            enzyme_form_basis: "per catalytic site".to_owned(),
+            reaction_id: "reaction-1".to_owned(),
+            substrate_ids: vec!["substrate-1".to_owned()],
+            assay_context: json!({"pH": 7.0, "temperature_c": 25.0}),
+            kinetic_equation_id: "michaelis-menten".to_owned(),
+            source_or_fit_node_id: "n_fit".to_owned(),
+            uncertainty_status: "not_available".to_owned(),
+        };
+
+        let error = validate_parameter_claims(&[claim], &nodes_by_id, &[])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("without an estimates edge"));
+
+        let edge = Edge {
+            edge_id: "e_estimates".to_owned(),
+            edge_type: "estimates".to_owned(),
+            from_node_id: "n_fit".to_owned(),
+            to_node_id: "n_estimate".to_owned(),
+        };
+        assert!(validate_parameter_claims(&[claim], &nodes_by_id, &[edge]).is_ok());
+    }
+
+    #[test]
     fn rejects_parameter_claim_linked_to_source_without_reported_by_edge() {
         let workspace = TempWorkspace::new();
         let mut graph = fixture(workspace.root());
