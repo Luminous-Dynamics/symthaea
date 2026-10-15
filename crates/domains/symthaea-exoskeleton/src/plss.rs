@@ -316,6 +316,14 @@ impl PlssReferenceTwin {
 
         self.consume_oxygen(oxygen_needed_l)?;
 
+        // Commit modeled gas/water changes before thermal-path evaluation:
+        // if cooling fails after this simulated segment ran, gas generation and
+        // resource consumption must not disappear from the mission ledger.
+        self.state.co2_burden_l = co2_burden_l;
+        self.state.co2_scrubber_capacity_remaining_l = co2_capacity_remaining_l;
+        self.state.humidity_vapor_burden_g = humidity_vapor_burden_g;
+        self.state.humidity_collector_capacity_remaining_g = humidity_capacity_remaining_g;
+
         let heat_in_w = input.metabolism.metabolic_heat_w + input.equipment_heat_w;
         let heat_rejection_w = self.available_heat_rejection_w()? * heat_rejection_fraction;
         let net_heat_j = (heat_in_w - heat_rejection_w) * input.dt_s;
@@ -329,10 +337,6 @@ impl PlssReferenceTwin {
             return Err(PlssStepError::InvalidInput);
         }
 
-        self.state.co2_burden_l = co2_burden_l;
-        self.state.co2_scrubber_capacity_remaining_l = co2_capacity_remaining_l;
-        self.state.humidity_vapor_burden_g = humidity_vapor_burden_g;
-        self.state.humidity_collector_capacity_remaining_g = humidity_capacity_remaining_g;
         self.state.thermal_store_k = thermal_store_k;
 
         Ok(())
@@ -434,6 +438,11 @@ mod tests {
             dt_s: 1.0,
         });
         assert_eq!(result, Err(PlssStepError::NoThermalPath));
+        // The simulated segment still consumed oxygen and generated CO2/water
+        // before the independent thermal-path failure was reported.
+        assert!(twin.state().primary_o2_remaining_l < 2_000.0);
+        assert!(twin.state().co2_scrubber_capacity_remaining_l < 120.0);
+        assert!(twin.state().humidity_collector_capacity_remaining_g < 100.0);
     }
 
     #[test]
