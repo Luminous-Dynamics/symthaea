@@ -2045,7 +2045,7 @@ mod tests {
     }
 
     #[test]
-    fn verified_wave2_mappings_index_sustain_and_brass_staccato_samples() {
+    fn verified_sample_style_mappings_load_sustain_and_short_articulations() {
         let root = std::env::temp_dir().join(format!(
             "muse-wave2-mapping-fixture-{}",
             std::process::id()
@@ -2162,7 +2162,7 @@ mod tests {
         );
 
         let library = VcslLibrary::load_from_roots(&vcsl_root, &vsco2_root)
-            .expect("four real-source mappings should load from the controlled fixture");
+            .expect("five real-source mappings should load from the controlled fixture");
         for (instrument, _source, _relative_dir, _filename, midi, velocity) in samples {
             assert!(
                 library.can_play(instrument, midi, velocity),
