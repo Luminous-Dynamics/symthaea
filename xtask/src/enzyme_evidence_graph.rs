@@ -39,6 +39,9 @@ const ARTIFACT_ROLES: &[&str] = &[
     "prediction_output",
     "evaluation_output",
     "supporting_metadata",
+    "transformation_code",
+    "transformation_configuration",
+    "environment_lock",
 ];
 
 const EDGE_TYPES: &[&str] = &[
@@ -144,6 +147,15 @@ struct Transformation {
     code_sha256: String,
     configuration_sha256: String,
     environment_lock_sha256: String,
+    /// Optional for unsuccessful/blocked runs; required and byte-verified for success.
+    #[serde(default)]
+    code_artifact_id: Option<String>,
+    /// Exact configuration bytes used by the transform, when available.
+    #[serde(default)]
+    configuration_artifact_id: Option<String>,
+    /// Environment lockfile/container definition bytes, when available.
+    #[serde(default)]
+    environment_lock_artifact_id: Option<String>,
     input_node_ids: Vec<String>,
     output_node_ids: Vec<String>,
     input_artifact_ids: Vec<String>,
@@ -441,6 +453,39 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
         ensure!(is_sha256(&transformation.code_sha256), "transformation {} code_sha256 is invalid", transformation.transformation_id);
         ensure!(is_sha256(&transformation.configuration_sha256), "transformation {} configuration_sha256 is invalid", transformation.transformation_id);
         ensure!(is_sha256(&transformation.environment_lock_sha256), "transformation {} environment_lock_sha256 is invalid", transformation.transformation_id);
+
+        for (identity_kind, artifact_id, expected_sha256, expected_role) in [
+            ("code", transformation.code_artifact_id.as_deref(), transformation.code_sha256.as_str(), "transformation_code"),
+            ("configuration", transformation.configuration_artifact_id.as_deref(), transformation.configuration_sha256.as_str(), "transformation_configuration"),
+            ("environment lock", transformation.environment_lock_artifact_id.as_deref(), transformation.environment_lock_sha256.as_str(), "environment_lock"),
+        ] {
+            if let Some(artifact_id) = artifact_id {
+                let artifact = artifacts_by_id.get(artifact_id).with_context(|| {
+                    format!(
+                        "transformation {} references missing {} artifact {}",
+                        transformation.transformation_id,
+                        identity_kind,
+                        artifact_id
+                    )
+                })?;
+                ensure!(
+                    artifact.role == expected_role,
+                    "transformation {} {} artifact {} must have role '{}'",
+                    transformation.transformation_id,
+                    identity_kind,
+                    artifact_id,
+                    expected_role
+                );
+                ensure!(
+                    artifact.sha256.eq_ignore_ascii_case(expected_sha256),
+                    "transformation {} {} SHA-256 does not match referenced artifact {}",
+                    transformation.transformation_id,
+                    identity_kind,
+                    artifact_id
+                );
+            }
+        }
+
         ensure!(
             TERMINAL_STATUSES.contains(&transformation.terminal_status.as_str()),
             "transformation {} has unknown terminal_status '{}'",
@@ -578,7 +623,32 @@ fn validate_graph(root: &Path, graph: &EvidenceGraph) -> Result<Report> {
                 "successful transformation {} has one or more unavailable or unverified input artifacts",
                 transformation.transformation_id
             );
-            for artifact_id in transformation.input_artifact_ids.iter().chain(&transformation.output_artifact_ids) {
+            let code_id = transformation.code_artifact_id.as_ref().with_context(|| {
+                format!("successful transformation {} is missing code_artifact_id", transformation.transformation_id)
+            })?;
+            let configuration_id = transformation.configuration_artifact_id.as_ref().with_context(|| {
+                format!("successful transformation {} is missing configuration_artifact_id", transformation.transformation_id)
+            })?;
+            let environment_id = transformation.environment_lock_artifact_id.as_ref().with_context(|| {
+                format!("successful transformation {} is missing environment_lock_artifact_id", transformation.transformation_id)
+            })?;
+            let identity_artifact_ids = [code_id, configuration_id, environment_id];
+            for artifact_id in identity_artifact_ids {
+                ensure!(
+                    verified_artifacts.get(artifact_id) == Some(&true),
+                    "successful transformation {} has unavailable or unverified execution-identity artifact {}",
+                    transformation.transformation_id,
+                    artifact_id
+                );
+            }
+            for artifact_id in transformation
+                .input_artifact_ids
+                .iter()
+                .chain(&transformation.output_artifact_ids)
+                .chain(transformation.code_artifact_id.iter())
+                .chain(transformation.configuration_artifact_id.iter())
+                .chain(transformation.environment_lock_artifact_id.iter())
+            {
                 let artifact = artifacts_by_id[artifact_id.as_str()];
                 let rights = rights_by_id[artifact.rights_record_id.as_str()];
                 ensure!(
@@ -851,10 +921,22 @@ mod tests {
     fn fixture(root: &Path) -> Value {
         let input = b"synthetic-input\n";
         let output = b"synthetic-output\n";
+        let code = b"fn synthetic_transform() {}\n";
+        let configuration = b"{\"scale\":1}\n";
+        let environment_lock = b"synthetic-lock-v1\n";
         let mut input_artifact = payload(root, "input.bin", input);
         let mut output_artifact = payload(root, "output.bin", output);
+        let mut code_artifact = payload(root, "code.rs", code);
+        let mut configuration_artifact = payload(root, "config.json", configuration);
+        let mut environment_artifact = payload(root, "environment.lock", environment_lock);
         input_artifact["role"] = json!("raw_signal");
         output_artifact["role"] = json!("processed_measurement");
+        code_artifact["role"] = json!("transformation_code");
+        configuration_artifact["role"] = json!("transformation_configuration");
+        environment_artifact["role"] = json!("environment_lock");
+        let code_sha256 = code_artifact["sha256"].clone();
+        let configuration_sha256 = configuration_artifact["sha256"].clone();
+        let environment_lock_sha256 = environment_artifact["sha256"].clone();
 
         json!({
             "schema_version": 1,
@@ -876,6 +958,9 @@ mod tests {
             "artifacts": [
                 input_artifact,
                 output_artifact,
+                code_artifact,
+                configuration_artifact,
+                environment_artifact,
                 {
                     "artifact_id": "a_remote",
                     "role": "source_record",
@@ -923,9 +1008,12 @@ mod tests {
                 "transformation_id": "t_process",
                 "name": "synthetic identity process",
                 "version": "1",
-                "code_sha256": "1".repeat(64),
-                "configuration_sha256": "2".repeat(64),
-                "environment_lock_sha256": "3".repeat(64),
+                "code_sha256": code_sha256,
+                "configuration_sha256": configuration_sha256,
+                "environment_lock_sha256": environment_lock_sha256,
+                "code_artifact_id": "a_code.rs",
+                "configuration_artifact_id": "a_config.json",
+                "environment_lock_artifact_id": "a_environment.lock",
                 "input_node_ids": ["n_raw"],
                 "output_node_ids": ["n_processed"],
                 "input_artifact_ids": ["a_input.bin"],
@@ -947,8 +1035,8 @@ mod tests {
         let workspace = TempWorkspace::new();
         let graph = fixture(workspace.root());
         let report = validate_fixture(workspace.root(), &graph).unwrap();
-        assert_eq!(report.artifacts_verified, 2);
-        assert_eq!(report.artifacts_total, 3);
+        assert_eq!(report.artifacts_verified, 5);
+        assert_eq!(report.artifacts_total, 6);
         assert_eq!(report.transformations_successful, 1);
         assert_eq!(report.rights_review_unresolved, 1);
     }
@@ -1258,6 +1346,24 @@ mod tests {
         let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
         let _ = fs::remove_file(&outside);
         assert!(error.contains("escapes workspace root through a symlink"));
+    }
+
+    #[test]
+    fn rejects_execution_fingerprint_that_disagrees_with_its_artifact_sha256() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["transformations"][0]["code_sha256"] = json!("f".repeat(64));
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("code SHA-256 does not match referenced artifact"));
+    }
+
+    #[test]
+    fn successful_transform_requires_code_configuration_and_environment_artifacts() {
+        let workspace = TempWorkspace::new();
+        let mut graph = fixture(workspace.root());
+        graph["transformations"][0].as_object_mut().unwrap().remove("environment_lock_artifact_id");
+        let error = validate_fixture(workspace.root(), &graph).unwrap_err().to_string();
+        assert!(error.contains("missing environment_lock_artifact_id"));
     }
 
     #[test]
