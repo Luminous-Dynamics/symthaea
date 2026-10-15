@@ -55,7 +55,10 @@ pub use extraction::{
     EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, KnowledgeExtractor, SemanticRole,
 };
 pub use graph::{
-    ContradictionAlert, EnhancedKnowledgeGraph, FactId, RoleAwareSearchResult,
+    ConstrainedRoleAwareSearchResult, ContradictionAlert, EnhancedKnowledgeGraph, FactId,
+    RelationConflictEvidence, RelationConstrainedQueryDecision, RelationConstrainedSearchReport,
+    RelationConstraintAbstentionReason, RelationConstraintDecision, RelationConstraintMatch,
+    RelationConstraintSearchPolicy, RelationObservationQuery, RoleAwareSearchResult,
     RoleObservationMatch, RoleObservationSearchConfig, TemporalFact,
 };
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
