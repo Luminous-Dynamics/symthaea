@@ -31,6 +31,7 @@ def approved_fixture(analysis_plan_root: Path) -> tuple[dict, dict]:
     plan_document = {
         "schema": "muse-choro-preregistered-analysis-plan-v1",
         "plan_id": "TEST-CHORO-ANALYSIS-PLAN",
+        "status": "registered",
         "pre_registration": {
             "status": "registered",
             "registered_on": registered_on,
@@ -307,6 +308,28 @@ class ChoroInputManifestTests(unittest.TestCase):
             approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
             with self.assertRaisesRegex(
                 ManifestError, "analysis-plan design.null_models must contain at least one concrete null model"
+            ):
+                evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
+
+    def test_plan_with_registered_receipt_but_template_status_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "synthetic-score-artifact.bin").write_bytes(ARTIFACT_BYTES)
+            manifest, approval = approved_fixture(root)
+            plan_path = root / "synthetic-analysis-plan.json"
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["status"] = "template_not_registered"
+            plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode()
+            plan_path.write_bytes(plan_bytes)
+            manifest["scope"]["analysis_plan"]["sha256"] = hashlib.sha256(plan_bytes).hexdigest()
+            manifest_path = root / "manifest.json"
+            approval_path = root / "approval.json"
+            raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
+            manifest_path.write_bytes(raw)
+            approval["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+            approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ManifestError, "analysis plan top-level status must be 'registered'"
             ):
                 evaluate_manifest(manifest_path, approval_path, INTAKE, root, root)
 
