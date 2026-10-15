@@ -23,6 +23,10 @@ No SAFOODS values or other real food-composition rows are included in this crate
 
 The evidence-record lookup goes beyond a non-empty-string check: unknown or duplicate IDs, wrong source/right/basis, invalid URI/date metadata, and non-current evidence block the requested use. It does not fetch or authenticate the referenced document; human review of the underlying license or permission remains necessary.
 
+
+- Every evaluation returns a self-describing decision receipt containing the evaluation date, source/record IDs, schema versions, declared and actually supplied artifact digests, and an input-envelope SHA-256.
+- The input envelope includes the complete manifest, food fact, use request, evaluation date and supplied artifact-byte digest; JSON object keys are recursively sorted before hashing. The digest identifies the exact evaluated inputs for replay and change detection, not truth, authorship or legal validity.
+
 ## Validation
 
 Run focused checks from the repository root:
