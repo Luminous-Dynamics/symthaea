@@ -81,7 +81,10 @@ impl KnowledgeEncoder {
 
     pub fn with_seed(seed: u64) -> Self {
         let mut role_bases = HashMap::new();
-        let roles = [
+        // Keep the historical role-to-seed mapping for every pre-existing role.
+        // Do not place feature-gated variants in the same positional seed list as
+        // newer variants: build features must not change a role's vector space.
+        let core_roles = [
             SemanticRole::Agent,
             SemanticRole::Patient,
             SemanticRole::Instrument,
@@ -93,23 +96,36 @@ impl KnowledgeEncoder {
             SemanticRole::Location,
             SemanticRole::Cause,
             SemanticRole::Result,
-            #[cfg(feature = "therapeutic")]
+        ];
+
+        for (i, role) in core_roles.iter().enumerate() {
+            role_bases.insert(*role, BinaryHV::random(seed + i as u64));
+        }
+
+        #[cfg(feature = "therapeutic")]
+        for (offset, role) in [
             SemanticRole::TherapeuticTarget,
-            #[cfg(feature = "therapeutic")]
             SemanticRole::ProtectiveFactor,
-            #[cfg(feature = "therapeutic")]
             SemanticRole::RiskFactor,
-            // Keep newer code/structure roles after the existing variants so
-            // the historical role-basis seeds remain unchanged.
+        ]
+        .iter()
+        .enumerate()
+        {
+            // Preserve the original therapeutic-role seeds (seed + 11..13).
+            role_bases.insert(*role, BinaryHV::random(seed + 11 + offset as u64));
+        }
+
+        // New code/structure roles use their own fixed seed range, independent
+        // of whether the therapeutic feature is enabled in this build.
+        let code_roles = [
             SemanticRole::Calls,
             SemanticRole::Implements,
             SemanticRole::DependsOn,
             SemanticRole::ReturnsType,
             SemanticRole::FixedBy,
         ];
-
-        for (i, role) in roles.iter().enumerate() {
-            role_bases.insert(*role, BinaryHV::random(seed + i as u64));
+        for (offset, role) in code_roles.iter().enumerate() {
+            role_bases.insert(*role, BinaryHV::random(seed + 1_000 + offset as u64));
         }
 
         let mut type_bases = HashMap::new();
@@ -496,6 +512,35 @@ mod tests {
             roles.len(),
             "every declared SemanticRole must have a role-basis vector"
         );
+    }
+
+    #[test]
+    fn test_code_role_bases_are_independent_of_build_feature_order() {
+        let seed = 42;
+        let mut encoder = KnowledgeEncoder::with_seed(seed);
+        let code_roles = [
+            SemanticRole::Calls,
+            SemanticRole::Implements,
+            SemanticRole::DependsOn,
+            SemanticRole::ReturnsType,
+            SemanticRole::FixedBy,
+        ];
+        let terms: Vec<_> = code_roles
+            .iter()
+            .map(|role| (*role, "role-basis-probe", EntityType::Concept))
+            .collect();
+        let encoded = encoder.encode_role_terms(&terms);
+
+        // The fixed seed range for code roles and the existing Concept type
+        // basis make these vectors stable whether therapeutic variants compile.
+        let token = BinaryHV::random(fnv1a_hash("role-basis-probe"));
+        let concept_basis = BinaryHV::random(seed + 104);
+        let typed_entity = token.bind(&concept_basis);
+        for (offset, observation) in encoded.iter().enumerate() {
+            let expected = BinaryHV::random(seed + 1_000 + offset as u64)
+                .bind(&typed_entity);
+            assert_eq!(observation.vector, expected);
+        }
     }
 
     #[test]
