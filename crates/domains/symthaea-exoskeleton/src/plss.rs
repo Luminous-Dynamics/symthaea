@@ -369,6 +369,11 @@ impl PlssReferenceTwin {
             || !self.state.humidity_collector_capacity_remaining_g.is_finite()
             || !(0.0..=self.config.humidity_collector_capacity_g)
                 .contains(&self.state.humidity_collector_capacity_remaining_g)
+            || !self.state.primary_o2_remaining_l.is_finite()
+            || !(0.0..=self.config.primary_o2_l).contains(&self.state.primary_o2_remaining_l)
+            || !self.state.secondary_o2_remaining_l.is_finite()
+            || !(0.0..=self.config.secondary_o2_l).contains(&self.state.secondary_o2_remaining_l)
+            || !self.state.thermal_store_k.is_finite()
         {
             return Err(PlssStepError::InvalidInput);
         }
@@ -427,50 +432,80 @@ impl PlssReferenceTwin {
             return Err(PlssStepError::InvalidInput);
         }
 
+        // Validate thermal arithmetic before any inventory or gas/water state is
+        // mutated. A finite input can still overflow when heat sources are added
+        // or integrated over a long step.
+        let heat_in_w = input.metabolism.metabolic_heat_w + input.equipment_heat_w;
+        if !heat_in_w.is_finite() {
+            return Err(PlssStepError::InvalidInput);
+        }
+        // Preserve the established simulation meaning of NoThermalPath: the
+        // segment's oxygen/gas/water exchange occurred, then the missing thermal
+        // path was reported. Still validate the no-cooling thermal arithmetic
+        // before committing those exchanges.
+        let heat_rejection_base_w = match self.available_heat_rejection_w() {
+            Ok(value) => Some(value),
+            Err(PlssStepError::NoThermalPath) => None,
+            Err(error) => return Err(error),
+        };
+        let heat_rejection_w = heat_rejection_base_w.unwrap_or(0.0) * heat_rejection_fraction;
+        let net_heat_j = (heat_in_w - heat_rejection_w) * input.dt_s;
+        let projected_thermal_store_k =
+            self.state.thermal_store_k + net_heat_j / self.config.thermal_capacitance_j_k;
+        if !heat_rejection_w.is_finite()
+            || !net_heat_j.is_finite()
+            || !projected_thermal_store_k.is_finite()
+        {
+            return Err(PlssStepError::InvalidInput);
+        }
+
+        // Oxygen consumption is all-or-nothing on this step API. A rejected
+        // segment must not partially drain the primary/secondary inventories.
         self.consume_oxygen(oxygen_needed_l)?;
 
-        // Commit modeled gas/water changes before thermal-path evaluation:
-        // if cooling fails after this simulated segment ran, gas generation and
-        // resource consumption must not disappear from the mission ledger.
+        // Commit modeled gas/water changes before reporting a missing thermal
+        // path: those exchanges occurred during the simulated segment even when
+        // the independent cooling subsystem cannot complete its bookkeeping.
         self.state.co2_burden_l = co2_burden_l;
         self.state.co2_scrubber_capacity_remaining_l = co2_capacity_remaining_l;
         self.state.humidity_vapor_burden_g = humidity_vapor_burden_g;
         self.state.humidity_collector_capacity_remaining_g = humidity_capacity_remaining_g;
 
-        let heat_in_w = input.metabolism.metabolic_heat_w + input.equipment_heat_w;
-        let heat_rejection_w = self.available_heat_rejection_w()? * heat_rejection_fraction;
-        let net_heat_j = (heat_in_w - heat_rejection_w) * input.dt_s;
-        let thermal_store_k =
-            self.state.thermal_store_k + net_heat_j / self.config.thermal_capacitance_j_k;
-        if !heat_in_w.is_finite()
-            || !heat_rejection_w.is_finite()
-            || !net_heat_j.is_finite()
-            || !thermal_store_k.is_finite()
-        {
+        if let Some(thermal_store_k) = heat_rejection_base_w.map(|_| projected_thermal_store_k) {
+            self.state.thermal_store_k = thermal_store_k;
+            Ok(())
+        } else {
+            Err(PlssStepError::NoThermalPath)
+        }
+    }
+
+    fn consume_oxygen(&mut self, needed_l: f64) -> Result<(), PlssStepError> {
+        if !needed_l.is_finite() || needed_l < 0.0 {
             return Err(PlssStepError::InvalidInput);
         }
 
-        self.state.thermal_store_k = thermal_store_k;
-
-        Ok(())
-    }
-
-    fn consume_oxygen(&mut self, mut needed_l: f64) -> Result<(), PlssStepError> {
-        if self.state.primary_oxygen != PlssPathState::Failed {
-            let take = needed_l.min(self.state.primary_o2_remaining_l);
-            self.state.primary_o2_remaining_l -= take;
-            needed_l -= take;
-        }
-        if needed_l > 0.0 && self.state.secondary_oxygen != PlssPathState::Failed {
-            let take = needed_l.min(self.state.secondary_o2_remaining_l);
-            self.state.secondary_o2_remaining_l -= take;
-            needed_l -= take;
-        }
-        if needed_l > 1e-9 {
-            Err(PlssStepError::NoOxygenPath)
+        // Work out the complete allocation first; do not mutate one inventory
+        // and then discover that the combined available supply is insufficient.
+        let primary_take = if self.state.primary_oxygen != PlssPathState::Failed {
+            needed_l.min(self.state.primary_o2_remaining_l)
         } else {
-            Ok(())
+            0.0
+        };
+        let after_primary = needed_l - primary_take;
+        let secondary_take = if after_primary > 0.0
+            && self.state.secondary_oxygen != PlssPathState::Failed
+        {
+            after_primary.min(self.state.secondary_o2_remaining_l)
+        } else {
+            0.0
+        };
+        if after_primary - secondary_take > 1e-9 {
+            return Err(PlssStepError::NoOxygenPath);
         }
+
+        self.state.primary_o2_remaining_l -= primary_take;
+        self.state.secondary_o2_remaining_l -= secondary_take;
+        Ok(())
     }
 
     fn available_heat_rejection_w(&self) -> Result<f64, PlssStepError> {
@@ -522,6 +557,32 @@ mod tests {
         let before = twin.state().primary_o2_remaining_l;
         twin.step(input()).unwrap();
         assert!(twin.state().primary_o2_remaining_l < before);
+    }
+
+    #[test]
+    fn insufficient_oxygen_does_not_partially_consume_inventory() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        twin.state_mut_for_fault_injection().primary_o2_remaining_l = 0.01;
+        twin.state_mut_for_fault_injection().secondary_o2_remaining_l = 0.01;
+        let before = twin.state;
+        let mut attempted = input();
+        attempted.metabolism.oxygen_l_min = 1.0;
+        attempted.dt_s = 60.0;
+
+        assert_eq!(twin.step(attempted), Err(PlssStepError::NoOxygenPath));
+        assert_eq!(twin.state, before);
+    }
+
+    #[test]
+    fn thermal_arithmetic_overflow_is_rejected_before_state_mutation() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        let before = twin.state;
+        let mut attempted = input();
+        attempted.metabolism.metabolic_heat_w = f64::MAX;
+        attempted.equipment_heat_w = f64::MAX;
+
+        assert_eq!(twin.step(attempted), Err(PlssStepError::InvalidInput));
+        assert_eq!(twin.state, before);
     }
 
     #[test]
