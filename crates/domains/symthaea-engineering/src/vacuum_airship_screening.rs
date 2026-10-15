@@ -1623,6 +1623,153 @@ pub enum MassBudgetStatus {
     NegativeThroughout,
 }
 
+/// State of the pressure-capacity evidence after checking case-scope identifiers.
+///
+/// ScopeMatchedUnverified means identifiers match; referenced artifacts are not authenticated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PressureEvidenceGateState {
+    MissingCapacity,
+    ScopeIncomplete,
+    ScopeMismatch,
+    ScopeMatchedUnverified,
+}
+
+/// Maturity of the structural analysis for a candidate evidence package.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NonlinearAnalysisGateState {
+    Missing,
+    LinearOrPerfectGeometryOnly,
+    NonlinearImperfectionAware,
+}
+
+/// Whether a competent independent structural review is recorded for the analysis package.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndependentReviewGateState {
+    Missing,
+    ReviewNotIndependentOrNotRecorded,
+    IndependentlyReviewed,
+}
+
+/// Physical validation maturity for the candidate shell architecture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhysicalValidationGateState {
+    Missing,
+    CouponsOrJointsOnly,
+    SubscaleShell,
+    RepresentativeShell,
+}
+
+/// Damage-tolerance evidence maturity within a declared load/operating envelope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DamageToleranceGateState {
+    Missing,
+    AnalysisOnly,
+    DemonstratedByTestWithinDeclaredEnvelope,
+}
+
+/// Maturity of the declared operating envelope and its independent review.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperatingEnvelopeGateState {
+    Missing,
+    DraftOnly,
+    DefinedAndIndependentlyReviewed,
+}
+
+/// Completeness of the evidence manifest references, not a cryptographic verification result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceManifestGateState {
+    Missing,
+    IdentifiersOnly,
+    ContentAddressed,
+}
+
+/// Declared maturity profile used to find blockers before a candidate is promoted to review.
+///
+/// Every state is supplied by the caller. This function does not inspect files, authenticate
+/// hashes, certify reviewers, validate experiments, or qualify a solver. It deliberately uses
+/// conjunctive gates rather than an averaged score: one missing critical evidence class cannot be
+/// compensated for by a strong payload estimate in another class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CandidateEvidenceGateProfile {
+    pub mass_budget: MassBudgetStatus,
+    pub pressure_capacity: PressureEvidenceGateState,
+    pub nonlinear_analysis: NonlinearAnalysisGateState,
+    pub independent_structural_review: IndependentReviewGateState,
+    pub physical_validation: PhysicalValidationGateState,
+    pub damage_tolerance: DamageToleranceGateState,
+    pub operating_envelope: OperatingEnvelopeGateState,
+    pub evidence_manifest: EvidenceManifestGateState,
+}
+
+/// Fail-closed outcome of the candidate evidence-gap assessment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CandidateEvidenceGateStatus {
+    /// Even the optimistic declared payload bound is negative.
+    MassBudgetNegativeThroughout,
+    /// The payload interval crosses zero; the mass claim is assumption-sensitive.
+    MassBudgetBoundSensitive,
+    /// One or more critical evidence gates remain open.
+    EvidenceGapsRemain,
+    /// All declared gates are satisfied; external engineering review is still required.
+    EvidenceBundleReadyForIndependentAssessment,
+}
+
+/// Evidence gaps and a non-certifying promotion decision for a vacuum-airship candidate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CandidateEvidenceGateResult {
+    pub status: CandidateEvidenceGateStatus,
+    /// Stable machine-readable gap identifiers; empty only when all declared gates are satisfied.
+    pub blockers: Vec<&'static str>,
+}
+
+/// Identify missing evidence gates without converting mixed evidence into a scalar readiness score.
+///
+/// EvidenceBundleReadyForIndependentAssessment is only a bookkeeping milestone. The inputs are
+/// self-declared, the referenced records are not authenticated, and this result must never be read
+/// as safe, structurally feasible, flight-ready, or certified.
+pub fn assess_candidate_evidence_gates(
+    profile: CandidateEvidenceGateProfile,
+) -> CandidateEvidenceGateResult {
+    let mut blockers = Vec::new();
+    match profile.mass_budget {
+        MassBudgetStatus::RobustlyNonNegative => {}
+        MassBudgetStatus::BoundSensitive => blockers.push("mass_budget_not_robustly_nonnegative"),
+        MassBudgetStatus::NegativeThroughout => blockers.push("mass_budget_negative_throughout"),
+    }
+    if profile.pressure_capacity != PressureEvidenceGateState::ScopeMatchedUnverified {
+        blockers.push("pressure_capacity_scope_not_matched_or_missing");
+    }
+    if profile.nonlinear_analysis != NonlinearAnalysisGateState::NonlinearImperfectionAware {
+        blockers.push("nonlinear_imperfection_analysis_missing_or_insufficient");
+    }
+    if profile.independent_structural_review != IndependentReviewGateState::IndependentlyReviewed {
+        blockers.push("independent_structural_review_missing");
+    }
+    if profile.physical_validation != PhysicalValidationGateState::RepresentativeShell {
+        blockers.push("representative_shell_validation_missing");
+    }
+    if profile.damage_tolerance != DamageToleranceGateState::DemonstratedByTestWithinDeclaredEnvelope {
+        blockers.push("damage_tolerance_not_demonstrated_by_test");
+    }
+    if profile.operating_envelope != OperatingEnvelopeGateState::DefinedAndIndependentlyReviewed {
+        blockers.push("operating_envelope_missing_or_unreviewed");
+    }
+    if profile.evidence_manifest != EvidenceManifestGateState::ContentAddressed {
+        blockers.push("evidence_manifest_not_content_addressed");
+    }
+
+    let status = match profile.mass_budget {
+        MassBudgetStatus::NegativeThroughout => CandidateEvidenceGateStatus::MassBudgetNegativeThroughout,
+        MassBudgetStatus::BoundSensitive => CandidateEvidenceGateStatus::MassBudgetBoundSensitive,
+        MassBudgetStatus::RobustlyNonNegative if blockers.is_empty() => {
+            CandidateEvidenceGateStatus::EvidenceBundleReadyForIndependentAssessment
+        }
+        MassBudgetStatus::RobustlyNonNegative => CandidateEvidenceGateStatus::EvidenceGapsRemain,
+    };
+
+    CandidateEvidenceGateResult { status, blockers }
+}
+
 /// Propagate deterministic input bounds through the spherical payload equation.
 ///
 /// The lower result uses minimum ambient density, maximum interior density, maximum structural
@@ -2747,6 +2894,73 @@ mod tests {
             screen_load_path_scenario_set(&scenarios).unwrap_err(),
             ScreeningError::DuplicateScenarioId
         );
+    }
+
+    fn complete_candidate_evidence_profile() -> CandidateEvidenceGateProfile {
+        CandidateEvidenceGateProfile {
+            mass_budget: MassBudgetStatus::RobustlyNonNegative,
+            pressure_capacity: PressureEvidenceGateState::ScopeMatchedUnverified,
+            nonlinear_analysis: NonlinearAnalysisGateState::NonlinearImperfectionAware,
+            independent_structural_review: IndependentReviewGateState::IndependentlyReviewed,
+            physical_validation: PhysicalValidationGateState::RepresentativeShell,
+            damage_tolerance: DamageToleranceGateState::DemonstratedByTestWithinDeclaredEnvelope,
+            operating_envelope: OperatingEnvelopeGateState::DefinedAndIndependentlyReviewed,
+            evidence_manifest: EvidenceManifestGateState::ContentAddressed,
+        }
+    }
+
+    #[test]
+    fn candidate_gate_requires_all_critical_evidence_classes() {
+        let mut profile = complete_candidate_evidence_profile();
+        profile.pressure_capacity = PressureEvidenceGateState::ScopeMismatch;
+        profile.physical_validation = PhysicalValidationGateState::SubscaleShell;
+        profile.damage_tolerance = DamageToleranceGateState::AnalysisOnly;
+        let result = assess_candidate_evidence_gates(profile);
+        assert_eq!(result.status, CandidateEvidenceGateStatus::EvidenceGapsRemain);
+        assert!(result.blockers.contains(&"pressure_capacity_scope_not_matched_or_missing"));
+        assert!(result.blockers.contains(&"representative_shell_validation_missing"));
+        assert!(result.blockers.contains(&"damage_tolerance_not_demonstrated_by_test"));
+    }
+
+    #[test]
+    fn candidate_gate_never_averages_away_a_bound_sensitive_mass_budget() {
+        let mut profile = complete_candidate_evidence_profile();
+        profile.mass_budget = MassBudgetStatus::BoundSensitive;
+        let result = assess_candidate_evidence_gates(profile);
+        assert_eq!(result.status, CandidateEvidenceGateStatus::MassBudgetBoundSensitive);
+        assert!(result.blockers.contains(&"mass_budget_not_robustly_nonnegative"));
+    }
+
+    #[test]
+    fn candidate_gate_negative_mass_budget_takes_precedence() {
+        let mut profile = complete_candidate_evidence_profile();
+        profile.mass_budget = MassBudgetStatus::NegativeThroughout;
+        let result = assess_candidate_evidence_gates(profile);
+        assert_eq!(result.status, CandidateEvidenceGateStatus::MassBudgetNegativeThroughout);
+        assert_eq!(result.blockers, vec!["mass_budget_negative_throughout"]);
+    }
+
+    #[test]
+    fn candidate_gate_requires_imperfection_analysis_independent_review_and_manifest() {
+        let mut profile = complete_candidate_evidence_profile();
+        profile.nonlinear_analysis = NonlinearAnalysisGateState::LinearOrPerfectGeometryOnly;
+        profile.independent_structural_review = IndependentReviewGateState::ReviewNotIndependentOrNotRecorded;
+        profile.evidence_manifest = EvidenceManifestGateState::IdentifiersOnly;
+        let result = assess_candidate_evidence_gates(profile);
+        assert_eq!(result.status, CandidateEvidenceGateStatus::EvidenceGapsRemain);
+        assert!(result.blockers.contains(&"nonlinear_imperfection_analysis_missing_or_insufficient"));
+        assert!(result.blockers.contains(&"independent_structural_review_missing"));
+        assert!(result.blockers.contains(&"evidence_manifest_not_content_addressed"));
+    }
+
+    #[test]
+    fn candidate_gate_full_declared_profile_only_advances_to_external_assessment() {
+        let result = assess_candidate_evidence_gates(complete_candidate_evidence_profile());
+        assert_eq!(
+            result.status,
+            CandidateEvidenceGateStatus::EvidenceBundleReadyForIndependentAssessment
+        );
+        assert!(result.blockers.is_empty());
     }
 
     fn pressure_capacity_bounds(min_pa: f64, max_pa: f64) -> PressureCapacityBoundsRecord {
