@@ -25,6 +25,8 @@ pub enum ScreeningError {
     NonFiniteResult(&'static str),
     /// A fraction was outside the inclusive interval [0, 1].
     FractionOutOfRange(&'static str),
+    /// A declared lower bound exceeds its upper bound.
+    InvalidInterval(&'static str),
 }
 
 impl fmt::Display for ScreeningError {
@@ -35,6 +37,7 @@ impl fmt::Display for ScreeningError {
             Self::MustBeNonNegative(name) => write!(f, "{name} must be non-negative"),
             Self::NonFiniteResult(name) => write!(f, "derived {name} is not finite"),
             Self::FractionOutOfRange(name) => write!(f, "{name} must be within [0, 1]"),
+            Self::InvalidInterval(name) => write!(f, "{name} lower bound must not exceed its upper bound"),
         }
     }
 }
@@ -879,6 +882,166 @@ pub fn assess_external_pressure(
     })
 }
 
+
+/// Deterministic bounds for a scalar quantity. These are engineering bounds, not statistical
+/// confidence intervals; the caller is responsible for choosing justified limits.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ScalarBounds {
+    pub min: f64,
+    pub max: f64,
+}
+
+fn validate_bounds(
+    bounds: ScalarBounds,
+    name: &'static str,
+    allow_zero: bool,
+) -> Result<(), ScreeningError> {
+    validate_finite(bounds.min, name)?;
+    validate_finite(bounds.max, name)?;
+    if bounds.min > bounds.max {
+        return Err(ScreeningError::InvalidInterval(name));
+    }
+    if allow_zero {
+        validate_non_negative(bounds.min, name)?;
+        validate_non_negative(bounds.max, name)?;
+    } else {
+        validate_positive(bounds.min, name)?;
+        validate_positive(bounds.max, name)?;
+    }
+    Ok(())
+}
+
+/// Inputs for deterministic payload bounds at a fixed spherical reference radius.
+///
+/// Only scalar masses/densities vary over intervals. The radius is held fixed so this
+/// calculation does not silently assume payload monotonicity in radius; radius tolerance is a
+/// separate geometry-sensitivity study. The returned bounds cover all independent combinations
+/// inside the declared intervals. They do not establish structural pressure capacity.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SphericalPayloadBoundsRequest {
+    /// Fixed reference radius in metres.
+    pub radius_m: f64,
+    /// Lower/upper ambient-air density, kg/m³.
+    pub ambient_air_density_kg_m3: ScalarBounds,
+    /// Lower/upper internal gas density, kg/m³; use [0, 0] for ideal vacuum.
+    pub internal_gas_density_kg_m3: ScalarBounds,
+    /// Lower/upper complete structural-system areal mass, kg/m².
+    pub structural_system_areal_mass_kg_m2: ScalarBounds,
+    /// Lower/upper fixed non-structural vehicle mass, kg.
+    pub fixed_non_structural_vehicle_mass_kg: ScalarBounds,
+}
+
+/// Deterministic interval result for mass budgeting, never for pressure-strength assessment.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SphericalPayloadBoundsResult {
+    pub enclosed_volume_m3: f64,
+    pub outer_surface_area_m2: f64,
+    /// Conservative lower bound under the supplied independent bounds, kg.
+    pub payload_allowance_lower_bound_kg: f64,
+    /// Conservative upper bound under the supplied independent bounds, kg.
+    pub payload_allowance_upper_bound_kg: f64,
+    /// Upper minus lower payload allowance bound, kg.
+    pub payload_allowance_interval_width_kg: f64,
+    pub mass_budget_status: MassBudgetStatus,
+}
+
+/// What the declared mass bounds say—and only what they say—about payload arithmetic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MassBudgetStatus {
+    /// Every combination within the declared intervals has non-negative payload allowance.
+    RobustlyNonNegative,
+    /// Some combinations are non-negative and some are negative; additional evidence is needed.
+    BoundSensitive,
+    /// Every combination within the declared intervals has negative payload allowance.
+    NegativeThroughout,
+}
+
+/// Propagate deterministic input bounds through the spherical payload equation.
+///
+/// The lower result uses minimum ambient density, maximum interior density, maximum structural
+/// areal mass, and maximum fixed mass. The upper result uses the opposite endpoints. These are
+/// conservative arithmetic bounds for the fixed radius; they are not a probability distribution,
+/// a structural model, a capacity prediction, or a flight-readiness decision.
+pub fn screen_spherical_payload_bounds(
+    request: SphericalPayloadBoundsRequest,
+) -> Result<SphericalPayloadBoundsResult, ScreeningError> {
+    validate_positive(request.radius_m, "radius_m")?;
+    validate_bounds(
+        request.ambient_air_density_kg_m3,
+        "ambient_air_density_kg_m3",
+        false,
+    )?;
+    validate_bounds(
+        request.internal_gas_density_kg_m3,
+        "internal_gas_density_kg_m3",
+        true,
+    )?;
+    validate_bounds(
+        request.structural_system_areal_mass_kg_m2,
+        "structural_system_areal_mass_kg_m2",
+        true,
+    )?;
+    validate_bounds(
+        request.fixed_non_structural_vehicle_mass_kg,
+        "fixed_non_structural_vehicle_mass_kg",
+        true,
+    )?;
+
+    let enclosed_volume_m3 = sphere_volume_m3(request.radius_m)?;
+    let outer_surface_area_m2 = 4.0 * std::f64::consts::PI * request.radius_m.powi(2);
+    validate_result(outer_surface_area_m2, "outer surface area")?;
+
+    let payload_allowance_lower_bound_kg =
+        (request.ambient_air_density_kg_m3.min
+            - request.internal_gas_density_kg_m3.max)
+            * enclosed_volume_m3
+            - request.structural_system_areal_mass_kg_m2.max * outer_surface_area_m2
+            - request.fixed_non_structural_vehicle_mass_kg.max;
+    let payload_allowance_upper_bound_kg =
+        (request.ambient_air_density_kg_m3.max
+            - request.internal_gas_density_kg_m3.min)
+            * enclosed_volume_m3
+            - request.structural_system_areal_mass_kg_m2.min * outer_surface_area_m2
+            - request.fixed_non_structural_vehicle_mass_kg.min;
+    validate_result(
+        payload_allowance_lower_bound_kg,
+        "payload allowance lower bound",
+    )?;
+    validate_result(
+        payload_allowance_upper_bound_kg,
+        "payload allowance upper bound",
+    )?;
+
+    let payload_allowance_interval_width_kg =
+        payload_allowance_upper_bound_kg - payload_allowance_lower_bound_kg;
+    validate_result(
+        payload_allowance_interval_width_kg,
+        "payload allowance interval width",
+    )?;
+    if payload_allowance_interval_width_kg < 0.0 {
+        return Err(ScreeningError::NonFiniteResult(
+            "payload allowance interval ordering",
+        ));
+    }
+
+    let mass_budget_status = if payload_allowance_lower_bound_kg >= 0.0 {
+        MassBudgetStatus::RobustlyNonNegative
+    } else if payload_allowance_upper_bound_kg < 0.0 {
+        MassBudgetStatus::NegativeThroughout
+    } else {
+        MassBudgetStatus::BoundSensitive
+    };
+
+    Ok(SphericalPayloadBoundsResult {
+        enclosed_volume_m3,
+        outer_surface_area_m2,
+        payload_allowance_lower_bound_kg,
+        payload_allowance_upper_bound_kg,
+        payload_allowance_interval_width_kg,
+        mass_budget_status,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1410,4 +1573,118 @@ mod tests {
             ScreeningError::MustBePositive("radius_m")
         );
     }
+
+
+    fn bounded_payload_request() -> SphericalPayloadBoundsRequest {
+        SphericalPayloadBoundsRequest {
+            radius_m: 20.0,
+            ambient_air_density_kg_m3: ScalarBounds {
+                min: 1.20,
+                max: 1.25,
+            },
+            internal_gas_density_kg_m3: ScalarBounds {
+                min: 0.0,
+                max: 0.01,
+            },
+            structural_system_areal_mass_kg_m2: ScalarBounds {
+                min: 4.0,
+                max: 5.0,
+            },
+            fixed_non_structural_vehicle_mass_kg: ScalarBounds {
+                min: 14_000.0,
+                max: 18_000.0,
+            },
+        }
+    }
+
+    #[test]
+    fn bounded_payload_screen_preserves_optimistic_and_worst_case_bounds() {
+        let result = screen_spherical_payload_bounds(bounded_payload_request()).unwrap();
+        assert!(result.payload_allowance_lower_bound_kg < 0.0);
+        assert!(result.payload_allowance_upper_bound_kg > 0.0);
+        assert!(result.payload_allowance_interval_width_kg > 0.0);
+        assert_eq!(result.mass_budget_status, MassBudgetStatus::BoundSensitive);
+    }
+
+    #[test]
+    fn bounded_payload_screen_identifies_robustly_non_negative_mass_budget() {
+        let request = SphericalPayloadBoundsRequest {
+            fixed_non_structural_vehicle_mass_kg: ScalarBounds {
+                min: 1_000.0,
+                max: 2_000.0,
+            },
+            ..bounded_payload_request()
+        };
+        let result = screen_spherical_payload_bounds(request).unwrap();
+        assert!(result.payload_allowance_lower_bound_kg >= 0.0);
+        assert_eq!(result.mass_budget_status, MassBudgetStatus::RobustlyNonNegative);
+    }
+
+    #[test]
+    fn bounded_payload_screen_identifies_negative_budget_throughout_bounds() {
+        let request = SphericalPayloadBoundsRequest {
+            fixed_non_structural_vehicle_mass_kg: ScalarBounds {
+                min: 100_000.0,
+                max: 120_000.0,
+            },
+            ..bounded_payload_request()
+        };
+        let result = screen_spherical_payload_bounds(request).unwrap();
+        assert!(result.payload_allowance_upper_bound_kg < 0.0);
+        assert_eq!(result.mass_budget_status, MassBudgetStatus::NegativeThroughout);
+    }
+
+    #[test]
+    fn bounded_payload_screen_rejects_reversed_bounds() {
+        let request = SphericalPayloadBoundsRequest {
+            ambient_air_density_kg_m3: ScalarBounds {
+                min: 1.3,
+                max: 1.2,
+            },
+            ..bounded_payload_request()
+        };
+        assert_eq!(
+            screen_spherical_payload_bounds(request).unwrap_err(),
+            ScreeningError::InvalidInterval("ambient_air_density_kg_m3")
+        );
+    }
+
+    #[test]
+    fn bounded_payload_screen_rejects_non_finite_interval_endpoints() {
+        let request = SphericalPayloadBoundsRequest {
+            structural_system_areal_mass_kg_m2: ScalarBounds {
+                min: 1.0,
+                max: f64::INFINITY,
+            },
+            ..bounded_payload_request()
+        };
+        assert_eq!(
+            screen_spherical_payload_bounds(request).unwrap_err(),
+            ScreeningError::NonFiniteInput("structural_system_areal_mass_kg_m2")
+        );
+    }
+
+    #[test]
+    fn equal_bounds_reduce_to_point_screen_payload_equation() {
+        let request = SphericalPayloadBoundsRequest {
+            radius_m: 20.0,
+            ambient_air_density_kg_m3: ScalarBounds { min: 1.225, max: 1.225 },
+            internal_gas_density_kg_m3: ScalarBounds { min: 0.0, max: 0.0 },
+            structural_system_areal_mass_kg_m2: ScalarBounds { min: 4.0, max: 4.0 },
+            fixed_non_structural_vehicle_mass_kg: ScalarBounds { min: 10_000.0, max: 10_000.0 },
+        };
+        let bounded = screen_spherical_payload_bounds(request).unwrap();
+        let point = screen_spherical_payload(SphericalPayloadRequest {
+            radius_m: 20.0,
+            ambient_air_density_kg_m3: 1.225,
+            internal_gas_density_kg_m3: 0.0,
+            structural_system_areal_mass_kg_m2: 4.0,
+            fixed_non_structural_vehicle_mass_kg: 10_000.0,
+        })
+        .unwrap();
+        assert!((bounded.payload_allowance_lower_bound_kg - point.payload_allowance_kg).abs() < 1e-8);
+        assert!((bounded.payload_allowance_upper_bound_kg - point.payload_allowance_kg).abs() < 1e-8);
+        assert!(bounded.payload_allowance_interval_width_kg.abs() < 1e-8);
+    }
+
 }
