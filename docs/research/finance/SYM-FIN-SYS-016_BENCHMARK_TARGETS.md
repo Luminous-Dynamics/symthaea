@@ -12,7 +12,7 @@ A higher tier cannot compensate for a lower-tier failure.
 
 | Tier | Question | Proposed target | Required evidence |
 |---|---|---|---|
-| Q0 — Receipt integrity | Is the receipt structurally and semantically valid? | Positive fixture accepted; **24/24** pinned negative controls rejected by their intended layer; **8/8** authored unit tests pass when actually executed | Exact source SHA, dependency lock, validator log, control-by-control result |
+| Q0 — Receipt integrity | Is the receipt structurally and semantically valid? | Positive fixture accepted; **26/26** pinned negative controls rejected by their intended layer; **8/8** authored unit tests pass when actually executed | Exact source SHA, dependency lock, validator log, control-by-control result |
 | Q1 — Artifact identity | Do declared input digests resolve to the bytes used? | **100%** of required input digests resolve to exact bytes or are explicitly classified as unavailable/unverified; **0** unlabelled placeholders accepted as verified | Artifact manifest, digest algorithm, exact-byte hash report, missing-artifact register |
 | Q2 — Deterministic replay | Does identical input reproduce identical behavior? | **100/100** same-runner replays per frozen benchmark produce the same ordered event-log digest and final-state digest | Seed, runner fingerprint, source revision, environment and event-log digests |
 | Q3 — Mechanism invariants | Can transitions violate conservation or authority boundaries? | **0** invariant violations in 100,000 generated transition sequences; **0** duplicate settlement successes; **0** capacity overcommit; **0** synthetic/unknown evidence promotions | Property-based test report, minimized counterexamples, independent accounting and power oracles |
@@ -25,7 +25,7 @@ A pending, queued, skipped, cancelled or unobserved job does not satisfy a gate.
 
 ### Q0 — Fail-closed receipt checking
 
-The current contract pins 24 negative controls: 10 JSON-Schema failures and 14 semantic failures. On a real validator run:
+The current contract pins 26 negative controls: 10 JSON-Schema failures and 16 semantic failures. On a real validator run:
 
 - All 10 schema-level cases must be rejected by JSON Schema.
 - Each of the 14 semantic cases must remain schema-valid, then be rejected by semantic validation.
@@ -110,7 +110,7 @@ Performance gates apply only after behavior and workload are frozen. Report the 
 
 | Workload | Provisional target |
 |---|---:|
-| Receipt validation: positive fixture + 24 controls | p95 ≤ 2 seconds |
+| Receipt validation: positive fixture + 26 controls | p95 ≤ 2 seconds |
 | Baseline world: 100 people, 20 projects, 4 communities, 8 scarce-resource classes, one scenario horizon | p95 ≤ 2 seconds |
 | Medium world: 1,000 people, 200 projects, 8 communities, 100 ticks | p95 ≤ 10 seconds |
 | Stress world: 10,000 people, 2,000 projects, 32 communities, 1,000 ticks | p95 ≤ 120 seconds and peak RSS ≤ 2 GiB |
@@ -137,9 +137,9 @@ Use consistent metric semantics and units; [OpenTelemetry metric conventions](ht
 
 As of the current design revision:
 
-- The source contains 24 negative-control definitions and 8 authored Python unit tests. Those counts are not evidence that the tests executed.
-- A structural mirror checked the fixture's registry digest and rejected the 14 semantic mutations; this is not execution of the Python validator or JSON Schema engine.
-- The run-receipt validator currently recomputes the scenario-registry digest and checks scenario ID plus metric ID/dimension. Other digest-shaped fields remain declarations, not verified artifact identities.
+- The source contains 26 negative-control definitions and 11 authored Python unit tests. Those counts are not evidence that the tests executed.
+- A structural mirror checked the fixture's registry digest and rejected the 16 semantic mutations; this is not execution of the Python validator or JSON Schema engine.
+- The run-receipt validator now checks an exact-byte artifact manifest: it re-hashes a pinned set of repository source files, binds every digest-shaped receipt field to exactly one JSON-pointer binding, verifies the receipt’s manifest digest, and explicitly labels unavailable run-generated payloads unverified. Of the 19 digest-shaped fixture fields, the scenario-registry digest is the only one tied to repository bytes; the other 18 are illustrative values and remain unverified.
 - No 12,000-run or 16,800-run simulator campaign has been executed by this document.
 - The performance targets are proposed and unmeasured.
 
