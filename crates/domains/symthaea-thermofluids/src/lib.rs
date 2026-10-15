@@ -16,14 +16,19 @@
 //!   loss, continuity.
 //! - [`thermal`]: Carnot efficiency, Fourier conduction, Newton cooling, engine
 //!   work.
+//! - [`cycles`]: validated ideal Carnot, Brayton, Otto, and Diesel cycle
+//!   efficiency baselines for research and sanity checking. These are not real
+//!   engine performance predictions.
 //!
 //! ## Example
 //!
 //! ```
-//! use symthaea_thermofluids::{fluids, thermal};
+//! use symthaea_thermofluids::{cycles, fluids, thermal};
 //! assert_eq!(fluids::flow_regime(1000.0), fluids::Regime::Laminar);
 //! assert!((thermal::carnot_efficiency(300.0, 600.0) - 0.5).abs() < 1e-12);
+//! assert!((cycles::carnot_efficiency(300.0, 600.0).unwrap() - 0.5).abs() < 1e-12);
 //! ```
 
+pub mod cycles;
 pub mod fluids;
 pub mod thermal;
