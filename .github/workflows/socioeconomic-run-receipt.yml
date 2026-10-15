@@ -11,7 +11,8 @@ on:
       - "scripts/validate_socioeconomic_run_receipt.py"
       - "scripts/socioeconomic_run_receipt_requirements.txt"
   push:
-    branches: [main]
+    # Also run on the working feature branch before a PR can merge this workflow.
+    # Keep it bounded to changes in this receipt contract and its validator.
     paths:
       - ".github/workflows/socioeconomic-run-receipt.yml"
       - ".github/workflows/ci.yml"
