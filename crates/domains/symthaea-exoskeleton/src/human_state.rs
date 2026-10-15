@@ -427,11 +427,11 @@ pub fn fuse_human_state(
     })
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct HydrationLedger {
-    pub starting_ml: f64,
-    pub replenished_ml: f64,
-    pub consumed_ml: f64,
+    starting_ml: f64,
+    replenished_ml: f64,
+    consumed_ml: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -451,6 +451,18 @@ impl HydrationLedger {
             replenished_ml: 0.0,
             consumed_ml: 0.0,
         })
+    }
+
+    pub fn starting_ml(&self) -> f64 {
+        self.starting_ml
+    }
+
+    pub fn replenished_ml(&self) -> f64 {
+        self.replenished_ml
+    }
+
+    pub fn consumed_ml(&self) -> f64 {
+        self.consumed_ml
     }
 
     pub fn remaining_ml(&self) -> f64 {
@@ -513,7 +525,8 @@ mod tests {
 
     #[test]
     fn missing_metric_stays_unknown_instead_of_becoming_nominal() {
-        let report = fuse_human_state(&[], 100.0, HumanStateConfig::simulation_reference()).unwrap();
+        let report =
+            fuse_human_state(&[], 100.0, HumanStateConfig::simulation_reference()).unwrap();
         let metric = report.metric(HumanMetric::CoreTemperatureC).unwrap();
         assert_eq!(metric.status, HumanMetricStatus::Missing);
         assert_eq!(metric.value, None);
@@ -526,7 +539,8 @@ mod tests {
             HumanMetric::HeartRateBpm, 90.0, 2.0, 10.0, 0.99, "heart-a",
             HumanObservationSource::Instrument,
         );
-        let report = fuse_human_state(&[old], 100.0, HumanStateConfig::simulation_reference()).unwrap();
+        let report =
+            fuse_human_state(&[old], 100.0, HumanStateConfig::simulation_reference()).unwrap();
         assert_eq!(
             report.metric(HumanMetric::HeartRateBpm).unwrap().status,
             HumanMetricStatus::Stale
@@ -547,7 +561,8 @@ mod tests {
                 HumanObservationSource::Instrument,
             ),
         ];
-        let report = fuse_human_state(&inputs, 100.0, HumanStateConfig::simulation_reference()).unwrap();
+        let report =
+            fuse_human_state(&inputs, 100.0, HumanStateConfig::simulation_reference()).unwrap();
         let fused = report.metric(HumanMetric::CoreTemperatureC).unwrap();
         assert_eq!(fused.status, HumanMetricStatus::Conflicted);
         assert_eq!(fused.value, None);
@@ -625,7 +640,8 @@ mod tests {
             HumanMetric::LocalFatigueFraction, 1.5, 0.1, 99.0, 0.99, "fatigue",
             HumanObservationSource::ModelEstimate,
         );
-        let report = fuse_human_state(&[input], 100.0, HumanStateConfig::simulation_reference()).unwrap();
+        let report =
+            fuse_human_state(&[input], 100.0, HumanStateConfig::simulation_reference()).unwrap();
         assert_eq!(
             report.metric(HumanMetric::LocalFatigueFraction).unwrap().status,
             HumanMetricStatus::Invalid
