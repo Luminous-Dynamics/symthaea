@@ -316,6 +316,24 @@ For context, Toli's 2026 kenemostat paper gives the approximate effective great-
 
 Use this function as a transparent handoff to a geometry-specific member/joint analysis. For actual design ranking, record the load-path derivation, full spatial imperfection set, as-built configuration, and force distribution from the qualified model; compare the estimate against a physical subassembly before raising confidence in the model.
 
+### Propagate uncertainty through load-path demand, not just one assumed estimate
+
+The Rust API now includes `screen_bounded_load_path_demand`. It accepts independent bounds for the total compressive resultant, effective number of paths, and peak-to-mean concentration factor. It calculates bounded equal-share and factor-scaled demands using the monotonic endpoint rules:
+
+```text
+mean_min = resultant_min / path_count_max
+mean_max = resultant_max / path_count_min
+
+scaled_min = mean_min × concentration_min
+scaled_max = mean_max × concentration_max
+```
+
+A hypothetical 127.33 MN global resultant with an effective path-count range of 25–35 and a factor range of 1.2–1.5 yields a factor-scaled arithmetic interval of roughly **4.37–7.64 MN per effective path**. Those path-count and factor bounds are placeholders for demonstrating interval propagation, not model-derived or experimentally justified inputs. The resulting interval is only as defensible as the assumptions. It is not a predicted force on any particular member, not a structural allowable, and not a shell safety result.
+
+The bound propagation assumes independently declared intervals and monotonic use of the endpoints. If path count and concentration factor are correlated because the geometry or defect field changes both together, independent endpoint combinations may be overly broad or misleading as a design-specific envelope. In that case, use a joint parametric study over geometry and imperfections and retain each scenario's provenance rather than treating marginals as independent. The current API rejects non-finite or reversed endpoints, non-positive minimum path count, concentration factors below one, and overflowed derived bounds.
+
+This fills an arithmetic gap but not the physics gap: actual path count, load concentration, local member forces and global buckling modes still need geometry-specific nonlinear analysis with imperfections and comparison to physical tests. For the geodesic 2026 reference, the paper's approximate analytical load-sharing relationship and its FEA comparison are useful regression targets for an independently implemented checker, but they must remain tied to that paper's geometry and assumptions. [Toli, DOI 10.1016/j.ast.2026.112799](https://doi.org/10.1016/j.ast.2026.112799).
+
 ### Require exact scope alignment before comparing capacity evidence
 
 The bounded pressure screen now has a scope-aware wrapper, `assess_scoped_external_pressure_bounds`. A pressure-capacity record is compared only when eight immutable scope identifiers match the requested case:
@@ -360,7 +378,7 @@ An important research lead is Ning and Pellegrino's study of externally pressuri
 
 For each candidate, retain a complete and versioned evidence bundle: exact CAD/mesh generation, as-built geometry, material/layup and batch data, joint/edge stiffness, defect bounds, load/support definition, solver and convergence record, nonlinear imperfection analysis, and test receipt. Then compare blinded preregistered predictions against instrumented subassembly tests. Do not let a candidate optimizer use a predicted buckling load as a qualified capacity; only an independently reviewed, case-specific analysis and relevant tests can support that conclusion.
 
-The screening code should remain the quick-rejection layer. Candidate search may organize these alternatives and select high-information experiments, but it must not generate material allowables, infer shell strength from HDC similarity, or turn a recovery score into a safety claim.
+The screening code should remain the quick-rejection layer. Candidate search may organize these alternatives and select high-information experiments, but it must not generate material allowables, infer shell strength from HDC similarity, infer a real member's load from an unvalidated path count, or turn a recovery score into a safety claim.
 
 ## Known exclusions
 
