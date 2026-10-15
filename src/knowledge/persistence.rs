@@ -1322,6 +1322,7 @@ mod tests {
                     &[fact.clone()],
                     &[stale_edge, duplicate_edge],
                     &[stale_primitive],
+                    2,
                 )
                 .unwrap(),
             (1, 2, 1)
@@ -1341,7 +1342,7 @@ mod tests {
         };
         assert_eq!(
             persistence
-                .replace_knowledge_snapshot(&[replacement_fact], &[], &[])
+                .replace_knowledge_snapshot(&[replacement_fact], &[], &[], 2)
                 .unwrap(),
             (1, 0, 0)
         );
@@ -1355,6 +1356,68 @@ mod tests {
         assert!(
             ontology.is_empty(),
             "pruned ontology primitives must not reappear after restart"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_allocator_high_water_survives_removal_of_highest_fact() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_allocator_high_water_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+
+        let retained = FactRecord {
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "retained fact".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.8),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let soon_removed = FactRecord {
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            source_text: "fact retired before next restart".into(),
+            confidence: 0.4,
+            domain: None,
+            cycle: 2,
+            is_causal: false,
+            graph_fact_id: Some(2),
+            initial_confidence: Some(0.4),
+            last_accessed_cycle: Some(2),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+
+        persistence
+            .replace_knowledge_snapshot(
+                &[retained.clone(), soon_removed],
+                &[],
+                &[],
+                3,
+            )
+            .unwrap();
+        persistence
+            .replace_knowledge_snapshot(&[retained], &[], &[], 3)
+            .unwrap();
+
+        let records = persistence.load_facts().unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].graph_fact_id, Some(1));
+        assert_eq!(
+            persistence.load_next_graph_fact_id().unwrap(),
+            Some(3),
+            "deleting the highest-ID fact must not lower the persisted allocator"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -1401,7 +1464,7 @@ mod tests {
             is_a_parent: None,
         };
         persistence
-            .replace_knowledge_snapshot(&[old_fact], &[old_edge], &[old_primitive])
+            .replace_knowledge_snapshot(&[old_fact], &[old_edge], &[old_primitive], 2)
             .unwrap();
 
         let conn = rusqlite::Connection::open(&db_path).unwrap();
@@ -1447,7 +1510,7 @@ mod tests {
         };
 
         let error = persistence
-            .replace_knowledge_snapshot(&[new_fact], &[new_edge], &[rejected_primitive])
+            .replace_knowledge_snapshot(&[new_fact], &[new_edge], &[rejected_primitive], 4)
             .unwrap_err();
         assert!(error.contains("injected snapshot insert failure"), "{error}");
 
