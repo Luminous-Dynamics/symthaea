@@ -51,6 +51,50 @@ These values are arithmetic reference cases, not structural designs or payload c
 
 Vacuum has higher gross lift than helium by the helium mass that would otherwise occupy the same volume, not by the full mass of displaced air. The density comparison must use the same temperature and pressure. The additional lift is small compared with the total displaced-air mass, so the structural mass penalty may dominate.
 
+## Cargo-transport assessment: vacuum must beat the helium mass penalty
+
+The cargo use case is credible only as a conditional research target. It is not yet supported as a feasible vehicle by the available evidence. The strongest first comparison is vacuum against helium at the *same external displacement volume*, with the full non-payload mass for each configuration entered separately.
+
+For a common external volume \(V\):
+
+\[
+m_{\mathrm{lift,vac}}=\rho_{\mathrm{air}}V
+\qquad
+m_{\mathrm{lift,He}}=(\rho_{\mathrm{air}}-\rho_{\mathrm{He}})V
+\]
+
+Therefore the vacuum vehicle's extra gross lift is only:
+
+\[
+\Delta m_{\mathrm{gross}}=\rho_{\mathrm{He}}V
+\]
+
+Vacuum carries more payload than helium only when its *additional* non-payload vehicle mass is less than \(\rho_{\mathrm{He}}V\). This threshold does not estimate how heavy the vacuum pressure hull will be; it tells the researcher exactly what that hull and its additional systems must beat.
+
+Using standard sea-level ambient density 1.225 kg/m³ and helium density 0.16928 kg/m³ as illustrative matched-condition inputs:
+
+| Spherical radius | Volume | Ideal vacuum gross lift | Ideal helium gross lift | Maximum incremental vehicle-mass penalty for vacuum to retain more payload |
+|---:|---:|---:|---:|---:|
+| 20 m | 33,510 m³ | 41.05 t | 35.38 t | 5.67 t |
+| 40 m | 268,083 m³ | 328.40 t | 283.02 t | 45.38 t |
+
+These are gross lift calculations, not vehicle payload results. Actual atmospheric conditions alter all densities. A helium craft still has its own envelope, ballonets or buoyancy-control equipment, propulsion, batteries/fuel, cargo handling, and structure. A fair study must compare complete designs and common safety requirements, not compare a vacuum shell with an otherwise fully-equipped helium airship.
+
+The Rust module now exposes `compare_vacuum_and_helium` to keep this mass penalty explicit, plus `screen_cargo_fit` to check cargo mass and cargo volume independently against declared capacities. Usable cargo volume must be supplied from the chosen configuration; it is never assumed equal to the entire hull volume. Passing these arithmetic gates does not establish route or operational viability.
+
+## What cargo market could suit an eventual vehicle?
+
+Existing studies suggest that conventional cargo airships, if made operationally available, might serve as a middle tier between slow/low-cost surface freight and costly/faster air freight, especially for remote delivery and project cargo. A mode-choice study of 96 logistics professionals found hypothetical market shares from 5% to 34% depending on cargo type; these stated-preference results are not proof of actual uptake. A 2024 refrigerated freight comparison modeled a 100-tonne electrically powered cargo airship against long-haul trucking. A separate solar-airship route study projected very low energy use and emissions but several-fold longer flight times than conventional aircraft. These results support researching a niche, not assuming a universal freight advantage.
+
+For a vacuum airship, the practical first niches would be high-value or otherwise difficult-to-deliver cargo where slow travel is acceptable and remote landing / hovering access is valuable. It must first beat a helium cargo airship structurally and economically. The principal questions are whether the extra pressure-resistant mass fits under the helium-mass ceiling, whether cargo can be loaded without compromising the hull, how loading/unloading changes mass and trim, and what happens after damage or loss of vacuum. A standard pressurized cargo bay within a vacuum envelope is possible only by paying for its pressure boundary and supports, and by counting every associated mass and displacement effect. External sling cargo might simplify the interior-volume issue but makes load attachment, sway, weather, clearance and ground handling harder.
+
+Research context:
+- Toli's 2026 geodesic study discusses idealized structural feasibility and estimates critical size / payload scaling, but remains an analysis rather than a flight demonstration: [Aerospace Science and Technology](https://doi.org/10.1016/j.ast.2026.112799).
+- Akhmeteli & Gavrilin's 2021 sandwich-shell study estimates a small theoretical payload fraction using commercial-material properties but says manufacturing imperfections were not explicitly modelled in their analysis: [Engineering](https://doi.org/10.3390/eng2040030).
+- Prentice's cargo-airship mode-choice study surveyed 96 logistics professionals and reports hypothetical 5–34% market share depending on freight type: [Journal of Air Transport Management](https://doi.org/10.1016/j.jairtraman.2019.101741).
+- Prentice's 2024 study compares trucking with a modeled 100-tonne electric cargo airship for refrigerated supply chains: [Journal of Transportation Technologies](https://doi.org/10.4236/jtts.2024.142012).
+- A 2023 route-optimization study for solar airships estimates reduced energy/emissions in its model with longer travel times than conventional aircraft: [International Journal of Automotive and Mechanical Engineering](https://doi.org/10.1080/14786451.2023.2189488).
+
 ## New first-pass improvement: bound the envelope's allowable areal mass
 
 For a spherical pressure boundary with reference radius `R), the idealized outer area and enclosed volume are:
