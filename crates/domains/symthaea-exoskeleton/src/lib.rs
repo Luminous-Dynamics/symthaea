@@ -41,6 +41,7 @@ pub mod integrated_adversarial_campaign;
 pub mod metabolism;
 pub mod perturbations;
 pub mod plss;
+pub mod plss_telemetry;
 pub mod plugin;
 pub mod power;
 pub mod powered_glove;
