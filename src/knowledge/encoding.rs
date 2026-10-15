@@ -25,7 +25,7 @@ use symthaea_core::hdc::unified_hv::{BinaryHV, HDC_DIMENSION};
 ///
 /// Unlike the compatibility map on `FactEncoding`, this representation preserves
 /// distinct entities that share a semantic role.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoleBoundVector {
     pub role: SemanticRole,
     pub entity_text: String,
