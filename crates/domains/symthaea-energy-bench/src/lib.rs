@@ -156,9 +156,9 @@ pub struct VerifiedTotals {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ComparisonDecision {
     /// The declared expanded-uncertainty lower bound exceeds the preregistered margin.
-    ImprovementSupportedWithinDeclaredUncertainty,
+    LowerBoundClearsRegisteredMargin,
     /// The estimated advantage did not clear the preregistered margin.
-    NoImprovementDemonstrated,
+    LowerBoundDoesNotClearMargin,
     /// Evidence or uncertainty assumptions are insufficient for a decision.
     Indeterminate,
 }
@@ -664,9 +664,9 @@ pub fn compare_candidates(
     report.expanded_difference_uncertainty = Some(expanded_delta_u);
     report.conservative_lower_bound = Some(lower_bound);
     report.decision = if lower_bound > required_margin {
-        ComparisonDecision::ImprovementSupportedWithinDeclaredUncertainty
+        ComparisonDecision::LowerBoundClearsRegisteredMargin
     } else {
-        ComparisonDecision::NoImprovementDemonstrated
+        ComparisonDecision::LowerBoundDoesNotClearMargin
     };
     report.reason = Some(
         "first-order propagation using declared independent standard uncertainties; this is model-level evidence only, not physical validation".into()
@@ -692,8 +692,11 @@ fn efficiency_standard_uncertainty(
         input_uncertainty_j = input_uncertainty_j.hypot(interval.standard_uncertainty_j.external_input);
         output_uncertainty_j = output_uncertainty_j.hypot(interval.standard_uncertainty_j.net_useful_output);
     }
+    let efficiency = total_useful_output_j / total_input_j;
     let input_term = output_uncertainty_j / total_input_j;
-    let output_term = total_useful_output_j * input_uncertainty_j / (total_input_j * total_input_j);
+    // Algebraically equivalent to Q_out * u(Q_in) / Q_in^2, but avoids
+    // squaring a large finite Q_in and overflowing the denominator.
+    let output_term = efficiency * (input_uncertainty_j / total_input_j);
     let uncertainty = input_term.hypot(output_term);
     if !uncertainty.is_finite() {
         return Err(ValidationError {
@@ -821,7 +824,7 @@ mod tests {
     fn comparison_only_supports_improvement_when_lower_bound_clears_margin() {
         let (candidate, baseline) = comparison_runs();
         let result = compare_candidates(&candidate, &baseline).unwrap();
-        assert_eq!(result.decision, ComparisonDecision::ImprovementSupportedWithinDeclaredUncertainty);
+        assert_eq!(result.decision, ComparisonDecision::LowerBoundClearsRegisteredMargin);
         assert!(result.estimated_efficiency_difference.unwrap() > 0.02);
         assert!(result.conservative_lower_bound.unwrap() > result.required_superiority_margin);
         assert!(result.expanded_difference_uncertainty.unwrap() > 0.0);
@@ -833,7 +836,7 @@ mod tests {
         candidate.intervals[1].standard_uncertainty_j.external_input = 25.0;
         candidate.intervals[1].standard_uncertainty_j.net_useful_output = 20.0;
         let result = compare_candidates(&candidate, &baseline).unwrap();
-        assert_eq!(result.decision, ComparisonDecision::NoImprovementDemonstrated);
+        assert_eq!(result.decision, ComparisonDecision::LowerBoundDoesNotClearMargin);
         assert!(result.conservative_lower_bound.unwrap() <= result.required_superiority_margin);
     }
 
