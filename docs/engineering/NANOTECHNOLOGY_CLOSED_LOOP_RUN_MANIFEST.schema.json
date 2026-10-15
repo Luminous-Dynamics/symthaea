@@ -743,6 +743,14 @@
               "wall_clock_observed_seconds",
               "peak_memory_observed_mib"
             ]
+          },
+          "finished_at_utc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "output_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         }
       }
@@ -775,6 +783,10 @@
                 "minItems": 1
               },
               "system_artifact_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "split_manifest_sha256": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
               }
@@ -853,6 +865,32 @@
                 }
               }
             }
+          },
+          "episodes": {
+            "minItems": 1
+          },
+          "source_code": {
+            "properties": {
+              "symthaea_revision": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "adapter_revision": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "adapter_runtime": {
+                "enum": [
+                  "rust_jsonl_subprocess",
+                  "other_isolated_research_adapter"
+                ]
+              }
+            },
+            "required": [
+              "symthaea_revision",
+              "adapter_revision",
+              "adapter_runtime"
+            ]
           }
         },
         "required": [
