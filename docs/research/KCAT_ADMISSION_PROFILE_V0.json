@@ -2,7 +2,7 @@
   "schema_version": 1,
   "profile_id": "kcat-admission-profile-v0",
   "status": "tier_counter_implemented_policy_review_required",
-  "purpose": "Define endpoint-specific evidence tiers for reported enzyme turnover numbers without treating metadata completeness as scientific quality. The Rust checker now emits per-row aggregate counts for context-qualified, primary-comparison, and kinetic-reproduction candidate tiers; this policy still requires domain review before a real corpus is classified.",
+  "purpose": "Define endpoint-specific evidence tiers for reported enzyme turnover numbers without treating metadata completeness as scientific quality. The Rust checker now emits per-row aggregate counts for context-qualified, primary-comparison, and kinetic-reproduction candidate tiers; this policy still requires domain review before a real corpus is classified. The CLI also emits an observation-ID-linked highest-tier label so the aggregate counts are auditable.",
   "target": {
     "endpoint": "kcat",
     "normalized_unit": "s^-1",
@@ -31,7 +31,8 @@
     "eligibility_is_not_prediction_validation": true,
     "descriptive_coverage_counters_sum_to_observation_count": true,
     "tier_counter_implemented": true,
-    "profile_is_runtime_policy_source": false
+    "profile_is_runtime_policy_source": false,
+    "row_level_tier_labels_emitted": true
   },
   "tiers": [
     {
@@ -249,6 +250,7 @@
     "A record that meets these metadata requirements can still be biased, incorrectly fitted, duplicated, or out of domain.",
     "The Rust checker reports per-row aggregate tier counts, but the JSON file is not loaded as the runtime source of policy; a unit test checks that its field inventory covers all audited descriptors, and the hard-coded tier rules still require synchronized review.",
     "Tier labels are candidate classifications based on declared metadata shape and presence, not validation that values are truthful, assays are comparable in all material respects, or kinetic fits are scientifically correct.",
-    "The tier classifier is implemented and reports aggregate counts, but its threshold choices still require domain review; it has not yet been validated against an independently reviewed real kcat corpus."
+    "The tier classifier is implemented and reports aggregate counts, but its threshold choices still require domain review; it has not yet been validated against an independently reviewed real kcat corpus.",
+    "For raw_measurement_data_sha256, the current checker validates only a 64-character hexadecimal value and does not download the URL or prove that the digest matches its payload; the kinetic-reproduction tier is a pre-screen until an independent raw-file verifier binds URL, bytes, and digest."
   ]
 }
