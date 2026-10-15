@@ -12,7 +12,7 @@ A higher tier cannot compensate for a lower-tier failure.
 
 | Tier | Question | Proposed target | Required evidence |
 |---|---|---|---|
-| Q0 — Receipt integrity | Is the receipt structurally and semantically valid? | Positive fixture accepted; **26/26** pinned negative controls rejected by their intended layer; **8/8** authored unit tests pass when actually executed | Exact source SHA, dependency lock, validator log, control-by-control result |
+| Q0 — Receipt integrity | Is the receipt structurally and semantically valid? | Positive fixture accepted; **26/26** pinned negative controls rejected by their intended layer; **11/11** authored unit tests pass when actually executed | Exact source SHA, dependency lock, validator log, control-by-control result |
 | Q1 — Artifact identity | Do declared input digests resolve to the bytes used? | **100%** of required input digests resolve to exact bytes or are explicitly classified as unavailable/unverified; **0** unlabelled placeholders accepted as verified | Artifact manifest, digest algorithm, exact-byte hash report, missing-artifact register |
 | Q2 — Deterministic replay | Does identical input reproduce identical behavior? | **100/100** same-runner replays per frozen benchmark produce the same ordered event-log digest and final-state digest | Seed, runner fingerprint, source revision, environment and event-log digests |
 | Q3 — Mechanism invariants | Can transitions violate conservation or authority boundaries? | **0** invariant violations in 100,000 generated transition sequences; **0** duplicate settlement successes; **0** capacity overcommit; **0** synthetic/unknown evidence promotions | Property-based test report, minimized counterexamples, independent accounting and power oracles |
