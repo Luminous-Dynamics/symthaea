@@ -1471,11 +1471,33 @@ mod tests {
             .insert(SemanticRole::Agent, vec![0x5A; BinaryHV::BYTES]);
         fact.role_vectors
             .insert(SemanticRole::Patient, vec![0xC3; BinaryHV::BYTES]);
+        fact.role_vector_observations = vec![
+            RoleVectorObservationRecord {
+                role: SemanticRole::Agent,
+                entity_text: "United States".into(),
+                vector_bytes: vec![0x11; BinaryHV::BYTES],
+            },
+            RoleVectorObservationRecord {
+                role: SemanticRole::Agent,
+                entity_text: "European Union".into(),
+                vector_bytes: vec![0x22; BinaryHV::BYTES],
+            },
+            RoleVectorObservationRecord {
+                role: SemanticRole::Patient,
+                entity_text: "Iran".into(),
+                vector_bytes: vec![0x33; BinaryHV::BYTES],
+            },
+        ];
 
         assert_eq!(persistence.save_facts(&[fact.clone()]).unwrap(), 1);
         let loaded = persistence.load_facts().unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].role_vectors, fact.role_vectors);
+        assert_eq!(
+            loaded[0].role_vector_observations,
+            fact.role_vector_observations,
+            "the same role may have multiple distinct persisted entity observations"
+        );
 
         assert_eq!(
             persistence
@@ -1485,9 +1507,14 @@ mod tests {
         );
         let snapshot = persistence.load_facts().unwrap();
         assert_eq!(snapshot[0].role_vectors, fact.role_vectors);
+        assert_eq!(
+            snapshot[0].role_vector_observations,
+            fact.role_vector_observations
+        );
 
         let replacement = FactRecord {
             role_vectors: HashMap::new(),
+            role_vector_observations: Vec::new(),
             ..fact
         };
         assert_eq!(
@@ -1496,9 +1523,11 @@ mod tests {
                 .unwrap(),
             (1, 0, 0)
         );
+        let replacement_rows = persistence.load_facts().unwrap();
+        assert!(replacement_rows[0].role_vectors.is_empty());
         assert!(
-            persistence.load_facts().unwrap()[0].role_vectors.is_empty(),
-            "removed role vectors must not survive snapshot replacement"
+            replacement_rows[0].role_vector_observations.is_empty(),
+            "removed role-vector observations must not survive snapshot replacement"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -1555,6 +1584,58 @@ mod tests {
         drop(conn);
         let error = persistence.load_facts().unwrap_err();
         assert!(error.contains("unknown persisted semantic role key"), "{error}");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_corrupt_role_vector_observations() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_corrupt_role_vector_observations_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let mut fact = FactRecord {
+            vector_bytes: vec![0; BinaryHV::BYTES],
+            source_text: "role observation corruption fixture".into(),
+            confidence: 0.9,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+            relations: Vec::new(),
+            role_vectors: HashMap::new(),
+            role_vector_observations: vec![RoleVectorObservationRecord {
+                role: SemanticRole::Agent,
+                entity_text: "agent A".into(),
+                vector_bytes: vec![0x5A; BinaryHV::BYTES],
+            }],
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.9),
+            last_accessed_cycle: Some(1),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        fact.role_vectors
+            .insert(SemanticRole::Agent, vec![0x5A; BinaryHV::BYTES]);
+        persistence.save_facts(&[fact]).unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_role_observations SET vector_blob = ?1",
+            rusqlite::params![vec![0u8; 1]],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = persistence.load_facts().unwrap_err();
+        assert!(
+            error.contains("invalid hypervector length"),
+            "corrupt role observations must fail closed: {error}"
+        );
+        assert_eq!(persistence.total_loaded(), 0);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
