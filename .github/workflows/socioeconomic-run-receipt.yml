@@ -1,0 +1,44 @@
+name: Socioeconomic Run Receipt Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/socioeconomic-run-receipt.yml"
+      - "docs/research/finance/SYM-FIN-SYS-016_run_receipt_*"
+      - "scripts/validate_socioeconomic_run_receipt.py"
+      - "scripts/socioeconomic_run_receipt_requirements.txt"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/socioeconomic-run-receipt.yml"
+      - "docs/research/finance/SYM-FIN-SYS-016_run_receipt_*"
+      - "scripts/validate_socioeconomic_run_receipt.py"
+      - "scripts/socioeconomic_run_receipt_requirements.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: socioeconomic-run-receipt-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-contract:
+    name: JSON Schema and semantic negative controls
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 immutable commit
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Create isolated validation environment
+        run: python3 -m venv "$RUNNER_TEMP/run-receipt-venv"
+
+      - name: Install pinned validation-only dependencies
+        run: |
+          "$RUNNER_TEMP/run-receipt-venv/bin/python" -m pip install --disable-pip-version-check --requirement scripts/socioeconomic_run_receipt_requirements.txt
+
+      - name: Validate positive fixture and reject negative controls
+        run: "$RUNNER_TEMP/run-receipt-venv/bin/python" scripts/validate_socioeconomic_run_receipt.py
