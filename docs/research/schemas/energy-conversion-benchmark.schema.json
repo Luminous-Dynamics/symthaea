@@ -199,6 +199,17 @@
     },
     "limitations": { "type": "array", "items": { "type": "string", "minLength": 1 } }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "evidence_class": { "const": "synthetic_fixture" } },
+        "required": ["evidence_class"]
+      },
+      "then": {
+        "properties": { "not_for_decision": { "const": true } }
+      }
+    }
+  ],
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "gitRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
