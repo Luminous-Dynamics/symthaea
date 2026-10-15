@@ -191,8 +191,8 @@ fn run() -> Result<ExitCode> {
             "A matching checksum and safe inventory do not establish dataset schema, split correctness, license sufficiency, scientific validity, or benchmark performance.",
             "The receipt status remains pending semantic schema/split review even when local artifact integrity checks pass.",
             "Upstream MD5 is checked for compatibility only; measured SHA-256 and byte size identify the local artifact more strongly.",
-            "The archive is hashed before and after inventory; content changes block a clean integrity status.",
-            "Decompressed bytes, tar member counts, and member-path lengths are bounded to reduce resource-exhaustion risk from malformed archives. Archives failing the upstream checksum are not parsed.",
+            "The same opened file handle is hashed before and after inventory; content changes detected by those reads block a clean integrity status.",
+            "Compressed bytes, decompressed bytes, tar member counts, and member-path metadata are bounded to reduce resource-exhaustion risk from malformed archives. Archives failing the upstream MD5 compatibility check are not parsed; matching MD5 is not proof of authenticity.",
         ],
     };
 
