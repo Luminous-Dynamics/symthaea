@@ -309,6 +309,8 @@ pub struct RelationConflictEvidence {
     pub subject: String,
     pub predicate: String,
     pub object: String,
+    /// Original stored fact text associated with this conflicting relation.
+    pub source_text: String,
     pub query_is_negated: bool,
     pub stored_is_negated: bool,
 }
@@ -1463,6 +1465,7 @@ fn find_relation_conflicts<'a>(
                         subject: stored.subject.clone(),
                         predicate: stored.predicate.clone(),
                         object: stored.object.clone(),
+                        source_text: fact.encoding.source_text.clone(),
                         query_is_negated: query.is_negated,
                         stored_is_negated: stored.is_negated,
                     });
@@ -1470,6 +1473,12 @@ fn find_relation_conflicts<'a>(
             }
         }
     }
+    conflicts.sort_by(|a, b| {
+        a.query_index
+            .cmp(&b.query_index)
+            .then_with(|| a.conflicting_fact_id.cmp(&b.conflicting_fact_id))
+            .then_with(|| a.stored_relation_index.cmp(&b.stored_relation_index))
+    });
     conflicts
 }
 
