@@ -57,5 +57,6 @@ pub use extraction::{
 pub use graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactId, TemporalFact};
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
 pub use reasoning_context::{
-    CausalChain, EpistemicState, GroundedFact, KnowledgeQueryResult, ReasoningContext,
+    CausalChain, ContradictionEvidence, EpistemicState, GroundedFact, KnowledgeQueryResult,
+    ReasoningContext,
 };

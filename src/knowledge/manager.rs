@@ -685,7 +685,20 @@ impl KnowledgeManager {
         (&self.last_telemetry, &self.last_signals)
     }
 
-    /// Drain pending contradiction alerts
+    /// Return a non-destructive snapshot of pending contradiction alerts.
+    ///
+    /// Use this when assembling read-only reasoning context. Call `drain_alerts`
+    /// only at the explicit consumer/acknowledgement boundary; rendering context
+    /// must not silently consume alerts.
+    pub fn pending_contradiction_alerts(&self) -> Vec<ContradictionAlert> {
+        self.pending_alerts.iter().cloned().collect()
+    }
+
+    /// Drain pending contradiction alerts.
+    ///
+    /// This is destructive: use it only when the caller intends to consume the
+    /// pending queue. Read-only context assembly should use
+    /// `pending_contradiction_alerts` instead.
     pub fn drain_alerts(&mut self) -> Vec<ContradictionAlert> {
         self.pending_alerts.drain(..).collect()
     }
@@ -1369,6 +1382,83 @@ mod tests {
 
         assert!(result.facts.is_empty());
         assert_eq!(result.grounding_score, 0.0);
+    }
+
+    #[test]
+    fn test_pending_contradiction_alerts_are_non_destructive() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.pending_alerts.push_back(ContradictionAlert {
+            new_fact_id: 10,
+            existing_fact_id: 20,
+            similarity: 0.85,
+            higher_confidence_id: 20,
+            detected_at_cycle: 7,
+        });
+
+        let snapshot = mgr.pending_contradiction_alerts();
+        assert_eq!(snapshot.len(), 1);
+        assert_eq!(snapshot[0].new_fact_id, 10);
+        assert_eq!(snapshot[0].existing_fact_id, 20);
+        assert_eq!(mgr.pending_alerts.len(), 1);
+
+        let drained = mgr.drain_alerts();
+        assert_eq!(drained.len(), 1);
+        assert!(mgr.pending_contradiction_alerts().is_empty());
+    }
+
+    #[test]
+    fn test_reasoning_context_keeps_direct_contradictions_typed_and_non_destructive() {
+        let mut mgr = KnowledgeManager::default();
+        mgr.bootstrap_entities();
+        mgr.process("Iran caused sanctions to escalate.", 1);
+
+        // Isolate the context projection from any heuristic alerts produced while
+        // processing the fixture, then inject one deterministic pending alert.
+        mgr.pending_alerts.clear();
+        let new_fact_id = mgr
+            .graph()
+            .all_facts()
+            .next()
+            .expect("fixture should insert a graph fact")
+            .id;
+        let missing_fact_id = u64::MAX;
+        mgr.pending_alerts.push_back(ContradictionAlert {
+            new_fact_id,
+            existing_fact_id: missing_fact_id,
+            similarity: 0.91,
+            higher_confidence_id: new_fact_id,
+            detected_at_cycle: 2,
+        });
+
+        let ctx = ReasoningContext::from_manager(&mgr, "Iran");
+        assert_eq!(ctx.direct_contradictions.len(), 1);
+        assert_eq!(ctx.epistemic_state.contradiction_count, 1);
+        assert_eq!(ctx.direct_contradictions[0].new_fact_id, new_fact_id);
+        assert_eq!(
+            ctx.direct_contradictions[0].new_fact_text.as_deref(),
+            mgr.graph()
+                .get_fact(new_fact_id)
+                .map(|fact| fact.encoding.source_text.as_str())
+        );
+        assert_eq!(ctx.direct_contradictions[0].existing_fact_id, missing_fact_id);
+        assert!(ctx.direct_contradictions[0].existing_fact_text.is_none());
+        assert_eq!(ctx.direct_contradictions[0].similarity, 0.91);
+        assert_eq!(ctx.direct_contradictions[0].detected_at_cycle, 2);
+        assert!(
+            ctx.contradictions
+                .iter()
+                .any(|message| message.contains("Direct contradiction")),
+            "legacy human-readable messages should include the direct alert"
+        );
+        assert_eq!(
+            mgr.pending_contradiction_alerts().len(),
+            1,
+            "assembling a reasoning context must not consume pending alerts"
+        );
+
+        let second_context = ReasoningContext::from_manager(&mgr, "Iran");
+        assert_eq!(second_context.direct_contradictions.len(), 1);
+        assert_eq!(mgr.pending_contradiction_alerts().len(), 1);
     }
 
     #[test]
