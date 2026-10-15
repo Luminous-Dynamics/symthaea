@@ -77,7 +77,9 @@ def schema_errors(validator: Draft202012Validator, value: Any) -> list[str]:
     return errors
 
 
-def semantic_errors(\n    record: dict[str, Any], expected_registry_digest: str, known_scenario_ids: set[str]\n) -> list[str]:
+def semantic_errors(
+    record: dict[str, Any], expected_registry_digest: str, known_scenario_ids: set[str]
+) -> list[str]:
     errors: list[str] = []
     if record["run"]["scenario_registry_digest"] != expected_registry_digest:
         errors.append("scenario_registry_digest does not match the exact scenario registry bytes")
@@ -316,8 +318,8 @@ def main() -> int:
     # cannot become smaller or silently move semantic cases into JSON Schema.
     if checked_schema != 10:
         failures.append(f"expected 10 schema-level controls to be checked, got {checked_schema}")
-    if checked_semantic != 11:
-        failures.append(f"expected 11 semantic controls to be checked, got {checked_semantic}")
+    if checked_semantic != 12:
+        failures.append(f"expected 12 semantic controls to be checked, got {checked_semantic}")
 
     if failures:
         print("FAIL: run receipt negative controls:")
