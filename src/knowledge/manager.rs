@@ -1902,8 +1902,10 @@ mod tests {
             "Should extract on cycle 3 (on interval)"
         );
     } 
+    /// Reasoning contexts must count source-fact contradiction alerts, not
+    /// confounder candidates, and must not consume the cognitive loop's queue.
     #[test]
-    fn reasoning_context_counts_fact_contradictions_not_confounder_candidates() {
+    fn reasoning_context_preserves_pending_contradiction_alerts() {
         let mut mgr = KnowledgeManager::default();
         mgr.bootstrap_entities();
         mgr.process("Sanctions caused an oil shortage.", 1);
@@ -1913,8 +1915,20 @@ mod tests {
         assert!(fact_ids.len() >= 2, "test requires two stored facts");
         let first_id = fact_ids[0];
         let second_id = fact_ids[1];
-        let first_text = mgr.graph.get_fact(first_id).unwrap().encoding.source_text.clone();
-        let second_text = mgr.graph.get_fact(second_id).unwrap().encoding.source_text.clone();
+        let first_text = mgr
+            .graph
+            .get_fact(first_id)
+            .unwrap()
+            .encoding
+            .source_text
+            .clone();
+        let second_text = mgr
+            .graph
+            .get_fact(second_id)
+            .unwrap()
+            .encoding
+            .source_text
+            .clone();
 
         // Inject one deterministic alert so this regression does not depend on
         // the HDC contradiction detector's similarity threshold.
