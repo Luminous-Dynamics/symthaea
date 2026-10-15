@@ -2489,14 +2489,14 @@ mod tests {
         assert_eq!(mapping.failed_sample_decode_count, 23);
         assert_eq!(mapping.reported_sample_decode_failures.len(), 20);
         assert_eq!(mapping.omitted_sample_decode_failure_count, 3);
-        assert_eq!(
-            mapping.reported_sample_decode_failures.first().unwrap().file_name,
-            "Harp_C4_vl1_rr00.wav"
-        );
-        assert_eq!(
-            mapping.reported_sample_decode_failures.last().unwrap().file_name,
-            "Harp_C4_vl1_rr19.wav"
-        );
+        let first_failure = mapping.reported_sample_decode_failures.first().unwrap();
+        assert_eq!(first_failure.file_name, "Harp_C4_vl1_rr00.wav");
+        assert_eq!(first_failure.midi_note, 60);
+        assert_eq!(first_failure.normalized_dynamic_strength, 1.0);
+        let last_failure = mapping.reported_sample_decode_failures.last().unwrap();
+        assert_eq!(last_failure.file_name, "Harp_C4_vl1_rr19.wav");
+        assert_eq!(last_failure.midi_note, 60);
+        assert_eq!(last_failure.normalized_dynamic_strength, 1.0);
         assert!(mapping.reported_sample_decode_failures.iter().all(|failure| {
             failure.reason.chars().count() <= MAX_SAMPLE_DECODE_REASON_CHARS
                 && (0..=127).contains(&failure.midi_note)
