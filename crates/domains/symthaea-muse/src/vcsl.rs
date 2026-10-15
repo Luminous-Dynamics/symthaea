@@ -975,6 +975,7 @@ fn audit_one_wav(path: &Path) -> std::io::Result<(u32, u16, f32, f32, u64)> {
 
 fn resolve_executable(binary: &Path) -> std::io::Result<PathBuf> {
     let has_path_component = binary.is_absolute()
+        || binary.components().count() > 1
         || binary
             .components()
             .any(|component| !matches!(component, std::path::Component::Normal(_)));
@@ -1012,7 +1013,8 @@ fn sha256_file(path: &Path) -> std::io::Result<String> {
         }
         hasher.update(&buffer[..count]);
     }
-    Ok(hex_digest(hasher.finalize()))
+    let digest = hasher.finalize();
+    Ok(hex_digest(&digest[..]))
 }
 
 static FLUIDSYNTH_PROBE_COUNTER: AtomicU64 = AtomicU64::new(0);
