@@ -318,23 +318,23 @@ Do not start a biological concrete pilot in a critical sleeper, turnout, bridge 
 
 ### Biosafety and environmental persistence
 
-11. “Molecular and Biosafety Perspectives of Bacterial Self-Healing Concrete: From Sporulation and Biomineralization to Public Health Implications” (2026 review). https://pmc.ncbi.nlm.nih.gov/articles/PMC13566579/
+7. “Molecular and Biosafety Perspectives of Bacterial Self-Healing Concrete: From Sporulation and Biomineralization to Public Health Implications” (2026 review). https://pmc.ncbi.nlm.nih.gov/articles/PMC13566579/
 
 This recent review highlights strain persistence, genetic stability, horizontal gene transfer, environmental microbiome interaction and occupational/environmental exposure as matters requiring assessment. It is a narrative review and does not itself establish field-scale exposure risk for any specific concrete formulation.
 
 ### South African rail governance and data
-11. Railway Safety Regulator, [NIIMS NextGen | Strengthening Railway Safety Through Digital Oversight](https://www.rsr.org.za/niims-nextgen-strengthening-railway-safety-through-digital-oversight/) (22 June 2026).
-12. Railway Safety Regulator, [Railway Safety Standards index](https://www.rsr.org.za/categories_rt/railway-regulatory-tools/railway-safety-standards/).
-13. Railway Safety Regulator, [Standards Development overview](https://www.rsr.org.za/wp-content/uploads/2026/03/Standards-Development.pdf) (March 2026).
+8. Railway Safety Regulator, [NIIMS NextGen | Strengthening Railway Safety Through Digital Oversight](https://www.rsr.org.za/niims-nextgen-strengthening-railway-safety-through-digital-oversight/) (22 June 2026).
+9. Railway Safety Regulator, [Railway Safety Standards index](https://www.rsr.org.za/categories_rt/railway-regulatory-tools/railway-safety-standards/).
+10. Railway Safety Regulator, [Standards Development overview](https://www.rsr.org.za/wp-content/uploads/2026/03/Standards-Development.pdf) (March 2026).
 
 ### Rail condition, detection and maintenance
-6. FRA, RR 26-01, “Track Geometry Predictions Using Point and Segment Processing.” https://railroads.fra.dot.gov/elibrary/track-geometry-predictions-using-point-and-segment-processing
-7. FRA, RR 26-02, “Implementation of Advanced Track Geometry Forecasting Models” (page updated 30 July 2026). https://railroads.fra.dot.gov/elibrary/implementation-advanced-track-geometry-forecasting-models
-8. FRA, RR 21-18, “Feasibility of Applying Model-Assisted Probability of Detection to Track Inspection.” https://railroads.fra.dot.gov/elibrary/feasibility-applying-model-assisted-probability-detection-track-inspection
-9. Network Rail, CP7 Route Services Delivery Plan Year 2 update (2025), describing predictive asset-maintenance and earthworks-insight programmes. https://www.networkrail.co.uk/wp-content/uploads/2025/07/Route-Services-CP7-Delivery-Plan-Year-2-update.pdf
+11. FRA, RR 26-01, “Track Geometry Predictions Using Point and Segment Processing.” https://railroads.fra.dot.gov/elibrary/track-geometry-predictions-using-point-and-segment-processing
+12. FRA, RR 26-02, “Implementation of Advanced Track Geometry Forecasting Models” (page updated 30 July 2026). https://railroads.fra.dot.gov/elibrary/implementation-advanced-track-geometry-forecasting-models
+13. FRA, RR 21-18, “Feasibility of Applying Model-Assisted Probability of Detection to Track Inspection.” https://railroads.fra.dot.gov/elibrary/feasibility-applying-model-assisted-probability-detection-track-inspection
+14. Network Rail, CP7 Route Services Delivery Plan Year 2 update (2025), describing predictive asset-maintenance and earthworks-insight programmes. https://www.networkrail.co.uk/wp-content/uploads/2025/07/Route-Services-CP7-Delivery-Plan-Year-2-update.pdf
 
 ### South African context
-10. South African Department of Transport, COTO Standard Specifications for Road and Bridge Works portal. Its page lists October 2020 chapter versions and states the earlier August versions were superseded. Always verify the current applicable edition and project-specific contractual requirements before using numerical limits. https://www.transport.gov.za/?page_id=1155
+15. South African Department of Transport, COTO Standard Specifications for Road and Bridge Works portal. Its page lists October 2020 chapter versions and states the earlier August versions were superseded. Always verify the current applicable edition and project-specific contractual requirements before using numerical limits. https://www.transport.gov.za/?page_id=1155
 
 ## Claim ceiling
 
