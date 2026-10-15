@@ -977,6 +977,8 @@ mod tests {
             cycle: 2,
             is_causal: false,
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: Some(1),
             initial_confidence: Some(0.8),
             last_accessed_cycle: Some(2),
@@ -991,6 +993,8 @@ mod tests {
             cycle: 9,
             is_causal: false,
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: None,
             initial_confidence: None,
             last_accessed_cycle: None,
@@ -1169,6 +1173,8 @@ mod tests {
             cycle: 11,
             is_causal: false,
             relations: Vec::new(),
+            role_vector_observations: Vec::new(),
+
             graph_fact_id: None,
             initial_confidence: None,
             last_accessed_cycle: None,
