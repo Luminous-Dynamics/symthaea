@@ -1,6 +1,6 @@
 # Energy-Conversion Experiment Selection Protocol
 
-**Status:** proposed research protocol; no active experiment optimizer is implemented yet  
+**Status:** research protocol; a deterministic Phase A ranking baseline is implemented in `symthaea-energy-bench`; expected-information-gain and active-learning methods are not implemented  
 **Related PR:** [Symthaea energy-conversion discovery #7480](https://github.com/Luminous-Dynamics/symthaea/pull/7480)  
 **Predecessors:** [Benchmark contract](ENERGY_CONVERSION_BENCHMARK_CONTRACT.md), [discovery plan](ENERGY_CONVERSION_DISCOVERY.md)
 
@@ -45,7 +45,13 @@ Start with a deterministic ranked queue rather than immediately claiming Bayesia
 
 Do not collapse the tuple to a single score unless the benchmark policy states the weights and includes sensitivity analysis. Keep a simple, reproducible random/space-filling design as the comparison baseline.
 
-### Phase B — model-based expected information gain
+#### Phase A implementation status
+
+The `symthaea-energy-bench::experiment_selection::rank_experiments` API implements the transparent baseline described above. Its queue policy must be marked as preregistered before queue generation. Each proposal must name its decision question and observable, include at least two distinct competing hypotheses, declare a fractional uncertainty-reduction estimate and positive cost in the policy's exact registered unit, and have a prior registration, approved safety review, registered operating envelope and abort criteria, and complete provenance plan. Invalid proposals are retained in a rejection list with explicit reasons; duplicate IDs and incomparable cost units are rejected. Eligible items receive deterministic lexicographic ordering with a stable ID tie-break.
+
+This Phase A score is a **heuristic screening statistic**, not expected information gain. Its uncertainty-reduction estimate is supplied by the proposer; it is not independently calibrated by this module. The implementation does not choose physical operating conditions, perform simulations, authorize experiments, infer risk, or prove that a registered statement was actually committed before observation. These limits must remain visible in results and documentation. Unit tests have been authored but require exact-head CI or a local Rust toolchain to execute.
+
+## Phase B — model-based expected information gain
 
 Once predictive distributions have been calibrated, implement expected information gain or expected value of sample information. Use candidate experiments to predict observation distributions under competing model parameters or design hypotheses; select experiments expected to reduce uncertainty about quantities that can change the decision.
 
