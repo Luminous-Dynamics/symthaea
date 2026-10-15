@@ -37,6 +37,12 @@ class StrictJsonLoaderTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValidationFailure, "non-standard numeric constant"):
                     self.load_text('{"metric_value":' + value + '}')
 
+    def test_float_overflow_and_underflow_are_rejected(self) -> None:
+        for value in ("1e400", "1e-4000"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValidationFailure, "(overflows|underflows) float range"):
+                    self.load_text('{"metric_value":' + value + '}')
+
     def test_malformed_json_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValidationFailure, "cannot load strict JSON"):
             self.load_text('{"missing_value":')
