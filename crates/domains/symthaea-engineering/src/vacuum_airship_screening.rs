@@ -996,6 +996,15 @@ pub fn assess_external_pressure_bounds(
 ) -> Result<PressureBoundsAssessment, ScreeningError> {
     validate_bounds(request.external_pressure_pa, "external_pressure_pa", true)?;
     validate_bounds(request.internal_pressure_pa, "internal_pressure_pa", true)?;
+    // Validate any supplied capacity interval even when the pressure envelope later shows no
+    // external demand; malformed declarations should not be silently ignored.
+    if let Some(capacity) = request.capacity.as_ref() {
+        validate_bounds(
+            capacity.allowable_external_pressure_pa,
+            "allowable_external_pressure_pa",
+            false,
+        )?;
+    }
 
     let minimum_signed_differential_pa =
         request.external_pressure_pa.min - request.internal_pressure_pa.max;
@@ -1022,12 +1031,6 @@ pub fn assess_external_pressure_bounds(
             maximum_positive_demand_pa,
         });
     };
-    validate_bounds(
-        capacity.allowable_external_pressure_pa,
-        "allowable_external_pressure_pa",
-        false,
-    )?;
-
     let mut missing_fields = Vec::new();
     if capacity.evidence_record_id.trim().is_empty() {
         missing_fields.push("evidence_record_id");
@@ -1985,6 +1988,20 @@ mod tests {
             None,
         )).unwrap();
         assert!(matches!(result, PressureBoundsAssessment::CapacityUnknown { .. }));
+    }
+
+
+    #[test]
+    fn bounded_pressure_screen_rejects_invalid_capacity_even_when_no_demand() {
+        let result = assess_external_pressure_bounds(pressure_bounds_request(
+            ScalarBounds { min: 80_000.0, max: 95_000.0 },
+            ScalarBounds { min: 100_000.0, max: 110_000.0 },
+            Some(pressure_capacity_bounds(130_000.0, 120_000.0)),
+        ));
+        assert_eq!(
+            result.unwrap_err(),
+            ScreeningError::InvalidInterval("allowable_external_pressure_pa")
+        );
     }
 
     #[test]
