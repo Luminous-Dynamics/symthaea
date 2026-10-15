@@ -16,6 +16,10 @@
 //!   loss, continuity.
 //! - [`thermal`]: Carnot efficiency, Fourier conduction, Newton cooling, engine
 //!   work.
+//! - [`checked`]: additive `Result`-returning wrappers that reject non-finite
+//!   inputs, invalid physical domains, and non-finite derived results. These
+//!   check arithmetic-domain validity, not whether a simplified equation is
+//!   appropriate for a particular real-world system.
 //!
 //! ## Example
 //!
@@ -25,5 +29,6 @@
 //! assert!((thermal::carnot_efficiency(300.0, 600.0) - 0.5).abs() < 1e-12);
 //! ```
 
+pub mod checked;
 pub mod fluids;
 pub mod thermal;
