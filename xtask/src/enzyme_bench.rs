@@ -14,7 +14,10 @@ use std::path::{Component, Path, PathBuf};
 const REQUIRED_COLUMNS: &[&str] = &[
     "observation_id",
     "source_record_id",
+    "source_record_url",
+    "source_locator",
     "source_study_id",
+    "measurement_method_id",
     "protein_id",
     "sequence_family_id",
     "endpoint",
@@ -228,7 +231,10 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         );
         for required in [
             "source_record_id",
+            "source_record_url",
+            "source_locator",
             "source_study_id",
+            "measurement_method_id",
             "protein_id",
             "sequence_family_id",
             "endpoint",
@@ -244,6 +250,17 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
                 row_index + 2
             );
         }
+        let source_record_url = field(&row, &header_index, "source_record_url");
+        ensure!(
+            source_record_url.starts_with("https://"),
+            "source_record_url must be HTTPS at CSV record {}",
+            row_index + 2
+        );
+        ensure!(
+            !field(&row, &header_index, "source_locator").is_empty(),
+            "source_locator must identify the exact record/table/figure at CSV record {}",
+            row_index + 2
+        );
         ensure!(
             field(&row, &header_index, "endpoint") == manifest.target.endpoint,
             "mixed endpoints at CSV record {}",
@@ -586,11 +603,13 @@ mod tests {
         let context_a_json = context_a.to_string();
         let context_b_json = context_b.to_string();
         writer.write_record([
-            "obs-a", "source-a", "study-a", "protein-a", "family-a", "kcat",
+            "obs-a", "source-a", "https://example.invalid/source-a", "synthetic:record-a",
+            "study-a", "synthetic:assay-method-v1", "protein-a", "family-a", "kcat",
             "2.0", "s^-1", "2.0", "s^-1", "kcat_s-1_identity_v1", "1.0", context_a_json.as_str()
         ]).unwrap();
         writer.write_record([
-            "obs-b", "source-b", "study-b", "protein-b", "family-b", "kcat",
+            "obs-b", "source-b", "https://example.invalid/source-b", "synthetic:record-b",
+            "study-b", "synthetic:assay-method-v1", "protein-b", "family-b", "kcat",
             "3.0", "s^-1", "3.0", "s^-1", "kcat_s-1_identity_v1", "1.0", context_b_json.as_str()
         ]).unwrap();
         let csv_bytes = writer.into_inner().unwrap();
