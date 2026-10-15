@@ -1357,6 +1357,9 @@ fn main() {
             let mut curves = Vec::new();
             for base_seed in BASE_SEED_SET {
                 for control in ["tonic", "valence", "arousal", "energy", "bars", "seed"] {
+                    eprintln!(
+                        "[muse-response-curve] style={style:?} control={control} baseline_seed={base_seed}"
+                    );
                     curves.push(curve_json(style, control, base_seed));
                 }
             }
