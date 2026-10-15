@@ -2,7 +2,7 @@
 
 **Status:** Research plan and hypothesis registry. This document does not establish a concrete formulation, biological safety, rail-system fitness, code qualification, or authority to construct, inspect, maintain, or operate infrastructure.
 
-**Date:** 2026-10-14
+**Date:** 2026-10-15
 
 ## Executive direction
 
@@ -84,6 +84,26 @@ Reviews published in 2024–2025 identify promising laboratory results but also 
 - Investigate whether crack-width control, biological or mineral healing, and reduced early-age cracking are complementary.
 - Use a predeclared factorial or other justified design to test interactions instead of multiplying the best result from separate studies.
 - Treat fungal systems and novel engineered living materials as research hypotheses until material-level and biosafety evidence justify further investment.
+
+### Evidence maturity and cross-study comparability (2025–2026 update)
+
+Recent reviews sharpen the roadmap but do not remove the need for application-specific evidence. A 2026 review classifies autogenous healing as the most established approach, capsule/vascular systems as more advanced experimental or pilot-stage approaches, and many microbial, nanomaterial and shape-memory approaches as developmental because of long-term durability, healing-agent survival, cost and scale-up gaps. A 2025 review reports promising laboratory and selected field applications while still identifying gaps in standardized testing, long-term stability, compatibility and cost. Treat maturity labels as literature-triage signals, not qualification or proof that a specific formulation is fit for a bridge deck, road slab, sleeper or other asset.
+
+A separate inter-laboratory study of capsule-based healing found that specimen pre-cracking procedures and waterproofing around the test zone affect measured outcomes; in that study, sealing-efficiency comparisons were more consistent across laboratories than raw reference-specimen flow rates. The result is method-specific, but it demonstrates why test protocol identity and boundary preparation belong in the evidence, not in footnotes.
+
+**Keep evidence maturity separate from technology maturity.** Grade each *claim × property × exposure regime* independently; never award one composite maturity label to a formulation when its endpoints have different support:
+
+- **E0 — Reported lead:** literature claim or secondary-review summary; protocol, raw observations or comparator may not yet be independently reconstructed. Useful for hypothesis generation only.
+- **E1 — Controlled single-laboratory evidence:** identifiable specimens, formulation/batch, baseline, damage protocol, conditioning, outcome method, units, replicates and failures are available; results remain limited to that study and exposure.
+- **E2 — Independently replicated evidence:** preregistered outcome and analysis, a frozen protocol, appropriate blinded assessment where feasible, and replication by an independent team/laboratory. Method inter-comparability is reported rather than assumed.
+- **E3 — Owner-authorized, application-relevant pilot:** a non-critical or explicitly approved asset/use case, pre-existing baseline, exposure-relevant monitoring, qualified inspection, and a documented stop/withdrawal plan. This remains a bounded pilot, not general service-life validation.
+- **E4 — Sustained field evidence:** independent review of maintenance, durability and adverse outcomes across a declared duration and exposure envelope. This still does not replace the responsible engineer's asset-specific design, standards and authorization requirements.
+
+The grade is attached to the supported endpoint, not the paper or candidate as a whole. For example, crack closure may have E2 support while permeability recovery is E1, mechanical retention is E0 and biosafety is unresolved. A missing endpoint stays missing; it is not imputed from an adjacent endpoint.
+
+Before comparing rows from different studies, normalize or explicitly stratify by initial crack width and its distribution, specimen geometry and scale, age at pre-cracking, crack induction/loading method, curing and healing environment, wet/dry or thermal cycle, healing duration, transport-test geometry/boundary sealing, mechanical test and loading direction, comparator composition, replicate count, uncertainty and missingness. If two protocols cannot be compared credibly, retain separate strata rather than manufacturing a pooled ranking. Preserve reported outcomes as reported; derived unit conversions and computed ratios must retain method/version and calculation lineage.
+
+This supports a practical decision sequence: **established low-risk comparator first; non-living self-healing comparator second; microbial or more complex hybrid candidates only when they add measured value without unacceptable fresh-state, intact-strength, lifecycle or biosafety penalties.** Model-generated rankings remain proposals for qualified review, not material recipes or deployment authorization.
 
 ### A3. Candidate data contract (reference composition, not a duplicate ontology)
 
@@ -315,26 +335,29 @@ Do not start a biological concrete pilot in a critical sleeper, turnout, bridge 
 5. FHWA, “Enhance Concrete Performance with Internal Curing” (2025). https://www.fhwa.dot.gov/innovation/innovator/issue103/page_06.html
 6. “Effect of bacteria on uncracked concrete mechanical properties correlated with damage self-healing efficiency — A critical review” (2024), *Developments in the Built Environment*, 17, 100301. https://doi.org/10.1016/j.dibe.2023.100301
    This review reinforces that intact-material mechanical performance must be evaluated alongside post-crack healing; a candidate that seals cracks but degrades the uncracked matrix is not an acceptable improvement.
+7. Tumwiine et al. (2025), “On the use of self-healing materials in concrete technology: A comprehensive review of materials, mechanisms, and field applications,” *Materials Today Chemistry*, 48, 103001. https://doi.org/10.1016/j.mtchem.2025.103001
+8. “A Review of Self-healing Concrete: Mechanism, Performance, Techniques and Machine Learning Approaches” (2026), *International Journal of Concrete Structures and Materials*. https://doi.org/10.1186/s40069-026-00932-2
+9. “Addressing the need for standardization of test methods for self-healing concrete: an inter-laboratory study on concrete with macrocapsules” (2020). https://doi.org/10.1080/14686996.2020.1814117
 
 ### Biosafety and environmental persistence
 
-7. “Molecular and Biosafety Perspectives of Bacterial Self-Healing Concrete: From Sporulation and Biomineralization to Public Health Implications” (2026 review). https://pmc.ncbi.nlm.nih.gov/articles/PMC13566579/
+10. “Molecular and Biosafety Perspectives of Bacterial Self-Healing Concrete: From Sporulation and Biomineralization to Public Health Implications” (2026 review). https://pmc.ncbi.nlm.nih.gov/articles/PMC13566579/
 
 This recent review highlights strain persistence, genetic stability, horizontal gene transfer, environmental microbiome interaction and occupational/environmental exposure as matters requiring assessment. It is a narrative review and does not itself establish field-scale exposure risk for any specific concrete formulation.
 
 ### South African rail governance and data
-8. Railway Safety Regulator, [NIIMS NextGen | Strengthening Railway Safety Through Digital Oversight](https://www.rsr.org.za/niims-nextgen-strengthening-railway-safety-through-digital-oversight/) (22 June 2026).
-9. Railway Safety Regulator, [Railway Safety Standards index](https://www.rsr.org.za/categories_rt/railway-regulatory-tools/railway-safety-standards/).
-10. Railway Safety Regulator, [Standards Development overview](https://www.rsr.org.za/wp-content/uploads/2026/03/Standards-Development.pdf) (March 2026).
+11. Railway Safety Regulator, [NIIMS NextGen | Strengthening Railway Safety Through Digital Oversight](https://www.rsr.org.za/niims-nextgen-strengthening-railway-safety-through-digital-oversight/) (22 June 2026).
+12. Railway Safety Regulator, [Railway Safety Standards index](https://www.rsr.org.za/categories_rt/railway-regulatory-tools/railway-safety-standards/).
+13. Railway Safety Regulator, [Standards Development overview](https://www.rsr.org.za/wp-content/uploads/2026/03/Standards-Development.pdf) (March 2026).
 
 ### Rail condition, detection and maintenance
-11. FRA, RR 26-01, “Track Geometry Predictions Using Point and Segment Processing.” https://railroads.fra.dot.gov/elibrary/track-geometry-predictions-using-point-and-segment-processing
-12. FRA, RR 26-02, “Implementation of Advanced Track Geometry Forecasting Models” (page updated 30 July 2026). https://railroads.fra.dot.gov/elibrary/implementation-advanced-track-geometry-forecasting-models
-13. FRA, RR 21-18, “Feasibility of Applying Model-Assisted Probability of Detection to Track Inspection.” https://railroads.fra.dot.gov/elibrary/feasibility-applying-model-assisted-probability-detection-track-inspection
-14. Network Rail, CP7 Route Services Delivery Plan Year 2 update (2025), describing predictive asset-maintenance and earthworks-insight programmes. https://www.networkrail.co.uk/wp-content/uploads/2025/07/Route-Services-CP7-Delivery-Plan-Year-2-update.pdf
+14. FRA, RR 26-01, “Track Geometry Predictions Using Point and Segment Processing.” https://railroads.fra.dot.gov/elibrary/track-geometry-predictions-using-point-and-segment-processing
+15. FRA, RR 26-02, “Implementation of Advanced Track Geometry Forecasting Models” (page updated 30 July 2026). https://railroads.fra.dot.gov/elibrary/implementation-advanced-track-geometry-forecasting-models
+16. FRA, RR 21-18, “Feasibility of Applying Model-Assisted Probability of Detection to Track Inspection.” https://railroads.fra.dot.gov/elibrary/feasibility-applying-model-assisted-probability-detection-track-inspection
+17. Network Rail, CP7 Route Services Delivery Plan Year 2 update (2025), describing predictive asset-maintenance and earthworks-insight programmes. https://www.networkrail.co.uk/wp-content/uploads/2025/07/Route-Services-CP7-Delivery-Plan-Year-2-update.pdf
 
 ### South African context
-15. South African Department of Transport, COTO Standard Specifications for Road and Bridge Works portal. Its page lists October 2020 chapter versions and states the earlier August versions were superseded. Always verify the current applicable edition and project-specific contractual requirements before using numerical limits. https://www.transport.gov.za/?page_id=1155
+18. South African Department of Transport, COTO Standard Specifications for Road and Bridge Works portal. Its page lists October 2020 chapter versions and states the earlier August versions were superseded. Always verify the current applicable edition and project-specific contractual requirements before using numerical limits. https://www.transport.gov.za/?page_id=1155
 
 ## Claim ceiling
 
