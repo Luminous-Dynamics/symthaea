@@ -2161,6 +2161,34 @@ mod tests {
             );
         }
 
+        let inventory =
+            capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
+        for (instrument, source, relative_dir, _filename, _midi, _velocity) in samples {
+            let item = inventory
+                .instruments
+                .iter()
+                .find(|item| item.instrument == format!("{instrument:?}"))
+                .unwrap();
+            let evidence = item.sustained_samples.as_ref().unwrap();
+            assert_eq!(evidence.source_library, match source {
+                SampleSource::Vcsl => "vcsl",
+                SampleSource::Vsco2 => "vsco2_ce",
+            });
+            assert_eq!(evidence.relative_directory, relative_dir);
+            assert!(evidence.directory_present);
+            assert_eq!(evidence.indexed_sample_count, 1);
+        }
+        for instrument in [Instrument::Tuba, Instrument::Trombone] {
+            let item = inventory
+                .instruments
+                .iter()
+                .find(|item| item.instrument == format!("{instrument:?}"))
+                .unwrap();
+            let evidence = item.short_articulation_samples.as_ref().unwrap();
+            assert!(evidence.directory_present);
+            assert_eq!(evidence.indexed_sample_count, 1);
+        }
+
         // These two still lack a matching sample set in either inspected source.
         assert!(sample_subdir(Instrument::Duduk).is_none());
         assert!(sample_subdir(Instrument::ChoirOoh).is_none());
