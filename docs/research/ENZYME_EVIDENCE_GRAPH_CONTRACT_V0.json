@@ -24,7 +24,7 @@
     ],
     "field_rules": {
       "artifact_id": "Unique stable identifier within the graph.",
-      "role": "One of source_record, raw_signal, control_signal, calibration, processed_measurement, model_specification, fit_output, reported_parameter_table, prediction_output, evaluation_output, or supporting_metadata.",
+      "role": "One of source_record, raw_signal, control_signal, calibration, processed_measurement, model_specification, fit_output, reported_parameter_table, prediction_output, evaluation_output, supporting_metadata, transformation_code, transformation_configuration, or environment_lock.",
       "media_type": "Declared media type; not inferred from filename alone.",
       "sha256": "64 hexadecimal characters computed over the exact bytes consumed or produced.",
       "byte_length": "Non-negative integer matching the exact payload length.",
@@ -187,7 +187,13 @@
       "A successful status requires every declared output to exist and match its hash.",
       "A failed/blocked/excluded transformation remains in the graph with a reason; it is not omitted.",
       "A replay result compares stage outputs and declared tolerances, not only the final kcat value."
-    ]
+    ],
+    "conditional_artifact_fields": {
+      "code_artifact_id": "When present, references an artifact with role transformation_code whose exact-byte SHA-256 equals code_sha256. Required and byte-verified for successful transformations.",
+      "configuration_artifact_id": "When present, references an artifact with role transformation_configuration whose exact-byte SHA-256 equals configuration_sha256. Required and byte-verified for successful transformations.",
+      "environment_lock_artifact_id": "When present, references an artifact with role environment_lock whose exact-byte SHA-256 equals environment_lock_sha256. Required and byte-verified for successful transformations.",
+      "note": "These identity artifacts are separate from scientific input/output artifacts. Unsuccessful/blocked transformations may omit them if execution never started."
+    }
   },
   "parameter_claim_record": {
     "required_fields": [
@@ -230,7 +236,7 @@
     "The evidence graph's own serialized bytes are versioned and SHA-256 pinned when frozen."
   ],
   "future_verifier_checks": [
-    "Bind code/configuration/environment identities to immutable source, configuration, and environment-lock artifacts and verify their exact bytes; hash-shaped strings alone do not prove executable reproducibility.",
+    "Verify the execution semantics of the pinned source/configuration/environment artifacts and reproduce stage outputs in an independently implemented replay runner; matching identity hashes alone do not prove the declared code performed the claimed transform.",
     "Finalize and enforce a JSON Schema for the instance layout.",
     "Semantic-unit checks and parameter meaning using the selected EnzymeML version rather than a duplicate ontology.",
     "Chemical reaction-balance checks where appropriate; this must be a separate domain-aware validator.",
@@ -301,6 +307,7 @@
     "External exact-byte SHA-256 pin requirement for frozen graph inputs.",
     "Successful transformations may use and publish only artifacts whose linked rights record declares approved_for_this_use; this is enforcement of a recorded status, not legal adjudication.",
     "Parameter claim source values must be a JSON number or non-empty verbatim string; optional normalized_value and normalized_unit must appear together, and normalized_value is numeric.",
-    "Parameter claims require at least one unique substrate ID; missing substrate identity must be represented explicitly rather than as an empty list."
+    "Parameter claims require at least one unique substrate ID; missing substrate identity must be represented explicitly rather than as an empty list.",
+    "For successful transformations, code/configuration/environment-lock fingerprints resolve to separate artifacts with matching declared SHA-256, verified local bytes, and approved-for-this-use rights status."
   ]
 }
