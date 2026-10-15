@@ -14,7 +14,7 @@ The claim being tested is not that Symthaea can ignore physical limits. The clai
 
 The work should compose existing public Symthaea capabilities rather than start a parallel monolith:
 
-- `symthaea-thermofluids`: applied heat-transfer and fluid-flow relations. The `cycles` module provides ideal Carnot, Brayton, Otto, and Diesel efficiency baselines with input validation and analytical reference tests. The `energy_balance` module provides steady-state first-law closure checks and gross/net efficiency accounting with a declared relative tolerance.
+- `symthaea-thermofluids`: applied heat-transfer and fluid-flow relations. The `cycles` module provides ideal Carnot, Brayton, Otto, and Diesel efficiency baselines with input validation and analytical reference tests. The `energy_balance` module checks steady-state first-law closure and gross/net efficiency accounting; the `energy_interval` module checks interval-integrated transient energy closure while explicitly including stored-energy change.
 - `symthaea-materials`, `symthaea-structural`, and `symthaea-fabrication-kernel`: material/structural constraints and eventual geometry/fabrication hand-off.
 - `symthaea-circuits` and `symthaea-control-theory`: electrical conversion, instrumentation, and control models.
 - `symthaea-operations-research`: optimization techniques and constrained trade-offs.
@@ -27,7 +27,7 @@ These components do not by themselves establish a high-fidelity engine-design ca
 
 The new `energy_balance::EnergyBalance` API accepts four mutually exclusive steady-state power flows in watts: input, net useful output, auxiliary consumption, and rejected/other loss. It computes gross output as net useful output plus auxiliary draw, checks that gross output does not exceed input, and rejects a first-law residual that exceeds a caller-supplied relative tolerance. The tolerance must be chosen and justified before examining a candidate's score; do not relax it to make a design pass.
 
-This is intentionally a narrow accounting primitive, not an engine simulation. It assumes steady-state operation and cannot account for changing stored energy, start-up, or transient thermal inventories. Those require a dynamic energy-storage term or interval-integrated energy totals. A measured balance that fails closure is a failed data-quality gate, not a reason to tune the efficiency calculation.
+This is intentionally a narrow accounting primitive, not an engine simulation. It assumes steady-state operation and cannot account for changing stored energy, start-up, or transient thermal inventories. For a transient interval, use `energy_interval::EnergyIntervalBalance` with input, net useful output, auxiliaries, rejected/lost energy, and signed change in stored energy. A positive stored-energy change means energy accumulated; a negative value means a store discharged. Its reported throughput includes external input plus released stored energy, and it intentionally does not report a naive output/input efficiency for a storage-discharge interval. All interval values must use the same registered boundary and measurement interval. A balance that fails closure is a failed data-quality gate, not a reason to tune the efficiency calculation.
 
 ## Define “better” before searching
 
@@ -88,7 +88,7 @@ This baseline is deliberately modest. It is a small trustworthy floor, not a des
 
 ### E1 — benchmark contract and known-system reproduction
 
-Before proposing a novel system, freeze at least one target mission and reproduce a known design within stated tolerances. Require the steady-state energy-balance checker to close for any steady-state data record; for transient tests, integrate total energy over a registered interval and account for energy stored or released over that interval. Populate measured or authoritative baseline data with sources and compatible system boundaries. Do not mix ideal-cycle values with measured engine results in the same leaderboard.
+Before proposing a novel system, freeze at least one target mission and reproduce a known design within stated tolerances. Require the steady-state energy-balance checker to close for steady-state records and the interval-integrated checker to close for transient tests, including energy gained or released from storage. Populate measured or authoritative baseline data with sources and compatible system boundaries. Do not mix ideal-cycle values with measured engine results in the same leaderboard.
 
 Use negative controls: deliberately invalid ratios, unit/boundary mismatches, impossible material properties, and candidate outputs that violate constraints must be rejected. Preserve them as regression tests.
 
@@ -114,7 +114,7 @@ No operational autonomy or real-world actuation should be enabled merely because
 
 A candidate cannot advance unless all relevant gates pass:
 
-- **Physics:** steady-state conservation balances close within declared solver tolerances; transient studies account for stored-energy change; assumptions and domains are explicit; no over-unity claims or impossible property combinations.
+- **Physics:** steady-state and interval-integrated conservation balances close within declared tolerances; transient studies account for stored-energy change; assumptions and domains are explicit; no over-unity claims or impossible property combinations.
 - **Software:** deterministic test vectors, invalid-input tests, reproducible runs, immutable artifact hashes, and pinned solver/tool versions.
 - **Model validity:** validation data is separate from optimization data; uncertainty and extrapolation are surfaced; a low-cost surrogate cannot certify itself.
 - **Comparison fairness:** identical mission and boundary, compatible units, equal accounting for auxiliaries and storage, and transparent baseline sources.
