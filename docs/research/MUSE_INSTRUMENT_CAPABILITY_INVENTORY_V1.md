@@ -69,18 +69,19 @@ path_size_manifest_sha256 hashes sorted relative WAV paths and file sizes. It is
 
 ## Completing verified sample styles without inventing coverage
 
-A source-tree audit against the current public library revisions expanded the mapper for four previously unmapped Muse instruments:
+A source-tree audit against the current public library revisions expanded the mapper for five previously unmapped Muse instruments:
 
 | Muse instrument | Sample library | Sustained/primary path | Short articulation |
 | --- | --- | --- | --- |
 | Harpsichord | VCSL | `Chordophones/Zithers/Harpsichord, English/Sustains/Normal` | Not mapped |
 | Xylophone | VCSL | `Idiophones/Struck Idiophones/Xylophone/Hard Mallets` | Not mapped |
+| UprightBass | VSCO-2-CE | `Strings/Solo Contrabass/SusNV` | `Strings/Solo Contrabass/Spic` |
 | Tuba | VSCO-2-CE | `Brass/Tuba/sus` | `Brass/Tuba/stac` |
 | Trombone | VSCO-2-CE | `Brass/Tenor Trombone/sus` | `Brass/Tenor Trombone/stac` |
 
-The exact upstream trees inspected were [VCSL at `c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e`](https://github.com/sgossner/VCSL/tree/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e) and [VSCO-2-CE at `440300901dfe9275fd84e0b7763af1f8443ae62e`](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e). Representative paths: [VCSL Harpsichord](https://github.com/sgossner/VCSL/tree/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e/Chordophones/Zithers/Harpsichord%2C%20English/Sustains/Normal), [VCSL Xylophone](https://github.com/sgossner/VCSL/tree/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e/Idiophones/Struck%20Idiophones/Xylophone/Hard%20Mallets), [VSCO-2-CE Tuba](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e/Brass/Tuba), and [VSCO-2-CE Tenor Trombone](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e/Brass/Tenor%20Trombone).
+The exact upstream trees inspected were [VCSL at `c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e`](https://github.com/sgossner/VCSL/tree/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e) and [VSCO-2-CE at `440300901dfe9275fd84e0b7763af1f8443ae62e`](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e). Representative paths: [VCSL Harpsichord](https://github.com/sgossner/VCSL/tree/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e/Chordophones/Zithers/Harpsichord%2C%20English/Sustains/Normal), [VCSL Xylophone](https://github.com/sgossner/VCSL/tree/c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e/Idiophones/Struck%20Idiophones/Xylophone/Hard%20Mallets), [VSCO-2-CE Tuba](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e/Brass/Tuba), [VSCO-2-CE Tenor Trombone](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e/Brass/Tenor%20Trombone), and [VSCO-2-CE Solo Contrabass](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e/Strings/Solo%20Contrabass).
 
-A deterministic synthetic-fixture test exercises the production library loader, note selection, and inventory output for these paths; it also verifies that Tuba and Trombone load their real staccato banks. The fixture proves that the mapping and indexer agree on the declared paths and filename tokens. It does **not** replace auditing the actual downloaded recordings or listening to rendered examples.
+A deterministic synthetic-fixture test exercises the production library loader, note selection, and inventory output for these paths; it also verifies that UprightBass loads its non-vibrato sustain and real spiccato bank, and that Tuba and Trombone load their real staccato banks. The fixture proves that the mapping and indexer agree on the declared paths and filename tokens. It does **not** replace auditing the actual downloaded recordings or listening to rendered examples.
 
 Duduk and ChoirOoh remain synthesis-only because neither inspected upstream tree contained a matching sample set. Timpani also remains out of this pitched-note mapping because the available hit filenames encode drum identities, not scientific pitch. Completing the catalogue honestly means adding a dedicated drum-number-aware schema for Timpani and acquiring/locating a genuinely matching sample set for Duduk and ChoirOoh—not assigning the nearest available patch and calling it coverage.
 
