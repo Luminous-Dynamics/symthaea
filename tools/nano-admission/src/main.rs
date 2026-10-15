@@ -120,13 +120,11 @@ fn main() -> ExitCode {
 fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
     reject_same_input_and_output(&cli.archive, &cli.output)?;
-    ensure_regular_input(&cli.archive)?;
 
-    // Keep one descriptor open for every pass. Re-opening by pathname for each
-    // hash/parse step would allow a pathname swap to make the receipt combine
-    // hashes for one file with an inventory from another.
-    let mut archive_file = File::open(&cli.archive)
-        .with_context(|| format!("could not open archive {}", cli.archive.display()))?;
+    // Open once and validate the opened descriptor, rather than trusting a
+    // pathname metadata preflight that can race a symlink/FIFO replacement.
+    // On Unix, O_NONBLOCK ensures an unexpected FIFO cannot hang this open.
+    let mut archive_file = open_regular_input(&cli.archive)?;
     let compressed_size = archive_file
         .metadata()
         .context("could not inspect opened archive metadata")?
@@ -218,13 +216,27 @@ fn run() -> Result<ExitCode> {
     }
 }
 
-fn ensure_regular_input(input: &Path) -> Result<()> {
-    let metadata = fs::metadata(input)
-        .with_context(|| format!("could not inspect archive input {}", input.display()))?;
+fn open_regular_input(input: &Path) -> Result<File> {
+    #[cfg(unix)]
+    let file = {
+        use std::os::unix::fs::OpenOptionsExt;
+        OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(input)
+            .with_context(|| format!("could not open archive {}", input.display()))?
+    };
+    #[cfg(not(unix))]
+    let file = File::open(input)
+        .with_context(|| format!("could not open archive {}", input.display()))?;
+
+    let metadata = file
+        .metadata()
+        .with_context(|| format!("could not inspect opened archive {}", input.display()))?;
     if !metadata.is_file() {
-        bail!("archive input must resolve to a regular file: {}", input.display());
+        bail!("archive input must be a regular file: {}", input.display());
     }
-    Ok(())
+    Ok(file)
 }
 
 fn reject_same_input_and_output(input: &Path, output: &Path) -> Result<()> {
@@ -611,7 +623,24 @@ mod tests {
     #[test]
     fn directory_is_rejected_as_an_archive_input() {
         let directory = tempfile::tempdir().expect("temporary directory");
-        assert!(ensure_regular_input(directory.path()).is_err());
+        assert!(open_regular_input(directory.path()).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fifo_input_is_rejected_without_blocking() {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let fifo_path = directory.path().join("input.fifo");
+        let c_path = CString::new(fifo_path.as_os_str().as_bytes())
+            .expect("temporary path contains no NUL");
+        // SAFETY: c_path is a valid NUL-terminated path; the temporary directory
+        // owns the FIFO and is removed when this test exits.
+        let result = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
+        assert_eq!(result, 0, "mkfifo should create the fixture");
+        assert!(open_regular_input(&fifo_path).is_err());
     }
 
     #[test]
