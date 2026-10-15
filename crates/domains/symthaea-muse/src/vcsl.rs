@@ -722,10 +722,11 @@ fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
         hasher.update(size_bytes.to_string().as_bytes());
         hasher.update(b"\n");
     }
+    let digest = hasher.finalize();
     Ok(AssetRootEvidenceV1 {
         root_present: true,
         wav_file_count: entries.len(),
-        path_size_manifest_sha256: Some(hex_digest(hasher.finalize().as_slice())),
+        path_size_manifest_sha256: Some(hex_digest(&digest[..])),
     })
 }
 
@@ -777,6 +778,7 @@ fn soundfont_evidence(path: &Path) -> std::io::Result<SoundFontEvidenceV1> {
         }
         hasher.update(&buffer[..read]);
     }
+    let digest = hasher.finalize();
     Ok(SoundFontEvidenceV1 {
         file_name: path
             .file_name()
@@ -784,7 +786,7 @@ fn soundfont_evidence(path: &Path) -> std::io::Result<SoundFontEvidenceV1> {
             .to_string_lossy()
             .into_owned(),
         size_bytes,
-        sha256: hex_digest(hasher.finalize().as_slice()),
+        sha256: hex_digest(&digest[..]),
     })
 }
 
@@ -1123,9 +1125,10 @@ mod tests {
         let soundfont_evidence = inventory.soundfont.as_ref().unwrap();
         assert_eq!(soundfont_evidence.file_name, "fixture.sf2");
         assert_eq!(soundfont_evidence.size_bytes, b"soundfont-fixture-bytes".len() as u64);
+        let expected_digest = Sha256::digest(b"soundfont-fixture-bytes");
         assert_eq!(
             soundfont_evidence.sha256,
-            hex_digest(Sha256::digest(b"soundfont-fixture-bytes").as_slice())
+            hex_digest(&expected_digest[..])
         );
         std::fs::remove_dir_all(root).unwrap();
     }
