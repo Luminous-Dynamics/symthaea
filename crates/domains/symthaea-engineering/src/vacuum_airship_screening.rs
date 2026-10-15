@@ -943,6 +943,14 @@ pub struct SphericalPayloadBoundsResult {
     pub payload_allowance_upper_bound_kg: f64,
     /// Upper minus lower payload allowance bound, kg.
     pub payload_allowance_interval_width_kg: f64,
+    /// Contribution of ambient-density bounds to the payload interval width, kg.
+    pub ambient_air_density_interval_contribution_kg: f64,
+    /// Contribution of internal-gas density bounds to the payload interval width, kg.
+    pub internal_gas_density_interval_contribution_kg: f64,
+    /// Contribution of structural areal-mass bounds to the payload interval width, kg.
+    pub structural_areal_mass_interval_contribution_kg: f64,
+    /// Contribution of fixed vehicle-mass bounds to the payload interval width, kg.
+    pub fixed_vehicle_mass_interval_contribution_kg: f64,
     pub mass_budget_status: MassBudgetStatus,
 }
 
@@ -1025,6 +1033,46 @@ pub fn screen_spherical_payload_bounds(
         ));
     }
 
+    // The payload equation is affine in these four bounded inputs for a fixed radius.
+    // These terms partition the total interval width, helping prioritize measurements.
+    let ambient_air_density_interval_contribution_kg =
+        (request.ambient_air_density_kg_m3.max - request.ambient_air_density_kg_m3.min)
+            * enclosed_volume_m3;
+    let internal_gas_density_interval_contribution_kg =
+        (request.internal_gas_density_kg_m3.max - request.internal_gas_density_kg_m3.min)
+            * enclosed_volume_m3;
+    let structural_areal_mass_interval_contribution_kg =
+        (request.structural_system_areal_mass_kg_m2.max
+            - request.structural_system_areal_mass_kg_m2.min)
+            * outer_surface_area_m2;
+    let fixed_vehicle_mass_interval_contribution_kg =
+        request.fixed_non_structural_vehicle_mass_kg.max
+            - request.fixed_non_structural_vehicle_mass_kg.min;
+
+    for (name, value) in [
+        (
+            "ambient density interval contribution",
+            ambient_air_density_interval_contribution_kg,
+        ),
+        (
+            "internal gas density interval contribution",
+            internal_gas_density_interval_contribution_kg,
+        ),
+        (
+            "structural areal mass interval contribution",
+            structural_areal_mass_interval_contribution_kg,
+        ),
+        (
+            "fixed vehicle mass interval contribution",
+            fixed_vehicle_mass_interval_contribution_kg,
+        ),
+    ] {
+        validate_result(value, name)?;
+        if value < 0.0 {
+            return Err(ScreeningError::NonFiniteResult(name));
+        }
+    }
+
     let mass_budget_status = if payload_allowance_lower_bound_kg >= 0.0 {
         MassBudgetStatus::RobustlyNonNegative
     } else if payload_allowance_upper_bound_kg < 0.0 {
@@ -1039,6 +1087,10 @@ pub fn screen_spherical_payload_bounds(
         payload_allowance_lower_bound_kg,
         payload_allowance_upper_bound_kg,
         payload_allowance_interval_width_kg,
+        ambient_air_density_interval_contribution_kg,
+        internal_gas_density_interval_contribution_kg,
+        structural_areal_mass_interval_contribution_kg,
+        fixed_vehicle_mass_interval_contribution_kg,
         mass_budget_status,
     })
 }
@@ -1604,6 +1656,11 @@ mod tests {
         assert!(result.payload_allowance_lower_bound_kg < 0.0);
         assert!(result.payload_allowance_upper_bound_kg > 0.0);
         assert!(result.payload_allowance_interval_width_kg > 0.0);
+        let contribution_sum = result.ambient_air_density_interval_contribution_kg
+            + result.internal_gas_density_interval_contribution_kg
+            + result.structural_areal_mass_interval_contribution_kg
+            + result.fixed_vehicle_mass_interval_contribution_kg;
+        assert!((contribution_sum - result.payload_allowance_interval_width_kg).abs() < 1e-7);
         assert_eq!(result.mass_budget_status, MassBudgetStatus::BoundSensitive);
     }
 
@@ -1663,6 +1720,21 @@ mod tests {
             screen_spherical_payload_bounds(request).unwrap_err(),
             ScreeningError::NonFiniteInput("structural_system_areal_mass_kg_m2")
         );
+    }
+
+
+    #[test]
+    fn payload_interval_reports_each_input_uncertainty_contribution() {
+        let result = screen_spherical_payload_bounds(bounded_payload_request()).unwrap();
+        assert!(result.ambient_air_density_interval_contribution_kg > 0.0);
+        assert!(result.internal_gas_density_interval_contribution_kg > 0.0);
+        assert!(result.structural_areal_mass_interval_contribution_kg > 0.0);
+        assert!(result.fixed_vehicle_mass_interval_contribution_kg > 0.0);
+        let sum = result.ambient_air_density_interval_contribution_kg
+            + result.internal_gas_density_interval_contribution_kg
+            + result.structural_areal_mass_interval_contribution_kg
+            + result.fixed_vehicle_mass_interval_contribution_kg;
+        assert!((sum - result.payload_allowance_interval_width_kg).abs() < 1e-7);
     }
 
     #[test]
