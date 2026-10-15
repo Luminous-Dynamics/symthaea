@@ -586,6 +586,22 @@ mod tests {
     }
 
     #[test]
+    fn thermal_integration_overflow_is_rejected_before_state_mutation() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        let before = twin.state;
+        let mut attempted = input();
+        attempted.metabolism.oxygen_l_min = 0.0;
+        attempted.metabolism.co2_l_min = 0.0;
+        attempted.metabolism.metabolic_heat_w = 10.0;
+        attempted.equipment_heat_w = 0.0;
+        attempted.humidity_generation_g_per_min = 0.0;
+        attempted.dt_s = f64::MAX;
+
+        assert_eq!(twin.step(attempted), Err(PlssStepError::InvalidInput));
+        assert_eq!(twin.state, before);
+    }
+
+    #[test]
     fn secondary_oxygen_carries_primary_failure() {
         let mut twin = PlssReferenceTwin::simulation_reference();
         twin.state_mut_for_fault_injection().primary_oxygen = PlssPathState::Failed;
