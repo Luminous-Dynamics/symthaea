@@ -1852,6 +1852,7 @@ mod tests {
     #[test]
     fn test_typed_role_search_replays_after_manager_restart() {
         use crate::knowledge::encoding::FactEncoding;
+        use crate::knowledge::extraction::SemanticRole;
 
         let dir = std::env::temp_dir().join(format!(
             "symthaea_typed_role_search_restart_{}",
