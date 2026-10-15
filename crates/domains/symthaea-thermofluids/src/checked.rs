@@ -249,7 +249,10 @@ mod tests {
 
     #[test]
     fn checked_fluid_functions_match_reference_examples() {
-        assert!((bernoulli_head(200_000.0, 1.0, 0.0, 1000.0).unwrap() - 20.438_328_236_5).abs() < 1.0e-6);
+        assert!(
+            (bernoulli_head(200_000.0, 1.0, 0.0, 1000.0).unwrap() - 20.438_328_236_5).abs()
+                < 1.0e-6
+        );
         assert!((darcy_weisbach_head_loss(0.02, 100.0, 0.1, 2.0).unwrap() - 4.0775).abs() < 1.0e-3);
         assert_eq!(continuity_velocity(0.02, 1.0, 0.01), Ok(2.0));
         assert_eq!(continuity_velocity(0.02, -1.0, 0.01), Ok(-2.0));
