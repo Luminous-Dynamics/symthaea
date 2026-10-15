@@ -359,7 +359,6 @@ pub fn fuse_human_state(
         for item in accepted.iter().skip(1) {
             let next_weight = total_weight + item.confidence;
             if !next_weight.is_finite() || next_weight <= 0.0 {
-                rejected_invalid += accepted.len();
                 invalid_weight = true;
                 break;
             }
