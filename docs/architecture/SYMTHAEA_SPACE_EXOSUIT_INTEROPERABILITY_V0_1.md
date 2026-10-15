@@ -30,7 +30,7 @@ Sources:
 - applicable environment set;
 - declared evidence level, reference, and required/optional status.
 
-Interface kinds are deliberately distinct: pressure boundary, breathable gas, coolant, thermal exchange, electrical power, grounding/ESD, communications, telemetry/data, mechanical capture, restraint/anchor, consumable transfer, dust service and rescue handling.
+Interface kinds are deliberately distinct: pressure boundary, breathable gas, coolant, thermal exchange, electrical power, grounding/ESD, communications, telemetry/data, mechanical capture, restraint/anchor, consumable transfer, dust service and rescue handling. The SX-028 EVA profile model also declares `ElectrostaticChargeManagement` separately from `DustMitigation` for lunar-surface and dust-intensive work hypotheses, so dust protection is not silently treated as a substitute for charge/grounding work.
 
 The caller supplies a non-empty operating-environment context and minimum evidence floor. The evaluator checks both directions for required consumer/bidirectional endpoints and reports missing peers, duplicate/ambiguous providers, kind/role mismatches, revision or schema-digest mismatch, connector mismatch, unsupported environment, and evidence below policy. All findings are canonicalized before reporting.
 
