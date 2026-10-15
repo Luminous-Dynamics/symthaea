@@ -249,6 +249,7 @@ impl PlssTelemetryFusionReport {
 pub enum PlssTelemetryError {
     InvalidConfig,
     InvalidEvaluationTime,
+    InvalidSourceRevision,
 }
 
 /// Fuse only fresh, valid, sufficiently confident observations of the same
@@ -456,6 +457,168 @@ pub fn fuse_plss_telemetry(
         excluded_stale_observations: excluded_stale,
         excluded_low_confidence_observations: excluded_low_confidence,
     })
+}
+
+
+/// Reproducibility metadata for one fusion evaluation. FNV-1a 64-bit digests
+/// are non-cryptographic fingerprints only; they are not signatures or proof
+/// that a caller supplied a truthful source revision.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlssTelemetryReceipt {
+    /// Must be the exact 40-character Git SHA or 64-character Git object ID.
+    pub source_revision: String,
+    pub input_observation_count: usize,
+    pub accepted_source_metric_pairs: usize,
+    pub rejected_invalid_observations: usize,
+    pub rejected_future_dated_observations: usize,
+    pub excluded_stale_observations: usize,
+    pub excluded_low_confidence_observations: usize,
+    pub input_digest_fnv1a64: String,
+    pub result_digest_fnv1a64: String,
+}
+
+/// Evaluate and produce a deterministic receipt tied to a caller-supplied,
+/// syntactically valid source revision. Callers should supply the exact checked
+/// out commit SHA; this function validates the identifier's form, not Git trust.
+pub fn evaluate_plss_telemetry_with_receipt(
+    observations: &[PlssTelemetryObservation],
+    evaluated_at_s: f64,
+    config: PlssTelemetryConfig,
+    source_revision: &str,
+) -> Result<(PlssTelemetryFusionReport, PlssTelemetryReceipt), PlssTelemetryError> {
+    let valid_revision_length = source_revision.len() == 40 || source_revision.len() == 64;
+    if !valid_revision_length || !source_revision.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(PlssTelemetryError::InvalidSourceRevision);
+    }
+
+    let report = fuse_plss_telemetry(observations, evaluated_at_s, config)?;
+    let receipt = PlssTelemetryReceipt {
+        source_revision: source_revision.to_ascii_lowercase(),
+        input_observation_count: observations.len(),
+        accepted_source_metric_pairs: report
+            .metrics
+            .iter()
+            .map(|metric| metric.accepted_source_count)
+            .sum(),
+        rejected_invalid_observations: report.rejected_invalid_observations,
+        rejected_future_dated_observations: report.rejected_future_dated_observations,
+        excluded_stale_observations: report.excluded_stale_observations,
+        excluded_low_confidence_observations: report.excluded_low_confidence_observations,
+        input_digest_fnv1a64: digest_input_observations(observations),
+        result_digest_fnv1a64: digest_fusion_report(&report),
+    };
+    Ok((report, receipt))
+}
+
+struct StableFnv1a64(u64);
+
+impl StableFnv1a64 {
+    fn new() -> Self {
+        Self(0xcbf2_9ce4_8422_2325)
+    }
+
+    fn write_raw(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.0 ^= u64::from(*byte);
+            self.0 = self.0.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+
+    fn write_u64(&mut self, value: u64) {
+        self.write_raw(&value.to_le_bytes());
+    }
+
+    fn write_usize(&mut self, value: usize) {
+        self.write_u64(value as u64);
+    }
+
+    fn write_f64(&mut self, value: f64) {
+        self.write_u64(value.to_bits());
+    }
+
+    fn write_str(&mut self, value: &str) {
+        self.write_usize(value.len());
+        self.write_raw(value.as_bytes());
+    }
+
+    fn write_optional_f64(&mut self, value: Option<f64>) {
+        match value {
+            Some(value) => {
+                self.write_raw(&[1]);
+                self.write_f64(value);
+            }
+            None => self.write_raw(&[0]),
+        }
+    }
+
+    fn finish(self) -> String {
+        format!("fnv1a64:{:016x}", self.0)
+    }
+}
+
+fn digest_input_observations(observations: &[PlssTelemetryObservation]) -> String {
+    let mut canonical = observations.to_vec();
+    canonical.sort_by(|left, right| {
+        left.metric
+            .cmp(&right.metric)
+            .then(left.source_kind.cmp(&right.source_kind))
+            .then(left.source_id.cmp(&right.source_id))
+            .then(left.observed_at_s.total_cmp(&right.observed_at_s))
+            .then(left.unit.cmp(&right.unit))
+            .then(left.value.total_cmp(&right.value))
+            .then(left.uncertainty_abs.total_cmp(&right.uncertainty_abs))
+            .then(left.confidence.total_cmp(&right.confidence))
+    });
+
+    let mut hash = StableFnv1a64::new();
+    hash.write_usize(canonical.len());
+    for observation in &canonical {
+        hash.write_str(&format!("{:?}", observation.metric));
+        hash.write_str(&format!("{:?}", observation.unit));
+        hash.write_f64(observation.value);
+        hash.write_f64(observation.uncertainty_abs);
+        hash.write_f64(observation.observed_at_s);
+        hash.write_f64(observation.confidence);
+        hash.write_str(&observation.source_id);
+        hash.write_str(&format!("{:?}", observation.source_kind));
+    }
+    hash.finish()
+}
+
+fn digest_fusion_report(report: &PlssTelemetryFusionReport) -> String {
+    let mut hash = StableFnv1a64::new();
+    hash.write_f64(report.evaluated_at_s);
+    hash.write_str(&format!("{:?}", report.evidence_level));
+    hash.write_f64(report.config.maximum_observation_age_s);
+    hash.write_f64(report.config.minimum_confidence);
+    hash.write_f64(report.config.disagreement_tolerances.co2_partial_pressure_pa);
+    hash.write_f64(report.config.disagreement_tolerances.oxygen_partial_pressure_pa);
+    hash.write_f64(report.config.disagreement_tolerances.circuit_pressure_pa);
+    hash.write_f64(report.config.disagreement_tolerances.gas_temperature_k);
+    hash.write_f64(report.config.disagreement_tolerances.ventilation_flow_l_min);
+    hash.write_f64(report.config.disagreement_tolerances.relative_humidity_percent);
+    hash.write_usize(report.rejected_invalid_observations);
+    hash.write_usize(report.rejected_future_dated_observations);
+    hash.write_usize(report.excluded_stale_observations);
+    hash.write_usize(report.excluded_low_confidence_observations);
+    hash.write_usize(report.metrics.len());
+
+    for metric in &report.metrics {
+        hash.write_str(&format!("{:?}", metric.metric));
+        hash.write_str(&format!("{:?}", metric.unit));
+        hash.write_str(&format!("{:?}", metric.source_kind));
+        hash.write_str(&format!("{:?}", metric.status));
+        hash.write_optional_f64(metric.value);
+        hash.write_optional_f64(metric.lower_bound);
+        hash.write_optional_f64(metric.upper_bound);
+        hash.write_optional_f64(metric.confidence);
+        hash.write_usize(metric.accepted_source_count);
+        hash.write_usize(metric.source_ids.len());
+        for source_id in &metric.source_ids {
+            hash.write_str(source_id);
+        }
+    }
+    hash.finish()
 }
 
 fn same_reading(left: &PlssTelemetryObservation, right: &PlssTelemetryObservation) -> bool {
@@ -745,6 +908,62 @@ mod tests {
         let first = fuse(&[a.clone(), b.clone()]);
         let second = fuse(&[b, a]);
         assert_eq!(first.metrics, second.metrics);
+    }
+
+    #[test]
+    fn receipt_is_reproducible_and_input_order_independent() {
+        let a = observation(
+            PlssTelemetryMetric::RelativeHumidityPercent,
+            30.0,
+            1.0,
+            99.0,
+            0.90,
+            "humidity-a",
+            PlssTelemetrySourceKind::Instrument,
+        );
+        let b = observation(
+            PlssTelemetryMetric::RelativeHumidityPercent,
+            31.0,
+            1.0,
+            99.0,
+            0.95,
+            "humidity-b",
+            PlssTelemetrySourceKind::Instrument,
+        );
+        let revision = "a".repeat(40);
+        let (_, first) = evaluate_plss_telemetry_with_receipt(
+            &[a.clone(), b.clone()],
+            100.0,
+            PlssTelemetryConfig::simulation_reference(),
+            &revision,
+        )
+        .unwrap();
+        let (_, second) = evaluate_plss_telemetry_with_receipt(
+            &[b, a],
+            100.0,
+            PlssTelemetryConfig::simulation_reference(),
+            &revision,
+        )
+        .unwrap();
+        assert_eq!(first.source_revision, revision);
+        assert_eq!(first.input_observation_count, 2);
+        assert_eq!(first.input_digest_fnv1a64, second.input_digest_fnv1a64);
+        assert_eq!(first.result_digest_fnv1a64, second.result_digest_fnv1a64);
+        assert!(first.input_digest_fnv1a64.starts_with("fnv1a64:"));
+        assert!(first.result_digest_fnv1a64.starts_with("fnv1a64:"));
+    }
+
+    #[test]
+    fn receipt_requires_a_git_object_id_shape() {
+        assert_eq!(
+            evaluate_plss_telemetry_with_receipt(
+                &[],
+                100.0,
+                PlssTelemetryConfig::simulation_reference(),
+                "not-a-revision",
+            ),
+            Err(PlssTelemetryError::InvalidSourceRevision)
+        );
     }
 
     #[test]
