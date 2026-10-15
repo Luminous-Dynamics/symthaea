@@ -31,6 +31,8 @@ pub enum CycleError {
     InvalidCompressionRatio,
     /// The Diesel cutoff ratio must satisfy 1 < cutoff < compression ratio.
     InvalidCutoffRatio,
+    /// Finite inputs caused numeric overflow or an efficiency outside [0, 1].
+    NumericalFailure,
 }
 
 impl std::fmt::Display for CycleError {
@@ -43,6 +45,7 @@ impl std::fmt::Display for CycleError {
             Self::InvalidPressureRatio => "Brayton pressure ratio must be greater than one",
             Self::InvalidCompressionRatio => "compression ratio must be greater than one",
             Self::InvalidCutoffRatio => "Diesel cutoff ratio must be greater than one and less than the compression ratio",
+            Self::NumericalFailure => "cycle calculation overflowed or produced an efficiency outside [0, 1]",
         };
         f.write_str(message)
     }
@@ -58,6 +61,13 @@ fn validate_gamma(gamma: f64) -> Result<(), CycleError> {
         return Err(CycleError::InvalidSpecificHeatRatio);
     }
     Ok(())
+}
+
+fn checked_efficiency(efficiency: f64) -> Result<f64, CycleError> {
+    if !efficiency.is_finite() || !(0.0..=1.0).contains(&efficiency) {
+        return Err(CycleError::NumericalFailure);
+    }
+    Ok(efficiency)
 }
 
 /// Reversible Carnot efficiency bound: eta = 1 - T_cold / T_hot.
@@ -95,8 +105,7 @@ pub fn ideal_brayton_efficiency(
     validate_gamma(gamma)?;
 
     let efficiency = 1.0 - pressure_ratio.powf(-(gamma - 1.0) / gamma);
-    debug_assert!(efficiency.is_finite() && (0.0..1.0).contains(&efficiency));
-    Ok(efficiency)
+    checked_efficiency(efficiency)
 }
 
 /// Ideal air-standard Otto-cycle thermal efficiency.
@@ -117,8 +126,7 @@ pub fn air_standard_otto_efficiency(
     validate_gamma(gamma)?;
 
     let efficiency = 1.0 - compression_ratio.powf(-(gamma - 1.0));
-    debug_assert!(efficiency.is_finite() && (0.0..1.0).contains(&efficiency));
-    Ok(efficiency)
+    checked_efficiency(efficiency)
 }
 
 /// Ideal air-standard Diesel-cycle thermal efficiency.
@@ -148,8 +156,7 @@ pub fn air_standard_diesel_efficiency(
         (cutoff_ratio.powf(gamma) - 1.0) / (gamma * (cutoff_ratio - 1.0));
     let efficiency =
         1.0 - heat_addition_factor / compression_ratio.powf(gamma - 1.0);
-    debug_assert!(efficiency.is_finite() && (0.0..1.0).contains(&efficiency));
-    Ok(efficiency)
+    checked_efficiency(efficiency)
 }
 
 #[cfg(test)]
@@ -221,6 +228,10 @@ mod tests {
         assert_eq!(
             air_standard_otto_efficiency(8.0, f64::INFINITY),
             Err(CycleError::NonFiniteInput)
+        );
+        assert_eq!(
+            air_standard_diesel_efficiency(1.0e308, 2.0, 1000.0),
+            Err(CycleError::NumericalFailure)
         );
     }
 }
