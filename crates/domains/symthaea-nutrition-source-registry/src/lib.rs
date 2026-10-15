@@ -525,7 +525,11 @@ fn validate_fact(
         push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::EmptyCultivarId);
     }
     if fact.identity_confidence == FoodIdentityConfidence::Unknown {
-        push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::UnknownIdentityConfidence);
+        push_issue(
+            issues,
+            IssueCategory::DataQuality,
+            RegistryIssueCode::UnknownIdentityConfidence,
+        );
     }
     required_fact_field(&fact.food_state_id, RegistryIssueCode::MissingFoodState, issues);
     required_fact_field(&fact.nutrient_id, RegistryIssueCode::MissingNutrientId, issues);
@@ -548,41 +552,77 @@ fn validate_fact(
     }
 
     if fact.transformation_applied && fact.transformation_lineage.is_empty() {
-        push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationLineage);
+        push_issue(
+            issues,
+            IssueCategory::DataQuality,
+            RegistryIssueCode::MissingTransformationLineage,
+        );
     }
     if !fact.transformation_applied && !fact.transformation_lineage.is_empty() {
-        push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::UnexpectedTransformationLineage);
+        push_issue(
+            issues,
+            IssueCategory::DataQuality,
+            RegistryIssueCode::UnexpectedTransformationLineage,
+        );
     }
     let mut previous_output: Option<&str> = None;
     for step in &fact.transformation_lineage {
         if step.transformation_id.trim().is_empty() {
-            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationId);
+            push_issue(
+                issues,
+                IssueCategory::DataQuality,
+                RegistryIssueCode::MissingTransformationId,
+            );
         }
         if step.from_food_state_id.trim().is_empty() {
-            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationFromState);
+            push_issue(
+                issues,
+                IssueCategory::DataQuality,
+                RegistryIssueCode::MissingTransformationFromState,
+            );
         }
         if step.to_food_state_id.trim().is_empty() {
-            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationToState);
+            push_issue(
+                issues,
+                IssueCategory::DataQuality,
+                RegistryIssueCode::MissingTransformationToState,
+            );
         }
         if step.method_ref.trim().is_empty() {
-            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationMethod);
+            push_issue(
+                issues,
+                IssueCategory::DataQuality,
+                RegistryIssueCode::MissingTransformationMethod,
+            );
         }
         if step.evidence_ref.trim().is_empty() {
-            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::MissingTransformationEvidence);
+            push_issue(
+                issues,
+                IssueCategory::DataQuality,
+                RegistryIssueCode::MissingTransformationEvidence,
+            );
         }
         if let Some(output) = previous_output {
             if !output.is_empty()
                 && !step.from_food_state_id.trim().is_empty()
-                && output != step.from_food_state_id
+                && output != step.from_food_state_id.as_str()
             {
-                push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::TransformationChainMismatch);
+                push_issue(
+                    issues,
+                    IssueCategory::DataQuality,
+                    RegistryIssueCode::TransformationChainMismatch,
+                );
             }
         }
         previous_output = Some(&step.to_food_state_id);
     }
     if let Some(output) = previous_output {
-        if !output.trim().is_empty() && output != fact.food_state_id {
-            push_issue(issues, IssueCategory::DataQuality, RegistryIssueCode::TransformationOutputMismatch);
+        if !output.trim().is_empty() && output != fact.food_state_id.as_str() {
+            push_issue(
+                issues,
+                IssueCategory::DataQuality,
+                RegistryIssueCode::TransformationOutputMismatch,
+            );
         }
     }
 }
