@@ -152,6 +152,143 @@ impl EnergyIntervalBalance {
     }
 }
 
+/// Checked aggregate of individually validated intervals in one registered duty cycle.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EnergyDutyCycleReport {
+    /// Sum of all external input energy.
+    pub total_input_energy_j: f64,
+    /// Sum of useful energy delivered over the duty cycle.
+    pub total_net_useful_output_energy_j: f64,
+    /// Sum of auxiliary energy consumed.
+    pub total_auxiliary_energy_j: f64,
+    /// Sum of rejected and other loss energy.
+    pub total_rejected_or_loss_energy_j: f64,
+    /// Net stored-energy change from the start to end of the duty cycle.
+    pub net_stored_energy_change_j: f64,
+    /// Total input plus energy released from storage across intervals.
+    pub total_energy_throughput_j: f64,
+    /// Aggregate residual after every individual interval has passed closure.
+    pub residual_energy_j: f64,
+    /// Aggregate residual divided by total energy throughput.
+    pub relative_balance_error: f64,
+    /// Useful output divided by external input, available only when net storage
+    /// change is within the registered relative tolerance of total throughput.
+    /// This is a mission-cycle ratio, not a component or fuel-tank-to-wheel metric.
+    pub net_cycle_efficiency: Option<f64>,
+}
+
+/// Errors from evaluating a sequence of transient energy intervals.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum EnergyDutyCycleError {
+    /// No intervals were supplied.
+    EmptyCycle,
+    /// An individual interval failed validation before aggregation.
+    InvalidInterval {
+        /// Zero-based position in the supplied interval sequence.
+        index: usize,
+        /// The original interval validation failure.
+        error: EnergyIntervalError,
+    },
+    /// A sum of individually finite intervals overflowed.
+    NumericOverflow,
+    /// The aggregate conservation check failed.
+    AggregateImbalance(EnergyIntervalError),
+}
+
+impl std::fmt::Display for EnergyDutyCycleError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyCycle => f.write_str("duty cycle must contain at least one interval"),
+            Self::InvalidInterval { index, error } => {
+                write!(f, "duty-cycle interval {index} is invalid: {error}")
+            }
+            Self::NumericOverflow => f.write_str("aggregating duty-cycle energy flows overflowed"),
+            Self::AggregateImbalance(error) => write!(f, "aggregate duty-cycle balance failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for EnergyDutyCycleError {}
+
+/// Validate each interval first, then aggregate raw energies across the duty cycle.
+///
+/// Validating each interval before summation prevents positive and negative
+/// residuals from cancelling and concealing invalid observations. The aggregate
+/// check is performed as a second gate. This function expects already integrated
+/// energy quantities (joules); it does not infer duration-weighted energy from
+/// power readings or apply any system-boundary conversions.
+pub fn evaluate_duty_cycle(
+    intervals: &[EnergyIntervalBalance],
+    relative_tolerance: f64,
+) -> Result<EnergyDutyCycleReport, EnergyDutyCycleError> {
+    if intervals.is_empty() {
+        return Err(EnergyDutyCycleError::EmptyCycle);
+    }
+
+    let mut total_input_energy_j = 0.0;
+    let mut total_net_useful_output_energy_j = 0.0;
+    let mut total_auxiliary_energy_j = 0.0;
+    let mut total_rejected_or_loss_energy_j = 0.0;
+    let mut net_stored_energy_change_j = 0.0;
+
+    for (index, interval) in intervals.iter().copied().enumerate() {
+        interval
+            .evaluate(relative_tolerance)
+            .map_err(|error| EnergyDutyCycleError::InvalidInterval { index, error })?;
+
+        total_input_energy_j += interval.input_energy_j;
+        total_net_useful_output_energy_j += interval.net_useful_output_energy_j;
+        total_auxiliary_energy_j += interval.auxiliary_energy_j;
+        total_rejected_or_loss_energy_j += interval.rejected_or_loss_energy_j;
+        net_stored_energy_change_j += interval.stored_energy_change_j;
+
+        if [
+            total_input_energy_j,
+            total_net_useful_output_energy_j,
+            total_auxiliary_energy_j,
+            total_rejected_or_loss_energy_j,
+            net_stored_energy_change_j,
+        ]
+        .iter()
+        .any(|value| !value.is_finite())
+        {
+            return Err(EnergyDutyCycleError::NumericOverflow);
+        }
+    }
+
+    let aggregate = EnergyIntervalBalance {
+        input_energy_j: total_input_energy_j,
+        net_useful_output_energy_j: total_net_useful_output_energy_j,
+        auxiliary_energy_j: total_auxiliary_energy_j,
+        rejected_or_loss_energy_j: total_rejected_or_loss_energy_j,
+        stored_energy_change_j: net_stored_energy_change_j,
+    };
+    let aggregate_report = aggregate
+        .evaluate(relative_tolerance)
+        .map_err(EnergyDutyCycleError::AggregateImbalance)?;
+
+    let storage_is_balanced =
+        net_stored_energy_change_j.abs()
+            <= relative_tolerance * aggregate_report.energy_throughput_j;
+    let net_cycle_efficiency = if storage_is_balanced && total_input_energy_j > 0.0 {
+        Some(total_net_useful_output_energy_j / total_input_energy_j)
+    } else {
+        None
+    };
+
+    Ok(EnergyDutyCycleReport {
+        total_input_energy_j,
+        total_net_useful_output_energy_j,
+        total_auxiliary_energy_j,
+        total_rejected_or_loss_energy_j,
+        net_stored_energy_change_j,
+        total_energy_throughput_j: aggregate_report.energy_throughput_j,
+        residual_energy_j: aggregate_report.residual_energy_j,
+        relative_balance_error: aggregate_report.relative_balance_error,
+        net_cycle_efficiency,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -271,6 +408,78 @@ mod tests {
         assert_eq!(
             no_throughput.evaluate(-1e-6),
             Err(EnergyIntervalError::InvalidTolerance)
+        );
+    }
+
+    #[test]
+    fn duty_cycle_efficiency_requires_charge_sustaining_storage() {
+        let intervals = [
+            EnergyIntervalBalance {
+                input_energy_j: 200.0,
+                net_useful_output_energy_j: 50.0,
+                auxiliary_energy_j: 10.0,
+                rejected_or_loss_energy_j: 40.0,
+                stored_energy_change_j: 100.0,
+            },
+            EnergyIntervalBalance {
+                input_energy_j: 100.0,
+                net_useful_output_energy_j: 50.0,
+                auxiliary_energy_j: 10.0,
+                rejected_or_loss_energy_j: 140.0,
+                stored_energy_change_j: -100.0,
+            },
+        ];
+        let report = evaluate_duty_cycle(&intervals, 1e-9).unwrap();
+
+        assert!((report.total_input_energy_j - 300.0).abs() < 1e-12);
+        assert!((report.total_net_useful_output_energy_j - 100.0).abs() < 1e-12);
+        assert!(report.net_stored_energy_change_j.abs() < 1e-12);
+        assert!((report.net_cycle_efficiency.unwrap() - (1.0 / 3.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn non_charge_sustaining_duty_cycle_does_not_claim_cycle_efficiency() {
+        let intervals = [EnergyIntervalBalance {
+            input_energy_j: 200.0,
+            net_useful_output_energy_j: 50.0,
+            auxiliary_energy_j: 10.0,
+            rejected_or_loss_energy_j: 40.0,
+            stored_energy_change_j: 100.0,
+        }];
+        let report = evaluate_duty_cycle(&intervals, 1e-9).unwrap();
+        assert_eq!(report.net_cycle_efficiency, None);
+    }
+
+    #[test]
+    fn duty_cycle_rejects_individually_unbalanced_intervals_before_aggregation() {
+        // Residuals are +1 J and -1 J; aggregating first would hide both errors.
+        let intervals = [
+            EnergyIntervalBalance {
+                input_energy_j: 100.0,
+                net_useful_output_energy_j: 10.0,
+                auxiliary_energy_j: 0.0,
+                rejected_or_loss_energy_j: 89.0,
+                stored_energy_change_j: 0.0,
+            },
+            EnergyIntervalBalance {
+                input_energy_j: 100.0,
+                net_useful_output_energy_j: 10.0,
+                auxiliary_energy_j: 0.0,
+                rejected_or_loss_energy_j: 91.0,
+                stored_energy_change_j: 0.0,
+            },
+        ];
+        assert!(matches!(
+            evaluate_duty_cycle(&intervals, 1e-6),
+            Err(EnergyDutyCycleError::InvalidInterval { index: 0, error: EnergyIntervalError::FirstLawImbalance { .. } })
+        ));
+    }
+
+    #[test]
+    fn empty_duty_cycle_is_rejected() {
+        assert_eq!(
+            evaluate_duty_cycle(&[], 1e-6),
+            Err(EnergyDutyCycleError::EmptyCycle)
         );
     }
 
