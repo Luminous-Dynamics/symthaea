@@ -63,16 +63,36 @@ fn replays_versioned_trend_corpus_and_independently_verifies_sha256_receipt() {
     assert_eq!(report.evidence_level, TrendEvidenceLevel::SimulationOnly);
     assert_eq!(report.lanes.len(), 18);
     assert_eq!(report.input_observation_count, corpus.expected_counts.input_observation_count);
-    assert_eq!(report.accepted_observation_count, corpus.expected_counts.accepted_observation_count);
-    assert_eq!(report.rejected_invalid_observations, corpus.expected_counts.rejected_invalid_observations);
-    assert_eq!(report.rejected_future_dated_observations, corpus.expected_counts.rejected_future_dated_observations);
-    assert_eq!(report.excluded_out_of_window_observations, corpus.expected_counts.excluded_out_of_window_observations);
-    assert_eq!(report.excluded_low_confidence_observations, corpus.expected_counts.excluded_low_confidence_observations);
+    assert_eq!(
+        report.accepted_observation_count,
+        corpus.expected_counts.accepted_observation_count
+    );
+    assert_eq!(
+        report.rejected_invalid_observations,
+        corpus.expected_counts.rejected_invalid_observations
+    );
+    assert_eq!(
+        report.rejected_future_dated_observations,
+        corpus.expected_counts.rejected_future_dated_observations
+    );
+    assert_eq!(
+        report.excluded_out_of_window_observations,
+        corpus.expected_counts.excluded_out_of_window_observations
+    );
+    assert_eq!(
+        report.excluded_low_confidence_observations,
+        corpus.expected_counts.excluded_low_confidence_observations
+    );
 
     for expected in &corpus.expected {
         let lane = report
             .lane(expected.metric, expected.source_kind)
-            .unwrap_or_else(|| panic!("missing trend lane {:?}/{:?}", expected.metric, expected.source_kind));
+            .unwrap_or_else(|| {
+                panic!(
+                    "missing trend lane {:?}/{:?}",
+                    expected.metric, expected.source_kind
+                )
+            });
         assert_eq!(lane.status, expected.status);
         assert_eq!(
             lane.source_trends.iter().map(|trend| trend.source_id.clone()).collect::<Vec<_>>(),
@@ -235,6 +255,8 @@ fn hash_lane(h: &mut VerifierHash, lane: &PlssTelemetryTrendLane) {
         h.option_f64(source.last_timestamp_s);
         h.option_f64(source.first_value);
         h.option_f64(source.last_value);
+        h.option_f64(source.first_uncertainty_abs);
+        h.option_f64(source.last_uncertainty_abs);
         h.option_f64(source.maximum_observed_gap_s);
         h.option_f64(source.temporal_coverage_fraction);
         h.option_f64(source.change_over_window);
