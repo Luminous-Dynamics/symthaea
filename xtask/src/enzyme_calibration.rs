@@ -296,4 +296,21 @@ mod tests {
         let error = validate_fixture(&value).unwrap_err().to_string();
         assert!(error.contains("duplicate calibration sample ID"));
     }
+
+    #[test]
+    fn rejects_mixed_concentration_units() {
+        let mut value = fixture();
+        value["samples"][1]["conc_unit"] = json!("mmol / l");
+        let error = validate_fixture(&value).unwrap_err().to_string();
+        assert!(error.contains("calibration samples mix concentration units"));
+    }
+
+    #[test]
+    fn rejects_reversed_calibration_range() {
+        let mut value = fixture();
+        value["model_result"]["calibration_range"]["conc_lower"] = json!(4.0);
+        value["model_result"]["calibration_range"]["conc_upper"] = json!(3.0);
+        let error = validate_fixture(&value).unwrap_err().to_string();
+        assert!(error.contains("calibration range must have finite lower/upper bounds"));
+    }
 }
