@@ -17,9 +17,9 @@ const SCENARIOS: [&str; 10] = [
     "opportunity_gap_hidden_by_mean",
 ];
 const COHORTS: [&str; 5] = ["cohort_01", "cohort_02", "cohort_03", "cohort_04", "cohort_05"];
-const MIN_ESSENTIALS: f64 = 0.90;
+const MIN_ESSENTIALS_ACCESS: f64 = 0.90;
 const MIN_LAWFUL_OPPORTUNITY_COVERAGE: f64 = 0.80;
-const MIN_FAIR_PAY: f64 = 0.80;
+const MIN_FAIR_PAY_ADEQUACY: f64 = 0.80;
 const MIN_SAFE_WORK: f64 = 0.90;
 const MIN_WORK_STABILITY: f64 = 0.75;
 const MIN_SOCIAL_PROTECTION: f64 = 0.75;
@@ -163,9 +163,9 @@ fn assess_cohort(row: &Row) -> &'static str {
         return "fixture_indeterminate";
     }
     let checks = [
-        higher_is_better(&row.essentials, MIN_ESSENTIALS),
+        higher_is_better(&row.essentials, MIN_ESSENTIALS_ACCESS),
         higher_is_better(&row.opportunity, MIN_LAWFUL_OPPORTUNITY_COVERAGE),
-        higher_is_better(&row.pay, MIN_FAIR_PAY),
+        higher_is_better(&row.pay, MIN_FAIR_PAY_ADEQUACY),
         higher_is_better(&row.safe_work, MIN_SAFE_WORK),
         higher_is_better(&row.stability, MIN_WORK_STABILITY),
         higher_is_better(&row.social_protection, MIN_SOCIAL_PROTECTION),
@@ -296,7 +296,7 @@ fn run(path: &str) -> Result<(), String> {
         let (low, high) = row.essentials.complete().expect("fixture intervals are present");
         (low + high) / 2.0
     }).sum::<f64>() / high_mean.len() as f64;
-    if mean_essentials <= MIN_ESSENTIALS || assess_scenario(&high_mean) != "fixture_fail" {
+    if mean_essentials <= MIN_ESSENTIALS_ACCESS || assess_scenario(&high_mean) != "fixture_fail" {
         return Err("high mean must not hide a clearly failing cohort floor".to_string());
     }
     let job_count: Vec<&Row> = scenario_map["opportunity_without_quality"].clone();
