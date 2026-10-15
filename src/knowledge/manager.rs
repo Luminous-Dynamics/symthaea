@@ -1396,6 +1396,49 @@ mod tests {
     }
 
     #[test]
+    fn test_try_new_rejects_wrong_length_persisted_fact_vector() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_wrong_vector_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[super::super::persistence::FactRecord {
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                source_text: "persisted fixture".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_facts SET vector_blob = ?1",
+            rusqlite::params![vec![0u8; 1]],
+        )
+        .unwrap();
+        drop(conn);
+
+        let result = KnowledgeManager::try_new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..KnowledgeManagerConfig::default()
+        });
+        let error = result.expect_err("strict startup must reject invalid vector dimensions");
+        assert!(
+            error.contains("persisted facts") && error.contains("invalid hypervector length"),
+            "unexpected error context: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_new_falls_back_without_writing_to_unreadable_database() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_manager_fallback_test_{}",
