@@ -6,6 +6,7 @@ mod duplicate_scan;
 mod enzyme_bench;
 mod enzyme_calibration;
 mod enzyme_evidence_graph;
+mod enzyme_model_falsification;
 mod manifest;
 mod rhn_sweep;
 
@@ -95,6 +96,12 @@ enum Commands {
         #[arg(long)]
         sha256: Option<String>,
     },
+    /// Run deterministic synthetic parameter-recovery and model-discrimination fixtures.
+    EnzymeModelFalsification {
+        /// Output path for the machine-readable synthetic-only report.
+        #[arg(long, default_value = "reports/enzyme_model_falsification_v0.json")]
+        out: PathBuf,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -168,6 +175,9 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask lives one level below the workspace root")
                 .to_path_buf();
             enzyme_evidence_graph::check(&root, &input, sha256.as_deref())?;
+        }
+        Commands::EnzymeModelFalsification { out } => {
+            enzyme_model_falsification::run(&out)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
