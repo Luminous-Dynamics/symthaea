@@ -79,6 +79,12 @@ enum Commands {
         #[arg(long)]
         sha256: String,
     },
+    /// Verify all five hash-pinned SLAC calibration files from a local research-data staging area.
+    EnzymeCalibrationSuiteCheck {
+        /// Metadata-only suite manifest, workspace-relative unless absolute.
+        #[arg(long)]
+        manifest: PathBuf,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -137,6 +143,14 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::EnzymeCalibrationCheck { input, sha256 } => {
             enzyme_calibration::check(&input, &sha256)?;
+        }
+        Commands::EnzymeCalibrationSuiteCheck { manifest } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let manifest_path = if manifest.is_absolute() { manifest } else { root.join(manifest) };
+            enzyme_calibration::check_suite(&root, &manifest_path)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
