@@ -116,6 +116,66 @@ fn validate_hypervector_bytes(bytes: &[u8], column_index: usize) -> rusqlite::Re
     }
 }
 
+/// Persist a monotonic allocator high-water mark without lowering any value
+/// already committed by an earlier snapshot. The caller should use a transaction
+/// when this value must commit atomically with fact rows.
+fn persist_graph_fact_id_high_water(
+    conn: &rusqlite::Connection,
+    candidate_next_id: Option<u64>,
+) -> Result<(), String> {
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT value FROM knowledge_metadata WHERE key = 'next_graph_fact_id'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| format!("Read prior graph fact ID high-water mark: {e}"))?;
+    let existing = existing
+        .map(|value| {
+            u64::try_from(value)
+                .ok()
+                .filter(|id| *id > 0)
+                .ok_or_else(|| format!("Invalid persisted next graph fact ID: {value}"))
+        })
+        .transpose()?;
+    let next_id = match (existing, candidate_next_id) {
+        (Some(old), Some(candidate)) => Some(old.max(candidate)),
+        (Some(old), None) => Some(old),
+        (None, Some(candidate)) => Some(candidate),
+        (None, None) => None,
+    };
+    if let Some(next_id) = next_id {
+        if next_id == 0 {
+            return Err("Next graph fact ID must be positive".into());
+        }
+        let stored_id = i64::try_from(next_id)
+            .map_err(|e| format!("Next graph fact ID exceeds SQLite INTEGER range: {e}"))?;
+        conn.execute(
+            "INSERT OR REPLACE INTO knowledge_metadata (key, value)
+             VALUES ('next_graph_fact_id', ?1)",
+            rusqlite::params![stored_id],
+        )
+        .map_err(|e| format!("Write next graph fact ID: {e}"))?;
+    }
+    Ok(())
+}
+
+fn next_graph_fact_id_after_records(
+    facts: &[FactRecord],
+) -> Result<Option<u64>, String> {
+    facts
+        .iter()
+        .filter_map(|fact| fact.graph_fact_id)
+        .max()
+        .map(|max_id| {
+            max_id
+                .checked_add(1)
+                .ok_or_else(|| "Cannot advance allocator past maximum graph fact ID".to_string())
+        })
+        .transpose()
+}
+
 fn decode_optional_graph_fact_id(
     value: Option<i64>,
     column_index: usize,
@@ -288,6 +348,8 @@ impl KnowledgePersistence {
             count += 1;
         }
 
+        let candidate_next_id = next_graph_fact_id_after_records(facts)?;
+        persist_graph_fact_id_high_water(&conn, candidate_next_id)?;
         conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
 
         self.total_saved += count as u64;
@@ -347,6 +409,8 @@ impl KnowledgePersistence {
             count += 1;
         }
 
+        let candidate_next_id = next_graph_fact_id_after_records(facts)?;
+        persist_graph_fact_id_high_water(&tx, candidate_next_id)?;
         tx.commit()
             .map_err(|e| format!("Commit fact snapshot: {e}"))?;
         self.total_saved += count as u64;
@@ -522,13 +586,10 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Insert ontology snapshot row: {e}"))?;
         }
 
-        tx.execute(
-            "INSERT OR REPLACE INTO knowledge_metadata (key, value)
-             VALUES ('next_graph_fact_id', ?1)",
-            rusqlite::params![next_graph_fact_id_sql],
-        )
-        .map_err(|e| format!("Write next graph fact ID: {e}"))?;
-
+        // Preserve the highest allocator value ever committed, including IDs of
+        // facts removed by this snapshot; never allow stale references to alias a
+        // different fact created after restart.
+        persist_graph_fact_id_high_water(&tx, Some(next_graph_fact_id))?;
         tx.commit()
             .map_err(|e| format!("Commit knowledge snapshot: {e}"))?;
         self.total_saved += (facts.len() + edges.len() + ontology.len()) as u64;
