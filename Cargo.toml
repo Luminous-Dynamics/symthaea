@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "xtask",
+    "tools/nano-admission",
     "crates/core/*",
     "crates/domains/*",
     "crates/bridges/*",
