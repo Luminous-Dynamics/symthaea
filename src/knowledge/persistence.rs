@@ -1163,12 +1163,29 @@ mod tests {
             is_a_parent: None,
         };
 
+        let duplicate_edge = CausalEdgeRecord {
+            strength: -0.8,
+            is_inhibitory: true,
+            ..stale_edge.clone()
+        };
         assert_eq!(
             persistence
-                .replace_knowledge_snapshot(&[fact.clone()], &[stale_edge], &[stale_primitive])
+                .replace_knowledge_snapshot(
+                    &[fact.clone()],
+                    &[stale_edge, duplicate_edge],
+                    &[stale_primitive],
+                )
                 .unwrap(),
-            (1, 1, 1)
+            (1, 2, 1)
         );
+        let deduplicated_edges = persistence.load_causal_edges().unwrap();
+        assert_eq!(
+            deduplicated_edges.len(),
+            1,
+            "duplicate in-memory cause/effect pairs share one persisted row"
+        );
+        assert_eq!(deduplicated_edges[0].strength, -0.8);
+        assert!(deduplicated_edges[0].is_inhibitory);
 
         let replacement_fact = FactRecord {
             source_text: "replacement live fact".into(),
