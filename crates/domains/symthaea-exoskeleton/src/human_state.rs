@@ -78,6 +78,12 @@ pub enum HumanStateEvidenceKind {
     Unknown,
 }
 
+/// Current release is intentionally simulation-only; callers cannot elevate it by configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HumanStateEvidenceLevel {
+    SimulationOnly,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HumanStateObservation {
     pub metric: HumanMetric,
@@ -189,6 +195,7 @@ pub struct FusedHumanMetric {
     pub status: HumanMetricStatus,
     /// None for unknown, invalid, or conflicted evidence. Never defaults to zero.
     pub value: Option<f64>,
+    /// Conservative declared-uncertainty envelope, not a calibrated statistical confidence interval.
     pub lower_bound: Option<f64>,
     pub upper_bound: Option<f64>,
     pub confidence: Option<f64>,
@@ -217,6 +224,7 @@ impl FusedHumanMetric {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HumanStateFusionReport {
     pub evaluated_at_s: f64,
+    pub evidence_level: HumanStateEvidenceLevel,
     pub metrics: Vec<FusedHumanMetric>,
     pub rejected_invalid_observations: usize,
     pub rejected_future_dated_observations: usize,
@@ -419,6 +427,7 @@ pub fn fuse_human_state(
 
     Ok(HumanStateFusionReport {
         evaluated_at_s,
+        evidence_level: HumanStateEvidenceLevel::SimulationOnly,
         metrics: fused_metrics,
         rejected_invalid_observations: rejected_invalid,
         rejected_future_dated_observations: rejected_future,
@@ -531,6 +540,7 @@ mod tests {
         assert_eq!(metric.status, HumanMetricStatus::Missing);
         assert_eq!(metric.value, None);
         assert_eq!(metric.evidence_kind, HumanStateEvidenceKind::Unknown);
+        assert_eq!(report.evidence_level, HumanStateEvidenceLevel::SimulationOnly);
     }
 
     #[test]
