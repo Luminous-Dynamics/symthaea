@@ -54,7 +54,9 @@ pub use encoding::{FactEncoding, KnowledgeEncoder, RoleBoundVector};
 pub use extraction::{
     EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, KnowledgeExtractor, SemanticRole,
 };
-pub use graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactId, TemporalFact};
+pub use graph::{
+    ContradictionAlert, EnhancedKnowledgeGraph, FactId, RoleObservationSearchResult, TemporalFact,
+};
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
 pub use reasoning_context::{
     CausalChain, EpistemicState, GroundedFact, KnowledgeQueryResult, ReasoningContext,
