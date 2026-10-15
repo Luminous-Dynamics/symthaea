@@ -558,15 +558,15 @@ pub fn compare_candidates(
         || candidate.intervals.iter().zip(&baseline.intervals).any(|(left, right)| {
             left.index != right.index
                 || left.phase != right.phase
-                || !approximately_equal(
+                || !time_equal_within_tolerance(
                     left.start_s,
                     right.start_s,
-                    cp_time_tolerance(candidate),
+                    candidate.evaluation_policy.time_continuity_tolerance_s,
                 )
-                || !approximately_equal(
+                || !time_equal_within_tolerance(
                     left.end_s,
                     right.end_s,
-                    cp_time_tolerance(candidate),
+                    candidate.evaluation_policy.time_continuity_tolerance_s,
                 )
         })
     {
@@ -692,8 +692,8 @@ pub fn compare_candidates(
     Ok(report)
 }
 
-fn cp_time_tolerance(run: &BenchmarkRun) -> f64 {
-    run.evaluation_policy.time_continuity_tolerance_s
+fn time_equal_within_tolerance(left: f64, right: f64, tolerance: f64) -> bool {
+    left.is_finite() && right.is_finite() && (left - right).abs() <= tolerance
 }
 
 fn efficiency_standard_uncertainty(
@@ -869,6 +869,15 @@ mod tests {
         let result = compare_candidates(&candidate, &baseline).unwrap();
         assert_eq!(result.decision, ComparisonDecision::Indeterminate);
         assert!(result.reason.unwrap().contains("independent standard uncertainties"));
+    }
+
+    #[test]
+    fn candidates_with_different_interval_schedules_cannot_be_compared() {
+        let (mut candidate, baseline) = comparison_runs();
+        candidate.intervals[1].end_s = 3500.0;
+        candidate.intervals[2].start_s = 3500.0;
+        let error = compare_candidates(&candidate, &baseline).unwrap_err();
+        assert!(error.issues.iter().any(|issue| issue.contains("interval schedules differ")));
     }
 
     #[test]
