@@ -29,7 +29,8 @@ use symthaea_core::hdc::unified_hv::{BinaryHV, HDC_DIMENSION};
 pub struct RoleBinding {
     pub role: SemanticRole,
     /// Surface text identifying the entity this vector encodes.
-    pub entity_text: String,
+    /// None denotes a legacy binding whose entity identity was not persisted.
+    pub entity_text: Option<String>,
     /// Role-bound entity/type vector, before it is bundled into the fact vector.
     pub vector: BinaryHV,
 }
@@ -188,7 +189,7 @@ impl KnowledgeEncoder {
                     let role_bound = role_basis.bind(&entity_typed);
                     role_vectors.push(RoleBinding {
                         role: *role,
-                        entity_text: entity.text.clone(),
+                        entity_text: Some(entity.text.clone()),
                         vector: role_bound.clone(),
                     });
                     components.push(role_bound);
