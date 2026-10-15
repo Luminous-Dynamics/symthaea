@@ -31,7 +31,7 @@ impl PlssTelemetryTrendConfig {
         Self {
             window_start_s: 0.0,
             window_end_s: 60.0,
-            maximum_gap_s: 20.0,
+            maximum_gap_s: 30.0,
             minimum_samples: 3,
             minimum_coverage_fraction: 0.50,
             cross_source_tolerances: PlssTelemetryTolerances {
@@ -480,6 +480,8 @@ fn digest_trend_input(observations: &[PlssTelemetryObservation]) -> String {
 
 fn digest_trend_report(report: &PlssTelemetryTrendReport) -> String {
     let mut h = HashWriter::new("symthaea.plss.telemetry.trend.result.v1");
+    h.string(&format!("{:?}", report.evidence_level));
+    h.usize(report.lanes.len());
     h.f64(report.config.window_start_s);
     h.f64(report.config.window_end_s);
     h.f64(report.config.maximum_gap_s);
@@ -580,6 +582,32 @@ mod tests {
         let lane = report.lane(PlssTelemetryMetric::GasTemperatureK, PlssTelemetrySourceKind::Instrument).unwrap();
         assert_eq!(lane.status, PlssTelemetryTrendStatus::InsufficientEvidence);
         assert_eq!(lane.source_trends[0].rate_per_s, None);
+    }
+
+    #[test]
+    fn excessive_internal_gap_prevents_slope_even_with_full_window_coverage() {
+        let mut cfg = config();
+        cfg.maximum_gap_s = 20.0;
+        let report = analyze_plss_telemetry_trends(
+            &[
+                obs(PlssTelemetryMetric::GasTemperatureK, 290.0, 0.0, "a"),
+                obs(PlssTelemetryMetric::GasTemperatureK, 291.0, 10.0, "a"),
+                obs(PlssTelemetryMetric::GasTemperatureK, 292.0, 60.0, "a"),
+            ],
+            cfg,
+        )
+        .unwrap();
+        let source = &report
+            .lane(
+                PlssTelemetryMetric::GasTemperatureK,
+                PlssTelemetrySourceKind::Instrument,
+            )
+            .unwrap()
+            .source_trends[0];
+        assert_eq!(source.status, PlssTelemetryTrendStatus::InsufficientEvidence);
+        assert_eq!(source.maximum_observed_gap_s, Some(50.0));
+        assert_eq!(source.temporal_coverage_fraction, Some(1.0));
+        assert_eq!(source.rate_per_s, None);
     }
 
     #[test]
