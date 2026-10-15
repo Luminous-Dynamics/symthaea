@@ -9,7 +9,8 @@
 //!
 //! Schema:
 //! - knowledge_facts: row id, graph_fact_id, vector_blob, source_text, confidence, domain, cycle, is_causal
-//! - knowledge_causal_edges: cause, effect, strength, cycle
+//! - knowledge_causal_edges: edge_id, cause, effect, strength, inhibition/negation flags,
+//!   source text, and discovery cycle; each row is one edge observation
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
