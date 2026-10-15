@@ -1429,9 +1429,7 @@ mod tests {
             db_path: Some(db_path.to_string_lossy().into_owned()),
             ..KnowledgeManagerConfig::default()
         });
-        let error = result
-            .err()
-            .expect("strict startup must reject invalid vector dimensions");
+        let error = result.err().expect("strict startup must reject invalid vector dimensions");
         assert!(
             error.contains("persisted facts") && error.contains("invalid hypervector length"),
             "unexpected error context: {error}"
