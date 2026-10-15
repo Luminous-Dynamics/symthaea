@@ -258,6 +258,63 @@ impl KnowledgePersistence {
         Ok(count)
     }
 
+    /// Atomically replace the persisted fact set with a complete graph snapshot.
+    ///
+    /// Unlike `save_facts`, repeated snapshots do not append duplicate copies.
+    /// The delete and inserts commit together, so any failed snapshot preserves
+    /// the previous committed fact set.
+    pub fn replace_facts_snapshot(&mut self, facts: &[FactRecord]) -> Result<usize, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let mut conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(|e| format!("Begin fact snapshot transaction: {e}"))?;
+
+        tx.execute("DELETE FROM knowledge_facts", [])
+            .map_err(|e| format!("Clear previous fact snapshot: {e}"))?;
+
+        let mut count = 0;
+        for fact in facts {
+            let cycle = i64::try_from(fact.cycle)
+                .map_err(|e| format!("Fact insertion cycle exceeds SQLite INTEGER range: {e}"))?;
+            let last_accessed_cycle = fact
+                .last_accessed_cycle
+                .map(i64::try_from)
+                .transpose()
+                .map_err(|e| format!("Fact last-access cycle exceeds SQLite INTEGER range: {e}"))?;
+
+            tx.execute(
+                "INSERT INTO knowledge_facts
+                 (vector_blob, source_text, confidence, domain, cycle, is_causal,
+                  initial_confidence, last_accessed_cycle, corroboration_count, contradiction_count)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params![
+                    fact.vector_bytes,
+                    fact.source_text,
+                    fact.confidence,
+                    fact.domain,
+                    cycle,
+                    fact.is_causal,
+                    fact.initial_confidence,
+                    last_accessed_cycle,
+                    fact.corroboration_count as i64,
+                    fact.contradiction_count as i64,
+                ],
+            )
+            .map_err(|e| format!("Insert fact snapshot row: {e}"))?;
+            count += 1;
+        }
+
+        tx.commit()
+            .map_err(|e| format!("Commit fact snapshot: {e}"))?;
+        self.total_saved += count as u64;
+        Ok(count)
+    }
+
     /// Load all fact records from the database.
     pub fn load_facts(&mut self) -> Result<Vec<FactRecord>, String> {
         if !self.is_configured() {
