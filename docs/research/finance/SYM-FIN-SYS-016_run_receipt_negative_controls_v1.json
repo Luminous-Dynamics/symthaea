@@ -154,6 +154,13 @@
       "pointer": "/run/scenario_registry_digest",
       "replacement_value": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       "validation_layer": "semantic_check"
+    },
+    {
+      "id": "SRC-SEM-012",
+      "description": "The receipt names a scenario absent from the versioned scenario catalogue.",
+      "pointer": "/run/scenario_id",
+      "replacement_value": "unregistered-scenario",
+      "validation_layer": "semantic_check"
     }
   ]
 }
