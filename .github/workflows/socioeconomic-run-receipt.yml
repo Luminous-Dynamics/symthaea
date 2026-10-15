@@ -8,6 +8,7 @@ on:
       - ".github/workflows/socioeconomic-run-receipt.yml"
       - ".github/workflows/ci.yml"
       - "docs/research/finance/SYM-FIN-SYS-016_run_receipt_*"
+      - "docs/research/finance/SYM-FIN-SYS-016_scenario_registry_v1.json"
       - "scripts/validate_socioeconomic_run_receipt.py"
       - "scripts/socioeconomic_run_receipt_requirements.txt"
   push:
@@ -17,6 +18,7 @@ on:
       - ".github/workflows/socioeconomic-run-receipt.yml"
       - ".github/workflows/ci.yml"
       - "docs/research/finance/SYM-FIN-SYS-016_run_receipt_*"
+      - "docs/research/finance/SYM-FIN-SYS-016_scenario_registry_v1.json"
       - "scripts/validate_socioeconomic_run_receipt.py"
       - "scripts/socioeconomic_run_receipt_requirements.txt"
   workflow_dispatch:
