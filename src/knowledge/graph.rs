@@ -12,7 +12,7 @@
 //! Science: Temporal knowledge graphs (Trivedi et al. 2017),
 //!          Belief revision (AGM theory, Alchourrón et al. 1985)
 
-use super::encoding::FactEncoding;
+use super::encoding::{FactEncoding, RoleBoundVector};
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
@@ -70,6 +70,20 @@ pub struct FactSearchResult {
     pub similarity: f32,
     /// Current confidence
     pub confidence: f32,
+}
+
+/// Result from matching typed role queries against all stored role observations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoleAwareSearchResult {
+    /// Stable graph fact identifier.
+    pub fact_id: FactId,
+    /// Mean matched cosine similarity, with unmatched query terms contributing zero.
+    /// This is a retrieval score, not calibrated epistemic confidence.
+    pub similarity: f32,
+    /// Current stored fact confidence, returned separately from retrieval similarity.
+    pub confidence: f32,
+    /// Number of query terms assigned a distinct stored observation.
+    pub matched_query_terms: usize,
 }
 
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
@@ -253,6 +267,97 @@ impl EnhancedKnowledgeGraph {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         results.truncate(k);
+        results
+    }
+
+    /// Search using typed role-bound query observations.
+    ///
+    /// Each query term can match only one stored observation and each stored
+    /// observation can satisfy only one query term. This preserves same-role
+    /// multiplicity: one stored Agent cannot satisfy two distinct Agent terms.
+    ///
+    /// Only same-role pairs with bipolar cosine similarity >= 0.1 are matched.
+    /// Similarity is a retrieval signal; confidence remains a separate field
+    /// and is not multiplied into the ranking score.
+    pub fn search_role_observations(
+        &mut self,
+        query: &[RoleBoundVector],
+        k: usize,
+        current_cycle: u64,
+    ) -> Vec<RoleAwareSearchResult> {
+        if query.is_empty() || k == 0 {
+            return Vec::new();
+        }
+
+        const MIN_ROLE_MATCH_COSINE: f32 = 0.1;
+        let mut results = Vec::new();
+
+        for fact in self.facts.values() {
+            let observations = &fact.encoding.role_vector_observations;
+            if observations.is_empty() {
+                continue;
+            }
+
+            let mut candidate_pairs = Vec::new();
+            for (query_index, query_term) in query.iter().enumerate() {
+                for (observation_index, observation) in observations.iter().enumerate() {
+                    if query_term.role != observation.role {
+                        continue;
+                    }
+                    let similarity = query_term.vector.cosine_similarity(&observation.vector);
+                    if similarity >= MIN_ROLE_MATCH_COSINE {
+                        candidate_pairs.push((similarity, query_index, observation_index));
+                    }
+                }
+            }
+
+            candidate_pairs.sort_by(|a, b| {
+                b.0.partial_cmp(&a.0)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.1.cmp(&b.1))
+                    .then_with(|| a.2.cmp(&b.2))
+            });
+
+            let mut query_used = vec![false; query.len()];
+            let mut observation_used = vec![false; observations.len()];
+            let mut matched_query_terms = 0usize;
+            let mut total_similarity = 0.0f32;
+
+            for (similarity, query_index, observation_index) in candidate_pairs {
+                if query_used[query_index] || observation_used[observation_index] {
+                    continue;
+                }
+                query_used[query_index] = true;
+                observation_used[observation_index] = true;
+                matched_query_terms += 1;
+                total_similarity += similarity;
+            }
+
+            if matched_query_terms > 0 {
+                results.push(RoleAwareSearchResult {
+                    fact_id: fact.id,
+                    similarity: total_similarity / query.len() as f32,
+                    confidence: fact.confidence,
+                    matched_query_terms,
+                });
+            }
+        }
+
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.matched_query_terms.cmp(&a.matched_query_terms))
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
+        });
+        results.truncate(k);
+
+        for result in &results {
+            if let Some(fact) = self.facts.get_mut(&result.fact_id) {
+                fact.last_accessed_cycle = current_cycle;
+            }
+        }
+
         results
     }
 
@@ -834,7 +939,8 @@ fn contains_negation(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::extraction::{ExtractedRelation, SemanticRole};
+    use super::super::encoding::KnowledgeEncoder;
+    use super::super::extraction::{EntityType, ExtractedRelation, SemanticRole};
     use super::super::persistence::KnowledgePersistence;
 
     fn make_encoding(text: &str, confidence: f32) -> FactEncoding {
@@ -860,6 +966,66 @@ mod tests {
         let results = graph.search(&query, 5, 2);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].fact_id, id);
+    }
+
+    #[test]
+    fn test_role_observation_search_uses_multiplicity_and_separate_confidence() {
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let mut encoder = KnowledgeEncoder::with_seed(42);
+        let query = encoder.encode_role_terms(&[
+            (
+                SemanticRole::Agent,
+                "United States",
+                EntityType::Organization,
+            ),
+            (
+                SemanticRole::Agent,
+                "European Union",
+                EntityType::Organization,
+            ),
+        ]);
+
+        let mut complete = make_encoding("complete two-agent fact", 0.35);
+        complete.role_vector_observations = query.clone();
+        let (complete_id, _) = graph.insert(complete, 1, None, false);
+
+        let mut partial = make_encoding("partial one-agent fact", 0.99);
+        partial.role_vector_observations = vec![query[0].clone()];
+        let (partial_id, _) = graph.insert(partial, 2, None, false);
+
+        let results = graph.search_role_observations(&query, 10, 3);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].fact_id, complete_id);
+        assert_eq!(results[0].matched_query_terms, 2);
+        assert!((results[0].similarity - 1.0).abs() < f32::EPSILON);
+        assert!((results[0].confidence - 0.35).abs() < f32::EPSILON);
+
+        let partial_result = results
+            .iter()
+            .find(|result| result.fact_id == partial_id)
+            .expect("one matching Agent should retain partial relevance");
+        assert_eq!(partial_result.matched_query_terms, 1);
+        assert!((partial_result.similarity - 0.5).abs() < f32::EPSILON);
+        assert!((partial_result.confidence - 0.99).abs() < f32::EPSILON);
+        assert!(results[0].similarity > partial_result.similarity);
+    }
+
+    #[test]
+    fn test_empty_role_observation_query_returns_no_results() {
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        graph.insert(make_encoding("any fact", 0.8), 1, None, false);
+        assert!(graph.search_role_observations(&[], 5, 2).is_empty());
+        assert!(graph
+            .search_role_observations(
+                &[RoleBoundVector {
+                    role: SemanticRole::Agent,
+                    entity_text: "missing".into(),
+                    vector: BinaryHV::random(404),
+                }],
+                0,
+                2
+            )
+            .is_empty());
     }
 
     #[test]
