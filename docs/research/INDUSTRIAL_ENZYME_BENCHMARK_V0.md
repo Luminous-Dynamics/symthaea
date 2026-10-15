@@ -72,7 +72,7 @@ For each file, I computed MD5 over the returned 7-bit ASCII payload and compared
 
 Across all five files, the independently fitted slopes differ from the embedded reported slopes by less than 4.8×10⁻¹³. The R² values match at the reported precision; RMSD differs only by floating-point rounding (no more than about 1.8×10⁻¹⁷ in these results). These are calibration statistics from the published JSON metadata/data, not new experimental findings. They demonstrate why the declared concentration window must be honored: the 25 °C file alone shows that including the three 200 µmol/L observations changes its zero-intercept slope from 0.018329862325174823 to 0.017570697786690438 and raises RMSD from 0.052531170831419005 to 0.09230840071343391.
 
-The official DaRUS record identifies version 1.0, reports CC BY 4.0, documents raw absorption data plus calibration JSON and EnzymeML `.omex` files across 25–45 °C, and publishes the file-level MD5 values shown above. The mirror README states its data are equivalent to the DaRUS deposit. SHA-256 was computed over each pinned mirror payload in memory using a known-answer-checked implementation; these values are recorded for later replay but are not yet frozen in a source manifest. The MD5 comparison is useful cross-repository integrity evidence, although MD5 is not collision-resistant. The new Rust command has **not** yet been run against these files because none was saved locally. After obtaining the canonical/versioned files through the authorized download path, run `sha256sum` on the local bytes and confirm each value matches the table before invoking the Rust command. This work does **not** yet reproduce absorbance extraction, calibration generation from raw readings, the EnzymeML kinetic fit, all five temperature-dependent kinetic models, or any enzyme-function prediction.
+The official DaRUS record identifies version 1.0, reports CC BY 4.0, documents raw absorption data plus calibration JSON and EnzymeML `.omex` files across 25–45 °C, and publishes the file-level MD5 values shown above. The mirror README states its data are equivalent to the DaRUS deposit. SHA-256 was computed over each pinned mirror payload in memory using a known-answer-checked implementation, and the SHA-256, Git blob SHA, byte length, and canonical DaRUS MD5 are now frozen as metadata in the five-file reference manifest below. MD5 is used only to compare the payload with published file metadata; it is not collision-resistant and is not the security anchor. The Rust command has not yet been run locally against a saved copy in this checkout. The dedicated workflow is configured to fetch the pinned payloads into its temporary runner workspace and execute synthetic tests plus the real-payload replay; only a completed successful run for the exact current head counts as CI verification. After obtaining the canonical/versioned files through the authorized download path, place them in the ignored local staging directory shown below and confirm each local SHA-256 matches the frozen manifest before invoking the command. This work does **not** yet reproduce absorbance extraction, calibration generation from raw readings, the EnzymeML kinetic fit, all five temperature-dependent kinetic models, or any enzyme-function prediction.
 
 The five-file machine-readable reference index is [SLAC_CALIBRATION_REFERENCE_MANIFEST.json](SLAC_CALIBRATION_REFERENCE_MANIFEST.json). It records, per file, the pinned mirror Git commit/blob, byte length, source SHA-256, canonical DaRUS MD5, declared fitting range, sample counts and reference fit statistics. It is explicitly labelled `reference_only_not_admitted` and contains metadata only—no calibration JSON payloads.
 
@@ -88,11 +88,11 @@ The suite verifies every file's byte length, SHA-256, Git blob SHA and canonical
 For a one-file diagnostic, the replay command is:
 
 ```sh
-sha256sum research-data/enzyme-benchmark/ABTS_standard_25.0C.json
+sha256sum research-data/enzyme-benchmark/slac-calibration/ABTS_standard_25.0C.json
 # Expected SHA-256 for the pinned mirror payload:
 # 39ccca8d0288e71f9ea686fdd19b96f04e6761e658a599fee108b897a3c20187
 cargo run -p xtask -- enzyme-calibration-check \
-  --input research-data/enzyme-benchmark/ABTS_standard_25.0C.json \
+  --input research-data/enzyme-benchmark/slac-calibration/ABTS_standard_25.0C.json \
   --sha256 39ccca8d0288e71f9ea686fdd19b96f04e6761e658a599fee108b897a3c20187
 ```
 
