@@ -592,7 +592,7 @@ impl EnhancedKnowledgeGraph {
         config: RoleObservationSearchConfig,
         policy: RelationConstraintSearchPolicy,
     ) -> RelationConstrainedSearchReport {
-        if query.is_empty() || k == 0 {
+        if k == 0 {
             return RelationConstrainedSearchReport {
                 decision: RelationConstrainedQueryDecision::AbstainNoCandidates,
                 candidates: Vec::new(),
@@ -600,13 +600,27 @@ impl EnhancedKnowledgeGraph {
             };
         }
 
+        let conflicting_evidence =
+            find_relation_conflicts(relation_constraints, self.facts.values());
+        let has_conflicting_evidence =
+            policy.abstain_on_conflicting_evidence() && !conflicting_evidence.is_empty();
+
+        if query.is_empty() {
+            return RelationConstrainedSearchReport {
+                decision: if has_conflicting_evidence {
+                    RelationConstrainedQueryDecision::AbstainConflictingEvidence
+                } else {
+                    RelationConstrainedQueryDecision::AbstainNoCandidates
+                },
+                candidates: Vec::new(),
+                conflicting_evidence,
+            };
+        }
+
         // Score candidates without changing recency; only the final returned
         // candidates should receive the existing access-refresh side effect.
         let all_results =
             self.search_role_observations_untracked(query, self.facts.len(), config);
-        let conflicting_evidence = find_relation_conflicts(relation_constraints, self.facts.values());
-        let has_conflicting_evidence =
-            policy.abstain_on_conflicting_evidence() && !conflicting_evidence.is_empty();
         let mut constrained = Vec::with_capacity(all_results.len());
 
         for retrieval in all_results {
@@ -634,7 +648,8 @@ impl EnhancedKnowledgeGraph {
                     .push(RelationConstraintAbstentionReason::RequiredRelationConstraintMissing);
             }
             if has_conflicting_evidence {
-                abstention_reasons.push(RelationConstraintAbstentionReason::ConflictingStoredEvidence);
+                abstention_reasons
+                    .push(RelationConstraintAbstentionReason::ConflictingStoredEvidence);
             }
             let decision = if abstention_reasons.is_empty() {
                 RelationConstraintDecision::EligibleForReview
@@ -2387,7 +2402,11 @@ mod tests {
         assert_eq!(results.candidates[0].matched_relation_constraints.len(), 1);
         assert!(results.candidates[0].unmatched_relation_constraints.is_empty());
 
-        let rejected: Vec<_> = results.candidates.iter().filter(|result| !result.constraints_satisfied).collect();
+        let rejected: Vec<_> = results
+            .candidates
+            .iter()
+            .filter(|result| !result.constraints_satisfied)
+            .collect();
         assert_eq!(rejected.len(), 5);
         for result in rejected {
             assert_eq!(result.relation_coverage, 0.0);
@@ -2451,12 +2470,19 @@ mod tests {
             RoleObservationSearchConfig::new(0.99).unwrap(),
         );
 
-        assert_eq!(report.decision, RelationConstrainedQueryDecision::AbstainConflictingEvidence);
+        assert_eq!(
+            report.decision,
+            RelationConstrainedQueryDecision::AbstainConflictingEvidence
+        );
         assert_eq!(report.conflicting_evidence.len(), 1);
         assert_eq!(report.conflicting_evidence[0].conflicting_fact_id, negative_id);
         assert!(!report.conflicting_evidence[0].query_is_negated);
         assert!(report.conflicting_evidence[0].stored_is_negated);
-        let positive_result = report.candidates.iter().find(|item| item.retrieval.fact_id == positive_id).unwrap();
+        let positive_result = report
+            .candidates
+            .iter()
+            .find(|item| item.retrieval.fact_id == positive_id)
+            .unwrap();
         assert!(positive_result.constraints_satisfied);
         assert_eq!(positive_result.decision, RelationConstraintDecision::Abstain);
         assert!(positive_result.abstention_reasons.contains(
