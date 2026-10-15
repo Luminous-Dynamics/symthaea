@@ -793,8 +793,8 @@ impl KnowledgeManager {
                 })
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
-            if let Err(e) = p.save_facts(&facts) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
+            if let Err(e) = p.replace_facts_snapshot(&facts) {
+                tracing::warn!(error = %e, "Knowledge persistence: failed to replace fact snapshot");
             }
             if let Err(e) = p.save_causal_edges(&edges) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
@@ -2019,6 +2019,49 @@ mod tests {
     }
 
     /// Processing interval: facts only extracted on-interval
+    #[test]
+    fn test_persist_snapshot_does_not_duplicate_existing_facts() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_idempotent_snapshot_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db").to_string_lossy().to_string();
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path),
+            ..Default::default()
+        };
+        let mut mgr = KnowledgeManager::new(config);
+        mgr.bootstrap_entities();
+        mgr.process("Sanctions caused oil shortage.", 1);
+
+        mgr.persist_snapshot();
+        let first = mgr
+            .persistence
+            .as_mut()
+            .expect("persistence configured")
+            .load_facts()
+            .expect("first snapshot should load");
+        assert_eq!(first.len(), mgr.graph().len());
+
+        mgr.persist_snapshot();
+        let second = mgr
+            .persistence
+            .as_mut()
+            .expect("persistence configured")
+            .load_facts()
+            .expect("second snapshot should load");
+        assert_eq!(
+            second.len(),
+            first.len(),
+            "repeated full snapshots must replace, not append, graph facts"
+        );
+        assert_eq!(second.len(), mgr.graph().len());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_processing_interval() {
         let config = KnowledgeManagerConfig {
