@@ -190,15 +190,14 @@ def main() -> int:
         print("FAIL: negative control corpus cases must be an array")
         return 1
 
+    failures: list[str] = []
     if len(cases) != len(EXPECTED_NEGATIVE_CONTROL_LAYERS):
-        print(
-            "FAIL: negative control corpus size changed: "
+        failures.append(
+            "negative control corpus size changed: "
             f"expected {len(EXPECTED_NEGATIVE_CONTROL_LAYERS)}, got {len(cases)}"
         )
-        # Continue inspecting entries to report missing/unknown/duplicate IDs as well.
 
     seen_case_ids: set[str] = set()
-    failures: list[str] = []
     checked_schema = 0
     checked_semantic = 0
 
