@@ -24,7 +24,7 @@ The digest must be stored in the separate run receipt or publication record; emb
 The top-level JSON object contains:
 
 - schema_version: 1, a non-empty graph_id, and status (draft or frozen).
-- rights_records: unique source-specific records with rights_record_id, source_id, license_id, attribution, and status. Accepted statuses are approved_for_this_use, review_pending, restricted, rejected, and unknown. These labels are declarations to audit, not legal determinations.
+- rights_records: unique source-specific records with rights_record_id, source_id, license_id, attribution, and status. Accepted statuses are approved_for_this_use, review_pending, restricted, rejected, and unknown. These labels are declarations to audit, not legal determinations. A successful transformation is blocked unless all its input and output artifacts have status approved_for_this_use; the checker enforces the recorded label, not whether the review itself was legally or scientifically correct.
 - artifacts: unique records with artifact_id, role, media_type, sha256, byte_length, locator, rights_record_id, and acquisition_status.
 - nodes: unique node_id, contract-listed type, its matching evidence_class, and artifact_ids (use an empty array when none are attached).
 - edges: unique edge_id, contract-listed type, from_node_id, and to_node_id.
