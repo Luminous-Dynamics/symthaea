@@ -305,17 +305,17 @@ fn inventory_tar_gz(path: &Path) -> Result<ArchiveInventory> {
             .clone()
             .unwrap_or_else(|| format!("<non-utf8-path-{index}>"));
 
-        if path_is_unsafe(&entry_path, path_text.as_deref())
-            || path_text.as_ref().is_some_and(|text| text.len() > MAX_MEMBER_PATH_BYTES)
-        {
+        let path_is_unsafe = path_is_unsafe(&entry_path, path_text.as_deref())
+            || path_text.as_ref().is_some_and(|text| text.len() > MAX_MEMBER_PATH_BYTES);
+        if path_is_unsafe {
             inventory.unsafe_member_paths.push(display_path.clone());
         }
-        if let Some(path) = path_text.as_ref() {
-            if !seen_paths.insert(path.clone()) {
-                inventory.duplicate_member_paths.push(path.clone());
+        if let Some(path) = path_text.as_deref() {
+            if let Some(normalized_path) = normalized_member_path(path) {
+                if !seen_paths.insert(normalized_path.clone()) {
+                    inventory.duplicate_member_paths.push(normalized_path);
+                }
             }
-        } else {
-            inventory.unsafe_member_paths.push(display_path.clone());
         }
 
         let top_level = path_text
@@ -390,6 +390,32 @@ fn path_is_unsafe(path: &Path, text: Option<&str>) -> bool {
     normalized.starts_with('/')
         || has_windows_drive_prefix
         || normalized.split('/').any(|component| component == "..")
+}
+
+fn normalized_member_path(path: &str) -> Option<String> {
+    let normalized = path.replace('\\', "/");
+    let has_windows_drive_prefix = normalized.as_bytes().get(1) == Some(&b':')
+        && normalized
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphabetic);
+    if normalized.starts_with('/') || has_windows_drive_prefix {
+        return None;
+    }
+
+    let mut components = Vec::new();
+    for component in normalized.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => return None,
+            other => components.push(other),
+        }
+    }
+    if components.is_empty() {
+        Some(".".to_owned())
+    } else {
+        Some(components.join("/"))
+    }
 }
 
 fn top_level_component(path: &str) -> &str {
@@ -503,6 +529,20 @@ mod tests {
         let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
         assert_eq!(inventory.duplicate_member_paths, vec!["train/repeated.txt"]);
         assert_eq!(status_for(true, Some(&inventory), true), "archive_structure_review_required");
+    }
+
+    #[test]
+    fn path_aliases_are_detected_as_duplicate_members() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("aliases.tar.gz");
+        write_fixture(
+            &archive_path,
+            &[("train/./a.txt", b"first"), ("train/a.txt", b"second")],
+        );
+
+        let inventory = inventory_tar_gz(&archive_path).expect("inventory archive");
+        assert_eq!(inventory.duplicate_member_paths, vec!["train/a.txt"]);
+        assert!(inventory.requires_review());
     }
 
     #[test]
