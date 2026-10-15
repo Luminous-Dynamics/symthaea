@@ -835,7 +835,10 @@ fn hermite_interpolate(frames: &[f32], idx: usize, frac: f32) -> f32 {
 /// The bowed/blown sustain instruments whose recorded ATTACK transient
 /// should be skipped on legato continuations. Plucked/struck timbres
 /// (harp, piano, guitar, mallets) are their attack — never skip those.
-#[cfg(not(target_arch = "wasm32"))]
+///
+/// This classification is also used by the browser's additive synthesis
+/// path, so keep it available on every target. It has no native-only
+/// dependencies; only the VCSL sample-loading path below is native-only.
 fn instrument_benefits_from_legato(instrument: Instrument) -> bool {
     matches!(
         instrument,
@@ -1227,6 +1230,33 @@ mod tests {
     use super::*;
     use crate::voice::{Arrangement, Voice, VoiceRole};
     use crate::{MuseConfig, MusicalState, Note, OutputFormat};
+
+    #[test]
+    fn legato_instrument_policy_is_cross_target() {
+        // Every currently admitted bowed/blown instrument stays available to
+        // the shared browser synthesis path.
+        for instrument in [
+            Instrument::Violin,
+            Instrument::Cello,
+            Instrument::Flute,
+            Instrument::Clarinet,
+            Instrument::Trumpet,
+        ] {
+            assert!(
+                instrument_benefits_from_legato(instrument),
+                "{instrument:?} should use legato continuation"
+            );
+        }
+
+        // Plucked/struck attacks must remain articulated rather than being
+        // softened as if a bow or breath were continuing.
+        for instrument in [Instrument::AcousticGuitar, Instrument::Piano] {
+            assert!(
+                !instrument_benefits_from_legato(instrument),
+                "{instrument:?} should retain its attack"
+            );
+        }
+    }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
