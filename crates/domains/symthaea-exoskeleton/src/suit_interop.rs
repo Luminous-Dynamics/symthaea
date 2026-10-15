@@ -341,7 +341,9 @@ fn compare_endpoint(
             matches!(peer.role, SuitInterfaceRole::Provider | SuitInterfaceRole::Bidirectional)
         }
         SuitInterfaceRole::Bidirectional => peer.role == SuitInterfaceRole::Bidirectional,
-        SuitInterfaceRole::Provider => true,
+        SuitInterfaceRole::Provider => {
+            matches!(peer.role, SuitInterfaceRole::Consumer | SuitInterfaceRole::Bidirectional)
+        }
     };
     if !compatible_roles {
         return fail(SuitInteropFindingStatus::InterfaceRoleMismatch);
