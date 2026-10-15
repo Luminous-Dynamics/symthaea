@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod enzyme_bench;
+mod enzyme_calibration;
 mod manifest;
 mod rhn_sweep;
 
@@ -69,6 +70,15 @@ enum Commands {
         #[arg(long)]
         manifest: PathBuf,
     },
+    /// Reproduce and verify one declared zero-intercept EnzymeML calibration fit.
+    EnzymeCalibrationCheck {
+        /// Path to the local calibration JSON artifact.
+        #[arg(long)]
+        input: PathBuf,
+        /// Expected SHA-256 of the exact input bytes.
+        #[arg(long)]
+        sha256: String,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -124,6 +134,9 @@ fn main() -> anyhow::Result<()> {
                 root.join(manifest)
             };
             enzyme_bench::check(&root, &manifest_path)?;
+        }
+        Commands::EnzymeCalibrationCheck { input, sha256 } => {
+            enzyme_calibration::check(&input, &sha256)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
