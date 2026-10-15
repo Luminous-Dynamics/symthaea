@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+/// Deterministic screening for essential-service continuity and recovery.
+pub mod resilient_service_screening;
+
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
 use symthaea_causal_reasoning::causal_calculus::StructuralCausalModel;
