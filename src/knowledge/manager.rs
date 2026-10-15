@@ -798,7 +798,7 @@ impl KnowledgeManager {
     pub fn persist_snapshot(&mut self) {
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
-            let edge_observations = self.causal_bridge.export_edge_records();
+            let edge_observations = self.causal_bridge.export_observations();
             let edges: Vec<CausalEdgeRecord> = edge_observations
                 .into_iter()
                 .map(|edge| CausalEdgeRecord {
