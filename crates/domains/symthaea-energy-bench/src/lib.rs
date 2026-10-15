@@ -814,7 +814,7 @@ pub fn compare_candidates(
         ComparisonDecision::LowerBoundDoesNotClearMargin
     };
     report.reason = Some(
-        "numerical result only; preregistration anchoring and physical validity are not authenticated"
+        "numeric result only; preregistration and physical validity remain unverified"
             .into()
     );
     Ok(report)
