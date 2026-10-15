@@ -598,12 +598,12 @@ fn is_context_qualified(conditions: &Value) -> bool {
         && metadata_field_is_reported(conditions, "reaction_equation")
         && metadata_field_is_reported(conditions, "kinetic_equation")
         && metadata_field_is_reported_or_reasoned_na(conditions, "assay_pressure")
-        && if metadata_field_is_reported(conditions, "buffer_system") {
+        && (if metadata_field_is_reported(conditions, "buffer_system") {
             metadata_field_is_reported(conditions, "buffer_concentration")
         } else {
             metadata_field_is_reasoned_not_applicable(conditions, "buffer_system")
                 && metadata_field_is_reasoned_not_applicable(conditions, "buffer_concentration")
-        }
+        })
 }
 
 fn is_primary_comparison_candidate(conditions: &Value) -> bool {
