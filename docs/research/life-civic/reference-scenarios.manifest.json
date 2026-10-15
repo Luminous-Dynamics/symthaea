@@ -1,13 +1,14 @@
 {
   "suite_id": "SYM-LIFE-CIVIC-REFERENCE-001",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "status": "research_fixture",
   "scenario_file": "docs/research/life-civic/reference-scenarios.json",
-  "scenario_git_blob_sha1": "df29b96497a4a1dfc0042d9853ee10eb79f962c0",
+  "scenario_git_blob_sha1": "574f6d3ba235c68e306f84f5ee761d399cc165b6",
   "digest_semantics": "Git blob SHA-1 binds exact repository object bytes for drift detection. It is not a signature, source-authenticity proof, or independent collision-resistant trust claim.",
   "claim_ceiling": [
-    "The scenario document is the pinned reference input for this branch revision.",
-    "Shape and boundary checks do not measure Symthaea reasoning accuracy."
+    "The scenario document is a pinned reference input for this branch revision.",
+    "Shape and boundary checks do not measure Symthaea reasoning accuracy.",
+    "City newsroom examples are synthetic summaries of attributed publisher claims; they are not captured observations or independent verification."
   ],
   "prohibited_inferences": [
     "benchmark passed",
@@ -24,6 +25,10 @@
     "a candidate contact channel proves that a civic request was submitted",
     "official cross-utility coordination statement proves incident-level causality",
     "historical public statement proves current service status",
-    "synthetic fixture timestamp is actual retrieval evidence"
+    "synthetic fixture timestamp is actual retrieval evidence",
+    "publisher-reported project progress proves commissioning or operational acceptance",
+    "announced traffic-signal/accessibility upgrades prove current uptime or independent safety impact",
+    "a clinic reopening announcement proves current staffing, supplies, daily availability or clinical outcomes",
+    "synthetic city-project fixture timestamps or null source digests are actual source-retrieval evidence"
   ]
 }
