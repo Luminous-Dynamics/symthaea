@@ -57,6 +57,7 @@ pub struct Boundary {
     pub upstream_scope: String,
     pub custom_scope_definition: Option<String>,
     pub energy_unit: String,
+    pub power_unit: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -71,6 +72,9 @@ pub struct Solver {
     pub version: String,
     pub code_revision: String,
     pub configuration_sha256: Option<String>,
+    pub model_fidelity: String,
+    pub random_seed: Option<i64>,
+    pub calibration_dataset_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -113,6 +117,7 @@ pub struct EvaluationPolicy {
     pub minimum_superiority_margin: f64,
     pub baseline_id: String,
     pub selection_rule: String,
+    pub comparison_metric_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -308,6 +313,11 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         || policy.selection_rule.trim().is_empty()
     {
         issues.push("policy ID, baseline ID, and selection rule must be non-empty".into());
+    }
+    if policy.comparison_metric_id != "net_cycle_efficiency" {
+        issues.push(
+            "benchmark contract v1 only supports comparison_metric_id=net_cycle_efficiency".into(),
+        );
     }
     if !run.mission.expected_duration_s.is_finite() || run.mission.expected_duration_s <= 0.0 {
         issues.push("mission expected duration must be finite and positive".into());
@@ -683,6 +693,19 @@ pub fn compare_candidates(
     {
         issues.push("candidate and baseline interval schedules differ".into());
     }
+    if candidate.solver.method != baseline.solver.method
+        || candidate.solver.version != baseline.solver.version
+        || candidate.solver.code_revision != baseline.solver.code_revision
+        || candidate.solver.model_fidelity != baseline.solver.model_fidelity
+        || candidate.solver.random_seed != baseline.solver.random_seed
+        || candidate.solver.calibration_dataset_ids != baseline.solver.calibration_dataset_ids
+    {
+        issues.push(
+            "candidate and baseline solver method/version/revision/fidelity or calibration data differ"
+                .into(),
+        );
+    }
+
     let cb = &candidate.boundary;
     let bb = &baseline.boundary;
     if cb.boundary_id != bb.boundary_id
@@ -693,6 +716,7 @@ pub fn compare_candidates(
         || cb.upstream_scope != bb.upstream_scope
         || cb.custom_scope_definition != bb.custom_scope_definition
         || cb.energy_unit != bb.energy_unit
+        || cb.power_unit != bb.power_unit
     {
         issues.push("candidate and baseline system boundaries differ".into());
     }
@@ -707,6 +731,7 @@ pub fn compare_candidates(
         || cp.minimum_superiority_margin != bp.minimum_superiority_margin
         || cp.selection_rule != bp.selection_rule
         || cp.baseline_id != bp.baseline_id
+        || cp.comparison_metric_id != bp.comparison_metric_id
     {
         issues.push("candidate and baseline evaluation policies differ".into());
     }
@@ -991,6 +1016,9 @@ mod tests {
         baseline.data_provenance[0].sha256 = Some("b".repeat(64));
         baseline.uncertainty.correlation_model = "independent".into();
         baseline.uncertainty.method = "test-only independent primitive uncertainties".into();
+        baseline.candidate.candidate_id = "registered-baseline".into();
+        baseline.evaluation_policy.baseline_id = baseline.candidate.candidate_id.clone();
+        baseline.evaluation_policy.comparison_metric_id = "net_cycle_efficiency".into();
         baseline.evaluation_policy.minimum_superiority_margin = 0.02;
 
         let mut candidate = baseline.clone();
@@ -1022,6 +1050,22 @@ mod tests {
         let result = compare_candidates(&candidate, &baseline).unwrap();
         assert_eq!(result.decision, ComparisonDecision::LowerBoundDoesNotClearMargin);
         assert!(result.conservative_lower_bound.unwrap() <= result.required_superiority_margin);
+    }
+
+    #[test]
+    fn v1_rejects_an_unimplemented_comparison_metric() {
+        let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
+        run.evaluation_policy.comparison_metric_id = "coefficient_of_performance".into();
+        let error = validate_run(&run).unwrap_err();
+        assert!(error.issues.iter().any(|issue| issue.contains("only supports comparison_metric_id")));
+    }
+
+    #[test]
+    fn candidate_and_baseline_solver_provenance_must_match() {
+        let (candidate, mut baseline) = comparison_runs();
+        baseline.solver.model_fidelity = "high_fidelity_simulation".into();
+        let error = compare_candidates(&candidate, &baseline).unwrap_err();
+        assert!(error.issues.iter().any(|issue| issue.contains("solver method/version/revision/fidelity")));
     }
 
     #[test]
