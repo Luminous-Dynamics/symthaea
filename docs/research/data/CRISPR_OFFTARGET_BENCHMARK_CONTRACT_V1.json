@@ -47,7 +47,6 @@
   "reported_reference_counts": {
     "raw_sequence_resolved_observations": 3827,
     "guide_cas9_combinations": 26,
-    "raw_observations_at_or_above_indel_threshold_percent": 0.1,
     "raw_positive_observations": 383,
     "collapsed_standard_tool_sites": 1806,
     "collapsed_standard_tool_positive_sites": 118,
@@ -59,7 +58,8 @@
     "positives_missing_before_seed_at_guide_sequence_chromosome_level": 46,
     "raw_positive_records_represented_by_missing_sites": 53,
     "coordinate_resolved_rows_added_for_positive_seed": 66,
-    "final_post_seed_universe_count": "must_be_reconstructed_from_exact_source_artifact"
+    "final_post_seed_universe_count": "must_be_reconstructed_from_exact_source_artifact",
+    "operational_indel_threshold_percent": 0.1
   },
   "metric_planes": [
     {
