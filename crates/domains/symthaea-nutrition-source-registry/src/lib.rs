@@ -1002,6 +1002,75 @@ mod tests {
     }
 
     #[test]
+    fn cache_written_permission_requires_a_cache_scoped_reference() {
+        let mut m = manifest();
+        m.permissions.cache = PermissionDecision::GrantedByWrittenPermission;
+        let result = assess(&m, &fact(), Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::CachePermissionReferenceMissing
+        }));
+    }
+
+    #[test]
+    fn transformation_written_permission_requires_a_transformation_scoped_reference() {
+        let mut m = manifest();
+        m.permissions.transform = PermissionDecision::GrantedByWrittenPermission;
+        let mut f = fact();
+        f.transformation_applied = true;
+        f.transformation_lineage = vec![NutritionTransformationStepV1 {
+            transformation_id: "fixture:cook-001".to_owned(),
+            from_food_state_id: "raw_edible".to_owned(),
+            to_food_state_id: "cooked_edible".to_owned(),
+            method_ref: "fixture:boiling-method-001".to_owned(),
+            evidence_ref: "fixture:cooking-evidence-001".to_owned(),
+        }];
+        let result = assess(&m, &f, Some(ARTIFACT));
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::TransformationPermissionReferenceMissing
+        }));
+    }
+
+    #[test]
+    fn public_fixture_written_permission_requires_a_fixture_scoped_reference() {
+        let mut m = manifest();
+        m.permissions.public_fixture = PermissionDecision::GrantedByWrittenPermission;
+        let mut use_case = use_request();
+        use_case.public_fixture = true;
+        let result = assess_nutrition_source(
+            &m,
+            &fact(),
+            EVALUATION_DATE,
+            &use_case,
+            Some(ARTIFACT),
+        );
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::PublicFixturePermissionReferenceMissing
+        }));
+    }
+
+    #[test]
+    fn redistribution_written_permission_requires_a_redistribution_scoped_reference() {
+        let mut m = manifest();
+        m.permissions.redistribute = PermissionDecision::GrantedByWrittenPermission;
+        let mut use_case = use_request();
+        use_case.public_fixture = true;
+        let result = assess_nutrition_source(
+            &m,
+            &fact(),
+            EVALUATION_DATE,
+            &use_case,
+            Some(ARTIFACT),
+        );
+        assert_eq!(result.license_eligibility, Eligibility::Blocked);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == RegistryIssueCode::RedistributionPermissionReferenceMissing
+        }));
+    }
+
+    #[test]
     fn public_fixture_requires_both_public_fixture_and_redistribution_rights() {
         let mut m = manifest();
         m.permissions.public_fixture = PermissionDecision::AllowedByLicense;
