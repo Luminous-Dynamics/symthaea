@@ -19,13 +19,17 @@
   ],
   "policy_rules": {
     "do_not_infer_missing_values": true,
-    "explicit_missingness_states": ["not_reported", "not_applicable"],
+    "explicit_missingness_states": [
+      "not_reported",
+      "not_applicable"
+    ],
     "not_applicable_requires_reason": true,
     "metadata_coverage_is_quality_score": false,
     "synthetic_fixtures_are_biological_evidence": false,
     "zero_or_nondetect_is_exact_kcat": false,
     "pool_multiple_sources_without_per_source_rights_review": false,
-    "eligibility_is_not_prediction_validation": true
+    "eligibility_is_not_prediction_validation": true,
+    "descriptive_coverage_counters_sum_to_observation_count": true
   },
   "tiers": [
     {
@@ -143,6 +147,66 @@
       "representation": "{\"status\":\"reported\",\"value\":HTTPS URL} or explicit missingness",
       "context_tier": "kinetic_reproduction_candidate",
       "validation": "raw data are preferred and needed for a full replay; a parameter table by itself does not satisfy this tier"
+    },
+    {
+      "field": "enzyme_purity",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty description} or explicit missingness",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "describe purity criterion and whether purified enzyme, preparation, or crude fraction was used; text is not independently verified"
+    },
+    {
+      "field": "enzyme_form",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty description} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "state whether concentration/turnover is relative to subunit, monomer, oligomer, or another defined catalyst entity"
+    },
+    {
+      "field": "buffer_system",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty description} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "identify buffer and counter-ion where available; if no buffer applies, use not_applicable with a reason"
+    },
+    {
+      "field": "buffer_concentration",
+      "representation": "{\"status\":\"reported\",\"value\":{\"value\":number,\"unit\":string}} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "positive finite value and unit when a buffer concentration is relevant"
+    },
+    {
+      "field": "assay_pressure",
+      "representation": "{\"status\":\"reported\",\"value\":{\"value\":number,\"unit\":string}} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "report non-atmospheric pressure; when ambient pressure is assumed, use not_applicable with explicit rationale"
+    },
+    {
+      "field": "kinetic_equation",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty model/equation description} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "identify the kinetic equation and variable definitions used to obtain kcat; this is distinct from a stoichiometrically balanced reaction equation"
+    },
+    {
+      "field": "replicate_count",
+      "representation": "{\"status\":\"reported\",\"value\":positive integer} or explicit missingness",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "record total replicate count separately from independent-experiment count and describe replicate structure"
+    },
+    {
+      "field": "detection_limit",
+      "representation": "{\"status\":\"reported\",\"value\":{\"value\":number,\"unit\":string}} or explicit missingness",
+      "context_tier": "conditional_for_nondetects",
+      "validation": "finite non-negative value with unit and documented estimation basis where no activity/binding is detected; nondetect is not kcat=0"
+    },
+    {
+      "field": "reaction_equation",
+      "representation": "{\"status\":\"reported\",\"value\":non-empty equation} or explicit missingness",
+      "context_tier": "context_qualified",
+      "validation": "report stoichiometrically balanced reaction and identify products; checker validates only non-empty text, not chemical balance"
+    },
+    {
+      "field": "analysis_method",
+      "representation": "{\"status\":\"reported\",\"value\":{\"software\":string,\"version\":string,\"method\":string}} or explicit missingness",
+      "context_tier": "primary_comparison_candidate",
+      "validation": "identify analysis software, version and method; structural shape does not validate the algorithm"
     }
   ],
   "cohort_handling": {
