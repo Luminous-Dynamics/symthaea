@@ -646,6 +646,10 @@ pub struct SampleDirectoryEvidenceV1 {
     pub audio_decode_status: &'static str,
     pub decoded_sample_file_count: usize,
     pub failed_sample_decode_count: usize,
+    /// Bounded, path-sorted diagnostics for failed indexed WAVs; names only, never absolute paths.
+    pub reported_sample_decode_failures: Vec<SampleDecodeFailureV1>,
+    /// Number of failed indexed WAVs omitted after the diagnostic limit.
+    pub omitted_sample_decode_failure_count: usize,
     /// Fully decoded files whose peak absolute sample value is <= 1e-5.
     pub silent_sample_file_count: usize,
     /// Distinct sample rates/channels across files that fully decoded.
@@ -919,16 +923,31 @@ fn sample_directory_evidence(
         audio_decode_status,
         decoded_sample_file_count: audio_audit.decoded_sample_file_count,
         failed_sample_decode_count: audio_audit.failed_sample_decode_count,
+        reported_sample_decode_failures: audio_audit.reported_sample_decode_failures,
+        omitted_sample_decode_failure_count: audio_audit.omitted_sample_decode_failure_count,
         silent_sample_file_count: audio_audit.silent_sample_file_count,
         distinct_sample_rate_count: audio_audit.sample_rates.len(),
         distinct_channel_count: audio_audit.channel_counts.len(),
     })
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct SampleDecodeFailureV1 {
+    /// The indexed WAV's file name only; absolute asset-root paths are excluded.
+    pub file_name: String,
+    /// Bounded decoder diagnostic useful for locating malformed or truncated data.
+    pub reason: String,
+}
+
+const MAX_REPORTED_SAMPLE_DECODE_FAILURES: usize = 20;
+const MAX_SAMPLE_DECODE_REASON_CHARS: usize = 200;
+
 #[derive(Default)]
 struct IndexedSampleAudioAudit {
     decoded_sample_file_count: usize,
     failed_sample_decode_count: usize,
+    reported_sample_decode_failures: Vec<SampleDecodeFailureV1>,
+    omitted_sample_decode_failure_count: usize,
     silent_sample_file_count: usize,
     sample_rates: std::collections::BTreeSet<u32>,
     channel_counts: std::collections::BTreeSet<u16>,
@@ -950,7 +969,30 @@ fn audit_indexed_sample_audio(bank: Option<&InstrumentBank>) -> IndexedSampleAud
                     audit.silent_sample_file_count += 1;
                 }
             }
-            Err(_) => audit.failed_sample_decode_count += 1,
+            Err(error) => {
+                audit.failed_sample_decode_count += 1;
+                if audit.reported_sample_decode_failures.len()
+                    < MAX_REPORTED_SAMPLE_DECODE_FAILURES
+                {
+                    let file_name = sample
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into_owned();
+                    let reason = error
+                        .to_string()
+                        .chars()
+                        .take(MAX_SAMPLE_DECODE_REASON_CHARS)
+                        .collect();
+                    audit.reported_sample_decode_failures.push(SampleDecodeFailureV1 {
+                        file_name,
+                        reason,
+                    });
+                } else {
+                    audit.omitted_sample_decode_failure_count += 1;
+                }
+            }
         }
     }
     audit
@@ -2121,6 +2163,13 @@ mod tests {
         assert_eq!(mapping.audio_decode_status, "some_indexed_files_failed_decode");
         assert_eq!(mapping.decoded_sample_file_count, 2);
         assert_eq!(mapping.failed_sample_decode_count, 1);
+        assert_eq!(mapping.reported_sample_decode_failures.len(), 1);
+        assert_eq!(
+            mapping.reported_sample_decode_failures[0].file_name,
+            "Harp_D4_vl3.wav"
+        );
+        assert!(!mapping.reported_sample_decode_failures[0].reason.is_empty());
+        assert_eq!(mapping.omitted_sample_decode_failure_count, 0);
         assert_eq!(mapping.silent_sample_file_count, 1);
         assert_eq!(mapping.distinct_sample_rate_count, 1);
         assert_eq!(mapping.distinct_channel_count, 1);
