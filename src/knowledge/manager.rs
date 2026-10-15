@@ -26,6 +26,7 @@ use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
 use super::graph::{
     ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult, RoleAwareSearchResult,
+    RoleObservationSearchConfig,
 };
 use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord};
 use super::reasoning_context::{KnowledgeQueryResult, ReasoningContext};
@@ -796,9 +797,30 @@ impl KnowledgeManager {
         role_terms: &[(super::extraction::SemanticRole, &str, EntityType)],
         k: usize,
     ) -> Vec<RoleAwareSearchResult> {
+        self.search_with_role_terms_and_config(
+            role_terms,
+            k,
+            RoleObservationSearchConfig::default(),
+        )
+    }
+
+    /// Search with an explicit validated role-observation policy.
+    ///
+    /// This enables controlled threshold sweeps and domain-specific evaluation
+    /// without changing the default retrieval behavior.
+    pub fn search_with_role_terms_and_config(
+        &mut self,
+        role_terms: &[(super::extraction::SemanticRole, &str, EntityType)],
+        k: usize,
+        config: RoleObservationSearchConfig,
+    ) -> Vec<RoleAwareSearchResult> {
         let query = self.encoder.encode_role_terms(role_terms);
-        self.graph
-            .search_role_observations(&query, k, self.current_cycle)
+        self.graph.search_role_observations_with_config(
+            &query,
+            k,
+            self.current_cycle,
+            config,
+        )
     }
 
     /// Search the knowledge graph with a pre-composed HDC query
