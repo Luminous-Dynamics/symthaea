@@ -4,7 +4,7 @@
 
 **Research track:** [SX-026 — deterministic PLSS telemetry trend analysis](https://github.com/Luminous-Dynamics/symthaea/issues/7495).
 
-**Implementation:** see the SX-026 draft pull request stacked on SX-025.
+**Implementation:** [SX-026 draft PR #7498](https://github.com/Luminous-Dynamics/symthaea/pull/7498), stacked on [SX-025 PR #7482](https://github.com/Luminous-Dynamics/symthaea/pull/7482).
 
 ## Why trend analysis is separate
 
