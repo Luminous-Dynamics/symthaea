@@ -16,9 +16,9 @@ Exit codes:
 - 0: compressed artifact identity matches the upstream MD5 and archive inventory is structurally ordinary; status is still artifact_integrity_verified_pending_schema.
 - 2: upstream MD5 mismatch.
 - 3: duplicate path, unsafe path, or special file entry requires review.
-- 4: archive could not be parsed/fully streamed as tar.gz, or its decompressed-byte/member-count budget was exceeded.
+- 4: archive could not be parsed/fully streamed as tar.gz, or its decompressed-byte/member-count/member-path metadata budget was exceeded.
 - 5: the measured file contents changed between the initial hash and the post-inventory hash.
-- 1: argument, input, or output error prevented receipt creation.
+- 1: argument, input, compressed-size limit, or output error prevented receipt creation.
 
 The JSON receipt embeds the pinned source-document commit, advertised artifact URL, upstream-reported checksum/license, locally measured byte size and hashes, and inventory diagnostics. Archives with a mismatching MD5 are deliberately not parsed. Do not treat upstream-reported license/checksum information as local artifact proof. The output path must be new: an existing file, symlink, or hard-link path is refused rather than overwritten, and receipt creation uses exclusive create to close the preflight/write race. Choose a fresh `--output` path for each run.
 
