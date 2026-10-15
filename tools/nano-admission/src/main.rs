@@ -5,8 +5,8 @@ use md5::{Digest, Md5};
 use serde::Serialize;
 use sha2::Sha256;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, File};
-use std::io::{self, Read};
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -179,8 +179,7 @@ fn run() -> Result<ExitCode> {
     };
 
     let output = serde_json::to_vec_pretty(&receipt).context("could not serialize receipt")?;
-    fs::write(&cli.output, output)
-        .with_context(|| format!("could not write receipt {}", cli.output.display()))?;
+    write_receipt_new(&cli.output, &output)?;
 
     println!("status={}", receipt.status);
     println!("archive_bytes={}", receipt.artifact.byte_size_before_inspection);
@@ -204,15 +203,42 @@ fn reject_same_input_and_output(input: &Path, output: &Path) -> Result<()> {
     if input == output {
         bail!("input archive and receipt output cannot be the same path");
     }
-    if output.exists() {
-        let input_canonical = fs::canonicalize(input)
-            .with_context(|| format!("could not resolve input path {}", input.display()))?;
-        let output_canonical = fs::canonicalize(output)
-            .with_context(|| format!("could not resolve output path {}", output.display()))?;
-        if input_canonical == output_canonical {
-            bail!("input archive and receipt output resolve to the same file");
+
+    // Refuse every pre-existing destination, not just paths that canonicalize to
+    // the same string. Distinct hard-link paths can identify the same file, and
+    // canonicalize alone does not detect that alias. create_new in the writer
+    // below also closes the check/write race.
+    match fs::symlink_metadata(output) {
+        Ok(_) => bail!(
+            "receipt output already exists; refusing to overwrite it: {}",
+            output.display()
+        ),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("could not inspect receipt output {}", output.display()));
         }
     }
+    Ok(())
+}
+
+fn write_receipt_new(path: &Path, bytes: &[u8]) -> Result<()> {
+    let mut output = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .with_context(|| {
+            format!(
+                "could not create receipt {} without overwriting an existing path",
+                path.display()
+            )
+        })?;
+    output
+        .write_all(bytes)
+        .with_context(|| format!("could not write receipt {}", path.display()))?;
+    output
+        .sync_all()
+        .with_context(|| format!("could not sync receipt {}", path.display()))?;
     Ok(())
 }
 
@@ -501,6 +527,22 @@ mod tests {
             .expect("finish tar")
             .finish()
             .expect("finish gzip");
+    }
+
+    #[test]
+    fn existing_hard_link_output_is_refused_without_modifying_the_archive() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let archive_path = directory.path().join("archive.tar.gz");
+        let output_path = directory.path().join("receipt.json");
+        fs::write(&archive_path, b"preserve these archive bytes").expect("write archive fixture");
+        fs::hard_link(&archive_path, &output_path).expect("create output hard link");
+
+        assert!(reject_same_input_and_output(&archive_path, &output_path).is_err());
+        assert!(write_receipt_new(&output_path, b"{\"status\":\"unsafe\"}").is_err());
+        assert_eq!(
+            fs::read(&archive_path).expect("read archive after refusal"),
+            b"preserve these archive bytes"
+        );
     }
 
     #[test]
