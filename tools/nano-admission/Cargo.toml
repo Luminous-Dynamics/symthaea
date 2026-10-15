@@ -13,7 +13,7 @@ flate2 = "=1.1.9"
 md-5 = "=0.10.6"
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { version = "=0.10.9", features = ["oid"] }
+sha2 = "=0.10.9"
 tar = "=0.4.46"
 
 [dev-dependencies]
