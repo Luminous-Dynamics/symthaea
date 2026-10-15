@@ -96,6 +96,57 @@ fn validate_result(value: f64, name: &'static str) -> Result<(), ScreeningError>
     }
 }
 
+/// Conditional weakest-link calculation for a population of manufactured features.
+///
+/// This models the probability that at least one feature exceeds a defined defect criterion when
+/// every feature has the same declared exceedance probability and all feature events are independent.
+/// It is not a shell-failure probability, and it is not an empirical estimate unless the supplied
+/// per-feature probability is supported by representative manufacturing/inspection data.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FeatureDefectPopulationResult {
+    pub feature_count: u64,
+    pub per_feature_exceedance_probability: f64,
+    pub probability_at_least_one_feature_exceeds_criterion: f64,
+}
+
+/// Screen how a per-feature defect-tail probability scales with the number of manufactured features.
+///
+/// The identical-independent-feature assumption is strong: common-cause manufacturing drift,
+/// spatial correlation, inspection bias, and feature-to-feature heterogeneity are not represented.
+/// The probability is conditional on supplied input, not a measured property of the candidate.
+pub fn screen_feature_defect_population(
+    feature_count: u64,
+    per_feature_exceedance_probability: f64,
+) -> Result<FeatureDefectPopulationResult, ScreeningError> {
+    if feature_count == 0 {
+        return Err(ScreeningError::MustBePositive("feature_count"));
+    }
+    validate_finite(
+        per_feature_exceedance_probability,
+        "per_feature_exceedance_probability",
+    )?;
+    if !(0.0..=1.0).contains(&per_feature_exceedance_probability) {
+        return Err(ScreeningError::FractionOutOfRange(
+            "per_feature_exceedance_probability",
+        ));
+    }
+
+    // 1 - (1 - p)^N, evaluated with ln_1p/exp_m1 to reduce cancellation for small p.
+    let probability_at_least_one_feature_exceeds_criterion = -((feature_count as f64)
+        * (-per_feature_exceedance_probability).ln_1p())
+    .exp_m1();
+    validate_result(
+        probability_at_least_one_feature_exceeds_criterion,
+        "feature-population exceedance probability",
+    )?;
+
+    Ok(FeatureDefectPopulationResult {
+        feature_count,
+        per_feature_exceedance_probability,
+        probability_at_least_one_feature_exceeds_criterion,
+    })
+}
+
 /// Exact sphere volume for a positive radius, useful for an initial reference geometry.
 pub fn sphere_volume_m3(radius_m: f64) -> Result<f64, ScreeningError> {
     validate_positive(radius_m, "radius_m")?;
@@ -1683,6 +1734,30 @@ pub enum EvidenceManifestGateState {
     ContentAddressed,
 }
 
+/// Completeness of the component-level mass ledger and reconciliation against reality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VehicleMassLedgerGateState {
+    Incomplete,
+    ComponentCompleteUnreconciled,
+    ReconciledToMeasuredOrBuildEstimate,
+}
+
+/// Evidence that scaling from analyzed specimens to the intended vehicle size is justified.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScaleTransferGateState {
+    Unassessed,
+    AnalyticalScalingOnly,
+    ValidatedAcrossRelevantScaleRange,
+}
+
+/// Characterization maturity for the tail of the manufacturing-defect population.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DefectPopulationGateState {
+    Uncharacterized,
+    SingleSpecimenOrSmallSampleOnly,
+    CharacterizedForTargetManufacturingPopulation,
+}
+
 /// Declared maturity profile used to find blockers before a candidate is promoted to review.
 ///
 /// Every state is supplied by the caller. This function does not inspect files, authenticate
@@ -1699,6 +1774,9 @@ pub struct CandidateEvidenceGateProfile {
     pub damage_tolerance: DamageToleranceGateState,
     pub operating_envelope: OperatingEnvelopeGateState,
     pub evidence_manifest: EvidenceManifestGateState,
+    pub vehicle_mass_ledger: VehicleMassLedgerGateState,
+    pub scale_transfer: ScaleTransferGateState,
+    pub defect_population: DefectPopulationGateState,
 }
 
 /// Fail-closed outcome of the candidate evidence-gap assessment.
@@ -1758,6 +1836,19 @@ pub fn assess_candidate_evidence_gates(
     }
     if profile.evidence_manifest != EvidenceManifestGateState::ContentAddressed {
         blockers.push("evidence_manifest_not_content_addressed");
+    }
+    if profile.vehicle_mass_ledger
+        != VehicleMassLedgerGateState::ReconciledToMeasuredOrBuildEstimate
+    {
+        blockers.push("vehicle_mass_ledger_not_reconciled");
+    }
+    if profile.scale_transfer != ScaleTransferGateState::ValidatedAcrossRelevantScaleRange {
+        blockers.push("scale_transfer_not_validated");
+    }
+    if profile.defect_population
+        != DefectPopulationGateState::CharacterizedForTargetManufacturingPopulation
+    {
+        blockers.push("manufacturing_defect_population_not_characterized");
     }
 
     let status = match profile.mass_budget {
@@ -2900,6 +2991,47 @@ mod tests {
         );
     }
 
+    #[test]
+    fn feature_defect_population_probability_increases_with_population_size() {
+        let small = screen_feature_defect_population(270, 0.0001).unwrap();
+        let large = screen_feature_defect_population(10_000, 0.0001).unwrap();
+        assert!(small.probability_at_least_one_feature_exceeds_criterion > 0.0);
+        assert!(large.probability_at_least_one_feature_exceeds_criterion
+            > small.probability_at_least_one_feature_exceeds_criterion);
+        assert!((small.probability_at_least_one_feature_exceeds_criterion - 0.02664).abs() < 0.00001);
+        assert!((large.probability_at_least_one_feature_exceeds_criterion - 0.63214).abs() < 0.00001);
+    }
+
+    #[test]
+    fn feature_defect_population_probability_handles_probability_endpoints() {
+        assert_eq!(
+            screen_feature_defect_population(10, 0.0).unwrap()
+                .probability_at_least_one_feature_exceeds_criterion,
+            0.0
+        );
+        assert_eq!(
+            screen_feature_defect_population(10, 1.0).unwrap()
+                .probability_at_least_one_feature_exceeds_criterion,
+            1.0
+        );
+    }
+
+    #[test]
+    fn feature_defect_population_probability_rejects_invalid_input() {
+        assert_eq!(
+            screen_feature_defect_population(0, 0.1).unwrap_err(),
+            ScreeningError::MustBePositive("feature_count")
+        );
+        assert_eq!(
+            screen_feature_defect_population(10, 1.1).unwrap_err(),
+            ScreeningError::FractionOutOfRange("per_feature_exceedance_probability")
+        );
+        assert_eq!(
+            screen_feature_defect_population(10, f64::NAN).unwrap_err(),
+            ScreeningError::NonFiniteInput("per_feature_exceedance_probability")
+        );
+    }
+
     fn complete_candidate_evidence_profile() -> CandidateEvidenceGateProfile {
         CandidateEvidenceGateProfile {
             mass_budget: MassBudgetStatus::RobustlyNonNegative,
@@ -2910,6 +3042,9 @@ mod tests {
             damage_tolerance: DamageToleranceGateState::DemonstratedByTestWithinDeclaredEnvelope,
             operating_envelope: OperatingEnvelopeGateState::DefinedAndIndependentlyReviewed,
             evidence_manifest: EvidenceManifestGateState::ContentAddressed,
+            vehicle_mass_ledger: VehicleMassLedgerGateState::ReconciledToMeasuredOrBuildEstimate,
+            scale_transfer: ScaleTransferGateState::ValidatedAcrossRelevantScaleRange,
+            defect_population: DefectPopulationGateState::CharacterizedForTargetManufacturingPopulation,
         }
     }
 
@@ -2960,6 +3095,19 @@ mod tests {
         );
         assert!(result.blockers.contains(&"independent_structural_review_missing"));
         assert!(result.blockers.contains(&"evidence_manifest_not_content_addressed"));
+    }
+
+    #[test]
+    fn candidate_gate_requires_mass_reconciliation_scale_transfer_and_defect_tail() {
+        let mut profile = complete_candidate_evidence_profile();
+        profile.vehicle_mass_ledger = VehicleMassLedgerGateState::ComponentCompleteUnreconciled;
+        profile.scale_transfer = ScaleTransferGateState::AnalyticalScalingOnly;
+        profile.defect_population = DefectPopulationGateState::SingleSpecimenOrSmallSampleOnly;
+        let result = assess_candidate_evidence_gates(profile);
+        assert_eq!(result.status, CandidateEvidenceGateStatus::EvidenceGapsRemain);
+        assert!(result.blockers.contains(&"vehicle_mass_ledger_not_reconciled"));
+        assert!(result.blockers.contains(&"scale_transfer_not_validated"));
+        assert!(result.blockers.contains(&"manufacturing_defect_population_not_characterized"));
     }
 
     #[test]
