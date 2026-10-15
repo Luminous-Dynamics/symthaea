@@ -83,7 +83,7 @@ cargo run -p xtask -- enzyme-calibration-suite-check \
   --manifest docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json
 ```
 
-The suite verifies every file's byte length, SHA-256, Git blob SHA and canonical MD5, rejects paths escaping the workspace, recomputes each zero-intercept fit under its declared range, and compares sample counts plus slope/R²/RMSD against frozen references. Its status remains explicitly non-admitted; passing calibration checks is not approval for the predictive benchmark.
+The suite verifies every file's byte length, SHA-256, Git blob SHA and canonical MD5, rejects paths escaping the workspace, recomputes each zero-intercept fit under its declared range, and compares sample counts plus slope/R²/RMSD against frozen references. The dedicated GitHub Actions workflow now downloads the five files from the immutable mirror commit into its temporary job workspace, prints DaRUS attribution, runs the synthetic Rust tests, then runs this suite command against the real payloads; the source files are never committed by this workflow. Its manifest status remains explicitly non-admitted; a passing calibration check is not approval for the predictive benchmark.
 
 For a one-file diagnostic, the replay command is:
 
