@@ -1629,11 +1629,52 @@ mod tests {
         )
         .unwrap();
         drop(conn);
-
         let error = persistence.load_facts().unwrap_err();
         assert!(
             error.contains("invalid hypervector length"),
             "corrupt role observations must fail closed: {error}"
+        );
+        assert_eq!(persistence.total_loaded(), 0);
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_role_observations
+             SET role_key = 'future_role', vector_blob = ?1",
+            rusqlite::params![vec![0x5Au8; BinaryHV::BYTES]],
+        )
+        .unwrap();
+        drop(conn);
+        let error = persistence.load_facts().unwrap_err();
+        assert!(
+            error.contains("unknown persisted semantic role key"),
+            "unknown role keys must fail closed: {error}"
+        );
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_role_observations SET role_key = 'agent', ordinal = 1",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+        let error = persistence.load_facts().unwrap_err();
+        assert!(
+            error.contains("begin at ordinal 1"),
+            "a nonzero first ordinal must fail closed: {error}"
+        );
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_role_observations
+             SET fact_row_id = 99999, ordinal = 0",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+        let error = persistence.load_facts().unwrap_err();
+        assert!(
+            error.contains("Role-vector observation rows refer to missing fact row 99999"),
+            "orphan observation rows must fail closed: {error}"
         );
         assert_eq!(persistence.total_loaded(), 0);
 
