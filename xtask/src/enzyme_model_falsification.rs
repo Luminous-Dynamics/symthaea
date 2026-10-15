@@ -10,6 +10,8 @@ use std::path::Path;
 
 const RECOVERY_SUBSTRATES: &[f64] = &[0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0];
 const RECOVERY_NOISE: &[f64] = &[0.01, -0.02, 0.01, -0.015, 0.005, -0.01, 0.02, -0.005];
+const INHIBITION_SUBSTRATES: &[f64] = &[0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0];
+const INHIBITION_NOISE: &[f64] = &[0.01, -0.02, 0.01, -0.015, 0.005, -0.01, 0.02, -0.005, 0.015];
 const EXISTING_SUBSTRATES: &[f64] = &[0.1, 0.25, 0.5, 1.0];
 const CANDIDATE_SUBSTRATES: &[f64] = &[2.0, 5.0, 10.0, 20.0, 50.0, 100.0];
 const OBSERVATION_SD: f64 = 2.0;
@@ -26,6 +28,16 @@ struct MichaelisMentenFit {
     vmax: f64,
     km: f64,
     rmse: f64,
+    sse: f64,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SubstrateInhibitionFit {
+    vmax: f64,
+    km: f64,
+    ki: f64,
+    rmse: f64,
+    sse: f64,
 }
 
 fn michaelis_menten(substrate: f64, vmax: f64, km: f64) -> f64 {
@@ -52,6 +64,7 @@ fn fit_michaelis_menten_grid(observations: &[Observation]) -> MichaelisMentenFit
         vmax: f64::NAN,
         km: f64::NAN,
         rmse: f64::INFINITY,
+        sse: f64::INFINITY,
     };
 
     // Integer-indexed grids avoid accumulated floating-point loop drift and include (100, 2).
@@ -67,12 +80,72 @@ fn fit_michaelis_menten_grid(observations: &[Observation]) -> MichaelisMentenFit
                 })
                 .sum::<f64>();
             let rmse = (squared_error / observations.len() as f64).sqrt();
-            if rmse < best.rmse {
-                best = MichaelisMentenFit { vmax, km, rmse };
+            if squared_error < best.sse {
+                best = MichaelisMentenFit {
+                    vmax,
+                    km,
+                    rmse,
+                    sse: squared_error,
+                };
             }
         }
     }
     best
+}
+
+fn build_inhibition_observations() -> Vec<Observation> {
+    INHIBITION_SUBSTRATES
+        .iter()
+        .zip(INHIBITION_NOISE.iter())
+        .map(|(&substrate, &noise)| Observation {
+            substrate,
+            rate: substrate_inhibition(substrate, 100.0, 2.0, 20.0) + noise,
+        })
+        .collect()
+}
+
+fn fit_substrate_inhibition_grid(observations: &[Observation]) -> SubstrateInhibitionFit {
+    let mut best = SubstrateInhibitionFit {
+        vmax: f64::NAN,
+        km: f64::NAN,
+        ki: f64::NAN,
+        rmse: f64::INFINITY,
+        sse: f64::INFINITY,
+    };
+
+    // The fixture truth (100, 2, 20) is included in these fixed grids.
+    for vmax_index in 0..=80 {
+        let vmax = 80.0 + vmax_index as f64 * 0.5;
+        for km_index in 0..=180 {
+            let km = 0.5 + km_index as f64 * 0.025;
+            for ki_index in 0..=75 {
+                let ki = 5.0 + ki_index as f64;
+                let squared_error = observations
+                    .iter()
+                    .map(|obs| {
+                        let residual =
+                            obs.rate - substrate_inhibition(obs.substrate, vmax, km, ki);
+                        residual * residual
+                    })
+                    .sum::<f64>();
+                if squared_error < best.sse {
+                    best = SubstrateInhibitionFit {
+                        vmax,
+                        km,
+                        ki,
+                        rmse: (squared_error / observations.len() as f64).sqrt(),
+                        sse: squared_error,
+                    };
+                }
+            }
+        }
+    }
+    best
+}
+
+fn bic(sse: f64, observation_count: usize, parameter_count: usize) -> f64 {
+    let n = observation_count as f64;
+    n * (sse / n).ln() + parameter_count as f64 * n.ln()
 }
 
 fn relative_error(estimated: f64, truth: f64) -> f64 {
@@ -96,6 +169,33 @@ fn build_report() -> Result<Value> {
         "synthetic Km recovery relative error {:.4} exceeds {:.2}%",
         km_relative_error,
         RELATIVE_RECOVERY_LIMIT * 100.0
+    );
+
+    // Model-family selection on two intentionally separable synthetic truths. BIC is used here
+    // only as a fixture criterion; this does not establish real-data selection calibration.
+    let mm_truth_mm_fit = fit_michaelis_menten_grid(&observations);
+    let mm_truth_inhibition_fit = fit_substrate_inhibition_grid(&observations);
+    let mm_truth_delta_bic = bic(mm_truth_mm_fit.sse, observations.len(), 2)
+        - bic(mm_truth_inhibition_fit.sse, observations.len(), 3);
+    ensure!(
+        mm_truth_delta_bic < -10.0,
+        "MM-truth fixture should favor Michaelis-Menten by delta BIC < -10, got {mm_truth_delta_bic}"
+    );
+
+    let inhibition_observations = build_inhibition_observations();
+    let inhibition_truth_mm_fit = fit_michaelis_menten_grid(&inhibition_observations);
+    let inhibition_truth_inhibition_fit =
+        fit_substrate_inhibition_grid(&inhibition_observations);
+    let inhibition_truth_delta_bic =
+        bic(inhibition_truth_mm_fit.sse, inhibition_observations.len(), 2)
+            - bic(
+                inhibition_truth_inhibition_fit.sse,
+                inhibition_observations.len(),
+                3,
+            );
+    ensure!(
+        inhibition_truth_delta_bic > 10.0,
+        "substrate-inhibition truth fixture should favor substrate inhibition by delta BIC > 10, got {inhibition_truth_delta_bic}"
     );
 
     // Model discrimination uses two frozen hypotheses, not fitted or externally validated models.
@@ -221,6 +321,29 @@ fn build_report() -> Result<Value> {
             "prespecified_max_relative_error": RELATIVE_RECOVERY_LIMIT,
             "fixture_gate_passed": true
         },
+        "model_selection_falsification": {
+            "method": "Bayesian Information Criterion (BIC), lower is preferred",
+            "delta_definition": "BIC(Michaelis-Menten) - BIC(substrate inhibition); negative favors Michaelis-Menten, positive favors substrate inhibition",
+            "decisive_fixture_gate": "absolute delta BIC > 10 in both known-truth separable scenarios",
+            "michaelis_menten_truth": {
+                "truth": {"vmax": 100.0, "km": 2.0},
+                "observation_count": observations.len(),
+                "michaelis_menten_fit": {"vmax": mm_truth_mm_fit.vmax, "km": mm_truth_mm_fit.km, "rmse": mm_truth_mm_fit.rmse, "bic": bic(mm_truth_mm_fit.sse, observations.len(), 2)},
+                "substrate_inhibition_fit": {"vmax": mm_truth_inhibition_fit.vmax, "km": mm_truth_inhibition_fit.km, "ki": mm_truth_inhibition_fit.ki, "rmse": mm_truth_inhibition_fit.rmse, "bic": bic(mm_truth_inhibition_fit.sse, observations.len(), 3)},
+                "delta_bic_mm_minus_inhibition": mm_truth_delta_bic,
+                "selected_model": "michaelis_menten"
+            },
+            "substrate_inhibition_truth": {
+                "truth": {"vmax": 100.0, "km": 2.0, "ki": 20.0},
+                "observation_count": inhibition_observations.len(),
+                "michaelis_menten_fit": {"vmax": inhibition_truth_mm_fit.vmax, "km": inhibition_truth_mm_fit.km, "rmse": inhibition_truth_mm_fit.rmse, "bic": bic(inhibition_truth_mm_fit.sse, inhibition_observations.len(), 2)},
+                "substrate_inhibition_fit": {"vmax": inhibition_truth_inhibition_fit.vmax, "km": inhibition_truth_inhibition_fit.km, "ki": inhibition_truth_inhibition_fit.ki, "rmse": inhibition_truth_inhibition_fit.rmse, "bic": bic(inhibition_truth_inhibition_fit.sse, inhibition_observations.len(), 3)},
+                "delta_bic_mm_minus_inhibition": inhibition_truth_delta_bic,
+                "selected_model": "substrate_inhibition"
+            },
+            "fixture_gate_passed": true,
+            "warning": "Two deliberately separable in-sample synthetic cases; not model-selection calibration or evidence for a real enzyme mechanism."
+        },
         "model_discrimination_design": {
             "objective": "maximize squared prediction separation normalized by a fixed assumed measurement SD",
             "existing_conditions": EXISTING_SUBSTRATES,
@@ -284,6 +407,27 @@ mod tests {
         assert!(relative_error(fit.vmax, 100.0) <= RELATIVE_RECOVERY_LIMIT);
         assert!(relative_error(fit.km, 2.0) <= RELATIVE_RECOVERY_LIMIT);
         assert!(fit.rmse.is_finite());
+    }
+
+    #[test]
+    fn information_criterion_selects_each_generating_family_on_separable_truth_fixtures() {
+        let report = build_report().unwrap();
+        assert_eq!(
+            report["model_selection_falsification"]["michaelis_menten_truth"]["selected_model"],
+            "michaelis_menten"
+        );
+        assert_eq!(
+            report["model_selection_falsification"]["substrate_inhibition_truth"]["selected_model"],
+            "substrate_inhibition"
+        );
+        assert!(
+            report["model_selection_falsification"]["michaelis_menten_truth"]["delta_bic_mm_minus_inhibition"]
+                .as_f64().unwrap() < -10.0
+        );
+        assert!(
+            report["model_selection_falsification"]["substrate_inhibition_truth"]["delta_bic_mm_minus_inhibition"]
+                .as_f64().unwrap() > 10.0
+        );
     }
 
     #[test]
