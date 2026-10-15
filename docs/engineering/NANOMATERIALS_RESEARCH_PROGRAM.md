@@ -5,7 +5,8 @@
 **Tracking:** [NANO-001 #7453](https://github.com/Luminous-Dynamics/symthaea/issues/7453)  
 **Parent research boundary:** [MAT-HYPOTHESIS-001 #5254](https://github.com/Luminous-Dynamics/symthaea/issues/5254)  
 **Date:** 2026-10-15  
-**Initial data-admission companion:** [NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md](./NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md)  
+**Initial data-admission companion:** [NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md](./NANOMATERIALS_OC22_ADMISSION_CHECKLIST.md)
+**Cross-domain strategy:** [NANOTECHNOLOGY_FRONTIER_PORTFOLIO.md](./NANOTECHNOLOGY_FRONTIER_PORTFOLIO.md) — staged opportunities beyond the initial OC22 benchmark.  
 **Checkpoint eligibility gate:** [NANO-001C #7465](https://github.com/Luminous-Dynamics/symthaea/issues/7465)
 
 ## 1. Mission
