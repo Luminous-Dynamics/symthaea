@@ -82,7 +82,13 @@ fn replay_versioned_corpus_and_independently_verify_receipt() {
     .expect("synthetic revision is only a test fixture for revision-binding semantics");
     assert_eq!(report, report_from_receipt_api);
     assert_eq!(receipt.source_revision, SYNTHETIC_REVISION);
-    assert_eq!(receipt.input_observation_count, corpus.observations.len());
+    assert_eq!(receipt.input_observation_count, 12);
+    // Locked expectations make accidental corpus drift visible in review.
+    assert_eq!(receipt.accepted_source_metric_pairs, 7);
+    assert_eq!(receipt.rejected_invalid_observations, 1);
+    assert_eq!(receipt.rejected_future_dated_observations, 1);
+    assert_eq!(receipt.excluded_stale_observations, 1);
+    assert_eq!(receipt.excluded_low_confidence_observations, 1);
 
     // Independent verifier: don't trust the production digest helper to verify
     // its own outputs. Recompute the defined canonical byte stream here.
