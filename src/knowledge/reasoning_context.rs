@@ -161,7 +161,7 @@ impl ReasoningContext {
                         alert.similarity,
                     ),
                     _ => format!(
-                        "Contradiction alert references unavailable fact record(s)                          (new={}, existing={}, similarity {:.2})",
+                        "Contradiction alert references unavailable fact record(s) (new={}, existing={}, similarity {:.2})",
                         alert.new_fact_id, alert.existing_fact_id, alert.similarity,
                     ),
                 }
@@ -224,8 +224,8 @@ impl ReasoningContext {
         let chain_roots: Vec<&str> = causal_chains.iter().map(|c| c.root.as_str()).collect();
         for i in 0..chain_roots.len() {
             for j in (i + 1)..chain_roots.len() {
-                let confounders = manager.detect_confounders(chain_roots[i], chain_roots[j]);
-                for (confounder, strength) in &confounders {
+                let candidates = manager.detect_confounders(chain_roots[i], chain_roots[j]);
+                for (confounder, strength) in &candidates {
                     if *strength > thresholds::KNOWLEDGE_CONFOUNDER_STRENGTH_THRESHOLD {
                         confounders.push(format!(
                             "'{}' (strength {:.2}) may cause both '{}' and '{}'",
