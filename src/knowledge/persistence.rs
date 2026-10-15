@@ -15,8 +15,10 @@
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
+use std::collections::HashMap;
 use std::path::Path;
 use rusqlite::OptionalExtension;
+use super::extraction::{ExtractedRelation, SemanticRole};
 use symthaea_core::hdc::unified_hv::BinaryHV;
 
 /// Knowledge persistence layer backed by SQLite.
@@ -48,6 +50,8 @@ pub struct FactRecord {
     pub cycle: u64,
     /// Whether the fact contains causal relations
     pub is_causal: bool,
+    /// Structured extracted relations, retained separately from the lossy HDC bundle.
+    pub relations: Vec<ExtractedRelation>,
     /// Stable graph-level identity; absent for rows written before this field existed.
     pub graph_fact_id: Option<u64>,
     /// Confidence assigned at insertion; absent for rows written by older schemas.
@@ -181,6 +185,110 @@ fn next_graph_fact_id_after_records(
                 .ok_or_else(|| "Cannot advance allocator past maximum graph fact ID".to_string())
         })
         .transpose()
+}
+
+fn decode_semantic_role(value: String, column_index: usize) -> rusqlite::Result<SemanticRole> {
+    SemanticRole::from_storage_key(&value).ok_or_else(|| {
+        invalid_column_data(
+            column_index,
+            rusqlite::types::Type::Text,
+            format!("unknown persisted semantic role key: {value}"),
+        )
+    })
+}
+
+fn insert_fact_relations(
+    conn: &rusqlite::Connection,
+    fact_row_id: i64,
+    relations: &[ExtractedRelation],
+) -> Result<(), String> {
+    for (ordinal, relation) in relations.iter().enumerate() {
+        if !relation.confidence.is_finite() || !(0.0..=1.0).contains(&relation.confidence) {
+            return Err(format!(
+                "Invalid extracted-relation confidence outside [0, 1] for fact row {fact_row_id}: {}",
+                relation.confidence
+            ));
+        }
+        let ordinal = i64::try_from(ordinal)
+            .map_err(|e| format!("Relation ordinal exceeds SQLite INTEGER range: {e}"))?;
+        conn.execute(
+            "INSERT INTO knowledge_fact_relations
+             (fact_row_id, ordinal, subject, predicate, object, subject_role, object_role,
+              is_causal, is_negated, confidence)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            rusqlite::params![
+                fact_row_id,
+                ordinal,
+                relation.subject,
+                relation.predicate,
+                relation.object,
+                relation.subject_role.storage_key(),
+                relation.object_role.storage_key(),
+                relation.is_causal,
+                relation.is_negated,
+                relation.confidence,
+            ],
+        )
+        .map_err(|e| format!("Insert structured fact relation: {e}"))?;
+    }
+    Ok(())
+}
+
+fn load_fact_relations(
+    conn: &rusqlite::Connection,
+) -> Result<HashMap<i64, Vec<ExtractedRelation>>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT fact_row_id, ordinal, subject, predicate, object, subject_role, object_role,
+                    is_causal, is_negated, confidence
+             FROM knowledge_fact_relations
+             ORDER BY fact_row_id, ordinal",
+        )
+        .map_err(|e| format!("Prepare structured fact relations: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let confidence = decode_confidence(row.get(9)?, 9)?;
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, i64>(1)?,
+                ExtractedRelation {
+                    subject: row.get(2)?,
+                    predicate: row.get(3)?,
+                    object: row.get(4)?,
+                    subject_role: decode_semantic_role(row.get(5)?, 5)?,
+                    object_role: decode_semantic_role(row.get(6)?, 6)?,
+                    is_causal: row.get(7)?,
+                    is_negated: row.get(8)?,
+                    confidence,
+                },
+            ))
+        })
+        .map_err(|e| format!("Query structured fact relations: {e}"))?;
+    let decoded = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Decode structured fact relations: {e}"))?;
+    let mut by_fact: HashMap<i64, Vec<ExtractedRelation>> = HashMap::new();
+    let mut previous: HashMap<i64, i64> = HashMap::new();
+    for (fact_row_id, ordinal, relation) in decoded {
+        if fact_row_id <= 0 || ordinal < 0 {
+            return Err(format!(
+                "Invalid structured-relation key: fact row {fact_row_id}, ordinal {ordinal}"
+            ));
+        }
+        if let Some(previous_ordinal) = previous.insert(fact_row_id, ordinal) {
+            if ordinal <= previous_ordinal {
+                return Err(format!(
+                    "Non-increasing relation ordinal for fact row {fact_row_id}: {ordinal}"
+                ));
+            }
+        } else if ordinal != 0 {
+            return Err(format!(
+                "Structured relations for fact row {fact_row_id} begin at ordinal {ordinal}, expected 0"
+            ));
+        }
+        by_fact.entry(fact_row_id).or_default().push(relation);
+    }
+    Ok(by_fact)
 }
 
 fn decode_optional_graph_fact_id(
@@ -914,6 +1022,20 @@ impl KnowledgePersistence {
                 corroboration_count INTEGER NOT NULL DEFAULT 0,
                 contradiction_count INTEGER NOT NULL DEFAULT 0,
                 graph_fact_id INTEGER
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_fact_relations (
+                fact_row_id INTEGER NOT NULL,
+                ordinal INTEGER NOT NULL,
+                subject TEXT NOT NULL,
+                predicate TEXT NOT NULL,
+                object TEXT NOT NULL,
+                subject_role TEXT NOT NULL,
+                object_role TEXT NOT NULL,
+                is_causal INTEGER NOT NULL,
+                is_negated INTEGER NOT NULL,
+                confidence REAL NOT NULL,
+                PRIMARY KEY (fact_row_id, ordinal),
+                FOREIGN KEY (fact_row_id) REFERENCES knowledge_facts(id) ON DELETE CASCADE
             );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
                 edge_id INTEGER PRIMARY KEY AUTOINCREMENT,
