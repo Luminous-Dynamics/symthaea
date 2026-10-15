@@ -163,5 +163,8 @@
     "random_seed",
     "oracle_version",
     "claim_ceiling"
+  ],
+  "scenario_ids": [
+    "mixed-regime-essential-service-smoke"
   ]
 }
