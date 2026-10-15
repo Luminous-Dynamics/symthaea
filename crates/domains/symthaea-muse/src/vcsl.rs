@@ -1290,6 +1290,61 @@ mod tests {
         );
     }
 
+    fn soundfont_fixture(presets: &[(&str, u16, u16)]) -> Vec<u8> {
+        fn append_record(
+            output: &mut Vec<u8>,
+            name: &str,
+            program: u16,
+            bank: u16,
+            bag_index: u16,
+        ) {
+            let mut record = [0u8; 38];
+            let name_bytes = name.as_bytes();
+            let copy_len = name_bytes.len().min(20);
+            record[..copy_len].copy_from_slice(&name_bytes[..copy_len]);
+            record[20..22].copy_from_slice(&program.to_le_bytes());
+            record[22..24].copy_from_slice(&bank.to_le_bytes());
+            record[24..26].copy_from_slice(&bag_index.to_le_bytes());
+            output.extend_from_slice(&record);
+        }
+
+        let mut phdr = Vec::new();
+        for (index, (name, bank, program)) in presets.iter().enumerate() {
+            append_record(&mut phdr, name, *program, *bank, index as u16);
+        }
+        append_record(&mut phdr, "EOP", 0, 0, presets.len() as u16);
+
+        let mut pdta_list = b"pdta".to_vec();
+        pdta_list.extend_from_slice(b"phdr");
+        pdta_list.extend_from_slice(&(phdr.len() as u32).to_le_bytes());
+        pdta_list.extend_from_slice(&phdr);
+
+        let mut riff_payload = b"sfbk".to_vec();
+        riff_payload.extend_from_slice(b"LIST");
+        riff_payload.extend_from_slice(&(pdta_list.len() as u32).to_le_bytes());
+        riff_payload.extend_from_slice(&pdta_list);
+
+        let mut file = b"RIFF".to_vec();
+        file.extend_from_slice(&(riff_payload.len() as u32).to_le_bytes());
+        file.extend_from_slice(&riff_payload);
+        file
+    }
+
+    #[test]
+    fn invalid_soundfont_is_rejected_instead_of_reporting_no_presets() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-instrument-inventory-invalid-sf2-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let soundfont = root.join("not-a-soundfont.sf2");
+        std::fs::write(&soundfont, b"not a RIFF soundfont").unwrap();
+
+        let error = soundfont_evidence(&soundfont).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn inventory_counts_only_files_accepted_by_the_declared_indexer() {
         let root = std::env::temp_dir().join(format!(
@@ -1306,7 +1361,13 @@ mod tests {
         std::fs::write(harp_dir.join("not-a-pitch-file.wav"), []).unwrap();
         std::fs::create_dir_all(&vsco2_root).unwrap();
         let soundfont = root.join("fixture.sf2");
-        std::fs::write(&soundfont, b"soundfont-fixture-bytes").unwrap();
+        let soundfont_bytes = soundfont_fixture(&[
+            ("Grand Piano", 0, 0),
+            ("Violin", 0, 40),
+            ("Alternate Violin", 0, 40),
+            ("Percussion", 128, 0),
+        ]);
+        std::fs::write(&soundfont, &soundfont_bytes).unwrap();
 
         let inventory = capability_inventory(&vcsl_root, &vsco2_root, Some(&soundfont)).unwrap();
         assert!(inventory.vcsl_root.root_present);
@@ -1326,12 +1387,26 @@ mod tests {
 
         let soundfont_evidence = inventory.soundfont.as_ref().unwrap();
         assert_eq!(soundfont_evidence.file_name, "fixture.sf2");
-        assert_eq!(soundfont_evidence.size_bytes, b"soundfont-fixture-bytes".len() as u64);
-        let expected_digest = Sha256::digest(b"soundfont-fixture-bytes");
+        assert_eq!(soundfont_evidence.size_bytes, soundfont_bytes.len() as u64);
+        let expected_digest = Sha256::digest(&soundfont_bytes);
         assert_eq!(
             soundfont_evidence.sha256,
             hex_digest(&expected_digest[..])
         );
+        let presets = &soundfont_evidence.preset_inventory;
+        assert_eq!(presets.status, "preset_headers_parsed_not_renderability");
+        assert_eq!(presets.declared_preset_count, 4);
+        assert_eq!(presets.declared_bank_count, 2);
+        assert_eq!(presets.duplicate_bank_program_slots, 1);
+        assert_eq!(presets.presets[0].name, "Grand Piano");
+        assert_eq!(presets.presets[0].bank, 0);
+        assert_eq!(presets.presets[0].program, 0);
+        assert!(presets.presets.iter().any(|preset| {
+            preset.name == "Violin" && preset.bank == 0 && preset.program == 40
+        }));
+        assert!(presets.presets.iter().any(|preset| {
+            preset.name == "Percussion" && preset.bank == 128 && preset.program == 0
+        }));
         std::fs::remove_dir_all(root).unwrap();
     }
 
