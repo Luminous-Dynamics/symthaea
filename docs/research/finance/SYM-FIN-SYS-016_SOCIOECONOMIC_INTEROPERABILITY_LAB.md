@@ -459,3 +459,7 @@ Keep the following relations machine-visible:
 ### Evidence status
 
 The schema, illustrative fixture, negative-control corpus and test-only validator are reference artifacts. Exact validator dependency versions are pinned. The draft-PR-capable job in the existing CI workflow checks out the exact pull-request head; the standalone workflow is retained for future maintenance/dispatch. Until one of these exact-head executions completes successfully, the schema/fixture pair is not qualified as a validated interchange format. The example metrics are synthetic placeholders, not observed results and not evidence for the efficacy of any regime.
+
+## 17. Qualification benchmarks and targets
+
+The staged qualification ladder, proposed numerical thresholds, reproducibility requirements, adversarial campaign sizes and provisional performance targets are specified in [SYM-FIN-SYS-016_BENCHMARK_TARGETS.md](SYM-FIN-SYS-016_BENCHMARK_TARGETS.md). These are targets, not measured results; the document separates current receipt-checker evidence from unexecuted simulator campaigns.

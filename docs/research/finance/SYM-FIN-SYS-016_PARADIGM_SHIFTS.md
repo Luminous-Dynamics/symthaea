@@ -92,3 +92,7 @@ The intended architecture is a **capability floor with bounded actions**, not a 
 - JSON Schema, [Specification](https://json-schema.org/specification) (current version listed as 2020-12).
 
 This note is a testable research direction, not a claim that the proposed system is fair, correct, production-ready, or proven to improve real economies.
+
+## Benchmark targets
+
+The research lab now has a staged qualification contract: receipt controls; exact-byte artifact provenance; deterministic replay; accounting/capacity/authority invariants; cross-regime common-seed experiments; adversarial recovery; and pinned-runner performance budgets. See [SYM-FIN-SYS-016_BENCHMARK_TARGETS.md](SYM-FIN-SYS-016_BENCHMARK_TARGETS.md). The 12,000-run baseline/shock campaign, 16,800-run directed interoperability campaign and performance thresholds are proposed future targets, not completed benchmarks.
