@@ -41,6 +41,9 @@ This patch replaces both shortcuts with explicitly dimensioned, finite-capacity 
 
 - All numeric reference values remain tagged `Simulation`.
 - Non-finite derived mass-balance quantities are rejected rather than converted to zero.
+- Oxygen inventories, residual gas/water state, and the thermal store are checked for finite, in-range state before a step is accepted.
+- Oxygen allocation is planned against both usable inventories before either one is mutated. An insufficient-supply error does not partially drain primary or secondary oxygen.
+- Thermal arithmetic (including source summation and step integration) is checked before inventory or gas/water mutation. The established `NoThermalPath` semantics remain explicit: the modeled segment exchange is recorded, then the unavailable independent cooling path is reported.
 - Negative oxygen/CO2 generation rates and negative metabolic input values are invalid.
 - CO2 removal cannot exceed available modeled CO2; capture cannot exceed the declared rate or remaining capacity.
 - Humidity removal cannot exceed the available modeled water vapor, declared rate, or remaining collector capacity.
@@ -58,9 +61,24 @@ The PLSS and integrated EVA regression suites now include:
 5. Failed scrubber/ventilation paths are represented conservatively.
 6. Humidity removal is capped by finite condensate-storage capacity and failed control lets vapor accumulate.
 7. Overflowing humidity input is rejected before oxygen inventory is consumed.
-8. Mission preflight refuses a segment when current or projected bulk-circuit pressure exceeds the synthetic ceiling.
+8. Insufficient total oxygen leaves both inventories unchanged.
+9. Heat-source summation and thermal step-integration overflow are rejected before model state mutation.
+10. Mission preflight refuses a segment when current or projected bulk-circuit pressure exceeds the synthetic ceiling.
 
 These tests are intended to prove arithmetic/accounting invariants. They do not validate suitability of chosen rates/capacities or establish human safety.
+
+## Validation strategy informed by external test evidence
+
+NASA's integrated PLSS testbed work evaluates subsystem behavior under varying metabolic rate, suit pressure, ventilation flow, transient/contingency operation, and system interactions. Published PLSS breadboard testing also reports boundary anomalies involving CO2/water-vapor saturation, degraded vacuum quality, fan control, and thermal valve response. The implication for this software model is concrete: a scalar removal-rate fit is not enough. Future calibration must preserve coupled operating conditions and include adverse boundary points.
+
+Recommended staged acceptance:
+1. **Software invariants:** exact-head Rust tests, property tests for mass/resource bounds, state-unchanged assertions on rejected numerical steps, and deterministic fault campaigns. These establish accounting semantics only.
+2. **Component maps:** characterize scrubber/collector removal rates across inlet CO2 and water loading, flow, temperature, pressure, and remaining capacity; preserve the source data, instrument calibration, uncertainty, and raw runs.
+3. **Integrated loop:** sweep metabolic gas/water load, ventilation flow, circuit pressure/temperature, thermal rejection, and transient faults together. Test fan degradation, sorbent/collector saturation, valve or flow-path anomalies, and recovery behavior.
+4. **Inspired-CO2 validation:** use a validated suit/helmet flow and breathing model plus the standardized human-in-the-loop CO2 washout method; do not substitute the bulk-circuit estimate for PICO2.
+5. **Independent review:** require an independent verifier to consume versioned raw measurements and model parameters, recreate the fit and holdout errors, and issue a receipt tied to exact source/data hashes before any quantitative performance claim.
+
+External research: [NASA PLSS 1.0 development/testing report](https://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/20120007410.pdf), [NASA PLSS 1.0 breadboard development and results](https://ntrs.nasa.gov/citations/20120004300), [active NASA-STD-3001 Volume 2 Revision F](https://standards.nasa.gov/node/237), and [NASA's standardized PICO2 measurement method (2026)](https://ntrs.nasa.gov/citations/20260001545).
 
 ## Required next steps before quantitative use
 
