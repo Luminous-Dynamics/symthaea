@@ -893,7 +893,7 @@ mod tests {
             obs(PlssTelemetryMetric::GasTemperatureK, 292.0, 60.0, "a"),
         ];
         let mut changed = first.clone();
-        changed[2].value = 292.5;
+        changed[1].value = 291.5;
         let (_, first_receipt) =
             analyze_plss_telemetry_trends_with_receipt(&first, config(), &revision).unwrap();
         let (_, changed_receipt) =
