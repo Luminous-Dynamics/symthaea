@@ -62,17 +62,30 @@ I checked the five temperature-specific calibration JSON files in the public mir
 
 For each file, I computed MD5 over the returned 7-bit ASCII payload and compared it with the file-level MD5 published by the canonical DaRUS record. All five matched. I then independently refit the declared zero-intercept linear equation, `signal = a × concentration`, including only samples within the embedded calibration range (0–150 µmol/L inclusive). Each file contains 30 samples, with 27 selected and the three 200 µmol/L samples excluded by the stated rule.
 
-| Calibration file | Bytes | Canonical / computed MD5 | Refit slope | Refit R² | Refit RMSD |
-|---|---:|---|---:|---:|---:|
-| ABTS_standard_25.0C.json | 5,054 | `c8561fe8784f956d1123bbcd52a65121` ✓ | 0.018329862325174823 | 0.9965435394942497 | 0.052531170831419005 |
-| ABTS_standard_30.0C.json | 5,052 | `b9b51ddcd76bf1ee8dcb5c08f258b7a2` ✓ | 0.017314605186480186 | 0.9997826256275483 | 0.012440262679447662 |
-| ABTS_standard_35.5C.json | 5,050 | `38e7b2be4eb40a383eec57efa319e897` ✓ | 0.017977302593240093 | 0.9961949291160336 | 0.05377164085489366 |
-| ABTS_standard_40.0C.json | 5,054 | `7ffcd2249695adb526afe06eee28066b` ✓ | 0.019069431818181815 | 0.9997064382973191 | 0.01589866612109839 |
-| ABTS_standard_45.0C.json | 5,052 | `e1960a2f3cfeabb71e291ae4967b6e91` ✓ | 0.018059865603146853 | 0.9977614756102724 | 0.04146734721174711 |
+| Calibration file | Bytes | Canonical MD5 ✓ | SHA-256 of pinned mirror payload | Refit slope | Refit R² | Refit RMSD |
+|---|---:|---|---|---:|---:|---:|
+| ABTS_standard_25.0C.json | 5,054 | `c8561fe8784f956d1123bbcd52a65121` | `39ccca8d0288e71f9ea686fdd19b96f04e6761e658a599fee108b897a3c20187` | 0.018329862325174823 | 0.9965435394942497 | 0.052531170831419005 |
+| ABTS_standard_30.0C.json | 5,052 | `b9b51ddcd76bf1ee8dcb5c08f258b7a2` | `de7da34ff636397e5ca130b4dbe28916d537290699847a63ce1acdcf33fff4f9` | 0.017314605186480186 | 0.9997826256275483 | 0.012440262679447662 |
+| ABTS_standard_35.5C.json | 5,050 | `38e7b2be4eb40a383eec57efa319e897` | `229a013d707ae09dc200588a2b1cd5a2fcfb7831c2f1461663b237e14226a8c5` | 0.017977302593240093 | 0.9961949291160336 | 0.05377164085489366 |
+| ABTS_standard_40.0C.json | 5,054 | `7ffcd2249695adb526afe06eee28066b` | `5d2d5f91a5d8cc02508f6591f592687ee711c746143edbb0acdcc83155b112df` | 0.019069431818181815 | 0.9997064382973191 | 0.01589866612109839 |
+| ABTS_standard_45.0C.json | 5,052 | `e1960a2f3cfeabb71e291ae4967b6e91` | `b8fcf7ee94bd64b85acd886adc29a2653979ebdfefd4909b00b305f1b3663c6d` | 0.018059865603146853 | 0.9977614756102724 | 0.04146734721174711 |
 
 Across all five files, the independently fitted slopes differ from the embedded reported slopes by less than 4.8×10⁻¹³. The R² values match at the reported precision; RMSD differs only by floating-point rounding (no more than about 1.8×10⁻¹⁷ in these results). These are calibration statistics from the published JSON metadata/data, not new experimental findings. They demonstrate why the declared concentration window must be honored: the 25 °C file alone shows that including the three 200 µmol/L observations changes its zero-intercept slope from 0.018329862325174823 to 0.017570697786690438 and raises RMSD from 0.052531170831419005 to 0.09230840071343391.
 
-The official DaRUS record identifies version 1.0, reports CC BY 4.0, documents raw absorption data plus calibration JSON and EnzymeML `.omex` files across 25–45 °C, and lists the canonical file checksums. The mirror README states its data are equivalent to the DaRUS deposit. This is a useful cross-repository byte-consistency check; MD5 is not collision-resistant and is not the benchmark integrity hash. No SHA-256 values have been frozen for the source files, and the new Rust command has **not** yet been run against these files because none was saved locally. Formal replay still requires obtaining the canonical/versioned files through the authorized download path, computing SHA-256 on the actual local bytes, adding a source manifest, and running the Rust command on those bytes. This work does **not** yet reproduce absorbance extraction, calibration generation from raw readings, the EnzymeML kinetic fit, all five temperature-dependent kinetic models, or any enzyme-function prediction.
+The official DaRUS record identifies version 1.0, reports CC BY 4.0, documents raw absorption data plus calibration JSON and EnzymeML `.omex` files across 25–45 °C, and publishes the file-level MD5 values shown above. The mirror README states its data are equivalent to the DaRUS deposit. SHA-256 was computed over each pinned mirror payload in memory using a known-answer-checked implementation; these values are recorded for later replay but are not yet frozen in a source manifest. The MD5 comparison is useful cross-repository integrity evidence, although MD5 is not collision-resistant. The new Rust command has **not** yet been run against these files because none was saved locally. After obtaining the canonical/versioned files through the authorized download path, run `sha256sum` on the local bytes and confirm each value matches the table before invoking the Rust command. This work does **not** yet reproduce absorbance extraction, calibration generation from raw readings, the EnzymeML kinetic fit, all five temperature-dependent kinetic models, or any enzyme-function prediction.
+
+For the 25 °C file, the replay command is:
+
+```sh
+sha256sum research-data/enzyme-benchmark/ABTS_standard_25.0C.json
+# Expected SHA-256 for the pinned mirror payload:
+# 39ccca8d0288e71f9ea686fdd19b96f04e6761e658a599fee108b897a3c20187
+cargo run -p xtask -- enzyme-calibration-check \
+  --input research-data/enzyme-benchmark/ABTS_standard_25.0C.json \
+  --sha256 39ccca8d0288e71f9ea686fdd19b96f04e6761e658a599fee108b897a3c20187
+```
+
+The command fails closed on byte-hash mismatch, unsupported equation, duplicate sample IDs, mixed concentration units, invalid declared range, or disagreement between the recomputed fit and embedded slope/R²/RMSD.
 
 ### Executable admission gate
 
