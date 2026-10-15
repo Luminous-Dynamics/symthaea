@@ -568,7 +568,10 @@ impl HashWriter {
 
     fn option_string(&mut self, value: Option<&str>) {
         match value {
-            Some(value) => { self.boolean(true); self.string(value); }
+            Some(value) => {
+                self.boolean(true);
+                self.string(value);
+            }
             None => self.boolean(false),
         }
     }
@@ -699,7 +702,10 @@ fn digest_report(report: &MissionConfigurationReport) -> String {
         writer.usize(finding.claim_count);
         writer.option_string(finding.implementation_id.as_deref());
         match finding.evidence_level {
-            Some(level) => { writer.boolean(true); writer.string(evidence_tag(level)); }
+            Some(level) => {
+                writer.boolean(true);
+                writer.string(evidence_tag(level));
+            }
             None => writer.boolean(false),
         }
         writer.option_string(finding.evidence_reference.as_deref());
