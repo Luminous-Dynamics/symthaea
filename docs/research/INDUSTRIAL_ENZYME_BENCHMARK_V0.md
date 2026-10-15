@@ -71,7 +71,7 @@ cargo run -p xtask -- enzyme-calibration-check \
   --sha256 REPLACE_WITH_THE_SHA256_FROM_SHA256SUM
 ```
 
-The command fails closed if the source hash, expected equation, sample IDs/units, declared range, fitted slope, R² or RMSD disagree. Its synthetic unit tests use toy fixtures; the public calibration file has **not yet** been run through this Rust command because its bytes have not been staged locally.
+The command fails closed if the source hash, equation, sample IDs, concentration-unit consistency, declared range, fitted slope, R² or RMSD disagree. Six synthetic unit tests cover successful range-aware reproduction and rejection of a wrong hash, source-fit disagreement, duplicate sample IDs, mixed concentration units, and a reversed declared range. These tests use toy fixtures; the public calibration file has **not yet** been run through this Rust command because its bytes have not been staged locally.
 
 ### Executable admission gate
 
