@@ -167,8 +167,8 @@ impl KnowledgePersistence {
                 })
             })
             .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Collect: {e}"))?;
 
         self.total_loaded += facts.len() as u64;
         Ok(facts)
@@ -235,8 +235,8 @@ impl KnowledgePersistence {
                 })
             })
             .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Collect: {e}"))?;
 
         self.total_loaded += edges.len() as u64;
         Ok(edges)
@@ -383,6 +383,81 @@ impl KnowledgePersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn test_load_facts_propagates_row_decode_errors() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_corrupt_facts_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[FactRecord {
+                vector_bytes: vec![0u8; 2048],
+                source_text: "fixture fact".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        // SQLite's dynamic typing permits this value in the REAL-affinity column.
+        // Decoding it as f32 must fail closed rather than silently omit the fact.
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_facts SET confidence = ?1",
+            rusqlite::params!["not-a-number"],
+        )
+        .unwrap();
+        drop(conn);
+
+        let err = persistence.load_facts().unwrap_err();
+        assert!(err.contains("Collect:"), "unexpected error context: {err}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_causal_edges_propagates_row_decode_errors() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_corrupt_edges_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_causal_edges(&[CausalEdgeRecord {
+                cause: "fixture cause".into(),
+                effect: "fixture effect".into(),
+                strength: 0.8,
+                is_inhibitory: false,
+                cycle: 1,
+            }])
+            .unwrap();
+
+        // A corrupt numeric value must be surfaced, not treated as an absent edge.
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_causal_edges SET strength = ?1",
+            rusqlite::params!["not-a-number"],
+        )
+        .unwrap();
+        drop(conn);
+
+        let err = persistence.load_causal_edges().unwrap_err();
+        assert!(err.contains("Collect:"), "unexpected error context: {err}");
+        assert_eq!(persistence.total_loaded(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_unconfigured() {
