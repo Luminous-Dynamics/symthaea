@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod enzyme_bench;
 mod manifest;
 mod rhn_sweep;
 
@@ -62,6 +63,12 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Validate a frozen, provenance-complete enzyme benchmark before any model scoring.
+    EnzymeBenchCheck {
+        /// Manifest path, relative to the workspace root unless absolute.
+        #[arg(long)]
+        manifest: PathBuf,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +112,18 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::EnzymeBenchCheck { manifest } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let manifest_path = if manifest.is_absolute() {
+                manifest
+            } else {
+                root.join(manifest)
+            };
+            enzyme_bench::check(&root, &manifest_path)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
