@@ -43,7 +43,7 @@ Missing optional asset roots are a valid observation and are reported as unavail
 ## Evidence fields
 
 - instrument_count and instruments enumerate the current 42 source-declared instrument variants.
-- procedural_fallback_declared means the source declares the instrument/model path. It is not an audio-quality score.
+- procedural_renderer_path is derived from the instrument's source dispatch classifiers: karplus_strong, frequency_modulation, or additive. This is not an audio-quality score.
 - gm_program_0_based is Muse's output mapping, not an asserted original source-patch identity. Some instruments use documented nearest-family approximations because General MIDI does not have exact names for all instruments.
 - soundfont_bank0_program_matches is null when no SoundFont was supplied. With a SoundFont, it lists declared preset names matching bank 0 and that instrument's selected program; an empty list is evidence of no exact header match, not proof that no suitable sound is available in another bank or via a fallback.
 - sustained_samples and short_articulation_samples report the mapped library, relative mapping directory, whether the directory exists, and how many WAV filenames are accepted by the current sample indexer.
@@ -61,7 +61,7 @@ Keep the following status dimensions separate when consuming the inventory:
 | Question | Evidence required |
 | --- | --- |
 | Is the symbolic identity represented? | Source-declared Instrument variant |
-| Is there a procedural fallback declared? | Source field, separately from fidelity evidence |
+| Which procedural renderer family does source dispatch select? | Source-derived Karplus-Strong / FM / additive classifier, separate from fidelity evidence |
 | Is a sample mapping declared? | Explicit sample_subdir or staccato_subdir match |
 | Does the mapped directory exist locally? | Filesystem observation in this receipt |
 | Can the current indexer index files? | indexed_sample_count > 0; decode still unproven |
