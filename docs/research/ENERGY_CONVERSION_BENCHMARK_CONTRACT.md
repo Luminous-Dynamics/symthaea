@@ -61,6 +61,16 @@ A qualifying implementation must:
 
 Do not assume errors are independent merely to simplify the calculation. A narrow confidence interval is only justified when the measurement model and assumptions support it. Follow an accepted measurement-uncertainty framework such as the JCGM Guide to the Expression of Uncertainty in Measurement (GUM) and state which method was used: https://www.iso.org/sites/JCGM/GUM-introduction.htm.
 
+### 4. Compare candidates using uncertainty-aware evidence
+
+The Rust verifier's `compare_candidates` function compares two validated records only if they use the same benchmark, mission schedule, system boundary, preregistered policy, and evidence class. It requires the candidate policy's `baseline_id` to identify the supplied baseline candidate.
+
+For the currently implemented uncertainty path, both records must declare `correlation_model: "independent"`. The calculation combines the per-interval standard uncertainties for total external input and useful output by root-sum-of-squares, then uses the first-order delta method for `eta = useful_output / external_input`. It combines candidate and baseline efficiency standard uncertainties in quadrature and subtracts the registered coverage factor times that combined uncertainty from the point-estimate difference.
+
+The decision is supported only if this conservative lower bound exceeds `minimum_superiority_margin`, an **absolute efficiency-fraction difference** (0.02 means two percentage points). Otherwise the result is `NoImprovementDemonstrated`, which does not prove equivalence or inferiority. Synthetic/not-for-decision records and correlated or unknown uncertainty models yield `Indeterminate`.
+
+This is a deliberately limited first-order method, not a universal uncertainty solution. Its independence assumption includes energy channels, intervals, and candidate/baseline results. Shared sensors, calibration, ambient conditions, fuel measurements, or model parameters can induce correlation; those cases require a covariance model or distribution-propagation method such as Monte Carlo before a decision is justified. A coverage factor is not itself a guaranteed confidence probability unless the underlying distributions and degrees of freedom support that interpretation. See the [NIST law of propagation of uncertainty](https://www.nist.gov/pml/nist-technical-note-1297/nist-tn-1297-appendix-law-propagation-uncertainty) and [JCGM 101 Monte Carlo supplement](https://www.bipm.org/en/doi/10.59161/jcgm101-2008).
+
 ### 4. Preserve provenance and make runs replayable
 
 Each non-synthetic source artifact must carry a SHA-256 hash of its exact bytes. Store URI or stable source identity, retrieval time where relevant, license/access terms, units, transformation steps, and raw-data references. Candidate configuration and solver revisions must be immutable and versioned. Record random seeds where applicable, solver version, model fidelity, calibration datasets, and all generated inputs/outputs needed for replay.
@@ -98,7 +108,7 @@ Run the targeted tests with `cargo test -p symthaea-energy-bench`. The workspace
 Important limits remain:
 - Apply the published JSON Schema (Draft 2020-12) separately. The Rust typed parser ignores unknown fields, so semantic validation does not replace schema validation.
 - URI resolution, artifact-byte retrieval, and immutable pre-search policy anchoring are caller responsibilities. A self-reported timestamp/boolean cannot prove preregistration without an independently verifiable commit or signed append-only registry.
-- Uncertainty values and the declared method are recorded, but uncertainty distributions/correlations are not propagated by this crate.
-- The crate does not integrate raw sensor data, validate a solver's physical fidelity, decide superiority between two candidates, or replace engineering/hardware validation.
+- First-order uncertainty propagation is implemented only for the explicit mutually-independent input case. The verifier returns indeterminate for unknown/correlated cases; it does not yet support covariance or Monte Carlo propagation.
+- The crate does not integrate raw sensor data, verify URI-retrieved artifact bytes automatically, validate a solver's physical fidelity, or replace engineering/hardware validation. The comparison decision is a model-level result, not a physical superiority claim.
 
 The benchmark pipeline is therefore more than a record contract, but it is not yet an automated end-to-end physically validated discovery system.
