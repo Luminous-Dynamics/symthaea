@@ -863,7 +863,8 @@ fn sample_directory_evidence_cached(
         staccato_subdir(instrument)
     } else {
         sample_subdir(instrument)
-    } else {
+    };
+    let Some(mapping) = mapping else {
         return Ok(None);
     };
     let key = (mapping.0, mapping.1.to_owned(), hash_indexed_samples);
@@ -892,10 +893,10 @@ fn sample_directory_evidence(
         staccato_subdir(instrument)
     } else {
         sample_subdir(instrument)
-    } else {
+    };
+    let Some((source, relative_directory)) = mapping else {
         return Ok(None);
     };
-    let (source, relative_directory) = mapping;
     let source_name = match source {
         SampleSource::Vcsl => "vcsl",
         SampleSource::Vsco2 => "vsco2_ce",
@@ -954,7 +955,7 @@ fn sample_directory_evidence(
             .collect::<std::collections::HashSet<_>>()
             .len()
     });
-    Some(SampleDirectoryEvidenceV1 {
+    Ok(Some(SampleDirectoryEvidenceV1 {
         source_library: source_name,
         relative_directory: relative_directory.to_owned(),
         directory_present,
@@ -981,7 +982,7 @@ fn indexed_sample_content_manifest_sha256(bank: &InstrumentBank) -> std::io::Res
     use std::io::Read as _;
 
     let mut manifest = Sha256::new();
-    manifest.update(b"muse-indexed-sample-content-manifest-v1\\0");
+    manifest.update(b"muse-indexed-sample-content-manifest-v1\0");
     let mut buffer = [0u8; 64 * 1024];
 
     for sample in &bank.samples {
