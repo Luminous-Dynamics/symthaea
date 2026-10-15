@@ -1117,6 +1117,10 @@ fn indexed_sample_content_manifest_sha256(bank: &InstrumentBank) -> std::io::Res
 pub struct SampleDecodeFailureV1 {
     /// The indexed WAV's file name only; absolute asset-root paths are excluded.
     pub file_name: String,
+    /// MIDI label parsed from this filename; metadata, not measured audio pitch.
+    pub midi_note: u8,
+    /// Normalized dynamic strength inferred from filename tokens, not calibrated velocity.
+    pub normalized_dynamic_strength: f32,
     /// Bounded decoder diagnostic useful for locating malformed or truncated data.
     pub reason: String,
 }
@@ -1203,6 +1207,8 @@ fn audit_indexed_sample_audio(bank: Option<&InstrumentBank>) -> IndexedSampleAud
                         .collect();
                     audit.reported_sample_decode_failures.push(SampleDecodeFailureV1 {
                         file_name,
+                        midi_note: sample.midi,
+                        normalized_dynamic_strength: sample.dynamic,
                         reason,
                     });
                 } else {
@@ -2493,6 +2499,8 @@ mod tests {
         );
         assert!(mapping.reported_sample_decode_failures.iter().all(|failure| {
             failure.reason.chars().count() <= MAX_SAMPLE_DECODE_REASON_CHARS
+                && (0..=127).contains(&failure.midi_note)
+                && (0.0..=1.0).contains(&failure.normalized_dynamic_strength)
                 && !failure.file_name.contains('/')
                 && !failure.file_name.contains('\\')
         }));
@@ -2608,6 +2616,11 @@ mod tests {
         assert_eq!(
             mapping.reported_sample_decode_failures[0].file_name,
             "Harp_D4_vl3.wav"
+        );
+        assert_eq!(mapping.reported_sample_decode_failures[0].midi_note, 62);
+        assert_eq!(
+            mapping.reported_sample_decode_failures[0].normalized_dynamic_strength,
+            1.0
         );
         assert!(!mapping.reported_sample_decode_failures[0].reason.is_empty());
         assert_eq!(mapping.omitted_sample_decode_failure_count, 0);
