@@ -3,7 +3,7 @@
   "schema_version": 1,
   "version": "0.3.0",
   "status": "research_fixture",
-  "generated_on": "2026-10-14",
+  "generated_on": "2026-10-15",
   "purpose": "Pin source identity and document the synthetic crime-economics evaluator plus a separate non-compensatory aggregate lawful-alternative viability contract.",
   "model_dimensions": {
     "weeks": 52,
@@ -28,7 +28,7 @@
     },
     {
       "path": "tools/crime-economics-sim/src/lib.rs",
-      "git_blob_sha1": "2d50643d3f4a52ea15f3a7ffde285b4e96a02ac5"
+      "git_blob_sha1": "6a618381019f601fee0db9e2e6d66db7c0ec5d38"
     },
     {
       "path": "tools/crime-economics-sim/src/bin/simulate.rs",
