@@ -111,6 +111,91 @@ Possible prime-editing comparators include PRIDICT2.0, DeepPrime/DeepPrime7 and 
 
 Do not claim a Symthaea win merely because it wraps a stronger external model. Separate the specialist model's contribution from improvements due to context handling, disagreement analysis, uncertainty calibration or experiment selection.
 
+## First proving vertical: decision-centric off-target triage
+
+Start here before attempting novel editor design. This is the most defensible initial test because a current published benchmark exposes a real decision bottleneck and distributes reproducibility artifacts.
+
+### Published evidence anchor
+
+Kaufmann et al. (2026), *Systematic Benchmarking of CRISPR-Cas9 Off-Target Prediction Tools Reveals Limitations and Implications for Preclinical Assessment* (Human Gene Therapy; first published online 26 July 2026), compared 14 prediction tools: https://doi.org/10.1177/10430342261466407
+
+The paper reports:
+- 3,827 deep-sequenced sites across 26 guide-RNA/Cas9 combinations, using published CRISPRoffT data and several human-cell contexts;
+- 383 observations above the paper's operational indel-frequency threshold of 0.1%;
+- after collapsing repeated genomic sites, 1,806 unique sites and 118 operational positives for ranked classification;
+- a further no-bulge subset for some ML comparisons, with 1,768 unique sites and 114 positives;
+- a shared candidate universe of 324,375 sites assembled from several genome-wide nomination tools;
+- approximately 77% recall among the top 500 ranked sites and up to 83% among the top 1,250 in the reported comparison, with weak-to-moderate score/indel-frequency correlation and only modest gains from tool combinations.
+
+These quantities are specific to that cohort, operational label threshold, site universe, and analysis. They are not universal clinical false-negative rates and do not prove a guide or therapy is safe.
+
+The authors' public [reproducibility repository](https://github.com/maren-ha/OffTargetPredictionBenchmark) provides code and a small canonical truth-table input, with larger standardized prediction artifacts distributed through [Zenodo record 20627722](https://zenodo.org/records/20627722). Its documented workflow reproduces the analysis from standardized outputs; it does **not** rerun every predictor in its native environment. We should therefore describe a first replay as a reproduction/secondary analysis, not an independent re-execution of all prediction tools.
+
+### Paradigm shift: rank for evidence acquisition, not merely for a leaderboard
+
+A usual score leaderboard asks, "Which predictor has the best aggregate metric?" The more operationally meaningful question is:
+
+> Under a fixed review/validation budget, which policy surfaces the largest fraction of independently observed off-target sites while preserving uncertainty and generalization limits?
+
+This becomes a bounded **decision-under-measurement-budget** benchmark. Symthaea should initially operate only on published prediction outputs and recorded measurements. It must not autonomously generate wet-lab instructions, authorize experiments, make clinical recommendations, or label a guide as safe.
+
+### Experiment contract
+
+1. **Freeze the exact source generation.** Record the manuscript/version, Git commit, Zenodo record and artifact IDs, license/terms, retrieval date, artifact digests, schema, and any transformations. Rights or artifact identity unresolved means no qualification.
+2. **Reconstruct source-defined cohorts.** Independently reproduce the full-cohort and no-bulge cohort counts and label/collapse rules from the paper. Keep the two cohorts separate where the source does. Do not mix predictor outputs calculated on different candidate universes without an explicit mapping.
+3. **Use a source-faithful first replay.** Begin with the paper's standardized outputs. Any later native rerun of tools is a separate lineage requiring native environment, exact tool/version, reference genome, parameters and source input identity.
+4. **Prevent guide leakage.** Random-row splits are not sufficient. Primary generalization analysis holds out complete guide-RNA/Cas9 groups; additional cell-context/lab/source-group evaluations are allowed only where IDs and cohort structure support them. Because there are only 26 guide/Cas9 combinations in this benchmark, uncertainty intervals must respect group clustering rather than pretending every site is independent.
+5. **Compare fair policies at equal budget.** Include each reproducibly represented published tool, transparent score/rank baselines, simple aggregation where justified, and a Symthaea policy that uses only permitted pre-outcome information. Report when a tool or candidate universe cannot be fairly compared rather than silently dropping it.
+6. **Preregister the decision rule.** Commit candidate universe, group split, rank/fusion policy, validation budget(s), primary metric, tie-break behavior, exclusions, and evaluation cutoff before exposing held-out labels. The selected policy and output list must be immutable after commitment.
+7. **Rebuild metrics independently.** A separate verifier recomputes the top-K recall/precision and other preregistered metrics from exact prediction and outcome artifacts, checks all eligible groups, and reports a complete terminal disposition census.
+
+### Primary outcome vector
+
+Report the full vector; do not optimize one metric at the expense of hidden failure modes:
+
+- recall at preregistered review budgets (for example, top-K site counts, interpreted only within the benchmark's candidate universe);
+- precision and number of false negatives at each budget;
+- precision-recall curve / average precision when labels and candidate-universe rules support it;
+- performance by held-out guide/Cas9 group and supported biological context;
+- uncertainty/calibration only where scores have a defensible, separately evaluated probability interpretation;
+- abstention and out-of-domain behavior;
+- performance and ranking stability under duplicate collapse, label-threshold sensitivity, and permitted cohort changes;
+- resource cost and number of candidates reviewed per detected benchmark-positive site.
+
+Do not use overall accuracy as the decisive measure on an imbalanced cohort. Do not treat untested or unreported sites as confirmed true negatives. A higher recall at top-K on this retrospective dataset is an algorithmic benchmark result, not proof of clinical safety.
+
+### What would show a real Symthaea advantage?
+
+A useful result would show that the Symthaea-assisted **selection policy**, compared with strong existing score/rank baselines under identical budget and held-out groups, improves a preregistered decision metric with uncertainty intervals and no material collapse in subgroup performance. The result must persist when the strongest external specialist model is held constant, so any measured gain can be attributed to Symthaea's coordination/selection layer rather than to merely choosing a stronger predictor.
+
+A null result is informative. If no policy beats the best fair baseline, report that result and retain the benchmark as a qualified reference. Do not convert a small pooled-data gain into a general claim about novel editor design, safety, or treatment cost.
+
+### Mycelix evidence record
+
+Use the existing Mycelix-DeSci event/provenance contracts rather than a second ledger. Preserve:
+- exact source, dataset, standardized prediction file, and artifact-digest identities;
+- each tool's known version/configuration and common data/model ancestry;
+- frozen cohort/split and selection-policy commitments;
+- complete output census, exclusions and transformation lineage;
+- observed-label source and the operational definition used by the paper;
+- independent metric-verification receipt;
+- failed, null, contradictory and superseded evaluation attempts.
+
+These records establish lineage and reproducibility only. They do not prove data authenticity, independent biological truth, or clinical utility.
+
+### First exit gate
+
+The first gate passes only when the team can, from permitted source artifacts:
+- reconstruct the published cohort definitions and key counts;
+- independently recompute the key baseline metrics to a stated tolerance;
+- pass deliberate split-leakage, label-mutation, artifact-mismatch and metric-manipulation negative controls;
+- measure at least one preregistered equal-budget comparison over held-out guide/Cas9 groups;
+- clearly separate source reproduction, independent reanalysis, native tool rerun, and biological validation.
+
+No new production model type is authorized by this plan. Compose the existing biology benchmark (#6324), source/contract oracle and evidence-plane infrastructure. Open a new adapter only after the ownership audit proves an actual gap.
+
+---
+
 ## Symthaea contribution hypotheses
 
 These are hypotheses to test, not established capabilities.
