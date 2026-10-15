@@ -388,7 +388,8 @@
             "covariance_matrix_artifact",
             "monte_carlo_propagation",
             "unknown"
-          ]
+          ],
+          "description": "Correlation assumptions for primitive energy quantities. The current Rust comparator only computes a result for independent, mutually uncorrelated interval/channel/candidate-baseline inputs; unknown or correlated cases are indeterminate until covariance or Monte Carlo propagation is implemented."
         },
         "covariance_matrix_artifact_id": {
           "type": "string",
@@ -592,7 +593,8 @@
         "minimum_superiority_margin": {
           "type": "number",
           "minimum": 0,
-          "maximum": 1
+          "maximum": 1,
+          "description": "Minimum absolute efficiency-fraction improvement required after subtracting expanded uncertainty (0.02 means two percentage points). Registered before candidate search."
         },
         "baseline_id": {
           "type": "string",
