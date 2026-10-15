@@ -1531,6 +1531,26 @@ mod tests {
         let error = persistence.load_facts().unwrap_err();
         assert!(error.contains("unknown persisted semantic role key"), "{error}");
 
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_role_bindings SET role_key = 'agent', ordinal = 1",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("begin at ordinal 1"), "{error}");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_fact_role_bindings SET fact_row_id = 99999, ordinal = 0",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+        let error = persistence.load_facts().unwrap_err();
+        assert!(error.contains("Role-vector rows refer to missing fact row 99999"), "{error}");
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
