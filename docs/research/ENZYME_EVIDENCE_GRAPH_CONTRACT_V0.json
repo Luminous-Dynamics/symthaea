@@ -31,7 +31,23 @@
       "locator": "HTTPS URL or approved workspace-relative path. A remote URL must be acquired and hash-verified before the artifact may satisfy a replay requirement.",
       "rights_record_id": "Reference to a separate source-specific rights/attribution review record. A checksum is not a rights grant.",
       "acquisition_status": "available means an exact local workspace-relative payload is checked for byte length and SHA-256; not_acquired means HTTPS metadata only and is never downloaded by the verifier."
-    }
+    },
+    "role_values": [
+      "source_record",
+      "raw_signal",
+      "control_signal",
+      "calibration",
+      "processed_measurement",
+      "model_specification",
+      "fit_output",
+      "reported_parameter_table",
+      "prediction_output",
+      "evaluation_output",
+      "supporting_metadata",
+      "transformation_code",
+      "transformation_configuration",
+      "environment_lock"
+    ]
   },
   "node_types": [
     {
@@ -293,7 +309,26 @@
       "rejected",
       "unknown"
     ],
-    "note": "The record layout is a V0 implementation convention documented in ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md, not a finalized JSON Schema. Frozen graphs require an external SHA-256 pin of their exact serialized bytes."
+    "note": "The record layout is a V0 implementation convention documented in ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md, not a finalized JSON Schema. Rust unit tests compare the executable checker vocabularies against these machine-readable enumerations. Frozen graphs require an external SHA-256 pin of their exact serialized bytes.",
+    "graph_status_values": [
+      "draft",
+      "frozen"
+    ],
+    "terminal_status_values": [
+      "success",
+      "null_result",
+      "failed",
+      "excluded",
+      "out_of_domain",
+      "blocked"
+    ],
+    "uncertainty_status_values": [
+      "reported",
+      "recomputed",
+      "not_available",
+      "not_estimable",
+      "not_applicable"
+    ]
   },
   "v0_implemented_checks": [
     "Unique IDs for node, edge, artifact, rights-record, transformation, and parameter-claim records.",
