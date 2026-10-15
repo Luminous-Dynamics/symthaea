@@ -13,6 +13,12 @@ cargo fmt --all -- --check
 
 Current validation is performed by the Rust unit tests and exact-head CI. Do not treat a queued job as a pass.
 
+## Deterministic experiment selection (Phase A)
+
+The `experiment_selection` module implements a transparent queue baseline before active learning. It ranks proposals lexicographically by registered decision relevance, expected fractional uncertainty reduction for a named observable, that reduction per unit of a common preregistered resource, reproducibility, and stable experiment ID. The queue rejects proposals with missing competing hypotheses, absent pre-observation registration, unapproved safety review, missing operating envelope or abort criteria, incomplete provenance planning, non-finite estimates, duplicate IDs, or inconsistent cost units. Rejections include explicit reasons.
+
+Example API: `experiment_selection::rank_experiments(&policy, &proposals)`. The queue policy itself must be registered before ranking. Resource units are compared exactly; conversions must happen before selection. This is **not** Bayesian optimization, expected information gain, a calibrated uncertainty model, or a safety approval system. Ranking is a screening aid and cannot replace engineering review.
+
 ## What it checks
 
 - schema version and key identifiers;
