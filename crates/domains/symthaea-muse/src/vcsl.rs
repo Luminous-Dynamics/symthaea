@@ -551,9 +551,11 @@ pub struct FluidSynthRuntimeProbeV1 {
     pub binary_sha256: String,
     pub soundfont_sha256: String,
     pub requested_program_count: usize,
-    pub rendered_non_silent_count: usize,
-    pub probe_note_midi: u8,
-    pub probe_velocity: u8,
+    pub probe_count: usize,
+    pub rendered_non_silent_probe_count: usize,
+    /// Fixed coverage grid. A non-silent result at one cell does not certify the other cells.
+    pub probe_notes_midi: Vec<u8>,
+    pub probe_velocities: Vec<u8>,
     pub sample_rate_hz: u32,
     pub reverb_disabled: bool,
     pub chorus_disabled: bool,
@@ -566,6 +568,8 @@ pub struct FluidSynthRuntimeProbeV1 {
 pub struct FluidSynthProgramProbeV1 {
     pub bank: u16,
     pub program_0_based: u8,
+    pub note_midi: u8,
+    pub velocity: u8,
     pub soundfont_header_preset_names: Vec<String>,
     /// Statuses include skipped_no_bank0_header_match, fluidsynth_exit_nonzero,
     /// fluidsynth_success_without_output_wav, output_wav_decode_failed,
@@ -1112,8 +1116,10 @@ fn probe_fluidsynth_programs(
     };
 
     let unique_programs = programs.collect::<std::collections::BTreeSet<_>>();
-    let mut results = Vec::with_capacity(unique_programs.len());
-    let mut rendered_non_silent_count = 0usize;
+    const PROBE_NOTES_MIDI: [u8; 3] = [48, 60, 72];
+    const PROBE_VELOCITIES: [u8; 3] = [48, 96, 120];
+    let mut results = Vec::with_capacity(unique_programs.len() * PROBE_NOTES_MIDI.len() * PROBE_VELOCITIES.len());
+    let mut rendered_non_silent_probe_count = 0usize;
 
     for program in unique_programs {
         let header_names = preset_inventory
@@ -1123,116 +1129,127 @@ fn probe_fluidsynth_programs(
             .map(|preset| preset.name.clone())
             .collect::<Vec<_>>();
 
-        if header_names.is_empty() {
-            results.push(FluidSynthProgramProbeV1 {
-                bank: 0,
-                program_0_based: program,
-                soundfont_header_preset_names: header_names,
-                status: "skipped_no_bank0_header_match",
-                command_exit_code: None,
-                sample_rate: None,
-                channels: None,
-                frames: None,
-                output_wav_sha256: None,
-                peak_absolute_sample: None,
-                rms: None,
-            });
-            continue;
-        }
+        for note in PROBE_NOTES_MIDI {
+            for velocity in PROBE_VELOCITIES {
+                if header_names.is_empty() {
+                    results.push(FluidSynthProgramProbeV1 {
+                        bank: 0,
+                        program_0_based: program,
+                        note_midi: note,
+                        velocity,
+                        soundfont_header_preset_names: header_names.clone(),
+                        status: "skipped_no_bank0_header_match",
+                        command_exit_code: None,
+                        sample_rate: None,
+                        channels: None,
+                        frames: None,
+                        output_wav_sha256: None,
+                        peak_absolute_sample: None,
+                        rms: None,
+                    });
+                    continue;
+                }
 
-        let unique = FLUIDSYNTH_PROBE_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let stem = format!("muse_fluid_probe_{}_{}_{}", std::process::id(), unique, program);
-        let temp = std::env::temp_dir();
-        let midi_path = temp.join(format!("{stem}.mid"));
-        let wav_path = temp.join(format!("{stem}.wav"));
-        // A previous process may have crashed before cleanup while reusing a
-        // PID; a stale WAV must never qualify as this invocation's evidence.
-        let _ = std::fs::remove_file(&wav_path);
-        let _ = std::fs::remove_file(&midi_path);
-        std::fs::write(&midi_path, probe_midi_bytes(program, 60, 96))?;
+                let unique = FLUIDSYNTH_PROBE_COUNTER.fetch_add(1, Ordering::Relaxed);
+                let stem = format!(
+                    "muse_fluid_probe_{}_{}_{}_{}_{}",
+                    std::process::id(), unique, program, note, velocity
+                );
+                let temp = std::env::temp_dir();
+                let midi_path = temp.join(format!("{stem}.mid"));
+                let wav_path = temp.join(format!("{stem}.wav"));
+                // A previous process may have crashed before cleanup while reusing a
+                // PID; a stale WAV must never qualify as this invocation's evidence.
+                let _ = std::fs::remove_file(&wav_path);
+                let _ = std::fs::remove_file(&midi_path);
+                std::fs::write(&midi_path, probe_midi_bytes(program, note, velocity))?;
 
-        // The -n/-i pair disables live MIDI and the shell. -F renders the
-        // supplied MIDI to a WAV file without requiring an audio device.
-        // Disable chorus/reverb to keep this small mechanical probe controlled.
-        let command_result = std::process::Command::new(&resolved_binary)
-            .arg("-n")
-            .arg("-i")
-            .arg("-g")
-            .arg("0.8")
-            .arg("-o")
-            .arg("synth.reverb.active=0")
-            .arg("-o")
-            .arg("synth.chorus.active=0")
-            .arg("-T")
-            .arg("wav")
-            .arg("-F")
-            .arg(&wav_path)
-            .arg("-r")
-            .arg("22050")
-            .arg(soundfont_path)
-            .arg(&midi_path)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status();
+                // The -n/-i pair disables live MIDI and the shell. -F renders the
+                // supplied MIDI to a WAV file without requiring an audio device.
+                // Disable chorus/reverb to keep this small mechanical probe controlled.
+                let command_result = std::process::Command::new(&resolved_binary)
+                    .arg("-n")
+                    .arg("-i")
+                    .arg("-g")
+                    .arg("0.8")
+                    .arg("-o")
+                    .arg("synth.reverb.active=0")
+                    .arg("-o")
+                    .arg("synth.chorus.active=0")
+                    .arg("-T")
+                    .arg("wav")
+                    .arg("-F")
+                    .arg(&wav_path)
+                    .arg("-r")
+                    .arg("22050")
+                    .arg(soundfont_path)
+                    .arg(&midi_path)
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status();
 
-        let _ = std::fs::remove_file(&midi_path);
-        let mut result = FluidSynthProgramProbeV1 {
-            bank: 0,
-            program_0_based: program,
-            soundfont_header_preset_names: header_names,
-            status: "fluidsynth_exit_nonzero",
-            command_exit_code: None,
-            sample_rate: None,
-            channels: None,
-            frames: None,
-            output_wav_sha256: None,
-            peak_absolute_sample: None,
-            rms: None,
-        };
-        match command_result {
-            Ok(status) => {
-                result.command_exit_code = status.code();
-                if status.success() {
-                    if wav_path.is_file() {
-                        result.output_wav_sha256 = sha256_file(&wav_path).ok();
-                    }
-                    match audit_one_wav(&wav_path) {
-                        Ok((sample_rate, channels, peak, rms, frames)) => {
-                            result.sample_rate = Some(sample_rate);
-                            result.channels = Some(channels);
-                            result.frames = Some(frames);
-                            result.peak_absolute_sample = Some(peak);
-                            result.rms = Some(rms);
-                            if peak <= 1e-5 {
-                                result.status = "rendered_silent";
-                            } else {
-                                result.status = "rendered_non_silent";
-                                rendered_non_silent_count += 1;
+                let _ = std::fs::remove_file(&midi_path);
+                let mut result = FluidSynthProgramProbeV1 {
+                    bank: 0,
+                    program_0_based: program,
+                    note_midi: note,
+                    velocity,
+                    soundfont_header_preset_names: header_names.clone(),
+                    status: "fluidsynth_exit_nonzero",
+                    command_exit_code: None,
+                    sample_rate: None,
+                    channels: None,
+                    frames: None,
+                    output_wav_sha256: None,
+                    peak_absolute_sample: None,
+                    rms: None,
+                };
+                match command_result {
+                    Ok(status) => {
+                        result.command_exit_code = status.code();
+                        if status.success() {
+                            if wav_path.is_file() {
+                                result.output_wav_sha256 = sha256_file(&wav_path).ok();
+                            }
+                            match audit_one_wav(&wav_path) {
+                                Ok((sample_rate, channels, peak, rms, frames)) => {
+                                    result.sample_rate = Some(sample_rate);
+                                    result.channels = Some(channels);
+                                    result.frames = Some(frames);
+                                    result.peak_absolute_sample = Some(peak);
+                                    result.rms = Some(rms);
+                                    if peak <= 1e-5 {
+                                        result.status = "rendered_silent";
+                                    } else {
+                                        result.status = "rendered_non_silent";
+                                        rendered_non_silent_probe_count += 1;
+                                    }
+                                }
+                                Err(_) => {
+                                    result.status = if wav_path.is_file() {
+                                        "output_wav_decode_failed"
+                                    } else {
+                                        "fluidsynth_success_without_output_wav"
+                                    };
+                                }
                             }
                         }
-                        Err(_) => {
-                            result.status = if wav_path.is_file() {
-                                "output_wav_decode_failed"
-                            } else {
-                                "fluidsynth_success_without_output_wav"
-                            };
-                        }
+                    }
+                    Err(error) => {
+                        let _ = std::fs::remove_file(&wav_path);
+                        return Err(std::io::Error::new(
+                            error.kind(),
+                            format!(
+                                "failed to execute FluidSynth probe binary {}: {error}",
+                                binary.display()
+                            ),
+                        ));
                     }
                 }
-            }
-            Err(error) => {
                 let _ = std::fs::remove_file(&wav_path);
-                return Err(std::io::Error::new(
-                    error.kind(),
-                    format!(
-                        "failed to execute FluidSynth probe binary {}: {error}",
-                        binary.display()
-                    ),
-                ));
+                results.push(result);
             }
         }
-        let _ = std::fs::remove_file(&wav_path);
-        results.push(result);
     }
 
     Ok(FluidSynthRuntimeProbeV1 {
@@ -1245,10 +1262,11 @@ fn probe_fluidsynth_programs(
         binary_version: version_text,
         binary_sha256,
         soundfont_sha256: soundfont_sha256.to_owned(),
-        requested_program_count: results.len(),
-        rendered_non_silent_count,
-        probe_note_midi: 60,
-        probe_velocity: 96,
+        requested_program_count: unique_programs.len(),
+        probe_count: results.len(),
+        rendered_non_silent_probe_count,
+        probe_notes_midi: PROBE_NOTES_MIDI.to_vec(),
+        probe_velocities: PROBE_VELOCITIES.to_vec(),
         sample_rate_hz: 22050,
         reverb_disabled: true,
         chorus_disabled: true,
