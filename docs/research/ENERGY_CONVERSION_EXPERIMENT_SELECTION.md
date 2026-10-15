@@ -94,4 +94,4 @@ JCGM published a 2026 amendment to the GUM concerning nonlinearity in measuremen
 
 ## Implementation boundary today
 
-The current `symthaea-energy-bench` comparator implements a first-order delta approximation for *charge-sustaining net cycle efficiency* only when primitive input/output, interval, and candidate/baseline uncertainties are explicitly assumed independent. It does not yet implement expected information gain, covariance-matrix propagation, Monte Carlo propagation, a proposal queue, or a multi-fidelity controller. This protocol specifies the research direction, not shipped capability.
+The current `symthaea-energy-bench` comparator implements a first-order delta approximation for *charge-sustaining net cycle efficiency* only when primitive input/output, interval, and candidate/baseline uncertainties are explicitly assumed independent. It does not yet implement expected information gain, covariance-matrix propagation, Monte Carlo propagation, or a multi-fidelity controller. The transparent Phase A proposal queue is implemented, but does not perform active learning. This protocol specifies the research direction and current implementation boundary.
