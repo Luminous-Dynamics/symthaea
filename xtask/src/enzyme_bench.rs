@@ -618,7 +618,7 @@ mod tests {
         writer.write_record(&headers).unwrap();
         for row in reader.records() {
             let mut fields: Vec<String> = row.unwrap().iter().map(str::to_string).collect();
-            if fields[observation_index] == observation_id {
+            if fields[observation_index].as_str() == observation_id {
                 fields[field_index] = value.to_string();
             }
             writer.write_record(fields).unwrap();
