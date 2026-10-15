@@ -260,8 +260,6 @@ impl PlssReferenceTwin {
             return Err(PlssStepError::InvalidInput);
         }
 
-        self.consume_oxygen(oxygen_needed_l)?;
-
         let ventilation_factor = match self.state.ventilation {
             PlssPathState::Available => 1.0,
             PlssPathState::Degraded => 0.6,
@@ -315,6 +313,8 @@ impl PlssReferenceTwin {
         {
             return Err(PlssStepError::InvalidInput);
         }
+
+        self.consume_oxygen(oxygen_needed_l)?;
 
         let heat_in_w = input.metabolism.metabolic_heat_w + input.equipment_heat_w;
         let heat_rejection_w = self.available_heat_rejection_w()? * heat_rejection_fraction;
@@ -453,6 +453,27 @@ mod tests {
         .unwrap();
         assert!((twin.state().co2_burden_l - (generated_l - 0.10)).abs() < 1e-9);
         assert_eq!(twin.state().co2_scrubber_capacity_remaining_l, 0.0);
+    }
+
+    #[test]
+    fn co2_capture_rate_is_independent_of_total_fan_throughput() {
+        let mut config = PlssConfig::simulation_reference();
+        config.co2_scrubber_removal_rate_l_min = 0.10;
+        config.co2_scrubber_capacity_l = 100.0;
+        // Keep fan throughput high: it must not become a CO2-capture multiplier.
+        config.ventilation_flow_l_min = 10_000.0;
+        let mut twin = PlssReferenceTwin::new(config).unwrap();
+        let metabolic = metabolism();
+        let generated_l = metabolic.co2_l_min;
+        twin.step(PlssStepInput {
+            metabolism: metabolic,
+            equipment_heat_w: 0.0,
+            humidity_generation_g_per_min: 0.0,
+            dt_s: 60.0,
+        })
+        .unwrap();
+        assert!((twin.state().co2_burden_l - (generated_l - 0.10)).abs() < 1e-9);
+        assert!((twin.state().co2_scrubber_capacity_remaining_l - 99.90).abs() < 1e-9);
     }
 
     #[test]
