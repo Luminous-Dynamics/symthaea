@@ -7,6 +7,7 @@ This is test/CI tooling only. It is not part of Symthaea's production runtime.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -19,13 +20,14 @@ DOCS = ROOT / "docs" / "research" / "finance"
 SCHEMA_PATH = DOCS / "SYM-FIN-SYS-016_run_receipt_v1.schema.json"
 FIXTURE_PATH = DOCS / "SYM-FIN-SYS-016_run_receipt_example_v1.json"
 NEGATIVE_PATH = DOCS / "SYM-FIN-SYS-016_run_receipt_negative_controls_v1.json"
+REGISTRY_PATH = DOCS / "SYM-FIN-SYS-016_scenario_registry_v1.json"
 
 EXPECTED_NEGATIVE_CORPUS_SCHEMA = (
     "civos.socioeconomic_interoperability.run_receipt_negative_controls.v1"
 )
 EXPECTED_NEGATIVE_CONTROL_LAYERS = {
     **{f"SRC-NEG-{number:03d}": "json_schema" for number in range(1, 11)},
-    **{f"SRC-SEM-{number:03d}": "semantic_check" for number in range(1, 11)},
+    **{f"SRC-SEM-{number:03d}": "semantic_check" for number in range(1, 12)},
 }
 EXPECTED_NEGATIVE_CONTROL_FIELDS = {
     "id",
@@ -75,8 +77,11 @@ def schema_errors(validator: Draft202012Validator, value: Any) -> list[str]:
     return errors
 
 
-def semantic_errors(record: dict[str, Any]) -> list[str]:
+def semantic_errors(record: dict[str, Any], expected_registry_digest: str) -> list[str]:
     errors: list[str] = []
+    if record["run"]["scenario_registry_digest"] != expected_registry_digest:
+        errors.append("scenario_registry_digest does not match the exact scenario registry bytes")
+
     profiles = record["profiles"]
     assignments = profiles["regime_assignments"]
     community_ids = [entry["community_id"] for entry in assignments]
@@ -166,6 +171,15 @@ def main() -> int:
     schema = load_json(SCHEMA_PATH)
     fixture = load_json(FIXTURE_PATH)
     negative_corpus = load_json(NEGATIVE_PATH)
+    scenario_registry = load_json(REGISTRY_PATH)
+    if not isinstance(scenario_registry, dict) or (
+        scenario_registry.get("schema") != "civos.socioeconomic_interoperability.scenario.v1"
+        or scenario_registry.get("status") != "research"
+        or scenario_registry.get("claim_ceiling") != "synthetic_deterministic_only"
+    ):
+        print("FAIL: scenario registry metadata is missing or outside its research-only contract")
+        return 1
+    expected_registry_digest = "sha256:" + hashlib.sha256(REGISTRY_PATH.read_bytes()).hexdigest()
 
     Draft202012Validator.check_schema(schema)
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
@@ -177,7 +191,7 @@ def main() -> int:
             print(f"  - {error}")
         return 1
 
-    positive_semantics = semantic_errors(fixture)
+    positive_semantics = semantic_errors(fixture, expected_registry_digest)
     if positive_semantics:
         print("FAIL: positive example violates semantic invariants:")
         for error in positive_semantics:
@@ -278,7 +292,7 @@ def main() -> int:
             if errors:
                 failures.append(f"{case_id}: semantic control was already rejected at schema layer: {errors[0]}")
             else:
-                found = semantic_errors(mutated)
+                found = semantic_errors(mutated, expected_registry_digest)
                 if not found:
                     failures.append(f"{case_id}: invalid mutation unexpectedly passed semantic checks")
 
@@ -290,8 +304,8 @@ def main() -> int:
     # cannot become smaller or silently move semantic cases into JSON Schema.
     if checked_schema != 10:
         failures.append(f"expected 10 schema-level controls to be checked, got {checked_schema}")
-    if checked_semantic != 10:
-        failures.append(f"expected 10 semantic controls to be checked, got {checked_semantic}")
+    if checked_semantic != 11:
+        failures.append(f"expected 11 semantic controls to be checked, got {checked_semantic}")
 
     if failures:
         print("FAIL: run receipt negative controls:")
@@ -302,7 +316,7 @@ def main() -> int:
     print(
         "PASS: schema definition valid; positive fixture valid; "
         f"{checked_schema} schema-level and {checked_semantic} semantic negative controls rejected; "
-        "required v1 control IDs and corpus metadata intact."
+        "required v1 control IDs and corpus metadata intact; scenario registry digest matches exact bytes."
     )
     print("Claim boundary: synthetic deterministic research fixture only; no production or economic effects.")
     return 0
