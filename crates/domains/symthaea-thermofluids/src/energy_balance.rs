@@ -250,8 +250,14 @@ mod tests {
             zero.evaluate(f64::NAN),
             Err(EnergyBalanceError::NonFiniteInput)
         );
+        let valid_flows = EnergyBalance {
+            input_power_w: 100.0,
+            net_useful_output_power_w: 0.0,
+            auxiliary_power_w: 0.0,
+            rejected_or_loss_power_w: 100.0,
+        };
         assert_eq!(
-            zero.evaluate(-1e-6),
+            valid_flows.evaluate(-1e-6),
             Err(EnergyBalanceError::InvalidTolerance)
         );
     }
