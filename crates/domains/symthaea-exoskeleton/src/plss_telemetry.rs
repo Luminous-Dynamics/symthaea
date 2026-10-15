@@ -194,6 +194,7 @@ pub enum PlssTelemetryEvidenceLevel {
 pub enum PlssTelemetryStatus {
     Fresh,
     Conflicted,
+    FutureDated,
     Stale,
     LowConfidence,
     Invalid,
@@ -331,11 +332,17 @@ pub fn fuse_plss_telemetry(
             }
 
             if latest_by_source.is_empty() {
-                let status = match (saw_invalid || saw_future, saw_stale, saw_low_confidence) {
-                    (true, false, false) => PlssTelemetryStatus::Invalid,
-                    (false, true, false) => PlssTelemetryStatus::Stale,
-                    (false, false, true) => PlssTelemetryStatus::LowConfidence,
-                    (false, false, false) if !saw_any => PlssTelemetryStatus::Missing,
+                let status = match (
+                    saw_invalid,
+                    saw_future,
+                    saw_stale,
+                    saw_low_confidence,
+                ) {
+                    (true, false, false, false) => PlssTelemetryStatus::Invalid,
+                    (false, true, false, false) => PlssTelemetryStatus::FutureDated,
+                    (false, false, true, false) => PlssTelemetryStatus::Stale,
+                    (false, false, false, true) => PlssTelemetryStatus::LowConfidence,
+                    (false, false, false, false) if !saw_any => PlssTelemetryStatus::Missing,
                     _ => PlssTelemetryStatus::InsufficientEvidence,
                 };
                 fused.push(FusedPlssTelemetryMetric {
