@@ -16,8 +16,8 @@ This patch replaces both shortcuts with explicitly dimensioned, finite-capacity 
 
 ## CO2 model
 
-- `co2_burden_l` is the unremoved generated CO2 quantity represented as liters of CO2-equivalent at a declared reference condition. It is a bookkeeping proxy, **not** suit CO2 partial pressure, ppm, physiological exposure, or time-to-harm.
-- `co2_scrubber_removal_rate_l_min` is the configured maximum CO2-equivalent capture rate. It is separate from `ventilation_flow_l_min`.
+- `co2_burden_l` is the unremoved generated CO2 quantity represented as liters of CO2-equivalent on the metabolic estimator's implicit gas-volume basis. The software does not yet declare/calibrate the reference temperature and pressure or convert gas volume into moles/partial pressure. It is a bookkeeping proxy, **not** suit CO2 partial pressure, ppm, physiological exposure, or time-to-harm.
+- `co2_scrubber_removal_rate_l_min` is the configured maximum CO2-equivalent capture rate on that same implicit volume basis. It is separate from `ventilation_flow_l_min` and is not calibrated against a particular sorbent.
 - `co2_scrubber_capacity_l` is a finite total capacity. Remaining capacity is stateful and decremented only by modeled capture.
 - The modeled capture per step is bounded by all three: CO2-equivalent burden available, rate × step duration (and modeled path availability), and remaining cartridge capacity.
 - Scrubber degradation halves the synthetic reference rate; a failed scrubber captures zero. A degraded ventilation path reduces the declared scrubber rate; a failed ventilation path retains the existing mission-abort behavior.
