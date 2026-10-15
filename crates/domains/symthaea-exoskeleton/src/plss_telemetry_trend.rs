@@ -102,7 +102,7 @@ pub struct PlssTelemetrySourceTrend {
     /// Observed first-to-last span divided by the requested window duration.
     /// This is a coverage proxy, not a statement that the sensor ran continuously.
     pub temporal_coverage_fraction: Option<f64>,
-    pub change_over_window: Option<f64>,
+    pub change_over_observed_span: Option<f64>,
     /// Endpoint secant rate per second, not a fitted regression slope.
     pub rate_per_s: Option<f64>,
     /// Bounds obtained from endpoint absolute uncertainty envelopes; not statistical CI.
@@ -318,7 +318,7 @@ fn analyze_source_trend(
         last_uncertainty_abs: unique.last().map(|sample| sample.uncertainty_abs),
         maximum_observed_gap_s: None,
         temporal_coverage_fraction: None,
-        change_over_window: None,
+        change_over_observed_span: None,
         rate_per_s: None,
         rate_lower_bound_per_s: None,
         rate_upper_bound_per_s: None,
@@ -389,7 +389,7 @@ fn analyze_source_trend(
         last_uncertainty_abs: Some(last.uncertainty_abs),
         maximum_observed_gap_s: Some(maximum_gap),
         temporal_coverage_fraction: Some(coverage),
-        change_over_window: Some(change),
+        change_over_observed_span: Some(change),
         rate_per_s: Some(rate),
         rate_lower_bound_per_s: Some(lower),
         rate_upper_bound_per_s: Some(upper),
@@ -554,7 +554,7 @@ fn digest_trend_report(report: &PlssTelemetryTrendReport) -> String {
             h.option_f64(source.last_uncertainty_abs);
             h.option_f64(source.maximum_observed_gap_s);
             h.option_f64(source.temporal_coverage_fraction);
-            h.option_f64(source.change_over_window);
+            h.option_f64(source.change_over_observed_span);
             h.option_f64(source.rate_per_s);
             h.option_f64(source.rate_lower_bound_per_s);
             h.option_f64(source.rate_upper_bound_per_s);
@@ -682,6 +682,8 @@ mod tests {
             .source_trends[0];
         assert_eq!(source.status, PlssTelemetryTrendStatus::Conflicted);
         assert_eq!(source.rate_per_s, None);
+        assert_eq!(source.maximum_observed_gap_s, Some(30.0));
+        assert_eq!(source.temporal_coverage_fraction, Some(0.5));
     }
 
     #[test]
