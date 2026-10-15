@@ -856,6 +856,7 @@ mod tests {
         restored.import_fact_record(&records[0]);
         let fact = restored.all_facts().next().unwrap();
 
+        assert_eq!(fact.id, id, "graph-level fact IDs must survive export/import");
         assert!((fact.confidence - 0.61).abs() < f32::EPSILON);
         assert!((fact.initial_confidence - 0.94).abs() < f32::EPSILON);
         assert_eq!(fact.inserted_at_cycle, 7);
@@ -864,6 +865,60 @@ mod tests {
         assert_eq!(fact.contradiction_count, 2);
         assert_eq!(fact.domain.as_deref(), Some("test"));
         assert!(fact.has_causal_relations);
+    }
+
+    #[test]
+    fn test_batch_import_reserves_stable_ids_before_legacy_rows() {
+        use super::super::persistence::FactRecord;
+
+        let stable = FactRecord {
+            vector_bytes: vec![1u8; 2048],
+            source_text: "stable identity".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 2,
+            is_causal: false,
+            graph_fact_id: Some(1),
+            initial_confidence: Some(0.8),
+            last_accessed_cycle: Some(2),
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+        let legacy = FactRecord {
+            vector_bytes: vec![2u8; 2048],
+            source_text: "legacy identity".into(),
+            confidence: 0.7,
+            domain: None,
+            cycle: 9,
+            is_causal: false,
+            graph_fact_id: None,
+            initial_confidence: None,
+            last_accessed_cycle: None,
+            corroboration_count: 0,
+            contradiction_count: 0,
+        };
+
+        // The legacy row comes first in the source vector to prove input ordering
+        // cannot steal a stable ID from a record written by the newer schema.
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        assert_eq!(graph.import_fact_records(&[legacy, stable]), 2);
+        assert_eq!(
+            graph.get_fact(1).unwrap().encoding.source_text,
+            "stable identity"
+        );
+        let legacy_fact = graph
+            .all_facts()
+            .find(|fact| fact.encoding.source_text == "legacy identity")
+            .unwrap();
+        assert_eq!(legacy_fact.id, 2);
+
+        let (next_id, _) = graph.insert(
+            make_encoding("new insertion after migration", 0.6),
+            10,
+            None,
+            false,
+        );
+        assert_eq!(next_id, 3, "next ID must advance beyond restored facts");
     }
 
     #[test]
@@ -908,6 +963,7 @@ mod tests {
             .next()
             .expect("restored graph should have a fact");
 
+        assert_eq!(fact.id, id, "SQLite round trip must preserve graph-level fact IDs");
         assert_eq!(fact.encoding.source_text, "persistent temporal fixture");
         assert_eq!(fact.encoding.vector.0.to_vec(), expected_vector);
         assert!((fact.confidence - 0.61).abs() < f32::EPSILON);
