@@ -800,9 +800,8 @@ impl KnowledgeManager {
                 .map(|(cause, effect, strength)| CausalEdgeRecord {
                     cause,
                     effect,
-                    // The legacy tuple export carries no inhibitory flag.
-                    // Do not misinterpret a confidence score's sign as relation semantics.
-                    is_inhibitory: false,
+                    // The legacy tuple export encodes inhibitory edges as negative strengths.
+                    is_inhibitory: strength < 0.0,
                     strength,
                     cycle: 0,
                 })
