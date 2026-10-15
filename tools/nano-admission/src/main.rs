@@ -392,12 +392,10 @@ fn inventory_tar_gz_open(file: &mut File) -> Result<ArchiveInventory> {
         let (display_path, path_is_unsafe, normalized_path, top_level) = {
             let entry_path = entry.path()?;
             let path_text = entry_path.to_str();
-            if let Some(path) = path_text {
-                inventory.member_path_bytes_inspected = next_member_path_byte_total(
-                    inventory.member_path_bytes_inspected,
-                    path.len(),
-                )?;
-            }
+            inventory.member_path_bytes_inspected = next_member_path_byte_total(
+                inventory.member_path_bytes_inspected,
+                member_path_metadata_len(&entry_path),
+            )?;
             let display_path = path_text
                 .map(bounded_member_display)
                 .unwrap_or_else(|| format!("<non-utf8-path-{index}>"));
@@ -490,6 +488,10 @@ fn path_is_unsafe(path: &Path, text: Option<&str>) -> bool {
     normalized.starts_with('/')
         || has_windows_drive_prefix
         || normalized.split('/').any(|component| component == "..")
+}
+
+fn member_path_metadata_len(path: &Path) -> usize {
+    path.as_os_str().as_encoded_bytes().len()
 }
 
 fn next_member_path_byte_total(current: u64, path_len: usize) -> Result<u64> {
@@ -696,6 +698,21 @@ mod tests {
     fn cumulative_member_path_metadata_is_bounded() {
         assert_eq!(next_member_path_byte_total(10, 20).expect("within path budget"), 30);
         assert!(next_member_path_byte_total(MAX_TOTAL_MEMBER_PATH_BYTES, 1).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_member_path_bytes_count_toward_cumulative_budget() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = PathBuf::from(OsString::from_vec(vec![b'x', 0xff, b'y']));
+        assert_eq!(member_path_metadata_len(&path), 3);
+        assert_eq!(
+            next_member_path_byte_total(0, member_path_metadata_len(&path))
+                .expect("count non-UTF-8 path bytes"),
+            3
+        );
     }
 
     #[test]
