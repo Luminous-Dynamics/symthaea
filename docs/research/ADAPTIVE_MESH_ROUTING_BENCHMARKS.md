@@ -47,6 +47,14 @@ Report delivery ratio, p50/p95/p99 latency, convergence / recovery time after a 
 
 The router now rejects non-finite and out-of-range peer metrics, unknown governance tiers, and obviously stale cycle updates before they alter cached peer state. Regression tests cover those conditions. These checks reduce malformed-input hazards; they do not replace authenticated sequence numbers or establish that a peer is trustworthy.
 
+A dependency-free microbenchmark measures routing-policy throughput for 16 / 64 / 256 known peers and update cost under deterministic peer-state churn:
+
+```sh
+cargo bench --bench adaptive_mesh_routing --features mesh
+```
+
+The microbenchmark is only a local CPU-cost baseline. It does **not** model multi-hop packet delivery or prove end-to-end routing quality; use the scenario corpus above for those questions.
+
 ## Acceptance gates
 
 An adaptive configuration is eligible for further consideration only if it:
