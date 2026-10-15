@@ -158,3 +158,43 @@ The existing Mycelix contracts should remain the civic-facing owners; Symthaea s
 ## Claim ceiling
 
 This is a source inspection and engineering plan. No runtime improvement, test pass, source authentication, calibration improvement, causal effect, or production readiness is claimed by this document. The grounded-query projection fix is under review in PR #7469; PR #7475 proposes the separate contradiction-context correction. Neither is treated as validated or merged in this audit. Subsequent changes should be separately reviewed and qualified.
+
+
+## Threshold sweep and retrieval-scaling follow-up (2026-10-15)
+
+This section supersedes the earlier snapshot of the role-retrieval stack where noted; it records the exact current heads, not presumed merge readiness.
+
+### A — Recheck exact-head evidence and correct the matcher diff
+
+- [PR #7494](https://github.com/Luminous-Dynamics/symthaea/pull/7494) role-aware retrieval: exact head `ea7e3e3b6f4b48715dadd094528f3b6712c9228d`, base head `d4e204d73ac0f724e54ca888895240660e2c7dfe). CI run [38791969017](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38791969017) and PR Governance [38791968929](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38791968929) remain **queued**.
+- [PR #7499](https://github.com/Luminous-Dynamics/symthaea/pull/7499) weighted matcher: exact head `3a058df9cfce2c3d8c28495215f3d9395551abf2), base head `ea7e3e3b6f4b48715dadd094528f3b6712c9228d`. CI run [38798592137](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38798592137) and PR Governance [38798592155](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38798592155) remain **queued**.
+- The live #7499 diff contained two `#[test]` attributes on the same augmenting-path test function. The second annotation was removed in commit `3a058df9cfce2c3d8c28495215f3d9395551abf2`; it is a source-level correction, not a claimed test pass.
+
+### B — Make assignment quality an explicit objective
+
+The weighted matcher in #7499 uses deterministic min-cost max-flow to optimize lexicographically: maximize matched query-term cardinality first, then maximize summed cosine among equal-cardinality assignments. Its Rust tests include coverage over all 512 eligibility graphs for a 3-query × 3-observation bipartite graph, plus concrete tests for global similarity, coverage precedence, deterministic ties and invalid candidate edges. These checks are authored and awaiting CI; the exhaustive oracle has **not** been executed in this authoring environment. This remains an implementation hypothesis, not a measured retrieval improvement.
+
+### C — Sweep threshold behavior on labeled synthetic controls
+
+[PR #7508](https://github.com/Luminous-Dynamics/symthaea/pull/7508) was rebuilt directly on the corrected weighted-matcher head; it is one commit ahead and zero behind that base.
+
+- Exact head: `905f494eee1dafd57bd1664dffd4a21769cb7515`; base head: `3a058df9cfce2c3d8c28495215f3d9395551abf2`.
+- CI [38798717664](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38798717664) and PR Governance [38798717663](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38798717663) are **queued**, not passing.
+- The labeled test now sweeps cosine thresholds 0.99, 0.1, and -1.0 over the same two positive controls and four negative-control families, reporting recall@10, false-positive count and false-positive rate. Its assertions are meant to expose the threshold/false-positive trade-off; they have not yet executed.
+- The earlier stale corpus branch [PR #7497](https://github.com/Luminous-Dynamics/symthaea/pull/7497) is closed unmerged. It was superseded by #7508 so the corpus change sits directly on the corrected weighted-matcher head without carrying the duplicate annotation.
+
+This synthetic sweep **does not calibrate** a production threshold. The small corpus is handcrafted, lacks realistic prevalence, and cannot establish natural-language semantic recall or external-validity estimates.
+
+### D — Add a non-gating scaling probe and define qualification gates
+
+#7508 also adds an opt-in ignored test that measures retrieval for 16, 64 and 256 stored observations and query sizes 1, 2 and 4, taking seven samples per condition and printing the median plus the observed maximum. It deliberately asserts no runtime limit, avoiding flaky CI timing gates. Run it on a controlled machine and preferably in release mode with:
+
+```sh
+cargo test --release benchmark_role_observation_search_query_and_graph_scaling -- --ignored --nocapture
+```
+
+The current authoring environment has no local Rust checkout/toolchain, so neither the normal tests nor the ignored scaling probe has been executed here. CI is queued at the three exact heads above; no workflow success is claimed.
+
+Before enabling role-observation search in the default `KnowledgeManager::do_search` path, qualification still requires an independently sourced and versioned corpus, adjudicated qrels, development/held-out separation, hard negatives (same text/different type; same entities/different role; reversed relation; negation; missing terms; legacy records; contradictory claims), and direct comparisons to lexical and conventional-structural baselines over the same candidate universe. Report Recall@k, MRR/nDCG, per-query coverage, false-match rate, abstention/coverage trade-offs, and p50/p95 latency by query size and observation count. Fix thresholds on development data and report held-out results; do not select a default from unit fixtures or from one high-dimensional random-token setup.
+
+The default search path remains unchanged. Retrieval similarity remains separate from stored confidence and must not be reported as calibrated epistemic probability, source authenticity, causal identification, or truth.
