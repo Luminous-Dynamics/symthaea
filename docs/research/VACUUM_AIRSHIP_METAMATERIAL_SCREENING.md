@@ -300,7 +300,7 @@ signed Δp ∈ [p_external,min − p_internal,max,
 demand = max(signed Δp, 0)
 ```
 
-If every possible case has no positive external differential, it reports `NoExternalPressureDemand`. If demand can be positive but no capacity is declared, capacity remains unknown. If capacity metadata is incomplete, comparison is blocked. Otherwise, the result distinguishes three arithmetic relationships: the minimum declared capacity covers the maximum declared demand; the intervals overlap; or even the maximum declared capacity is below the minimum positive demand.
+If every possible case has no positive external differential, it reports `NoExternalPressureDemand`. Any supplied capacity interval is still validated for finite, ordered, positive endpoints even in this branch, so malformed declarations cannot be silently ignored. If demand can be positive but no capacity is declared, capacity remains unknown. If capacity metadata is incomplete, comparison is blocked. Otherwise, the result distinguishes three arithmetic relationships: the minimum declared capacity covers the maximum declared demand; the intervals overlap; or even the maximum declared capacity is below the minimum positive demand.
 
 For example, a hypothetical demand bound of 98–102 kPa and a hypothetical declared allowable-capacity bound of 105–120 kPa yields `DeclaredCapacityCoversDemandBounds`. That means only the *declared endpoint intervals* are ordered. It does not mean the evidence is genuine, the capacity is qualified for the exact design, or the shell is safe. The code cannot authenticate the referenced solver/test records, inspect their scopes, verify independence, establish imperfection coverage, or account for damage and dynamic effects.
 
