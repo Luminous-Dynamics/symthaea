@@ -225,6 +225,101 @@ pub fn screen_inspection_escape_population(
     })
 }
 
+/// Conditional inspection-escape bounds across independent declared intervals.
+///
+/// The lower endpoint uses the lowest defect prevalence and highest probability of detection;
+/// the upper endpoint uses the highest defect prevalence and lowest probability of detection.
+/// This produces an outer arithmetic envelope for all combinations within the declared intervals
+/// if the identical-independent-feature model applies. It does not cover unmodeled common causes,
+/// heterogeneous populations, or an incorrect model.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoundedInspectionEscapePopulationResult {
+    pub feature_count: u64,
+    pub per_feature_critical_defect_probability: ScalarBounds,
+    pub conditional_probability_of_detection: ScalarBounds,
+    pub expected_undetected_critical_defect_count_lower_bound: f64,
+    pub expected_undetected_critical_defect_count_upper_bound: f64,
+    pub probability_at_least_one_critical_defect_escapes_lower_bound: f64,
+    pub probability_at_least_one_critical_defect_escapes_upper_bound: f64,
+}
+
+/// Propagate ranges for defect prevalence and inspection detection into escaped-defect bounds.
+///
+/// The result is conditional on the supplied interval limits and the identical-independent-feature
+/// model. It is useful for sensitivity analysis when probability-of-detection or prevalence comes
+/// from finite qualification samples. Do not interpret the endpoints as confidence limits unless
+/// the caller has constructed them as such using an appropriate statistical method.
+pub fn screen_bounded_inspection_escape_population(
+    feature_count: u64,
+    per_feature_critical_defect_probability: ScalarBounds,
+    conditional_probability_of_detection: ScalarBounds,
+) -> Result<BoundedInspectionEscapePopulationResult, ScreeningError> {
+    if feature_count == 0 {
+        return Err(ScreeningError::MustBePositive("feature_count"));
+    }
+    for (name, bounds) in [
+        (
+            "per_feature_critical_defect_probability",
+            per_feature_critical_defect_probability,
+        ),
+        (
+            "conditional_probability_of_detection",
+            conditional_probability_of_detection,
+        ),
+    ] {
+        validate_bounds(bounds, name, true)?;
+        if bounds.max > 1.0 {
+            return Err(ScreeningError::FractionOutOfRange(name));
+        }
+    }
+
+    let escape_probability_lower_bound = per_feature_critical_defect_probability.min
+        * (1.0 - conditional_probability_of_detection.max);
+    let escape_probability_upper_bound = per_feature_critical_defect_probability.max
+        * (1.0 - conditional_probability_of_detection.min);
+    let expected_undetected_critical_defect_count_lower_bound =
+        feature_count as f64 * escape_probability_lower_bound;
+    let expected_undetected_critical_defect_count_upper_bound =
+        feature_count as f64 * escape_probability_upper_bound;
+    let probability_at_least_one_critical_defect_escapes_lower_bound = -((feature_count as f64)
+        * (-escape_probability_lower_bound).ln_1p())
+    .exp_m1();
+    let probability_at_least_one_critical_defect_escapes_upper_bound = -((feature_count as f64)
+        * (-escape_probability_upper_bound).ln_1p())
+    .exp_m1();
+
+    for (name, value) in [
+        (
+            "expected undetected critical defect lower bound",
+            expected_undetected_critical_defect_count_lower_bound,
+        ),
+        (
+            "expected undetected critical defect upper bound",
+            expected_undetected_critical_defect_count_upper_bound,
+        ),
+        (
+            "population inspection escape probability lower bound",
+            probability_at_least_one_critical_defect_escapes_lower_bound,
+        ),
+        (
+            "population inspection escape probability upper bound",
+            probability_at_least_one_critical_defect_escapes_upper_bound,
+        ),
+    ] {
+        validate_result(value, name)?;
+    }
+
+    Ok(BoundedInspectionEscapePopulationResult {
+        feature_count,
+        per_feature_critical_defect_probability,
+        conditional_probability_of_detection,
+        expected_undetected_critical_defect_count_lower_bound,
+        expected_undetected_critical_defect_count_upper_bound,
+        probability_at_least_one_critical_defect_escapes_lower_bound,
+        probability_at_least_one_critical_defect_escapes_upper_bound,
+    })
+}
+
 /// Exact sphere volume for a positive radius, useful for an initial reference geometry.
 pub fn sphere_volume_m3(radius_m: f64) -> Result<f64, ScreeningError> {
     validate_positive(radius_m, "radius_m")?;
@@ -3180,6 +3275,64 @@ mod tests {
         assert_eq!(
             screen_inspection_escape_population(10, 0.1, f64::NAN).unwrap_err(),
             ScreeningError::NonFiniteInput("conditional_probability_of_detection")
+        );
+    }
+
+    #[test]
+    fn bounded_inspection_escape_intervals_match_scalar_for_degenerate_inputs() {
+        let scalar = screen_inspection_escape_population(1_000, 0.01, 0.9).unwrap();
+        let bounded = screen_bounded_inspection_escape_population(
+            1_000,
+            ScalarBounds { min: 0.01, max: 0.01 },
+            ScalarBounds { min: 0.9, max: 0.9 },
+        )
+        .unwrap();
+        assert!((bounded.probability_at_least_one_critical_defect_escapes_lower_bound
+            - scalar.probability_at_least_one_critical_defect_escapes)
+            .abs()
+            < 1e-12);
+        assert!((bounded.probability_at_least_one_critical_defect_escapes_upper_bound
+            - scalar.probability_at_least_one_critical_defect_escapes)
+            .abs()
+            < 1e-12);
+    }
+
+    #[test]
+    fn bounded_inspection_escape_intervals_propagate_worst_and_best_endpoints() {
+        let result = screen_bounded_inspection_escape_population(
+            1_000,
+            ScalarBounds { min: 0.001, max: 0.01 },
+            ScalarBounds { min: 0.8, max: 0.95 },
+        )
+        .unwrap();
+        let expected_lower = -1_000.0_f64.mul_add(0.0, (1.0_f64 - 0.00005_f64).powi(0));
+        let _ = expected_lower;
+        assert!(result.probability_at_least_one_critical_defect_escapes_lower_bound > 0.0);
+        assert!(result.probability_at_least_one_critical_defect_escapes_upper_bound
+            > result.probability_at_least_one_critical_defect_escapes_lower_bound);
+        assert!((result.expected_undetected_critical_defect_count_lower_bound - 0.05).abs() < 1e-12);
+        assert!((result.expected_undetected_critical_defect_count_upper_bound - 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn bounded_inspection_escape_intervals_reject_reversed_and_out_of_range_inputs() {
+        assert_eq!(
+            screen_bounded_inspection_escape_population(
+                10,
+                ScalarBounds { min: 0.2, max: 0.1 },
+                ScalarBounds { min: 0.8, max: 0.9 },
+            )
+            .unwrap_err(),
+            ScreeningError::InvalidInterval("per_feature_critical_defect_probability")
+        );
+        assert_eq!(
+            screen_bounded_inspection_escape_population(
+                10,
+                ScalarBounds { min: 0.0, max: 1.1 },
+                ScalarBounds { min: 0.8, max: 0.9 },
+            )
+            .unwrap_err(),
+            ScreeningError::FractionOutOfRange("per_feature_critical_defect_probability")
         );
     }
 
