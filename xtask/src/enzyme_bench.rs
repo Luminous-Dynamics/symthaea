@@ -141,6 +141,8 @@ pub struct CheckReport {
     pub metadata_coverage: BTreeMap<String, MetadataCoverage>,
     /// Nested candidate counts under the proposed kcat admission profile; not an admission result.
     pub kcat_evidence_tiers: KcatEvidenceTiers,
+    /// One highest-tier label per observation, in CSV row order.
+    pub row_evidence_tiers: Vec<RowEvidenceTier>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -148,6 +150,13 @@ pub struct KcatEvidenceTiers {
     pub context_qualified: usize,
     pub primary_comparison_candidates: usize,
     pub kinetic_reproduction_candidates: usize,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct RowEvidenceTier {
+    pub observation_id: String,
+    /// The highest metadata-evidence tier reached; not a scientific-validity judgment.
+    pub tier: &'static str,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -206,6 +215,14 @@ pub fn check(workspace_root: &Path, manifest_path: &Path) -> Result<()> {
         report.kcat_evidence_tiers.primary_comparison_candidates,
         report.kcat_evidence_tiers.kinetic_reproduction_candidates
     );
+    for row_tier in &report.row_evidence_tiers {
+        let observation_id_json =
+            serde_json::to_string(&row_tier.observation_id).expect("JSON serialization of a string is infallible");
+        println!(
+            "ENZYME_KCAT_ROW_TIER observation_id_json={} tier={}",
+            observation_id_json, row_tier.tier
+        );
+    }
     for (field_name, coverage) in &report.metadata_coverage {
         println!(
             "ENZYME_METADATA_COVERAGE field={} observations={} reported={} not_reported={} not_applicable={} unrecorded={} invalid={}",
@@ -315,6 +332,7 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
     let mut observed_test_families = BTreeSet::new();
     let mut metadata_coverage = empty_metadata_coverage();
     let mut kcat_evidence_tiers = KcatEvidenceTiers::default();
+    let mut row_evidence_tiers = Vec::new();
     let mut observations = 0usize;
 
     for (row_index, row) in reader.records().enumerate() {
@@ -426,15 +444,23 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         validate_condition(&conditions, "temperature_c", row_index + 2)?;
         validate_condition(&conditions, "substrate_id", row_index + 2)?;
         record_optional_metadata_coverage(&conditions, &mut metadata_coverage);
+        let mut tier_name = "review_only";
         if is_context_qualified(&conditions) {
             kcat_evidence_tiers.context_qualified += 1;
+            tier_name = "context_qualified";
             if is_primary_comparison_candidate(&conditions) {
                 kcat_evidence_tiers.primary_comparison_candidates += 1;
+                tier_name = "primary_comparison_candidate";
                 if is_kinetic_reproduction_candidate(&conditions) {
                     kcat_evidence_tiers.kinetic_reproduction_candidates += 1;
+                    tier_name = "kinetic_reproduction_candidate";
                 }
             }
         }
+        row_evidence_tiers.push(RowEvidenceTier {
+            observation_id: observation_id.to_string(),
+            tier: tier_name,
+        });
 
         let study = field(&row, &header_index, "source_study_id");
         let family = field(&row, &header_index, "sequence_family_id");
@@ -536,6 +562,7 @@ fn validate(workspace_root: &Path, manifest: &Manifest) -> Result<CheckReport> {
         cross_split_studies,
         metadata_coverage,
         kcat_evidence_tiers,
+        row_evidence_tiers,
     })
 }
 
@@ -1302,6 +1329,11 @@ mod tests {
         assert_eq!(report.cross_split_studies, 0);
         assert_eq!(report.metadata_coverage.len(), OPTIONAL_METADATA_FIELDS.len());
         assert_eq!(report.metadata_coverage["enzyme_purity"].unrecorded, 2);
+        assert_eq!(report.kcat_evidence_tiers.context_qualified, 0);
+        assert_eq!(report.kcat_evidence_tiers.primary_comparison_candidates, 0);
+        assert_eq!(report.kcat_evidence_tiers.kinetic_reproduction_candidates, 0);
+        assert_eq!(report.row_evidence_tiers.len(), report.observations);
+        assert!(report.row_evidence_tiers.iter().all(|row| row.tier == "review_only"));
         fs::remove_dir_all(root).unwrap();
     }
 
