@@ -389,8 +389,8 @@ impl EnhancedKnowledgeGraph {
                 }
             }
 
-            // Search high-similarity edges first, but permit reassignment through
-            // augmenting paths so a locally best edge cannot reduce total coverage.
+            // Optimize the assignment lexicographically: maximize covered query terms,
+            // then maximize total pairwise similarity among equally complete assignments.
             for candidates in &mut candidates_by_query {
                 candidates.sort_by(|a, b| {
                     b.1.partial_cmp(&a.1)
@@ -398,8 +398,10 @@ impl EnhancedKnowledgeGraph {
                         .then_with(|| a.0.cmp(&b.0))
                 });
             }
-            let observation_to_query =
-                maximum_cardinality_matching(&candidates_by_query, observations.len());
+            let observation_to_query = maximum_weight_maximum_cardinality_matching(
+                &candidates_by_query,
+                observations.len(),
+            );
             let mut assignments: Vec<(usize, usize)> = observation_to_query
                 .iter()
                 .enumerate()
@@ -1032,50 +1034,129 @@ impl EnhancedKnowledgeGraph {
     }
 }
 
-fn maximum_cardinality_matching(
+fn maximum_weight_maximum_cardinality_matching(
     candidates_by_query: &[Vec<(usize, f32)>],
     observation_count: usize,
 ) -> Vec<Option<usize>> {
-    fn augment(
-        query_index: usize,
-        candidates_by_query: &[Vec<(usize, f32)>],
-        observation_to_query: &mut [Option<usize>],
-        seen_observations: &mut [bool],
-    ) -> bool {
-        for &(observation_index, _) in &candidates_by_query[query_index] {
-            if observation_index >= observation_to_query.len()
-                || seen_observations[observation_index]
-            {
-                continue;
-            }
-            seen_observations[observation_index] = true;
-
-            let can_assign = match observation_to_query[observation_index] {
-                None => true,
-                Some(previous_query) => augment(
-                    previous_query,
-                    candidates_by_query,
-                    observation_to_query,
-                    seen_observations,
-                ),
-            };
-            if can_assign {
-                observation_to_query[observation_index] = Some(query_index);
-                return true;
-            }
-        }
-        false
+    #[derive(Clone)]
+    struct Edge {
+        to: usize,
+        reverse_index: usize,
+        capacity: u8,
+        cost: f64,
     }
 
-    let mut observation_to_query = vec![None; observation_count];
-    for query_index in 0..candidates_by_query.len() {
-        let mut seen_observations = vec![false; observation_count];
-        let _ = augment(
-            query_index,
-            candidates_by_query,
-            &mut observation_to_query,
-            &mut seen_observations,
+    fn add_edge(graph: &mut [Vec<Edge>], from: usize, to: usize, cost: f64) -> usize {
+        let forward_index = graph[from].len();
+        let reverse_index = graph[to].len();
+        graph[from].push(Edge {
+            to,
+            reverse_index,
+            capacity: 1,
+            cost,
+        });
+        graph[to].push(Edge {
+            to: from,
+            reverse_index: forward_index,
+            capacity: 0,
+            cost: -cost,
+        });
+        forward_index
+    }
+
+    let query_count = candidates_by_query.len();
+    let source = 0;
+    let query_start = 1;
+    let observation_start = query_start + query_count;
+    let sink = observation_start + observation_count;
+    let mut residual: Vec<Vec<Edge>> = vec![Vec::new(); sink + 1];
+    let mut assignment_edges: Vec<Vec<(usize, usize)>> = vec![Vec::new(); query_count];
+
+    for query_index in 0..query_count {
+        add_edge(&mut residual, source, query_start + query_index, 0.0);
+    }
+    for observation_index in 0..observation_count {
+        add_edge(
+            &mut residual,
+            observation_start + observation_index,
+            sink,
+            0.0,
         );
+    }
+    for (query_index, candidates) in candidates_by_query.iter().enumerate() {
+        let query_node = query_start + query_index;
+        for &(observation_index, similarity) in candidates {
+            if observation_index >= observation_count || !similarity.is_finite() {
+                continue;
+            }
+            let observation_node = observation_start + observation_index;
+            let edge_index = add_edge(
+                &mut residual,
+                query_node,
+                observation_node,
+                -(similarity as f64),
+            );
+            assignment_edges[query_index].push((observation_index, edge_index));
+        }
+    }
+
+    loop {
+        let node_count = residual.len();
+        let mut distance = vec![f64::INFINITY; node_count];
+        let mut predecessor: Vec<Option<(usize, usize)>> = vec![None; node_count];
+        distance[source] = 0.0;
+
+        // Bellman-Ford over the residual network; insertion order breaks ties.
+        for _ in 0..node_count.saturating_sub(1) {
+            let mut changed = false;
+            for from in 0..node_count {
+                if !distance[from].is_finite() {
+                    continue;
+                }
+                for (edge_index, edge) in residual[from].iter().enumerate() {
+                    if edge.capacity == 0 {
+                        continue;
+                    }
+                    let candidate_distance = distance[from] + edge.cost;
+                    if candidate_distance < distance[edge.to] - 1e-12 {
+                        distance[edge.to] = candidate_distance;
+                        predecessor[edge.to] = Some((from, edge_index));
+                        changed = true;
+                    }
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+
+        if predecessor[sink].is_none() {
+            break;
+        }
+
+        // Augment one unit of flow along the shortest residual path.
+        let mut node = sink;
+        while node != source {
+            let (from, edge_index) = predecessor[node]
+                .expect("a reachable augmenting path must have a predecessor");
+            let to = residual[from][edge_index].to;
+            let reverse_index = residual[from][edge_index].reverse_index;
+            residual[from][edge_index].capacity -= 1;
+            residual[to][reverse_index].capacity += 1;
+            node = from;
+        }
+    }
+
+    // Return the existing representation: observation index -> assigned query.
+    let mut observation_to_query = vec![None; observation_count];
+    for (query_index, edges) in assignment_edges.iter().enumerate() {
+        let query_node = query_start + query_index;
+        for &(observation_index, edge_index) in edges {
+            if residual[query_node][edge_index].capacity == 0 {
+                observation_to_query[observation_index] = Some(query_index);
+                break;
+            }
+        }
     }
     observation_to_query
 }
@@ -1320,6 +1401,166 @@ mod tests {
             .is_empty());
     }
 
+    fn brute_force_matching_objective(
+        candidates_by_query: &[Vec<(usize, f32)>],
+        observation_count: usize,
+    ) -> (usize, f64) {
+        fn visit(
+            query_index: usize,
+            candidates_by_query: &[Vec<(usize, f32)>],
+            used_observations: &mut [bool],
+            matched_count: usize,
+            total_similarity: f64,
+            best: &mut (usize, f64),
+        ) {
+            if query_index == candidates_by_query.len() {
+                if matched_count > best.0
+                    || (matched_count == best.0 && total_similarity > best.1 + 1e-12)
+                {
+                    *best = (matched_count, total_similarity);
+                }
+                return;
+            }
+
+            // Leaving a query term unmatched is always a valid candidate.
+            visit(
+                query_index + 1,
+                candidates_by_query,
+                used_observations,
+                matched_count,
+                total_similarity,
+                best,
+            );
+
+            for &(observation_index, similarity) in &candidates_by_query[query_index] {
+                if observation_index >= used_observations.len()
+                    || used_observations[observation_index]
+                    || !similarity.is_finite()
+                {
+                    continue;
+                }
+                used_observations[observation_index] = true;
+                visit(
+                    query_index + 1,
+                    candidates_by_query,
+                    used_observations,
+                    matched_count + 1,
+                    total_similarity + similarity as f64,
+                    best,
+                );
+                used_observations[observation_index] = false;
+            }
+        }
+
+        let mut best = (0, 0.0);
+        visit(
+            0,
+            candidates_by_query,
+            &mut vec![false; observation_count],
+            0,
+            0.0,
+            &mut best,
+        );
+        best
+    }
+
+    #[test]
+    fn test_role_matcher_maximizes_similarity_after_coverage() {
+        // Both assignments have cardinality two. A first-fit matcher would take
+        // query 0 -> observation 0 (0.95) and query 1 -> observation 1 (0.10),
+        // total 1.05. The optimal assignment is 0.80 + 0.90 = 1.70.
+        let candidates_by_query =
+            vec![vec![(0, 0.95), (1, 0.80)], vec![(0, 0.90), (1, 0.10)]];
+        let assignment =
+            maximum_weight_maximum_cardinality_matching(&candidates_by_query, 2);
+        assert_eq!(assignment, vec![Some(1), Some(0)]);
+        let total_similarity = 0.80_f32 + 0.90_f32;
+        assert!((total_similarity - 1.70).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_role_matcher_maximizes_coverage_before_similarity() {
+        // A one-edge assignment scores 0.95 but covers only one query term.
+        // The selected solution must cover both terms, even at lower total score.
+        let candidates_by_query = vec![vec![(0, 0.95), (1, 0.20)], vec![(0, 0.80)]];
+        let assignment =
+            maximum_weight_maximum_cardinality_matching(&candidates_by_query, 2);
+        assert_eq!(assignment, vec![Some(1), Some(0)]);
+    }
+
+    #[test]
+    fn test_role_matcher_ties_are_deterministic() {
+        let candidates_by_query = vec![vec![(0, 0.7), (1, 0.7)], vec![(0, 0.7), (1, 0.7)]];
+        let first = maximum_weight_maximum_cardinality_matching(&candidates_by_query, 2);
+        let second = maximum_weight_maximum_cardinality_matching(&candidates_by_query, 2);
+        assert_eq!(first, second);
+        assert_eq!(first.iter().filter(|assigned| assigned.is_some()).count(), 2);
+    }
+
+    #[test]
+    fn test_role_matcher_ignores_invalid_weights_and_indices() {
+        let candidates_by_query = vec![vec![(0, f32::NAN), (7, 0.9), (1, 0.4)]];
+        let assignment =
+            maximum_weight_maximum_cardinality_matching(&candidates_by_query, 2);
+        assert_eq!(assignment, vec![None, Some(0)]);
+    }
+
+    #[test]
+    fn test_weighted_matcher_agrees_with_exhaustive_oracle_for_all_3x3_graphs() {
+        // Enumerate every eligibility graph for three query terms and three
+        // observations (2^9 graphs). Compare against an independent exhaustive
+        // oracle whose objective is lexicographic: cardinality, then total weight.
+        let query_count = 3usize;
+        let observation_count = 3usize;
+        for edge_mask in 0u16..(1u16 << (query_count * observation_count)) {
+            let mut candidates_by_query = vec![Vec::new(); query_count];
+            for query_index in 0..query_count {
+                for observation_index in 0..observation_count {
+                    let bit = query_index * observation_count + observation_index;
+                    if edge_mask & (1u16 << bit) != 0 {
+                        let weight = (1 + ((query_index * 5 + observation_index * 3) % 9)) as f32
+                            / 10.0;
+                        candidates_by_query[query_index].push((observation_index, weight));
+                    }
+                }
+            }
+
+            let expected =
+                brute_force_matching_objective(&candidates_by_query, observation_count);
+            let assignment = maximum_weight_maximum_cardinality_matching(
+                &candidates_by_query,
+                observation_count,
+            );
+            let actual_count = assignment
+                .iter()
+                .filter(|query_index| query_index.is_some())
+                .count();
+            let actual_weight: f64 = assignment
+                .iter()
+                .enumerate()
+                .filter_map(|(observation_index, query_index)| {
+                    let query_index = (*query_index)?;
+                    candidates_by_query[query_index]
+                        .iter()
+                        .find(|(candidate_observation, _)| {
+                            *candidate_observation == observation_index
+                        })
+                        .map(|(_, similarity)| *similarity as f64)
+                })
+                .sum();
+
+            assert_eq!(
+                actual_count, expected.0,
+                "weighted matcher has wrong cardinality for edge mask {edge_mask:#05x}"
+            );
+            assert!(
+                (actual_weight - expected.1).abs() < 1e-8,
+                "weighted matcher has wrong total score for edge mask {edge_mask:#05x}: got {actual_weight}, expected {}",
+                expected.1
+            );
+        }
+    }
+
     #[test]
     fn test_role_observation_search_is_stable_across_sqlite_restart() {
         let dir = std::env::temp_dir().join(format!(
@@ -1395,7 +1636,8 @@ mod tests {
         // leaving query 1 unmatched. Reassignment should find the full solution:
         // query 0 -> observation 1 and query 1 -> observation 0.
         let candidates_by_query = vec![vec![(0, 0.9), (1, 0.2)], vec![(0, 0.8)]];
-        let observation_to_query = maximum_cardinality_matching(&candidates_by_query, 2);
+        let observation_to_query =
+            maximum_weight_maximum_cardinality_matching(&candidates_by_query, 2);
 
         assert_eq!(observation_to_query, vec![Some(1), Some(0)]);
     }
