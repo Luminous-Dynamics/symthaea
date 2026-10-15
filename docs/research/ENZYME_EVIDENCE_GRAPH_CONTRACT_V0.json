@@ -243,6 +243,8 @@
     ]
   },
   "graph_invariants": [
+    "Unknown fields in typed graph records are rejected rather than silently ignored.",
+    "Every declared artifact is referenced by an evidence node or transformation input/output/execution-identity field.",
     "Every node ID and artifact ID is unique within a graph version.",
     "Every edge endpoint resolves to a declared node; dangling edges fail closed.",
     "Derivation edges form a directed acyclic graph; provenance references may point to shared upstream source nodes.",
