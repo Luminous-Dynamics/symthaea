@@ -31,6 +31,14 @@ Do not add a second generic observation/provenance ontology for this work. The i
 
 The execution contract is tracked in [TRANSPORT-RAIL-001A #7452](https://github.com/Luminous-Dynamics/symthaea/issues/7452), under the existing rail/fixed-guideway owner [#6248](https://github.com/Luminous-Dynamics/symthaea/issues/6248). It is a research/data workstream, not a new track-geometry schema or railway dynamics solver. The current FRA RR 26-01 report describes an initial investigation and states that case studies were the next research step; source access to raw track geometry remains a gate, not an assumption. The benchmark therefore separates (a) operational forecasts using only information available at issuance from (b) post-intervention forecasts after maintenance actually occurs, and requires future-time plus segment/route holdouts, negative leakage controls and independently recomputed metrics.
 
+## South African railway data and governance path
+
+The Railway Safety Regulator's [NIIMS NextGen update published 22 June 2026](https://www.rsr.org.za/niims-nextgen-strengthening-railway-safety-through-digital-oversight/) describes an Operator Asset Management Module for asset registers and maintenance plans. Treat it as a potential **authorized data/interoperability lead**, not as public data, an open API, or permission to access operator records. Obtain explicit owner approval, purpose/access terms, and source/version metadata before any dataset admission. Do not replace an operator's asset register or the RSR's compliance/occurrence systems with a Mycelix duplicate.
+
+The same update says Phase 2 of NIIMS NextGen was planned for **1 November 2026** for safety permits, audits and inspections. As of 15 October 2026, that date is future; verify official status rather than presuming those modules are live. Current approved processes remain authoritative until the regulator confirms the transition.
+
+Use the RSR's [rail safety standards index](https://www.rsr.org.za/categories_rt/railway-regulatory-tools/railway-safety-standards/) and [2026 standards-development overview](https://www.rsr.org.za/wp-content/uploads/2026/03/Standards-Development.pdf) to discover applicable sources. Freeze a standard's edition and authority in each project profile only after confirmation with the responsible operator/infrastructure manager and current regulator requirements. FRA forecasts may inform methods, but their datasets, maintenance practices and geography do not establish South African model calibration.
+
 ## First research targets
 
 ### Roads
