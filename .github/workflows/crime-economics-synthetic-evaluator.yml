@@ -93,7 +93,9 @@ jobs:
             ([.viability_gate_registry[] | select(.gate_id == "MAX_INTERVAL_WIDTH" and .value == 0.2)] | length) == 1 and
             ([.viability_gate_registry[] | select(.gate_id == "MAX_TIME_INTERVAL_WIDTH_MINUTES" and .value == 20)] | length) == 1 and
             ([.viability_gate_registry[] | select(.gate_id == "MAX_EVIDENCE_AGE_DAYS" and .value == 180)] | length) == 1 and
-            (.evidence_context_sources | length) == 3 and
+            (.evidence_context_sources | length) == 4 and
+            ([.evidence_context_sources[].source_id] | unique | length) == 4 and
+            ([.evidence_context_sources[] | select(.source_id == "STATSSA-GPSJS-2025-26" and .used_as_crime_effect_parameter == false)] | length) == 1 and
             all(.evidence_context_sources[]; .used_as_crime_effect_parameter == false) and
             (.files | length) == 10 and
             ([.files[].path] | unique | length) == (.files | length) and

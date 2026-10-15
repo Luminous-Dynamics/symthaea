@@ -40,11 +40,11 @@
     },
     {
       "path": "tools/crime-economics-sim/README.md",
-      "git_blob_sha1": "58e3474ed6581c05dfa3960d5d50588905265d41"
+      "git_blob_sha1": "5c9a2a76ab7d2e15c08fde89ee55c16f56429410"
     },
     {
       "path": ".github/workflows/crime-economics-synthetic-evaluator.yml",
-      "git_blob_sha1": "a1a709d99dc4f054bde37703d2dfab2906e010ce"
+      "git_blob_sha1": "19f568ae1d70c648f08d9ae50012496455db04b8"
     },
     {
       "path": "tools/crime-economics-sim/src/viability.rs",
@@ -509,6 +509,16 @@
       "used_as_crime_effect_parameter": false,
       "relevance": "Context for structuring labour and decent-work indicators.",
       "limitation": "Used for construct coverage only; not an empirical parameter source for the simulation."
+    },
+    {
+      "source_id": "STATSSA-GPSJS-2025-26",
+      "title": "Governance, Public Safety and Justice Survey 2025/26 — Victims of Crime Release",
+      "uri": "https://www.statssa.gov.za/?PPN=P0341&SCH=74591&page_id=1856",
+      "publication_date": "2026-09-01",
+      "source_class": "official_descriptive_victimization_and_reporting_statistics",
+      "used_as_crime_effect_parameter": false,
+      "relevance": "Latest national victimization survey release; distinguishes incident counts, affected households, and the share reporting some or all incidents to police.",
+      "limitation": "National descriptive survey estimates are not Johannesburg pilot data, a causal effect coefficient, or an individual risk signal. Incident counts, affected-household counts, and reporting proportions are distinct measures; sample-design and precision information must be retained for empirical use."
     }
   ],
   "viability_measure_definitions": [
