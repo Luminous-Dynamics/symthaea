@@ -26,6 +26,33 @@ Every request to make a factory smaller MUST declare one transformation class:
 
 A smaller drawing that omits support systems is not an equivalent smaller factory. A microfactory is not a shrink-wrapped industrial plant unless its operations, hazards, controls and evidence remain valid in the new envelope.
 
+## Representation ownership and zero-new-type rule
+
+The names in this document (including `FactoryDesignCandidateV1`,
+`ScaleTransferPlanV1`, and `QualificationEvidenceEnvelopeV1`) are conceptual
+groupings for review, **not a mandate to add three new persistent/shared Rust
+types**. Before implementation, project them onto the current canonical owners:
+
+- [ENG-DESIGN-002 #6090](https://github.com/Luminous-Dynamics/symthaea/issues/6090)
+  owns design-processing orchestration and the reference-based package.
+- [MFG-PROC-007A #5701](https://github.com/Luminous-Dynamics/symthaea/pull/5701)
+  exposes existing process-state, capability, recipe and plan contracts.
+- [MFG-FOUNDATION-001I #5763](https://github.com/Luminous-Dynamics/symthaea/issues/5763)
+  already names `GeometryOrScaleTransfer` as a transfer dimension and describes
+  a reference-based research-to-manufacturing adapter.
+- [MFG-FOUNDATION-001A0 #5768](https://github.com/Luminous-Dynamics/symthaea/issues/5768)
+  sets common manufacturing production types to zero by default until an
+  adversarial fixture demonstrates an actual semantic gap.
+- [CP-03 #6390](https://github.com/Luminous-Dynamics/symthaea/pull/6390)
+  owns the manufacturing digital-thread relation between design, plan,
+  execution, as-built article, metrology and disposition.
+
+Therefore, prefer exact references plus a derived assessment over copied
+payloads. Add a new shared type only after an ownership audit and frozen
+negative-control fixture prove that the existing owners cannot represent the
+required distinction losslessly. Do not create a second qualification ledger,
+unit ontology, component catalogue, measurement store or release authority.
+
 ## 3. Typed artifact boundaries
 
 Reuse the existing engineering catalog, typed physical-model and CP-03 manufacturing contracts rather than defining a parallel ontology.
@@ -114,7 +141,7 @@ For South Africa, check current local requirements with qualified professionals 
 
 ## 8. Implementation sequence
 
-1. Add typed candidate and scale-transfer records to current engineering contracts; no actuation and no new solver.
+1. Compose exact ENG-DESIGN/MFG-PROC/CP-03 references first; add only a minimal derived scale-transfer adapter if a frozen adversarial fixture proves an unrepresented semantic gap. No actuation and no new solver.
 2. Use one benign reference facility (for example an irrigation/monitoring cell) with water/power/heat balances and an independent checker.
 3. Validate one safe hardware component with calibrated instrumentation before labelling a model validated.
 4. Join components through exact interface/frame/unit contracts; inject sensor loss, stuck actuator, supply interruption and over-limit conditions.
