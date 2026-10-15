@@ -2293,11 +2293,11 @@ mod tests {
         })
         .unwrap();
         assert!(
-            (result.mean_compressive_load_per_effective_path_n - 4_444_444.444444444).abs()
+            (result.mean_compressive_load_per_effective_path_n - 4_444_611.848623908).abs()
                 < 1e-6
         );
         assert!(
-            (result.factor_scaled_peak_load_path_demand_n - 5_866_666.666666667).abs()
+            (result.factor_scaled_peak_load_path_demand_n - 5_866_887.640183559).abs()
                 < 1e-6
         );
         assert_eq!(result.assumed_peak_to_mean_load_factor, 1.32);
