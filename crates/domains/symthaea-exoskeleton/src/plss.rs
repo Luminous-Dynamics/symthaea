@@ -547,7 +547,7 @@ mod tests {
         let result = twin.step(PlssStepInput {
             metabolism: metabolism(),
             equipment_heat_w: 0.0,
-            humidity_generation_g_per_min: 0.0,
+            humidity_generation_g_per_min: 0.25,
             dt_s: 1.0,
         });
         assert_eq!(result, Err(PlssStepError::NoThermalPath));
