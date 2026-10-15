@@ -55,8 +55,8 @@ fn replays_versioned_boundary_corpus_and_independently_verifies_receipts() {
     let corpus: Corpus = serde_json::from_str(FIXTURE).expect("boundary fixture must parse");
     assert_eq!(corpus.schema, "symthaea.plss.telemetry.boundary.v1");
     assert_eq!(corpus.observations.len(), 3);
-    assert_eq!(corpus.boundaries.len(), 6);
-    assert_eq!(corpus.expected.len(), 6);
+    assert_eq!(corpus.boundaries.len(), 7);
+    assert_eq!(corpus.expected.len(), 7);
 
     let (trend_report, trend_receipt) = analyze_plss_telemetry_trends_with_receipt(
         &corpus.observations,
@@ -94,6 +94,28 @@ fn replays_versioned_boundary_corpus_and_independently_verifies_receipts() {
     assert_eq!(receipt.input_digest_sha256, independent_input_digest(&report));
     assert_eq!(receipt.result_digest_sha256, independent_report_digest(&report));
     assert_eq!(receipt.receipt_digest_sha256, independent_receipt_digest(&receipt));
+}
+
+#[test]
+fn threshold_changes_alter_input_and_result_fingerprints() {
+    let corpus: Corpus = serde_json::from_str(FIXTURE).expect("boundary fixture must parse");
+    let (trend, source_receipt) = analyze_plss_telemetry_trends_with_receipt(
+        &corpus.observations,
+        PlssTelemetryTrendConfig::simulation_reference(),
+        &corpus.source_revision,
+    ).unwrap();
+    let (first_report, first_receipt) = project_plss_telemetry_boundaries(
+        &trend, &source_receipt, &corpus.boundaries,
+    ).unwrap();
+
+    let mut changed = corpus.boundaries.clone();
+    changed[0].threshold_value += 1.0;
+    let (changed_report, changed_receipt) = project_plss_telemetry_boundaries(
+        &trend, &source_receipt, &changed,
+    ).unwrap();
+    assert_ne!(first_receipt.input_digest_sha256, changed_receipt.input_digest_sha256);
+    assert_ne!(first_receipt.result_digest_sha256, changed_receipt.result_digest_sha256);
+    assert_ne!(first_report, changed_report);
 }
 
 #[test]
