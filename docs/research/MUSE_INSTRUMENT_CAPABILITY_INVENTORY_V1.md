@@ -45,6 +45,7 @@ Missing optional asset roots are a valid observation and are reported as unavail
 - instrument_count and instruments enumerate the current 42 source-declared instrument variants.
 - procedural_fallback_declared means the source declares the instrument/model path. It is not an audio-quality score.
 - gm_program_0_based is Muse's output mapping, not an asserted original source-patch identity. Some instruments use documented nearest-family approximations because General MIDI does not have exact names for all instruments.
+- soundfont_bank0_program_matches is null when no SoundFont was supplied. With a SoundFont, it lists declared preset names matching bank 0 and that instrument's selected program; an empty list is evidence of no exact header match, not proof that no suitable sound is available in another bank or via a fallback.
 - sustained_samples and short_articulation_samples report the mapped library, relative mapping directory, whether the directory exists, and how many WAV filenames are accepted by the current sample indexer.
 - vcsl_root and vsco2_root record root presence, number of recursively discovered lowercase .wav files, and a deterministic path_size_manifest_sha256.
 - soundfont, when requested, records the file name, byte size, and SHA-256 of the SoundFont bytes, plus parsed preset-header names, bank/program values, bank count, and duplicate bank/program slots.
@@ -66,6 +67,7 @@ Keep the following status dimensions separate when consuming the inventory:
 | Can the current indexer index files? | indexed_sample_count > 0; decode still unproven |
 | Which SoundFont file was inspected? | Optional content SHA-256 |
 | Does its preset-header table declare a bank/program/name? | Parsed RIFF SoundFont preset headers |
+| Does bank 0 contain Muse's selected GM program? | Exact bank-0/program header match, or an explicit empty match list |
 | Does the SoundFont actually render that preset? | Not answered by header parsing; requires FluidSynth load/render evidence |
 | Is the audible rendering convincing? | Independent audio/render and listening evaluation |
 
