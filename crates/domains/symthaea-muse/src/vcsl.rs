@@ -1760,6 +1760,103 @@ mod tests {
     }
 
     #[test]
+    fn probe_midi_encodes_requested_program_and_one_note() {
+        let midi = probe_midi_bytes(40, 60, 96);
+        assert_eq!(&midi[0..4], b"MThd");
+        assert_eq!(u32::from_be_bytes(midi[4..8].try_into().unwrap()), 6);
+        assert_eq!(u16::from_be_bytes(midi[8..10].try_into().unwrap()), 0);
+        assert_eq!(u16::from_be_bytes(midi[10..12].try_into().unwrap()), 1);
+        assert_eq!(u16::from_be_bytes(midi[12..14].try_into().unwrap()), 480);
+        assert_eq!(&midi[14..18], b"MTrk");
+        assert_eq!(u32::from_be_bytes(midi[18..22].try_into().unwrap()), 17);
+        assert_eq!(midi[24], 40, "program change event uses requested GM program");
+        assert_eq!(midi[27], 60, "probe note is middle C");
+        assert_eq!(midi[28], 96, "probe velocity is fixed");
+        assert_eq!(&midi[midi.len() - 3..], &[0xFF, 0x2F, 0x00]);
+    }
+
+    #[test]
+    fn fluidsynth_probe_requires_explicit_soundfont() {
+        let error = capability_inventory_with_fluidsynth(
+            Path::new("/missing-vcsl"),
+            Path::new("/missing-vsco2"),
+            None,
+            Some(Path::new("fluidsynth")),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(error.to_string().contains("--soundfont"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_probe_records_non_silent_output_and_skips_missing_header_matches() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = std::env::temp_dir().join(format!(
+            "muse-instrument-runtime-probe-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+
+        let soundfont = root.join("fixture.sf2");
+        std::fs::write(&soundfont, soundfont_fixture(&[("Grand Piano", 0, 0)])).unwrap();
+        let evidence = soundfont_evidence(&soundfont).unwrap();
+
+        let output_fixture = root.join("non-silent.wav");
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 22050,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(&output_fixture, spec).unwrap();
+        for index in 0..256 {
+            writer.write_sample(if index % 2 == 0 { 8000i16 } else { -8000i16 }).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        // Isolated fake CLI: copy a valid WAV to the path supplied after -F.
+        // This exercises subprocess argument construction and output auditing,
+        // without pretending CI has a real SoundFont or installed FluidSynth.
+        let fake_binary = root.join("fake-fluidsynth");
+        let script = format!(
+            "#!/bin/sh\nout=''\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-F\" ]; then shift; out=\"$1\"; fi\n  shift\ndone\ncp \"{}\" \"$out\"\n",
+            output_fixture.display()
+        );
+        std::fs::write(&fake_binary, script).unwrap();
+        let mut permissions = std::fs::metadata(&fake_binary).unwrap().permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&fake_binary, permissions).unwrap();
+
+        let probe = probe_fluidsynth_programs(
+            &fake_binary,
+            &soundfont,
+            &evidence.sha256,
+            &evidence.preset_inventory,
+            [0u8, 24u8].into_iter(),
+        )
+        .unwrap();
+
+        assert_eq!(probe.status, "fluidsynth_render_probes_completed");
+        assert_eq!(probe.requested_program_count, 2);
+        assert_eq!(probe.rendered_non_silent_count, 1);
+        assert_eq!(probe.programs[0].program_0_based, 0);
+        assert_eq!(probe.programs[0].status, "rendered_non_silent");
+        assert_eq!(probe.programs[0].sample_rate, Some(22050));
+        assert_eq!(probe.programs[0].channels, Some(1));
+        assert!(probe.programs[0].frames.unwrap() > 0);
+        assert!(probe.programs[0].peak_absolute_sample.unwrap() > 1e-5);
+        assert!(probe.programs[0].rms.unwrap() > 0.0);
+        assert_eq!(probe.programs[1].program_0_based, 24);
+        assert_eq!(probe.programs[1].status, "skipped_no_bank0_header_match");
+        assert_eq!(probe.programs[1].command_exit_code, None);
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn invalid_soundfont_is_rejected_instead_of_reporting_no_presets() {
         let root = std::env::temp_dir().join(format!(
             "muse-instrument-inventory-invalid-sf2-{}",
