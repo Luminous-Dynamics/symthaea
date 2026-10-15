@@ -64,7 +64,7 @@ jobs:
         run: bash tests/shell/test-cargo-lock-closure.sh
 
       - name: Verify full workspace Cargo lock closure
-        run: scripts/check_cargo_lock_closure.sh target/broca-lock-closure
+        run: bash scripts/check_cargo_lock_closure.sh target/broca-lock-closure
 
       - name: Generate Broca measurement artifacts
         run: scripts/broca_measurement_artifacts.sh target/broca-measurements
