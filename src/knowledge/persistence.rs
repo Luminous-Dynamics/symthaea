@@ -607,6 +607,7 @@ impl KnowledgePersistence {
         }
         for fact in facts {
             validate_fact_relations(&fact.relations)?;
+            validate_role_vector_observations(&fact.role_vector_observations)?;
         }
 
         let conn = self.open_connection()?;
@@ -648,6 +649,7 @@ impl KnowledgePersistence {
             let fact_row_id = conn.last_insert_rowid();
             insert_fact_relations(&conn, fact_row_id, &fact.relations)?;
             insert_fact_role_vectors(&conn, fact_row_id, &fact.role_vectors)?;
+            insert_fact_role_observations(&conn, fact_row_id, &fact.role_vector_observations)?;
             count += 1;
         }
 
@@ -670,6 +672,7 @@ impl KnowledgePersistence {
         }
         for fact in facts {
             validate_fact_relations(&fact.relations)?;
+            validate_role_vector_observations(&fact.role_vector_observations)?;
         }
 
         let mut conn = self.open_connection()?;
@@ -680,6 +683,8 @@ impl KnowledgePersistence {
 
         tx.execute("DELETE FROM knowledge_fact_role_vectors", [])
             .map_err(|e| format!("Clear previous role-vector snapshot: {e}"))?;
+        tx.execute("DELETE FROM knowledge_fact_role_observations", [])
+            .map_err(|e| format!("Clear previous role-vector observations: {e}"))?;
         tx.execute("DELETE FROM knowledge_fact_relations", [])
             .map_err(|e| format!("Clear previous fact relation snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_facts", [])
@@ -719,6 +724,7 @@ impl KnowledgePersistence {
             let fact_row_id = tx.last_insert_rowid();
             insert_fact_relations(&tx, fact_row_id, &fact.relations)?;
             insert_fact_role_vectors(&tx, fact_row_id, &fact.role_vectors)?;
+            insert_fact_role_observations(&tx, fact_row_id, &fact.role_vector_observations)?;
             count += 1;
         }
 
@@ -763,6 +769,7 @@ impl KnowledgePersistence {
                     format!("Invalid role vector for {}: {e}", role.storage_key())
                 })?;
             }
+            validate_role_vector_observations(&fact.role_vector_observations)?;
             if !fact.confidence.is_finite() || !(0.0..=1.0).contains(&fact.confidence) {
                 return Err(format!(
                     "Invalid fact snapshot confidence outside [0, 1]: {}",
@@ -842,6 +849,8 @@ impl KnowledgePersistence {
 
         tx.execute("DELETE FROM knowledge_fact_role_vectors", [])
             .map_err(|e| format!("Clear previous role-vector snapshot: {e}"))?;
+        tx.execute("DELETE FROM knowledge_fact_role_observations", [])
+            .map_err(|e| format!("Clear previous role-vector observations: {e}"))?;
         tx.execute("DELETE FROM knowledge_fact_relations", [])
             .map_err(|e| format!("Clear fact relation snapshot: {e}"))?;
         tx.execute("DELETE FROM knowledge_facts", [])
@@ -875,6 +884,7 @@ impl KnowledgePersistence {
             let fact_row_id = tx.last_insert_rowid();
             insert_fact_relations(&tx, fact_row_id, &fact.relations)?;
             insert_fact_role_vectors(&tx, fact_row_id, &fact.role_vectors)?;
+            insert_fact_role_observations(&tx, fact_row_id, &fact.role_vector_observations)?;
         }
 
         for (edge, cycle, strength, is_inhibitory) in &prepared_edges {
@@ -1019,6 +1029,7 @@ impl KnowledgePersistence {
 
         let mut relations_by_fact = load_fact_relations(&conn)?;
         let mut role_vectors_by_fact = load_fact_role_vectors(&conn)?;
+        let mut role_observations_by_fact = load_fact_role_observations(&conn)?;
         let fact_row_ids: std::collections::HashSet<i64> =
             facts_with_row_id.iter().map(|(id, _)| *id).collect();
         if let Some(orphan_id) = relations_by_fact
@@ -1037,9 +1048,20 @@ impl KnowledgePersistence {
                 "Role-vector rows refer to missing fact row {orphan_id}"
             ));
         }
+        if let Some(orphan_id) = role_observations_by_fact
+            .keys()
+            .find(|id| !fact_row_ids.contains(id))
+        {
+            return Err(format!(
+                "Role-vector observation rows refer to missing fact row {orphan_id}"
+            ));
+        }
         for (fact_row_id, fact) in &mut facts_with_row_id {
             fact.relations = relations_by_fact.remove(fact_row_id).unwrap_or_default();
             fact.role_vectors = role_vectors_by_fact.remove(fact_row_id).unwrap_or_default();
+            fact.role_vector_observations = role_observations_by_fact
+                .remove(fact_row_id)
+                .unwrap_or_default();
         }
 
         let facts: Vec<FactRecord> = facts_with_row_id
