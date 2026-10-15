@@ -1748,7 +1748,9 @@ pub fn assess_candidate_evidence_gates(
     if profile.physical_validation != PhysicalValidationGateState::RepresentativeShell {
         blockers.push("representative_shell_validation_missing");
     }
-    if profile.damage_tolerance != DamageToleranceGateState::DemonstratedByTestWithinDeclaredEnvelope {
+    if profile.damage_tolerance
+        != DamageToleranceGateState::DemonstratedByTestWithinDeclaredEnvelope
+    {
         blockers.push("damage_tolerance_not_demonstrated_by_test");
     }
     if profile.operating_envelope != OperatingEnvelopeGateState::DefinedAndIndependentlyReviewed {
@@ -1759,7 +1761,9 @@ pub fn assess_candidate_evidence_gates(
     }
 
     let status = match profile.mass_budget {
-        MassBudgetStatus::NegativeThroughout => CandidateEvidenceGateStatus::MassBudgetNegativeThroughout,
+        MassBudgetStatus::NegativeThroughout => {
+            CandidateEvidenceGateStatus::MassBudgetNegativeThroughout
+        }
         MassBudgetStatus::BoundSensitive => CandidateEvidenceGateStatus::MassBudgetBoundSensitive,
         MassBudgetStatus::RobustlyNonNegative if blockers.is_empty() => {
             CandidateEvidenceGateStatus::EvidenceBundleReadyForIndependentAssessment
@@ -2944,11 +2948,16 @@ mod tests {
     fn candidate_gate_requires_imperfection_analysis_independent_review_and_manifest() {
         let mut profile = complete_candidate_evidence_profile();
         profile.nonlinear_analysis = NonlinearAnalysisGateState::LinearOrPerfectGeometryOnly;
-        profile.independent_structural_review = IndependentReviewGateState::ReviewNotIndependentOrNotRecorded;
+        profile.independent_structural_review =
+            IndependentReviewGateState::ReviewNotIndependentOrNotRecorded;
         profile.evidence_manifest = EvidenceManifestGateState::IdentifiersOnly;
         let result = assess_candidate_evidence_gates(profile);
         assert_eq!(result.status, CandidateEvidenceGateStatus::EvidenceGapsRemain);
-        assert!(result.blockers.contains(&"nonlinear_imperfection_analysis_missing_or_insufficient"));
+        assert!(
+            result
+                .blockers
+                .contains(&"nonlinear_imperfection_analysis_missing_or_insufficient")
+        );
         assert!(result.blockers.contains(&"independent_structural_review_missing"));
         assert!(result.blockers.contains(&"evidence_manifest_not_content_addressed"));
     }
