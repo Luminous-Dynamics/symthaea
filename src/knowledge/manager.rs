@@ -1850,6 +1850,69 @@ mod tests {
     }
 
     #[test]
+    fn test_typed_role_search_replays_after_manager_restart() {
+        use crate::knowledge::encoding::FactEncoding;
+
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_typed_role_search_restart_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db").to_string_lossy().to_string();
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path),
+            ..KnowledgeManagerConfig::default()
+        };
+        let terms = [
+            (
+                SemanticRole::Agent,
+                "United States",
+                EntityType::Organization,
+            ),
+            (
+                SemanticRole::Agent,
+                "European Union",
+                EntityType::Organization,
+            ),
+            (SemanticRole::Patient, "Iran", EntityType::Organization),
+        ];
+
+        let mut manager = KnowledgeManager::try_new(config.clone()).unwrap();
+        let observations = manager.encoder.encode_role_terms(&terms);
+        let encoding = FactEncoding {
+            vector: BinaryHV::random(9_382),
+            role_vectors: std::collections::HashMap::new(),
+            role_vector_observations: observations,
+            relations: Vec::new(),
+            source_text: "three-term role-query restart fixture".into(),
+            confidence: 0.73,
+        };
+        let (fact_id, _) = manager.graph_mut().insert(encoding, 0, Some("test".into()), false);
+
+        let before = manager.search_with_role_terms(&terms, 5);
+        assert_eq!(before.len(), 1);
+        assert_eq!(before[0].fact_id, fact_id);
+        assert_eq!(before[0].matched_query_terms, 3);
+        assert!((before[0].similarity - 1.0).abs() < f32::EPSILON);
+        assert!((before[0].confidence - 0.73).abs() < f32::EPSILON);
+
+        manager.persist_snapshot();
+        drop(manager);
+
+        let mut restored = KnowledgeManager::try_new(config).unwrap();
+        let after = restored.search_with_role_terms(&terms, 5);
+        assert_eq!(after.len(), before.len());
+        assert_eq!(after[0].fact_id, before[0].fact_id);
+        assert_eq!(after[0].matched_query_terms, before[0].matched_query_terms);
+        assert!((after[0].similarity - before[0].similarity).abs() < f32::EPSILON);
+        assert!((after[0].confidence - before[0].confidence).abs() < f32::EPSILON);
+
+        drop(restored);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_causal_chain_tracing() {
         let mut mgr = KnowledgeManager::default();
         mgr.bootstrap_entities();
