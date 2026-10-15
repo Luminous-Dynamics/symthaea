@@ -48,11 +48,48 @@ Prefer reusing existing epistemic types and evidence-plane boundaries after insp
 
 Add deterministic tests for: negated versus affirmative relations; two entities sharing one role; source text preserved through storage/reload; role-query behavior before/after reload; malformed persisted rows; stale search IDs; contradictory source claims; explicit source time versus retrieval time; and missing, stale or untrusted source metadata. The verifier should independently check expected invariants and bind its output to exact inputs and source revision.
 
-## Mycelix integration boundary
+## Mycelix handoff boundary — schema-derived mapping (2026-10-15)
 
-The existing [Living City Evidence Loop/work-package contract PR #5017](https://github.com/Luminous-Dynamics/mycelix/pull/5017) and [source/evidence contract PR #5029](https://github.com/Luminous-Dynamics/mycelix/pull/5029) already distinguish observations, assumptions, predictions, decisions, economic commitments, claimed completion, independent verification and measured outcomes. Reuse those contracts as the civic-facing boundary rather than copying their concepts into Symthaea.
+Reviewed the current open contract branches directly:
+- Mycelix [PR #5017](https://github.com/Luminous-Dynamics/mycelix/pull/5017), work-package schema Git blob `e939265af66c70ad16f399203853ba1c8284ddbf` and Living City loop doc blob `3a57458f3aea0358aa722788886298f9d4e8f984`.
+- Mycelix [PR #5029](https://github.com/Luminous-Dynamics/mycelix/pull/5029), evidence-claim schema Git blob `888e7fdf1b950f48662553620781a37e27b88ac7` and source-record schema blob `d4cfe7ef97f9d1fdc57efd368369999dea27da38`.
 
-The next integration should pass explicit evidence references and status/uncertainty through that boundary. A Symthaea recommendation must not itself authorize a work package; a participant's completion claim must not itself become independent verification. These PRs are still research/reference work: their own claim ceilings do not establish authenticated sources, municipal integration, deployment, or field outcomes.
+These are open research/reference PRs, not deployed contracts. Their schemas make the safe handoff boundary more concrete:
+
+| Symthaea output field | Meaning it currently supports | Mycelix handoff rule |
+|---|---|---|
+| `GroundedFact.text` | Stored source text, after the query-projection fix in PR #7469 | Text alone must not become a registered evidence claim; require real source-record references and a separately reviewed claim record. |
+| `GroundedFact.confidence` | Internal knowledge-graph confidence score, including decay/corroboration effects | Do not copy into Mycelix uncertainty bounds or treat it as a calibrated truth probability. Preserve as a model-side score with its definition/version, if needed. |
+| `GroundedFact.similarity` | HDC search similarity to a query | Retrieval relevance only; it does not qualify source quality, corroboration, truth, or causal effect. |
+| `GroundedFact.domain` and `is_causal` | Coarse domain label and causal-relation flag | Context metadata only. Neither independently establishes evidence kind, causal identification, or intervention effectiveness. |
+| `ContradictionEvidence` (proposed in PR #7475) | Direct graph alert IDs, available source text, similarity, higher-confidence ID and detection cycle | Carry as an analysis alert. It lacks source IDs, source times, review state and authenticated issuer metadata, so it is not itself a Mycelix evidence claim. |
+| `confounder_warnings` (proposed in PR #7475) | Hypotheses inferred while tracing causal-chain roots | Keep explicitly as hypotheses/warnings, distinct from direct contradictions and measured findings. Do not promote automatically to a source observation or causal result. |
+
+### Required Mycelix-owned records
+
+The current evidence-claim schema requires a stable `evidence_id`, a versioned concept/hypothesis reference, an explicit `evidence_kind`, a relationship to the hypothesis, non-empty `source_refs`, spatial/temporal coverage, method/version, uncertainty classification, review state, record time and limitations. Each referenced source record in turn carries publisher/title, landing URL, publication/access time, version label, geographic and temporal scope, reuse/rights state and limitations.
+
+The work-package contract links `case_refs`, `scenario_refs`, `analysis_refs`, and `evidence_refs` separately. It also requires deliverables, commissioning, procurement, whole-period funding/costing, labor protections, authorization, verification, lifecycle events, timestamps and limitations. Therefore:
+
+1. A Symthaea recommendation may become an `analysis_ref` only after an analysis record exists with stable identity, model/source revision, input refs, limitations, uncertainty semantics and reproducibility evidence.
+2. A model result may link to existing `evidence_refs`, but it must not invent source IDs or backfill missing publisher, coverage, timestamps, review status or reuse rights.
+3. A registered evidence claim can only be authored by a boundary adapter when its required source and claim fields have real, validated owners. If those inputs are absent, the handoff stays an analysis/warning with explicit unknowns.
+4. No output from Symthaea may advance a work package into funding-committed or authorized states. Those transitions require their own evidence and authorized human/institutional decision.
+5. Completion claims, independent verification and measured outcomes remain distinct. A model prediction or participant statement cannot substitute for the latter two.
+
+### Smallest safe integration milestone
+
+Do **not** add another shared provenance ontology or an adapter that fabricates an evidence claim from `GroundedFact`. First define a versioned Mycelix-owned analysis-record contract, or identify an already-existing canonical owner for it. Then build an offline adapter qualification corpus with these negative controls:
+
+- missing/unknown source ID does not generate a Mycelix evidence claim;
+- unreviewed/contested or withdrawn source evidence does not become verified because Symthaea confidence is high;
+- HDC similarity and internal confidence never become statistical bounds by implicit conversion;
+- a contradiction alert retains both fact IDs and its unresolved/missing source references;
+- confounder warnings remain hypotheses and do not increment direct contradiction count;
+- no analysis output advances funding or authorization lifecycle state;
+- output is bound to exact source revision, model/config version, input digests and schema version.
+
+The existing Mycelix contracts should remain the civic-facing owners; Symthaea should supply source-linked analysis only to the level its evidence actually supports. This mapping is source-derived design guidance, not a implemented adapter, schema migration, or qualification result.
 
 ## Claim ceiling
 
