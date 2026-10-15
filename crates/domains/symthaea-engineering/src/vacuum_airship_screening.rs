@@ -2011,13 +2011,16 @@ mod tests {
             ScalarBounds { min: 100_000.0, max: 110_000.0 },
             None,
         )).unwrap();
-        assert!(matches!(
-            result,
+        match result {
             PressureBoundsAssessment::NoExternalPressureDemand {
-                minimum_signed_differential_pa: -30_000.0,
-                maximum_signed_differential_pa: -5_000.0,
+                minimum_signed_differential_pa,
+                maximum_signed_differential_pa,
+            } => {
+                assert!((minimum_signed_differential_pa - -30_000.0).abs() < 1e-9);
+                assert!((maximum_signed_differential_pa - -5_000.0).abs() < 1e-9);
             }
-        ));
+            other => panic!("unexpected assessment: {other:?}"),
+        }
     }
 
     #[test]
