@@ -51,6 +51,32 @@ These values are arithmetic reference cases, not structural designs or payload c
 
 Vacuum has higher gross lift than helium by the helium mass that would otherwise occupy the same volume, not by the full mass of displaced air. The density comparison must use the same temperature and pressure. The additional lift is small compared with the total displaced-air mass, so the structural mass penalty may dominate.
 
+## New first-pass improvement: bound the envelope's allowable areal mass
+
+For a spherical pressure boundary with reference radius `R), the idealized outer area and enclosed volume are:
+
+```text
+A = 4πR²
+V = (4/3)πR³
+```
+
+If all non-envelope hardware and the target payload are explicitly accounted for, the maximum mass left for the envelope is:
+
+```text
+m_envelope,max = (ρ_air − ρ_inside) V
+                 − m_fixed_non_envelope − m_target_payload
+```
+
+The corresponding maximum mean envelope areal mass is:
+
+```text
+σ_envelope,max = m_envelope,max / A
+```
+
+For an ideal vacuum sphere with no frame, joints, propulsion, systems, or payload, this simplifies to `σ_max = ρ_air R / 3`. At `ρ_air = 1.225 kg/m³`, a 20 m radius gives only **8.17 kg/m²**, and a 40 m radius gives **16.33 kg/m²**, available for the *entire* envelope layer under those deliberately unattainable zero-other-mass assumptions. Every non-envelope kilogram and every target-payload kilogram tightens that ceiling. This is a strong early rejection screen for overweight concepts; it is not a material recommendation or pressure-strength estimate.
+
+The API returns a **signed** ceiling. A negative envelope mass/areal-mass allowance means the fixed systems plus target payload already exceed ideal net lift even before the envelope is added. The calculation assumes that one radius represents both enclosed volume and pressure-boundary area; thickness, appendages, deformations, and topology-specific surface area are not resolved.
+
 ## Pressure evidence is a separate gate
 
 A pressure case uses explicit exterior and interior absolute pressures. The screen computes only the differential load:
