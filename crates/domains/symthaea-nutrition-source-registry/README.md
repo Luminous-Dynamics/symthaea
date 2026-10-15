@@ -8,7 +8,7 @@ It is not a food database, a nutrient calculator, a license attorney, a publishe
 
 - Rights are separate explicit decisions for assessment use, caching, transformation, redistribution, commercial use and public fixtures. Unknown, denied and unresolved written-permission requirements fail closed.
 - The source manifest records the source's declared rights; a separate SourceUseRequestV1 states what the caller intends to do. A request cannot grant itself permission. Permission-reference requirements are evaluated only for rights exercised by the current request.
-- Every affirmative right decision—whether allowed by license or granted by written permission—must carry a non-empty evidence reference scoped to that right. References are separate for assessment, cache/retention, transformation, commercial use, public fixtures and redistribution; evidence for one right cannot satisfy another right's requirement. The referenced license clause or document still needs human review for scope, authenticity, validity and legal sufficiency.
+- Every affirmative right decision—whether allowed by license or granted by written permission—must resolve to a typed evidence record scoped to the exact source and right. The record must match the grant basis, use a valid HTTP(S) evidence URI, have a valid review/expiry window, and remain active. References are separate for assessment, cache/retention, transformation, commercial use, public fixtures and redistribution; evidence for one right cannot satisfy another right's requirement. The underlying license clause or document still needs human review for authenticity and legal sufficiency.
 - A public fixture necessarily retains source-derived data, even if a caller omits the separate retention flag; cache permission and verified artifact bytes remain required.
 - Source manifests record retrieval and review dates. Future-dated retrieval, expired review windows, revoked, withdrawn or review-required sources block use.
 - Retaining source-derived records requires cache permission and a canonical lower-case SHA-256 plus the exact source-artifact bytes. A digest-shaped string by itself is not proof: verification recomputes SHA-256 over the supplied bytes.
@@ -19,6 +19,9 @@ It is not a food database, a nutrient calculator, a license attorney, a publishe
 - Synthetic rows return SyntheticFixtureOnly and cannot be misrepresented as empirical source data.
 
 No SAFOODS values or other real food-composition rows are included in this crate's fixtures; all fixtures use synthetic example bytes and identifiers. The actual source licensing and data quality still require human review. This validator checks declarations and supplied bytes, not whether those declarations are truthful or legally sufficient.
+
+
+The evidence-record lookup goes beyond a non-empty-string check: unknown or duplicate IDs, wrong source/right/basis, invalid URI/date metadata, and non-current evidence block the requested use. It does not fetch or authenticate the referenced document; human review of the underlying license or permission remains necessary.
 
 ## Validation
 
