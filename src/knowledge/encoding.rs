@@ -368,7 +368,16 @@ mod tests {
         let encoding = encoder.encode_fact(&fact);
         assert_eq!(encoding.role_vectors.len(), 3);
         assert_eq!(
-            encoding.role_vectors.iter().map(|binding| binding.entity_text.as_deref().expect("newly encoded bindings have entity text")).collect::<Vec<_>>(),
+            encoding
+                .role_vectors
+                .iter()
+                .map(|binding| {
+                    binding
+                        .entity_text
+                        .as_deref()
+                        .expect("newly encoded bindings have entity text")
+                })
+                .collect::<Vec<_>>(),
             vec!["Alice", "Bob", "Project"]
         );
         assert_eq!(encoding.role_vectors[0].role, SemanticRole::Agent);
