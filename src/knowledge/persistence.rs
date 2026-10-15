@@ -1968,6 +1968,77 @@ mod tests {
     }
 
     #[test]
+    fn test_legacy_causal_edge_schema_migrates_without_losing_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_causal_edge_migration_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE knowledge_causal_edges (
+                cause TEXT NOT NULL,
+                effect TEXT NOT NULL,
+                strength REAL NOT NULL,
+                is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                cycle INTEGER NOT NULL,
+                PRIMARY KEY (cause, effect)
+            );
+            INSERT INTO knowledge_causal_edges
+                (cause, effect, strength, is_inhibitory, cycle)
+            VALUES ('ceasefire', 'escalation', -0.7, 0, 9);",
+        )
+        .unwrap();
+        drop(conn);
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        let edges = persistence.load_causal_edges().unwrap();
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].cause, "ceasefire");
+        assert_eq!(edges[0].effect, "escalation");
+        assert_eq!(edges[0].strength, 0.7);
+        assert!(edges[0].is_inhibitory);
+        assert!(!edges[0].is_negated);
+        assert!(edges[0].source_text.is_empty());
+        assert_eq!(edges[0].cycle, 9);
+
+        // The migrated schema accepts distinct observations for the same pair.
+        persistence
+            .save_causal_edges(&[
+                CausalEdgeRecord {
+                    cause: "ceasefire".into(),
+                    effect: "escalation".into(),
+                    strength: 0.6,
+                    is_inhibitory: false,
+                    is_negated: false,
+                    source_text: "later observation one".into(),
+                    cycle: 10,
+                },
+                CausalEdgeRecord {
+                    cause: "ceasefire".into(),
+                    effect: "escalation".into(),
+                    strength: 0.8,
+                    is_inhibitory: true,
+                    is_negated: true,
+                    source_text: "later observation two".into(),
+                    cycle: 11,
+                },
+            ])
+            .unwrap();
+
+        let after_legacy_upserts = persistence.load_causal_edges().unwrap();
+        assert_eq!(after_legacy_upserts.len(), 1);
+        assert_eq!(after_legacy_upserts[0].source_text, "later observation two");
+        assert!(after_legacy_upserts[0].is_inhibitory);
+        assert!(after_legacy_upserts[0].is_negated);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_upsert_causal_edges() {
         let dir = std::env::temp_dir().join(format!("symthaea_upsert_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
