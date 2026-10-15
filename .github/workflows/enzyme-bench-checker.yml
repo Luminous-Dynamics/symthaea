@@ -4,18 +4,22 @@ on:
   pull_request:
     paths:
       - "xtask/src/enzyme_bench.rs"
+      - "xtask/src/enzyme_calibration.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
       - "Cargo.toml"
+      - "Cargo.lock"
       - "docs/research/INDUSTRIAL_ENZYME_BENCHMARK_V0.md"
       - ".github/workflows/enzyme-bench-checker.yml"
   push:
     branches: [main]
     paths:
       - "xtask/src/enzyme_bench.rs"
+      - "xtask/src/enzyme_calibration.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
       - "Cargo.toml"
+      - "Cargo.lock"
       - "docs/research/INDUSTRIAL_ENZYME_BENCHMARK_V0.md"
       - ".github/workflows/enzyme-bench-checker.yml"
   workflow_dispatch:
