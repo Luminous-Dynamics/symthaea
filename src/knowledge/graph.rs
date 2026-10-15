@@ -935,6 +935,62 @@ mod tests {
     }
 
     #[test]
+    fn test_deleted_fact_id_is_not_reused_after_sqlite_restart() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_id_high_water_round_trip_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let (retained_id, _) = graph.insert(
+            make_encoding("retained stable fact", 0.9),
+            1,
+            None,
+            false,
+        );
+        let (retired_id, _) = graph.insert(
+            make_encoding("retired high ID fact", 0.02),
+            2,
+            None,
+            false,
+        );
+        assert_eq!((retained_id, retired_id), (1, 2));
+        assert_eq!(graph.prune_low_confidence(0.05), 1);
+        assert!(graph.get_fact(retired_id).is_none());
+        assert_eq!(graph.next_fact_id(), 3);
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .replace_knowledge_snapshot(&graph.export_fact_records(), &[], &[], graph.next_fact_id())
+            .unwrap();
+
+        let records = persistence.load_facts().unwrap();
+        let reserved_next_id = persistence
+            .load_next_graph_fact_id()
+            .unwrap()
+            .expect("a complete snapshot must persist the ID allocator");
+
+        let mut restored = EnhancedKnowledgeGraph::new(10);
+        assert_eq!(restored.import_fact_records(&records), 1);
+        restored.ensure_next_fact_id(reserved_next_id);
+        let (new_id, _) = restored.insert(
+            make_encoding("brand new fact after restart", 0.7),
+            3,
+            None,
+            false,
+        );
+        assert_eq!(
+            new_id, 3,
+            "the removed fact's ID must remain retired after restart"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_sqlite_round_trip_preserves_temporal_fact_state() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_temporal_state_round_trip_{}",
