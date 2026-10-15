@@ -43,18 +43,17 @@ fn run_route_case(peer_count: usize, iterations: usize) {
             (i % 3) as u8,
             &classifier,
         ));
-        decisions = decisions.wrapping_add(usize::from(matches!(
-            decision,
-            ConsciousRoutingDecision::Normal(_)
-        )));
+        if matches!(decision, ConsciousRoutingDecision::Normal(_)) {
+            decisions = decisions.wrapping_add(1);
+        }
     }
     let elapsed = start.elapsed();
     black_box(decisions);
-    let ns_per_route = elapsed.as_secs_f64() * 1_000_000_000.0 / iterations as f64;
+    let mean_us_per_route = elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64;
     println!(
-        "route,{peer_count},{iterations},{:.3},{:.3},{decisions}",
+        "route,{peer_count},{iterations},{:.3},{:.6},{decisions}",
         elapsed.as_secs_f64() * 1_000.0,
-        ns_per_route
+        mean_us_per_route
     );
 }
 
