@@ -322,6 +322,16 @@ The identifiers should point to immutable manifests, not hand-written labels. A 
 
 This is deliberately an applicability gate, not an evidence authenticator. The Rust module cannot establish that referenced objects exist, that hashes correspond to the claimed content, that the reviewer was independent, or that a numerical allowable reflects real failure. Those requirements remain external provenance-verification and physical-validation gates.
 
+### Treat imperfection geometry as a structured input, not one scalar penalty
+
+A September 2026 preprint by Yang and Schneider studies axially compressed cylindrical shells using nonlinear continuation and bifurcation analysis. Even one localized Gaussian defect can change which instability triggers first; the predicted buckling threshold varies non-monotonically and can change discontinuously as defect depth or size changes. The authors' key implication is that imperfection severity cannot be reliably ranked by a single defect-amplitude number alone: [arXiv:2609.19436](https://arxiv.org/abs/2609.19436).
+
+This is evidence about cylindrical shells, not direct validation for a spherical geodesic structure. The research lesson to carry forward is narrower and still valuable: for every candidate imperfection basis, preserve the *spatial field and mode*, not only RMS deviation or maximum dent depth. Include location relative to nodes/joints, defect width/shape, combinations of defects, measured as-built deviations, and the mapping from scan to analysis mesh. Use nonlinear path-following capable of detecting relevant asymmetric modes rather than assuming one symmetric eigenmode necessarily governs.
+
+The next test matrix should therefore include geometrically distinct imperfections with similar maximum amplitude and RMS magnitude. That tests whether shape and location materially change predicted failure, and helps guard against an optimizer learning that an arbitrary scalar defect score is a sufficient safety proxy. Any localized probing or subcritical stability-landscape experiments require an independently reviewed procedure: probing can itself change equilibrium paths and trigger snap-through in sensitive structures.
+
+
+
 ### Expand geometry search beyond a smooth sphere—but keep the loads honest
 
 Compare the spherical reference against at least two distinct families:
