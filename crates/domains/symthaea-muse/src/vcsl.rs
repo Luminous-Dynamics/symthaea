@@ -703,12 +703,22 @@ fn sample_directory_evidence(
 }
 
 fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
-    if !root.is_dir() {
-        return Ok(AssetRootEvidenceV1 {
-            root_present: false,
-            wav_file_count: 0,
-            path_size_manifest_sha256: None,
-        });
+    let metadata = match std::fs::metadata(root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(AssetRootEvidenceV1 {
+                root_present: false,
+                wav_file_count: 0,
+                path_size_manifest_sha256: None,
+            });
+        }
+        Err(error) => return Err(error),
+    };
+    if !metadata.is_dir() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("sample root is not a directory: {}", root.display()),
+        ));
     }
 
     let mut entries = Vec::<(String, u64)>::new();
@@ -717,10 +727,11 @@ fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
 
     let mut hasher = Sha256::new();
     for (relative_path, size_bytes) in &entries {
+        // Length-prefix the path and use a fixed-endian size encoding so
+        // filenames containing separators cannot make the manifest ambiguous.
+        hasher.update((relative_path.len() as u64).to_le_bytes());
         hasher.update(relative_path.as_bytes());
-        hasher.update(b"\t");
-        hasher.update(size_bytes.to_string().as_bytes());
-        hasher.update(b"\n");
+        hasher.update(size_bytes.to_le_bytes());
     }
     let digest = hasher.finalize();
     Ok(AssetRootEvidenceV1 {
@@ -796,9 +807,10 @@ fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
         .as_ref()
         .iter()
         .flat_map(|byte| {
+            let value = *byte;
             [
-                HEX[(byte >> 4) as usize] as char,
-                HEX[(byte & 0x0f) as usize] as char,
+                HEX[(value >> 4) as usize] as char,
+                HEX[(value & 0x0f) as usize] as char,
             ]
         })
         .collect()
