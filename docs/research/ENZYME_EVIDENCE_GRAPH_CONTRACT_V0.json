@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "contract_id": "enzyme-evidence-graph-v0",
-  "status": "proposal_not_enforced",
-  "format_note": "Descriptive contract, not a JSON Schema and not yet consumed by the Rust CLI. It defines the minimum invariants for a future independent verifier.",
+  "status": "partial_verifier_implemented_policy_review_required",
+  "format_note": "Descriptive contract, not a JSON Schema. xtask's enzyme-evidence-graph-check command now enforces a fail-closed structural/provenance subset; see ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md. Full replay, scientific semantics, and policy enforcement remain future work.",
   "purpose": "Bind each enzyme kinetic claim to exact source artifacts and the transformations, models, parameters, uncertainty, and evaluation decisions derived from them. Reuse EnzymeML/SBML for scientific objects; this contract addresses provenance and replay links.",
   "design_principles": [
     "A reported literature value, a raw measurement, a reproduced fit, and a prediction are distinct evidence classes.",
@@ -19,7 +19,8 @@
       "sha256",
       "byte_length",
       "locator",
-      "rights_record_id"
+      "rights_record_id",
+      "acquisition_status"
     ],
     "field_rules": {
       "artifact_id": "Unique stable identifier within the graph.",
@@ -28,7 +29,8 @@
       "sha256": "64 hexadecimal characters computed over the exact bytes consumed or produced.",
       "byte_length": "Non-negative integer matching the exact payload length.",
       "locator": "HTTPS URL or approved workspace-relative path. A remote URL must be acquired and hash-verified before the artifact may satisfy a replay requirement.",
-      "rights_record_id": "Reference to a separate source-specific rights/attribution review record. A checksum is not a rights grant."
+      "rights_record_id": "Reference to a separate source-specific rights/attribution review record. A checksum is not a rights grant.",
+      "acquisition_status": "available means an exact local workspace-relative payload is checked for byte length and SHA-256; not_acquired means HTTPS metadata only and is never downloaded by the verifier."
     }
   },
   "node_types": [
@@ -228,16 +230,16 @@
     "The evidence graph's own serialized bytes are versioned and SHA-256 pinned when frozen."
   ],
   "future_verifier_checks": [
-    "JSON Schema validation after the record layout is finalized.",
-    "Unique IDs, valid node types, valid edge types, endpoint type constraints, dangling-edge detection and DAG check.",
-    "Hash/byte-length verification for all accessible artifacts, with remote fetches limited to explicitly authorized source URLs.",
-    "Transformation input/output closure, content-hash chain and run-status accounting.",
-    "Scientific-unit checks and parameter semantics using the selected EnzymeML version rather than a duplicate ontology.",
-    "A separately implemented replay verifier that compares every required pipeline stage within preregistered tolerances.",
-    "Negative controls for modified inputs, changed configurations, missing artifacts, dangling edges, cycles, and swapped source/fit/prediction evidence classes."
+    "Finalize and enforce a JSON Schema for the instance layout.",
+    "Semantic-unit checks and parameter meaning using the selected EnzymeML version rather than a duplicate ontology.",
+    "Chemical reaction-balance checks where appropriate; this must be a separate domain-aware validator.",
+    "Rights/attribution review and permitted-use enforcement, with human review where needed.",
+    "A separately implemented computational replay verifier that compares every required pipeline-stage output within preregistered tolerances.",
+    "Independent checks of uncertainty calibration, parameter identifiability, model ambiguity, denominator accounting, and negative controls.",
+    "Prospective experimental-decision utility and generalization under study, sequence-family, laboratory/protocol, and assay-context holdouts."
   ],
   "non_claims": [
-    "This contract is not yet implemented by enzyme-bench-check.",
+    "The Rust verifier implements only a structural/provenance subset. Scientific semantics, legal clearance, and actual computational replay remain unimplemented.",
     "It does not establish that source data are scientifically valid or that a reaction equation is chemically balanced.",
     "It does not automatically clear source licenses or sequence-data benefit-sharing obligations.",
     "It does not implement a kinetic solver, protein predictor, prospective experiment system, or laboratory automation."
@@ -255,5 +257,45 @@
       "name": "Reproducibility of enzyme reactions and kinetic modelling",
       "url": "https://pubmed.ncbi.nlm.nih.gov/35357794/"
     }
+  ],
+  "graph_instance_v0": {
+    "required_top_level_fields": [
+      "schema_version",
+      "graph_id",
+      "status",
+      "rights_records",
+      "artifacts",
+      "nodes",
+      "edges",
+      "transformations",
+      "parameter_claims"
+    ],
+    "status_values": [
+      "draft",
+      "frozen"
+    ],
+    "acquisition_status_values": [
+      "available",
+      "not_acquired"
+    ],
+    "rights_status_values": [
+      "approved_for_this_use",
+      "review_pending",
+      "restricted",
+      "rejected",
+      "unknown"
+    ],
+    "note": "The record layout is a V0 implementation convention documented in ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md, not a finalized JSON Schema. Frozen graphs require an external SHA-256 pin of their exact serialized bytes."
+  },
+  "v0_implemented_checks": [
+    "Unique IDs for node, edge, artifact, rights-record, transformation, and parameter-claim records.",
+    "Contract node-type/evidence-class consistency; known edge types and endpoint type constraints.",
+    "Dangling references and directed-cycle detection.",
+    "Exact byte-length and SHA-256 verification for acquired local artifacts; workspace confinement and symlink-escape protection.",
+    "HTTPS-only metadata locators for not-acquired artifacts; no automatic remote fetch.",
+    "Transformation input/output node and artifact reference closure, explicit dependency edges, and verified artifacts for successful transformations.",
+    "Explicit terminal reason for non-success transformations; null_result cannot claim outputs.",
+    "Parameter-claim uncertainty-status vocabulary and source/fit-node reference checks.",
+    "External exact-byte SHA-256 pin requirement for frozen graph inputs."
   ]
 }
