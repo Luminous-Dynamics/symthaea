@@ -40,7 +40,7 @@ The Rust crate now contains `experiment_benchmark`, a known-answer synthetic ben
 
 The oracle assigns each synthetic experiment an independent probability of resolving the hidden decision. Combined utility is defined as `1 - product(1 - gain_i)`. This convenient closed-form assumption makes exact subset enumeration possible; it is not a general information-gain estimator and does not model correlated, redundant, or mutually dependent experiments. The oracle is only an upper bound for this toy objective.
 
-A 1,000-scenario Rust regression test has been authored. Until the test actually executes on an identified revision, it must not be described as passing or used to claim that Phase A meets the proposed targets.
+A 1,000-scenario Rust regression test has been authored. Heuristic strategies stop selecting once their registered synthetic resolution threshold is reached, allowing resource-to-resolution to be measured; the exhaustive oracle also calculates the minimum cost of any eligible subset that reaches the threshold. The current selector harness does **not** model candidate feasibility/superiority declarations, so the false-feasible and false-superiority metrics above require a separate candidate-decision oracle suite. Until tests execute on an identified revision, they must not be described as passing or used to claim that Phase A meets the proposed targets.
 
 ### Gate 1 — oracle-backed synthetic experiment selection
 
