@@ -5,6 +5,8 @@
 This crate is a narrow audit kernel for six structural questions:
 
 1. Does a large count of forecast accounts conceal repeated reports from the same declared source group?
+7. Can a comparative replay choose only forecasts available by a frozen horizon cutoff and report explicit stale/missing exclusions?
+8. Can paired Brier differences be summarized with a deterministic, declared-cluster bootstrap rather than treating repeated snapshots as independent?
 2. How much gross turnover is explicitly same-beneficial-owner, assuming the supplied ownership labels are already qualified?
 3. Does an event contract specify the fields required for a structured resolution policy?
 4. How much of a terminal outcome-aligned price move was already present before a supplied public-information timestamp, under declared scope conditions?
@@ -34,6 +36,8 @@ These commands are proposed reproduction commands. Do not infer they passed unti
 - Resolution-policy qualification checks field completeness and simple bounds. It does not authenticate a source, freeze contract bytes, establish independent adjudication, or interpret the law.
 - Information-timing diagnostics depend on an independently qualified public-event timestamp, declared edge exclusions, and sufficient terminal movement toward the realized outcome. They are not an insider-trading probability or proof of misconduct; timestamp error and event selection can invalidate the interpretation.
 - Timestamp sensitivity reports variation over a finite, strictly ordered candidate sample only; it is not a continuous uncertainty bound unless the candidate set is separately justified as complete for the declared timestamp interval.
+- Prequential replay selects the latest forecast at or before the target cutoff; a selected stale observation is excluded, not replaced by an older or future quote. Target timestamps remain caller-supplied data, not authenticated facts.
+- The paired cluster bootstrap resamples declared event/parent-event clusters, not rows. Call separately per horizon for horizon-specific inference; the interval is descriptive and depends on defensible cluster definitions and a valid prospective sampling protocol.
 - All outputs are diagnostics, never a trade recommendation or autonomous market action.
 
-See docs/research/finance/PREDICTION_MARKET_EPISTEMIC_INFRASTRUCTURE_V1.md for the wider research agenda and benchmark targets.
+See docs/research/finance/PREDICTION_MARKET_EPISTEMIC_INFRASTRUCTURE_V1.md for the wider research agenda and benchmark targets, and [PREDICTION_MARKET_COMPARATIVE_REPLAY_BENCHMARK_V1.md](../../../docs/research/finance/PREDICTION_MARKET_COMPARATIVE_REPLAY_BENCHMARK_V1.md) for the preregistered horizon-replay protocol.
