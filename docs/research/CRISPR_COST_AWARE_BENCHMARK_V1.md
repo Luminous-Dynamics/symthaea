@@ -135,6 +135,8 @@ These quantities are specific to that cohort, operational label threshold, site 
 
 The authors' public [reproducibility repository](https://github.com/maren-ha/OffTargetPredictionBenchmark) provides code and a small canonical truth-table input, with larger standardized prediction artifacts distributed through [Zenodo record 20627722](https://zenodo.org/records/20627722). Its documented workflow reproduces the analysis from standardized outputs; it does **not** rerun every predictor in its native environment. We should therefore describe a first replay as a reproduction/secondary analysis, not an independent re-execution of all prediction tools.
 
+**Artifact-rights audit (2026-10-16):** the retrieved Zenodo record lists `offtarget_prediction_benchmark_zenodo_artifacts_v1.zip` (190.7 MB) with displayed MD5 `611cb28ab0516e471c5dc59ea44a330a`, but its visible Rights/License section yielded no license value. Treat this as **unresolved**, not as evidence of either permission or prohibition. Do not retrieve or ingest the archive for model/benchmark development until explicit record metadata or written rights-holder confirmation establishes permission for the intended use. A declared MIT license for the reproduction code does not establish the dataset/artifact license. The compact GitHub-hosted truth table also needs its own data-rights check. Archive bytes were not downloaded and SHA-256 has not been verified.
+
 ### Paradigm shift: rank for evidence acquisition, not merely for a leaderboard
 
 A usual score leaderboard asks, "Which predictor has the best aggregate metric?" The more operationally meaningful question is:
