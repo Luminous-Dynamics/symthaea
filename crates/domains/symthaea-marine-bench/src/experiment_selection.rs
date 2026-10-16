@@ -1060,6 +1060,19 @@ mod tests {
     }
 
     #[test]
+    fn source_revision_is_bound_into_receipt_digest() {
+        let unspecified = run_reference_benchmark(5, &[0], 3).expect("benchmark runs");
+        let pinned = run_reference_benchmark_with_revision(5, &[0], 3, "0123456789abcdef")
+            .expect("benchmark runs with revision");
+        assert_eq!(
+            pinned.body.benchmark_source_revision,
+            "0123456789abcdef"
+        );
+        assert_ne!(unspecified.body_sha256, pinned.body_sha256);
+    }
+
+
+    #[test]
     fn receipts_are_deterministic_and_content_addressed() {
         let seeds = [0, 1, 2];
         let first = run_reference_benchmark(20, &seeds, 6).expect("benchmark runs");
