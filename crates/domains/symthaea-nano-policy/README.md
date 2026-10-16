@@ -57,16 +57,17 @@ This crate uses workspace-pinned serde, serde_json, and blake3 plus Symthaea cor
 ## Prototype acceptance and performance profile
 
 Software acceptance before scientific use:
-- all 21 unit tests pass on the exact commit;
+- all 21 active unit tests pass on the exact commit;
 - formatting and Clippy pass with warnings denied;
 - same canonical request produces the same ordered IDs for all three policies, independent of input row order;
+- the ignored manual profile completes five repeats per case with a stable selected-ID digest;
 - unknown target/outcome fields fail parsing;
 - all candidate IDs and budget slots are accounted for, and no candidate is selected twice;
 - the locked dependency graph is unchanged except for this package.
 
 The maximin loop has target complexity O(N · D · (P + K)) where N is pool size, D is descriptor count, P is the number of already-selected IDs used for initialization, and K is the new selection budget; this is a complexity analysis, not a measured runtime claim.
 
-Profile in release mode using synthetic descriptor pools first (synthetic data is a software test, not a scientific result): random/maximin at pool sizes 1,000 / 10,000 / 100,000; HDC at 1,000 / 10,000; dimensions 8 / 64 / 256; budgets 1 / 10 / 100. Record p50/p95 wall time, peak resident memory, input size, selected count and deterministic output digest on a named CPU. Benchmark all three policies separately. HDC has a lower hard candidate cap than the descriptor-only arms. Do not set an absolute runtime pass target until a reference machine and baseline are measured; once measured, preregister the selector-overhead budget relative to the actual forward oracle.
+The ignored Rust profile harness runs five repeats for these synthetic cases: random (10k candidates, 64 features, budget 100); Euclidean maximin (1k × 8 features, budget 100; 10k × 64 features, budget 10); HDC maximin (100 × 8, 1k × 8, 1k × 64, 10k × 8 features; budget 10). It reports p50/p95 wall time and a stable selected-ID digest for each case. Run with `cargo test -p symthaea-nano-policy --locked manual_profile_selector_scaling -- --ignored --nocapture`; on Linux, wrap it with `/usr/bin/time -v` to record process peak RSS. The manual CI dispatch can run this profile and reports memory via `/usr/bin/time -v`. These are source-defined profile cases, not measured runtime results or pass/fail targets. HDC has a lower hard candidate cap than descriptor-only arms. Do not set an absolute runtime pass target until a reference machine and baseline are measured; once measured, preregister the selector-overhead budget relative to the actual forward oracle.
 
 ## Required next steps before scientific use
 
