@@ -22,6 +22,8 @@
     "python_version",
     "test_commands",
     "authored_test_function_count",
+    "executed_test_count",
+    "executed_test_counts_by_suite",
     "artifacts",
     "authority_boundary"
   ],
@@ -94,6 +96,18 @@
     "authored_test_function_count": {
       "type": "integer",
       "minimum": 1
+    },
+    "executed_test_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "executed_test_counts_by_suite": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
     },
     "artifacts": {
       "type": "array",
