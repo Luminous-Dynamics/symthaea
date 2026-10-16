@@ -207,7 +207,7 @@ fn pack_tree_sha256(root: &Path) -> Result<String, Box<dyn Error>> {
         hasher.update(relative.as_bytes());
         hasher.update([0_u8]);
         hasher.update(Sha256::digest(&bytes));
-        hasher.update([b'\\n']);
+        hasher.update([b'\n']);
     }
     Ok(format!("{:x}", hasher.finalize()))
 }
