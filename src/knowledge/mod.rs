@@ -39,6 +39,8 @@ pub mod encoding;
 pub mod evidence_action_policy;
 #[cfg(feature = "evidence-benchmark")]
 pub mod evidence_benchmark;
+#[cfg(feature = "evidence-benchmark")]
+pub mod evidence_trajectory;
 pub mod evidence_lineage;
 pub mod evidence_proof_formula;
 pub mod evidence_provenance_graph;
