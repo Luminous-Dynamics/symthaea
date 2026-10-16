@@ -78,3 +78,10 @@ Once the prototype's unit tests are observed passing:
 ## Claim boundary
 
 A valid bundle proves that the supplied bytes match the declared digests and the receipt pointers are complete. It does **not** prove that the execution genuinely occurred, that a model is valid, that an issuer is authorized, that a verifier is independent, that physical evidence is true, or that any simulated economic mechanism is fair or effective. Those require separate controls and evidence.
+
+
+## Research grounding and novelty boundary
+
+The byte inventory and receipt checks should eventually fit a standard attestation structure rather than become a parallel, unauthenticated format. The [in-toto Attestation Framework](https://github.com/in-toto/attestation/tree/main/spec/v1) separates the subject/predicate statement, authentication envelope, and bundle grouping. [SLSA Build Provenance v1](https://slsa.dev/spec/v1.2/build-provenance) provides a standard description of where and how an artifact was produced, with verification against consumer expectations described in the [SLSA artifact-verification guidance](https://slsa.dev/spec/v1.2/verifying-artifacts).
+
+This prototype currently verifies exact bytes and declared relationships only. It does not emit or verify an in-toto envelope, authenticate the runner, establish that an execution actually occurred, or establish the truth of simulated events. The future versioned design should reuse established attestation layers for identity/authentication and keep domain-specific receipt semantics as a typed predicate, rather than claiming that the custom manifest alone proves execution provenance.
