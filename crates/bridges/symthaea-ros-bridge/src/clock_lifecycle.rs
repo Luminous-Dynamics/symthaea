@@ -784,8 +784,10 @@ mod tests {
                 kind: RosClockTransitionKindV1::ClockSourceSilent
             }
         ));
+        let rebound =
+            tracker.acknowledge_transition(&observation(1_010, 61), "bridge-run-1", 61);
         assert!(matches!(
-            tracker.acknowledge_transition(&observation(1_010, 61), "bridge-run-1", 61),
+            &rebound,
             RosClockLifecycleDispositionV1::TransitionRebound {
                 kind: RosClockTransitionKindV1::ClockSourceSilent,
                 generation: 2,
@@ -793,11 +795,7 @@ mod tests {
             }
         ));
         // Rebinding establishes the new generation but is not itself an advancing tick.
-        assert!(!RosClockLifecycleDispositionV1::TransitionRebound {
-            kind: RosClockTransitionKindV1::ClockSourceSilent,
-            generation: 2,
-            timestamp_ns: 1_010,
-        }.permits_temporal_admission());
+        assert!(!rebound.permits_temporal_admission());
         assert!(matches!(
             tracker.observe(&observation(1_020, 62), "bridge-run-1", 62),
             RosClockLifecycleDispositionV1::Advancing { generation: 2, .. }
