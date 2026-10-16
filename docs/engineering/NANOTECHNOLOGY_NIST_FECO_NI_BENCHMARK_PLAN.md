@@ -2,7 +2,7 @@
 
 **Status:** Candidate benchmark specification and source audit; no dataset bytes have been downloaded, parsed, or benchmarked in this work.  
 **Date:** 2026-10-16  
-**Tracking issue:** NANO-006 (dataset/rights qualification)  
+**Tracking issue:** [NANO-007](https://github.com/Luminous-Dynamics/symthaea/issues/7644) (dataset/rights qualification)  
 **Rust policy prototype:** [tools/nano-policy](../../tree/research/nano-001-atomistic-discovery/tools/nano-policy)  
 **Benchmark policy:** [NANOTECHNOLOGY_BENCHMARK_CHARTER.md](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md)  
 **Domain map:** [NANOTECHNOLOGY_DOMAIN_ATLAS.md](./NANOTECHNOLOGY_DOMAIN_ATLAS.md)
@@ -38,7 +38,7 @@ The data-description file identifies fields:
 - `Coer`: magnetic coercivity, in mT;
 - `Kerr`: Kerr rotation, in mrad.
 
-These are source documentation claims. The MAT file has not been parsed locally; actual array shapes, MATLAB cell/struct types, missing entries, finite-value checks, duplicate samples, row correspondence, measurement protocols and file digest must be established in NANO-006 before any run.
+These are source documentation claims. The MAT file has not been parsed locally; actual array shapes, MATLAB cell/struct types, missing entries, finite-value checks, duplicate samples, row correspondence, measurement protocols and file digest must be established in NANO-007 before any run.
 
 ## 3. Scientific question
 
@@ -135,4 +135,4 @@ No dataset download or benchmark run has happened yet; a previous binary-fetch a
 
 A successful offline replay would show only that a fixed-budget selection policy performs better under this specific historical Fe–Co–Ni library and simulated oracle protocol. It would not establish new Fe–Co–Ni performance, reproducible fabrication, industrial value, or generalization to other nanomaterials. Such claims would require fresh physical experiments, calibrated characterization and independent replication.
 
-**Next action:** NANO-006 gates the rights/schema audit. If cleared, run the source-pinned offline replay as a separate empirical benchmark for the Rust candidate-selection prototype while OC22 and MOCLIP retain their own validation paths.
+**Next action:** NANO-007 gates the rights/schema audit. If cleared, run the source-pinned offline replay as a separate empirical benchmark for the Rust candidate-selection prototype while OC22 and MOCLIP retain their own validation paths.
