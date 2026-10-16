@@ -1,0 +1,562 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:marine-vessel-concept:v1",
+  "title": "Symthaea yacht and cruise-ship concept record v1",
+  "description": "Mission-first concept contract. Concept inputs and targets are not computed performance, physical validation, class approval, or vessel certification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "concept_id",
+    "concept_name",
+    "archetype",
+    "maturity",
+    "mission",
+    "dimensions",
+    "capacity",
+    "operating_profile",
+    "energy_architecture",
+    "load_budget",
+    "performance_targets",
+    "hard_constraints",
+    "assumptions",
+    "provenance",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "concept_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "concept_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "archetype": {
+      "enum": [
+        "expedition_yacht",
+        "coastal_expedition_cruise",
+        "ocean_cruise"
+      ]
+    },
+    "maturity": {
+      "enum": [
+        "concept_hypothesis",
+        "preliminary_design",
+        "modelled",
+        "bench_validated",
+        "sea_trial_validated",
+        "class_reviewed"
+      ]
+    },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mission_statement",
+        "operating_region",
+        "route_profile",
+        "target_cruise_speed_kn",
+        "target_range_nmi",
+        "voyage_duration_days",
+        "port_calls"
+      ],
+      "properties": {
+        "mission_statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_cruise_speed_kn": {
+          "$ref": "#/$defs/quantity"
+        },
+        "target_range_nmi": {
+          "$ref": "#/$defs/quantity"
+        },
+        "voyage_duration_days": {
+          "$ref": "#/$defs/quantity"
+        },
+        "port_calls": {
+          "$ref": "#/$defs/quantity"
+        }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length_overall_m",
+        "beam_m",
+        "design_draft_m",
+        "air_draft_m",
+        "displacement_tonnes"
+      ],
+      "properties": {
+        "length_overall_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "beam_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "design_draft_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "air_draft_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "displacement_tonnes": {
+          "$ref": "#/$defs/quantity"
+        }
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "guest_capacity",
+        "crew_capacity",
+        "vehicle_or_cargo_capacity"
+      ],
+      "properties": {
+        "guest_capacity": {
+          "$ref": "#/$defs/quantity"
+        },
+        "crew_capacity": {
+          "$ref": "#/$defs/quantity"
+        },
+        "vehicle_or_cargo_capacity": {
+          "$ref": "#/$defs/quantity"
+        }
+      }
+    },
+    "operating_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_modes",
+        "sea_state_envelope",
+        "weather_routing",
+        "speed_policy",
+        "availability_target"
+      ],
+      "properties": {
+        "service_modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sea_state_envelope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weather_routing": {
+          "type": "string",
+          "minLength": 1
+        },
+        "speed_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "availability_target": {
+          "$ref": "#/$defs/quantity"
+        }
+      }
+    },
+    "energy_architecture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution_architecture",
+        "propulsion_candidates",
+        "energy_carriers_to_evaluate",
+        "battery_capacity_mwh",
+        "shore_power",
+        "wind_assist",
+        "solar_assist",
+        "thermal_integration"
+      ],
+      "properties": {
+        "distribution_architecture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propulsion_candidates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "energy_carriers_to_evaluate": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "battery_capacity_mwh": {
+          "$ref": "#/$defs/quantity"
+        },
+        "shore_power": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wind_assist": {
+          "type": "string",
+          "minLength": 1
+        },
+        "solar_assist": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thermal_integration": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "load_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "propulsion_kw",
+        "hotel_kw",
+        "hvac_kw",
+        "freshwater_kw",
+        "waste_treatment_kw",
+        "galley_kw",
+        "port_mode_kw",
+        "basis"
+      ],
+      "properties": {
+        "propulsion_kw": {
+          "$ref": "#/$defs/quantity"
+        },
+        "hotel_kw": {
+          "$ref": "#/$defs/quantity"
+        },
+        "hvac_kw": {
+          "$ref": "#/$defs/quantity"
+        },
+        "freshwater_kw": {
+          "$ref": "#/$defs/quantity"
+        },
+        "waste_treatment_kw": {
+          "$ref": "#/$defs/quantity"
+        },
+        "galley_kw": {
+          "$ref": "#/$defs/quantity"
+        },
+        "port_mode_kw": {
+          "$ref": "#/$defs/quantity"
+        },
+        "basis": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "performance_targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/performance_target"
+      }
+    },
+    "hard_constraints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hard_constraint"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/assumption"
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/provenance"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "unit",
+        "status",
+        "lower_bound",
+        "upper_bound",
+        "source_ref",
+        "rationale"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "design_assumption",
+            "design_target",
+            "computed",
+            "measured",
+            "unknown"
+          ]
+        },
+        "lower_bound": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "upper_bound": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "source_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "performance_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "unit",
+        "target_value",
+        "direction",
+        "status",
+        "comparison_basis",
+        "validation_method"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "minimize",
+            "maximize",
+            "threshold",
+            "report_only"
+          ]
+        },
+        "status": {
+          "enum": [
+            "aspirational_target",
+            "provisional_target",
+            "requires_baseline",
+            "not_quantified"
+          ]
+        },
+        "comparison_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validation_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "hard_constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id",
+        "description",
+        "disposition",
+        "evidence_needed"
+      ],
+      "properties": {
+        "constraint_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": [
+            "not_assessed",
+            "pass",
+            "fail",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "evidence_needed": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assumption_id",
+        "statement",
+        "category",
+        "status",
+        "falsification_method"
+      ],
+      "properties": {
+        "assumption_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "enum": [
+            "mission",
+            "geometry",
+            "hydrodynamics",
+            "propulsion",
+            "hotel_load",
+            "energy_storage",
+            "fuels",
+            "operations",
+            "regulatory",
+            "environmental",
+            "cost",
+            "comfort"
+          ]
+        },
+        "status": {
+          "enum": [
+            "untested",
+            "supported_by_literature",
+            "measured",
+            "rejected"
+          ]
+        },
+        "falsification_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "title",
+        "uri",
+        "scope",
+        "rights_disposition"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_disposition": {
+          "enum": [
+            "public_metadata_only",
+            "reviewed_for_use",
+            "unknown_needs_review",
+            "restricted"
+          ]
+        }
+      }
+    }
+  }
+}
