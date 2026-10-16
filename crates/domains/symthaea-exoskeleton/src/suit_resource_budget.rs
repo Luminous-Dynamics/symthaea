@@ -1345,6 +1345,41 @@ mod tests {
     }
 
     #[test]
+    fn disconnected_declared_provider_is_not_treated_as_reachable_supply() {
+        let (mut configuration, tasks, _, mut plan) = fixture();
+        let mut station = configuration.components[1].clone();
+        station.component_id = "unconnected-station".into();
+        station.kind = crate::suit_mission_configuration::MissionComponentKind::ServiceStation;
+        station.hardware_revision = "station-r1".into();
+        station.interfaces.component_id = station.component_id.clone();
+        station.interfaces.hardware_revision = station.hardware_revision.clone();
+        for endpoint in &mut station.interfaces.endpoints {
+            endpoint.endpoint_id = "unconnected-station.resource-service".into();
+            endpoint.evidence_reference = "synthetic-interface:unconnected-station".into();
+        }
+        configuration.components.push(station);
+        let (task_report, fresh_task_receipt) =
+            evaluate_mission_tasks(&configuration, &tasks).unwrap();
+        plan.expected_configuration_digest_sha256 =
+            task_report.configuration_digest_sha256;
+        plan.expected_task_plan_digest_sha256 = task_report.task_plan_digest_sha256;
+        plan.pools[0].provider_component_id = "unconnected-station".into();
+        plan.pools[0].provider_hardware_revision = "station-r1".into();
+        let (report, _) = evaluate_mission_resource_budget(
+            &configuration,
+            &tasks,
+            &fresh_task_receipt,
+            &plan,
+        )
+        .unwrap();
+        assert_eq!(report.status, MissionResourceBudgetStatus::Blocked);
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == MissionResourceFindingCode::ProviderNotReachable
+                && finding.severity == MissionResourceFindingSeverity::Blocker
+        }));
+    }
+
+    #[test]
     fn missing_supply_provider_is_not_inferred() {
         let (configuration, tasks, task_receipt, mut plan) = fixture();
         plan.pools[0].provider_component_id = "unlisted-oxygen-tank".into();
