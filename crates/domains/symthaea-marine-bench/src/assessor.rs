@@ -24,8 +24,14 @@ pub enum FindingStatus {
 pub struct Finding {
     pub metric: String,
     pub status: FindingStatus,
+    /// Nominal observed quantity (for report context only).
     pub observed: Option<f64>,
+    /// Nominal constraint quantity (for report context only).
     pub bound: Option<f64>,
+    pub observed_lower: Option<f64>,
+    pub observed_upper: Option<f64>,
+    pub bound_lower: Option<f64>,
+    pub bound_upper: Option<f64>,
     pub unit: String,
     pub calculation: String,
     pub reason: String,
@@ -173,7 +179,7 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
     findings.push(compare_le(
         "service_turnaround_window",
         match (resolve(&case.duty_cycle.round_trip_duration_h, "h", &sources), charge_duration) {
-            (Ok(mission_h), Ok(charge_h)) => finite_result(mission_h + charge_h, "mission plus recharge time"),
+            (Ok(mission_h), Ok(charge_h)) => mission_h.add(charge_h, "mission plus recharge time"),
             (Err(reason), _) => Err(reason),
             (_, Err(reason)) => Err(reason),
         },
@@ -190,7 +196,8 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
         findings,
         claim_ceiling: CLAIM_CEILING.to_owned(),
         notes: vec![
-            "Each finding is a screening calculation over declared inputs, not a physical qualification.".to_owned(),
+            "Each finding uses conservative closed-interval arithmetic over declared bounds; bounds do not imply a probability distribution or physical calibration.".to_owned(),
+            "A WithinDeclaredBound result requires the entire observed interval to sit below the entire constraint interval; overlapping intervals are indeterminate.".to_owned(),
             "Energy demand is supplied by the case; this evaluator does not derive hull resistance or propulsion loads.".to_owned(),
             "Charge duration assumes constant delivered power and a constant declared efficiency; taper, thermal limits, grid dynamics, and degradation during the cycle are not modeled.".to_owned(),
             "No overall PASS, weighted score, design ranking, or operating authority is produced.".to_owned(),
@@ -216,24 +223,72 @@ fn validate_provenance<'a>(
     Ok(sources)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Interval {
+    nominal: f64,
+    lower: f64,
+    upper: f64,
+}
+
+impl Interval {
+    fn add(self, other: Self, label: &str) -> Result<Self, String> {
+        checked_interval(
+            self.nominal + other.nominal,
+            self.lower + other.lower,
+            self.upper + other.upper,
+            label,
+        )
+    }
+
+    fn multiply_nonnegative(self, other: Self, label: &str) -> Result<Self, String> {
+        checked_interval(
+            self.nominal * other.nominal,
+            self.lower * other.lower,
+            self.upper * other.upper,
+            label,
+        )
+    }
+
+    fn complement_unit_interval(self, label: &str) -> Result<Self, String> {
+        checked_interval(
+            1.0 - self.nominal,
+            1.0 - self.upper,
+            1.0 - self.lower,
+            label,
+        )
+    }
+
+    fn midpoint(self) -> f64 {
+        self.lower + (self.upper - self.lower) / 2.0
+    }
+}
+
+fn checked_interval(nominal: f64, lower: f64, upper: f64, label: &str) -> Result<Interval, String> {
+    if !nominal.is_finite() || !lower.is_finite() || !upper.is_finite() {
+        return Err(format!("{label} produced a non-finite interval"));
+    }
+    if lower < 0.0 || lower > nominal || nominal > upper {
+        return Err(format!(
+            "{label} produced an invalid interval (require 0 <= lower <= nominal <= upper)"
+        ));
+    }
+    Ok(Interval { nominal, lower, upper })
+}
+
 fn resolve(
     input: &EvidenceValue,
     expected_unit: &str,
     sources: &BTreeMap<&str, &ProvenanceRecord>,
-) -> Result<f64, String> {
+) -> Result<Interval, String> {
     match input {
         EvidenceValue::Unknown { reason } => Err(format!("unknown input: {}", reason.trim())),
         EvidenceValue::Known {
             value,
+            lower_bound,
+            upper_bound,
             unit,
             provenance_id,
         } => {
-            if !value.is_finite() {
-                return Err("input value is not finite".to_owned());
-            }
-            if *value < 0.0 {
-                return Err("input value must not be negative".to_owned());
-            }
             if unit != expected_unit {
                 return Err(format!(
                     "unit mismatch: expected {expected_unit}, received {unit}"
@@ -248,7 +303,7 @@ fn resolve(
             if source.class == EvidenceClass::Unknown {
                 return Err(format!("provenance class is unknown: {provenance_id}"));
             }
-            Ok(*value)
+            checked_interval(*value, *lower_bound, *upper_bound, "input")
         }
     }
 }
@@ -257,29 +312,29 @@ fn resolve_fraction(
     input: &EvidenceValue,
     label: &str,
     sources: &BTreeMap<&str, &ProvenanceRecord>,
-) -> Result<f64, String> {
-    let value = resolve(input, "fraction", sources)?;
-    if value > 1.0 {
-        return Err(format!("{label} must be in interval [0, 1]"));
+) -> Result<Interval, String> {
+    let interval = resolve(input, "fraction", sources)?;
+    if interval.upper > 1.0 {
+        return Err(format!("{label} must have bounds in interval [0, 1]"));
     }
-    Ok(value)
+    Ok(interval)
 }
 
 fn sum_values(
     inputs: &[(&EvidenceValue, &str)],
     sources: &BTreeMap<&str, &ProvenanceRecord>,
-) -> Result<f64, String> {
-    let values = inputs
-        .iter()
-        .map(|(input, unit)| resolve(input, unit, sources))
-        .collect::<Result<Vec<_>, _>>()?;
-    finite_result(values.iter().sum(), "sum of declared inputs")
+) -> Result<Interval, String> {
+    let mut total = Interval { nominal: 0.0, lower: 0.0, upper: 0.0 };
+    for (input, unit) in inputs {
+        total = total.add(resolve(input, unit, sources)?, "sum of declared inputs")?;
+    }
+    Ok(total)
 }
 
 fn duty_cycle_energy_kwh(
     case: &MarineFreightCase,
     sources: &BTreeMap<&str, &ProvenanceRecord>,
-) -> Result<f64, String> {
+) -> Result<Interval, String> {
     sum_values(
         &[
             (&case.duty_cycle.loaded_leg_propulsion_kwh, "kWh"),
@@ -294,7 +349,7 @@ fn duty_cycle_energy_kwh(
 fn usable_battery_energy_kwh(
     case: &MarineFreightCase,
     sources: &BTreeMap<&str, &ProvenanceRecord>,
-) -> Result<f64, String> {
+) -> Result<Interval, String> {
     let nominal = resolve(&case.energy_system.nominal_battery_kwh, "kWh", sources)?;
     let temperature = resolve_fraction(
         &case.energy_system.temperature_capacity_factor,
@@ -311,25 +366,33 @@ fn usable_battery_energy_kwh(
         "reserve fraction",
         sources,
     )?;
-    finite_result(
-        nominal * temperature * end_of_life * (1.0 - reserve),
-        "derated usable battery energy",
-    )
+    nominal
+        .multiply_nonnegative(temperature, "battery × temperature derating")?
+        .multiply_nonnegative(end_of_life, "battery × end-of-life derating")?
+        .multiply_nonnegative(
+            reserve.complement_unit_interval("reserve complement")?,
+            "battery reserve-adjusted usable energy",
+        )
 }
 
 fn effective_charge_rate_kw(
     case: &MarineFreightCase,
     sources: &BTreeMap<&str, &ProvenanceRecord>,
-) -> Result<f64, String> {
+) -> Result<Interval, String> {
     let charger = resolve(&case.energy_system.charger_power_kw, "kW", sources)?;
     let shore = resolve(&case.terminal.shore_connection_power_kw, "kW", sources)?;
-    finite_result(charger.min(shore), "effective charge power")
+    checked_interval(
+        charger.nominal.min(shore.nominal),
+        charger.lower.min(shore.lower),
+        charger.upper.min(shore.upper),
+        "effective charge power",
+    )
 }
 
 fn charge_energy_available_kwh(
     case: &MarineFreightCase,
     sources: &BTreeMap<&str, &ProvenanceRecord>,
-) -> Result<f64, String> {
+) -> Result<Interval, String> {
     let effective_power = effective_charge_rate_kw(case, sources)?;
     let window = resolve(&case.terminal.available_charge_window_h, "h", sources)?;
     let efficiency = resolve_fraction(
@@ -337,14 +400,16 @@ fn charge_energy_available_kwh(
         "charging efficiency",
         sources,
     )?;
-    finite_result(effective_power * window * efficiency, "available battery-side recharge energy")
+    effective_power
+        .multiply_nonnegative(window, "power × charge window")?
+        .multiply_nonnegative(efficiency, "available battery-side recharge energy")
 }
 
 fn charge_duration_h(
     case: &MarineFreightCase,
     sources: &BTreeMap<&str, &ProvenanceRecord>,
-    demand: &Result<f64, String>,
-) -> Result<f64, String> {
+    demand: &Result<Interval, String>,
+) -> Result<Interval, String> {
     let demand = *demand.as_ref().map_err(Clone::clone)?;
     let effective_power = effective_charge_rate_kw(case, sources)?;
     let efficiency = resolve_fraction(
@@ -352,51 +417,61 @@ fn charge_duration_h(
         "charging efficiency",
         sources,
     )?;
-    let rate = effective_power * efficiency;
-    if rate == 0.0 {
-        return if demand == 0.0 {
-            Ok(0.0)
+    let rate = effective_power.multiply_nonnegative(efficiency, "delivered charge rate")?;
+    if rate.upper == 0.0 {
+        return if demand.upper == 0.0 {
+            Ok(Interval { nominal: 0.0, lower: 0.0, upper: 0.0 })
         } else {
             Err("no positive charge rate is available".to_owned())
         };
     }
-    finite_result(demand / rate, "idealized recharge duration")
-}
-
-fn finite_result(value: f64, label: &str) -> Result<f64, String> {
-    if value.is_finite() && value >= 0.0 {
-        Ok(value)
-    } else {
-        Err(format!("{label} produced a non-finite or negative result"))
+    if rate.lower <= 0.0 {
+        return Err("recharge-time upper bound is unbounded because the delivered-rate lower bound is zero".to_owned());
     }
+    checked_interval(
+        demand.nominal / rate.nominal,
+        demand.lower / rate.upper,
+        demand.upper / rate.lower,
+        "idealized recharge duration",
+    )
 }
 
 fn compare_le(
     metric: &str,
-    observed: Result<f64, String>,
-    bound: Result<f64, String>,
+    observed: Result<Interval, String>,
+    bound: Result<Interval, String>,
     unit: &str,
     calculation: &str,
 ) -> Finding {
     match (observed, bound) {
         (Ok(observed), Ok(bound)) => {
-            let within = observed <= bound;
+            let status = if observed.upper <= bound.lower {
+                FindingStatus::WithinDeclaredBound
+            } else if observed.lower > bound.upper {
+                FindingStatus::ViolatesDeclaredBound
+            } else {
+                FindingStatus::Indeterminate
+            };
+            let reason = match status {
+                FindingStatus::WithinDeclaredBound =>
+                    "entire observed interval is within the entire declared bound interval; this is not physical qualification".to_owned(),
+                FindingStatus::ViolatesDeclaredBound =>
+                    "even the lowest observed value exceeds the highest declared bound".to_owned(),
+                FindingStatus::Indeterminate =>
+                    "input intervals overlap or cross; available bounds do not establish feasibility or violation".to_owned(),
+            };
             Finding {
                 metric: metric.to_owned(),
-                status: if within {
-                    FindingStatus::WithinDeclaredBound
-                } else {
-                    FindingStatus::ViolatesDeclaredBound
-                },
-                observed: Some(observed),
-                bound: Some(bound),
+                status,
+                observed: Some(observed.nominal),
+                bound: Some(bound.nominal),
+                observed_lower: Some(observed.lower),
+                observed_upper: Some(observed.upper),
+                bound_lower: Some(bound.lower),
+                bound_upper: Some(bound.upper),
                 unit: unit.to_owned(),
                 calculation: calculation.to_owned(),
-                reason: if within {
-                    "arithmetic comparison is within the declared bound; this is not physical qualification".to_owned()
-                } else {
-                    "observed value exceeds the declared bound".to_owned()
-                },
+                reason,
             }
         }
         (left, right) => {
@@ -413,6 +488,10 @@ fn compare_le(
                 status: FindingStatus::Indeterminate,
                 observed: None,
                 bound: None,
+                observed_lower: None,
+                observed_upper: None,
+                bound_lower: None,
+                bound_upper: None,
                 unit: unit.to_owned(),
                 calculation: calculation.to_owned(),
                 reason: reasons,
@@ -439,7 +518,11 @@ mod tests {
 
     fn set_number(input: &mut EvidenceValue, value: f64) {
         match input {
-            EvidenceValue::Known { value: slot, .. } => *slot = value,
+            EvidenceValue::Known { value: slot, lower_bound, upper_bound, .. } => {
+                *slot = value;
+                *lower_bound = value;
+                *upper_bound = value;
+            },
             EvidenceValue::Unknown { .. } => panic!("test expected a known input"),
         }
     }
@@ -634,3 +717,54 @@ mod tests {
         );
     }
 }
+
+    fn set_range(input: &mut EvidenceValue, nominal: f64, lower: f64, upper: f64) {
+        match input {
+            EvidenceValue::Known { value, lower_bound, upper_bound, .. } => {
+                *value = nominal;
+                *lower_bound = lower;
+                *upper_bound = upper;
+            }
+            EvidenceValue::Unknown { .. } => panic!("test expected a known input"),
+        }
+    }
+
+    #[test]
+    fn overlapping_energy_intervals_are_indeterminate_not_nominal_pass() {
+        let mut case = case();
+        set_range(&mut case.duty_cycle.loaded_leg_propulsion_kwh, 1850.0, 1700.0, 2500.0);
+        let report = assess(&case).expect("synthetic bounded case");
+        let energy = finding(&report, "battery_energy_per_duty_cycle");
+        assert_eq!(energy.status, FindingStatus::Indeterminate);
+        assert!(energy.observed_lower.expect("lower bound") < energy.bound_upper.expect("upper capacity"));
+        assert!(energy.observed_upper.expect("upper bound") > energy.bound_lower.expect("lower capacity"));
+    }
+
+    #[test]
+    fn fully_separated_input_ranges_prove_robust_violation() {
+        let mut case = case();
+        set_range(&mut case.duty_cycle.loaded_leg_propulsion_kwh, 2500.0, 2400.0, 2600.0);
+        let report = assess(&case).expect("synthetic bounded case");
+        let energy = finding(&report, "battery_energy_per_duty_cycle");
+        assert_eq!(energy.status, FindingStatus::ViolatesDeclaredBound);
+        assert!(energy.observed_lower.expect("lower demand") > energy.bound_upper.expect("upper capacity"));
+    }
+
+    #[test]
+    fn malformed_interval_does_not_get_optimistic_default() {
+        let mut case = case();
+        set_range(&mut case.vessel.length_overall_m, 80.0, 82.0, 81.0);
+        let report = assess(&case).expect("range error is a finding, not a panic");
+        assert_eq!(finding(&report, "route_length_envelope").status, FindingStatus::Indeterminate);
+    }
+
+    #[test]
+    fn uncertainty_ranges_are_propagated_through_under_keel_clearance() {
+        let mut case = case();
+        set_range(&mut case.vessel.design_draft_m, 2.2, 2.1, 2.4);
+        set_range(&mut case.route.minimum_under_keel_clearance_m, 0.5, 0.4, 0.7);
+        set_range(&mut case.route.available_water_depth_m, 3.2, 3.0, 3.25);
+        let report = assess(&case).expect("synthetic bounded case");
+        assert_eq!(finding(&report, "under_keel_clearance").status, FindingStatus::Indeterminate);
+    }
+
