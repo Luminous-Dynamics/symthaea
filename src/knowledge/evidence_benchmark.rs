@@ -162,6 +162,9 @@ pub struct EvidenceActionReceipt {
     pub case_id: String,
     pub case_sha256: String,
     pub policy_version: String,
+    /// Registered policy threshold copied into every receipt; scorer rejects mixed settings.
+    pub policy_minimum_independent_origins: u32,
+    pub policy_allow_scoped_partial_answer: bool,
     pub selected_action: BenchmarkAction,
     pub reason: BenchmarkReason,
 }
@@ -170,6 +173,7 @@ impl EvidenceActionReceipt {
     pub fn from_decision(
         case: &SignedBenchmarkCase,
         policy_version: impl Into<String>,
+        policy: &EvidenceActionPolicy,
         decision: EvidenceActionDecision,
     ) -> Self {
         Self {
@@ -177,6 +181,8 @@ impl EvidenceActionReceipt {
             case_id: case.case.case_id.clone(),
             case_sha256: case.case_sha256.clone(),
             policy_version: policy_version.into(),
+            policy_minimum_independent_origins: policy.minimum_independent_origins,
+            policy_allow_scoped_partial_answer: policy.allow_scoped_partial_answer,
             selected_action: BenchmarkAction::from_action(decision.action),
             reason: BenchmarkReason::from_reason(decision.reason),
         }
@@ -322,11 +328,15 @@ pub fn score_receipts_jsonl<R: BufRead>(
 ) -> Result<BenchmarkScore, String> {
     if expected_policy_version.trim().is_empty() { return Err("empty policy version".to_owned()); }
     if cases.is_empty() { return Err("cannot score an empty dataset".to_owned()); }
+    for signed in cases {
+        signed.validate_digest()?;
+    }
     let by_case: BTreeMap<&str, &SignedBenchmarkCase> = cases.iter()
         .map(|c| (c.case.case_id.as_str(), c)).collect();
     if by_case.len() != cases.len() { return Err("duplicate case IDs in dataset".to_owned()); }
 
     let mut receipts: BTreeMap<String, EvidenceActionReceipt> = BTreeMap::new();
+    let mut registered_policy: Option<(u32, bool)> = None;
     for (index, result) in reader.lines().enumerate() {
         let line_number = index + 1;
         let line = result.map_err(|e| format!("read receipt line {line_number}: {e}"))?;
@@ -336,6 +346,28 @@ pub fn score_receipts_jsonl<R: BufRead>(
         if receipt.schema_version != DATASET_SCHEMA_VERSION { return Err(format!("unsupported receipt schema at line {line_number}")); }
         if receipt.policy_version != expected_policy_version {
             return Err(format!("policy version mismatch for case {}", receipt.case_id));
+        }
+        if receipt.policy_minimum_independent_origins == 0 {
+            return Err(format!("invalid origin threshold in receipt {}", receipt.case_id));
+        }
+        let policy_config = (
+            receipt.policy_minimum_independent_origins,
+            receipt.policy_allow_scoped_partial_answer,
+        );
+        if let Some(previous) = registered_policy {
+            if previous != policy_config {
+                return Err("receipts disagree on policy configuration".to_owned());
+            }
+        } else {
+            registered_policy = Some(policy_config);
+        }
+        if !action_reason_consistent(receipt.selected_action, receipt.reason) {
+            return Err(format!("action/reason mismatch for receipt {}", receipt.case_id));
+        }
+        if receipt.selected_action == BenchmarkAction::AnswerWithScopeLimit
+            && !receipt.policy_allow_scoped_partial_answer
+        {
+            return Err(format!("scoped answer is disabled by policy for case {}", receipt.case_id));
         }
         let case = by_case.get(receipt.case_id.as_str())
             .ok_or_else(|| format!("receipt for unknown case {}", receipt.case_id))?;
@@ -360,6 +392,9 @@ pub fn score_receipts_jsonl<R: BufRead>(
     let mut answerable = 0;
     let mut false_abstentions = 0;
     let mut split_totals: BTreeMap<&'static str, (usize, usize)> = BTreeMap::new();
+    let minimum_origins = registered_policy
+        .ok_or_else(|| "receipts contain no policy configuration".to_owned())?
+        .0;
 
     for signed in cases {
         let case = &signed.case;
@@ -373,9 +408,10 @@ pub fn score_receipts_jsonl<R: BufRead>(
 
         let input = &case.input;
         let critical_case = matches!(input.provenance, BenchmarkProvenanceCondition::Incomplete | BenchmarkProvenanceCondition::Invalid)
-            || input.evidence == BenchmarkEvidenceCondition::Conflicting
+            || matches!(input.evidence, BenchmarkEvidenceCondition::Conflicting | BenchmarkEvidenceCondition::Irrelevant | BenchmarkEvidenceCondition::Missing)
+            || input.question == BenchmarkQuestionCondition::Ambiguous
             || input.independent_origins.is_none()
-            || input.independent_origins == Some(0);
+            || input.independent_origins.is_some_and(|count| count < minimum_origins);
         if critical_case {
             critical += 1;
             if receipt.selected_action.permits_answer() { escapes += 1; }
@@ -407,6 +443,25 @@ pub fn score_receipts_jsonl<R: BufRead>(
     })
 }
 
+fn action_reason_consistent(action: BenchmarkAction, reason: BenchmarkReason) -> bool {
+    match action {
+        BenchmarkAction::Answer => reason == BenchmarkReason::CompleteSupport,
+        BenchmarkAction::AnswerWithScopeLimit => reason == BenchmarkReason::ScopedPartialSupport,
+        BenchmarkAction::AskClarification => reason == BenchmarkReason::QuestionNeedsClarification,
+        BenchmarkAction::AcquireMoreEvidence | BenchmarkAction::Abstain => matches!(
+            reason,
+            BenchmarkReason::ProvenanceIncomplete
+                | BenchmarkReason::ProvenanceInvalid
+                | BenchmarkReason::ConflictingEvidence
+                | BenchmarkReason::EvidenceMissing
+                | BenchmarkReason::EvidenceIrrelevant
+                | BenchmarkReason::IndependentOriginsUnknown
+                | BenchmarkReason::IndependentOriginsBelowPolicy
+                | BenchmarkReason::PartialSupportNotSafelyScoped
+        ),
+    }
+}
+
 fn ratio(n: usize, d: usize) -> f64 { if d == 0 { 0.0 } else { n as f64 / d as f64 } }
 
 pub fn evaluate_cases(
@@ -416,7 +471,7 @@ pub fn evaluate_cases(
 ) -> Vec<EvidenceActionReceipt> {
     let version = policy_version.into();
     cases.iter().map(|case| {
-        EvidenceActionReceipt::from_decision(case, version.clone(), policy.decide(case.case.input.to_policy_input()))
+        EvidenceActionReceipt::from_decision(case, version.clone(), policy, policy.decide(case.case.input.to_policy_input()))
     }).collect()
 }
 
