@@ -1,6 +1,6 @@
 # Resilient Systems Feasibility Portfolio
 **Status:** research synthesis and first-pass screening; not a validated engineering design, cost estimate, life-support design, or investment recommendation  
-**As of:** 2026-10-15  
+**As of:** 2026-10-16  
 **Proposed home:** Symthaea engineering research  
 **Related work:** [Vacuum-airship metamaterial screening](https://github.com/Luminous-Dynamics/symthaea/blob/research/vacuum-airship-screening-v1/docs/research/VACUUM_AIRSHIP_METAMATERIAL_SCREENING.md)
 
