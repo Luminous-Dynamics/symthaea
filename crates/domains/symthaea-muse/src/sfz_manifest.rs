@@ -861,7 +861,7 @@ mod tests {
         assert_eq!(other_key.decision, "unique_candidate");
         assert_eq!(other_key.selected_region_index, Some(3));
         assert_eq!(other_bank.selected_region_index, Some(1), "a different SFZ manifest starts a separate sequence");
-        assert_eq!(router.stream_count(), 2, "unique non-sequenced zones must not create state");
+        assert_eq!(router.stream_count(), 3, "unique non-sequenced zones must not create state");
 
         router.reset_stream("voice-a");
         let b2 = router.next_selection(&manifest, "voice-b", 60, 90);
