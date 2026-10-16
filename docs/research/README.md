@@ -357,3 +357,6 @@ Open an issue on GitHub for research discussions.
 ## Resilient-systems feasibility program
 
 The deterministic service, resource, crew-scheduling, uncertainty, and event-triggered dispatch models are indexed by [the feasibility portfolio](./RESILIENT_SYSTEMS_FEASIBILITY_PORTFOLIO.md) and [benchmark protocol](./RESILIENT_SYSTEMS_BENCHMARKS.md). The newest adaptive dispatcher is [rolling_horizon_repair.rs](../../crates/domains/symthaea-engineering/src/rolling_horizon_repair.rs); use its decision traces to review information boundaries rather than inferring correctness from a single summary score.
+
+
+The paired comparison harness is [repair_policy_comparison.rs](../../crates/domains/symthaea-engineering/src/repair_policy_comparison.rs). It compares the fixed-plan robust baseline with event-triggered dispatch under the same realized-duration scenarios and preserves per-scenario deltas and decision traces.
