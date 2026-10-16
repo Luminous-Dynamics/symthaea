@@ -464,3 +464,14 @@ This demonstrates why policies should be benchmarked against each other on a dis
 #### New scheduling heuristic: preserve flexible crews
 
 A new fixture demonstrates that when a mechanical repair can be handled by either a specialist or a multi-skilled technician, while an electrical repair can only be handled by the multi-skilled technician, a deterministic least-flexible-crew tie-break schedules both jobs at step 0. This is a scheduling heuristic, not a global optimality guarantee; benchmarks should compare it against stable-ID-only assignment and other baselines.
+
+
+## Implementation update — nonanticipative duration stress evaluation
+
+A fourth module, [`robust_repair_evaluation`](../../crates/domains/symthaea-engineering/src/robust_repair_evaluation.rs), evaluates priority-first, shortest-job-first and weighted-recovery repair policies under alternative realized-duration scenarios.
+
+For each policy, the initial schedule is selected from nominal inputs only. The initial dispatch order and crew assignments are then kept fixed during scenario replay. Realized repair times can delay later jobs sharing a crew and jobs with prerequisites, but they cannot influence the original schedule. The report includes weighted expected loss, worst-case loss, upper-tail CVaR, and per-scenario traces.
+
+This creates an explicit boundary between a schedule that looks good given assumed durations and one that is robust under disclosed alternatives. Scenario weights must sum to one, but are not automatically empirical probabilities. The next layer should compare fixed-plan replay with a separate rolling-horizon policy that makes decisions only from information revealed by that step.
+
+The initial module contains nine authored unit tests for a CVaR tail case, frozen nominal job order, repair-duration monotonicity, dependency delays, scenario-weight validation, complete per-job scenario coverage, invalid alpha/duration inputs and determinism. These tests are authored but have not been compiled or run in the available environment.
