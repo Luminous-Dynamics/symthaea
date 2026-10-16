@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:civos:socioeconomic-interoperability:validator-execution-record:v1",
   "title": "CivOS Run Bundle Validator Execution Record v1",
-  "description": "Metadata emitted by a CI job after its run-bundle validator tests succeed. This record is suitable as a custom in-toto attestation predicate, but is non-authoritative without verification of the external signature and builder identity.",
+  "description": "Execution report used as the subject of a separate signed artifact attestation. It is not itself the attestation predicate and is non-authoritative without external signature verification and appraisal policy.",
   "type": "object",
   "additionalProperties": false,
   "required": [
