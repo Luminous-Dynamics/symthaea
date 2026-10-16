@@ -370,7 +370,7 @@ mod tests {
         assert_eq!(results.len(), GRID_REFERENCE_CASE_IDS.len());
         assert_eq!(
             results.iter().map(|result| result.case_id).collect::<Vec<_>>(),
-            GRID_REFERENCE_CASE_IDS
+            GRID_REFERENCE_CASE_IDS.to_vec()
         );
         assert!(results.iter().all(|result| {
             result.max_absolute_voltage_error_v <= GRID_REFERENCE_VOLTAGE_TOLERANCE_V
