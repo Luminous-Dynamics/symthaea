@@ -451,7 +451,7 @@ A third Rust module, [`repair_crew_scheduling`](../../crates/domains/symthaea-en
 
 The objective measures caller-weighted service-unit-steps lost from outage until repair completion, capped at the analysis horizon. It is intended for policy comparison on identical scenarios, not as an objective ethical ranking. The implementation is a deterministic list-scheduling heuristic, not a global optimizer.
 
-The initial module now has 16 authored unit tests covering policy comparison, skill eligibility, crew exclusivity, dependency ordering, finite spares, horizon accounting, deterministic output, cycle rejection and invalid inputs. The tests have not been compiled or run in the current environment. The module includes a test-only permutation-enumeration oracle for a tiny, single-crew/no-prerequisite case; on the disclosed weighted two-job fixture it identifies weighted loss 111 as the exact optimum, which the weighted heuristic matches. The next research target is to generalize that oracle to a public small-case corpus, then add uncertain repair time and route/access dependencies. The oracle test is authored but has not been run in Rust.
+The initial module now has 17 authored unit tests covering policy comparison, skill eligibility, crew exclusivity, dependency ordering, finite spares, horizon accounting, deterministic output, cycle rejection and invalid inputs. The tests have not been compiled or run in the current environment. The module includes a test-only permutation-enumeration oracle for a tiny, single-crew/no-prerequisite case; on the disclosed weighted two-job fixture it identifies weighted loss 111 as the exact optimum, which the weighted heuristic matches. The next research target is to generalize that oracle to a public small-case corpus, then add uncertain repair time and route/access dependencies. The oracle test is authored but has not been run in Rust.
 
 
 ### Policy-comparison witness (synthetic; not empirical)
@@ -459,3 +459,8 @@ The initial module now has 16 authored unit tests covering policy comparison, sk
 An independent arithmetic check was performed on a one-crew, two-job fixture. Priority-first repairs a duration-10, service-weight-1 task before a duration-1, service-weight-100 task, yielding (10\times1 + 11\times100 = 1{,}110) weighted service-unit-steps lost. The weighted-recovery policy reverses the order and yields (1\times100 + 11\times1 = 111), a 90% reduction for this explicitly weighted objective.
 
 This demonstrates why policies should be benchmarked against each other on a disclosed objective and why the objective matters. It does **not** prove the heuristic is globally optimal or that service weights capture ethical priorities. This was a separate arithmetic oracle, not execution of the Rust test.
+
+
+#### New scheduling heuristic: preserve flexible crews
+
+A new fixture demonstrates that when a mechanical repair can be handled by either a specialist or a multi-skilled technician, while an electrical repair can only be handled by the multi-skilled technician, a deterministic least-flexible-crew tie-break schedules both jobs at step 0. This is a scheduling heuristic, not a global optimality guarantee; benchmarks should compare it against stable-ID-only assignment and other baselines.
