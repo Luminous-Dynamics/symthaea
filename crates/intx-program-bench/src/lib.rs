@@ -96,14 +96,16 @@ pub fn validate_cases(cases: &[Case]) -> Result<(), String> {
         if !["yes", "no"].contains(&case.reconcile.as_str()) {
             return Err(format!("invalid reconcile value for {}", case.id));
         }
-        if !case.id.starts_with(&format!("{}-", match case.dimension.as_str() {
-            "identity" => "C0",
-            "artifact" => "C1",
-            "authority" => "C2",
-            "transport" => "C3",
-            "lifecycle" => "C4",
-            _ => unreachable!("dimension was validated"),
-        })) {
+
+        let expected_prefix = match case.dimension.as_str() {
+            "identity" => "C0-",
+            "artifact" => "C1-",
+            "authority" => "C2-",
+            "transport" => "C3-",
+            "lifecycle" => "C4-",
+            _ => return Err(format!("unknown dimension: {}", case.dimension)),
+        };
+        if !case.id.starts_with(expected_prefix) {
             return Err(format!("case id and dimension disagree: {}", case.id));
         }
 
@@ -111,27 +113,35 @@ pub fn validate_cases(cases: &[Case]) -> Result<(), String> {
 
         if ["denied", "release_blocked", "requalification_required", "not_dispatched"]
             .contains(&case.expected_state.as_str())
-            && case.dispatch != "none"
+            && (case.dispatch != "none" || case.reconcile != "no")
         {
-            return Err(format!("blocked case could dispatch: {}", case.id));
+            return Err(format!("blocked case could dispatch or expects unsupported reconciliation: {}", case.id));
         }
         if case.expected_state == "outcome_unknown"
             && (case.dispatch != "may_have_occurred" || case.reconcile != "yes")
         {
             return Err(format!("ambiguous outcome must require reconciliation: {}", case.id));
         }
-        if case.expected_state == "discrepancy"
+        if ["discrepancy", "synthetic_effect_verified"].contains(&case.expected_state.as_str())
             && (case.dispatch != "occurred" || case.reconcile != "yes")
         {
-            return Err(format!("discrepancy must reconcile after dispatch: {}", case.id));
+            return Err(format!("post-dispatch state must reconcile: {}", case.id));
         }
-        if case.expected_state == "synthetic_effect_verified"
-            && (case.dispatch != "occurred" || case.reconcile != "yes")
+        if ["remote_rejected", "deduplicated"].contains(&case.expected_state.as_str())
+            && (case.dispatch != "occurred" || case.reconcile != "no")
         {
-            return Err(format!(
-                "synthetic verification requires dispatch and reconciliation evidence: {}",
-                case.id
-            ));
+            return Err(format!("definitive transport result has inconsistent dispatch/reconciliation: {}", case.id));
+        }
+        if [
+            "observation_admitted",
+            "artifact_exported",
+            "offline_validation_passed",
+            "preflight_admitted",
+        ]
+        .contains(&case.expected_state.as_str())
+            && case.dispatch != "none"
+        {
+            return Err(format!("non-effect stage cannot dispatch: {}", case.id));
         }
     }
 
@@ -192,6 +202,9 @@ mod tests {
 
     #[test]
     fn malformed_fixture_rows_fail_closed() {
-        assert!(parse_cases("id|dimension|scenario|expected_state|dispatch|reconcile\nC0-01|identity").is_err());
+        assert!(parse_cases(
+            "id|dimension|scenario|expected_state|dispatch|reconcile\nC0-01|identity"
+        )
+        .is_err());
     }
 }
