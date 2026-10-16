@@ -67,6 +67,98 @@ pub struct ConsciousnessStatusMsg {
     pub timestamp: String,
 }
 
+/// Explicit ROS clock binding for a sensor timestamp.
+///
+/// ROS header stamps do not, by themselves, prove that two publishers use the
+/// same clock domain. A freshly captured observation therefore defaults to
+/// `Unbound` and is not eligible for cross-sensor age/skew claims until a
+/// deployment profile binds the source.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RosClockDomainV1 {
+    Unbound,
+    Named(String),
+}
+
+/// Provenance metadata preserved from one ROS Header.
+///
+/// This bridge currently preserves the source stamp and frame but does not
+/// capture callback receive time, bind the ROS clock domain, or prove a
+/// calibration identity. Those unknowns stay explicit.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RosSampleMetadataV1 {
+    pub stamp_sec: i32,
+    pub stamp_nanosec: u32,
+    pub frame_id: String,
+    pub clock_domain: RosClockDomainV1,
+    pub received_monotonic_ns: Option<u64>,
+    pub calibration_id: Option<String>,
+}
+
+/// An individual physical field without conflating missing data with zero.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RosEvidenceValueV1<T> {
+    Available {
+        value: T,
+        source: RosSampleMetadataV1,
+    },
+    Unavailable {
+        reason: String,
+        source: Option<RosSampleMetadataV1>,
+    },
+}
+
+/// Interpreted ROS covariance semantics. All-zero covariance means unknown,
+/// not zero uncertainty. A -1 first element denotes an unavailable estimate.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum RosCovarianceV1 {
+    Unknown,
+    Reported([f64; 9]),
+    Unavailable,
+}
+
+/// Canonical DMC21 joint observations with independent availability per field.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RosJointStateObservationV1 {
+    pub joint_names: Vec<String>,
+    pub positions: RosEvidenceValueV1<Vec<f64>>,
+    pub velocities: RosEvidenceValueV1<Vec<f64>>,
+    pub efforts: RosEvidenceValueV1<Vec<f64>>,
+    pub source: RosSampleMetadataV1,
+}
+
+/// IMU values remain in their source frame. No implicit transform or sensor
+/// fusion is performed at this boundary.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RosImuObservationV1 {
+    pub orientation_wxyz: RosEvidenceValueV1<[f64; 4]>,
+    pub orientation_covariance: RosCovarianceV1,
+    pub angular_velocity_body_rad_s: RosEvidenceValueV1<[f64; 3]>,
+    pub angular_velocity_covariance: RosCovarianceV1,
+    pub linear_acceleration_sensor_frame_mps2: RosEvidenceValueV1<[f64; 3]>,
+    pub linear_acceleration_covariance: RosCovarianceV1,
+    pub source: RosSampleMetadataV1,
+}
+
+/// A deliberately partial humanoid observation, not a HumanoidState.
+///
+/// This type can represent the data the current bridge actually subscribes to
+/// without inventing root pose, root/COM velocity, extremity positions, sensor
+/// time-domain bindings, or calibration evidence. Downstream fusion must check
+/// each field's availability and bind clocks/frames before treating sources as
+/// one synchronized physical state.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RosPartialHumanoidObservationV1 {
+    pub schema_version: u16,
+    pub morphology_profile_id: String,
+    pub joint_state: RosJointStateObservationV1,
+    pub imu: RosEvidenceValueV1<RosImuObservationV1>,
+    pub root_position_world_m: RosEvidenceValueV1<[f64; 3]>,
+    pub root_linear_velocity_world_mps: RosEvidenceValueV1<[f64; 3]>,
+    pub center_of_mass_velocity_world_mps: RosEvidenceValueV1<[f64; 3]>,
+    pub head_height_world_m: RosEvidenceValueV1<f64>,
+    pub extremities_world_m: RosEvidenceValueV1<Vec<f64>>,
+}
+
 /// Reorder one ROS JointState value array into the bridge's explicit model order.
 ///
 /// ROS message array position is not joint identity. This helper requires an exact
@@ -174,6 +266,80 @@ fn validate_sensor_vector(field: &str, values: [f64; 3]) -> Result<[f64; 3], Ros
         )));
     }
     Ok(values)
+}
+
+#[cfg(feature = "ros2")]
+fn ros_sample_metadata(
+    header: &std_msgs::msg::Header,
+) -> Result<RosSampleMetadataV1, RosBridgeError> {
+    if header.stamp.nanosec >= 1_000_000_000 {
+        return Err(RosBridgeError::InvalidSensorData(
+            "ROS header nanosec must be less than 1,000,000,000".into(),
+        ));
+    }
+
+    Ok(RosSampleMetadataV1 {
+        stamp_sec: header.stamp.sec,
+        stamp_nanosec: header.stamp.nanosec,
+        frame_id: header.frame_id.clone(),
+        clock_domain: RosClockDomainV1::Unbound,
+        received_monotonic_ns: None,
+        calibration_id: None,
+    })
+}
+
+#[cfg(feature = "ros2")]
+fn ros_covariance_v1(
+    covariance: [f64; 9],
+    field: &str,
+) -> Result<RosCovarianceV1, RosBridgeError> {
+    // ROS sensor_msgs/Imu specifies -1 in element 0 when this estimate is
+    // unavailable. The other covariance cells are not interpreted in that case.
+    classify_ros_covariance(covariance).map_err(|_| {
+        RosBridgeError::InvalidSensorData(format!(
+            "{field} covariance contains a non-finite value"
+        ))
+    })
+}
+
+#[cfg(feature = "ros2")]
+fn evidence_from_imu_vector(
+    value: [f64; 3],
+    covariance: &RosCovarianceV1,
+    source: &RosSampleMetadataV1,
+    field: &str,
+) -> Result<RosEvidenceValueV1<[f64; 3]>, RosBridgeError> {
+    if matches!(covariance, RosCovarianceV1::Unavailable) {
+        return Ok(RosEvidenceValueV1::Unavailable {
+            reason: format!("ROS IMU marks {field} estimate unavailable (covariance[0] = -1)"),
+            source: Some(source.clone()),
+        });
+    }
+
+    Ok(RosEvidenceValueV1::Available {
+        value: validate_sensor_vector(field, value)?,
+        source: source.clone(),
+    })
+}
+
+fn classify_ros_covariance(
+    covariance: [f64; 9],
+) -> Result<RosCovarianceV1, RosBridgeError> {
+    // ROS sensor_msgs/Imu reserves covariance[0] == -1 for an unavailable
+    // estimate. In that case the remaining covariance cells are not consulted.
+    if covariance[0] == -1.0 {
+        return Ok(RosCovarianceV1::Unavailable);
+    }
+    if covariance.iter().any(|value| !value.is_finite()) {
+        return Err(RosBridgeError::InvalidSensorData(
+            "ROS covariance contains a non-finite value".into(),
+        ));
+    }
+    if covariance.iter().all(|value| *value == 0.0) {
+        Ok(RosCovarianceV1::Unknown)
+    } else {
+        Ok(RosCovarianceV1::Reported(covariance))
+    }
 }
 
 /// Configuration for the ROS2 bridge node.
@@ -497,61 +663,227 @@ impl RosBridgeNode {
         Ok(())
     }
 
-    /// Return a humanoid state only when the subscribed evidence can support its fields.
+    /// Return a complete humanoid state only when the subscribed evidence supports it.
     ///
-    /// Joint positions and velocities are mapped by canonical joint names. IMU
-    /// orientation and angular velocity are validated, but this bridge currently
-    /// has no odometry or qualified state-estimator source for root/COM linear
-    /// velocity. A single acceleration sample multiplied by a fixed timestep is
-    /// not velocity. Until a typed velocity source is wired in, this method fails
-    /// closed instead of constructing a plausible-looking state with fabricated
-    /// neutral values.
+    /// This API intentionally remains unavailable until root pose and root/COM
+    /// linear velocity are supplied by qualified, frame- and clock-bound sources.
+    /// Use `get_partial_sensor_observation()` to inspect available fields without
+    /// promoting partial measurements to a complete `HumanoidState`.
     #[cfg(feature = "ros2")]
     pub fn get_current_humanoid_state(
         &self,
     ) -> Result<symthaea_humanoid::types::HumanoidState, RosBridgeError> {
-        let joint_state_opt = self.latest_joint_state.lock().unwrap().clone();
-        let imu_opt = self.latest_imu.lock().unwrap().clone();
+        let observation = self.get_partial_sensor_observation()?;
+        let imu = match observation.imu {
+            RosEvidenceValueV1::Available { value, .. } => value,
+            RosEvidenceValueV1::Unavailable { reason, .. } => {
+                return Err(RosBridgeError::SensorDataUnavailable(reason));
+            }
+        };
 
-        let joint_state = joint_state_opt.ok_or(RosBridgeError::NotInitialized)?;
-        // DMC21 is the current explicit bridge profile. Resolve semantic identity
-        // by JointState.name; never assume transport array position is model order.
-        let _canonical_positions = canonicalize_joint_values(
-            &joint_state.name,
-            &joint_state.position,
-            &symthaea_humanoid::types::JOINT_NAMES,
-            "position",
-        )?;
-        let _canonical_velocities = canonicalize_joint_values(
-            &joint_state.name,
-            &joint_state.velocity,
-            &symthaea_humanoid::types::JOINT_NAMES,
-            "velocity",
-        )?;
-
-        let imu = imu_opt.ok_or_else(|| {
-            RosBridgeError::SensorDataUnavailable(
-                "IMU orientation/angular velocity is absent; no neutral physical state was substituted".into(),
-            )
-        })?;
-        let _orientation = normalize_imu_quaternion([
-            imu.orientation.w,
-            imu.orientation.x,
-            imu.orientation.y,
-            imu.orientation.z,
-        ])?;
-        let _angular_velocity = validate_sensor_vector(
-            "IMU angular velocity",
-            [
-                imu.angular_velocity.x,
-                imu.angular_velocity.y,
-                imu.angular_velocity.z,
-            ],
-        )?;
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &imu.orientation_wxyz {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } =
+            &observation.joint_state.velocities
+        {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &imu.angular_velocity_body_rad_s {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } =
+            &observation.root_linear_velocity_world_mps
+        {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } =
+            &observation.center_of_mass_velocity_world_mps
+        {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &observation.root_position_world_m {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &observation.head_height_world_m {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &observation.extremities_world_m {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
 
         Err(RosBridgeError::SensorDataUnavailable(
-            "root linear velocity and center-of-mass velocity are not subscribed or estimated by this bridge; IMU linear acceleration cannot substitute for velocity. Add a qualified odometry/state-estimator source before constructing HumanoidState".into(),
+            "complete humanoid state construction is blocked: every required field must be explicitly available and qualified".into(),
         ))
+    }
+
+    /// Capture currently available ROS sensor fields without fabricating a complete state.
+    ///
+    /// This method preserves each sensor's own header stamp/frame. Clock domains,
+    /// callback receive times, and calibration identities are intentionally left
+    /// unbound because the current subscriptions do not establish those facts.
+    /// It does not claim cross-sensor synchronization or world-frame transforms.
+    #[cfg(feature = "ros2")]
+    pub fn get_partial_sensor_observation(
+        &self,
+    ) -> Result<RosPartialHumanoidObservationV1, RosBridgeError> {
+        let joint_state = self
+            .latest_joint_state
+            .lock()
+            .map_err(|_| RosBridgeError::Communication("joint-state lock poisoned".into()))?
+            .clone()
+            .ok_or(RosBridgeError::NotInitialized)?;
+        let imu = self
+            .latest_imu
+            .lock()
+            .map_err(|_| RosBridgeError::Communication("IMU lock poisoned".into()))?
+            .clone();
+
+        let joint_source = ros_sample_metadata(&joint_state.header)?;
+        let expected = &symthaea_humanoid::types::JOINT_NAMES;
+        let positions = canonicalize_joint_values(
+            &joint_state.name,
+            &joint_state.position,
+            expected,
+            "position",
+        )?;
+        let velocities = if joint_state.velocity.is_empty() {
+            RosEvidenceValueV1::Unavailable {
+                reason: "JointState velocity array is empty; velocities were not reported".into(),
+                source: Some(joint_source.clone()),
+            }
+        } else {
+            RosEvidenceValueV1::Available {
+                value: canonicalize_joint_values(
+                    &joint_state.name,
+                    &joint_state.velocity,
+                    expected,
+                    "velocity",
+                )?,
+                source: joint_source.clone(),
+            }
+        };
+        let efforts = if joint_state.effort.is_empty() {
+            RosEvidenceValueV1::Unavailable {
+                reason: "JointState effort array is empty; efforts were not reported".into(),
+                source: Some(joint_source.clone()),
+            }
+        } else {
+            RosEvidenceValueV1::Available {
+                value: canonicalize_joint_values(
+                    &joint_state.name,
+                    &joint_state.effort,
+                    expected,
+                    "effort",
+                )?,
+                source: joint_source.clone(),
+            }
+        };
+
+        let imu_evidence = match imu {
+            None => RosEvidenceValueV1::Unavailable {
+                reason: "No IMU message has been received".into(),
+                source: None,
+            },
+            Some(imu) => {
+                let source = ros_sample_metadata(&imu.header)?;
+                let orientation_covariance =
+                    ros_covariance_v1(imu.orientation_covariance, "orientation")?;
+                let angular_velocity_covariance =
+                    ros_covariance_v1(imu.angular_velocity_covariance, "angular velocity")?;
+                let linear_acceleration_covariance =
+                    ros_covariance_v1(imu.linear_acceleration_covariance, "linear acceleration")?;
+
+                let orientation_wxyz = if matches!(
+                    orientation_covariance,
+                    RosCovarianceV1::Unavailable
+                ) {
+                    RosEvidenceValueV1::Unavailable {
+                        reason: "ROS IMU marks orientation estimate unavailable (covariance[0] = -1)".into(),
+                        source: Some(source.clone()),
+                    }
+                } else {
+                    RosEvidenceValueV1::Available {
+                        value: normalize_imu_quaternion([
+                            imu.orientation.w,
+                            imu.orientation.x,
+                            imu.orientation.y,
+                            imu.orientation.z,
+                        ])?,
+                        source: source.clone(),
+                    }
+                };
+                let angular_velocity_body_rad_s = evidence_from_imu_vector(
+                    [
+                        imu.angular_velocity.x,
+                        imu.angular_velocity.y,
+                        imu.angular_velocity.z,
+                    ],
+                    &angular_velocity_covariance,
+                    &source,
+                    "IMU angular velocity",
+                )?;
+                let linear_acceleration_sensor_frame_mps2 = evidence_from_imu_vector(
+                    [
+                        imu.linear_acceleration.x,
+                        imu.linear_acceleration.y,
+                        imu.linear_acceleration.z,
+                    ],
+                    &linear_acceleration_covariance,
+                    &source,
+                    "IMU linear acceleration",
+                )?;
+
+                RosEvidenceValueV1::Available {
+                    value: RosImuObservationV1 {
+                        orientation_wxyz,
+                        orientation_covariance,
+                        angular_velocity_body_rad_s,
+                        angular_velocity_covariance,
+                        linear_acceleration_sensor_frame_mps2,
+                        linear_acceleration_covariance,
+                        source,
+                    },
+                    source: ros_sample_metadata(&imu.header)?,
+                }
+            }
+        };
+
+        Ok(RosPartialHumanoidObservationV1 {
+            schema_version: 1,
+            morphology_profile_id: "symthaea.humanoid.dmc21".into(),
+            joint_state: RosJointStateObservationV1 {
+                joint_names: expected.iter().map(|name| (*name).to_string()).collect(),
+                positions: RosEvidenceValueV1::Available {
+                    value: positions,
+                    source: joint_source.clone(),
+                },
+                velocities,
+                efforts,
+                source: joint_source,
+            },
+            imu: imu_evidence,
+            root_position_world_m: RosEvidenceValueV1::Unavailable {
+                reason: "No qualified world-position source or frame transform is subscribed".into(),
+                source: None,
+            },
+            root_linear_velocity_world_mps: RosEvidenceValueV1::Unavailable {
+                reason: "No qualified odometry/state-estimator velocity source is subscribed".into(),
+                source: None,
+            },
+            center_of_mass_velocity_world_mps: RosEvidenceValueV1::Unavailable {
+                reason: "Center-of-mass velocity is not measured or estimated by this bridge".into(),
+                source: None,
+            },
+            head_height_world_m: RosEvidenceValueV1::Unavailable {
+                reason: "Head height requires qualified kinematics/model geometry or a tracked frame".into(),
+                source: None,
+            },
+            extremities_world_m: RosEvidenceValueV1::Unavailable {
+                reason: "Extremity positions require qualified kinematics and frame transforms".into(),
+                source: None,
+            },
+        })
     }
 
     /// Log status and trajectory states to a local CSV file for offline replay and IIT diagnostics.
@@ -1071,6 +1403,28 @@ mod tests {
     }
 
     #[test]
+    fn ros_covariance_semantics_keep_unknown_separate_from_unavailable() {
+        // A zero matrix means the uncertainty is unknown; it is not zero uncertainty.
+        assert!(matches!(
+            classify_ros_covariance([0.0; 9]).unwrap(),
+            RosCovarianceV1::Unknown
+        ));
+
+        // ROS marks a missing estimate with covariance[0] = -1.
+        let mut unavailable = [0.0; 9];
+        unavailable[0] = -1.0;
+        unavailable[4] = f64::NAN; // remaining entries must not revive this unavailable estimate
+        assert!(matches!(
+            classify_ros_covariance(unavailable).unwrap(),
+            RosCovarianceV1::Unavailable
+        ));
+
+        let mut invalid = [0.0; 9];
+        invalid[4] = f64::NAN;
+        assert!(classify_ros_covariance(invalid).is_err());
+    }
+
+    #[test]
     fn imu_quaternion_is_normalized_and_rejects_degenerate_or_nonfinite_values() {
         let normalized = normalize_imu_quaternion([2.0, 0.0, 0.0, 0.0]).unwrap();
         assert_eq!(normalized, [1.0, 0.0, 0.0, 0.0]);
@@ -1130,9 +1484,62 @@ mod tests {
                 Err(RosBridgeError::SensorDataUnavailable(reason)) if reason.contains("IMU")
             ));
 
+            let partial = node.get_partial_sensor_observation().unwrap();
+            assert_eq!(partial.schema_version, 1);
+            assert!(matches!(
+                partial.imu,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                partial.root_linear_velocity_world_mps,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                partial.joint_state.efforts,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                partial.head_height_world_m,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                partial.extremities_world_m,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+
             let mut imu = sensor_msgs::msg::Imu::default();
-            imu.orientation.w = 1.0;
+            // The covariance sentinel is authoritative: do not use even plausible
+            // numeric fields when ROS explicitly says the estimate is unavailable.
+            imu.orientation_covariance[0] = -1.0;
+            imu.angular_velocity_covariance[0] = -1.0;
+            imu.linear_acceleration_covariance[0] = -1.0;
             *node.latest_imu.lock().unwrap() = Some(imu);
+
+            let partial = node.get_partial_sensor_observation().unwrap();
+            let imu = match partial.imu {
+                RosEvidenceValueV1::Available { value, .. } => value,
+                RosEvidenceValueV1::Unavailable { .. } => panic!("IMU message existed"),
+            };
+            assert!(matches!(
+                imu.orientation_wxyz,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                imu.angular_velocity_body_rad_s,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                imu.linear_acceleration_sensor_frame_mps2,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                node.get_current_humanoid_state(),
+                Err(RosBridgeError::SensorDataUnavailable(reason)) if reason.contains("orientation")
+            ));
+
+            let mut valid_imu = sensor_msgs::msg::Imu::default();
+            valid_imu.orientation.w = 1.0;
+            *node.latest_imu.lock().unwrap() = Some(valid_imu);
             assert!(matches!(
                 node.get_current_humanoid_state(),
                 Err(RosBridgeError::SensorDataUnavailable(reason)) if reason.contains("linear velocity")
