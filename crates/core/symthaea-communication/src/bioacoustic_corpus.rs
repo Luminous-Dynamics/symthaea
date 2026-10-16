@@ -10,7 +10,7 @@
 //! does not leak across evaluation partitions.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const BIOACOUSTIC_CORPUS_SCHEMA_VERSION: u32 = 1;
 
@@ -314,39 +314,46 @@ pub fn validate_bioacoustic_corpus(
         }
     }
 
-    for (index, left) in manifest.recordings.iter().enumerate() {
-        for right in &manifest.recordings[index + 1..] {
-            if left.split == right.split {
-                continue;
+    // Track the owning split for each provenance ID instead of comparing every
+    // recording pair. Corpora with tens of thousands of windows must remain
+    // practical; pairwise leakage checks would otherwise be O(recordings^2).
+    let mut source_owners: BTreeMap<&str, (BioacousticSplit, &str)> = BTreeMap::new();
+    let mut session_owners: BTreeMap<&str, (BioacousticSplit, &str)> = BTreeMap::new();
+    let mut site_owners: BTreeMap<&str, (BioacousticSplit, &str)> = BTreeMap::new();
+    let mut individual_owners: BTreeMap<&str, (BioacousticSplit, &str)> = BTreeMap::new();
+
+    for recording in &manifest.recordings {
+        if let Some(source_id) = recording.source_recording_id.as_deref() {
+            reject_cross_split_owner(
+                &mut source_owners,
+                source_id,
+                recording,
+                "source-recording",
+            )?;
+        }
+        if policy.hold_out_sessions {
+            if let Some(session_id) = recording.session_id.as_deref() {
+                reject_cross_split_owner(
+                    &mut session_owners,
+                    session_id,
+                    recording,
+                    "session",
+                )?;
             }
-            if same_optional_id(&left.source_recording_id, &right.source_recording_id) {
-                return Err(format!(
-                    "source-recording leakage between samples {} and {}",
-                    left.sample_id, right.sample_id
-                ));
+        }
+        if policy.hold_out_sites {
+            if let Some(site_id) = recording.site_id.as_deref() {
+                reject_cross_split_owner(&mut site_owners, site_id, recording, "site")?;
             }
-            if policy.hold_out_sessions && same_optional_id(&left.session_id, &right.session_id) {
-                return Err(format!(
-                    "session leakage between samples {} and {}",
-                    left.sample_id, right.sample_id
-                ));
-            }
-            if policy.hold_out_sites && same_optional_id(&left.site_id, &right.site_id) {
-                return Err(format!(
-                    "site leakage between samples {} and {}",
-                    left.sample_id, right.sample_id
-                ));
-            }
-            if policy.hold_out_individuals
-                && left
-                    .individual_ids
-                    .iter()
-                    .any(|id| right.individual_ids.iter().any(|other| other == id))
-            {
-                return Err(format!(
-                    "individual leakage between samples {} and {}",
-                    left.sample_id, right.sample_id
-                ));
+        }
+        if policy.hold_out_individuals {
+            for individual_id in &recording.individual_ids {
+                reject_cross_split_owner(
+                    &mut individual_owners,
+                    individual_id,
+                    recording,
+                    "individual",
+                )?;
             }
         }
     }
@@ -354,10 +361,27 @@ pub fn validate_bioacoustic_corpus(
     Ok(())
 }
 
-fn same_optional_id(left: &Option<String>, right: &Option<String>) -> bool {
-    match (left, right) {
-        (Some(left), Some(right)) => left == right,
-        _ => false,
+fn reject_cross_split_owner<'a>(
+    owners: &mut BTreeMap<&'a str, (BioacousticSplit, &'a str)>,
+    provenance_id: &'a str,
+    recording: &'a BioacousticRecording,
+    kind: &str,
+) -> Result<(), String> {
+    match owners.get(provenance_id) {
+        Some((previous_split, previous_sample)) if *previous_split != recording.split => {
+            Err(format!(
+                "{kind} leakage between samples {previous_sample} and {}",
+                recording.sample_id
+            ))
+        }
+        Some(_) => Ok(()),
+        None => {
+            owners.insert(
+                provenance_id,
+                (recording.split, recording.sample_id.as_str()),
+            );
+            Ok(())
+        }
     }
 }
 
