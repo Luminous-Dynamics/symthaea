@@ -1127,7 +1127,14 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
             .join("\n");
-        let score = score_trajectory_receipts(&expanded, Cursor::new(text), "v1", 1, false).unwrap();
+        let score = score_trajectory_receipts(
+            &expanded,
+            Cursor::new(text),
+            "v1",
+            1,
+            false,
+        )
+        .unwrap();
         assert_eq!(score.budget_violations, 1);
     }
 
