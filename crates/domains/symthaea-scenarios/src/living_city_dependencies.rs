@@ -360,6 +360,68 @@ mod tests {
     }
 
     #[test]
+    fn input_order_does_not_change_dependency_assessment() {
+        let nodes = vec![
+            node("grid", ServiceDomain::Electricity),
+            node("water-pump", ServiceDomain::Water),
+            node("cooling-center", ServiceDomain::Cooling),
+            node("telecom-tower", ServiceDomain::Communications),
+            node("emergency-dispatch", ServiceDomain::EmergencyResponse),
+        ];
+        let dependencies = vec![
+            edge("water-pump", "grid", DependencyMode::Required),
+            edge("cooling-center", "grid", DependencyMode::Required),
+            edge("telecom-tower", "grid", DependencyMode::Required),
+            edge("emergency-dispatch", "telecom-tower", DependencyMode::Required),
+            edge("cooling-center", "telecom-tower", DependencyMode::Degraded),
+        ];
+        let expected =
+            assess_dependency_failures(&nodes, &dependencies, &["grid".into()]).unwrap();
+
+        let mut reversed_nodes = nodes.clone();
+        reversed_nodes.reverse();
+        let mut reversed_dependencies = dependencies.clone();
+        reversed_dependencies.reverse();
+        let actual = assess_dependency_failures(
+            &reversed_nodes,
+            &reversed_dependencies,
+            &["grid".into()],
+        )
+        .unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn adding_failures_never_restores_a_service_in_a_static_scenario() {
+        let nodes = vec![
+            node("grid", ServiceDomain::Electricity),
+            node("water-pump", ServiceDomain::Water),
+            node("hospital", ServiceDomain::Healthcare),
+            node("public-wifi", ServiceDomain::Communications),
+        ];
+        let dependencies = vec![
+            edge("water-pump", "grid", DependencyMode::Required),
+            edge("hospital", "water-pump", DependencyMode::Required),
+            edge("public-wifi", "grid", DependencyMode::Degraded),
+        ];
+        let one_failure =
+            assess_dependency_failures(&nodes, &dependencies, &["grid".into()]).unwrap();
+        let two_failures = assess_dependency_failures(
+            &nodes,
+            &dependencies,
+            &["grid".into(), "public-wifi".into()],
+        )
+        .unwrap();
+
+        for id in one_failure.failed_ids() {
+            assert!(
+                two_failures.failed_ids().contains(&id),
+                "service {id} was restored after adding another initiating failure"
+            );
+        }
+    }
+
+    #[test]
     fn unknown_endpoint_duplicate_edges_and_unknown_initiators_fail_closed() {
         let nodes = vec![
             node("grid", ServiceDomain::Electricity),
