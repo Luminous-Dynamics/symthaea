@@ -30,7 +30,9 @@ These are reproduction commands, not evidence of passing checks. The example emi
 
 ## New comparative replay
 
-The `replay` module selects the latest observation at or before a caller-frozen event/horizon cutoff, rejects duplicate observation keys, and records missing/stale combinations as explicit exclusions. The paired cluster bootstrap computes candidate-minus-baseline Brier differences, averages rows within each declared event/parent-event cluster, then resamples clusters with replacement.
+The `replay` module selects the latest observation at or before a caller-frozen event/horizon cutoff, rejects duplicate observation keys, and records missing/stale combinations as explicit exclusions. The new `calibration_report` builds equal-width reliability bins for one method and one horizon, preserves empty bins, and publishes bin counts, mean forecast probabilities, observed frequencies, and a secondary bin-dependent weighted absolute calibration error. It rejects mixed horizons/methods to avoid a silently pooled reliability diagram.
+
+The paired cluster bootstrap computes candidate-minus-baseline Brier differences, averages rows within each declared event/parent-event cluster, then resamples clusters with replacement.
 
 Call the bootstrap separately for horizon-specific inference. Mixing horizons produces a cluster-weighted average over the supplied rows, which is only meaningful if that combined estimand was preregistered. Negative Brier differences favor the candidate. The fraction of bootstrap means below zero is descriptive, **not a p-value**. The percentile interval depends on defensible cluster labels and a valid sampling design; this module cannot infer statistical independence.
 
