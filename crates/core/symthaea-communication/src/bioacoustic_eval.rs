@@ -128,6 +128,7 @@ impl BioacousticEventMetrics {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BioacousticPerSampleMetrics {
     pub sample_id: String,
+    pub predictions_excluded_by_unscored_regions: u64,
     pub metrics: BioacousticEventMetrics,
 }
 
@@ -135,6 +136,7 @@ pub struct BioacousticPerSampleMetrics {
 pub struct BioacousticEventEvaluationReport {
     pub status: String,
     pub schema_version: u32,
+    pub corpus_schema_version: u32,
     pub dataset_id: String,
     pub dataset_revision: String,
     pub corpus_manifest_blake3: String,
@@ -149,6 +151,7 @@ pub struct BioacousticEventEvaluationReport {
     pub exhaustive_test_annotation_coverage_asserted: bool,
     pub split_policy: BioacousticSplitPolicy,
     pub test_recording_count: usize,
+    pub predictions_excluded_by_unscored_regions: u64,
     pub metrics: BioacousticEventMetrics,
     pub per_sample: Vec<BioacousticPerSampleMetrics>,
     pub audio_bytes_verified_by_this_evaluator: bool,
@@ -320,6 +323,7 @@ pub fn evaluate_bioacoustic_events(
     let mut total_duration = 0.0_f64;
     let mut all_test_truth = Vec::new();
     let mut all_test_predictions = Vec::new();
+    let mut total_predictions_excluded_by_unscored_regions = 0usize;
 
     for recording in &test_recordings {
         let duration_s = recording.sample_count as f64 / recording.sample_rate_hz as f64;
@@ -341,6 +345,7 @@ pub fn evaluate_bioacoustic_events(
         let mut all_predictions = predictions_by_sample
             .remove(recording.sample_id.as_str())
             .unwrap_or_default();
+        let predictions_before_unscored_filter = all_predictions.len();
         all_predictions.retain(|prediction| {
             !prediction_in_unscored_region(
                 prediction,
@@ -348,6 +353,9 @@ pub fn evaluate_bioacoustic_events(
                 &bundle.matching_rule,
             )
         });
+        let excluded_by_unscored_regions =
+            predictions_before_unscored_filter - all_predictions.len();
+        total_predictions_excluded_by_unscored_regions += excluded_by_unscored_regions;
         let mut predicted = Vec::new();
         for prediction in &all_predictions {
             if prediction.score >= bundle.frozen_score_threshold {
@@ -382,6 +390,7 @@ pub fn evaluate_bioacoustic_events(
         all_test_predictions.extend(all_predictions);
         per_sample.push(BioacousticPerSampleMetrics {
             sample_id: recording.sample_id.clone(),
+            predictions_excluded_by_unscored_regions: excluded_by_unscored_regions as u64,
             metrics: sample_metrics,
         });
     }
@@ -400,6 +409,7 @@ pub fn evaluate_bioacoustic_events(
     Ok(BioacousticEventEvaluationReport {
         status: "EVALUATED".into(),
         schema_version: BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION,
+        corpus_schema_version: manifest.schema_version,
         dataset_id: manifest.dataset_id.clone(),
         dataset_revision: manifest.dataset_revision.clone(),
         corpus_manifest_blake3: computed_manifest_hash,
@@ -414,6 +424,7 @@ pub fn evaluate_bioacoustic_events(
         exhaustive_test_annotation_coverage_asserted: true,
         split_policy: bundle.split_policy,
         test_recording_count: test_recordings.len(),
+        predictions_excluded_by_unscored_regions: total_predictions_excluded_by_unscored_regions as u64,
         metrics,
         per_sample,
         audio_bytes_verified_by_this_evaluator: false,
@@ -920,6 +931,8 @@ mod tests {
 
         let report = evaluate_bioacoustic_events(&manifest, &bundle).unwrap();
         assert_eq!(report.metrics.predictions_after_threshold, 2);
+        assert_eq!(report.predictions_excluded_by_unscored_regions, 1);
+        assert_eq!(report.per_sample[0].predictions_excluded_by_unscored_regions, 1);
         assert_eq!(report.metrics.false_positives, 1);
         assert!((report.metrics.average_precision.unwrap() - 5.0 / 6.0).abs() < 1e-9);
     }
