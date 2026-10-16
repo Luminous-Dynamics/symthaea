@@ -763,4 +763,4 @@ mod tests {
         let report = assess(&case).expect("synthetic bounded case");
         assert_eq!(finding(&report, "under_keel_clearance").status, FindingStatus::Indeterminate);
     }
-
+}
