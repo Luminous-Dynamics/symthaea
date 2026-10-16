@@ -395,6 +395,12 @@ impl ScenarioRunReceipt {
         if self.validate().is_err() {
             return PromotionState::Blocked;
         }
+        if self.tools.iter().any(|tool| tool.status == ToolRunStatus::Failed) {
+            return PromotionState::Failed;
+        }
+        if self.tools.iter().any(|tool| tool.status == ToolRunStatus::Blocked) {
+            return PromotionState::Blocked;
+        }
         let required = self.gates.iter().filter(|gate| gate.required);
         let mut blocked = false;
         for gate in required {
@@ -625,6 +631,20 @@ mod tests {
     fn invalid_receipt_cannot_be_promoted_even_if_gate_says_pass() {
         let mut input = receipt(GateStatus::Pass);
         input.gates[0].verifier_id = None;
+        assert_eq!(input.promotion_state(), PromotionState::Blocked);
+    }
+
+    #[test]
+    fn failed_solver_cannot_be_overridden_by_passing_gate() {
+        let mut input = receipt(GateStatus::Pass);
+        input.tools[0].status = ToolRunStatus::Failed;
+        assert_eq!(input.promotion_state(), PromotionState::Failed);
+    }
+
+    #[test]
+    fn blocked_solver_blocks_promotion() {
+        let mut input = receipt(GateStatus::Pass);
+        input.tools[0].status = ToolRunStatus::Blocked;
         assert_eq!(input.promotion_state(), PromotionState::Blocked);
     }
 
