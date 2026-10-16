@@ -1,0 +1,40 @@
+{
+  "schema_version": "nano-simulator-campaign-manifest-v1",
+  "benchmark_id": "synthetic-budget-accounting",
+  "campaign_id": "synthetic-campaign-001",
+  "expected_simulator_calls": 2,
+  "proposal_attempt_cap": 10,
+  "cost_unit": "cost_units",
+  "task_contract_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "evaluation_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "simulator_recipe_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "expected_seeds": [
+    42
+  ],
+  "arms": [
+    {
+      "arm_id": "surrogate_rank",
+      "policy_id": "synthetic_policy",
+      "policy_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ledgers": [
+        {
+          "seed": 42,
+          "relative_path": "synthetic-sim-budget-ledger-equal.json",
+          "sha256": "0993c84b1ea05353f4c43b1cf4be58a561f23b28362a07c1f938240b45e341a3"
+        }
+      ]
+    },
+    {
+      "arm_id": "random",
+      "policy_id": "random_seeded",
+      "policy_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "ledgers": [
+        {
+          "seed": 42,
+          "relative_path": "synthetic-sim-budget-ledger-random-equal.json",
+          "sha256": "df3120d9202993b9c05b540c811bd03e0d64437d0e6671cfa8f6e1b9951ffdc5"
+        }
+      ]
+    }
+  ]
+}
