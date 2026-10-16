@@ -1001,7 +1001,7 @@ mod tests {
             .map(serde_json::to_string)
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
-            .join("\\n");
+            .join("\n");
         let score = score_trajectory_receipts(&expanded, Cursor::new(text), "v1").unwrap();
         assert_eq!(score.budget_violations, 1);
     }
@@ -1032,7 +1032,7 @@ mod tests {
             .map(serde_json::to_string)
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
-            .join("\\n");
+            .join("\n");
         let score = score_trajectory_receipts(&expanded, Cursor::new(text), "v1").unwrap();
         assert_eq!(score.budget_violations, 0);
     }
