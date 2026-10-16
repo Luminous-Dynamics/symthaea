@@ -240,6 +240,8 @@ pub enum MdInputError {
     NegativeTemperature,
     NonFiniteFiniteDifferenceStep,
     NonPositiveFiniteDifferenceStep,
+    StepCountOverflow,
+    NonFiniteTrajectoryDuration,
 }
 
 impl std::fmt::Display for MdInputError {
@@ -275,6 +277,12 @@ impl std::fmt::Display for MdInputError {
             Self::NonPositiveFiniteDifferenceStep => {
                 write!(f, "finite-difference step must be greater than zero")
             }
+            Self::StepCountOverflow => {
+                write!(f, "step count plus initial frame overflows usize")
+            }
+            Self::NonFiniteTrajectoryDuration => {
+                write!(f, "total trajectory duration must be finite")
+            }
         }
     }
 }
@@ -289,12 +297,18 @@ pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), 
     if molecule.atoms.is_empty() {
         return Err(MdInputError::EmptyMolecule);
     }
+    if config.n_steps.checked_add(1).is_none() {
+        return Err(MdInputError::StepCountOverflow);
+    }
 
     if !config.dt.is_finite() {
         return Err(MdInputError::NonFiniteTimeStep);
     }
     if config.dt <= 0.0 {
         return Err(MdInputError::NonPositiveTimeStep);
+    }
+    if !(config.dt * config.n_steps as f64).is_finite() {
+        return Err(MdInputError::NonFiniteTrajectoryDuration);
     }
     if !config.temperature.is_finite() {
         return Err(MdInputError::NonFiniteTemperature);
@@ -632,6 +646,25 @@ mod tests {
         assert_eq!(
             validate_md_inputs(&molecule, &config),
             Err(MdInputError::NonFiniteFiniteDifferenceStep)
+        );
+    }
+
+    #[test]
+    fn validation_rejects_overflowing_step_count_or_duration() {
+        let molecule = Molecule::h2();
+        let mut config = MdConfig {
+            n_steps: usize::MAX,
+            ..MdConfig::default()
+        };
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::StepCountOverflow)
+        );
+        config.n_steps = 2;
+        config.dt = f64::MAX;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteTrajectoryDuration)
         );
     }
 
