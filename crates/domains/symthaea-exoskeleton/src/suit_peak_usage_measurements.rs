@@ -1283,6 +1283,93 @@ mod tests {
     }
 
     #[test]
+    fn seeded_2000_case_corpus_checks_forecast_and_capacity_boundaries() {
+        let (
+            config,
+            tasks,
+            task_receipt,
+            reserve_plan,
+            reserve_report,
+            reserve_receipt,
+            mut plan,
+        ) = fixture();
+
+        for seed in 0_u64..2_000 {
+            let lower = seed.wrapping_mul(97) % 1_001;
+            let width = seed.wrapping_mul(53).wrapping_add(7) % 201;
+            let upper = lower + width;
+            let nominal = lower + (width / 2);
+            plan.observations[0].observed_peak = PeakQuantityInterval {
+                lower,
+                nominal,
+                upper,
+            };
+            let (report, _) = evaluate_peak_resource_usage(
+                &config,
+                &tasks,
+                &task_receipt,
+                &reserve_plan,
+                &reserve_report,
+                &reserve_receipt,
+                &plan,
+            )
+            .unwrap();
+
+            let expected = if lower > 900 {
+                PeakUsageObservationStatus::DefiniteBudgetLimitExceeded
+            } else if upper > 900 {
+                PeakUsageObservationStatus::PossibleBudgetLimitExceeded
+            } else if lower > 500 {
+                PeakUsageObservationStatus::ForecastDefinitelyUnderestimated
+            } else if upper > 500 {
+                PeakUsageObservationStatus::ForecastMayBeUnderestimated
+            } else {
+                PeakUsageObservationStatus::WithinDeclaredForecast
+            };
+            assert_eq!(
+                report.observations[0].status,
+                expected,
+                "seed {seed}, observed [{lower}, {nominal}, {upper}]"
+            );
+            assert_eq!(
+                report.definite_budget_limit_exceedance_count,
+                usize::from(lower > 900),
+                "seed {seed}"
+            );
+            assert_eq!(
+                report.possible_budget_limit_exceedance_count,
+                usize::from(lower <= 900 && upper > 900),
+                "seed {seed}"
+            );
+            assert_eq!(report.forecasted_observation_count, 1, "seed {seed}");
+
+            if seed % 251 == 0 {
+                assert!(verify_peak_resource_usage_receipt(
+                    &config,
+                    &tasks,
+                    &task_receipt,
+                    &reserve_plan,
+                    &reserve_report,
+                    &reserve_receipt,
+                    &plan,
+                    &report,
+                    &evaluate_peak_resource_usage(
+                        &config,
+                        &tasks,
+                        &task_receipt,
+                        &reserve_plan,
+                        &reserve_report,
+                        &reserve_receipt,
+                        &plan,
+                    )
+                    .unwrap()
+                    .1,
+                ));
+            }
+        }
+    }
+
+    #[test]
     fn input_order_is_invariant_and_mutation_breaks_receipt() {
         let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) =
             fixture();
