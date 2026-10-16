@@ -30,7 +30,7 @@ The harness can emit a replayable JSON receipt with `experiment_benchmark::bench
 
 ## Candidate-decision negative controls
 
-The `candidate_decision_benchmark` module separates synthetic oracle truth from the observed candidate record, and computes false-superiority and false-negative rates for the existing comparator over a controlled grid of measurement bias, uncertainty scales, and correlation declarations. This deliberately tests a failure mode that accounting closure alone cannot catch: biased observations can close the energy ledger yet still imply the wrong conclusion.
+The `candidate_decision_benchmark` module separates synthetic oracle truth from the observed candidate record, and computes false-superiority and false-negative rates over a 720-case grid of observed bias, uncertainty scales, correlation declarations, and registered worst-case differential-bias bounds. The comparator subtracts that bound linearly after expanded measurement uncertainty. Its required basis text documents the assumption but does not authenticate it. This deliberately tests a failure mode that accounting closure alone cannot catch: biased observations can close the energy ledger yet still imply the wrong conclusion.
 
 Run the standalone report generator:
 
