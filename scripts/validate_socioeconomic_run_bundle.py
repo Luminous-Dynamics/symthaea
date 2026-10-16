@@ -176,6 +176,9 @@ def validate_bundle(root_path: str | Path, manifest_relative_path: str) -> dict[
         if boundary.get(field) is not False:
             raise ValidationFailure(f"authority_boundary.{field} must be exactly false")
 
+    receipt_digests = _digest_fields(receipt)
+    if MANIFEST_DIGEST_POINTER not in receipt_digests:
+        raise ValidationFailure("receipt must contain /run/artifact_manifest_digest")
     expected_manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
     if _at_pointer(receipt, MANIFEST_DIGEST_POINTER) != expected_manifest_digest:
         raise ValidationFailure("receipt artifact_manifest_digest does not match exact manifest bytes")
@@ -240,7 +243,6 @@ def validate_bundle(root_path: str | Path, manifest_relative_path: str) -> dict[
                 raise ValidationFailure(f"{pointer}: receipt digest disagrees with artifact {artifact_id}")
             bound_pointers[pointer] = artifact_id
 
-    receipt_digests = _digest_fields(receipt)
     if MANIFEST_DIGEST_POINTER not in receipt_digests:
         raise ValidationFailure("receipt must contain /run/artifact_manifest_digest")
     expected_payload_pointers = set(receipt_digests) - {MANIFEST_DIGEST_POINTER}
