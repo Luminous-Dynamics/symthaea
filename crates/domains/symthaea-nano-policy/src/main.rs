@@ -519,6 +519,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_prior_ids() {
+        let mut req = request(Policy::Maximin, 1, vec![candidate("a", &[0.0]), candidate("b", &[1.0])]);
+        req.already_selected = vec!["a".to_owned(), "a".to_owned()];
+        assert!(select(&req).unwrap_err().contains("duplicate ids"));
+    }
+
+    #[test]
+    fn rejects_non_finite_numeric_span() {
+        let req = request(
+            Policy::Maximin,
+            1,
+            vec![candidate("low", &[f64::MIN]), candidate("high", &[f64::MAX])],
+        );
+        assert!(select(&req).unwrap_err().contains("non-finite numeric span"));
+    }
+
+    #[test]
     fn rejects_wrong_schema_version() {
         let mut req = request(Policy::Maximin, 1, vec![candidate("a", &[0.0])]);
         req.schema_version = "future-schema".to_owned();
