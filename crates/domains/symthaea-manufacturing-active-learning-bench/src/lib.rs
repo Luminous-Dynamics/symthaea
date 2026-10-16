@@ -830,6 +830,12 @@ mod tests {
                 let report = evaluate_transcript(&manifest, &a).unwrap();
                 assert_eq!(report.total_cost_units, a.claimed_total_cost_units);
                 assert!(report.total_cost_units <= manifest.budget_units);
+                let expected_max_throughput = a.records.iter().filter_map(|record| {
+                    let margin = record.measurements.quality_margin_milli?;
+                    let throughput = record.measurements.throughput_units?;
+                    (margin >= manifest.minimum_quality_margin_milli).then_some(throughput)
+                }).max();
+                assert_eq!(report.max_conforming_throughput_units, expected_max_throughput);
             }
         }
     }
