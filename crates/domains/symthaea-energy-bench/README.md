@@ -28,6 +28,18 @@ The report includes selected IDs, rejected proposals and reasons, budget use, ac
 Run with `cargo test -p symthaea-energy-bench experiment_benchmark::tests::reference_suite_runs_one_thousand_known_answer_scenarios`. This test is authored but must be run on a Rust-enabled environment; source presence is not a passing result.
 The harness can emit a replayable JSON receipt with `experiment_benchmark::benchmark_report_json(&report)`. It embeds complete scenario inputs and records SHA-256 digests for the registered policy, each scenario, suite configuration, and computed result set. `parse_and_verify_benchmark_report_json` checks digests and replays each strategy to reject inconsistent/tampered outputs. Store the exact Symthaea source commit alongside the receipt; these input digests do not identify which source revision executed the benchmark.
 
+## Candidate-decision negative controls
+
+The `candidate_decision_benchmark` module separates synthetic oracle truth from the observed candidate record, and computes false-superiority and false-negative rates for the existing comparator over a controlled grid of measurement bias, uncertainty scales, and correlation declarations. This deliberately tests a failure mode that accounting closure alone cannot catch: biased observations can close the energy ledger yet still imply the wrong conclusion.
+
+Run the standalone report generator:
+
+```bash
+cargo run -p symthaea-energy-bench --example candidate_decision_benchmark > candidate-decision-benchmark.json
+```
+
+The receipt embeds its scenario inputs, records fixture/suite/result hashes, and can be replay-checked with `parse_and_verify_candidate_decision_report_json`. Its records are software-generated negative controls, not measured or simulated physical-engine results. A nonzero false-superiority rate here is an identified limitation to address, not an efficiency finding.
+
 ## Benchmark acceptance targets
 
 The research acceptance ladder is specified in [ENERGY_CONVERSION_BENCHMARK_TARGETS.md](../../../docs/research/ENERGY_CONVERSION_BENCHMARK_TARGETS.md). It separates code/accounting conformance, oracle-backed selector quality, calibrated multifidelity evaluation, and independent physical validation. Proposed percentage improvements are unproven go/no-go targets, not current performance claims. Synthetic cases never establish physical superiority.
