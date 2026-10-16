@@ -24,6 +24,12 @@ Policies:
 - Structural verifier API: `symthaea_nano_policy::receipt::verify_receipt(request_line, response_line)`
 - Benchmark and go/no-go protocol: BENCHMARK.md
 
+## Receipt verification
+
+Call `symthaea_nano_policy::receipt::verify_receipt(request_line, response_line)` with the exact JSONL line contents, excluding line terminators. A `passed` audit means the request and response are structurally consistent: it checks the request SHA-256, feature-contract digest, policy/seed/budget/count, candidate membership and uniqueness, family/cost lineage, bounds and the reported nearest-selected distances recomputed from the frozen descriptors.
+
+This checker does **not** rerun the selector or prove that the chosen candidates are optimal, scientifically useful, safe, novel, or physically valid. Use it as a structural receipt gate; a separate benchmark checker must independently recompute task-specific metrics from held-out labels/observations.
+
 ## Fail-closed contract
 
 - Unknown fields are rejected. Target/label fields, optical target spectra, test membership and oracle observations must not be included.
