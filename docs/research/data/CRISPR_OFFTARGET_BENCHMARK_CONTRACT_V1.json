@@ -106,7 +106,8 @@
         "recall_at_fixed_slots",
         "precision_tradeoff",
         "group_uncertainty",
-        "runtime_compute"
+        "runtime_compute",
+        "paired_recall_delta_label_sensitivity_bounds"
       ]
     },
     {
@@ -210,6 +211,17 @@
         "report observed-label metrics with worst/best-case label-assignment bounds within the fixed candidate universe, or report why the metric is not estimable",
         "state that conditional bounds do not cover sites omitted from the declared candidate universe"
       ]
+    },
+    {
+      "id": "G7_paired_delta_label_sensitivity",
+      "required_when_unknown_candidates_exist": true,
+      "pass_conditions": [
+        "compare policies only on the same candidate IDs and observed label mapping",
+        "use the same latent label assignment for a shared unknown site across both policies",
+        "report worst/best-case paired Recall@K delta bounds whenever unknown candidates exist",
+        "do not infer superiority merely from overlapping/non-overlapping separate policy bounds",
+        "label-robust superiority within the fixed candidate universe requires the paired worst-case lower bound to exceed zero"
+      ]
     }
   ],
   "aspirational_engineering_targets": {
@@ -239,7 +251,8 @@
     "symthaea_improvement_demonstrated": false,
     "rust_metric_kernel_compiled": false,
     "rust_unit_tests_executed": false,
-    "partial_label_bounds_executed": false
+    "partial_label_bounds_executed": false,
+    "paired_delta_label_sensitivity_bounds_executed": false
   },
   "implementation_artifact": {
     "path": "scripts/crispr_triage_verifier.rs",
