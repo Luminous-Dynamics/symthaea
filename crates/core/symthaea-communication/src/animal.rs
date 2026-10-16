@@ -104,6 +104,47 @@ fn ratio(numerator: u64, denominator: u64) -> Option<f64> {
     (denominator > 0).then(|| numerator as f64 / denominator as f64)
 }
 
+/// Brier score (mean squared probability error) for binary outcomes.
+/// Lower is better; the result is in [0, 1] for valid probability scores.
+pub fn binary_brier_score(truth: &[bool], scores: &[f64]) -> Result<f64, String> {
+    if truth.is_empty() || truth.len() != scores.len() {
+        return Err("Brier score requires aligned, non-empty labels and scores".into());
+    }
+    if scores
+        .iter()
+        .any(|score| !score.is_finite() || !(0.0..=1.0).contains(score))
+    {
+        return Err("Brier scores must be finite probabilities within [0, 1]".into());
+    }
+
+    let squared_error_sum: f64 = truth
+        .iter()
+        .zip(scores)
+        .map(|(actual, score)| {
+            let target = if *actual { 1.0 } else { 0.0 };
+            (score - target).powi(2)
+        })
+        .sum();
+    Ok(squared_error_sum / truth.len() as f64)
+}
+
+/// False-alarm events per hour of scored continuous audio. The caller must
+/// match predicted events to annotations and merge adjacent threshold
+/// crossings first; this function does not perform event matching.
+pub fn false_alarm_events_per_hour(
+    false_alarm_events: u64,
+    observation_seconds: f64,
+) -> Result<f64, String> {
+    if !observation_seconds.is_finite() || observation_seconds <= 0.0 {
+        return Err("false-alarm rate requires positive finite observation duration".into());
+    }
+    let rate = false_alarm_events as f64 / (observation_seconds / 3600.0);
+    if !rate.is_finite() {
+        return Err("false-alarm rate is not representable as a finite value".into());
+    }
+    Ok(rate)
+}
+
 /// Tie-aware stepwise average precision for binary labels and scores.
 /// Scores must be finite values in [0, 1]; a split with no positive labels
 /// is rejected because recall and average precision are undefined.
@@ -746,6 +787,34 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn binary_brier_score_rewards_calibrated_probabilities() {
+        assert_eq!(binary_brier_score(&[true, false], &[1.0, 0.0]).unwrap(), 0.0);
+        assert_eq!(binary_brier_score(&[true, false], &[0.5, 0.5]).unwrap(), 0.25);
+        assert_eq!(binary_brier_score(&[true, false], &[0.0, 1.0]).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn binary_brier_score_rejects_invalid_inputs() {
+        assert!(binary_brier_score(&[], &[]).is_err());
+        assert!(binary_brier_score(&[true], &[]).is_err());
+        assert!(binary_brier_score(&[true], &[f64::NAN]).is_err());
+        assert!(binary_brier_score(&[false], &[1.1]).is_err());
+    }
+
+    #[test]
+    fn false_alarm_events_per_hour_uses_recording_exposure() {
+        assert_eq!(false_alarm_events_per_hour(2, 1800.0).unwrap(), 4.0);
+        assert_eq!(false_alarm_events_per_hour(0, 3600.0).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn false_alarm_events_per_hour_rejects_invalid_duration() {
+        assert!(false_alarm_events_per_hour(1, 0.0).is_err());
+        assert!(false_alarm_events_per_hour(1, f64::NAN).is_err());
+        assert!(false_alarm_events_per_hour(1, f64::INFINITY).is_err());
     }
 
     #[test]
