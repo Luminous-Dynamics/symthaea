@@ -602,5 +602,68 @@
       "weighted_recovery_per_step",
       "least_flexible_qualified_crew_as_assignment_tiebreak"
     ]
+  },
+  "robust_repair_evaluation": {
+    "status": "out_of_sample_scenario_evaluation_not_calibrated",
+    "policies": [
+      "priority_first",
+      "shortest_job_first",
+      "weighted_recovery_per_step"
+    ],
+    "information_contract": "initial dispatch order and crew assignments are selected from nominal durations only and remain fixed during duration-scenario replay",
+    "per_scenario_retiming": "realized duration changes finish times; crew availability and prerequisite finish times delay later work",
+    "metrics": [
+      "scenario_weighted_expected_loss",
+      "worst_case_loss",
+      "upper_tail_cvar",
+      "per_scenario_schedule_and_loss",
+      "jobs_completed_within_horizon"
+    ],
+    "scenario_weight_semantics": "weights must sum to 1 but are not probabilities without empirical support",
+    "tests_authored": 9,
+    "tests_executed": false,
+    "limitations": [
+      "no calibrated duration distribution",
+      "no stochastic scenario generation or reduction",
+      "no travel/access uncertainty",
+      "no online or rolling-horizon replanning",
+      "initial dispatch order and crew assignments are frozen",
+      "CVaR reflects the supplied scenario weights and set only"
+    ],
+    "reference_cases": [
+      {
+        "id": "DUR-01",
+        "expected": "nominal decision order and crew assignment do not vary across realized duration scenarios"
+      },
+      {
+        "id": "DUR-02",
+        "expected": "rare slow repair raises worst-case and upper-tail CVaR loss"
+      },
+      {
+        "id": "DUR-03",
+        "expected": "longer realized repair cannot reduce its fixed-plan loss"
+      },
+      {
+        "id": "DUR-04",
+        "expected": "slower prerequisite delays dependent restoration"
+      },
+      {
+        "id": "DUR-05",
+        "expected": "weights and duration records fail closed when invalid/incomplete"
+      },
+      {
+        "id": "DUR-06",
+        "expected": "identical input reproduces identical risk report"
+      },
+      {
+        "id": "DUR-07",
+        "expected": "expected, worst-case, CVaR and scenario traces remain jointly available"
+      }
+    ],
+    "research_sources": [
+      "https://doi.org/10.1016/0360-8352(96)00119-2",
+      "https://doi.org/10.1016/j.ejor.2021.04.025",
+      "https://doi.org/10.1016/j.cor.2025.107379"
+    ]
   }
 }
