@@ -38,10 +38,15 @@ jobs:
       - name: Run unit tests
         run: cargo test -p symthaea-nano-policy --locked
 
-      - name: Run stdin/stdout smoke fixture
+      - name: Run maximin stdin/stdout smoke fixture
         run: |
           cargo run -p symthaea-nano-policy --release --locked -- < crates/domains/symthaea-nano-policy/fixtures/smoke-request.json > /tmp/nano-policy-response.json
-          jq -e '.selected | map(.id) == ["a", "d"]' /tmp/nano-policy-response.json
+          jq -e '.selected | map(.id) == ["a", "d"] and .input_blake3 | test("^[a-f0-9]{64}$")' /tmp/nano-policy-response.json
+
+      - name: Run Symthaea HDC stdin/stdout smoke fixture
+        run: |
+          cargo run -p symthaea-nano-policy --release --locked -- < crates/domains/symthaea-nano-policy/fixtures/hdc-smoke-request.json > /tmp/nano-policy-hdc-response.json
+          jq -e '.policy == "hdc_maximin" and (.selected | length == 2) and (([.selected[].id] | unique | length) == 2) and all(.selected[]; .score >= 0 and .score <= 1) and (.input_blake3 | test("^[a-f0-9]{64}$"))' /tmp/nano-policy-hdc-response.json
 
       - name: Run Clippy
         run: cargo clippy -p symthaea-nano-policy --all-targets --locked -- -D warnings
