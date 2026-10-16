@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use crate::suit_interop::{SuitInteropReportStatus, SuitOperatingEnvironment};
+use crate::suit_interop::{
+    SuitInteropFindingStatus, SuitInterfaceKind, SuitInteropReportStatus,
+    SuitOperatingEnvironment,
+};
 use crate::suit_mission_configuration::{
     MissionComponent, MissionConfiguration, MissionConfigurationReport,
 };
@@ -66,6 +69,8 @@ pub struct PeakResourcePool {
     pub provider_hardware_revision: String,
     /// Exact SX-030 contract IDs that provide access to this resource pool.
     pub required_connection_ids: BTreeSet<String>,
+    /// Interface kinds that constitute this resource path; empty is invalid.
+    pub required_interface_kinds: BTreeSet<SuitInterfaceKind>,
     /// Conservative capacity envelope; capacity lower bound is budgeted.
     pub capacity: PeakQuantityInterval,
     pub evidence_level: SuitEvidenceLevel,
@@ -110,6 +115,7 @@ pub enum PeakResourceFindingCode {
     ProviderNotReachable,
     MissingProviderConnection,
     ProviderConnectionDoesNotBindProvider,
+    ProviderConnectionResourceKindMismatch,
     ProviderConnectionBlocked,
     ProviderConnectionEnvironmentMismatch,
     EnvironmentScopeMismatch,
@@ -503,6 +509,22 @@ pub fn evaluate_peak_resource_reservations(
                             observed_evidence_level: None,
                         });
                     }
+                    let resource_interface_matches = connection.interoperability.findings.iter()
+                        .any(|finding| {
+                            finding.status == SuitInteropFindingStatus::CompatibleUnderPolicy
+                                && pool.required_interface_kinds.contains(&finding.interface_kind)
+                        });
+                    if !resource_interface_matches {
+                        findings.push(PeakResourceFinding {
+                            pool_id: pool.pool_id.clone(),
+                            task_id: Some(task.task_id.clone()),
+                            reservation_id: Some(reservation.reservation_id.clone()),
+                            window: Some(reservation.window),
+                            code: PeakResourceFindingCode::ProviderConnectionResourceKindMismatch,
+                            severity,
+                            observed_evidence_level: None,
+                        });
+                    }
                     if connection.interoperability.status
                         != SuitInteropReportStatus::MeetsDeclaredCompatibilityPolicy
                     {
@@ -772,6 +794,7 @@ fn validate_plan_structure(
             || pool.applicable_environments.is_empty()
             || pool.required_connection_ids.is_empty()
             || pool.required_connection_ids.iter().any(|id| !clean_identifier(id))
+            || pool.required_interface_kinds.is_empty()
         {
             return Err(PeakResourceReservationError::InvalidPool);
         }
@@ -915,6 +938,10 @@ fn digest_plan(plan: &PeakResourceReservationPlan) -> String {
         writer.usize(pool.required_connection_ids.len());
         for connection_id in &pool.required_connection_ids {
             writer.string(connection_id);
+        }
+        writer.usize(pool.required_interface_kinds.len());
+        for interface_kind in &pool.required_interface_kinds {
+            writer.string(interface_kind_tag(*interface_kind));
         }
         write_interval(
             &mut writer,
@@ -1196,6 +1223,9 @@ fn finding_code_tag(value: PeakResourceFindingCode) -> &'static str {
         PeakResourceFindingCode::ProviderConnectionDoesNotBindProvider => {
             "provider_connection_does_not_bind_provider"
         }
+        PeakResourceFindingCode::ProviderConnectionResourceKindMismatch => {
+            "provider_connection_resource_kind_mismatch"
+        }
         PeakResourceFindingCode::ProviderConnectionBlocked => "provider_connection_blocked",
         PeakResourceFindingCode::ProviderConnectionEnvironmentMismatch => {
             "provider_connection_environment_mismatch"
@@ -1352,6 +1382,9 @@ mod tests {
                 provider_component_id: "vehicle".into(),
                 provider_hardware_revision: vehicle_revision.into(),
                 required_connection_ids: BTreeSet::from(["suit-vehicle-power".into()]),
+                required_interface_kinds: BTreeSet::from([
+                    crate::suit_interop::SuitInterfaceKind::ElectricalPower,
+                ]),
                 capacity: PeakQuantityInterval {
                     lower: 1_000,
                     nominal: 1_100,
