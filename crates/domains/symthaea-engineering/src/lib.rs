@@ -8,6 +8,9 @@
 /// Event-triggered rolling-horizon repair dispatch under partial information.
 pub mod rolling_horizon_repair;
 
+/// Paired comparison of fixed plans and rolling-horizon repair policies.
+pub mod repair_policy_comparison;
+
 /// Out-of-sample repair-policy evaluation under duration uncertainty.
 pub mod robust_repair_evaluation;
 
