@@ -126,6 +126,22 @@ A related generalization warning applies to conformal or nominally calibrated un
 
 Research task: [CRISPR-OT-004 #7589 — allocate measurements to resolve decision-critical unknown labels](https://github.com/Luminous-Dynamics/symthaea/issues/7589).
 
+### M. From point-estimate Pareto winners to interval-aware robust frontiers
+
+A point-estimate frontier can overstate decisiveness when group-aware metric intervals, partial-label bounds, or cost ranges overlap. Retain intervals in the objective vectors and distinguish three relations:
+
+- **Robust/definite dominance:** A's worst-case bound is no worse than B's best-case bound for every preregistered objective, and strictly better on at least one.
+- **Possible-only dominance:** at least one assignment within the stated objective intervals permits dominance, but the bounds do not establish it for all assignments.
+- **Unresolved or incompatible trade-off:** neither strict dominance direction follows from the intervals.
+
+The resulting **robust frontier** removes only policies definitely dominated under these conservative bounds. Policies may remain on it because they are genuinely competitive or because the evidence is too imprecise to decide. Report robust dominance pairs and possible-only pairs separately; do not misread possible dominance as a win.
+
+This is an established optimization concept, not a novel algorithmic claim. Recent interval-valued multi-objective research supports keeping uncertainty ranges instead of collapsing them to midpoints ([Information Sciences, 2026](https://doi.org/10.1016/j.ins.2026.123217)). For uncertainty under covariate shift, KMM-CP (UAI 2026) highlights the importance of support overlap and shift assumptions when making coverage claims ([paper](https://proceedings.mlr.press/v337/laghuvarapu26a.html)). Neither source validates this implementation or the CRISPR benchmark.
+
+The Rust utility consumes intervals; it does not compute them. The caller must document their source and should use group-aware, paired, and where necessary simultaneous intervals across policies/objectives. Coordinate-wise intervals do not model covariance, and this conservative rule may leave a large frontier when evidence is weak. That is a meaningful “insufficient evidence to decide” result, not a defect to hide through arbitrary weights.
+
+Research task: [CRISPR-OT-005 #7602 — interval-aware robust Pareto frontier](https://github.com/Luminous-Dynamics/symthaea/issues/7602).
+
 ### J. From price claims to causal cost accounting
 
 Report computational resources and review slots first. Progress to human review minutes only when measured. Report per-qualified-finding cost only when numerator and denominator are observed end-to-end. Do not convert fewer ranked candidates into claims of lower experimental costs, clinical costs, or treatment prices without prospective accounting.
@@ -146,6 +162,7 @@ Report computational resources and review slots first. Progress to human review 
 | T9 Multi-objective frontier | Which policies offer genuine trade-offs without arbitrary score weights? | complete objective vectors, dominated-policy count, Pareto membership, excluded-policy reasons | a universal safety score or proof of biological/clinical improvement |
 | T10 Selective prediction | What error/uncertainty trade-off occurs as the policy abstains, and where does calibration fail? | Brier/log loss on measured labels, fixed-bin reliability, full risk–coverage curve, unknown-aware error bounds, per-context label completeness | clinical safety or outcomes missing from the evidence universe |
 | T11 Decision-critical measurement allocation | Which unknown outcomes most directly resolve disagreement in a preregistered top-K policy comparison? | differential unknown labels resolved at fixed declared cost, residual numerator-ambiguity count, context coverage, before/after paired label-sensitivity bounds | full expected value of information, total uncertainty resolved, experimental savings, biological safety |
+| T12 Interval-aware robust frontier | Which policy dominance claims survive interval uncertainty in every objective? | robust frontier, definitely dominated policies, robust dominance pairs, possible-only dominance pairs, point-frontier disagreements | intervals generated, simultaneous coverage, biological/clinical safety |
 
 Tracks are reported separately. A composite “CRISPR score” that hides failed nomination, calibration, or generalization is prohibited.
 
@@ -289,7 +306,7 @@ The credible breakthrough would be evidence that a general-purpose reasoning/evi
 
 ## 11. Synthetic contract fixtures
 
-The machine-readable companion contract contains ten synthetic fixtures intended to become deterministic unit tests for the Rust scorer/verifier:
+The machine-readable companion contract contains eleven synthetic fixtures intended to become deterministic unit tests for the Rust scorer/verifier:
 
 1. **F1 — nomination vs seeded ranking.** Four eligible positives, two in the native nominations: expected native coverage is 2/4 = 0.5. Later seeding the two missing positives into a ranking universe allows Recall@5 to reach 1.0, but native nomination coverage remains 0.5.
 2. **F2 — unknown is not negative.** If an unknown/unassayed candidate is inside the review set, precision is not estimable under the declared label semantics; it may not be silently counted as a true negative.
@@ -349,3 +366,13 @@ The dependency-free implementation is [scripts/crispr_measurement_priority.rs](.
     /tmp/crispr-measurement-tests
 
 This allocation method is deliberately narrow and deterministic. Its proposed 20% improvement over random allocation at equal cost is an evaluation target, not a current result; compare score-first and top-ranked-unknown baselines as well. No assay or biological data have been run.
+
+
+11. **F11 — robust frontier under objective intervals.** Compare three synthetic policies on macro recall (maximize) and review slots (minimize). `robust` has recall [0.90, 0.92] and slots [90, 100]; `uncertain` has recall [0.80, 0.93] and slots [95, 130]; `dominated` has recall [0.70, 0.75] and slots [120, 140]. The robust policy definitely dominates `dominated`, but its intervals overlap the trade-off policy's in ways that prevent definite dominance. Expected robust frontier: [`robust`, `uncertain`]; definitely dominated: [`dominated`]. Possible-only dominance is reported separately. These are synthetic ranges, not statistical confidence intervals or biological results.
+
+The dependency-free Rust utility is [scripts/crispr_interval_frontier.rs](../../scripts/crispr_interval_frontier.rs). Fifteen unit tests are authored but not compiled or executed because `rustc` is unavailable. It rejects duplicate identifiers/objective names, dimensional mismatches, non-finite bounds and reversed intervals. Its relation semantics are documented in source: robust dominance requires A's worst bound to beat B's best bound on all objectives; possible dominance is only a feasible relation under coordinate-wise interval uncertainty. The module does not derive intervals or encode covariance, pairing, or multiple-comparison correction.
+
+    rustc --edition=2024 --test scripts/crispr_interval_frontier.rs -o /tmp/crispr-interval-tests
+    /tmp/crispr-interval-tests
+
+The next acceptance check is independent F11 evaluation plus point-frontier vs interval-frontier disagreement reporting on exactly the same metric episodes. No biological cohort or Symthaea improvement has been evaluated.
