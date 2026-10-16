@@ -13,7 +13,7 @@ cargo test -p symthaea-manufacturing-active-learning-bench
 cargo run -p symthaea-manufacturing-active-learning-bench --example run_reference_campaigns > mfg-active-learning-synthetic-v1.json
 ```
 
-The example runs six policies across five deterministic scenario families with a matched per-scenario budget and emits JSON transcripts plus evaluator reports. The output file is an experiment artifact and should be hashed and preserved alongside the exact commit used to produce it.
+The example runs six policies across five deterministic scenario families with a matched per-scenario budget and emits JSON transcripts plus evaluator reports. The five example-manifest SHA-256 digests are pinned in a unit test. The output file is an experiment artifact and should be hashed and preserved alongside the exact commit used to produce it.
 
 ## Current policy arms
 
