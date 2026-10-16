@@ -185,6 +185,27 @@
         "measured_runtime_and_compute"
       ],
       "acceptance": "All compared policies use same preregistered objective definitions, units, direction, episodes, and availability rules. Missing metrics are not zero-filled. Pareto membership is not by itself a performance win or biological/clinical safety finding."
+    },
+    {
+      "id": "selective_prediction_calibration",
+      "definition": "Calibration quality and selective error-risk as a policy abstains on lower-confidence cases; report separately by declared biological/measurement context.",
+      "required_metrics": [
+        "brier_score_on_measured_labels",
+        "log_loss_on_measured_labels",
+        "fixed_bin_reliability_and_counts",
+        "expected_calibration_error_with_counts",
+        "risk_coverage_curve",
+        "observed_label_risk",
+        "unknown_aware_error_rate_bounds",
+        "context_specific_label_completeness"
+      ],
+      "rules": [
+        "Unknown/unassayed outcomes are excluded from proper-scoring-rule denominators, counted explicitly, and never converted into negatives.",
+        "Risk at each coverage reports observed-label risk and best/worst error bounds assigning unknown accepted labels correctly or incorrectly.",
+        "Exact confidence ties are accepted as a whole tier; probabilities and confidence thresholds are frozen before holdout reveal.",
+        "Calibration is not estimable within a context with no valid measured labels.",
+        "Calibration summaries are conditional on label ascertainment and are not clinical safety guarantees."
+      ]
     }
   ],
   "initial_gates": [
@@ -289,6 +310,17 @@
         "report complete nondominated policy frontier and excluded policy reasons",
         "do not aggregate distinct molecular, cellular, functional, delivery or clinical endpoints into a universal safety score"
       ]
+    },
+    {
+      "id": "G10_selective_prediction_integrity",
+      "required": true,
+      "pass_conditions": [
+        "report fixed-bin Brier/log loss/reliability only when measured-label semantics support them",
+        "report full confidence-tied risk-coverage curve, including observed-label coverage, accepted-label completeness and unknown-aware error bounds",
+        "emit per-context summary and explicit not-estimable calibration where no observed labels exist",
+        "freeze calibration bins, confidence policy and thresholds before holdout reveal",
+        "do not clip exact overconfident errors or count unknown outcomes as negative"
+      ]
     }
   ],
   "aspirational_engineering_targets": {
@@ -324,7 +356,11 @@
     "dataset_license_explicitly_verified": false,
     "zenodo_archive_downloaded": false,
     "pareto_frontier_kernel_compiled": false,
-    "pareto_frontier_unit_tests_executed": false
+    "pareto_frontier_unit_tests_executed": false,
+    "selective_risk_kernel_compiled": false,
+    "selective_risk_unit_tests_executed": false,
+    "calibration_metrics_executed": false,
+    "risk_coverage_metrics_executed": false
   },
   "implementation_artifact": {
     "path": "scripts/crispr_triage_verifier.rs",
@@ -336,7 +372,8 @@
       "Rust unit tests not executed because rustc was unavailable in the authoring environment"
     ],
     "additional_source_paths": [
-      "scripts/crispr_decision_frontier.rs"
+      "scripts/crispr_decision_frontier.rs",
+      "scripts/crispr_selective_risk.rs"
     ]
   },
   "updated_on": "2026-10-16",
