@@ -31,16 +31,15 @@ The NeurIPS nanophotonic-structures code repository is MIT-licensed and links pu
 
 ## 3. Research question
 
-**Can Symthaea improve the quality or efficiency of nanophotonic inverse-design search under equal query, compute and candidate constraints, without pretending to replace the electromagnetic solver or MOCLIP's learned representation?**
+**Can a selector built on Symthaea's actual BinaryHV primitives improve label-acquisition efficiency for nanophotonic spectra under an equal oracle budget, compared fairly with Euclidean maximin and task-native baselines?**
 
-Test one contribution at a time:
-- HDC-based candidate grouping/retrieval as a *new hypothesis*, not a proven superior optical representation;
-- selection of diverse starting candidates or probe libraries;
-- multi-objective choice of candidates trading off spectral match, robustness, fabrication constraints and compute cost;
-- uncertainty/abstention for targets outside the data distribution;
-- failure and replicate-aware measurement accounting.
+The research-only selector is implemented in [PR #7628](https://github.com/Luminous-Dynamics/symthaea/pull/7628): `random`, `maximin` in normalized descriptor space, and `hdc_maximin` using Symthaea core's 16,384-bit `BinaryHV`, a deterministic 256-level scalar codebook, role binding, bundling, and normalized Hamming distance. This makes it an actual Symthaea-HDC policy hypothesis rather than a renamed Euclidean heuristic. It is not a spectrum predictor or direct target-spectrum optimizer.
 
-MOCLIP's own contrastive retrieval and conventional library/adjoint search are strong baselines. Symthaea must earn any claimed contribution.
+Separate two scientific questions:
+- **Published-model reproduction:** reproduce MOCLIP retrieval/inverse-design metrics on the official split and exact protocol.
+- **Budgeted active acquisition:** select which geometry-spectrum labels to acquire from the official training pool, then train the same downstream surrogate from scratch on each arm's selected labels, and evaluate on a sealed official test set. Only geometry-derived features may reach the selector before acquisition. A pretrained model exposed to candidates or labels used to claim label efficiency is ineligible for that primary comparison unless its exposure is demonstrably independent.
+
+The HDC metric is a descriptor-space selection score, not optical performance, a calibrated uncertainty, or a claim that HDC preserves Maxwell physics. MOCLIP retrieval and adjoint/full-wave methods remain the task-native comparison; Symthaea must demonstrate added value against these and the Euclidean/random controls.
 
 ## 4. Staged benchmark plan
 
@@ -76,37 +75,38 @@ Preferred if the full evaluation set/split artifacts and rights are available:
 
 **Paper context target, not a new guarantee:** reproduce approximately 0.75 Top-1, 0.95 Top-5, 0.98 Top-10, and 95% of predictions below MSE 1e-2 for a probe set above 10,000 candidates, only when the exact published protocol is available. These correspond to author-reported results, not independently achieved milestones.
 
-### N3 — Fair selection-policy experiment
+### N3 — Fair budgeted-acquisition experiment (separate from MOCLIP reproduction)
 
-Use a *properly held-out target query set* and a fixed candidate pool; freeze all of this before the scored run. Each arm gets the same target spectra, candidate restrictions, calls to any expensive forward solver, wall-time budget and stopping rule.
+The selector has no target-spectrum input by design, so do **not** report its output as a direct target-specific inverse-design ranking. Test it as a policy for selecting which candidate geometries should receive an expensive simulated/measured spectrum label.
 
-Arms:
-1. random valid candidate;
-2. nearest-neighbor spectral library search (where allowed by the task);
-3. the published MOCLIP retrieval/optimization pipeline where license and checkpoint eligibility are resolved;
-4. a standard diversity or established optimizer baseline appropriate to the defined task;
-5. one Symthaea HDC/diversity or evidence-value selection policy;
-6. an ablation removing the specific Symthaea component;
-7. a shuffled-feature/label or randomized-policy negative control.
+Prerequisites:
+- map the public subset's exact geometry identities to the official training/validation/test split or obtain the official split artifacts;
+- use only the official **training split** as the candidate acquisition pool, official validation only for policy/model tuning, and keep the official test split sealed;
+- freeze geometry-only features, feature order/units, query budget, candidate pool, repeated seeds, downstream surrogate architecture/training recipe, and the primary metric before test evaluation;
+- train the same downstream surrogate **from scratch** on each arm's acquired labels; do not use the MOCLIP full-data checkpoint to prove label efficiency on rows it has already seen;
+- the selector receives only allowed geometry-only descriptors (or a geometry-only embedding whose checkpoint exposure is audited), IDs and the budget; it never sees spectra, target outcomes, validation/test membership, or unacquired labels;
+- a masked offline oracle may reveal a selected row's spectrum after selection. The oracle lookup itself is not available to the selection policy before the query.
 
-**Primary metrics (choose one before testing):**
-- **Success@K:** fraction of target queries where the best selected geometry's independently evaluated spectral MSE is below 1e-2, for frozen K values such as 100, 1,000 and 10,000 candidate probes.
-- **Budgeted inverse-design utility:** negative best-so-far spectral MSE versus number of candidate evaluations or high-fidelity oracle calls, area under the improvement curve, with a predeclared integration range.
-- **Robust success@K:** same success definition after fixed, preregistered perturbations to geometry or operating wavelength and after re-evaluation by a forward solver/measurement where available.
+**Acquisition arms (same labeled-example/oracle budget):**
+1. seeded random;
+2. Euclidean descriptor maximin (`maximin`);
+3. Symthaea BinaryHV HDC maximin (`hdc_maximin`);
+4. one task-native acquisition baseline, such as uncertainty sampling from a surrogate trained only on already acquired labels, if it can be implemented without leaking hidden labels;
+5. an HDC ablation (same pipeline with Euclidean distance) and a feature/selection negative control.
 
-Secondary metrics:
-- Top-1/5/10 exact-pair retrieval only for the paper's paired-candidate task;
-- spectral MSE and wavelength/polarization-wise residuals;
-- Pareto coverage in spectral match, robustness, feature size and compute cost;
-- valid/fabrication-constrained design fraction, duplicate rate and candidate diversity;
-- number of solver calls, cost per successful design, wall time and peak memory;
-- abstention risk versus coverage for out-of-domain targets.
+MOCLIP's published retrieval/optimization pipeline belongs in the separate N2 model-reproduction track. It should not be silently mixed into the acquisition arms unless a model's prior training exposure is consistent with the explicitly stated claim.
 
-Do not treat exact-pair retrieval accuracy as functional success when different geometries can produce equivalent spectra. For the functional task, success is defined by the target response and hard design constraints, and all solutions must be reevaluated under the same forward model.
+**Primary metric (choose one before testing):**
+- **Label-efficiency curve:** held-out official-test spectral MSE of the *same from-scratch downstream surrogate* versus number of acquired training labels; report area under the error-vs-label-budget curve and final test error at fixed budgets.
+- **Downstream inverse-design Success@K (secondary):** apply the exact same inverse-design/search procedure to the surrogates from each acquisition arm and count how often the best candidate meets the predeclared spectral-MSE threshold under independent full-wave re-evaluation. The downstream optimizer must be identical across arms.
 
-**Provisional improvement target:** compared with the strongest applicable standard baseline under the same candidate/oracle budget, seek at least +5 percentage points in Success@K or at least 20% reduction in median best-achieved spectral MSE, with a 95% bootstrap confidence interval that excludes zero/neutral improvement across held-out target queries. These are experimental go/no-go thresholds proposed for this pilot, not literature results. Freeze one as primary after power/feasibility inspection; do not switch metrics after results are seen.
+Secondary metrics: wavelength- and polarization-wise residuals; candidate-family and geometry coverage; duplicate rate; failed/invalid queries; abstention/uncertainty coverage if calibrated; query cost, selector latency, peak RAM/VRAM, and full-wave calls. Use paired/group-aware confidence intervals over independent test geometries and repeat acquisition seeds.
 
-A valid null result is “no demonstrated policy improvement within the tested budget.”
+Do not treat exact-pair retrieval accuracy as functional success when different geometries can produce equivalent spectra. For the functional task, success is defined by the target response and hard design constraints, with every finalist reevaluated by the same forward model.
+
+**Provisional improvement target:** versus the strongest eligible acquisition baseline at equal acquired-label count, seek at least 20% lower median held-out spectral MSE at a preregistered label budget, or at least +5 percentage points in downstream Success@K, with a paired/cluster-aware 95% interval excluding no improvement. These are proposed pilot go/no-go targets, not universal scientific standards. Choose one primary metric after data variance/power and feasibility are inspected, before opening the held-out test; never change the primary metric after seeing outcomes.
+
+A valid null result is “no demonstrated HDC acquisition benefit over the random or Euclidean maximin control.”
 
 ### N4 — Fabrication robustness bridge
 
