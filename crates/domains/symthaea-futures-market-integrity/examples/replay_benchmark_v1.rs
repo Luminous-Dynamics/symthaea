@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use symthaea_futures_market_integrity::replay::{
     paired_cluster_bootstrap, replay_horizons, ForecastObservation, ForecastTarget,
-    PairedForecastComparison, ReplayError,
+    PairedForecastComparison, ReplayError, ReplayExclusionReason,
 };
 
 const EVENT_COUNT: usize = 60;
@@ -100,6 +100,31 @@ fn run() -> Result<(), ReplayError> {
 
     let report = replay_horizons(&observations, &targets)?;
     println!("horizon,method,eligible,total,coverage,mean_brier,mean_log_loss,paired_brier_difference,ci95_low,ci95_high,bootstrap_share_candidate_better,clusters");
+
+    for (horizon, _) in HORIZONS {
+        let negative_controls = report
+            .excluded
+            .iter()
+            .filter(|row| row.horizon_id == horizon && row.forecaster_id == "oracle_future_only")
+            .collect::<Vec<_>>();
+        assert_eq!(
+            negative_controls.len(),
+            EVENT_COUNT,
+            "the future-only oracle control must be excluded for every event/horizon"
+        );
+        assert!(
+            negative_controls.iter().all(|row| matches!(
+                row.reason,
+                ReplayExclusionReason::NoForecastAtOrBeforeCutoff
+                    | ReplayExclusionReason::ForecastTooStale
+            )),
+            "the future-only oracle control may only be excluded for explicit temporal reasons"
+        );
+        eprintln!(
+            "NEGATIVE_CONTROL horizon={horizon} oracle_forecasts_excluded={} expected={EVENT_COUNT}",
+            negative_controls.len()
+        );
+    }
 
     for (horizon_index, (horizon, _)) in HORIZONS.iter().enumerate() {
         let horizon_targets = targets
