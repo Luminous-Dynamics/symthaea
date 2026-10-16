@@ -580,6 +580,19 @@ mod tests {
             manifest().computed_manifest_blake3().unwrap(),
             offset_changed.computed_manifest_blake3().unwrap()
         );
+
+        let mut unscored_changed = manifest();
+        unscored_changed.recordings[0].unscored_regions.push(BioacousticUnscoredRegion {
+            interval: TimeSpan {
+                start_s: 0.3,
+                end_s: 0.4,
+            },
+            reason: "uncertain caller".into(),
+        });
+        assert_ne!(
+            manifest().computed_manifest_blake3().unwrap(),
+            unscored_changed.computed_manifest_blake3().unwrap()
+        );
     }
 
     #[test]
