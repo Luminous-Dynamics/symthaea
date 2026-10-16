@@ -709,8 +709,19 @@ fn verify_fixture_manifest_identity(
     let Some(fixture_sfz_file) = fixture.get("sfz_file").and_then(Value::as_str) else {
         return fail("selected fixture has no sfz_file".to_owned());
     };
+    let fixture_id_path = Path::new(fixture_id);
+    if fixture_id_path.is_absolute()
+        || fixture_id.contains('\\')
+        || fixture_id_path.components().count() != 1
+        || fixture_id_path.components().any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return fail("fixture ID is not a single safe path component".to_owned());
+    }
     let pack_root = Path::new(fixture_manifest_path).parent().unwrap_or_else(|| Path::new(""));
-    let expected_bundle_sfz = pack_root.join(fixture_sfz_file).to_string_lossy().replace('\\\\', "/");
+    let expected_bundle_sfz = pack_root
+        .join(fixture_sfz_file)
+        .to_string_lossy()
+        .replace('\\', "/");
     if expected_bundle_sfz != sfz.path {
         return fail(format!(
             "fixture manifest SFZ path {:?} does not resolve to bundle path {:?}",
@@ -721,21 +732,62 @@ fn verify_fixture_manifest_identity(
     let Some(expected_assets) = fixture.get("sample_assets").and_then(Value::as_array) else {
         return fail("selected fixture has no sample_assets array".to_owned());
     };
-    let mut expected_hashes: Vec<String> = expected_assets
-        .iter()
-        .filter_map(|asset| asset.get("sha256").and_then(Value::as_str).map(str::to_ascii_lowercase))
-        .collect();
-    if expected_hashes.len() != expected_assets.len() {
-        return fail("fixture manifest contains a sample asset without a SHA-256 hash".to_owned());
+
+    // Asset paths recorded in fixtures.json are relative to the fixture's own directory.
+    // Bind both path and digest, not just a multiset of hashes, so a bundle cannot
+    // silently substitute another file with identical bytes at a different path.
+    let mut expected_entries: Vec<(String, String)> = Vec::with_capacity(expected_assets.len());
+    for asset in expected_assets {
+        let Some(relative_asset_path) = asset.get("path").and_then(Value::as_str) else {
+            return fail("fixture manifest sample asset has no path".to_owned());
+        };
+        let relative_asset = Path::new(relative_asset_path);
+        if relative_asset_path.is_empty()
+            || relative_asset_path.contains('\\')
+            || relative_asset.is_absolute()
+            || relative_asset.components().any(|component| !matches!(component, Component::Normal(_)))
+        {
+            return fail(format!("fixture manifest has unsafe sample asset path {relative_asset_path:?}"));
+        }
+        let Some(digest) = asset.get("sha256").and_then(Value::as_str) else {
+            return fail("fixture manifest sample asset has no SHA-256".to_owned());
+        };
+        if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return fail(format!("fixture manifest sample asset has invalid SHA-256 {digest:?}"));
+        }
+        let expected_byte_len = match asset.get("byte_len").and_then(Value::as_u64) {
+            Some(value) => value,
+            None => return fail(format!("fixture manifest asset {relative_asset_path:?} has no byte_len")),
+        };
+        let full_relative = pack_root
+            .join(fixture_id)
+            .join(relative_asset)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let actual_path = match resolve_artifact(root, &full_relative) {
+            Ok(path) => path,
+            Err(error) => return fail(format!("unsafe expected sample asset path: {error}")),
+        };
+        let actual_byte_len = match fs::metadata(actual_path) {
+            Ok(metadata) => metadata.len(),
+            Err(error) => return fail(format!("cannot inspect selected sample asset {full_relative:?}: {error}")),
+        };
+        if actual_byte_len != expected_byte_len {
+            return fail(format!(
+                "sample asset {full_relative:?} byte length differs from fixture manifest: expected {expected_byte_len}, got {actual_byte_len}"
+            ));
+        }
+        expected_entries.push((full_relative, digest.to_ascii_lowercase()));
     }
-    let mut declared_hashes: Vec<String> = sample_assets
+
+    let mut declared_entries: Vec<(String, String)> = sample_assets
         .iter()
-        .map(|asset| asset.sha256.to_ascii_lowercase())
+        .map(|asset| (asset.path.replace('\\', "/"), asset.sha256.to_ascii_lowercase()))
         .collect();
-    expected_hashes.sort();
-    declared_hashes.sort();
-    if expected_hashes != declared_hashes {
-        return fail("declared sample-asset hash multiset does not match selected fixture".to_owned());
+    expected_entries.sort();
+    declared_entries.sort();
+    if expected_entries != declared_entries {
+        return fail("declared sample-asset path/hash pairs do not match selected fixture".to_owned());
     }
 
     (true, None)
