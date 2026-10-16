@@ -229,6 +229,40 @@ This fills an important literature-backed gap. Xu et al.'s 2026 review describes
 4. Next iterations should add uncertain repair durations, travel/access times and power/transport interdependency. The model currently has none of these, no online replanning, no shared tool constraint, and no policy-level fairness guarantee.
 5. The weighted-service objective is caller-defined and can encode harmful priorities. Keep service-level floors and group impacts as explicit constraints; never treat a scalar weight as an ethical decision.\n6. Initial performance target (unmeasured): 100 jobs, 20 crews, 50 part types, and 200 precedence edges below 250 ms p95 on a documented release-build host; a 1,000-job/100-crew stress case below 10 s. Profile before setting release gates, and retain feasibility checks and full traces.
 
+## Duration-uncertainty evaluation
+
+The fourth module, [`robust_repair_evaluation.rs`](../../crates/domains/symthaea-engineering/src/robust_repair_evaluation.rs), adds **out-of-sample evaluation** of the three existing repair policies. Each initial schedule is built using nominal durations. Its dispatch order and crew assignments are then held fixed while that same plan is replayed with alternative realized-duration scenarios. Realized durations can delay work through crew contention and prerequisite constraints, but cannot change the initial decision using future knowledge.
+
+This explicit information boundary matters. Stochastic scheduling has long recognized the need for nonanticipativity: decisions must be based on information available when they are made, or the computed plan can be unattainable in practice ([nonanticipativity in stochastic project scheduling](https://doi.org/10.1016/0360-8352(96)00119-2)). Risk-averse restoration research also compares expected performance with worst-case and CVaR-based outcomes under uncertain repair and travel times ([Alkhaleel, Liao & Sullivan](https://doi.org/10.1016/j.ejor.2021.04.025)). The April 2026 robust multicrew road-restoration paper uses an explicit uncertainty set for uncertain repairs ([Moreno et al., 2026](https://doi.org/10.1016/j.cor.2025.107379)).
+
+### What is evaluated
+
+- Expected weighted service-unit-steps lost under explicitly supplied scenario weights.
+- Worst-case loss across the supplied scenario set.
+- Upper-tail CVaR at a user-declared `alpha`, averaging the worst (1-\alpha) weighted fraction of outcomes.
+- Per-scenario repair start/finish times, realized duration, crew assignment, completion share and loss.
+- A fixed-plan replay where nominal decisions are preserved; future durations cannot rearrange the initial dispatch order.
+
+Scenario weights must sum to one, but they are **not probabilities** unless justified by data. With no defensible probability model, use named stress scenarios and interpret expected loss only as a weighted scenario score. Always report worst-case and per-scenario results alongside CVaR.
+
+### Required tests
+
+- **DUR-01 — Nonanticipativity:** the nominal job/crew decisions are identical across duration scenarios; only resulting times and consequences differ.
+- **DUR-02 — Tail risk:** a rare slow-repair scenario raises worst-case/CVaR even when expected loss looks modest.
+- **DUR-03 — Monotonicity:** lengthening a realized repair cannot reduce its loss in the fixed-plan replay.
+- **DUR-04 — Dependency delay:** a slower prerequisite delays dependent restoration.
+- **DUR-05 — Valid scenario weights:** invalid, missing, repeated or unknown duration records fail closed.
+- **DUR-06 — Determinism:** identical scenarios and nominal inputs reproduce identical policy-risk summaries.
+- **DUR-07 — Risk-report completeness:** expected, worst-case and CVaR results all accompany per-scenario traces; no summary silently replaces the details.
+
+### Targets and limits
+
+- Keep **nominal plan selection** separate from **scenario replay**; prohibit future information leaking into the starting plan.
+- Include at least 3 duration scenarios per tiny fixture (ordinary, adverse and severe) when constructing a published stress set; use calibrated scenario weights only when historical data supports them.
+- Compare all three policies on identical scenarios and report expected loss, worst-case loss, CVaR, and scenario-by-scenario regret relative to the best *nonanticipative* plan found by an independent small-instance oracle.
+- Next, implement true rolling-horizon replanning as a separate policy class that may use only observations revealed up to the current step. Compare its regret, service-floor violations and action stability against the fixed-plan baseline.
+- Current module coverage is a starting point, not a validated uncertainty model. Scenario generation, uncertainty calibration, travel uncertainty and adaptive/online replanning remain future work.
+
 ## 8. Research references
 
 - Poulin, C. & Kane, M. B. (2021), [Infrastructure resilience curves: Performance measures and summary metrics](https://doi.org/10.1016/j.ress.2021.107926).
@@ -236,7 +270,7 @@ This fills an important literature-backed gap. Xu et al.'s 2026 review describes
 - [Resilience in Cyber-Physical Infrastructures: R-KPI prioritization](https://doi.org/10.1016/j.jnlssr.2024.12.005), 2025.
 - [Modeling and operation of water-energy microgrids considering resilience assessment](https://doi.org/10.1016/j.nexus.2025.100590), 2025.
 - Shi et al., [Temporal modeling and resilience analysis of supply chain networks under cascading failures](https://doi.org/10.1016/j.ress.2025.111763), 2026.
-- Prasetia, [Agents of collaborative adaptation: modelling temporal resilience in supply chains](https://link.springer.com/article/10.1007/s10479-026-07406-4), published September 3, 2026.\n- Xu, M. et al. (2026), [Scheduling Repair Resources for Post-Disaster Critical Infrastructure Systems: A Review of Models and Algorithms](https://doi.org/10.1111/risa.70220).\n- Pan, S. & Boyles, S. (2026), [Optimising repair sequences for interdependent infrastructure resilience](https://doi.org/10.1080/10286608.2025.2602872).\n- [The Robust Multicrew Scheduling and Routing Problem in road restoration](https://doi.org/10.1016/j.cor.2025.107379), April 2026.\n- Hosseina, Moghaddam & Hassannia (2025), [Optimizing energy and load management in island microgrids for enhancing resilience against resource interruptions](https://doi.org/10.1038/s41598-025-99974-x).\n- Pourramezani et al. (2026), [Physical vulnerability-oriented reconfiguration of microgrids: centralized vs. decentralized control](https://www.nature.com/articles/s41598-026-63123-9).\n- [Simulation-driven optimization for resilient and sustainable supply chain operations](https://doi.org/10.1016/j.cie.2026.112063), July 2026.
+- Prasetia, [Agents of collaborative adaptation: modelling temporal resilience in supply chains](https://link.springer.com/article/10.1007/s10479-026-07406-4), published September 3, 2026.\n- Xu, M. et al. (2026), [Scheduling Repair Resources for Post-Disaster Critical Infrastructure Systems: A Review of Models and Algorithms](https://doi.org/10.1111/risa.70220).\n- Pan, S. & Boyles, S. (2026), [Optimising repair sequences for interdependent infrastructure resilience](https://doi.org/10.1080/10286608.2025.2602872).\n- [The Robust Multicrew Scheduling and Routing Problem in road restoration](https://doi.org/10.1016/j.cor.2025.107379), April 2026.\n- [The role of nonanticipativity constraints in stochastic project scheduling](https://doi.org/10.1016/0360-8352(96)00119-2) — decisions must use only information available at decision time.\n- Hosseina, Moghaddam & Hassannia (2025), [Optimizing energy and load management in island microgrids for enhancing resilience against resource interruptions](https://doi.org/10.1038/s41598-025-99974-x).\n- Pourramezani et al. (2026), [Physical vulnerability-oriented reconfiguration of microgrids: centralized vs. decentralized control](https://www.nature.com/articles/s41598-026-63123-9).\n- [Simulation-driven optimization for resilient and sustainable supply chain operations](https://doi.org/10.1016/j.cie.2026.112063), July 2026.
 
 ---
 *Integrity rule: simulated benchmarks, skipped CI, and successful source-level checks are not evidence of field reliability. Report each evidence class separately.*
