@@ -11,8 +11,20 @@ serde_json = { workspace = true }
 blake3 = { workspace = true }
 clap = { workspace = true }
 hound = { workspace = true }
+sha2 = { workspace = true }
 
 [[bin]]
 name = "symthaea-comm-eval"
 path = "src/bin/eval.rs"
 
+[[bin]]
+name = "bioacoustic-corpus-preflight"
+path = "src/bin/bioacoustic_corpus_preflight.rs"
+
+[[bin]]
+name = "bioacoustic-asset-audit"
+path = "src/bin/bioacoustic_asset_audit.rs"
+
+[[bin]]
+name = "bioacoustic-event-eval"
+path = "src/bin/bioacoustic_event_eval.rs"

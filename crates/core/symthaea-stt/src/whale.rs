@@ -63,6 +63,65 @@ impl Default for WhaleConfig {
     }
 }
 
+impl WhaleConfig {
+    /// Build the sperm-whale ICI timing profile against a declared native
+    /// recording clock. This does not resample audio or validate detector
+    /// accuracy; the caller must pass the same rate to `try_process_buffer`.
+    pub fn for_native_sample_rate(sample_rate_hz: u32) -> Self {
+        Self {
+            sample_rate: sample_rate_hz,
+            ..Self::default()
+        }
+    }
+
+    /// Validate coda timing and LTC configuration before processing.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.sample_rate == 0 {
+            return Err("whale coda sample rate must be non-zero".into());
+        }
+        if !self.click_threshold.is_finite() || self.click_threshold < 0.0 {
+            return Err("click threshold must be finite and non-negative".into());
+        }
+        if !self.min_click_gap.is_finite()
+            || self.min_click_gap < 0.0
+            || !self.max_ici.is_finite()
+            || self.max_ici <= self.min_click_gap
+        {
+            return Err("coda timing must be finite with max ICI > minimum click gap".into());
+        }
+        if self.min_coda_clicks < 2 || self.max_coda_clicks < self.min_coda_clicks {
+            return Err("coda click-count limits must satisfy 2 <= min <= max".into());
+        }
+        if !self.click_tau.is_finite()
+            || self.click_tau <= 0.0
+            || self.click_tau > f32::MAX / 2.0
+            || !self.rhythm_tau.is_finite()
+            || self.rhythm_tau <= 0.0
+            || self.rhythm_tau > f32::MAX / 2.0
+        {
+            return Err(
+                "LTC time constants must be finite, positive, and safe under scaling".into(),
+            );
+        }
+        Ok(())
+    }
+
+    /// This streaming sentinel uses the configured clock and does not resample.
+    pub fn validate_source_sample_rate(&self, source_rate_hz: u32) -> Result<(), String> {
+        self.validate()?;
+        if source_rate_hz != self.sample_rate {
+            return Err(format!(
+                concat!(
+                    "source rate {source_rate_hz} Hz does not match sentinel clock {} Hz; ",
+                    "resample with a verified pipeline or configure the native rate"
+                ),
+                self.sample_rate
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// A detected whale coda with its rhythm signature
 #[derive(Debug, Clone)]
 pub struct DetectedCoda {
@@ -136,7 +195,14 @@ impl WhaleSentinel {
         Self::with_config(WhaleConfig::default())
     }
 
-    /// Create with custom configuration
+    /// Create a sentinel after validating its timing configuration.
+    pub fn try_with_config(config: WhaleConfig) -> Result<Self, String> {
+        config.validate()?;
+        Ok(Self::with_config(config))
+    }
+
+    /// Create with custom configuration without eager validation for compatibility.
+    /// Prefer `try_with_config` for new code.
     pub fn with_config(config: WhaleConfig) -> Self {
         // Fast LTC for click detection (input: 1 energy value)
         let click_ltc_config = LtcConfig {
@@ -214,7 +280,25 @@ impl WhaleSentinel {
         result
     }
 
-    /// Process a buffer of audio samples
+    /// Validate source clock before processing a complete buffer.
+    /// This prevents sample-rate mismatch from corrupting inter-click intervals.
+    pub fn try_process_buffer(
+        &mut self,
+        samples: &[f32],
+        source_sample_rate_hz: u32,
+    ) -> Result<Vec<DetectedCoda>, String> {
+        self.config.validate_source_sample_rate(source_sample_rate_hz)?;
+        if samples.is_empty() {
+            return Err("whale coda processing requires non-empty audio".into());
+        }
+        if samples.iter().any(|sample| !sample.is_finite()) {
+            return Err("whale coda audio contains non-finite samples".into());
+        }
+        Ok(self.process_buffer(samples))
+    }
+
+    /// Process a buffer already sampled at `config.sample_rate`.
+    /// Prefer `try_process_buffer` when the source sampling rate is available.
     pub fn process_buffer(&mut self, samples: &[f32]) -> Vec<DetectedCoda> {
         let mut codas = Vec::new();
 
@@ -275,17 +359,23 @@ impl WhaleSentinel {
             return result;
         }
 
-        // Add ICI to buffer
-        self.ici_buffer.push_back(ici);
-        if self.ici_buffer.len() > self.config.max_coda_clicks {
-            self.ici_buffer.pop_front();
-        }
+        self.push_ici(ici);
 
         // Feed ICI to rhythm encoder
         self.rhythm_encoder.forward(&[ici], ici);
 
         self.last_click_time = self.current_time;
         None
+    }
+
+    /// Retain at most max_coda_clicks - 1 intervals, so the represented
+    /// coda never exceeds its configured maximum number of clicks.
+    fn push_ici(&mut self, ici: f32) {
+        self.ici_buffer.push_back(ici);
+        let max_intervals = self.config.max_coda_clicks.saturating_sub(1);
+        while self.ici_buffer.len() > max_intervals {
+            self.ici_buffer.pop_front();
+        }
     }
 
     /// Check if current coda has timed out
@@ -308,7 +398,9 @@ impl WhaleSentinel {
 
     /// Finalize a coda and generate its signature
     fn finalize_coda(&mut self) -> Option<DetectedCoda> {
-        if self.ici_buffer.len() < self.config.min_coda_clicks - 1 {
+        if self.config.validate().is_err()
+            || self.ici_buffer.len() < self.config.min_coda_clicks.saturating_sub(1)
+        {
             return None; // Not enough clicks for a valid coda
         }
 
@@ -497,6 +589,73 @@ mod tests {
         let sentinel = WhaleSentinel::new();
         assert_eq!(sentinel.stats.samples_processed, 0);
         assert_eq!(sentinel.stats.clicks_detected, 0);
+    }
+
+    #[test]
+    fn whale_config_validates_clock_timing_and_click_limits() {
+        assert!(WhaleConfig::default().validate().is_ok());
+
+        let mut invalid = WhaleConfig::default();
+        invalid.sample_rate = 0;
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = WhaleConfig::default();
+        invalid.max_ici = invalid.min_click_gap;
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = WhaleConfig::default();
+        invalid.max_coda_clicks = invalid.min_coda_clicks - 1;
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = WhaleConfig::default();
+        invalid.rhythm_tau = f32::NAN;
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = WhaleConfig::default();
+        invalid.click_tau = f32::MAX;
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = WhaleConfig::default();
+        invalid.rhythm_tau = f32::MAX;
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn whale_profile_can_bind_to_declared_native_sample_rate() {
+        let config = WhaleConfig::for_native_sample_rate(512_000);
+        assert_eq!(config.sample_rate, 512_000);
+        assert!(config.validate().is_ok());
+        assert!(config.validate_source_sample_rate(512_000).is_ok());
+        assert!(config.validate_source_sample_rate(44100).is_err());
+    }
+
+    #[test]
+    fn try_with_config_rejects_invalid_temporal_configuration() {
+        let mut config = WhaleConfig::default();
+        config.sample_rate = 0;
+        assert!(WhaleSentinel::try_with_config(config).is_err());
+    }
+
+    #[test]
+    fn whale_sentinel_requires_source_clock_match_and_finite_audio() {
+        let mut sentinel = WhaleSentinel::try_with_config(WhaleConfig::default()).unwrap();
+        assert!(sentinel.try_process_buffer(&[0.0; 32], 48000).is_err());
+        assert!(sentinel.try_process_buffer(&[], 44100).is_err());
+        assert!(sentinel.try_process_buffer(&[0.0, f32::NAN], 44100).is_err());
+        assert!(sentinel.try_process_buffer(&[0.0; 32], 44100).is_ok());
+    }
+
+    #[test]
+    fn coda_buffer_respects_maximum_click_count_not_interval_count() {
+        let mut config = WhaleConfig::default();
+        config.min_coda_clicks = 2;
+        config.max_coda_clicks = 4;
+        let mut sentinel = WhaleSentinel::try_with_config(config).unwrap();
+        for interval in 1..10 {
+            sentinel.push_ici(interval as f32 * 0.1);
+        }
+        assert_eq!(sentinel.ici_buffer.len(), 3);
+        assert_eq!(sentinel.ici_buffer.len() + 1, sentinel.config.max_coda_clicks);
     }
 
     #[test]

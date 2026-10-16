@@ -1,11 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Real-World Whale Validation
+//! Exploratory cetacean acoustic diagnostics — not a validated benchmark.
 //!
-//! Validates the Universal Temporal Grammar on actual whale recordings.
-//! This is the "Whale Bridge" - proving the architecture works on real data
-//! before scaling to speech.
+//! Evidence limits: files are split by sorted/list position, not by verified
+//! recording, encounter, individual, or site lineage. Cross-species labels in
+//! this example are inferred from filenames. Scores are descriptive diagnostics,
+//! not independent generalization or communication evidence.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -182,10 +183,10 @@ fn analyze_recording(
 }
 
 fn main() -> std::io::Result<()> {
-    header("WHALE BRIDGE: REAL-WORLD VALIDATION");
+    header("EXPLORATORY DIAGNOSTIC — NOT A VALIDATION");
 
-    println!("  Testing Universal Temporal Grammar on actual whale recordings.");
-    println!("  This validates the architecture on real, messy bioacoustic data.");
+    println!("  Evidence limit: file-position split; no verified grouped source manifest.");
+    println!("  Scores are descriptive only and do not establish generalization or meaning.");
 
     // Find whale audio files
     let whale_dir = Path::new("data/whales/sperm");
@@ -244,8 +245,8 @@ fn main() -> std::io::Result<()> {
     let mid = all_results.len() / 2;
     let (train_set, test_set) = all_results.split_at(mid);
 
-    println!("    Training set: {} recordings", train_set.len());
-    println!("    Test set:     {} recordings", test_set.len());
+    println!("    First list partition (used for adaptation): {} recordings", train_set.len());
+    println!("    Second list partition (not a verified independent holdout):     {} recordings", test_set.len());
 
     // Train on first half
     println!("\n    Training on:");
@@ -307,9 +308,9 @@ fn main() -> std::io::Result<()> {
 
     subheader("Results");
 
-    println!("    Training set average: {:.4}", train_avg);
-    println!("    Test set average:     {:.4}", test_avg);
-    println!("    Generalization gap:   {:+.4}", train_avg - test_avg);
+    println!("    First list-partition mean: {:.4}", train_avg);
+    println!("    Second list-partition mean (not independent holdout):     {:.4}", test_avg);
+    println!("    Train-minus-holdout diagnostic difference (not a generalization estimate):   {:+.4}", train_avg - test_avg);
 
     // Phase 4: Cross-species test (if test_animals exists)
     if test_dir.exists() {
@@ -331,6 +332,7 @@ fn main() -> std::io::Result<()> {
             if let Some((filename, events, _)) = analyze_recording(&entry.path(), &mut grammar) {
                 if !events.is_empty() {
                     let score = grammar.score_sequence(&events);
+                    // Exploratory grouping only: filename tokens are not independent ground-truth labels.
                     let species = if filename.contains("whale") {
                         "[WHALE]"
                     } else if filename.contains("dolphin") {
@@ -349,7 +351,7 @@ fn main() -> std::io::Result<()> {
     }
 
     // Summary
-    header("VALIDATION SUMMARY");
+    header("EXPLORATORY DIAGNOSTIC SUMMARY");
 
     println!("  Universal Temporal Grammar on Real Whale Audio:");
     println!();
@@ -363,18 +365,19 @@ fn main() -> std::io::Result<()> {
     println!();
 
     if train_avg > 0.3 {
-        println!("  [SUCCESS] Grammar learned patterns from real whale recordings!");
+        println!("  [DIAGNOSTIC ONLY] A training score crossed a heuristic threshold; this is not evidence of learning.");
     } else if train_avg > 0.1 {
-        println!("  [PARTIAL] Grammar shows some learning, may need more data.");
+        println!("  [DIAGNOSTIC ONLY] Score fell in the intermediate heuristic range; learning is not established.");
     } else {
         println!("  [INFO] Low scores may indicate threshold tuning needed.");
     }
 
     if (train_avg - test_avg).abs() < 0.2 {
-        println!("  [SUCCESS] Good generalization to unseen recordings!");
+        println!("  [NOT QUALIFIED] The list-position split does not establish unseen-recording generalization.");
     }
 
     separator('=', 70);
+    println!("  No validated benchmark or communication claim is produced by this example.");
     println!("  WHALE BRIDGE VALIDATION COMPLETE");
     separator('=', 70);
 
