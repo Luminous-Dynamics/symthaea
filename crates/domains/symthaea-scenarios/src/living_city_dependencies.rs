@@ -6,9 +6,11 @@
 //! identify initiating failures; this module exposes the consequences of the
 //! declared dependency graph so cross-sector cascades are not silently omitted.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ServiceDomain {
     Electricity,
     Water,
@@ -24,7 +26,8 @@ pub enum ServiceDomain {
     DigitalControl,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ServiceNode {
     pub id: String,
     pub domain: ServiceDomain,
@@ -32,13 +35,15 @@ pub struct ServiceNode {
 
 /// Required dependencies propagate failure; degraded dependencies mark the
 /// dependent service degraded but do not automatically declare it unavailable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DependencyMode {
     Required,
     Degraded,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ServiceDependency {
     /// Service that depends on the prerequisite.
     pub dependent_id: String,
