@@ -185,3 +185,26 @@ The upstream WarpX README describes four helium RF capacitive-discharge cases fo
 **Critical separation:** WarpX's helium kinetic cases are not automatically comparable to the Zapdos fluid cases. First qualify each case independently. Only define a fluid-vs-PIC score if gas species, collision data, geometry, drive, boundary conditions, initial state, averaging window and observables are made commensurate; otherwise preserve them as distinct regime-specific benchmarks.
 
 A new implementation/preflight work item tracks the next step: [PLASMA-PIC-REF-001 #7640](https://github.com/Luminous-Dynamics/symthaea/issues/7640). The immediate acceptance condition is exact dependency closure, independent SHA-256 computed over downloaded bytes, a frozen case manifest, and explicit canonical-vs-smoke status. No WarpX run or benchmark pass is claimed by this source inspection.
+
+## 11. Measured disruption-prediction benchmark — separate evidence track
+
+Disruption prediction is a useful adjacent benchmark for the Symthaea plasma domain, but it is **not a substitute** for verifying the governing equations or numerics of an RF-CCP solver.
+
+Research anchors identified for a future measured-corpus track:
+
+- [DisruptionBench](https://github.com/MIT-PSFC/DisruptionBench) describes model-agnostic tasks across Alcator C-Mod, DIII-D and EAST, including zero-shot, few-shot and many-shot settings. Its paper is “DisruptionBench: A robust benchmarking framework for machine learning-driven disruption prediction,” DOI: https://doi.org/10.1007/s10894-025-00495-2. The repository is archived/read-only; exact commit, task/data manifests, label conventions and paper/code correspondence still need to be pinned and audited.
+- The repository's MIT license and README files were inspected through the GitHub connector (README blob `936719dd7020688da0870d2ef171f0d1eeaca5ca`; license blob `d674d4d67f0c1d191ed21338292cbbbb24bc64bb`). These are file blob identities, **not** a substitute for a complete immutable repository commit and dataset closure.
+- [DisruptionPy](https://github.com/MIT-PSFC/disruption-py) provides data access/analysis tooling for several tokamak datasets. Its current development README lists C-Mod, DIII-D, EAST, HBT-EP and MAST; the MIT license was inspected (README blob `2705fc2bc4c118cbb92ba50c9bf4ce28e1c6d233`, license blob `43d39319e26a6b4034fd229d585225b3125a88b8`). Availability and terms are machine-dependent. An access library does not grant redistribution rights to underlying diagnostics, and raw/restricted machine data must not be committed to Symthaea.
+- The concrete follow-on is [PLASMA-ML-REF-001 #7665](https://github.com/Luminous-Dynamics/symthaea/issues/7665); the current metric-semantics correction is [PR #7663](https://github.com/Luminous-Dynamics/symthaea/pull/7663).
+
+Protocol requirements for this track:
+
+1. Keep a rights-cleared, source-pinned data manifest and immutable hashes for any locally acquired permitted artifact. If credentials or a data-use agreement are required and unavailable, record the gate as blocked rather than swapping in synthetic data.
+2. Use a Rust-native scoring/validation contract even if an upstream dataset requires a separately pinned extraction utility. Preserve the input schema, preprocessing revision, time base and label-generation provenance.
+3. Group all partitions by complete shot, then by session/campaign and machine when available. No adjacent-sample random splits; no normalization, feature selection or pretraining leakage across held-out groups.
+4. Report event-level metrics separately from sample/time-window metrics. Include event recall/precision/F1, false alarms per non-disruption shot and per unit observation time, false-positive rate, warning-lead-time distribution, calibration, scoreability/censoring counts, and uncertainty intervals bootstrapped over shots. State the exact useful-warning horizon and repeated-alarm policy before running the benchmark.
+5. Report per machine and regime before an aggregate. Zero-shot/few-shot/many-shot transfer and leave-one-machine-out are separate experimental conditions, not interchangeable names for one holdout.
+6. Include integrity adversaries: absent/corrupt diagnostics, malformed/irregular time axes, post-event alarms, duplicate/reordered samples, repeated warnings, partial/censored shots, duplicate shot IDs and split leakage. All injected faults in the finite preregistered suite should be detected; show suite size and coverage.
+7. Treat a 95% event-recall objective as a preregistered operating-point hypothesis only when paired with an explicit false-alarm constraint, a useful lead-time requirement, held-out results and uncertainty. It is not, by itself, a safety claim or a hardware-operating recommendation.
+
+The target distinction remains: synthetic demonstrations test implementation; source/data integrity tests establish lineage; numerical verification tests equations and discretization; comparison with published references checks reproducibility; experimental agreement tests a model against measurements. Passing one state does not promote it to another.
