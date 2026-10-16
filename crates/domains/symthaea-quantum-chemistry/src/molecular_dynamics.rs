@@ -157,7 +157,7 @@ impl NormalRng {
 /// Construct a thermal initial velocity set in atomic units.
 fn initialize_velocities(masses: &[f64], temperature: f64, seed: u64) -> Vec<[f64; 3]> {
     let mut velocities = vec![[0.0; 3]; masses.len()];
-    if temperature <= 0.0 || masses.len() <= 1 {
+    if !temperature.is_finite() || temperature <= 0.0 || masses.len() <= 1 {
         return velocities;
     }
 
