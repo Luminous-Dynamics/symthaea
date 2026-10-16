@@ -875,4 +875,74 @@ mod tests {
             Err(ResourceScreeningError::DuplicateResource(_))
         ));
     }
+
+    #[test]
+    fn invalid_horizon_floor_and_replenishment_fail_closed() {
+        assert!(matches!(
+            screen_resource_constrained_services(
+                &one_service(1.0, 1.0, 1.0),
+                &one_resource(1.0, 1.0, 0.0),
+                &[],
+                &config(0, 0.8),
+            ),
+            Err(ResourceScreeningError::ZeroHorizon)
+        ));
+        assert!(matches!(
+            screen_resource_constrained_services(
+                &one_service(1.0, 1.0, 1.0),
+                &one_resource(1.0, 1.0, 0.0),
+                &[],
+                &config(1, f64::NAN),
+            ),
+            Err(ResourceScreeningError::InvalidServiceFloor)
+        ));
+        assert!(matches!(
+            screen_resource_constrained_services(
+                &one_service(1.0, 1.0, 1.0),
+                &one_resource(1.0, 1.0, -0.1),
+                &[],
+                &config(1, 0.0),
+            ),
+            Err(ResourceScreeningError::InvalidReplenishment(_))
+        ));
+    }
+
+    #[test]
+    fn unknown_and_repeated_service_dependencies_fail_closed() {
+        let unknown = [ResourceService::new(
+            "water",
+            1.0,
+            1.0,
+            0,
+            ["not-a-service"],
+            Vec::<ResourceRequirement>::new(),
+        )];
+        assert!(matches!(
+            screen_resource_constrained_services(&unknown, &[], &[], &config(1, 0.0)),
+            Err(ResourceScreeningError::UnknownDependency { .. })
+        ));
+
+        let repeated = [
+            ResourceService::new(
+                "water",
+                1.0,
+                1.0,
+                0,
+                ["power", "power"],
+                Vec::<ResourceRequirement>::new(),
+            ),
+            ResourceService::new(
+                "power",
+                1.0,
+                1.0,
+                1,
+                Vec::<String>::new(),
+                Vec::<ResourceRequirement>::new(),
+            ),
+        ];
+        assert!(matches!(
+            screen_resource_constrained_services(&repeated, &[], &[], &config(1, 0.0)),
+            Err(ResourceScreeningError::DuplicateDependency { .. })
+        ));
+    }
 }
