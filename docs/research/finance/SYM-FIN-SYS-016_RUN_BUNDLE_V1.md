@@ -32,7 +32,7 @@ The verifier rejects:
 - unsupported or malformed digest fields;
 - byte-length and SHA-256 mismatches;
 - missing, duplicate, extra or inconsistent receipt-pointer bindings;
-- absolute paths, parent traversal, symlinks and files outside the bundle root;
+- absolute paths, parent traversal, non-canonical path aliases, symlinks and files outside the bundle root;
 - a receipt that enables real-world observation, authorization, reservation, settlement or production import.
 
 Run-bundle verification complements rather than replaces the full receipt validator. The latter still owns the v1 schema and cross-field/domain semantics, such as the registered scenario, metric IDs/dimensions, event ordering and bridge topology.
