@@ -1206,7 +1206,26 @@
     ],
     "research_sources": [
       "https://doi.org/10.1016/j.ejor.2022.05.049",
-      "https://doi.org/10.1016/j.asoc.2022.109253"
-    ]
+      "https://doi.org/10.1016/j.asoc.2022.109253",
+      "https://github.com/MarioVanhoucke/MSLIB-Multi-Skilled-Resource-Constrained-Project-Library",
+      "https://github.com/imopse/imopse"
+    ],
+    "external_benchmark_plan": {
+      "primary_candidate": "MSLIB",
+      "primary_source": "https://github.com/MarioVanhoucke/MSLIB-Multi-Skilled-Resource-Constrained-Project-Library",
+      "release_source": "https://github.com/MarioVanhoucke/MSLIB-Multi-Skilled-Resource-Constrained-Project-Library/releases",
+      "secondary_candidate": "iMOPSE",
+      "secondary_source": "https://github.com/imopse/imopse",
+      "secondary_reference": "https://doi.org/10.1016/j.asoc.2022.109253",
+      "status": "research_selected_adapter_not_implemented",
+      "required_controls": [
+        "preserve_upstream_instance_ids",
+        "record_release_and_file_checksums",
+        "document_every_mapping_and_exclusion",
+        "separate_tuning_and_holdout_instances",
+        "report_benchmark_native_objectives_separately_from_weighted_completion_loss",
+        "only compute best_known_gap when objective_and_constraints_match"
+      ]
+    }
   }
 }
