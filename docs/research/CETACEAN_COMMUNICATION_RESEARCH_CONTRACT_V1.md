@@ -42,6 +42,8 @@ Do not model all cetacean sounds as one universal "cetacean phoneme" classificat
 |---|---|---|
 | Bottlenose / common dolphins: whistles | Sustained frequency contours, harmonics, overlapping calls, individual/encounter metadata where actually known | Contour detection / tracking, contour error and held-out-session generalization |
 | Dolphins: echolocation clicks | Short broadband transients, high sample rates, multi-channel geometry where available | Click-event detection and timing; later source localization only with array calibration / ground truth |
+
+**Important distinction:** `WhaleSentinel` is a sperm-whale coda-ICI prototype, not a drop-in dolphin click detector. Its default `min_click_gap` is 20 ms; do not reuse that operating point for faster dolphin click trains without a task-specific configuration and annotated validation.
 | Dolphins: burst pulses | Dense pulse trains, broad spectral content and context | Detection / segmentation with class-specific errors, not an assumed social meaning |
 | Sperm whales: codas | Click-event sequences and inter-click interval patterns, often social-unit / individual metadata | Coda boundaries, click counts, ICI error and held-out-encounter structure |
 | Sperm whales: spectral / "vowel" features | Spectral shape within validated click/coda segments | Feature reproducibility and held-out social-unit classification; not human-phoneme equivalence |
@@ -81,6 +83,7 @@ NOAA SanctSound hourly dolphin-presence records may provide an additional large-
 
 - **Project CETI Coda-detector** is a useful method baseline for coda detection / click timing and vocalizer separation. Its public repository includes example recordings from previously published datasets, not a guarantee that full source datasets are openly redistributable: https://github.com/Project-CETI/Coda-detector
 - **Project CETI coda-vowel-phonology** provides code and tabular materials relevant to sperm-whale coda spectral features: https://github.com/Project-CETI/coda-vowel-phonology
+- **DolphinGemma** is a relevant dolphin-sequence baseline candidate: Google DeepMind describes it as learning patterns and generating dolphin-like acoustic sequences from Wild Dolphin Project data; this does not establish semantic translation or mutual understanding. Pin exact weights / license / version before use: https://deepmind.google/models/gemma/dolphingemma/
 - **WhAM** (NeurIPS 2025) is a transformer-based audio-to-audio coda model with embeddings for downstream social-unit and spectral-feature tasks. Its code repository is MIT-licensed, but full DSWP+CETI annotations required to reproduce all published results are not all publicly available. Treat model code, pretrained weights, data and annotations as separate license/access objects. Generation of pseudo-codas is not evidence of communication: https://github.com/Project-CETI/wham
 - **Dominica Sperm Whale Project (DSWP)** is identified by WhAM as a publicly available coda dataset, but pin its exact release, source lineage, annotation availability and license before use.
 
@@ -117,7 +120,7 @@ Initial engineering gates to evaluate after a manual-label audit:
 
 ### Level 2 — structure and predictive value
 
-- Compare HDC/CfC temporal structure against a constant/base-rate predictor, simple ICI/renewal or n-gram model and a suitable self-supervised acoustic representation.
+- Compare HDC/CfC temporal structure against a constant/base-rate predictor, simple ICI/renewal or n-gram model and a suitable self-supervised acoustic representation. For dolphin sequence prediction, include DolphinGemma as a comparison only where the exact model weights, intended-use license and reproducible preprocessing are available; its published role is to learn/predict acoustic sequence structure, not to serve as a proven natural-language translator.
 - Report next-event negative log-likelihood / Brier score or task-appropriate predictive metric, against shuffled-event, temporal-permutation and context-only controls.
 - Require improvement on held-out recording/session groups with paired/grouped confidence intervals; keep null results.
 - For coda families, report balanced accuracy / macro-F1 only when the label ontology and source identity are defensible.
