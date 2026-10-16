@@ -115,7 +115,7 @@
         "runtime_and_resource_delta",
         "paired_recall_delta_label_sensitivity_bounds"
       ],
-      "denominator_rule": "Hold specialist outputs, candidate universe, and budget fixed when isolating the Symthaea-added policy. For label-robust comparison, both policies must share the exact candidate IDs and label mapping, and their difference bounds must assign each unknown site's outcome jointly across both policies."
+      "denominator_rule": "Hold specialist outputs, candidate universe, and budget fixed when isolating the Symthaea-added policy. Where unknowns exist, policy comparisons require identical candidate IDs and label mappings, shared latent outcomes for unknown sites, and paired worst/best-case Recall@K-delta bounds."
     },
     {
       "id": "T7_evidence_integrity",
@@ -159,7 +159,8 @@
           "endpoint, splits, exclusions, analysis and interval procedure preregistered before holdout reveal",
           "report precision, false negatives and all per-group deltas",
           "paired group-aware interval excludes no improvement",
-          "report paired label-sensitivity bounds when unknown candidates exist; call the improvement label-robust within the fixed universe only if the paired worst-case lower bound is above zero"
+          "report paired label-sensitivity bounds when unknown candidates exist; call the improvement label-robust within the fixed universe only if the paired worst-case lower bound is above zero",
+          "When unknown candidates exist, label-robust superiority within the exact candidate universe requires the paired worst-case Recall@K-delta lower bound to exceed zero; a statistical improvement on observed labels alone must be reported as observed-label improvement."
         ]
       },
       {
@@ -170,7 +171,8 @@
           "baseline recall target fixed before holdout reveal",
           "report precision, false negatives and all per-group deltas",
           "paired group-aware interval excludes no improvement",
-          "report paired label-sensitivity bounds when unknown candidates exist; call the improvement label-robust within the fixed universe only if the paired worst-case lower bound is above zero"
+          "report paired label-sensitivity bounds when unknown candidates exist; call the improvement label-robust within the fixed universe only if the paired worst-case lower bound is above zero",
+          "When unknown candidates exist, label-robust superiority within the exact candidate universe requires the paired worst-case Recall@K-delta lower bound to exceed zero; a statistical improvement on observed labels alone must be reported as observed-label improvement."
         ]
       }
     ],
@@ -505,13 +507,13 @@
       "note": "Do not report the lower bound as a point estimate when selected outcomes are unknown."
     },
     "paired_policy_delta": {
-      "status": "method_specified_synthetic_test_added_not_compiled",
-      "required_preconditions": [
+      "status": "specified_and_source_added_not_compiled_or_executed",
+      "preconditions": [
         "identical candidate ID universe",
         "identical observed label mapping",
-        "shared assignment of every unknown candidate outcome across policies",
-        "same eligible positive reference",
-        "same K"
+        "same latent label assignment of each unknown site across policies",
+        "same eligible-positive reference",
+        "same K and K candidates available in the universe"
       ],
       "symbols": {
         "P": "eligible measured-positive reference count",
@@ -528,7 +530,7 @@
         "numerator": "d + a",
         "denominator": "P + a + (n if d + a < 0 else 0)"
       },
-      "interpretation": "A positive lower bound indicates improvement robust to every unknown-label assignment inside the shared candidate universe; bounds spanning zero mean the observed-label delta is not robust to all such assignments. Not a confidence interval, posterior or safety guarantee."
+      "interpretation": "A positive lower bound indicates improvement robust to every unknown-label assignment inside the shared candidate universe. Bounds spanning zero mean the observed-label delta is not robust to all assignments. Not a confidence interval, posterior or safety guarantee."
     }
   }
 }
