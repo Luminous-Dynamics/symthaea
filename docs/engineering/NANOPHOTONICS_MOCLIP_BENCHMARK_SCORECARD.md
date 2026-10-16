@@ -1,7 +1,7 @@
 # Nanophotonics Pilot Benchmark Scorecard: MOCLIP, HDC and Budgeted Inverse Design
 
 **Status:** Preregistered pilot proposal; not an executed benchmark.
-**Rust policy primitive:** [tools/nano-policy](../../tree/research/nano-001-atomistic-discovery/tools/nano-policy), tracked by [NANO-005](https://github.com/Luminous-Dynamics/symthaea/issues/7643).
+**Rust policy reference:** [tools/nano-policy](../../tree/research/nano-001-atomistic-discovery/tools/nano-policy) is a small isolated prototype; canonical selector development is in [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568) and [NANO-005 issue #7570](https://github.com/Luminous-Dynamics/symthaea/issues/7570).
 **Cross-domain benchmark charter:** [NANOTECHNOLOGY_BENCHMARK_CHARTER.md](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md) sets shared reproducibility/leakage gates and domain-specific acceptance logic.  
 **Date:** 2026-10-16  
 **Parent domain-selection gate:** [NANO-002](https://github.com/Luminous-Dynamics/symthaea/issues/7507)  
