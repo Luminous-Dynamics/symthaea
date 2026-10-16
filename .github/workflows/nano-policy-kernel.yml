@@ -1,0 +1,37 @@
+name: NANO Policy Kernel
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-nano-policy/**"
+      - ".github/workflows/nano-policy-kernel.yml"
+  push:
+    branches:
+      - "research/nano-policy-kernel"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-nano-policy/**"
+      - ".github/workflows/nano-policy-kernel.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nano-policy-kernel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Rust unit tests (locked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-nano-policy/src/lib.rs crates/domains/symthaea-nano-policy/src/main.rs
+      - name: Test selector contract and policies
+        run: cargo test --locked -p symthaea-nano-policy --all-targets
