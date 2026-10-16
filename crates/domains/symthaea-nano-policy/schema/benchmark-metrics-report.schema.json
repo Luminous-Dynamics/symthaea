@@ -351,6 +351,8 @@
           "confidence_level",
           "practical_margin",
           "independent_group_count",
+          "covered_target_count",
+          "total_target_count",
           "bootstrap_replicates",
           "disposition"
         ],
@@ -368,29 +370,31 @@
           "metric": {
             "enum": [
               "success_rate_at_budget",
-              "normalized_success_auc"
+              "normalized_success_auc",
+              "best_loss_reduction_at_budget"
             ]
           },
           "estimated_delta": {
             "type": "number",
-            "minimum": -1,
-            "maximum": 1
+            "minimum": -1000000000000,
+            "maximum": 1000000000000,
+            "description": "Positive means the candidate improves relative to baseline; for best-loss reduction this is baseline loss minus candidate loss."
           },
           "confidence_interval_lower": {
             "type": [
               "number",
               "null"
             ],
-            "minimum": -1,
-            "maximum": 1
+            "minimum": -1000000000000,
+            "maximum": 1000000000000
           },
           "confidence_interval_upper": {
             "type": [
               "number",
               "null"
             ],
-            "minimum": -1,
-            "maximum": 1
+            "minimum": -1000000000000,
+            "maximum": 1000000000000
           },
           "confidence_level": {
             "const": 0.95
@@ -398,11 +402,11 @@
           "practical_margin": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1000000000000
           },
           "independent_group_count": {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 0,
             "maximum": 2000
           },
           "bootstrap_replicates": {
@@ -415,8 +419,19 @@
               "improvement_beyond_margin",
               "regression_beyond_margin",
               "inconclusive",
-              "insufficient_independent_groups"
+              "insufficient_independent_groups",
+              "insufficient_target_coverage"
             ]
+          },
+          "covered_target_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "total_target_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
           }
         },
         "allOf": [
@@ -425,6 +440,28 @@
               "properties": {
                 "disposition": {
                   "const": "insufficient_independent_groups"
+                }
+              },
+              "required": [
+                "disposition"
+              ]
+            },
+            "then": {
+              "properties": {
+                "confidence_interval_lower": {
+                  "type": "null"
+                },
+                "confidence_interval_upper": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "disposition": {
+                  "const": "insufficient_target_coverage"
                 }
               },
               "required": [
