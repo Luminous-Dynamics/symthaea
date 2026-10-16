@@ -311,9 +311,9 @@ impl CognitiveLoopService {
             if cycle_num % interval == 0 {
                 if let Some(mut bridge) = self.sensorimotor.embodiment_bridge.take() {
                     let phi = self.carryover.history.consciousness_level;
-                    // Scale motor dt by substrate speed factor (Putnam 1967: substrate independence).
-                    // Photonic substrates step physics faster; biological substrates slower.
-                    let dt = self.config.cfc_config.delta_t * self.substrate_manager.tau_factor;
+                    // Plant/model time belongs to the simulator or physical backend.
+                    // Cognitive tau may modulate internal dynamics; it must not silently
+                    // change the number of plant-time seconds advanced by this step.
                     // Forward ethics verdict to embodiment bridge (from previous cycle).
                     // Platforms that override apply_moral_gate() will constrain motor output.
                     let verdict_u8 = match self.last_ethics_verdict {
@@ -373,18 +373,38 @@ impl CognitiveLoopService {
                             written_at: consumed_written_at,
                         });
 
-                    let result = bridge.step(&thought_hv, dt, phi);
-                    if result.success {
-                        let proprioceptive_hv = bridge.encode_perception();
-                        let w = self.config.embodiment_blend_weight;
-                        if w > 0.0 {
-                            perception.encoding.encoding_result.hdv.lerp_in_place(
-                                &proprioceptive_hv,
-                                1.0 - w,
-                                w,
+                    // The legacy default adapter forwards configured simulator dt.
+                    // Hardware bridges should override step_with_timing and enforce
+                    // their own qualified physical/device clock contract.
+                    match symthaea_core::embodiment::PlantStepTimingV1::configured_simulation(
+                        (cycle_num / interval) as u64,
+                        self.config.cfc_config.delta_t,
+                    ) {
+                        Ok(timing) => {
+                            let result = bridge.step_with_timing(&thought_hv, &timing, phi);
+                            if result.success {
+                                let proprioceptive_hv = bridge.encode_perception();
+                                let w = self.config.embodiment_blend_weight;
+                                if w > 0.0 {
+                                    perception.encoding.encoding_result.hdv.lerp_in_place(
+                                        &proprioceptive_hv,
+                                        1.0 - w,
+                                        w,
+                                    );
+                                }
+                                self.sensorimotor.last_proprioceptive_hv =
+                                    Some(proprioceptive_hv);
+                            }
+                        }
+                        Err(error) => {
+                            // Fail closed: do not call the legacy bridge with an invalid dt.
+                            tracing::error!(
+                                target: "symthaea::embodiment",
+                                cycle = cycle_num,
+                                error = ?error,
+                                "refusing embodiment step with invalid plant timing"
                             );
                         }
-                        self.sensorimotor.last_proprioceptive_hv = Some(proprioceptive_hv);
                     }
                     self.sensorimotor.embodiment_telemetry = bridge.telemetry();
                     self.sensorimotor.embodiment_bridge = Some(bridge);
