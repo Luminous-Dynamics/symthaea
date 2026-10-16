@@ -147,6 +147,13 @@ A communication claim requires a species/population-specific, ethically reviewed
 1. Run the new classifier and whale configuration tests on a real Rust toolchain; inspect formatting / Clippy and do not call skipped CI a pass.
 2. Replace the list-position partitions and filename-derived labels inside the now-explicitly-exploratory `whale_validation.rs` and v2–v4 demos with a versioned annotation manifest and recording/encounter-grouped evaluation harness. The display labels have been corrected, but the underlying split/label method is still unsuitable for validation.
 3. Use the new shared `BioacousticCorpusManifest` / `validate_bioacoustic_corpus` contract for a Rust-first metadata-only preflight. Populate actual content hashes from the exact assets, record `computed_manifest_blake3()`, resolve source/recording lineage, verify annotation coverage, and record a human-reviewed license decision. Do not copy raw audio into the repo.
+
+When a manifest is prepared, the preflight CLI can validate it without downloading audio:
+```sh
+cargo run -p symthaea-communication --bin bioacoustic-corpus-preflight -- corpus-manifest.json \
+  --require-source-recording-ids --require-annotations
+```
+Add `--hold-out-sessions`, `--hold-out-sites`, or `--hold-out-individuals` only where the metadata actually supports those claims. The output explicitly states that audio bytes, legal rights and model performance are not independently verified by this preflight.
 4. Build the first permissible small subset / metadata preflight only after rights admission; prioritize whistle contours (rich labels) and coda timing as two separate tracks rather than one blended metric.
 5. Compare the legacy Symthaea prototypes against explicit baselines and released model families; pin each model's license, weights hash and preprocessing, and record compute/hardware.
 6. Keep the shared `symthaea-communication` capability ladder: Signal → Unit → Structure → Reference → Intent → Dialogue. A passing software benchmark can establish only the declared measurement capability; it cannot establish subjective meaning or conscious understanding.
