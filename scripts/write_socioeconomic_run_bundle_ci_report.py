@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 REPORT_SCHEMA = "civos.socioeconomic_interoperability.validator_execution_record.v1"
+PREDICATE_SCHEMA = "civos.socioeconomic_interoperability.validator_attestation_predicate.v1"
 CLAIM_CEILING = "synthetic_deterministic_only"
 SOURCE_PATHS = (
     "scripts/validate_socioeconomic_run_bundle.py",
@@ -28,6 +29,7 @@ SOURCE_PATHS = (
     "scripts/test_write_socioeconomic_run_bundle_ci_report.py",
     "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json",
     "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json",
+    "docs/research/finance/SYM-FIN-SYS-016_validator_attestation_predicate_v1.schema.json",
     "scripts/socioeconomic_run_receipt_requirements.txt",
     ".github/workflows/socioeconomic-run-bundle.yml",
 )
@@ -198,37 +200,73 @@ def build_report(
     }
 
 
+def build_attestation_predicate(report: dict[str, Any], report_bytes: bytes) -> dict[str, Any]:
+    """Build a distinct custom predicate bound to the exact execution-report bytes."""
+    return {
+        "schema": PREDICATE_SCHEMA,
+        "claim_ceiling": CLAIM_CEILING,
+        "scope": report["scope"],
+        "result": report["result"],
+        "repository": report["repository"],
+        "source_revision": report["source_revision"],
+        "event_sha": report["event_sha"],
+        "workflow": report["workflow"],
+        "run_id": report["run_id"],
+        "run_attempt": report["run_attempt"],
+        "execution_record_digest": sha256_bytes(report_bytes),
+        "executed_test_count": report["executed_test_count"],
+        "executed_test_counts_by_suite": report["executed_test_counts_by_suite"],
+        "authority_boundary": {
+            "proves_simulation_truth": False,
+            "can_authorize_real_actions": False,
+            "can_reserve_real_resources": False,
+            "can_settle_real_assets": False,
+            "production_ledger_import_allowed": False,
+        },
+    }
+
+
+def safe_output_path(root: Path, relative: str) -> Path:
+    path = Path(relative)
+    if path.is_absolute() or ".." in path.parts or not path.parts:
+        raise ReportFailure(f"output must be a safe relative path within the workspace: {relative}")
+    parent = root
+    for part in path.parts[:-1]:
+        parent = parent / part
+        if parent.is_symlink():
+            raise ReportFailure(f"symlink components are forbidden in report output: {relative}")
+        if parent.exists() and not parent.is_dir():
+            raise ReportFailure(f"report output parent is not a directory: {relative}")
+    parent.mkdir(parents=True, exist_ok=True)
+    try:
+        parent.resolve(strict=True).relative_to(root)
+    except (ValueError, OSError) as exc:
+        raise ReportFailure(f"report output escapes workspace: {relative}") from exc
+    output_path = parent / path.parts[-1]
+    if output_path.exists() or output_path.is_symlink():
+        raise ReportFailure(f"refusing to overwrite existing report: {relative}")
+    return output_path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".")
     parser.add_argument("--test-log", default="evidence/test-output.txt")
     parser.add_argument("--output", default="evidence/qualification-report.json")
+    parser.add_argument("--predicate-output", default="evidence/attestation-predicate.json")
     args = parser.parse_args()
     root = Path(args.root).resolve(strict=True)
     try:
+        if Path(args.output) == Path(args.predicate_output):
+            raise ReportFailure("report and predicate outputs must be distinct files")
         report = build_report(root, dict(os.environ), args.test_log)
-        output = Path(args.output)
-        if output.is_absolute() or ".." in output.parts or not output.parts:
-            raise ReportFailure("output must be a safe relative path within the workspace")
-        output_path = root / output
-        parent = root
-        for part in output.parts[:-1]:
-            parent = parent / part
-            if parent.is_symlink():
-                raise ReportFailure(f"symlink components are forbidden in report output: {args.output}")
-            if parent.exists() and not parent.is_dir():
-                raise ReportFailure(f"report output parent is not a directory: {args.output}")
-        parent.mkdir(parents=True, exist_ok=True)
-        try:
-            parent.resolve(strict=True).relative_to(root)
-        except (ValueError, OSError) as exc:
-            raise ReportFailure(f"report output escapes workspace: {args.output}") from exc
-        if output_path.exists() or output_path.is_symlink():
-            raise ReportFailure(f"refusing to overwrite existing report: {args.output}")
-        output_path.write_text(
-            json.dumps(report, sort_keys=True, separators=(",", ":")) + "\n",
-            encoding="utf-8",
-        )
+        output_path = safe_output_path(root, args.output)
+        predicate_path = safe_output_path(root, args.predicate_output)
+        report_bytes = (json.dumps(report, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+        predicate = build_attestation_predicate(report, report_bytes)
+        predicate_bytes = (json.dumps(predicate, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+        output_path.write_bytes(report_bytes)
+        predicate_path.write_bytes(predicate_bytes)
     except (ReportFailure, OSError, ValueError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
