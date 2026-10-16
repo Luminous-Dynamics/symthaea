@@ -25,12 +25,12 @@ pub enum TimpaniGesture {
     Roll,
 }
 
-/// Structured filename identity. The tuning_variant retains labels such as A
+/// Structured filename identity. The source_variant retains labels such as A
 /// in Timpani1A; it is not interpreted as a pitch or a tuning frequency.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TimpaniSampleDescriptor {
     pub drum_number: u8,
-    pub tuning_variant: Option<char>,
+    pub source_variant: Option<char>,
     pub gesture: TimpaniGesture,
     pub velocity_layer: u8,
     pub round_robin: u8,
@@ -64,7 +64,7 @@ pub struct TimpaniSampleIndexV1 {
     pub hit_count: usize,
     pub roll_count: usize,
     pub drum_numbers: Vec<u8>,
-    pub tuning_variants: Vec<char>,
+    pub source_variants: Vec<char>,
     pub velocity_layers: Vec<u8>,
     pub round_robin_indices: Vec<u8>,
     /// SHA-256 of sorted relative-path + byte-length records (not audio bytes).
@@ -86,7 +86,7 @@ pub struct TimpaniSampleIndexV1 {
 /// - Timpani1_Roll_v3_rr1_Sum.wav
 /// - Timpani1A_hit_v2_rr1_main.wav
 ///
-/// No MIDI note is inferred. Timpani1A remains drum 1, variant A.
+/// No MIDI note or tuning is inferred. Timpani1A remains drum 1, source variant A.
 pub fn parse_timpani_sample_filename(
     filename: impl AsRef<Path>,
 ) -> Option<TimpaniSampleDescriptor> {
@@ -101,7 +101,7 @@ pub fn parse_timpani_sample_filename(
 
     let stem = path.file_stem()?.to_str()?;
     let tokens: Vec<&str> = stem.split('_').collect();
-    let (drum_number, tuning_variant) = parse_drum_identifier(tokens.first()?)?;
+    let (drum_number, source_variant) = parse_drum_identifier(tokens.first()?)?;
 
     let mut gesture = None;
     let mut velocity_layer = None;
@@ -135,7 +135,7 @@ pub fn parse_timpani_sample_filename(
 
     Some(TimpaniSampleDescriptor {
         drum_number,
-        tuning_variant,
+        source_variant,
         gesture: gesture?,
         velocity_layer: velocity_layer?,
         round_robin: round_robin?,
@@ -162,7 +162,7 @@ fn parse_drum_identifier(token: &str) -> Option<(u8, Option<char>)> {
     }
 
     let tail = suffix.get(digits_end..)?;
-    let tuning_variant = if tail.is_empty() {
+    let source_variant = if tail.is_empty() {
         None
     } else if tail.len() == 1 && tail.as_bytes()[0].is_ascii_alphabetic() {
         Some(tail.as_bytes()[0].to_ascii_uppercase() as char)
@@ -170,7 +170,7 @@ fn parse_drum_identifier(token: &str) -> Option<(u8, Option<char>)> {
         return None;
     };
 
-    Some((drum_number, tuning_variant))
+    Some((drum_number, source_variant))
 }
 
 fn parse_positive_number_token(token: &str, prefix: &str) -> Option<u8> {
@@ -217,10 +217,10 @@ pub fn index_timpani_samples(
         .then(|| hash_content_manifest(&files));
 
     let drum_numbers = sorted_unique(files.iter().map(|file| file.descriptor.drum_number));
-    let tuning_variants = sorted_unique(
+    let source_variants = sorted_unique(
         files
             .iter()
-            .filter_map(|file| file.descriptor.tuning_variant),
+            .filter_map(|file| file.descriptor.source_variant),
     );
     let velocity_layers = sorted_unique(files.iter().map(|file| file.descriptor.velocity_layer));
     let round_robin_indices = sorted_unique(files.iter().map(|file| file.descriptor.round_robin));
@@ -238,7 +238,7 @@ pub fn index_timpani_samples(
         hit_count,
         roll_count,
         drum_numbers,
-        tuning_variants,
+        source_variants,
         velocity_layers,
         round_robin_indices,
         path_size_manifest_sha256,
@@ -365,7 +365,7 @@ mod tests {
     fn parses_both_pinned_library_filename_families() {
         let hit = parse_timpani_sample_filename("Timpani1_Hit_v3_rr2_Sum.wav").unwrap();
         assert_eq!(hit.drum_number, 1);
-        assert_eq!(hit.tuning_variant, None);
+        assert_eq!(hit.source_variant, None);
         assert_eq!(hit.gesture, TimpaniGesture::Hit);
         assert_eq!(hit.velocity_layer, 3);
         assert_eq!(hit.round_robin, 2);
@@ -375,7 +375,7 @@ mod tests {
 
         let variant = parse_timpani_sample_filename("Timpani1A_hit_v2_rr1_main.wav").unwrap();
         assert_eq!(variant.drum_number, 1);
-        assert_eq!(variant.tuning_variant, Some('A'));
+        assert_eq!(variant.source_variant, Some('A'));
         assert_eq!(variant.gesture, TimpaniGesture::Hit);
     }
 
