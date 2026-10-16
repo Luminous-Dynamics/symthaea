@@ -1,6 +1,6 @@
 # Manufacturing Active-Learning Benchmark
 
-This crate is the first executable slice for Symthaea issue [#7638](https://github.com/Luminous-Dynamics/symthaea/issues/7638), implementing parts of protocol [PR #7637](https://github.com/Luminous-Dynamics/symthaea/pull/7637).
+This crate is the first executable slice for Symthaea issue [#7638](https://github.com/Luminous-Dynamics/symthaea/issues/7638), implementing parts of protocol [PR #7637](https://github.com/Luminous-Dynamics/symthaea/pull/7637). Statistical reporting follows the paired, censor-aware plan in [#7691](https://github.com/Luminous-Dynamics/symthaea/issues/7691).
 
 It is **synthetic policy evidence only**. Its normalized factors, quality margin, throughput, resources and relative cost units do not represent real equipment, material properties, process settings, safety limits or manufacturing savings. No hardware, network, supplier or machine-control interface exists here.
 
