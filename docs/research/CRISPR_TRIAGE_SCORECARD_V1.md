@@ -109,7 +109,7 @@ Tracks are reported separately. A composite “CRISPR score” that hides failed
 A **benchmark episode** is a pinned combination of source cohort, assay context, guide/Cas9 group, reference genome/version, candidate universe, label policy, split and prediction snapshot. Every metric must identify its episode(s).
 
 - **Native positive coverage** = unique measured positive sites present in native tool output / unique measured positive sites eligible in the reference cohort. Count a miss when the native generator never nominated the site. Publish numerator and denominator.
-- **Recall@K** = measured positives among the first K candidates / all eligible measured positives in the declared ranking universe. State explicitly whether positives were added to that universe after the native search phase.
+- **Recall@K** = measured positives among the first K candidates / all eligible measured positives in the declared ranking universe. State explicitly whether positives were added to that universe after the native search phase. If fewer than K candidates exist, report **not estimable at budget K** rather than silently evaluating a smaller budget. K=0 is not an impact result.
 - **Precision@K** = measured positives among the first K candidates / K reviewed candidates, only when outcomes for the selected candidates are actually known under a declared label policy. Do not treat unassayed candidates as negatives to manufacture this value.
 - **Slots@R** = smallest K at which a policy meets a preregistered recall R on the same eligible positive reference and same candidate universe. If it never reaches R, report **not reached**, not a fabricated K.
 - **Fixed-budget delta** = Symthaea policy metric minus the strongest fair baseline metric at the same fixed K on identical episodes. The primary comparison is paired by guide/Cas9 group.
@@ -145,6 +145,7 @@ For either alternative:
 - **100%** of used artifacts have source identity, terms/permission status, retrieval/version information and verified SHA-256 digests recorded.
 - **100%** of candidate outcomes use explicit positive / assay-defined-negative / unknown semantics; unknowns are never silently imputed as true negatives.
 - **100%** of reported tables identify the candidate universe, seed status, group unit, denominator and missingness policy.
+- Every fixed-budget comparison has at least K candidates for every policy, or that policy's metric is marked not estimable; no shorter list is silently treated as the same budget.
 - **100%** of deliberate corruption/leakage fixtures are rejected by the independent verifier.
 - Exact deterministic replay of the metric layer on the same pinned inputs produces the same canonical output and manifest digest.
 - A prediction-only or schema-valid receipt can never promote an evidence state to independently observed, assessed or replicated.
@@ -242,7 +243,7 @@ The machine-readable companion contract contains four small fixtures intended to
 
 6. **F6 — paired policy delta.** Two policies have the same five candidate IDs and labels, two measured positives, and three unknowns. At K=2 each finds one measured positive; they each uniquely select one different unknown, and one unknown is neutral. The observed known-label delta is 0, but the sharp paired label-sensitivity bounds are [-1/3, +1/3]. This is a comparison bound, not a confidence interval.
 
-The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, individual and paired partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F6 plus invalid targets, duplicate identities/ranks, reference-label contradictions, and mismatched candidate universes.
+The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, individual and paired partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F6 plus underfilled fixed budgets, invalid targets, duplicate identities/ranks, reference-label contradictions, and mismatched candidate universes.
 
 Run the unit tests with an installed Rust toolchain:
 
