@@ -142,3 +142,5 @@ mod composition_tests {
         );
     }
 }
+
+pub mod living_city;
