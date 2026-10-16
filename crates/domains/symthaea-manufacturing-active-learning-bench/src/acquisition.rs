@@ -751,9 +751,19 @@ fn calculate_acquisition(
             .iter()
             .zip(prior_probabilities.iter())
             .map(|(hypothesis_id, prior)| {
-                *prior * likelihood_rows[hypothesis_id][outcome_id]
+                let likelihood = likelihood_rows
+                    .get(*hypothesis_id)
+                    .and_then(|row| row.get(outcome_id))
+                    .copied()
+                    .ok_or_else(|| {
+                        format!(
+                            "validated likelihood is missing outcome {} for hypothesis {}",
+                            outcome_id, hypothesis_id
+                        )
+                    })?;
+                Ok::<f64, String>(*prior * likelihood)
             })
-            .collect();
+            .collect::<Result<Vec<_>, String>>()?;
         let marginal = joint_probabilities.iter().sum::<f64>();
         outcome_marginals.push(OutcomeMarginal {
             outcome_id: outcome_id.to_string(),
@@ -1198,7 +1208,7 @@ mod tests {
         state.current_prior[1].probability_ppm += 1;
         assert!(condition_posterior(&model, &state, "evidence-1", "noisy", "O1")
             .unwrap_err()
-            .contains("state digest"));
+            .contains("current prior"));
     }
 
     #[test]
