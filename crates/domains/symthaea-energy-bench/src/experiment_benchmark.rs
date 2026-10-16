@@ -783,6 +783,37 @@ mod tests {
     }
 
     #[test]
+    fn phase_a_stops_spending_when_registered_resolution_threshold_is_reached() {
+        let mut scenario = generate_synthetic_scenarios(1, 0x1234, &policy()).remove(0);
+        scenario.resource_budget = 10.0;
+        scenario.resolution_threshold = 0.80;
+        for experiment in &mut scenario.experiments {
+            experiment.proposal.decision_relevance = DecisionRelevance::Exploratory;
+            experiment.proposal.expected_uncertainty_reduction_fraction = 0.10;
+            experiment.proposal.estimated_resource_cost.amount = 8.0;
+            experiment.oracle_information_gain = 0.05;
+        }
+        let first = &mut scenario.experiments[0];
+        first.proposal.decision_relevance =
+            DecisionRelevance::CanChangeFeasibilityOrDesignDecision;
+        first.proposal.expected_uncertainty_reduction_fraction = 0.99;
+        first.proposal.estimated_resource_cost.amount = 1.0;
+        first.oracle_information_gain = 0.90;
+
+        let result = evaluate_scenario(
+            &policy(),
+            &scenario,
+            ExperimentSelectionStrategy::PhaseA,
+        )
+        .unwrap();
+
+        assert!(result.resolved);
+        assert_eq!(result.selected_experiment_ids, vec![first.proposal.experiment_id.clone()]);
+        assert!((result.resource_used - 1.0).abs() <= 1e-12);
+        assert_eq!(result.oracle_minimum_cost_to_resolve, Some(1.0));
+    }
+
+    #[test]
     fn reference_suite_runs_one_thousand_known_answer_scenarios() {
         let scenarios = generate_synthetic_scenarios(1_000, 0x51ec7, &policy());
         let report = run_selection_benchmark(&policy(), &scenarios, &STRATEGIES).unwrap();
