@@ -76,6 +76,21 @@ impl ThresholdConfig {
         phi_rate_threshold: f32,
         volatility_threshold: f32,
     ) -> Option<Self> {
+        // Reject non-finite and out-of-search-domain configurations before ordering checks.
+        // This prevents NaN/Infinity from slipping through comparisons as apparently valid.
+        let values_and_bounds = [
+            (phi_stable, Self::PHI_STABLE_BOUNDS),
+            (phi_warning, Self::PHI_WARNING_BOUNDS),
+            (phi_critical, Self::PHI_CRITICAL_BOUNDS),
+            (phi_rate_threshold, Self::PHI_RATE_BOUNDS),
+            (volatility_threshold, Self::VOLATILITY_BOUNDS),
+        ];
+        if values_and_bounds.iter().any(|(value, (low, high))| {
+            !value.is_finite() || *value < *low || *value > *high
+        }) {
+            return None;
+        }
+
         // Validate threshold ordering: stable > warning > critical
         if phi_stable <= phi_warning || phi_warning <= phi_critical {
             return None;
@@ -1182,6 +1197,8 @@ pub enum DatasetProvenance {
         sample_interval_ms: f64,
         warning_window_ms: f64,
         critical_window_ms: f64,
+        minimum_valid_warning_window_samples: usize,
+        scoreability_policy: String,
         time_alignment: String,
         label_definition: String,
         generator_version: String,
@@ -1192,6 +1209,8 @@ pub enum DatasetProvenance {
         dataset_id: String,
         dataset_version: String,
         content_sha256: String,
+        minimum_valid_warning_window_samples: usize,
+        scoreability_policy: String,
         time_alignment: String,
         label_definition: String,
     },
@@ -1558,6 +1577,8 @@ fn main() {
             sample_interval_ms: synth_config.sample_interval_ms,
             warning_window_ms: WARNING_WINDOW_MS,
             critical_window_ms: CRITICAL_WINDOW_MS,
+            minimum_valid_warning_window_samples: 1,
+            scoreability_policy: "Provisional example rule: a disrupted shot is scoreable when at least one valid sample lands in the warning/critical label window; otherwise it is censored. The measured-data benchmark must preregister and justify this threshold for each acquisition regime.".to_string(),
             time_alignment: "sample time is milliseconds from shot start; time-to-disruption is disruption_time_ms minus sample.time_ms".to_string(),
             label_definition: "Warning when 20 ms < time-to-disruption <= 100 ms; Critical when 0 <= time-to-disruption <= 20 ms; post-disruption samples are not detections".to_string(),
             generator_version: "synthetic-cmod-generator-v1".to_string(),
@@ -1688,6 +1709,11 @@ mod tests {
         // Invalid: critical > warning
         let invalid2 = ThresholdConfig::new(0.7, 0.3, 0.5, -0.1, 0.2);
         assert!(invalid2.is_none());
+
+        // Non-finite thresholds must fail closed rather than pass ordering checks with NaN.
+        assert!(ThresholdConfig::new(f32::NAN, 0.4, 0.25, -0.1, 0.15).is_none());
+        assert!(ThresholdConfig::new(0.6, 0.4, 0.25, f32::INFINITY, 0.15).is_none());
+        assert!(ThresholdConfig::new(0.9, 0.4, 0.25, -0.1, 0.15).is_none());
     }
 
     #[test]
