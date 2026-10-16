@@ -176,7 +176,9 @@ impl SelectionError {
     fn message(&self) -> String {
         let text = match self {
             Self::InvalidJson(message) => message.clone(),
-            Self::UnsupportedSchemaVersion => format!("schema_version must be {SCHEMA_VERSION}"),
+            Self::UnsupportedSchemaVersion => {
+                format!("schema_version must be {SCHEMA_VERSION}")
+            }
             Self::InvalidFeatureContractDigest => {
                 "feature_contract_sha256 must be 64 lowercase hexadecimal characters".to_owned()
             }
@@ -234,7 +236,8 @@ fn error_json(digest: &str, error: &SelectionError) -> String {
         error_code: error.code().to_owned(),
         message: error.message(),
     };
-    serde_json::to_string(&response).unwrap_or_else(|_| fallback_error_json(digest))
+    serde_json::to_string(&response)
+        .unwrap_or_else(|_| fallback_error_json(digest))
 }
 
 fn fallback_error_json(digest: &str) -> String {
@@ -300,7 +303,9 @@ fn validate(request: &SelectionRequest) -> Result<(), SelectionError> {
     if request.budget == 0 || request.budget > MAX_BUDGET {
         return Err(SelectionError::InvalidBudget);
     }
-    if request.candidates.is_empty() || request.candidates.len() > MAX_CANDIDATES {
+    if request.candidates.is_empty()
+        || request.candidates.len() > MAX_CANDIDATES
+    {
         return Err(SelectionError::InvalidCandidateCount);
     }
 
@@ -531,7 +536,8 @@ fn update_distances(
     selected_flags: &[bool],
     minimum_squared_distances: &mut [f64],
 ) {
-    let reference = &request.candidates[newly_selected].normalized_features;
+    let reference =
+        &request.candidates[newly_selected].normalized_features;
     for candidate_index in sorted.iter().copied() {
         if selected_flags[candidate_index] {
             continue;
@@ -636,11 +642,14 @@ mod tests {
     #[test]
     fn farthest_first_selects_distant_candidates() {
         let request_bytes = b"farthest-first-test";
-        let result = select(request(Policy::FarthestFirst, 2), request_bytes).unwrap();
+        let result =
+            select(request(Policy::FarthestFirst, 2), request_bytes).unwrap();
         assert_eq!(result.selected_count, 2);
         assert_eq!(result.selected[0].candidate_id, "candidate-a");
         assert_eq!(result.selected[1].candidate_id, "candidate-c");
-        assert!((result.selected[1].min_distance.unwrap() - 2.0_f64.sqrt()).abs() < 1e-12);
+        assert!(
+            (result.selected[1].min_distance.unwrap() - 2.0_f64.sqrt()).abs() < 1e-12
+        );
     }
 
     #[test]
@@ -744,7 +753,8 @@ mod tests {
     #[test]
     fn checked_in_example_fixture_runs_end_to_end() {
         let line = include_str!("../fixtures/example-request.jsonl").trim_end();
-        let response: SelectionResponse = serde_json::from_str(&handle_line(line)).unwrap();
+        let response: SelectionResponse =
+            serde_json::from_str(&handle_line(line)).unwrap();
         let ids: Vec<_> = response
             .selected
             .iter()
@@ -772,7 +782,8 @@ mod tests {
 
     #[test]
     fn malformed_line_returns_json_error_instead_of_panicking() {
-        let response: ErrorResponse = serde_json::from_str(&handle_line("{")).unwrap();
+        let response: ErrorResponse =
+            serde_json::from_str(&handle_line("{")).unwrap();
         assert_eq!(response.status, "rejected_input");
         assert_eq!(response.error_code, "invalid_json_or_forbidden_field");
     }
