@@ -5,7 +5,8 @@
 **Main portfolio:** [NANOTECHNOLOGY_FRONTIER_PORTFOLIO.md](./NANOTECHNOLOGY_FRONTIER_PORTFOLIO.md)  
 **Paradigm shifts:** [NANOMATERIALS_PARADIGM_SHIFT_ROADMAP.md](./NANOMATERIALS_PARADIGM_SHIFT_ROADMAP.md)  
 **Closed-loop method benchmark:** [NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md](./NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md)
-**Nanophotonics pilot scorecard:** [NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md](./NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md), tracked by [NANO-004](https://github.com/Luminous-Dynamics/symthaea/issues/7531); includes source pins, reproducibility gates and numerical benchmark targets.  
+**Nanophotonics pilot scorecard:** [NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md](./NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md), tracked by [NANO-004](https://github.com/Luminous-Dynamics/symthaea/issues/7531); includes source pins, reproducibility gates and numerical benchmark targets.
+**Cross-domain benchmark policy:** [NANOTECHNOLOGY_BENCHMARK_CHARTER.md](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md) defines universal evidence gates plus domain-specific metrics and provisional thresholds.  
 **Follow-on domain gate:** [NANO-002](https://github.com/Luminous-Dynamics/symthaea/issues/7507)  
 **Evidence status:** literature review and source-planning only; no new domain data or models were run.
 
