@@ -251,6 +251,10 @@ fn comparison_runs(
     baseline.evaluation_policy.minimum_superiority_margin = scenario.superiority_margin;
     baseline.evaluation_policy.maximum_unmodeled_differential_bias_efficiency =
         scenario.maximum_unmodeled_differential_bias_efficiency;
+    baseline.evaluation_policy.differential_bias_bound_basis = format!(
+        "Synthetic oracle scenario bound {}; test-only, not evidence about physical bias.",
+        scenario.maximum_unmodeled_differential_bias_efficiency
+    );
     baseline.evaluation_policy.selection_rule =
         "Synthetic negative-control benchmark only; no physical decision permitted.".into();
 
