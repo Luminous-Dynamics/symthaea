@@ -109,6 +109,7 @@ struct VerificationReceiptV1 {
     fixture_id: String,
     fixture_pack_digest: String,
     fixture_pack_digest_content_matches: bool,
+    fixture_pack_tree_recomputed_matches: bool,
     fixture_manifest_identity_matches: bool,
     candidate_renderer: RendererReceiptV1,
     reference_renderer: RendererReceiptV1,
@@ -209,6 +210,24 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
     } else {
         false
     };
+    let (fixture_pack_tree_recomputed_matches, fixture_pack_tree_failure) =
+        match fixture_pack_root(root, &manifest.fixture_manifest, &manifest.fixture_pack_receipt) {
+            Ok(pack_root) => match fixture_pack_tree_sha256(&pack_root) {
+                Ok(actual_digest) => (
+                    actual_digest.eq_ignore_ascii_case(&manifest.fixture_pack_digest),
+                    if actual_digest.eq_ignore_ascii_case(&manifest.fixture_pack_digest) {
+                        None
+                    } else {
+                        Some(format!(
+                            "recomputed fixture-pack digest mismatch: declared {}, actual {}",
+                            manifest.fixture_pack_digest, actual_digest
+                        ))
+                    },
+                ),
+                Err(error) => (false, Some(format!("cannot recompute fixture-pack digest: {error}"))),
+            },
+            Err(error) => (false, Some(error)),
+        };
 
     let comparison_check = check_artifact(
         root,
@@ -260,6 +279,9 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
     if !fixture_pack_digest_content_matches {
         failures.push("fixture-pack receipt content does not match declared tree digest".to_owned());
     }
+    if let Some(failure) = fixture_pack_tree_failure {
+        failures.push(failure);
+    }
     if let Some(failure) = fixture_manifest_failure {
         failures.push(failure);
     }
@@ -280,6 +302,7 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
         fixture_id: manifest.fixture_id,
         fixture_pack_digest: manifest.fixture_pack_digest,
         fixture_pack_digest_content_matches,
+        fixture_pack_tree_recomputed_matches,
         fixture_manifest_identity_matches,
         candidate_renderer: renderer_receipt(&manifest.candidate),
         reference_renderer: renderer_receipt(&manifest.reference),
@@ -524,6 +547,115 @@ fn check_artifact(root: &Path, role: &str, reference: &FileReferenceV1) -> Artif
             Some("SHA-256 mismatch".to_owned())
         },
     }
+}
+
+/// Require fixtures.json and pack.sha256 to live at the canonical locations in one fixture-pack root.
+fn fixture_pack_root(
+    bundle_root: &Path,
+    fixture_manifest: &FileReferenceV1,
+    pack_receipt: &FileReferenceV1,
+) -> Result<PathBuf, String> {
+    let manifest_path = resolve_artifact(bundle_root, &fixture_manifest.path)
+        .map_err(|error| format!("unsafe fixture manifest path: {error}"))?;
+    let receipt_path = resolve_artifact(bundle_root, &pack_receipt.path)
+        .map_err(|error| format!("unsafe fixture receipt path: {error}"))?;
+    let manifest_parent = manifest_path
+        .parent()
+        .ok_or_else(|| "fixture manifest has no parent directory".to_owned())?;
+    let receipt_parent = receipt_path
+        .parent()
+        .ok_or_else(|| "fixture-pack receipt has no parent directory".to_owned())?;
+    if manifest_parent != receipt_parent || manifest_path.file_name() != Some(std::ffi::OsStr::new("fixtures.json"))
+        || receipt_path.file_name() != Some(std::ffi::OsStr::new("pack.sha256"))
+    {
+        return Err(
+            "fixture manifest must be fixtures.json beside pack.sha256 in the same pack root"
+                .to_owned(),
+        );
+    }
+    Ok(manifest_parent.to_path_buf())
+}
+
+/// Independently recompute the fixture generator's tree digest.
+/// The pack.sha256 receipt is excluded because the generator computes the digest
+/// before writing that receipt, avoiding a self-referential digest.
+fn fixture_pack_tree_sha256(pack_root: &Path) -> Result<String, Box<dyn Error>> {
+    fn collect_files(
+        directory: &Path,
+        root: &Path,
+        files: &mut Vec<PathBuf>,
+    ) -> Result<(), Box<dyn Error>> {
+        for entry in fs::read_dir(directory)? {
+            let path = entry?.path();
+            let metadata = fs::symlink_metadata(&path)?;
+            if metadata.file_type().is_symlink() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("fixture pack contains symlink {}", path.display()),
+                )
+                .into());
+            }
+            if metadata.is_dir() {
+                collect_files(&path, root, files)?;
+            } else if metadata.is_file() {
+                let relative = path.strip_prefix(root)?;
+                if relative != Path::new("pack.sha256") {
+                    files.push(path);
+                }
+            } else {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("fixture pack contains non-regular entry {}", path.display()),
+                )
+                .into());
+            }
+        }
+        Ok(())
+    }
+
+    let root_metadata = fs::symlink_metadata(pack_root)?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "fixture-pack root must be a real directory, not a symlink",
+        )
+        .into());
+    }
+
+    let mut files = Vec::new();
+    collect_files(pack_root, pack_root, &mut files)?;
+    files.sort();
+
+    let mut hasher = Sha256::new();
+    for path in files {
+        let metadata = fs::symlink_metadata(&path)?;
+        if metadata.len() > MAX_ARTIFACT_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("fixture-pack file exceeds size limit: {}", path.display()),
+            )
+            .into());
+        }
+        let relative = path
+            .strip_prefix(pack_root)?
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        let mut file = File::open(&path)?;
+        let mut content_hasher = Sha256::new();
+        let mut buffer = [0_u8; 64 * 1024];
+        loop {
+            let count = file.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            content_hasher.update(&buffer[..count]);
+        }
+        hasher.update(relative.as_bytes());
+        hasher.update([0_u8]);
+        hasher.update(content_hasher.finalize());
+        hasher.update([b'\\n']);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn verify_fixture_manifest_identity(
@@ -822,6 +954,50 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         symlink(&outside, root.join("linked")).unwrap();
         assert!(ensure_no_symlink_components(&root, "linked/audio.wav").is_err());
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(outside).unwrap();
+    }
+
+    #[test]
+    fn fixture_tree_digest_is_independent_and_ignores_only_its_own_receipt() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-fixture-tree-digest-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("nested")).unwrap();
+        fs::write(root.join("a.txt"), b"alpha").unwrap();
+        fs::write(root.join("nested/b.txt"), b"beta").unwrap();
+        fs::write(root.join("pack.sha256"), b"receipt-one").unwrap();
+
+        let first = fixture_pack_tree_sha256(&root).unwrap();
+        fs::write(root.join("pack.sha256"), b"receipt-two").unwrap();
+        let same_after_receipt_change = fixture_pack_tree_sha256(&root).unwrap();
+        assert_eq!(first, same_after_receipt_change);
+
+        fs::write(root.join("nested/b.txt"), b"changed beta").unwrap();
+        let changed = fixture_pack_tree_sha256(&root).unwrap();
+        assert_ne!(first, changed);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fixture_tree_digest_rejects_symlink_entries() {
+        use std::os::unix::fs::symlink;
+        let root = std::env::temp_dir().join(format!(
+            "muse-fixture-tree-symlink-{}",
+            std::process::id()
+        ));
+        let outside = root.with_extension("outside");
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&outside);
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("outside.txt"), b"outside").unwrap();
+        symlink(outside.join("outside.txt"), root.join("escape.txt")).unwrap();
+
+        assert!(fixture_pack_tree_sha256(&root).is_err());
         fs::remove_dir_all(root).unwrap();
         fs::remove_dir_all(outside).unwrap();
     }
