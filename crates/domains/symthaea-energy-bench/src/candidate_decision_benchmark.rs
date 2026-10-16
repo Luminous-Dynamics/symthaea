@@ -15,7 +15,7 @@ use std::fmt;
 
 const FIXTURE: &str =
     include_str!("../../../../docs/research/examples/energy-conversion-benchmark.synthetic.json");
-const PROTOCOL_VERSION: u32 = 1;
+const PROTOCOL_VERSION: u32 = 2;
 const BASELINE_ID: &str = "registered-baseline";
 const BASELINE_INPUT_J: f64 = 112.0;
 const BASELINE_OUTPUT_J: f64 = 35.7;
@@ -46,6 +46,10 @@ pub struct CandidateDecisionResult {
     pub observed_efficiency_difference: Option<f64>,
     pub registered_margin: f64,
     pub registered_bias_bound_efficiency: f64,
+    /// Synthetic oracle discrepancy injected between observed and true efficiency deltas.
+    pub oracle_injected_differential_bias_efficiency: f64,
+    /// Whether the registered worst-case bound covers the injected oracle discrepancy.
+    pub registered_bias_bound_covers_oracle_bias: bool,
     pub comparator_decision: String,
     pub conservative_lower_bound: Option<f64>,
     pub false_superiority: bool,
@@ -67,6 +71,14 @@ pub struct CandidateDecisionSummary {
     /// Non-affirmative outcomes / all oracle-superior cases. Includes abstentions.
     pub false_negative_rate: Option<f64>,
     pub indeterminate_cases: usize,
+    /// Oracle-non-superior scenarios whose registered bound covers injected discrepancy.
+    pub registered_bias_bound_covered_non_superior_cases: usize,
+    pub false_superiority_claims_with_covered_bias: usize,
+    pub false_superiority_rate_with_covered_bias: Option<f64>,
+    /// Oracle-non-superior scenarios where the registered bound is too small.
+    pub registered_bias_bound_undercovered_non_superior_cases: usize,
+    pub false_superiority_claims_with_undercovered_bias: usize,
+    pub false_superiority_rate_with_undercovered_bias: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -179,6 +191,12 @@ pub fn run_candidate_decision_benchmark(
             registered_margin: scenario.superiority_margin,
             registered_bias_bound_efficiency: scenario
                 .maximum_unmodeled_differential_bias_efficiency,
+            oracle_injected_differential_bias_efficiency: scenario.observed_efficiency_difference
+                - scenario.oracle_true_efficiency_difference,
+            registered_bias_bound_covers_oracle_bias: (scenario.observed_efficiency_difference
+                - scenario.oracle_true_efficiency_difference)
+                .abs()
+                <= scenario.maximum_unmodeled_differential_bias_efficiency + 1e-12,
             comparator_decision: decision_label(&comparison),
             conservative_lower_bound: comparison.conservative_lower_bound,
             false_superiority: affirmed && !truly_superior,
@@ -371,6 +389,19 @@ fn summarize(results: &[CandidateDecisionResult]) -> CandidateDecisionSummary {
     let false_negative_cases = results.iter().filter(|result| result.false_negative).count();
     let indeterminate_cases = results.iter().filter(|result| result.indeterminate).count();
 
+    let covered_non_superior = results.iter().filter(|result| {
+        result.oracle_true_efficiency_difference <= result.registered_margin
+            && result.registered_bias_bound_covers_oracle_bias
+    }).collect::<Vec<_>>();
+    let undercovered_non_superior = results.iter().filter(|result| {
+        result.oracle_true_efficiency_difference <= result.registered_margin
+            && !result.registered_bias_bound_covers_oracle_bias
+    }).collect::<Vec<_>>();
+    let false_superiority_claims_with_covered_bias = covered_non_superior
+        .iter().filter(|result| result.false_superiority).count();
+    let false_superiority_claims_with_undercovered_bias = undercovered_non_superior
+        .iter().filter(|result| result.false_superiority).count();
+
     CandidateDecisionSummary {
         scenario_count: results.len(),
         truly_superior_cases,
@@ -381,6 +412,18 @@ fn summarize(results: &[CandidateDecisionResult]) -> CandidateDecisionSummary {
         false_negative_cases,
         false_negative_rate: ratio_or_none(false_negative_cases, truly_superior_cases),
         indeterminate_cases,
+        registered_bias_bound_covered_non_superior_cases: covered_non_superior.len(),
+        false_superiority_claims_with_covered_bias,
+        false_superiority_rate_with_covered_bias: ratio_or_none(
+            false_superiority_claims_with_covered_bias,
+            covered_non_superior.len(),
+        ),
+        registered_bias_bound_undercovered_non_superior_cases: undercovered_non_superior.len(),
+        false_superiority_claims_with_undercovered_bias,
+        false_superiority_rate_with_undercovered_bias: ratio_or_none(
+            false_superiority_claims_with_undercovered_bias,
+            undercovered_non_superior.len(),
+        ),
     }
 }
 
@@ -434,6 +477,22 @@ mod tests {
                 && result.conservative_lower_bound.is_none()
                     == (result.comparator_decision == "indeterminate")
         }));
+    }
+
+    #[test]
+    fn registered_bias_bound_coverage_prevents_false_superiority_in_covered_non_superior_cases() {
+        let scenarios = generate_candidate_decision_scenarios();
+        let report = run_candidate_decision_benchmark(&scenarios).unwrap();
+
+        assert!(report.summary.registered_bias_bound_covered_non_superior_cases > 0);
+        assert_eq!(report.summary.false_superiority_claims_with_covered_bias, 0);
+        assert_eq!(report.summary.false_superiority_rate_with_covered_bias, Some(0.0));
+        assert!(report.summary.registered_bias_bound_undercovered_non_superior_cases > 0);
+        assert!(report.summary.false_superiority_claims_with_undercovered_bias > 0);
+        assert!(report.results.iter().filter(|result| {
+            result.oracle_true_efficiency_difference <= result.registered_margin
+                && result.registered_bias_bound_covers_oracle_bias
+        }).all(|result| !result.false_superiority));
     }
 
     #[test]
