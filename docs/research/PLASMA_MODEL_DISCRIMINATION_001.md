@@ -167,3 +167,21 @@ No step depends on waiting for CI runners to start planning or auditing the next
 - Vagnoni, Murphy & Ghedini (2026), “Cross-Code Verification for Improved Thermophysical Properties of Argon, Krypton and Xenon Plasmas,” *Entropy* 28(7), 830. https://doi.org/10.3390/e28070830
 - Uncertainty-aware ML for a microwave atmospheric-pressure plasma jet (2026). https://doi.org/10.1039/D5CP04364F
 - Neudecker et al., PARADIGM Collaboration (2025), “Machine Learning to Select Experiments Driven by Fundamental Science and Applications for Targeted Nuclear Data Improvement,” *Physical Review X* 15, 021086. https://doi.org/10.1103/PhysRevX.15.021086
+
+
+## 10. Kinetic benchmark companion: WarpX / Turner four-case PIC-MCC
+
+Source reconnaissance has now identified an open-source kinetic comparator with an existing published benchmark rather than a hand-built proxy:
+
+- WarpX source tip inspected 2026-10-16: `4f2c08099faddfab540fb925a02f2c13bc5eacdd`.
+- Existing driver: `Examples/Physics_applications/capacitive_discharge/inputs_base_1d_picmi.py`, blob `7fd5827b4f6c7126a9e27aeb00852e1c266edcb5`.
+- Published-reference analyzer: `Examples/Physics_applications/capacitive_discharge/analysis_1d.py`, blob `d4c791e6a015dd6b8006abba7c8cf2587de044fb`.
+- Test registration: `Examples/Physics_applications/capacitive_discharge/CMakeLists.txt`, blob `5e733eeeb4dea1405460f8992c01cbf35f677299`.
+- WarpX itself uses a BSD-style license in `LICENSE.txt`; the cross-section data are separately licensed, so software and data permission must not be collapsed into one license field.
+- Cross-section source repo tip inspected: `BLAST-WarpX/warpx-data@3033347525b9cf24cad99a724fb3d15345764840`. The helium directory documents electron-neutral/excitation/ionization tables from Biagi/MAGBOLTZ v7.1 and ion-neutral data from Phelps. Preserve that provenance and the dataset's separate Community Data License Agreement — Permissive 2.0; do not copy any files into Symthaea until license and contributor attribution are checked.
+
+The upstream WarpX README describes four helium RF capacitive-discharge cases following Turner et al. (2013), with 6.7 cm gap and 13.56 MHz drive, and points to the published benchmark: https://doi.org/10.1063/1.4775084. The analyzer includes the 129-point reference time-averaged ion-density profile for Case 1, excludes wall-endpoint nodes due to a documented deposition artifact, and asserts interior RMS-relative-density error below 6.5%. The CMake `--test` mode is a lower-cost regression using 320 RF cycles, so it must be labelled smoke/regression mode and not presented as the full canonical-resolution benchmark.
+
+**Critical separation:** WarpX's helium kinetic cases are not automatically comparable to the Zapdos fluid cases. First qualify each case independently. Only define a fluid-vs-PIC score if gas species, collision data, geometry, drive, boundary conditions, initial state, averaging window and observables are made commensurate; otherwise preserve them as distinct regime-specific benchmarks.
+
+A new implementation/preflight work item tracks the next step: [PLASMA-PIC-REF-001 #7640](https://github.com/Luminous-Dynamics/symthaea/issues/7640). The immediate acceptance condition is exact dependency closure, independent SHA-256 computed over downloaded bytes, a frozen case manifest, and explicit canonical-vs-smoke status. No WarpX run or benchmark pass is claimed by this source inspection.
