@@ -14,7 +14,7 @@ use std::collections::BTreeSet;
 
 pub const BIOACOUSTIC_CORPUS_SCHEMA_VERSION: u32 = 1;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum BioacousticSplit {
     Development,
     Train,
