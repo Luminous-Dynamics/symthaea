@@ -248,6 +248,48 @@ fn handle_receipt_line(line: &str) -> String {
         .unwrap_or_else(|_| rejected_receipt_envelope("unable to serialize receipt audit"))
 }
 
+fn handle_bounded_record(record: BoundedLine, verify_receipt: bool) -> Option<String> {
+    match record {
+        BoundedLine::TooLarge { sha256 } => Some(if verify_receipt {
+            rejected_receipt_envelope(format!(
+                "receipt envelope exceeds {MAX_LINE_BYTES} bytes"
+            ))
+        } else {
+            rejected_request_line(
+                sha256,
+                "request_too_large",
+                &format!("request line exceeds {MAX_LINE_BYTES} bytes"),
+            )
+        }),
+        BoundedLine::Accepted(bytes) => {
+            let line = match String::from_utf8(bytes) {
+                Ok(line) => line,
+                Err(error) => {
+                    if verify_receipt {
+                        return Some(rejected_receipt_envelope(
+                            "input line is not valid UTF-8",
+                        ));
+                    }
+                    let raw = error.into_bytes();
+                    return Some(rejected_request_line(
+                        digest_hex(&raw),
+                        "invalid_utf8",
+                        "request line is not valid UTF-8",
+                    ));
+                }
+            };
+            if line.trim().is_empty() {
+                return None;
+            }
+            Some(if verify_receipt {
+                handle_receipt_line(&line)
+            } else {
+                symthaea_nano_policy::handle_line(&line)
+            })
+        }
+    }
+}
+
 fn main() -> io::Result<()> {
     let mode = match std::env::args().nth(1).as_deref() {
         None | Some("--select") => false,
@@ -267,48 +309,10 @@ fn main() -> io::Result<()> {
     let mut reader = stdin.lock();
     let mut output = stdout.lock();
 
-    while let Some(line) = read_bounded_line(&mut reader, MAX_LINE_BYTES)? {
-        let response = match line {
-            BoundedLine::TooLarge { sha256 } => {
-                if mode {
-                    rejected_receipt_envelope(format!(
-                        "receipt envelope exceeds {MAX_LINE_BYTES} bytes"
-                    ))
-                } else {
-                    rejected_request_line(
-                        sha256,
-                        "request_too_large",
-                        &format!("request line exceeds {MAX_LINE_BYTES} bytes"),
-                    )
-                }
-            }
-            BoundedLine::Accepted(bytes) => {
-                let line = match String::from_utf8(bytes) {
-                    Ok(line) => line,
-                    Err(error) => {
-                        if mode {
-                            rejected_receipt_envelope("input line is not valid UTF-8")
-                        } else {
-                            let raw = error.into_bytes();
-                            rejected_request_line(
-                                digest_hex(&raw),
-                                "invalid_utf8",
-                                "request line is not valid UTF-8",
-                            )
-                        }
-                    }
-                };
-                if line.trim().is_empty() {
-                    continue;
-                }
-                if mode {
-                    handle_receipt_line(&line)
-                } else {
-                    symthaea_nano_policy::handle_line(&line)
-                }
-            }
-        };
-        writeln!(output, "{response}")?;
+    while let Some(record) = read_bounded_line(&mut reader, MAX_LINE_BYTES)? {
+        if let Some(response) = handle_bounded_record(record, mode) {
+            writeln!(output, "{response}")?;
+        }
     }
     output.flush()
 }
@@ -402,6 +406,51 @@ mod tests {
         assert_eq!(response.request_sha256, digest);
         assert_eq!(response.error_code, "request_too_large");
         assert_eq!(response.status, "rejected_input");
+    }
+
+    #[test]
+    fn bounded_record_rejects_invalid_utf8_with_raw_line_digest() {
+        let raw = vec![0xff, b'{', b'}'];
+        let expected_digest = digest_hex(&raw);
+        let output = handle_bounded_record(BoundedLine::Accepted(raw), false).unwrap();
+        let response: symthaea_nano_policy::ErrorResponse =
+            serde_json::from_str(&output).unwrap();
+        assert_eq!(response.error_code, "invalid_utf8");
+        assert_eq!(response.request_sha256, expected_digest);
+    }
+
+    #[test]
+    fn bounded_record_skips_whitespace_and_rejects_oversized_select_request() {
+        assert!(handle_bounded_record(
+            BoundedLine::Accepted(b"  \\t ".to_vec()),
+            false,
+        )
+        .is_none());
+
+        let digest = digest_hex(b"too-large");
+        let output = handle_bounded_record(
+            BoundedLine::TooLarge {
+                sha256: digest.clone(),
+            },
+            false,
+        )
+        .unwrap();
+        let response: symthaea_nano_policy::ErrorResponse =
+            serde_json::from_str(&output).unwrap();
+        assert_eq!(response.error_code, "request_too_large");
+        assert_eq!(response.request_sha256, digest);
+    }
+
+    #[test]
+    fn bounded_record_rejects_invalid_utf8_receipt_envelope() {
+        let output = handle_bounded_record(
+            BoundedLine::Accepted(vec![0xff]),
+            true,
+        )
+        .unwrap();
+        let response: ReceiptEnvelopeError = serde_json::from_str(&output).unwrap();
+        assert_eq!(response.status, "rejected_input");
+        assert_eq!(response.error_code, "invalid_receipt_envelope");
     }
 
     #[test]
