@@ -72,8 +72,8 @@ impl fmt::Display for AssessmentError {
             }
             Self::DuplicateProvenanceId(id) => write!(f, "duplicate provenance ID: {id}"),
             Self::ClaimCeilingMismatch => write!(f, "case claim ceiling does not match this evaluator's frozen ceiling"),
-            Self::UnsupportedEvidenceClass(class) => write!(f, "v1 accepts synthetic illustrations only; received evidence class {class}"),
-            Self::UnsupportedDecisionUse => write!(f, "v1 accepts not_for_decision cases only"),
+            Self::UnsupportedEvidenceClass(class) => write!(f, "v2 accepts synthetic illustrations only; received evidence class {class}"),
+            Self::UnsupportedDecisionUse => write!(f, "v2 accepts not_for_decision cases only"),
         }
     }
 }
