@@ -404,4 +404,4 @@ The dependency-free implementation is [scripts/crispr_transportability.rs](../..
     rustc --edition=2024 --test scripts/crispr_transportability.rs -o /tmp/crispr-transport-tests
     /tmp/crispr-transport-tests
 
-An independent grid oracle checked all 12 feasible tenth-step prevalence vectors for F12 and all 8 endpoint combinations of the three context delta intervals (96 assignments total). It reproduced the exact lower bound -0.076 at [0.2, 0.4, 0.4] and upper bound +0.073 at [0.5, 0.4, 0.1]. This is a direct synthetic calculation, not Rust execution or biological evidence.
+An independent grid oracle checked all 12 feasible tenth-step prevalence vectors for F12 and all 8 endpoint combinations of the three context delta intervals (96 assignments total). A broader deterministic oracle checked 2,000 feasible three-context fixtures, 10,856 feasible prevalence vectors, and 86,848 endpoint assignments on 0.1 grids, with zero mismatches against exhaustive enumeration. It reproduced the exact lower bound -0.076 at [0.2, 0.4, 0.4] and upper bound +0.073 at [0.5, 0.4, 0.1]. This is a direct synthetic calculation, not Rust execution or biological evidence.
