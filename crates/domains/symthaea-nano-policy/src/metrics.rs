@@ -253,7 +253,8 @@ pub struct MetricComparison {
     pub comparison_arm_id: String,
     /// Compared metric.
     pub metric: ComparisonMetric,
-    /// Mean paired difference over target queries; uncertainty resamples whole declared groups.
+    /// Mean paired effect; loss reduction is baseline loss minus candidate loss, so positive is better.
+    /// With incomplete loss coverage this is descriptive over covered targets only; no interval is emitted.
     pub estimated_delta: f64,
     /// Percentile 95% interval lower bound; null if groups are insufficient.
     pub confidence_interval_lower: Option<f64>,
@@ -263,7 +264,7 @@ pub struct MetricComparison {
     pub confidence_level: f64,
     /// Predeclared practical margin.
     pub practical_margin: f64,
-    /// Number of independent groups declared by the evaluation contract.
+    /// Number of declared groups represented by paired target values for this metric.
     pub independent_group_count: usize,
     /// Paired targets with a metric value in both arms (continuous loss requires complete coverage).
     pub covered_target_count: usize,
@@ -466,11 +467,13 @@ fn validate_ledger(ledger: &OutcomeLedger) -> Result<(), String> {
     for (name, margin) in [
         ("minimum_success_rate_delta", ledger.minimum_success_rate_delta),
         ("minimum_success_auc_delta", ledger.minimum_success_auc_delta),
-        ("minimum_best_loss_reduction", ledger.minimum_best_loss_reduction),
     ] {
         if !margin.is_finite() || !(0.0..=1.0).contains(&margin) {
             return Err(format!("{name} must be finite and within [0, 1]"));
         }
+    }
+    if !valid_nonnegative(ledger.minimum_best_loss_reduction) {
+        return Err("minimum_best_loss_reduction must be finite and within the allowed non-negative range".to_string());
     }
     if !(2..=MAX_ARMS).contains(&ledger.arms.len()) {
         return Err(format!("arms must contain between 2 and {MAX_ARMS} policy runs"));
@@ -1204,6 +1207,60 @@ mod tests {
     }
 
     #[test]
+    fn computes_paired_best_loss_reduction_when_every_target_is_covered() {
+        let mut ledger = fixture();
+        ledger.minimum_best_loss_reduction = 0.05;
+        for target in &mut ledger.arms[0].target_queries {
+            for observation in &mut target.observations {
+                if observation.status == ObservationStatus::Evaluated {
+                    observation.loss = Some(0.5);
+                }
+            }
+        }
+        for target in &mut ledger.arms[1].target_queries {
+            for observation in &mut target.observations {
+                if observation.status == ObservationStatus::Evaluated {
+                    observation.loss = Some(0.001);
+                }
+            }
+        }
+
+        let report = evaluate_fixture(&ledger);
+        let comparison = report
+            .comparisons
+            .iter()
+            .find(|comparison| comparison.metric == ComparisonMetric::BestLossReductionAtBudget)
+            .unwrap();
+        assert!((comparison.estimated_delta - 0.499).abs() < 1e-12);
+        assert_eq!(comparison.covered_target_count, 5);
+        assert_eq!(comparison.total_target_count, 5);
+        assert_eq!(comparison.disposition, ComparisonDisposition::ImprovementBeyondMargin);
+        assert!(comparison.confidence_interval_lower.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn refuses_loss_reduction_interval_when_one_target_has_no_valid_outcome() {
+        let mut ledger = fixture();
+        ledger.arms[1].target_queries[2].observations = vec![observation(
+            1,
+            "all-failed",
+            None,
+            ObservationStatus::OracleFailed,
+        )];
+        let report = evaluate_fixture(&ledger);
+        let comparison = report
+            .comparisons
+            .iter()
+            .find(|comparison| comparison.metric == ComparisonMetric::BestLossReductionAtBudget)
+            .unwrap();
+        assert_eq!(comparison.disposition, ComparisonDisposition::InsufficientTargetCoverage);
+        assert_eq!(comparison.covered_target_count, 4);
+        assert_eq!(comparison.total_target_count, 5);
+        assert!(comparison.confidence_interval_lower.is_none());
+        assert!(comparison.confidence_interval_upper.is_none());
+    }
+
+    #[test]
     fn rejects_mismatched_paired_target_sets() {
         let mut ledger = fixture();
         ledger.arms[1].target_queries.pop();
@@ -1249,6 +1306,18 @@ mod tests {
         assert_eq!(report_schema["additionalProperties"], false);
         assert_eq!(ledger_schema["properties"]["schema_version"]["const"], OUTCOME_LEDGER_SCHEMA_VERSION);
         assert_eq!(report_schema["properties"]["schema_version"]["const"], METRICS_REPORT_SCHEMA_VERSION);
+        assert!(
+            report_schema["properties"]["comparisons"]["items"]["properties"]["metric"]["enum"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("best_loss_reduction_at_budget"))
+        );
+        assert!(
+            ledger_schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("minimum_best_loss_reduction"))
+        );
 
         let report_value = serde_json::to_value(report).expect("serialize report");
         assert_eq!(report_value["schema_version"], METRICS_REPORT_SCHEMA_VERSION);
