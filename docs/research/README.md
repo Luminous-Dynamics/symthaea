@@ -366,3 +366,6 @@ The tiny exact scheduling oracle is [repair_small_instance_oracle.rs](../../crat
 The exact-oracle module also reports per-policy absolute and relative optimality gaps for priority-first, shortest-job-first and weighted-recovery scheduling, directly supporting the published benchmark targets.
 
 The multi-crew exact oracle is [multi_crew_repair_oracle.rs](../../crates/domains/symthaea-engineering/src/multi_crew_repair_oracle.rs), with three hand-checkable [multi-crew benchmark fixtures](./multi_crew_repair_oracle_corpus.json). It includes crew skill eligibility, cross-crew precedence, concurrent repairs, and optimality-gap measurement for the current greedy policies.
+
+
+The multi-crew schedule checker is [repair_schedule_certificate.rs](../../crates/domains/symthaea-engineering/src/repair_schedule_certificate.rs). It independently checks schedule feasibility and objective arithmetic, and explicitly does not claim to certify global optimality.
