@@ -768,6 +768,84 @@ mod tests {
     }
 
     #[test]
+    fn sha256_matches_nist_vectors() {
+        assert_eq!(
+            sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn manifest_digest_verification_detects_changed_metadata() {
+        let original = manifest();
+        let digest = evidence_manifest_sha256(&original).unwrap();
+        verify_evidence_manifest_digest(&original, &digest).unwrap();
+
+        let mut changed = original.clone();
+        changed.items[0].units = "feet".into();
+        assert_eq!(
+            verify_evidence_manifest_digest(&changed, &digest)
+                .unwrap_err()
+                .field,
+            "evidence_manifest_sha256"
+        );
+    }
+
+    #[test]
+    fn receipt_digest_verification_detects_changed_receipt() {
+        let original = receipt(GateStatus::Pass);
+        let digest = scenario_run_receipt_sha256(&original).unwrap();
+        verify_scenario_run_receipt_digest(&original, &digest).unwrap();
+
+        let mut changed = original.clone();
+        changed.commit_sha = "cccccccccccccccccccccccccccccccccccccccc".into();
+        assert_eq!(
+            verify_scenario_run_receipt_digest(&changed, &digest)
+                .unwrap_err()
+                .field,
+            "scenario_run_receipt_sha256"
+        );
+    }
+
+    #[test]
+    fn retained_output_bytes_are_rehashed_not_trusted() {
+        let bytes = b"synthetic model output v1";
+        let artifact = OutputArtifact {
+            id: "metrics".into(),
+            media_type: "application/json".into(),
+            sha256: sha256_hex(bytes),
+        };
+        assert!(verify_output_artifact_bytes(&artifact, bytes).is_ok());
+        assert_eq!(
+            verify_output_artifact_bytes(&artifact, b"synthetic model output v2")
+                .unwrap_err()
+                .field,
+            "outputs.sha256"
+        );
+    }
+
+    #[test]
+    fn retained_evidence_bytes_are_rehashed_and_missing_sources_block() {
+        let bytes = b"synthetic source bytes";
+        let mut item = measured_item("survey");
+        item.content_sha256 = Some(sha256_hex(bytes));
+        assert!(verify_evidence_item_bytes(&item, bytes).is_ok());
+        assert!(verify_evidence_item_bytes(&item, b"corrupted source").is_err());
+
+        item.kind = EvidenceKind::Missing;
+        item.content_sha256 = None;
+        item.missing_reason = Some("not collected".into());
+        assert_eq!(
+            verify_evidence_item_bytes(&item, bytes).unwrap_err().field,
+            "items.content_sha256"
+        );
+    }
+
+    #[test]
     fn unsupported_schema_versions_are_rejected() {
         let mut input = manifest();
         input.schema_version += 1;
