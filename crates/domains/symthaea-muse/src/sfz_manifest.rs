@@ -221,6 +221,8 @@ pub struct SfzZoneSelectionV1 {
     pub round_robin_index: u64,
     pub matching_region_indices: Vec<usize>,
     pub selected_region_index: Option<usize>,
+    pub selected_sample_path: Option<String>,
+    pub selected_sample_asset_state: Option<String>,
     /// One of: uncovered, invalid_request, unique_candidate,
     /// round_robin_candidate, incomplete_round_robin_set, ambiguous_zones.
     /// None of these names imply audio decoding or rendering.
@@ -250,6 +252,8 @@ pub fn plan_sfz_zone_selection(
         round_robin_index,
         matching_region_indices: Vec::new(),
         selected_region_index: None,
+        selected_sample_path: None,
+        selected_sample_asset_state: None,
         decision: "uncovered".to_owned(),
         semitone_shift: None,
         frequency_ratio: None,
@@ -340,6 +344,8 @@ pub fn plan_sfz_zone_selection(
         let semitone_shift = f64::from(requested_key) - f64::from(region.pitch_keycenter)
             + f64::from(region.tune_cents) / 100.0;
         receipt.selected_region_index = Some(region.region_index);
+        receipt.selected_sample_path = Some(region.sample_path.clone());
+        receipt.selected_sample_asset_state = Some(region.sample_asset_state.clone());
         receipt.semitone_shift = Some(semitone_shift);
         receipt.frequency_ratio = Some(2.0_f64.powf(semitone_shift / 12.0));
     }
@@ -705,7 +711,10 @@ mod tests {
 
         assert_eq!(first.decision, "round_robin_candidate");
         assert_eq!(first.selected_region_index, Some(1));
+        assert_eq!(first.selected_sample_path.as_deref(), Some("samples/one.wav"));
+        assert_eq!(first.selected_sample_asset_state.as_deref(), Some("not_checked"));
         assert_eq!(second.selected_region_index, Some(2));
+        assert_eq!(second.selected_sample_path.as_deref(), Some("samples/two.wav"));
         assert_eq!(repeat.selected_region_index, Some(1));
         assert_eq!(first.semitone_shift, Some(0.0));
         assert_eq!(first.frequency_ratio, Some(1.0));
@@ -745,6 +754,51 @@ mod tests {
             plan_sfz_zone_selection(&manifest, 60, 128, 0).decision,
             "invalid_request"
         );
+    }
+
+    #[test]
+    fn sample_reference_inspection_distinguishes_presence_hash_and_traversal() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-sfz-reference-inspection-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("samples")).unwrap();
+        let sample_bytes = b"test sample contents";
+        std::fs::write(root.join("samples/test.wav"), sample_bytes).unwrap();
+
+        assert_eq!(
+            inspect_sample_reference(&root, "samples/test.wav", false).unwrap(),
+            Some((sample_bytes.len() as u64, None))
+        );
+        let (byte_len, digest) =
+            inspect_sample_reference(&root, "samples/test.wav", true).unwrap().unwrap();
+        assert_eq!(byte_len, sample_bytes.len() as u64);
+        assert_eq!(
+            digest.as_deref(),
+            Some(format!("{:x}", Sha256::digest(sample_bytes)).as_str())
+        );
+        assert_eq!(
+            inspect_sample_reference(&root, "samples/missing.wav", false).unwrap(),
+            None
+        );
+        assert!(
+            inspect_sample_reference(&root, "../outside.wav", false).is_err()
+        );
+
+        #[cfg(unix)]
+        {
+            let outside = root.with_extension("outside");
+            std::fs::write(&outside, b"not in root").unwrap();
+            std::os::unix::fs::symlink(&outside, root.join("samples/escape.wav")).unwrap();
+            assert_eq!(
+                inspect_sample_reference(&root, "samples/escape.wav", true).unwrap(),
+                None
+            );
+            std::fs::remove_file(outside).unwrap();
+        }
+
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
