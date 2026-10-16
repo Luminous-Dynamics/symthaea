@@ -13,8 +13,10 @@ For example, a substrate concentration near a fitted (K_m) may be informative ab
 
 The benchmark therefore treats two objectives as distinct:
 
-1. **Model discrimination:** select a condition where currently fitted competing model predictions differ most relative to a declared observation-noise scale.
-2. **Parameter-estimation proxy:** select a condition with high local finite-difference sensitivity to (K_m), conditional on the Michaelis–Menten model family.
+1. **Model discrimination:** select a condition where currently fitted competing model predictions differ most relative to a declared observation-noise scale. Under fixed illustrative hypotheses Vmax=100, Km=2, Ki=20, the high-substrate end maximizes prediction separation between the two candidate families.
+2. **Parameter-estimation proxy:** select a condition with high local finite-difference sensitivity to (Km), conditional on the Michaelis–Menten model family. In the same toy comparison, this concentrates near the fitted Km, rather than at the high-substrate boundary.
+
+A unit test locks down this distinction for the fixed illustrative hypotheses: model discrimination chooses substrate 179.2 from the declared candidate pool, while the local Km-sensitivity proxy chooses 2.8. This is a software-level illustration of different objectives, not a claim that these conditions are optimal for a real assay.
 
 The reference strategies are a deterministic uniform-random control and a precommitted log-spaced sequence. All strategies use the same initial observations, candidate pool, simulated outcomes, measurement budget, and scenario seeds. Where two strategies select the same condition, they receive the same deterministic noisy outcome. This paired design reduces avoidable variation in the comparison.
 
