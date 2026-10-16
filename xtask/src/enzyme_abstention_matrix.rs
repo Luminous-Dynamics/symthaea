@@ -338,7 +338,7 @@ fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
 
 fn build_report() -> Result<Value> {
     let mut cases = Vec::new();
-    let mut grouped: BTreeMap<&'static str, BTreeMap<&'static str, usize>> = BTreeMap::new();
+    let mut grouped: BTreeMap<&'static str, BTreeMap<String, usize>> = BTreeMap::new();
     let mut target_hits: BTreeMap<&'static str, usize> = BTreeMap::new();
     let mut target_totals: BTreeMap<&'static str, usize> = BTreeMap::new();
 
@@ -353,7 +353,7 @@ fn build_report() -> Result<Value> {
                     .as_bool()
                     .context("target_hit must be a boolean")?;
 
-                *grouped.entry(scenario.stratum).or_default().entry(selected).or_default() += 1;
+                *grouped.entry(scenario.stratum).or_default().entry(selected.to_string()).or_default() += 1;
                 *target_totals.entry(scenario.stratum).or_default() += 1;
                 if target_hit {
                     *target_hits.entry(scenario.stratum).or_default() += 1;
@@ -485,7 +485,7 @@ mod tests {
     fn generated_matrix_has_fixed_denominators_and_explicit_targets() {
         let report = build_report().expect("matrix generation should succeed");
         assert_eq!(report["status"], "exploratory_synthetic_matrix_generated");
-        assert_eq!(report["matrix"]["case_count"], scenarios().len() * NOISE_SDS.len() * SEEDS.len());
+        assert_eq!(report["matrix"]["case_count"].as_u64().unwrap(), (scenarios().len() * NOISE_SDS.len() * SEEDS.len()) as u64);
         assert_eq!(report["cases"].as_array().unwrap().len(), 96);
         assert_eq!(report["summary_by_stratum"].as_array().unwrap().len(), 4);
         assert!(report["cases"].as_array().unwrap().iter().all(|case| {
