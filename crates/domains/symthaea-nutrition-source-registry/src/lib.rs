@@ -1998,7 +1998,7 @@ mod tests {
         assert_eq!(canonical, expected);
         assert_eq!(
             sha256_hex(canonical.as_bytes()),
-            "5e321556d22018a9656991a9e94f77ec175fa193e52a2429d312f8419ec8b08c"
+            "4aee9ae2ef2f539ef267a45daa48be38011d735c63078562a898610794ad6a8a"
         );
     }
 
