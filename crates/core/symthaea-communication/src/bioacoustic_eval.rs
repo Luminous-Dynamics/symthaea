@@ -462,23 +462,41 @@ fn prediction_in_unscored_region(
     regions: &[crate::bioacoustic_corpus::BioacousticUnscoredRegion],
     rule: &EventMatchRule,
 ) -> bool {
-    regions.iter().any(|region| match rule {
+    match rule {
         EventMatchRule::StartTolerance { .. } => {
-            prediction.interval.start_s >= region.interval.start_s
-                && prediction.interval.start_s < region.interval.end_s
+            // Region metadata is validated as sorted and non-overlapping, so
+            // only the last region beginning at/before the point can contain it.
+            let after_start = regions.partition_point(|region| {
+                region.interval.start_s <= prediction.interval.start_s
+            });
+            after_start > 0
+                && prediction.interval.start_s < regions[after_start - 1].interval.end_s
         }
         EventMatchRule::TemporalIou { min_iou } => {
-            let prediction_duration =
+            // Here min_iou is reused as the predeclared minimum fraction of the
+            // predicted duration covered by unscored regions (not a region IoU).
+            let duration =
                 prediction.interval.end_s - prediction.interval.start_s;
-            if prediction_duration <= 0.0 {
+            if duration <= 0.0 {
                 return false;
             }
-            let overlap = (prediction.interval.end_s.min(region.interval.end_s)
-                - prediction.interval.start_s.max(region.interval.start_s))
-                .max(0.0);
-            overlap / prediction_duration >= *min_iou
+            let first = regions.partition_point(|region| {
+                region.interval.end_s <= prediction.interval.start_s
+            });
+            let last = regions.partition_point(|region| {
+                region.interval.start_s < prediction.interval.end_s
+            });
+            let overlap_seconds: f64 = regions[first..last]
+                .iter()
+                .map(|region| {
+                    (prediction.interval.end_s.min(region.interval.end_s)
+                        - prediction.interval.start_s.max(region.interval.start_s))
+                        .max(0.0)
+                })
+                .sum();
+            overlap_seconds / duration >= *min_iou
         }
-    })
+    }
 }
 
 fn validate_non_overlapping_source_coverage(
