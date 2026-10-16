@@ -548,6 +548,33 @@ mod tests {
     }
 
     #[test]
+    fn profile_tampering_is_rejected_by_end_to_end_verifier() {
+        let root = write_valid_test_package();
+        let path = root.join("hazard-profile.json");
+        let bytes = fs::read(&path).unwrap();
+        let mut profile: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        profile["hazard_parameters"][0]["value"] = serde_json::Value::from(45.0);
+        fs::write(&path, serde_json::to_vec_pretty(&profile).unwrap()).unwrap();
+        assert!(verify_run_package(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn changed_service_graph_is_rejected_by_configuration_binding() {
+        let root = write_valid_test_package();
+        let path = root.join("service-graph.json");
+        let bytes = fs::read(&path).unwrap();
+        let mut graph: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        graph["nodes"].as_array_mut().unwrap().push(serde_json::json!({
+            "id": "unbound-extra-service",
+            "domain": "communications"
+        }));
+        fs::write(&path, serde_json::to_vec_pretty(&graph).unwrap()).unwrap();
+        assert!(verify_run_package(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn corrupt_output_is_rejected_by_end_to_end_verifier() {
         let root = write_valid_test_package();
         fs::write(root.join("outputs/metrics.dat"), b"tampered metrics").unwrap();
