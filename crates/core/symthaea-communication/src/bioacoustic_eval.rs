@@ -960,6 +960,7 @@ mod tests {
                     end_s: 6.0,
                 },
                 reason: "ambiguous overlapping caller".into(),
+                annotation_source: "expert-reviewed-uncertainty-v1".into(),
             },
         );
         bundle.predictions.push(PredictedBioacousticEvent {
