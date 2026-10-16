@@ -29,7 +29,7 @@ use std::sync::Arc;
 /// Configuration for cetacean acoustic analysis
 #[derive(Debug, Clone)]
 pub struct CetaceanConfig {
-    /// Sample rate (Hz) - whale recordings typically 44.1kHz or 96kHz
+    /// Native analysis sample rate (Hz); the declared band must fit below Nyquist.
     pub sample_rate: u32,
     /// Frame duration for analysis (seconds)
     pub frame_duration: f32,
@@ -39,7 +39,7 @@ pub struct CetaceanConfig {
     pub n_fft: usize,
     /// Minimum frequency for analysis (Hz)
     pub f_min: f32,
-    /// Maximum frequency for analysis (Hz) - whales use wide range
+    /// Maximum frequency for analysis (Hz); keep strictly below the Nyquist limit.
     pub f_max: f32,
     /// Threshold for transient detection
     pub transient_threshold: f32,
@@ -57,7 +57,7 @@ impl Default for CetaceanConfig {
             hop_duration: 0.01,   // 10ms hop
             n_fft: 2048,          // High resolution for frequency tracking
             f_min: 100.0,         // Whale vocalizations start low
-            f_max: 20000.0,       // But can go quite high
+            f_max: 20000.0,       // Conservative low-band default; not ultrasonic-click capable
             transient_threshold: 0.5,
             harmonicity_threshold: 0.4,
             fm_slope_threshold: 500.0, // Hz/frame
