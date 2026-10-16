@@ -122,6 +122,8 @@ The implemented prequential evaluator lives in `crates/domains/symthaea-futures-
 
 The same module now includes a deterministic paired cluster bootstrap over candidate-minus-baseline Brier differences. Repeated rows within the same declared event/parent-event cluster are averaged before clusters are resampled. This addresses one common pseudoreplication failure, but it does not repair bad cluster definitions, selection bias, or invalid timestamps. The bootstrap share of samples below zero is not a p-value; score intervals and primary horizons must be preregistered.
 
+The module also emits equal-width reliability bins through `calibration_report`, scoped to one method/horizon and preserving empty bins, sample counts, mean forecast probabilities and observed frequencies. A weighted absolute calibration error is reported only as a secondary bin-dependent statistic; it does not replace the bin table, Brier score, log loss or calibration uncertainty. The synthetic example emits per-horizon bins and a paired common-cohort summary so eligible-set averages are not confused with paired comparison results.
+
 See [PREDICTION_MARKET_COMPARATIVE_REPLAY_BENCHMARK_V1.md](PREDICTION_MARKET_COMPARATIVE_REPLAY_BENCHMARK_V1.md) for the full replay estimand, adversarial corpus design, inference/reporting protocol and provisional gates.
 
 ## Benchmark plan
