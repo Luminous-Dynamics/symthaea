@@ -590,7 +590,12 @@ mod tests {
             .collect()
     }
 
-    fn audio_fixture(samples: Vec<f32>, sample_rate_hz: u32, channels: u16, name: &str) -> LoadedAudio {
+    fn audio_fixture(
+        samples: Vec<f32>,
+        sample_rate_hz: u32,
+        channels: u16,
+        name: &str,
+    ) -> LoadedAudio {
         let frames = samples.len() / usize::from(channels);
         let finite_samples = samples.iter().all(|sample| sample.is_finite());
         let (peak_absolute, rms, dc_offset) = signal_summary(&samples, finite_samples);
@@ -684,7 +689,7 @@ mod tests {
         let reference = audio_fixture(vec![0.1, -0.1], 48_000, 1, "reference.wav");
         let receipt = build_receipt(candidate, reference);
         assert_eq!(receipt.comparison.status, "not_comparable_sample_rate_mismatch");
-        assert_eq!(receipt.comparison.metrics.is_none(), true);
+        assert!(receipt.comparison.metrics.is_none());
     }
 
     #[test]
@@ -693,7 +698,7 @@ mod tests {
         let reference = audio_fixture(vec![0.0, 0.1], 44_100, 1, "reference.wav");
         let receipt = build_receipt(candidate, reference);
         assert_eq!(receipt.comparison.status, "invalid_non_finite_samples");
-        assert_eq!(receipt.comparison.metrics.is_none(), true);
+        assert!(receipt.comparison.metrics.is_none());
     }
 
     #[test]
