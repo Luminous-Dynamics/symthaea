@@ -171,8 +171,18 @@
         "objective_direction_unit_and_availability_manifest"
       ],
       "objectives_must_be_preregistered": true,
-      "objective_policy": "Keep recall, review burden, worst-group behavior, valid calibration metrics, uncertainty sensitivity and measured compute as separate axes where estimable. Do not invent weights to produce one universal CRISPR safety score.",
-      "acceptance": "All compared policy vectors use the same objective definitions, units, direction, held-out episodes and metric availability rule. Every nondominated policy and full vector is reported."
+      "objective_policy": "Selective-risk objectives must use the same preregistered coverage tier, eligible episodes, and label-availability rule for every policy. Do not mix metrics computed on different subsets or zero-fill unknown/not-estimable values.",
+      "acceptance": "All compared policy vectors use the same objective definitions, units, direction, held-out episodes and metric availability rule. Every nondominated policy and full vector is reported.",
+      "candidate_objectives": [
+        "macro_recall_at_fixed_budget",
+        "review_slots_at_fixed_recall",
+        "worst_guide_cas9_group_recall",
+        "paired_label_sensitivity_bounds",
+        "brier_score_or_log_loss_when_estimable",
+        "upper_unknown_aware_error_rate_bound_at_fixed_coverage",
+        "accepted_label_completeness_at_fixed_coverage",
+        "measured_runtime_and_compute"
+      ]
     },
     {
       "id": "T10_selective_prediction",
