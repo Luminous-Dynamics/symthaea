@@ -1132,51 +1132,12 @@ mod tests {
     }
 
     #[test]
-    fn test_mok_password_generation() {
-        let password = generate_mok_password();
-        let parts: Vec<&str> = password.split('-').collect();
-
-        // Must be 6 words
-        assert_eq!(parts.len(), 6, "Password must be 6 words: {password}");
-
-        // Each word must be non-empty and ASCII lowercase
-        for word in &parts {
-            assert!(!word.is_empty(), "Password word must not be empty");
-            assert!(
-                word.chars().all(|c| c.is_ascii_lowercase()),
-                "Password word must be lowercase ASCII: {word}"
-            );
-        }
-
-        // Must be human-readable length (not too short, not too long)
-        assert!(
-            password.len() >= 20,
-            "Password too short: {password} ({})",
-            password.len()
-        );
-        assert!(
-            password.len() <= 60,
-            "Password too long: {password} ({})",
-            password.len()
-        );
-    }
-
-    #[test]
-    fn test_mok_password_uniqueness() {
-        // Two consecutive calls should produce different passwords
-        // (not guaranteed by PRNG, but extremely likely with counter mixing)
-        let p1 = generate_mok_password();
-        let p2 = generate_mok_password();
-        assert_ne!(p1, p2, "Two consecutive password generations should differ");
-    }
-
-    #[test]
     fn test_lanzaboote_nix_generation() {
         let config = LanzabooteConfig {
             enabled: true,
-            pki_dir: "/etc/secureboot".to_string(),
+            pki_dir: "/var/lib/sbctl".to_string(),
             generate_keys: true,
-            mok_password: Some("test-pass".to_string()),
+            enrollment_required: true,
         };
         let nix = generate_lanzaboote_nix(&config);
 
@@ -1193,7 +1154,7 @@ mod tests {
             "Must enable lanzaboote: {nix}"
         );
         assert!(
-            nix.contains("pkiBundle = \"/etc/secureboot\""),
+            nix.contains("pkiBundle = \"/var/lib/sbctl\""),
             "Must set PKI path: {nix}"
         );
         assert!(nix.contains("sbctl"), "Must include sbctl package: {nix}");
@@ -1215,80 +1176,32 @@ mod tests {
     }
 
     #[test]
-    fn test_key_enrollment_nix() {
+    fn test_key_generation_is_delegated_to_lanzaboote() {
         let nix = generate_key_enrollment_nix();
-
-        assert!(
-            nix.contains("activationScripts"),
-            "Must be an activation script: {nix}"
-        );
-        assert!(nix.contains("sbctl"), "Must reference sbctl: {nix}");
-        assert!(nix.contains("create-keys"), "Must run create-keys: {nix}");
-        assert!(
-            nix.contains("/etc/secureboot/GUID"),
-            "Must check for existing keys: {nix}"
-        );
+        assert!(nix.contains("boot.lanzaboote.autoGenerateKeys.enable = true"));
+        assert!(!nix.contains("system.activationScripts.secureBootKeys"));
+        assert!(!nix.contains("sbctl create-keys"));
     }
 
     #[test]
-    fn test_mok_guide_steps() {
-        let guide = MokEnrollmentGuide::new("cedar-bright-ocean-gentle-river-dawn");
-
-        assert_eq!(guide.step_count(), 6, "MOK guide must have exactly 6 steps");
-
-        // Verify step ordering
-        for (i, step) in guide.steps.iter().enumerate() {
-            assert_eq!(
-                step.step_number,
-                (i + 1) as u32,
-                "Step {} should be numbered {}",
-                i,
-                i + 1
-            );
-        }
-
-        // Step 1: MOK Manager entry
-        let s1 = guide.step(1).unwrap();
-        assert!(s1.title.contains("MOK Manager"));
-        assert!(s1.instruction.contains("10 seconds"));
-        assert!(s1.warning.is_some());
-
-        // Step 2: Enroll MOK
-        let s2 = guide.step(2).unwrap();
-        assert!(s2.instruction.contains("Enroll MOK"));
-
-        // Step 3: View key
-        let s3 = guide.step(3).unwrap();
-        assert!(s3.instruction.contains("Continue"));
-
-        // Step 4: Confirm
-        let s4 = guide.step(4).unwrap();
-        assert!(s4.instruction.contains("Yes"));
-
-        // Step 5: Password
-        let s5 = guide.step(5).unwrap();
-        assert!(
-            s5.instruction
-                .contains("cedar-bright-ocean-gentle-river-dawn"),
-            "Step 5 must contain the password"
-        );
-        assert!(
-            s5.warning.is_some(),
-            "Step 5 should warn about keyboard layout"
-        );
-
-        // Step 6: Reboot
-        let s6 = guide.step(6).unwrap();
-        assert!(s6.instruction.contains("Reboot"));
+    fn test_secure_boot_enrollment_guide_steps() {
+        let guide = SecureBootEnrollmentGuide::new();
+        assert_eq!(guide.step_count(), 6);
+        assert!(guide.step(1).unwrap().instruction.contains("pinned Lanzaboote"));
+        assert!(guide.step(2).unwrap().instruction.contains("recovery path"));
+        assert!(guide.step(3).unwrap().instruction.contains("Setup Mode"));
+        assert!(guide.step(4).unwrap().instruction.contains("sbctl verify"));
+        assert!(guide.step(5).unwrap().instruction.contains("sbctl enroll-keys --microsoft"));
+        assert!(guide.step(6).unwrap().instruction.contains("User Mode"));
+        assert!(guide.step(3).unwrap().warning.is_some());
     }
-
     #[test]
     fn test_boot_chain_with_secure_boot() {
         let config = LanzabooteConfig {
             enabled: true,
-            pki_dir: "/etc/secureboot".to_string(),
+            pki_dir: "/var/lib/sbctl".to_string(),
             generate_keys: true,
-            mok_password: Some("test-password".to_string()),
+            enrollment_required: true,
         };
         let chain = BootChainStatus::sovereign_boot_chain(&SecureBootState::Enabled, &config);
 
@@ -1298,10 +1211,10 @@ mod tests {
         assert_eq!(chain.stages[0].name, "Firmware");
         assert_eq!(chain.stages[0].status, BootStageStatus::Verified);
 
-        // Shim should be pending enrollment (password present = first boot)
+        // Lanzaboote uses a direct signed-UKI path, not shim/MOK.
         assert_eq!(chain.stages[1].name, "Shim");
-        assert_eq!(chain.stages[1].status, BootStageStatus::PendingEnrollment);
-        assert!(chain.stages[1].signer.contains("Microsoft"));
+        assert_eq!(chain.stages[1].status, BootStageStatus::NotApplicable);
+        assert_eq!(chain.stages[1].signer, "N/A");
 
         // Lanzaboote stages pending
         assert!(chain.stages[2].name.contains("lanzaboote"));
@@ -1528,7 +1441,7 @@ mod tests {
 
         assert!(orch.lanzaboote.enabled);
         assert!(orch.lanzaboote.enrollment_required);
-        assert!(orch.mok_guide.is_some());
+        assert!(orch.enrollment_guide.is_some());
         assert!(orch.boot_chain.is_some());
         assert!(!orch.boot_chain.as_ref().unwrap().fully_verified());
     }
@@ -1546,7 +1459,7 @@ mod tests {
         orch.apply_probe_result(result);
 
         assert!(!orch.lanzaboote.enabled);
-        assert!(orch.mok_guide.is_none());
+        assert!(orch.enrollment_guide.is_none());
         assert!(orch.boot_chain.as_ref().unwrap().fully_verified());
     }
 
@@ -1555,9 +1468,9 @@ mod tests {
         let mut orch = SecureBootOrchestration::new();
         orch.apply_guide_result(SecureBootMethod::MokEnrollment);
 
-        let (lanzaboote_nix, key_nix) = orch.generate_nix_config();
+        let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("explicit guide choice authorizes configuration");
         assert!(lanzaboote_nix.contains("lanzaboote"));
-        assert!(lanzaboote_nix.contains("pkiBundle = \"/etc/secureboot\""));
+        assert!(lanzaboote_nix.contains("pkiBundle = \"/var/lib/sbctl\""));
         assert!(key_nix.contains("boot.lanzaboote.autoGenerateKeys.enable = true"));
         assert!(!key_nix.contains("system.activationScripts.secureBootKeys"));
         assert!(!key_nix.contains("sbctl create-keys"));
@@ -1568,7 +1481,7 @@ mod tests {
         let key_nix = generate_key_enrollment_nix();
         assert!(key_nix.contains("boot.lanzaboote.autoGenerateKeys.enable = true"));
         assert!(!key_nix.contains("sbctl create-keys"));
-        assert!(!key_nix.contains("/etc/secureboot/GUID"));
+        assert!(!key_nix.contains("/var/lib/sbctl/GUID"));
     }
 
     #[test]
@@ -1578,10 +1491,11 @@ mod tests {
             enabled: true,
             pki_dir: "/var/lib/sbctl".to_string(),
             generate_keys: false,
-            mok_password: None,
+            enrollment_required: false,
         };
+        orch.configuration_authorized = true;
 
-        let (lanzaboote_nix, key_nix) = orch.generate_nix_config();
+        let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("explicit guide choice authorizes configuration");
         assert!(lanzaboote_nix.contains("pkiBundle = \"/var/lib/sbctl\""));
         assert!(key_nix.is_empty());
     }
@@ -1591,9 +1505,62 @@ mod tests {
         let mut orch = SecureBootOrchestration::new();
         orch.apply_guide_result(SecureBootMethod::AlreadyOff);
 
-        let (lanzaboote_nix, key_nix) = orch.generate_nix_config();
+        let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("explicit guide choice authorizes configuration");
         assert!(lanzaboote_nix.contains("systemd-boot.enable = true"));
         assert!(key_nix.is_empty());
+    }
+
+    #[test]
+    fn test_probe_result_alone_does_not_authorize_config_generation() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.apply_probe_result(SecureBootProbeResult {
+            state: SecureBootState::Enabled,
+            mok_required: true,
+            mokutil_available: true,
+            platform: TargetPlatform::Linux,
+            raw_output: String::new(),
+        });
+        assert!(!orch.configuration_authorized);
+        assert!(orch.generate_nix_config().is_err());
+    }
+
+    #[test]
+    fn test_unknown_probe_blocks_key_generation_configuration() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.apply_probe_result(SecureBootProbeResult {
+            state: SecureBootState::Unknown { reason: "missing SecureBoot EFI variable".to_string() },
+            mok_required: false,
+            mokutil_available: false,
+            platform: TargetPlatform::Linux,
+            raw_output: String::new(),
+        });
+        assert!(!orch.lanzaboote.enabled);
+        assert!(!orch.lanzaboote.generate_keys);
+        assert!(!orch.configuration_authorized);
+        assert!(orch.enrollment_guide.is_none());
+        assert!(orch.generate_nix_config().is_err());
+    }
+
+    #[test]
+    fn test_setup_mode_is_pending_enrollment_not_disabled() {
+        let config = LanzabooteConfig::for_secure_boot();
+        let chain = BootChainStatus::sovereign_boot_chain(&SecureBootState::SetupMode, &config);
+        assert!(!chain.fully_verified());
+        assert!(chain.count_by_status(&BootStageStatus::PendingEnrollment) >= 3);
+    }
+
+    #[test]
+    fn test_unknown_boot_chain_is_indeterminate_not_verified() {
+        let config = LanzabooteConfig::for_disabled_secure_boot();
+        let chain = BootChainStatus::sovereign_boot_chain(
+            &SecureBootState::Unknown { reason: "probe unavailable".to_string() },
+            &config,
+        );
+        assert!(!chain.fully_verified());
+        assert_eq!(
+            chain.stages.iter().filter(|stage| matches!(stage.status, BootStageStatus::Indeterminate { .. })).count(),
+            5
+        );
     }
 
     #[test]
@@ -1624,37 +1591,16 @@ mod tests {
     }
 
     #[test]
-    fn test_word_list_size() {
-        let words = mok_word_list();
-        assert!(
-            words.len() >= 200,
-            "Word list must have at least 200 words for sufficient entropy: {}",
-            words.len()
-        );
-    }
-
-    #[test]
-    fn test_word_list_all_ascii_lowercase() {
-        for word in mok_word_list() {
-            assert!(
-                word.chars().all(|c| c.is_ascii_lowercase()),
-                "Word must be ASCII lowercase: {word}"
-            );
-        }
-    }
-
-    #[test]
-    fn test_lanzaboote_config_defaults() {
+    fn test_lanzaboote_config_defaults_fail_closed() {
         let config = LanzabooteConfig::default();
-        assert!(config.enabled);
-        assert_eq!(config.pki_dir, "/etc/secureboot");
-        assert!(config.generate_keys);
-        assert!(config.mok_password.is_none());
+        assert!(!config.enabled);
+        assert_eq!(config.pki_dir, "/var/lib/sbctl");
+        assert!(!config.generate_keys);
+        assert!(config.enrollment_required);
     }
-
     #[test]
-    fn test_mok_guide_step_lookup() {
-        let guide = MokEnrollmentGuide::new("test");
+    fn test_secure_boot_enrollment_step_lookup() {
+        let guide = SecureBootEnrollmentGuide::new();
         assert!(guide.step(1).is_some());
         assert!(guide.step(6).is_some());
         assert!(guide.step(7).is_none());
