@@ -14,6 +14,7 @@ Policies:
 - random_seeded: deterministic pseudo-random sampling without replacement.
 - farthest_first: greedy max-min distance over normalized features, starting from the lexicographically smallest candidate ID.
 - group_balanced_farthest_first: seeded initial candidate, then prefers the least represented family before max-min distance.
+- cost_aware_farthest_first: starts with the cheapest candidate, then selects maximum minimum descriptor distance divided by declared evaluation cost. It requires a positive cost on every candidate, in one frozen unit.
 
 ## Schemas and benchmark criteria
 
@@ -25,6 +26,7 @@ Policies:
 
 - Unknown fields are rejected. Target/label fields, optical target spectra, test membership and oracle observations must not be included.
 - Candidate IDs must be unique; family IDs non-empty; vector dimension fixed; all feature values finite and within [0, 1].
+- Optional `estimated_cost` must be finite and positive when supplied; cost-aware policy rejects any missing cost. All costs must share one declared unit and be frozen before evaluation.
 - feature_contract_sha256 identifies the externally frozen feature and normalization definition.
 - Request-line SHA-256 is returned with the result. It is a digest of exact input text, not proof that source features are true or legally usable.
 - The selector performs no feature scaling or fitting. Fit transforms only on permitted training data and freeze them outside this program.
