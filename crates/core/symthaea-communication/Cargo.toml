@@ -16,3 +16,7 @@ hound = { workspace = true }
 name = "symthaea-comm-eval"
 path = "src/bin/eval.rs"
 
+[[bin]]
+name = "bioacoustic-corpus-preflight"
+path = "src/bin/bioacoustic_corpus_preflight.rs"
+
