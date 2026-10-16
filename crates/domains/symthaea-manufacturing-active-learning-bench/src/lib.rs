@@ -956,6 +956,15 @@ mod tests {
     }
 
     #[test]
+    fn evaluator_rejects_falsified_stop_reason() {
+        let manifest = CampaignManifest::reference(ScenarioFamily::SmoothResponse, 7, 20);
+        let mut transcript = run_campaign(&manifest, Policy::FixedSpaceFilling, 4).unwrap();
+        transcript.stop_reason = "BudgetExhausted".into();
+        assert!(evaluate_transcript(&manifest, &transcript)
+            .unwrap_err().contains("stop reason"));
+    }
+
+    #[test]
     fn evaluator_rejects_falsified_cost_aggregate() {
         let manifest = CampaignManifest::reference(ScenarioFamily::SmoothResponse, 7, 20);
         let mut transcript = run_campaign(&manifest, Policy::FixedSpaceFilling, 4).unwrap();
