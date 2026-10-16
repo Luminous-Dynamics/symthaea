@@ -365,7 +365,8 @@ pub fn audit_trajectory_jsonl<R: BufRead>(
     let mut trajectories = Vec::new();
     for (index, result) in reader.lines().enumerate() {
         let line_number = index + 1;
-        let line = result.map_err(|e| format!("read trajectory line {line_number}: {e}"))?;
+        let line =
+            result.map_err(|e| format!("read trajectory line {line_number}: {e}"))?;
         if line.trim().is_empty() {
             return Err(format!("blank trajectory line {line_number}"));
         }
@@ -379,23 +380,32 @@ pub fn audit_trajectory_jsonl<R: BufRead>(
     let total_steps = trajectories.iter().map(|t| t.trajectory.steps.len()).sum();
     let mut claims = BTreeSet::new();
     let mut origins = BTreeSet::new();
-    for t in &trajectories {
-        claims.insert(t.trajectory.claim_family_id.as_str());
-        for origin in &t.trajectory.origin_family_ids { origins.insert(origin.as_str()); }
+    for trajectory in &trajectories {
+        claims.insert(trajectory.trajectory.claim_family_id.as_str());
+        for origin in &trajectory.trajectory.origin_family_ids {
+            origins.insert(origin.as_str());
+        }
     }
     let partitions = [
         DatasetSplit::Train,
         DatasetSplit::Development,
         DatasetSplit::Test,
-    ].into_iter().map(|split| {
-        let rows: Vec<&EvidenceTrajectory> = trajectories.iter()
-            .filter(|t| t.trajectory.split == split).map(|t| &t.trajectory).collect();
+    ]
+    .into_iter()
+    .map(|split| {
+        let rows: Vec<&EvidenceTrajectory> = trajectories
+            .iter()
+            .filter(|t| t.trajectory.split == split)
+            .map(|t| &t.trajectory)
+            .collect();
         let claim_families: BTreeSet<&str> = rows
             .iter()
             .map(|t| t.claim_family_id.as_str())
             .collect();
-        let origin_families: BTreeSet<&str> = rows.iter()
-            .flat_map(|t| t.origin_family_ids.iter().map(String::as_str)).collect();
+        let origin_families: BTreeSet<&str> = rows
+            .iter()
+            .flat_map(|t| t.origin_family_ids.iter().map(String::as_str))
+            .collect();
         TrajectorySplitCount {
             split,
             trajectories: rows.len(),
@@ -403,16 +413,20 @@ pub fn audit_trajectory_jsonl<R: BufRead>(
             claim_families: claim_families.len(),
             origin_families: origin_families.len(),
         }
-    }).collect();
+    })
+    .collect();
 
-    Ok((trajectories.clone(), TrajectoryAudit {
-        schema_version: TRAJECTORY_SCHEMA_VERSION,
-        total_trajectories: trajectories.len(),
-        total_steps,
-        unique_claim_families: claims.len(),
-        unique_origin_families: origins.len(),
-        partitions,
-    }))
+    Ok((
+        trajectories.clone(),
+        TrajectoryAudit {
+            schema_version: TRAJECTORY_SCHEMA_VERSION,
+            total_trajectories: trajectories.len(),
+            total_steps,
+            unique_claim_families: claims.len(),
+            unique_origin_families: origins.len(),
+            partitions,
+        },
+    ))
 }
 
 fn policy_input(input: &BenchmarkInput) -> EvidenceActionInput {
@@ -488,32 +502,45 @@ pub fn evaluate_trajectories(
         return Err("empty policy version".to_owned());
     }
     validate_trajectory_collection(trajectories)?;
-    Ok(trajectories.iter().map(|hashed| {
-        let steps = hashed.trajectory.steps.iter().map(|step| {
-            let EvidenceActionDecision { action, reason } =
-                policy.decide(policy_input(&step.input));
-            TrajectoryStepReceipt {
-                sequence: step.sequence,
-                selected_action: match action {
-                    EvidenceAction::Answer => BenchmarkAction::Answer,
-                    EvidenceAction::AnswerWithScopeLimit => BenchmarkAction::AnswerWithScopeLimit,
-                    EvidenceAction::AskClarification => BenchmarkAction::AskClarification,
-                    EvidenceAction::AcquireMoreEvidence => BenchmarkAction::AcquireMoreEvidence,
-                    EvidenceAction::Abstain => BenchmarkAction::Abstain,
-                },
-                reason: benchmark_reason(reason),
+    let receipts = trajectories
+        .iter()
+        .map(|hashed| {
+            let steps: Vec<TrajectoryStepReceipt> = hashed
+                .trajectory
+                .steps
+                .iter()
+                .map(|step| {
+                    let EvidenceActionDecision { action, reason } =
+                        policy.decide(policy_input(&step.input));
+                    TrajectoryStepReceipt {
+                        sequence: step.sequence,
+                        selected_action: match action {
+                            EvidenceAction::Answer => BenchmarkAction::Answer,
+                            EvidenceAction::AnswerWithScopeLimit => {
+                                BenchmarkAction::AnswerWithScopeLimit
+                            }
+                            EvidenceAction::AskClarification => BenchmarkAction::AskClarification,
+                            EvidenceAction::AcquireMoreEvidence => {
+                                BenchmarkAction::AcquireMoreEvidence
+                            }
+                            EvidenceAction::Abstain => BenchmarkAction::Abstain,
+                        },
+                        reason: benchmark_reason(reason),
+                    }
+                })
+                .collect();
+            EvidenceTrajectoryReceipt {
+                schema_version: TRAJECTORY_SCHEMA_VERSION,
+                trajectory_id: hashed.trajectory.trajectory_id.clone(),
+                trajectory_sha256: hashed.trajectory_sha256.clone(),
+                policy_version: policy_version.to_owned(),
+                policy_minimum_independent_origins: policy.minimum_independent_origins,
+                policy_allow_scoped_partial_answer: policy.allow_scoped_partial_answer,
+                steps,
             }
-        }).collect();
-        EvidenceTrajectoryReceipt {
-            schema_version: TRAJECTORY_SCHEMA_VERSION,
-            trajectory_id: hashed.trajectory.trajectory_id.clone(),
-            trajectory_sha256: hashed.trajectory_sha256.clone(),
-            policy_version: policy_version.to_owned(),
-            policy_minimum_independent_origins: policy.minimum_independent_origins,
-            policy_allow_scoped_partial_answer: policy.allow_scoped_partial_answer,
-            steps,
-        }
-    }).collect())
+        })
+        .collect();
+    Ok(receipts)
 }
 
 fn answer_is_unsafe(
@@ -522,12 +549,20 @@ fn answer_is_unsafe(
     policy_minimum_independent_origins: u32,
     policy_allow_scoped_partial_answer: bool,
 ) -> bool {
-    if !action.permits_answer() { return false; }
+    if !action.permits_answer() {
+        return false;
+    }
     if input.provenance != BenchmarkProvenanceCondition::Verified
         || input.question != BenchmarkQuestionCondition::Clear
-        || matches!(input.evidence, BenchmarkEvidenceCondition::Irrelevant
-            | BenchmarkEvidenceCondition::Missing | BenchmarkEvidenceCondition::Conflicting)
-        || input.independent_origins.map_or(true, |n| n < policy_minimum_independent_origins)
+        || matches!(
+            input.evidence,
+            BenchmarkEvidenceCondition::Irrelevant
+                | BenchmarkEvidenceCondition::Missing
+                | BenchmarkEvidenceCondition::Conflicting
+        )
+        || input
+            .independent_origins
+            .map_or(true, |n| n < policy_minimum_independent_origins)
     {
         return true;
     }
@@ -584,8 +619,10 @@ pub fn score_trajectory_receipts<R: BufRead>(
         return Err("empty expected policy version".to_owned());
     }
     validate_trajectory_collection(trajectories)?;
-    let by_id: BTreeMap<&str, &HashedEvidenceTrajectory> = trajectories.iter()
-        .map(|t| (t.trajectory.trajectory_id.as_str(), t)).collect();
+    let by_id: BTreeMap<&str, &HashedEvidenceTrajectory> = trajectories
+        .iter()
+        .map(|t| (t.trajectory.trajectory_id.as_str(), t))
+        .collect();
     let mut receipts: BTreeMap<String, EvidenceTrajectoryReceipt> = BTreeMap::new();
     let mut registered_policy: Option<(u32, bool)> = None;
 
@@ -668,8 +705,9 @@ pub fn score_trajectory_receipts<R: BufRead>(
             missing.join(", ")
         ));
     }
-    let (minimum_origins, allow_scoped) = registered_policy
-        .ok_or_else(|| "trajectory receipts contain no policy configuration".to_owned())?;
+    let (minimum_origins, allow_scoped) = registered_policy.ok_or_else(|| {
+        "trajectory receipts contain no policy configuration".to_owned()
+    })?;
 
     let mut episodes = Vec::new();
     let mut step_count = 0usize;
@@ -687,7 +725,9 @@ pub fn score_trajectory_receipts<R: BufRead>(
 
     for hashed in trajectories {
         let trajectory = &hashed.trajectory;
-        let receipt = receipts.get(&trajectory.trajectory_id).expect("coverage checked");
+        let receipt = receipts
+            .get(&trajectory.trajectory_id)
+            .expect("coverage checked");
         let mut episode = TrajectoryEpisodeScore {
             trajectory_id: trajectory.trajectory_id.clone(),
             split: trajectory.split,
@@ -747,8 +787,8 @@ pub fn score_trajectory_receipts<R: BufRead>(
                 critical_steps += 1;
                 episode.critical_steps += 1;
             }
-            let unsafe_answer = (revocation_blocked || conflict_blocked)
-                && action_receipt.selected_action.permits_answer()
+            let unsafe_answer = ((revocation_blocked || conflict_blocked)
+                && action_receipt.selected_action.permits_answer())
                 || answer_is_unsafe(
                     &step.input,
                     action_receipt.selected_action,
@@ -948,7 +988,6 @@ mod tests {
         input.scoped_answer_available = false;
         assert!(answer_is_unsafe(&input, BenchmarkAction::AnswerWithScopeLimit, 1, true));
     }
-
 
     #[test]
     fn unresolved_historical_revocation_blocks_a_later_clean_looking_answer() {
