@@ -40,6 +40,8 @@ Dolphin and whale work is part of the same evidence ladder, but the acoustic tas
 
 The safer `CetaceanClassifier::try_new` / `try_classify_audio` paths validate analysis-band Nyquist limits and refuse implicit downsampling via the current linear interpolator. The safer `WhaleSentinel::try_with_config` / `try_process_buffer` paths validate temporal configuration and require the source rate to match the configured sample clock. Older infallible APIs remain for compatibility and do not provide the same input checks.
 
+The shared `symthaea-communication::bioacoustic_corpus` module provides a metadata-only `BioacousticCorpusManifest`, rights-admission evidence, a canonical BLAKE3 manifest identity, annotation bounds/Nyquist checks, and cross-split source/session/site/individual leakage checks. It checks declarations and references; it does not authenticate file bytes or make legal decisions.
+
 High-rate dolphin recordings must not be silently converted to the 44.1 kHz default before click analysis. A successful config check is only input-contract evidence; it does not prove click/whistle detection accuracy, coda classification, communicative meaning or dialogue.
 
 ## Expression policy
