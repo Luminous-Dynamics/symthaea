@@ -1,0 +1,154 @@
+//+ Name: Timpani
+//+ Date: 2024-08-10
+//+ URL: http://freepats.zenvoid.org/orchestral-percussion.html#Timpani
+
+<global>
+ ampeg_release=4
+
+<group>
+ lokey=36 hikey=38
+ pitch_keycenter=38
+ seq_length=2
+<region>
+ seq_position=1
+ sample=samples/1B_v5_rr1.flac
+<region>
+ seq_position=2
+ sample=samples/1B_v5_rr2.flac
+
+<group>
+ lokey=39 hikey=40
+ pitch_keycenter=39
+ seq_length=2
+<region>
+ seq_position=1
+ tune=-60
+ sample=samples/1C_v5_rr1.flac
+<region>
+ seq_position=2
+ tune=-60
+ sample=samples/1C_v5_rr2.flac
+
+<group>
+ lokey=41 hikey=42
+ pitch_keycenter=42
+ seq_length=2
+<region>
+ seq_position=1
+ sample=samples/1D_v5_rr1.flac
+<region>
+ seq_position=2
+ sample=samples/1D_v5_rr2.flac
+
+<group>
+ key=43
+ seq_length=2
+<region>
+ seq_position=1
+ tune=60
+ sample=samples/2A_v5_rr1.flac
+<region>
+ seq_position=2
+ tune=50
+ sample=samples/2A_v5_rr2.flac
+
+<group>
+ lokey=44 hikey=45
+ pitch_keycenter=45
+ seq_length=2
+<region>
+ seq_position=1
+ sample=samples/2B_v5_rr1.flac
+<region>
+ seq_position=2
+ sample=samples/2B_v5_rr2.flac
+
+<group>
+ key=46
+ seq_length=2
+<region>
+ seq_position=1
+ tune=50
+ sample=samples/3A_v5_rr1.flac
+<region>
+ seq_position=2
+ tune=50
+ sample=samples/3A_v5_rr2.flac
+
+<group>
+ key=47
+ seq_length=2
+<region>
+ seq_position=1
+ tune=-50
+ sample=samples/3B_v5_rr1.flac
+<region>
+ seq_position=2
+ tune=-50
+ sample=samples/3B_v5_rr2.flac
+
+<group>
+ lokey=48 hikey=50
+ pitch_keycenter=49
+ seq_length=2
+<region>
+ tune=-30
+ seq_position=1
+ sample=samples/3C_v5_rr1.flac
+<region>
+ tune=-30
+ seq_position=2
+ sample=samples/3C_v5_rr2.flac
+
+<group>
+ lokey=51 hikey=54
+ pitch_keycenter=53
+ seq_length=2
+<region>
+ seq_position=1
+ tune=20
+ sample=samples/4A_v5_rr1.flac
+<region>
+ seq_position=2
+ tune=20
+ sample=samples/4A_v5_rr2.flac
+
+<group>
+ key=55
+ seq_length=2
+<region>
+ seq_position=1
+ tune=50
+ sample=samples/5A_v5_rr1.flac
+<region>
+ seq_position=2
+ pitch_keycenter=53
+ tune=20
+ sample=samples/4A_v5_rr1.flac
+
+<group>
+ key=56
+ seq_length=2
+<region>
+ seq_position=1
+ pitch_keycenter=57
+ tune=20
+ sample=samples/5B_v5_rr1.flac
+<region>
+ seq_position=2
+ pitch_keycenter=55
+ tune=50
+ sample=samples/5A_v5_rr1.flac
+
+<group>
+ lokey=57 hikey=60
+ pitch_keycenter=57
+ seq_length=2
+<region>
+ seq_position=1
+ tune=20
+ sample=samples/5B_v5_rr1.flac
+<region>
+ seq_position=2
+ tune=10
+ sample=samples/5B_v5_rr2.flac

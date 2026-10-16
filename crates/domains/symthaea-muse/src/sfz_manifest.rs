@@ -665,6 +665,33 @@ mod tests {
     }
 
     #[test]
+    fn parses_and_plans_the_complete_pinned_freepats_timpani_map() {
+        const FREEPATS_TIMPANI_SFZ: &str =
+            include_str!("../tests/fixtures/freepats-timpani-20240810.sfz");
+        let manifest = parse_sfz_mapping(FREEPATS_TIMPANI_SFZ).unwrap();
+
+        assert_eq!(manifest.region_count, 24);
+        assert_eq!(manifest.mapped_midi_keys, (36..=60).collect::<Vec<_>>());
+        assert_eq!(manifest.unhandled_opcodes, vec!["ampeg_release"]);
+        assert_eq!(manifest.audio_decode_evidence, "not_performed");
+
+        for key in 36_u8..=60 {
+            let first = plan_sfz_zone_selection(&manifest, key, 96, 0);
+            let second = plan_sfz_zone_selection(&manifest, key, 96, 1);
+            assert_eq!(first.decision, "round_robin_candidate", "key={key}");
+            assert_eq!(second.decision, "round_robin_candidate", "key={key}");
+            assert!(first.selected_region_index.is_some(), "key={key}");
+            assert!(second.selected_region_index.is_some(), "key={key}");
+            assert_ne!(
+                first.selected_region_index, second.selected_region_index,
+                "round-robin positions should differ for key={key}"
+            );
+            assert!(first.frequency_ratio.unwrap().is_finite(), "key={key}");
+            assert!(second.frequency_ratio.unwrap().is_finite(), "key={key}");
+        }
+    }
+
+    #[test]
     fn zone_planner_selects_a_complete_round_robin_deterministically() {
         let source = r#"
 <group> lokey=36 hikey=38 pitch_keycenter=38 seq_length=2
