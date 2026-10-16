@@ -12,6 +12,7 @@
 #![warn(missing_docs)]
 
 /// Structural verifier for selector request/response receipts.
+/// Independent post-outcome benchmark metric computation.
 pub mod metrics;
 pub mod receipt;
 
