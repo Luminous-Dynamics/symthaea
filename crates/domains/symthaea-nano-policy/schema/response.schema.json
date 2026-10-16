@@ -19,7 +19,8 @@
         "requested_budget",
         "selected_count",
         "selected",
-        "limitations"
+        "limitations",
+        "cost_unit"
       ],
       "properties": {
         "schema_version": {
@@ -75,7 +76,8 @@
               "candidate_id",
               "family_id",
               "min_distance",
-              "reason"
+              "reason",
+              "estimated_cost"
             ],
             "properties": {
               "rank": {
@@ -102,6 +104,13 @@
               "reason": {
                 "type": "string",
                 "minLength": 1
+              },
+              "estimated_cost": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
               }
             }
           }
@@ -113,6 +122,13 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "cost_unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
         }
       }
     },
