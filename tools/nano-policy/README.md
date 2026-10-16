@@ -36,6 +36,7 @@ The caller constructs a `SelectionRequest` containing:
 - request schema version `nano-selection-request-v1`;
 - immutable or versioned `feature_schema_id`, including feature transform and order;
 - candidate IDs, numeric features and estimated cost;
+- optional prior-evaluation feature vectors using the same schema (no target values), enabling sequential diversity sampling;
 - policy, selection count, optional total cost budget, explicit seed and cost penalty.
 
 The result is a typed `SelectionReceipt` containing ranked selections, policy scores, cost accounting and exactly one disposition for every input candidate. Oversized diversity batches, non-finite inputs, duplicate IDs, inconsistent feature dimensions, invalid budgets, and excessive work estimates are rejected.
