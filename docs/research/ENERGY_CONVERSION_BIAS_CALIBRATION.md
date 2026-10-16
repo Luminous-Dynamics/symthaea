@@ -60,16 +60,16 @@ Propagate measurement uncertainty with justified covariance assumptions. If the 
 
 ### 5. Bind the claim to auditable evidence
 
-A future machine-enforced calibration record should bind at least:
+The manifest policy now requires `differential_bias_calibration_artifact_id` and `differential_bias_calibration_artifact_sha256`; the verifier requires the ID to appear in `data_provenance` and the declared digest to match that provenance entry. This is **reference consistency**, not retrieval or verification of the artifact bytes, a digital signature, inspection of calibration data, or independent proof that the bound is justified. A future machine-enforced calibration record should also bind at least:
 
-- calibration/reference dataset IDs and content digests;
+- calibration/reference dataset IDs and content digests (the bias-calibration ID and SHA-256 are now required, but actual byte retrieval/verification remains the caller's responsibility);
 - baseline and candidate identities, source revisions, measurement-chain and calibration-standard identities;
 - the exact metric, boundary, mission schedule, units, operating envelope, and excluded conditions;
 - correction model and version, held-out split definition, residual calculation, and bound derivation;
 - sample counts and independent-unit counts, coverage/confidence target, stratified results, and uncertainty/covariance model;
 - calibration date, expiration or revalidation triggers, and the conditions that invalidate transport to a new regime.
 
-A free-text basis remains helpful for reviewers but is not a substitute for structured evidence links, digest verification, and independent calibration review. The current v1 policy does **not yet** implement this full evidence binding.
+A free-text basis remains helpful for reviewers but is not a substitute for structured evidence links or independent calibration review. The current verifier implements only the provenance-ID/digest equality check; it does not resolve the URI, retrieve the artifact, recalculate its hash, validate calibration statistics, or authenticate the producer.
 
 ## Proposed benchmarks and release gates
 
