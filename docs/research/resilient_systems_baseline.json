@@ -509,7 +509,7 @@
       "no_online_replanning",
       "no_policy_fairness_guarantee"
     ],
-    "tests_authored": 15,
+    "tests_authored": 16,
     "tests_executed": false,
     "reference_cases": [
       {
@@ -582,6 +582,15 @@
         "release_build",
         "retain_full_traces_and_validation"
       ]
+    },
+    "exact_oracle": {
+      "status": "test_only_tiny_reference_oracle_authored_unexecuted",
+      "scope": "single_crew_no_prerequisites_no_spare_parts",
+      "enumeration": "all job permutations",
+      "reference_fixture_jobs": 2,
+      "weighted_policy_loss": 111,
+      "exact_optimum_loss": 111,
+      "is_rust_test_executed": false
     }
   }
 }
