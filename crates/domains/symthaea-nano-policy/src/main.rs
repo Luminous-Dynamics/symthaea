@@ -604,6 +604,60 @@ mod tests {
     }
 
     #[test]
+    fn hdc_scalar_level_codebook_preserves_ordered_distance() {
+        let levels = hdc_level_codebook();
+        assert_eq!(levels.len(), HDC_LEVEL_COUNT);
+        let base = &levels[0];
+        let mut previous = 0;
+        for level in levels.iter().skip(1) {
+            let distance = base.hamming_distance(level);
+            assert!(distance >= previous);
+            previous = distance;
+        }
+        assert_eq!(previous as usize, BinaryHV::DIM / 2);
+    }
+
+    #[test]
+    fn hdc_maximin_is_deterministic_and_obeys_budget() {
+        let first = request(
+            Policy::HdcMaximin,
+            3,
+            vec![
+                candidate("a", &[0.0, 0.0]),
+                candidate("b", &[0.1, 0.2]),
+                candidate("c", &[0.8, 0.9]),
+                candidate("d", &[1.0, 1.0]),
+            ],
+        );
+        let mut second = first.clone();
+        second.candidates.reverse();
+        let result = select(&first).expect("valid HDC request");
+        let repeat = select(&second).expect("same request with reordered rows");
+        assert_eq!(selected_ids(&result), selected_ids(&repeat));
+        assert_eq!(result.selected.len(), 3);
+        let unique: std::collections::HashSet<_> = selected_ids(&result).into_iter().collect();
+        assert_eq!(unique.len(), 3);
+        assert!(result.selected.iter().all(|item| {
+            item.score.is_some_and(|score| (0.0..=1.0).contains(&score))
+        }));
+        assert_eq!(
+            result.normalization,
+            "per_feature_min_max_then_symthaea_binary_hdc_256_levels"
+        );
+    }
+
+    #[test]
+    fn hdc_maximin_rejects_unsupported_feature_dimension() {
+        let features = vec![0.0; MAX_HDC_FEATURES + 1];
+        let req = request(
+            Policy::HdcMaximin,
+            1,
+            vec![candidate("a", &features), candidate("b", &features)],
+        );
+        assert!(select(&req).unwrap_err().contains("HDC feature count exceeds"));
+    }
+
+    #[test]
     fn maximin_selects_descriptor_extremes_deterministically() {
         let req = request(
             Policy::Maximin,
