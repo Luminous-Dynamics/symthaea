@@ -127,8 +127,11 @@ fn run() -> Result<(), (u8, String)> {
                 .map_err(|e| (1, format!("trajectory audit failed: {e}")))?;
             let receipt_file = File::open(&args[3]).map_err(input_error)?;
             let score = score_trajectory_receipts(
-                &trajectories, BufReader::new(receipt_file), &args[4],
-            ).map_err(|e| (1, format!("trajectory receipt verification/scoring failed: {e}")))?;
+                &trajectories,
+                BufReader::new(receipt_file),
+                &args[4],
+            )
+            .map_err(|e| (1, format!("trajectory receipt verification/scoring failed: {e}")))?;
             println!("{}", serde_json::to_string_pretty(&score).map_err(internal_error)?);
             if score.unsafe_answer_escapes > 0 || score.budget_violations > 0 {
                 return Err((
