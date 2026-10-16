@@ -87,7 +87,7 @@ The animal communication module now contains `BinaryDetectionCounts` for a decla
 |---|---|
 | Dataset integrity | 100% of evaluated samples have stable IDs, source/license attribution, content hashes and immutable split manifests; reject cross-split sample, recording/session, individual or site overlap for each claimed scope. |
 | Detection/classification | Publish event-level and recording/site-level average precision / PR-AUC (declared convention), precision, recall, false-positive rate, false alarm events per hour on continuous audio, and per-taxon/site support. Compare against the strongest relevant pinned baseline with grouped-bootstrap 95% confidence intervals; never hide weak taxa in a macro average. |
-| Operational threshold | On a validation split, select the highest-recall threshold under a preregistered maximum FPR or false-alarms/hour budget; freeze it before test evaluation and publish the resulting test confusion counts. |
+| Operational threshold | On a validation split, select the highest-recall threshold under a preregistered maximum window-level FPR; freeze it before test evaluation and publish test confusion counts. Report continuous-recording false-alarm events/hour separately using a pinned event-merging rule. |
 | Unit segmentation | Boundary F1 ≥ 0.75 at a task-specific, preregistered tolerance on strongly annotated data, plus bootstrap stability ≥ 0.80. Label these proposed floors until pilot annotation quality is assessed. |
 | Context value-add | Balanced accuracy at least 0.05 absolute above the strongest required non-contextual control on the held-out evaluation, with paired 95% CI for the difference excluding zero. Use a suitable alternative primary metric if the outcome is not categorical, chosen before testing. |
 | Calibration | Expected calibration error ≤ 0.10 and positive Brier skill versus a declared baseline where probabilistic predictions are emitted; provide reliability plots and sample counts. |
@@ -121,6 +121,8 @@ Candidate starting points:
 - WABAD data paper: https://doi.org/10.1002/ecy.70317; full dataset record and dataset description: https://zenodo.org/records/17293588
 - AVES/BirdAVES reference implementation and documented embedding/batching caveat: https://github.com/earthspecies/aves
 - BEANS-ZERO background via Earth Species Project benchmarks: https://earthspecies.org/what-we-do/
+- 2026 foundation-model benchmark comparison across BEANS and BirdSet: https://doi.org/10.1016/j.ecoinf.2026.103765
+- BirdSet dataset collection and focal/soundscape evaluation setup: https://github.com/DBD-research-group/BirdSet
 - BirdNET model documentation (including model scope and license): https://birdnet-team.github.io/BirdNET-Analyzer/stable/models.html
 - Global BirdNET evaluation: https://doi.org/10.1016/j.ecolind.2025.114550
 
@@ -138,7 +140,7 @@ Pin the exact dataset/version and each artifact's license before use. Public ava
 
 1. **Contract hardening (this tranche):** require all registered context controls; reject incomplete/duplicate/blank split identities, non-finite temporal-permutation evidence, and train/test overlap in source-recording lineage.
 2. **Passive corpus audit:** start with BirdVox-full-night v3, pin audio/annotation/metadata manifests, exclude device beeps from positive bird events, and split on source recording/sensor. State clearly that six sensors from one night cannot establish temporal or regional generalization. Use BirdVox-DCASE-20k only as a secondary clip-level comparison because its randomized UUIDs conceal lineage. Audit broader taxa/sites with BirdSet/BEANS after their constituent licenses and source lineage are recorded. No communication or training-quality claim yet.
-3. **Baseline harness:** connect BirdVox-DCASE-20k's source manifest to the new binary detection metrics, declare the average-precision convention, emit per-sample predictions and a separate unit-discovery report using Symthaea's existing immutable run bundle. The metric functions alone do not qualify a run or establish performance.
+3. **Baseline harness:** build a metadata-first manifest for BirdVox-full-night v3 and its six source recordings, link time/frequency annotations, isolate device alarms, and run a nested sensor-grouped evaluation. Select thresholds only inside each outer fold's training/validation data, freeze them before scoring the held-out sensor, and report both window/event metrics plus false alarm events/hour. Use BirdVox-DCASE-20k only as a secondary clip-level comparison because its source lineage is hidden. Emit per-sample predictions and a separate unit-discovery report using Symthaea's existing immutable run bundle. Metric functions alone do not qualify a run or establish performance.
 4. **Context prediction:** preregister one observable target and run every required control on held-out identities/sites/time.
 5. **Expert review:** reconcile annotation uncertainty and review negative controls before using words like “meaning.”
 6. **Intervention proposal:** only after the passive prediction gate passes, submit a species-specific welfare-reviewed protocol.
