@@ -596,7 +596,6 @@ mod tests {
             job("long-low-impact", "mechanical", 10, 0, 1.0, Vec::<String>::new()),
             job("short-critical", "electrical", 1, 1, 100.0, Vec::<String>::new()),
         ];
-        let crews = [crew("crew-a", "mechanical"), crew("crew-b", "electrical")];
         // Give one crew both skills so policy choice is actually tested.
         let crews = [RepairCrew::new("crew-a", ["mechanical", "electrical"], 0)];
         let priority = schedule_repairs(&jobs, &crews, &[], &config(RepairSchedulingPolicy::PriorityFirst)).unwrap();
