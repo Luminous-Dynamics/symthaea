@@ -114,6 +114,12 @@ pub fn summarize_paired_campaigns(
         {
             return Err("discovery cost exceeds total campaign cost".into());
         }
+        let has_discovery = report.first_conforming_cost_units.is_some();
+        if report.best_conforming_utility.is_some() != has_discovery
+            || report.max_conforming_throughput_units.is_some() != has_discovery
+        {
+            return Err("conforming utility/throughput does not match discovery disposition".into());
+        }
 
         let paired_key = (report.scenario, sample.paired_seed_index);
         let entry = paired_inputs.entry(paired_key).or_insert_with(|| {
@@ -269,7 +275,8 @@ pub fn summarize_paired_campaigns(
             let utility_deltas: Vec<f64> = seeds
                 .iter()
                 .map(|seed| {
-                    candidate_trials[seed].utility_per_trial - baseline_trials[seed].utility_per_trial
+                    candidate_trials[seed].utility_per_trial
+                        - baseline_trials[seed].utility_per_trial
                 })
                 .collect();
             let mean_cost_delta = mean(&cost_deltas);
