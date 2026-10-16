@@ -38,6 +38,8 @@ pub enum Policy {
     FarthestFirst,
     /// Farthest-first with a preference for underrepresented families.
     GroupBalancedFarthestFirst,
+    /// Greedy descriptor-space diversity per unit of externally declared cost.
+    CostAwareFarthestFirst,
 }
 
 /// Candidate inputs available to the selector.
@@ -49,6 +51,12 @@ pub enum Policy {
 pub struct Candidate {
     /// Stable, unique candidate identifier.
     pub candidate_id: String,
+    /// Optional positive estimated cost in one frozen cost unit (e.g. simulation seconds).
+    ///
+    /// Required by CostAwareFarthestFirst. Cost provenance and calibration are
+    /// external responsibilities; this field is not predicted by this crate.
+    #[serde(default)]
+    pub estimated_cost: Option<f64>,
     /// Predeclared scientific family/group key used by the group-balanced policy.
     pub family_id: String,
     /// Frozen descriptor vector; values must be finite and lie in [0, 1].
@@ -153,6 +161,10 @@ pub enum SelectionError {
     InvalidFeatureDimensions,
     /// Feature is non-finite or outside [0, 1].
     InvalidFeatureValue,
+    /// A supplied cost is non-finite or non-positive.
+    InvalidEstimatedCost,
+    /// The cost-aware policy was requested but at least one candidate has no cost.
+    MissingEstimatedCost,
     /// Request line exceeds the hard byte limit.
     RequestTooLarge,
 }
@@ -169,6 +181,8 @@ impl SelectionError {
             Self::InvalidCandidateId => "invalid_candidate_id",
             Self::InvalidFeatureDimensions => "invalid_feature_dimensions",
             Self::InvalidFeatureValue => "invalid_feature_value",
+            Self::InvalidEstimatedCost => "invalid_estimated_cost",
+            Self::MissingEstimatedCost => "missing_estimated_cost",
             Self::RequestTooLarge => "request_too_large",
         }
     }
@@ -194,6 +208,12 @@ impl SelectionError {
             ),
             Self::InvalidFeatureValue => {
                 "every normalized feature must be finite and in [0, 1]".to_owned()
+            }
+            Self::InvalidEstimatedCost => {
+                "estimated_cost must be finite and strictly positive".to_owned()
+            }
+            Self::MissingEstimatedCost => {
+                "cost_aware_farthest_first requires estimated_cost for every candidate".to_owned()
             }
             Self::RequestTooLarge => format!("request line exceeds {MAX_LINE_BYTES} bytes"),
         };
@@ -272,6 +292,9 @@ fn select(
         Policy::GroupBalancedFarthestFirst => {
             group_balanced_farthest_first(&request, &sorted, budget)
         }
+        Policy::CostAwareFarthestFirst => {
+            cost_aware_farthest_first(&request, &sorted, budget)
+        }
     };
 
     Ok(SelectionResponse {
@@ -314,6 +337,12 @@ fn validate(request: &SelectionRequest) -> Result<(), SelectionError> {
         return Err(SelectionError::InvalidFeatureDimensions);
     }
 
+    if request.policy == Policy::CostAwareFarthestFirst
+        && request.candidates.iter().any(|candidate| candidate.estimated_cost.is_none())
+    {
+        return Err(SelectionError::MissingEstimatedCost);
+    }
+
     let mut ids = BTreeSet::new();
     for candidate in &request.candidates {
         if candidate.candidate_id.trim().is_empty()
@@ -333,6 +362,12 @@ fn validate(request: &SelectionRequest) -> Result<(), SelectionError> {
             .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
         {
             return Err(SelectionError::InvalidFeatureValue);
+        }
+        if candidate
+            .estimated_cost
+            .is_some_and(|cost| !cost.is_finite() || cost <= 0.0)
+        {
+            return Err(SelectionError::InvalidEstimatedCost);
         }
     }
     Ok(())
@@ -505,6 +540,90 @@ fn group_balanced_farthest_first(
     decisions
 }
 
+/// Select a cheapest anchor, then maximize minimum descriptor distance per
+/// declared evaluation cost. This is a cost-aware diversity baseline, not
+/// expected information gain, calibrated utility, or a physical prediction.
+fn cost_aware_farthest_first(
+    request: &SelectionRequest,
+    sorted: &[usize],
+    budget: usize,
+) -> Vec<SelectionDecision> {
+    let first = sorted
+        .iter()
+        .copied()
+        .min_by(|left, right| {
+            request.candidates[*left]
+                .estimated_cost
+                .expect("cost-aware requests are validated")
+                .total_cmp(
+                    &request.candidates[*right]
+                        .estimated_cost
+                        .expect("cost-aware requests are validated"),
+                )
+                .then_with(|| {
+                    request.candidates[*left]
+                        .candidate_id
+                        .cmp(&request.candidates[*right].candidate_id)
+                })
+        })
+        .expect("validated candidate pool is nonempty");
+
+    let mut selected_flags = vec![false; request.candidates.len()];
+    let mut minimum_squared_distances = vec![f64::INFINITY; request.candidates.len()];
+    let mut decisions = Vec::with_capacity(budget);
+
+    selected_flags[first] = true;
+    decisions.push(decision(
+        &request.candidates[first],
+        1,
+        None,
+        "lowest_declared_cost_anchor",
+    ));
+    update_distances(
+        request,
+        first,
+        sorted,
+        &selected_flags,
+        &mut minimum_squared_distances,
+    );
+
+    while decisions.len() < budget {
+        let mut best: Option<usize> = None;
+        let mut best_score = f64::NEG_INFINITY;
+        for candidate_index in sorted.iter().copied() {
+            if selected_flags[candidate_index] {
+                continue;
+            }
+            let cost = request.candidates[candidate_index]
+                .estimated_cost
+                .expect("cost-aware requests are validated");
+            let score = minimum_squared_distances[candidate_index].sqrt() / cost;
+            if score > best_score {
+                best = Some(candidate_index);
+                best_score = score;
+            }
+        }
+
+        let next = best.expect("budget is bounded by validated candidate count");
+        let distance = minimum_squared_distances[next].sqrt();
+        selected_flags[next] = true;
+        decisions.push(decision(
+            &request.candidates[next],
+            decisions.len() + 1,
+            Some(distance),
+            "maximin_normalized_descriptor_distance_per_cost",
+        ));
+        update_distances(
+            request,
+            next,
+            sorted,
+            &selected_flags,
+            &mut minimum_squared_distances,
+        );
+    }
+    decisions
+}
+
 fn select_farthest(
     sorted: &[usize],
     selected_flags: &[bool],
@@ -618,6 +737,7 @@ mod tests {
     fn candidate(id: &str, family: &str, x: f64, y: f64) -> Candidate {
         Candidate {
             candidate_id: id.to_owned(),
+            estimated_cost: Some(1.0),
             family_id: family.to_owned(),
             normalized_features: vec![x, y],
         }
@@ -637,6 +757,33 @@ mod tests {
                 candidate("candidate-d", "family-c", 0.8, 0.8),
             ],
         }
+    }
+
+    #[test]
+    fn cost_aware_policy_prefers_coverage_per_cost() {
+        let mut req = request(Policy::CostAwareFarthestFirst, 2);
+        req.candidates[0].estimated_cost = Some(10.0);
+        req.candidates[1].estimated_cost = Some(2.0);
+        req.candidates[2].estimated_cost = Some(0.5);
+        req.candidates[3].estimated_cost = Some(1.0);
+
+        let result = select(req, b"cost-aware-test").unwrap();
+        assert_eq!(result.selected[0].candidate_id, "candidate-b");
+        assert_eq!(result.selected[1].candidate_id, "candidate-d");
+        assert_eq!(
+            result.selected[1].reason,
+            "maximin_normalized_descriptor_distance_per_cost"
+        );
+    }
+
+    #[test]
+    fn cost_aware_policy_rejects_missing_and_invalid_costs() {
+        let mut req = request(Policy::CostAwareFarthestFirst, 1);
+        req.candidates[0].estimated_cost = None;
+        assert_eq!(validate(&req), Err(SelectionError::MissingEstimatedCost));
+        req.policy = Policy::FarthestFirst;
+        req.candidates[0].estimated_cost = Some(0.0);
+        assert_eq!(validate(&req), Err(SelectionError::InvalidEstimatedCost));
     }
 
     #[test]
