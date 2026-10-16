@@ -207,7 +207,10 @@ fn kinetic_energy_and_temperature(velocities: &[[f64; 3]], masses: &[f64]) -> (f
     for (v, &m) in velocities.iter().zip(masses.iter()) {
         ke += 0.5 * m * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
     }
-    let n_dof = 3 * velocities.len() - 3; // subtract 3 for CM translation
+    let n_dof = velocities
+        .len()
+        .saturating_mul(3)
+        .saturating_sub(3); // subtract 3 for CM translation
     let temp = if n_dof > 0 {
         2.0 * ke / (n_dof as f64 * crate::stat_mech::K_BOLTZMANN_HARTREE)
     } else {
@@ -215,6 +218,173 @@ fn kinetic_energy_and_temperature(velocities: &[[f64; 3]], masses: &[f64]) -> (f
     };
     (ke, temp)
 }
+
+/// Validation errors returned before molecular AIMD starts an electronic-structure evaluation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MdInputError {
+    EmptyMolecule,
+    UnsupportedElement {
+        atom_index: usize,
+        atomic_number: u8,
+    },
+    NonFiniteCoordinate {
+        atom_index: usize,
+        axis: usize,
+    },
+    UnsupportedMultiplicity { multiplicity: u32 },
+    InvalidElectronCount { electron_count: i64 },
+    OddElectronCount { electron_count: i64 },
+    NonFiniteTimeStep,
+    NonPositiveTimeStep,
+    NonFiniteTimeStepSquared,
+    NonFiniteTemperature,
+    NegativeTemperature,
+    NonFiniteFiniteDifferenceStep,
+    NonPositiveFiniteDifferenceStep,
+    StepCountOverflow,
+    NonFiniteTrajectoryDuration,
+}
+
+impl std::fmt::Display for MdInputError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyMolecule => write!(f, "molecule has no atoms"),
+            Self::UnsupportedElement {
+                atom_index,
+                atomic_number,
+            } => write!(
+                f,
+                "atom {atom_index} has atomic number {atomic_number}, unsupported by STO-3G"
+            ),
+            Self::NonFiniteCoordinate { atom_index, axis } => {
+                write!(f, "atom {atom_index} coordinate axis {axis} is non-finite")
+            }
+            Self::UnsupportedMultiplicity { multiplicity } => write!(
+                f,
+                "multiplicity {multiplicity} is unsupported by restricted Hartree-Fock AIMD; expected singlet (1)"
+            ),
+            Self::InvalidElectronCount { electron_count } => {
+                write!(f, "electron count {electron_count} is not positive")
+            }
+            Self::OddElectronCount { electron_count } => write!(
+                f,
+                "electron count {electron_count} is odd; restricted closed-shell AIMD requires an even count"
+            ),
+            Self::NonFiniteTimeStep => write!(f, "time step dt must be finite"),
+            Self::NonPositiveTimeStep => write!(f, "time step dt must be greater than zero"),
+            Self::NonFiniteTimeStepSquared => {
+                write!(f, "squared time step dt^2 must be finite for Velocity-Verlet integration")
+            }
+            Self::NonFiniteTemperature => write!(f, "temperature must be finite"),
+            Self::NegativeTemperature => write!(f, "temperature must be non-negative"),
+            Self::NonFiniteFiniteDifferenceStep => write!(f, "finite-difference step must be finite"),
+            Self::NonPositiveFiniteDifferenceStep => {
+                write!(f, "finite-difference step must be greater than zero")
+            }
+            Self::StepCountOverflow => {
+                write!(f, "step count plus initial frame overflows usize")
+            }
+            Self::NonFiniteTrajectoryDuration => {
+                write!(f, "total trajectory duration must be finite")
+            }
+        }
+    }
+}
+
+impl std::error::Error for MdInputError {}
+
+/// Validate molecular AIMD inputs before basis construction or SCF evaluation.
+///
+/// This preflight reflects the current molecular RHF/STO-3G implementation,
+/// not a general periodic or open-shell molecular-dynamics capability.
+pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), MdInputError> {
+    if molecule.atoms.is_empty() {
+        return Err(MdInputError::EmptyMolecule);
+    }
+    if config.n_steps.checked_add(1).is_none() {
+        return Err(MdInputError::StepCountOverflow);
+    }
+
+    if !config.dt.is_finite() {
+        return Err(MdInputError::NonFiniteTimeStep);
+    }
+    if config.dt <= 0.0 {
+        return Err(MdInputError::NonPositiveTimeStep);
+    }
+    if !(config.dt * config.n_steps as f64).is_finite() {
+        return Err(MdInputError::NonFiniteTrajectoryDuration);
+    }
+    // Velocity-Verlet multiplies by dt squared; reject overflow before the
+    // force/SCF loop even when the total duration remains finite.
+    if !(config.dt * config.dt).is_finite() {
+        return Err(MdInputError::NonFiniteTimeStepSquared);
+    }
+    if !config.temperature.is_finite() {
+        return Err(MdInputError::NonFiniteTemperature);
+    }
+    if config.temperature < 0.0 {
+        return Err(MdInputError::NegativeTemperature);
+    }
+    if !config.fd_step.is_finite() {
+        return Err(MdInputError::NonFiniteFiniteDifferenceStep);
+    }
+    if config.fd_step <= 0.0 {
+        return Err(MdInputError::NonPositiveFiniteDifferenceStep);
+    }
+
+    for (atom_index, atom) in molecule.atoms.iter().enumerate() {
+        if !crate::basis::sto3g::Sto3g::supports_element(atom.atomic_number) {
+            return Err(MdInputError::UnsupportedElement {
+                atom_index,
+                atomic_number: atom.atomic_number,
+            });
+        }
+        for (axis, coordinate) in atom.position.iter().enumerate() {
+            if !coordinate.is_finite() {
+                return Err(MdInputError::NonFiniteCoordinate { atom_index, axis });
+            }
+        }
+    }
+
+    if molecule.multiplicity != 1 {
+        return Err(MdInputError::UnsupportedMultiplicity {
+            multiplicity: molecule.multiplicity,
+        });
+    }
+    let nuclear_charge: i64 = molecule
+        .atoms
+        .iter()
+        .map(|atom| atom.atomic_number as i64)
+        .sum();
+    let electron_count = nuclear_charge - i64::from(molecule.charge);
+    if electron_count <= 0 {
+        return Err(MdInputError::InvalidElectronCount { electron_count });
+    }
+    if electron_count % 2 != 0 {
+        return Err(MdInputError::OddElectronCount { electron_count });
+    }
+
+    Ok(())
+}
+
+/// Checked molecular AIMD entry point using the fixed default seed.
+pub fn run_md_checked(
+    molecule: &Molecule,
+    config: &MdConfig,
+) -> Result<MdResult, MdInputError> {
+    run_md_checked_with_seed(molecule, config, DEFAULT_MD_SEED)
+}
+
+/// Checked molecular AIMD entry point with a reproducible, explicit seed.
+pub fn run_md_checked_with_seed(
+    molecule: &Molecule,
+    config: &MdConfig,
+    seed: u64,
+) -> Result<MdResult, MdInputError> {
+    validate_md_inputs(molecule, config)?;
+    Ok(run_md_validated_with_seed(molecule, config, seed))
+}
+
 
 /// Run Born-Oppenheimer molecular dynamics using Velocity-Verlet.
 ///
@@ -230,6 +400,11 @@ pub fn run_md(molecule: &Molecule, config: &MdConfig) -> MdResult {
 /// to config.temperature. This makes replicas reproducible; it does not
 /// qualify the underlying electronic-structure model or trajectory physics.
 pub fn run_md_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64) -> MdResult {
+    run_md_checked_with_seed(molecule, config, seed)
+        .unwrap_or_else(|error| panic!("invalid AIMD inputs: {error}"))
+}
+
+fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64) -> MdResult {
     let n_atoms = molecule.n_atoms();
     let masses: Vec<f64> = molecule
         .atoms
@@ -405,7 +580,9 @@ mod tests {
     #[test]
     fn zero_temperature_initialization_is_exactly_stationary() {
         let velocities = initialize_velocities(&h2_masses(), 0.0, 19);
-        assert!(velocities.iter().flatten().all(|velocity| *velocity == 0.0));
+        assert!(
+            velocities.iter().flatten().all(|velocity| *velocity == 0.0)
+        );
     }
 
     #[test]
@@ -429,5 +606,143 @@ mod tests {
         let variance = sum_squares / count as f64 - mean * mean;
         assert!(mean.abs() < 0.03, "sample mean was {mean}");
         assert!((variance - 1.0).abs() < 0.05, "sample variance was {variance}");
+    }
+    #[test]
+    fn validate_default_h2_inputs() {
+        let molecule = Molecule::h2();
+        assert_eq!(validate_md_inputs(&molecule, &MdConfig::default()), Ok(()));
+    }
+
+    #[test]
+    fn validation_rejects_empty_molecule() {
+        let molecule = Molecule::new(vec![]);
+        assert_eq!(
+            validate_md_inputs(&molecule, &MdConfig::default()),
+            Err(MdInputError::EmptyMolecule)
+        );
+    }
+
+    #[test]
+    fn checked_runner_rejects_empty_molecule_before_solver_invocation() {
+        let molecule = Molecule::new(vec![]);
+        assert!(matches!(
+            run_md_checked(&molecule, &MdConfig::default()),
+            Err(MdInputError::EmptyMolecule)
+        ));
+    }
+
+    #[test]
+    fn validation_rejects_invalid_time_step_and_fd_step() {
+        let molecule = Molecule::h2();
+        let mut config = MdConfig::default();
+        config.dt = 0.0;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonPositiveTimeStep)
+        );
+        config.dt = f64::NAN;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteTimeStep)
+        );
+        config.dt = 1.0;
+        config.fd_step = 0.0;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonPositiveFiniteDifferenceStep)
+        );
+        config.fd_step = f64::INFINITY;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteFiniteDifferenceStep)
+        );
+    }
+
+    #[test]
+    fn validation_rejects_overflowing_step_count_or_duration() {
+        let molecule = Molecule::h2();
+        let mut config = MdConfig {
+            n_steps: usize::MAX,
+            ..MdConfig::default()
+        };
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::StepCountOverflow)
+        );
+        config.n_steps = 2;
+        config.dt = f64::MAX;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteTrajectoryDuration)
+        );
+
+        // A one-step run can have finite duration but overflowing dt squared.
+        config.n_steps = 1;
+        config.dt = 1.0e200;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteTimeStepSquared)
+        );
+    }
+
+    #[test]
+    fn validation_rejects_negative_and_non_finite_temperature() {
+        let molecule = Molecule::h2();
+        let mut config = MdConfig::default();
+        config.temperature = -1.0;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NegativeTemperature)
+        );
+        config.temperature = f64::INFINITY;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteTemperature)
+        );
+    }
+
+    #[test]
+    fn validation_rejects_non_finite_geometry_and_unsupported_elements() {
+        let mut molecule = Molecule::h2();
+        molecule.atoms[0].position[1] = f64::NAN;
+        assert_eq!(
+            validate_md_inputs(&molecule, &MdConfig::default()),
+            Err(MdInputError::NonFiniteCoordinate {
+                atom_index: 0,
+                axis: 1,
+            })
+        );
+
+        let unsupported = Molecule::new(vec![crate::molecule::Atom::new(55, 0.0, 0.0, 0.0)]);
+        assert_eq!(
+            validate_md_inputs(&unsupported, &MdConfig::default()),
+            Err(MdInputError::UnsupportedElement {
+                atom_index: 0,
+                atomic_number: 55,
+            })
+        );
+    }
+
+    #[test]
+    fn validation_rejects_open_shell_and_odd_electron_inputs() {
+        let mut open_shell = Molecule::h2();
+        open_shell.multiplicity = 3;
+        assert_eq!(
+            validate_md_inputs(&open_shell, &MdConfig::default()),
+            Err(MdInputError::UnsupportedMultiplicity { multiplicity: 3 })
+        );
+
+        let odd_electron = Molecule::with_charge(Molecule::h2().atoms, 1, 1);
+        assert_eq!(
+            validate_md_inputs(&odd_electron, &MdConfig::default()),
+            Err(MdInputError::OddElectronCount { electron_count: 1 })
+        );
+    }
+
+    #[test]
+    fn kinetic_temperature_handles_empty_velocity_slice() {
+        let (kinetic_energy, temperature) = kinetic_energy_and_temperature(&[], &[]);
+        assert_eq!(kinetic_energy, 0.0);
+        assert_eq!(temperature, 0.0);
     }
 }
