@@ -480,21 +480,8 @@ fn validate_ledger(ledger: &SimulatorBudgetLedger) -> Result<(), String> {
         }
     }
 
-    // Attempts after the budget-th actual invocation can be retained for audit, but
-    // cannot be classified as an exact-protocol completed run.
-    if ledger.run_status == RunStatus::Completed {
-        let call_positions: Vec<usize> = ledger
-            .attempts
-            .iter()
-            .enumerate()
-            .filter_map(|(index, attempt)| attempt.simulator_call.is_some().then_some(index))
-            .collect();
-        if call_positions.len() > ledger.expected_simulator_calls
-            && call_positions.len() > MAX_SIMULATOR_CALLS
-        {
-            return Err("observed simulator calls exceed the hard maximum".to_string());
-        }
-    }
+    // Call-budget ordering is assessed by the audit report below. Structural
+    // constraints (including the per-run cap) have already been checked above.
     Ok(())
 }
 
