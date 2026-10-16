@@ -42,6 +42,10 @@ pub enum RosBridgeError {
     InvalidTrajectory(String),
     #[error("Invalid ROS JointState: {0}")]
     InvalidJointState(String),
+    #[error("Sensor data unavailable: {0}")]
+    SensorDataUnavailable(String),
+    #[error("Invalid sensor data: {0}")]
+    InvalidSensorData(String),
     #[error("Safety interlock blocked trajectory publication: {0}")]
     SafetyInterlock(String),
 }
@@ -141,6 +145,35 @@ fn canonicalize_joint_values(
                 })
         })
         .collect()
+}
+
+/// Validate and normalize an IMU quaternion in ROS [w, x, y, z] order.
+fn normalize_imu_quaternion(quaternion: [f64; 4]) -> Result<[f64; 4], RosBridgeError> {
+    if quaternion.iter().any(|component| !component.is_finite()) {
+        return Err(RosBridgeError::InvalidSensorData(
+            "IMU orientation quaternion contains a non-finite component".into(),
+        ));
+    }
+
+    let norm_squared: f64 = quaternion.iter().map(|component| component * component).sum();
+    if !norm_squared.is_finite() || norm_squared <= 1.0e-24 {
+        return Err(RosBridgeError::InvalidSensorData(
+            "IMU orientation quaternion is degenerate or cannot be normalized".into(),
+        ));
+    }
+
+    let norm = norm_squared.sqrt();
+    Ok(quaternion.map(|component| component / norm))
+}
+
+/// Reject non-finite 3D sensor vectors before they enter physical state.
+fn validate_sensor_vector(field: &str, values: [f64; 3]) -> Result<[f64; 3], RosBridgeError> {
+    if values.iter().any(|component| !component.is_finite()) {
+        return Err(RosBridgeError::InvalidSensorData(format!(
+            "{field} contains a non-finite component"
+        )));
+    }
+    Ok(values)
 }
 
 /// Configuration for the ROS2 bridge node.
@@ -464,7 +497,15 @@ impl RosBridgeNode {
         Ok(())
     }
 
-    /// Estimate and return the current `HumanoidState` using sensor fusion over JointState and IMU.
+    /// Return a humanoid state only when the subscribed evidence can support its fields.
+    ///
+    /// Joint positions and velocities are mapped by canonical joint names. IMU
+    /// orientation and angular velocity are validated, but this bridge currently
+    /// has no odometry or qualified state-estimator source for root/COM linear
+    /// velocity. A single acceleration sample multiplied by a fixed timestep is
+    /// not velocity. Until a typed velocity source is wired in, this method fails
+    /// closed instead of constructing a plausible-looking state with fabricated
+    /// neutral values.
     #[cfg(feature = "ros2")]
     pub fn get_current_humanoid_state(
         &self,
@@ -475,89 +516,42 @@ impl RosBridgeNode {
         let joint_state = joint_state_opt.ok_or(RosBridgeError::NotInitialized)?;
         // DMC21 is the current explicit bridge profile. Resolve semantic identity
         // by JointState.name; never assume transport array position is model order.
-        let canonical_positions = canonicalize_joint_values(
+        let _canonical_positions = canonicalize_joint_values(
             &joint_state.name,
             &joint_state.position,
             &symthaea_humanoid::types::JOINT_NAMES,
             "position",
         )?;
-        let canonical_velocities = canonicalize_joint_values(
+        let _canonical_velocities = canonicalize_joint_values(
             &joint_state.name,
             &joint_state.velocity,
             &symthaea_humanoid::types::JOINT_NAMES,
             "velocity",
         )?;
 
-        // Torso orientation and angular velocity from IMU
-        let root_quat = if let Some(ref imu) = imu_opt {
-            [
-                imu.orientation.w,
-                imu.orientation.x,
-                imu.orientation.y,
-                imu.orientation.z,
-            ]
-        } else {
-            [1.0, 0.0, 0.0, 0.0]
-        };
-
-        let root_ang_vel = if let Some(ref imu) = imu_opt {
+        let imu = imu_opt.ok_or_else(|| {
+            RosBridgeError::SensorDataUnavailable(
+                "IMU orientation/angular velocity is absent; no neutral physical state was substituted".into(),
+            )
+        })?;
+        let _orientation = normalize_imu_quaternion([
+            imu.orientation.w,
+            imu.orientation.x,
+            imu.orientation.y,
+            imu.orientation.z,
+        ])?;
+        let _angular_velocity = validate_sensor_vector(
+            "IMU angular velocity",
             [
                 imu.angular_velocity.x,
                 imu.angular_velocity.y,
                 imu.angular_velocity.z,
-            ]
-        } else {
-            [0.0, 0.0, 0.0]
-        };
+            ],
+        )?;
 
-        // Torso vertical vector from IMU orientation
-        let torso_vertical = if let Some(ref imu) = imu_opt {
-            let w = imu.orientation.w;
-            let x = imu.orientation.x;
-            let y = imu.orientation.y;
-            let z = imu.orientation.z;
-            [
-                2.0 * (x * z + w * y),
-                2.0 * (y * z - w * x),
-                1.0 - 2.0 * (x * x + y * y),
-            ]
-        } else {
-            [0.0, 0.0, 1.0]
-        };
-
-        // Linear velocity estimated from IMU linear acceleration as a simple proxy
-        let root_lin_vel = if let Some(ref imu) = imu_opt {
-            [
-                imu.linear_acceleration.x * 0.025,
-                imu.linear_acceleration.y * 0.025,
-                imu.linear_acceleration.z * 0.025,
-            ]
-        } else {
-            [0.0, 0.0, 0.0]
-        };
-
-        let timestamp =
-            joint_state.header.stamp.sec as f64 + (joint_state.header.stamp.nanosec as f64 * 1e-9);
-
-        // Standard DMC humanoid heights: root at ~1.3m, head at ~1.4m
-        let root_height = 1.3;
-        let head_height = 1.4;
-
-        let mut state = self.ros_joint_states_to_humanoid(
-            &canonical_positions,
-            &canonical_velocities,
-            head_height,
-            torso_vertical,
-            root_lin_vel,
-            timestamp,
-        );
-
-        // Update root pose metrics with actual IMU orientation & height
-        state.root_height = root_height;
-        state.root_quaternion = root_quat;
-        state.root_angular_velocity = root_ang_vel;
-
-        Ok(state)
+        Err(RosBridgeError::SensorDataUnavailable(
+            "root linear velocity and center-of-mass velocity are not subscribed or estimated by this bridge; IMU linear acceleration cannot substitute for velocity. Add a qualified odometry/state-estimator source before constructing HumanoidState".into(),
+        ))
     }
 
     /// Log status and trajectory states to a local CSV file for offline replay and IIT diagnostics.
@@ -1102,6 +1096,33 @@ mod tests {
     }
 
     #[test]
+    fn imu_quaternion_is_normalized_and_rejects_degenerate_or_nonfinite_values() {
+        let normalized = normalize_imu_quaternion([2.0, 0.0, 0.0, 0.0]).unwrap();
+        assert_eq!(normalized, [1.0, 0.0, 0.0, 0.0]);
+
+        assert!(matches!(
+            normalize_imu_quaternion([0.0, 0.0, 0.0, 0.0]),
+            Err(RosBridgeError::InvalidSensorData(_))
+        ));
+        assert!(matches!(
+            normalize_imu_quaternion([f64::NAN, 0.0, 0.0, 1.0]),
+            Err(RosBridgeError::InvalidSensorData(_))
+        ));
+    }
+
+    #[test]
+    fn sensor_vectors_reject_nonfinite_components() {
+        assert_eq!(
+            validate_sensor_vector("angular velocity", [1.0, -2.0, 3.0]).unwrap(),
+            [1.0, -2.0, 3.0]
+        );
+        assert!(matches!(
+            validate_sensor_vector("angular velocity", [0.0, f64::INFINITY, 0.0]),
+            Err(RosBridgeError::InvalidSensorData(_))
+        ));
+    }
+
+    #[test]
     fn test_hdc_encoding_and_surprise() {
         let node = RosBridgeNode::new(RosBridgeConfig::default());
         let mut joints = vec![0.0f32; symthaea_humanoid::types::JOINT_NAMES.len()];
@@ -1128,6 +1149,19 @@ mod tests {
             js.position = joints.iter().map(|&value| value as f64).collect();
             js.velocity = vec![0.0; js.name.len()];
             *node.latest_joint_state.lock().unwrap() = Some(js);
+
+            assert!(matches!(
+                node.get_current_humanoid_state(),
+                Err(RosBridgeError::SensorDataUnavailable(reason)) if reason.contains("IMU")
+            ));
+
+            let mut imu = sensor_msgs::msg::Imu::default();
+            imu.orientation.w = 1.0;
+            *node.latest_imu.lock().unwrap() = Some(imu);
+            assert!(matches!(
+                node.get_current_humanoid_state(),
+                Err(RosBridgeError::SensorDataUnavailable(reason)) if reason.contains("linear velocity")
+            ));
 
             node.update_surprise_monitor().unwrap();
             let surprise = node.surprise_monitor.lock().unwrap().current_surprise;
