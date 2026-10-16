@@ -249,12 +249,7 @@ fn qualify_case(
         "<region> key={REQUESTED_KEY} pitch_keycenter={PITCH_KEYCENTER} sample={sample_name}\n"
     );
     let manifest = parse_sfz_mapping(&sfz_source)?;
-    let output_frequency = (source_tone_cycles_per_frame * 2.0).rem_euclid(1.0);
-    let output_alias_frequency = if output_frequency > 0.5 {
-        1.0 - output_frequency
-    } else {
-        output_frequency
-    };
+    let output_alias_frequency = fold_normalized_frequency(source_tone_cycles_per_frame * 2.0);
 
     let linear = measure_path(
         &manifest,
@@ -396,6 +391,12 @@ fn measure_path(
     })
 }
 
+/// Fold a normalized sinusoid into the Nyquist interval [0, 0.5].
+fn fold_normalized_frequency(cycles_per_frame: f64) -> f64 {
+    let wrapped = cycles_per_frame.rem_euclid(1.0);
+    if wrapped > 0.5 { 1.0 - wrapped } else { wrapped }
+}
+
 /// Single-tone quadrature amplitude, excluding 10% of each edge to reduce
 /// finite-window effects. The same estimator is used for both algorithms.
 fn tone_amplitude(samples: &[f32], cycles_per_frame: f64) -> f64 {
@@ -430,4 +431,34 @@ fn cpu_model_name() -> String {
         }
     }
     "unreported-by-host".to_owned()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalized_frequency_folds_aliases_into_nyquist_interval() {
+        assert!((fold_normalized_frequency(0.40 * 2.0) - 0.20).abs() < 1.0e-12);
+        assert!((fold_normalized_frequency(0.10 * 2.0) - 0.20).abs() < 1.0e-12);
+        assert!((fold_normalized_frequency(0.75) - 0.25).abs() < 1.0e-12);
+        assert!((fold_normalized_frequency(1.25) - 0.25).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn quadrature_estimator_recovers_known_tone_amplitude() {
+        let frequency = 0.137;
+        let amplitude = 0.37_f64;
+        let samples: Vec<f32> = (0..20_000)
+            .map(|index| {
+                (amplitude * (std::f64::consts::TAU * frequency * index as f64).sin()) as f32
+            })
+            .collect();
+        let measured = tone_amplitude(&samples, frequency);
+        assert!(
+            (measured - amplitude).abs() < 1.0e-4,
+            "measured {measured}, expected {amplitude}"
+        );
+    }
 }
