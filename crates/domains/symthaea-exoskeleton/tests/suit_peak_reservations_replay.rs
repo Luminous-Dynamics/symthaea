@@ -24,7 +24,7 @@ use symthaea_exoskeleton::suit_peak_reservations::{
     MissionTimeWindow, PeakQuantityInterval, PeakResourceFindingCode, PeakResourceFindingSeverity,
     PeakResourceKind, PeakResourcePool, PeakResourceReservation, PeakResourceReservationPlan,
     PeakResourceReservationReceipt, PeakResourceReservationReport,
-    PeakResourceReservationStatus, PeakResourcePoolStatus, PeakWindowStatus,
+    PeakResourceReservationStatus, PeakWindowStatus,
 };
 
 fn fixture() -> (
@@ -317,7 +317,9 @@ fn independent_plan_digest(plan: &PeakResourceReservationPlan) -> String {
         h.string(evidence_tag(pool.evidence_level));
         h.string(&pool.evidence_reference);
         h.usize(pool.applicable_environments.len());
-        for environment in &pool.applicable_environments { h.string(environment_tag(*environment)); }
+        for environment in &pool.applicable_environments {
+            h.string(environment_tag(*environment));
+        }
     }
     let mut reservations: Vec<_> = plan.reservations.iter().collect();
     reservations.sort_by(|a, b| a.reservation_id.cmp(&b.reservation_id));
@@ -487,15 +489,23 @@ fn window_status_tag(value: PeakWindowStatus) -> &'static str {
 fn finding_code_tag(value: PeakResourceFindingCode) -> &'static str {
     match value {
         PeakResourceFindingCode::MissingProviderComponent => "missing_provider_component",
-        PeakResourceFindingCode::ProviderHardwareRevisionMismatch => "provider_hardware_revision_mismatch",
+        PeakResourceFindingCode::ProviderHardwareRevisionMismatch => {
+            "provider_hardware_revision_mismatch"
+        },
         PeakResourceFindingCode::ProviderNotReachable => "provider_not_reachable",
         PeakResourceFindingCode::MissingProviderConnection => "missing_provider_connection",
-        PeakResourceFindingCode::ProviderConnectionDoesNotBindProvider => "provider_connection_does_not_bind_provider",
+        PeakResourceFindingCode::ProviderConnectionDoesNotBindProvider => {
+            "provider_connection_does_not_bind_provider"
+        },
         PeakResourceFindingCode::ProviderConnectionBlocked => "provider_connection_blocked",
-        PeakResourceFindingCode::ProviderConnectionEnvironmentMismatch => "provider_connection_environment_mismatch",
+        PeakResourceFindingCode::ProviderConnectionEnvironmentMismatch => {
+            "provider_connection_environment_mismatch"
+        },
         PeakResourceFindingCode::EnvironmentScopeMismatch => "environment_scope_mismatch",
         PeakResourceFindingCode::SupplyEvidenceBelowPolicy => "supply_evidence_below_policy",
-        PeakResourceFindingCode::ReservationEvidenceBelowPolicy => "reservation_evidence_below_policy",
+        PeakResourceFindingCode::ReservationEvidenceBelowPolicy => {
+            "reservation_evidence_below_policy"
+        },
         PeakResourceFindingCode::RequiredOversubscription => "required_oversubscription",
         PeakResourceFindingCode::OptionalOversubscription => "optional_oversubscription",
     }
