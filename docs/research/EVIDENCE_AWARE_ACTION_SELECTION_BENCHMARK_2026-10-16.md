@@ -30,6 +30,7 @@ Selective prediction and conformal abstention research also makes clear that red
 - Sina Tayebati et al. (2025), [CAP: Conformalized Abstention Policies for Context-Adaptive Risk Management for LLMs and VLMs](https://proceedings.mlr.press/v304/tayebati26a.html). Relevant to explicitly evaluating policy-calibrated coverage and risk/coverage trade-offs.
 - Varun Kotte (2026), [When Can Conformal Risk Control Certify LLM Outputs? Bounds, Impossibility, and Adaptation for Structured Generation](https://arxiv.org/abs/2606.29054). Relevant to feasibility checks, finite-sample bounds, and behavior under distribution shift.
 - W3C, [PROV-O: The PROV Ontology](https://www.w3.org/TR/prov-o/). A vocabulary for entities and derivations; using a provenance representation does not itself authenticate the entities or certify truth.
+- Sina Tayebati et al. (2026), [TRACER: Trajectory Risk Aggregation for Critical Episodes in Agentic Reasoning](https://proceedings.mlr.press/v306/tayebati26a.html). Motivates measuring failures across multi-step agent episodes, not only isolated decisions.
 
 ## 3. Prototype contract
 
@@ -161,7 +162,27 @@ Each case family should include near-identical variants where only one meaningfu
 
 The paired case is the experimental unit. Report consistency over the pair and the exact expected transition, not only aggregate accuracy.
 
-## 8. Implementation sequence
+## 8. Trajectory-level and online reliability
+
+A static case benchmark cannot reveal a policy that behaves acceptably one turn at a time but accumulates risk over an episode. Agentic reasoning repeatedly acquires, revises, and acts on evidence; a failure can be caused by a stale assessment carried forward, a failed acquisition treated as success, repeated retries that exhaust budget, or a sequence of individually plausible but jointly unsafe decisions.
+
+Add an episode benchmark with 10–100 decision steps and predeclared event schedules for source withdrawal, contradiction arrival, retrieval/tool errors, delayed evidence, budget exhaustion, and question clarification. Every step must record its exact input assessment, policy version, action/reason, acquisition result, remaining budget, and whether any substantive answer was emitted. Replay must be deterministic for a frozen event trace.
+
+Report both stepwise and episode-level metrics:
+
+- Any unsupported substantive answer per episode (primary safety metric).
+- Maximum severity of an unsupported claim in the trajectory, with a preregistered severity rubric.
+- Number of actions until a justified answer, clarification, or terminal abstention.
+- Acquisition attempts, successful repairs, unsuccessful retries, cumulative cost, and budget violations.
+- Repeated acquisition loops and clarification loops without material information gain.
+- Tail risk and the worst-case subgroup results, not only average per-step risk.
+- Action-policy drift after source revocation, revision updates, or distribution shift.
+
+Use a high-risk adversarial suite in which revocation or contradiction arrives after an earlier valid answer. The system must not retroactively erase the historical action receipt; it must append a correction/withdrawal event and stop treating the former source as current support. Distinguish past-answer correctness under then-current evidence from present eligibility under updated evidence.
+
+Trajectory-level risk aggregation is supported as a research direction by TRACER (ICML 2026), which studies critical failures in tool-agent-user episodes. Its metrics do not transfer as a guarantee to this policy. Any online/conformal guarantee would require a separately stated target risk, calibration/feedback process, dependence or exchangeability assumptions, and evidence that those assumptions hold under update and acquisition behavior. This prototype currently offers no such guarantee.
+
+## 9. Implementation sequence
 
 1. **Current PR:** add and unit-test the standalone deterministic action-policy kernel.
 2. **Next:** create an immutable JSONL case format and an independent receipt checker; reject unknown fields, duplicate IDs, missing labels, family leakage, and altered case digests.
@@ -169,9 +190,10 @@ The paired case is the experimental unit. Report consistency over the pair and t
 4. Add expert-adjudicated, source-family-disjoint cases and blind disagreement review.
 5. Join policy input assessments to the already separate provenance, lineage, derivation graph, and proof-formula results; retain component outputs as evidence, not as truth.
 6. Evaluate baselines, paired perturbations, calibration if a probabilistic selector is later introduced, and clustered uncertainty.
-7. Wire into the live answer path only after the end-to-end test shows that it receives trustworthy upstream assessments and that action receipts are auditable.
+7. Add episode-level replay and risk evaluation, including revocation and post-acquisition failure traces.
+8. Wire into the live answer path only after the end-to-end test shows that it receives trustworthy upstream assessments and that action receipts are auditable.
 
-## 9. Acceptance rule
+## 10. Acceptance rule
 
 A passing structural suite establishes only that the code follows its declared action contract on those tests. A passing synthetic benchmark establishes only behavior on that fixture. A source-disjoint, adjudicated test suite is needed for meaningful external validity. Production integration additionally needs end-to-end evidence of provenance inputs, budget enforcement, repair results, action receipts, latency, and policy-version binding.
 
