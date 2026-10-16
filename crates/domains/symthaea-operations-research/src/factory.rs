@@ -460,7 +460,9 @@ fn critical_path_lower_bound(
         let ready: Vec<String> = pending
             .iter()
             .filter(|operation_id| {
-                indexed[*operation_id]
+                indexed
+                    .get(operation_id.as_str())
+                    .expect("pending operation was validated and indexed")
                     .predecessors
                     .iter()
                     .all(|predecessor| earliest_finish.contains_key(predecessor))
