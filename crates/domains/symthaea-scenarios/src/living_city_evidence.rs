@@ -1,11 +1,12 @@
 //! Evidence manifests and scenario-run receipts for the living-city workflow.
 //!
-//! This module validates receipt structure and emits deterministic canonical
-//! bytes. It deliberately does not implement a cryptographic hash in pure std:
-//! the orchestration/verifier layer must compute SHA-256 over these bytes and
-//! independently recompute it from the retained artifacts.
+//! This module validates evidence/receipt structure, produces deterministic
+//! canonical bytes, and recomputes SHA-256 digests over retained source/output
+//! bytes. It is still a library contract, not by itself a separately deployed
+//! independent process: deployment must ensure that this verifier consumes
+//! retained artifacts rather than trusting generator-supplied digest strings.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Current schema version for evidence manifests and run receipts.
 pub const EVIDENCE_SCHEMA_VERSION: u32 = 1;
@@ -592,6 +593,106 @@ pub fn verify_evidence_item_bytes(
         return Err(invalid(
             "items.content_sha256",
             "recomputed digest does not match retained source bytes",
+        ));
+    }
+    Ok(())
+}
+
+/// Verify all retained source files referenced by a manifest.
+///
+/// Every non-missing source must be supplied by its manifest item ID and have
+/// bytes that match the declared digest. Explicitly missing sources must not be
+/// smuggled in under the same ID. Extra/unreferenced bytes are rejected to make
+/// accidental source substitution visible.
+pub fn verify_manifest_source_bytes(
+    manifest: &EvidenceManifest,
+    retained_sources: &BTreeMap<String, Vec<u8>>,
+) -> Result<(), EvidenceContractError> {
+    manifest.validate()?;
+    let expected_ids: BTreeSet<&str> = manifest.items.iter().map(|item| item.id.as_str()).collect();
+
+    for item in &manifest.items {
+        match item.kind {
+            EvidenceKind::Missing => {
+                if retained_sources.contains_key(&item.id) {
+                    return Err(invalid(
+                        "retained_sources",
+                        "bytes were supplied for an item explicitly declared missing",
+                    ));
+                }
+            }
+            _ => {
+                let bytes = retained_sources.get(&item.id).ok_or_else(|| {
+                    invalid(
+                        "retained_sources",
+                        "manifest source bytes are absent from the verification input",
+                    )
+                })?;
+                verify_evidence_item_bytes(item, bytes)?;
+            }
+        }
+    }
+
+    if retained_sources
+        .keys()
+        .any(|id| !expected_ids.contains(id.as_str()))
+    {
+        return Err(invalid(
+            "retained_sources",
+            "unreferenced source bytes are not present in the manifest",
+        ));
+    }
+    Ok(())
+}
+
+/// Verify that every receipt output digest matches the corresponding retained
+/// bytes, with no missing or extra output artifacts.
+pub fn verify_receipt_output_bytes(
+    receipt: &ScenarioRunReceipt,
+    retained_outputs: &BTreeMap<String, Vec<u8>>,
+) -> Result<(), EvidenceContractError> {
+    receipt.validate()?;
+    let expected_ids: BTreeSet<&str> = receipt.outputs.iter().map(|item| item.id.as_str()).collect();
+
+    for artifact in &receipt.outputs {
+        let bytes = retained_outputs.get(&artifact.id).ok_or_else(|| {
+            invalid(
+                "retained_outputs",
+                "receipt output bytes are absent from the verification input",
+            )
+        })?;
+        verify_output_artifact_bytes(artifact, bytes)?;
+    }
+
+    if retained_outputs
+        .keys()
+        .any(|id| !expected_ids.contains(id.as_str()))
+    {
+        return Err(invalid(
+            "retained_outputs",
+            "unreferenced output bytes are not present in the receipt",
+        ));
+    }
+    Ok(())
+}
+
+/// Bind a receipt to the exact evidence-manifest snapshot and scenario identity.
+pub fn verify_receipt_manifest_link(
+    receipt: &ScenarioRunReceipt,
+    manifest: &EvidenceManifest,
+) -> Result<(), EvidenceContractError> {
+    receipt.validate()?;
+    let actual_manifest_digest = evidence_manifest_sha256(manifest)?;
+    if receipt.evidence_manifest_sha256 != actual_manifest_digest {
+        return Err(invalid(
+            "evidence_manifest_sha256",
+            "receipt does not reference this exact canonical evidence manifest",
+        ));
+    }
+    if receipt.scenario_id != manifest.scenario_id {
+        return Err(invalid(
+            "scenario_id",
+            "receipt and evidence manifest refer to different scenarios",
         ));
     }
     Ok(())
