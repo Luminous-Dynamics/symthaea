@@ -123,16 +123,7 @@ fn compute_file_digest_map(
     Ok(digests)
 }
 
-fn run() -> Result<(), Box<dyn Error>> {
-    let mut args = env::args_os();
-    let _program = args.next();
-    let run_directory = match (args.next(), args.next()) {
-        (Some(path), None) => PathBuf::from(path),
-        _ => {
-            return Err(invalid_input("usage: living_city_verify <run-directory>").into());
-        }
-    };
-
+fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn Error>> {
     let root = fs::canonicalize(run_directory)?;
     if !root.is_dir() {
         return Err(invalid_input("run-directory must be a directory").into());
@@ -148,8 +139,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     manifest.validate()?;
     receipt.validate()?;
 
-    let receipt_digest_sidecar =
-        read_package_file(&root, &bundle.receipt_sha256_path)?;
+    let receipt_digest_sidecar = read_package_file(&root, &bundle.receipt_sha256_path)?;
     let expected_receipt_sha256 = std::str::from_utf8(&receipt_digest_sidecar)?.trim();
     verify_scenario_run_receipt_digest(&receipt, expected_receipt_sha256)?;
     verify_receipt_manifest_link(&receipt, &manifest)?;
@@ -174,7 +164,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         .map(|item| item.id.as_str())
         .collect();
 
-    let report = serde_json::json!({
+    Ok(serde_json::json!({
         "schema_version": 1,
         "package_integrity": "verified",
         "run_id": receipt.run_id,
@@ -187,11 +177,23 @@ fn run() -> Result<(), Box<dyn Error>> {
         "verified_output_count": output_digests.len(),
         "explicit_missing_source_ids": missing_sources,
         "scope": "Package integrity and digest linkage only. This report does not authenticate receipt authorship, validate the physical models or solver claims, establish jurisdictional code compliance, replace professional review, or authorize construction."
-    });
+    }))
+}
+
+fn run() -> Result<(), Box<dyn Error>> {
+    let mut args = env::args_os();
+    let _program = args.next();
+    let run_directory = match (args.next(), args.next()) {
+        (Some(path), None) => PathBuf::from(path),
+        _ => {
+            return Err(invalid_input("usage: living_city_verify <run-directory>").into());
+        }
+    };
+
+    let report = verify_run_package(&run_directory)?;
     println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(())
 }
-
 fn main() {
     if let Err(error) = run() {
         eprintln!("living_city_verify: verification failed: {error}");
