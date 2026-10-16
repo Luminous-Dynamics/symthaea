@@ -119,7 +119,7 @@ pub struct RosBridgeNode {
 
 /// Semantic field emitted for one ROS joint. Unit matching is mandatory because
 /// JointTrajectory itself does not carry quantity/unit metadata.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RosJointQuantityV2 {
     Position,
     Velocity,
