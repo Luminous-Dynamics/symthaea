@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod evaluator;
+pub use evaluator::evaluate_transcript;
+
 pub const BENCHMARK_ID: &str = "MFG-ACTIVE-001";
 pub const SCHEMA_VERSION: u16 = 1;
 pub const PROFILE_ID: &str = "profile:synthetic-reference-cell-v1";
@@ -236,7 +239,7 @@ impl CampaignManifest {
         Ok(())
     }
 
-    fn public_view(&self) -> PublicCampaignView {
+    pub(crate) fn public_view(&self) -> PublicCampaignView {
         PublicCampaignView {
             benchmark_id: self.benchmark_id.clone(),
             process_profile_id: self.process_profile_id.clone(),
@@ -311,7 +314,7 @@ pub struct ExperimentAction {
 }
 
 impl ExperimentAction {
-    fn key(&self) -> String {
+    pub(crate) fn key(&self) -> String {
         format!("{}:{:?}", self.candidate_id, self.fidelity)
     }
 }
@@ -683,7 +686,7 @@ fn synthetic_oracle(
     }
 }
 
-fn measurement_digest(
+pub(crate) fn measurement_digest(
     manifest_digest: &str,
     action: &ExperimentAction,
     process_profile_id: &str,
@@ -731,171 +734,6 @@ fn campaign_claims(
 /// This evaluator is a separate function boundary from policy selection and oracle access,
 /// but is in the same source module and is not an independently built executable. The receipt
 /// digest proves byte identity within this harness; it is not a signature or proof of physical evidence.
-pub fn evaluate_transcript(
-    manifest: &CampaignManifest,
-    transcript: &CampaignTranscript,
-) -> Result<EvaluationReport, String> {
-    manifest.validate()?;
-    let expected_manifest_digest = manifest.digest()?;
-    if transcript.manifest_digest != expected_manifest_digest {
-        return Err("manifest digest mismatch".into());
-    }
-
-    if transcript.records.len() < manifest.initial_actions.len() {
-        return Err("transcript omitted required initial observations".into());
-    }
-    for (index, expected_action) in manifest.initial_actions.iter().enumerate() {
-        if transcript.records[index].action != *expected_action {
-            return Err("initial observations are missing or out of order".into());
-        }
-    }
-
-    let candidates: BTreeMap<&str, &Candidate> = manifest
-        .candidates
-        .iter()
-        .map(|candidate| (candidate.id.as_str(), candidate))
-        .collect();
-    let view = manifest.public_view();
-    let mut seen_actions = BTreeSet::new();
-    let mut cumulative_cost = 0u32;
-    let mut first_conforming_cost = None;
-    let mut best_utility: Option<i64> = None;
-    let mut best_conforming_throughput: Option<u32> = None;
-    let mut total_resource = 0u32;
-    let mut points = BTreeSet::new();
-
-    for (index, record) in transcript.records.iter().enumerate() {
-        if record.step_index != index as u32 {
-            return Err("step indices are not contiguous and ordered".into());
-        }
-        let candidate = candidates
-            .get(record.action.candidate_id.as_str())
-            .ok_or_else(|| "transcript references a candidate outside the manifest".to_string())?;
-        if candidate.feasibility != Feasibility::Feasible {
-            return Err("blocked or unknown candidate escaped the feasibility gate".into());
-        }
-        if candidate.process_profile_id != manifest.process_profile_id {
-            return Err("candidate process profile does not match manifest".into());
-        }
-        let fidelity_available = match record.action.fidelity {
-            Fidelity::Proxy => candidate.proxy_available,
-            Fidelity::Reference => candidate.reference_available,
-        };
-        if !fidelity_available {
-            return Err("transcript uses unavailable measurement fidelity".into());
-        }
-        if !seen_actions.insert(record.action.key()) {
-            return Err("duplicate candidate/fidelity action in transcript".into());
-        }
-        if !record.measurements.complete() {
-            return Err("missing required measurement; evaluation is not admissible".into());
-        }
-
-        let canonical_cost = view.action_cost(candidate, record.action.fidelity);
-        if record.reported_cost_units != canonical_cost {
-            return Err("reported action cost differs from manifest-defined cost".into());
-        }
-        cumulative_cost = cumulative_cost
-            .checked_add(canonical_cost)
-            .ok_or_else(|| "cumulative cost overflow".to_string())?;
-        if cumulative_cost > manifest.budget_units {
-            return Err("campaign exceeded its declared experiment budget".into());
-        }
-
-        let expected_measurement_digest = measurement_digest(
-            &expected_manifest_digest,
-            &record.action,
-            &candidate.process_profile_id,
-            &record.measurements,
-        )?;
-        if record.measurement_digest != expected_measurement_digest {
-            return Err("measurement receipt digest mismatch".into());
-        }
-
-        let margin = record.measurements.quality_margin_milli.expect("checked complete");
-        let throughput = record.measurements.throughput_units.expect("checked complete");
-        let resource = record.measurements.resource_units.expect("checked complete");
-        let is_conforming = margin >= manifest.minimum_quality_margin_milli;
-        if record.claimed_conforming != is_conforming {
-            return Err("claimed conformity does not match measured quality margin".into());
-        }
-
-        if is_conforming {
-            if first_conforming_cost.is_none() {
-                first_conforming_cost = Some(cumulative_cost);
-            }
-            let utility = i64::from(throughput) * 1000 - i64::from(resource) * 100
-                + i64::from(margin);
-            if best_conforming_throughput.is_none_or(|best| throughput > best) {
-                best_conforming_throughput = Some(throughput);
-            }
-            if best_utility.is_none_or(|best| utility > best) {
-                best_utility = Some(utility);
-            }
-        }
-        total_resource = total_resource
-            .checked_add(resource)
-            .ok_or_else(|| "resource total overflow".to_string())?;
-        points.insert((candidate.factor_x, candidate.factor_y));
-    }
-
-    if transcript.claimed_total_cost_units != cumulative_cost {
-        return Err("claimed campaign cost differs from recomputed cost".into());
-    }
-    if transcript.claimed_first_conforming_cost_units != first_conforming_cost {
-        return Err("claimed discovery cost differs from recomputed discovery cost".into());
-    }
-    if transcript.claimed_best_utility != best_utility {
-        return Err("claimed best utility differs from recomputed utility".into());
-    }
-
-    let blocked_count = manifest
-        .candidates
-        .iter()
-        .filter(|candidate| matches!(&candidate.feasibility, Feasibility::Blocked { .. }))
-        .count() as u32;
-    let unknown_count = manifest
-        .candidates
-        .iter()
-        .filter(|candidate| matches!(&candidate.feasibility, Feasibility::Unknown { .. }))
-        .count() as u32;
-
-    Ok(EvaluationReport {
-        benchmark_id: manifest.benchmark_id.clone(),
-        scenario: manifest.scenario,
-        policy: transcript.policy,
-        manifest_digest: expected_manifest_digest,
-        experiments: transcript.records.len() as u32,
-        total_cost_units: cumulative_cost,
-        first_conforming_cost_units: first_conforming_cost,
-        best_conforming_utility: best_utility,
-        max_conforming_throughput_units: best_conforming_throughput,
-        total_resource_units: total_resource,
-        blocked_catalog_candidates: blocked_count,
-        unknown_catalog_candidates: unknown_count,
-        factor_design_full_rank: has_full_rank_factor_design(&points),
-    })
-}
-
-fn has_full_rank_factor_design(points: &BTreeSet<(i32, i32)>) -> bool {
-    let points: Vec<_> = points.iter().copied().collect();
-    for a in 0..points.len() {
-        for b in (a + 1)..points.len() {
-            for c in (b + 1)..points.len() {
-                let (x1, y1) = points[a];
-                let (x2, y2) = points[b];
-                let (x3, y3) = points[c];
-                let area_twice =
-                    (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1);
-                if area_twice != 0 {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1054,7 +892,7 @@ mod tests {
     #[test]
     fn factor_design_rank_is_not_inferred_from_a_diagonal_only_campaign() {
         let points = BTreeSet::from([(1, 1), (4, 4), (9, 9)]);
-        assert!(!has_full_rank_factor_design(&points));
+        assert!(!evaluator::has_full_rank_factor_design(&points));
         let points = BTreeSet::from([(1, 1), (4, 4), (4, 1)]);
         assert!(has_full_rank_factor_design(&points));
     }
