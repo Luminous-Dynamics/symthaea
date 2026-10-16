@@ -1039,7 +1039,35 @@ mod tests {
     }
 
     #[test]
-    fn a_chain_must_end_at_the_declared_root() {
+    fn missing_resource_specific_root_is_blocked() {
+        let mut fixture = fixture();
+        fixture.2.policy.reference_standards = vec![TraceabilityReferenceStandard {
+            resource_kind: PeakResourceKind::SharedEquipmentSlots,
+            artifact_digest_sha256: sha('1'),
+            evidence_level: SuitEvidenceLevel::BenchTested,
+        }];
+        let (report, _) = evaluate(&fixture);
+        assert!(has_code(
+            &report.assessments[0],
+            TraceabilityFindingCode::CalibrationRootMissing
+        ));
+        assert_eq!(report.status, MeasurementTraceabilityStatus::Blocked);
+    }
+
+    #[test]
+    fn cyclic_calibration_chain_is_blocked() {
+        let mut fixture = fixture();
+        fixture.2.claims[0].calibration_chain[1].reference_artifact_digest_sha256 = sha('a');
+        let (report, _) = evaluate(&fixture);
+        assert!(has_code(
+            &report.assessments[0],
+            TraceabilityFindingCode::CalibrationChainCycle
+        ));
+        assert_eq!(report.status, MeasurementTraceabilityStatus::Blocked);
+    }
+
+    #[test]
+    fn calibration_links_must_end_at_the_declared_root() {
         let mut fixture = fixture();
         fixture.2.claims[0].calibration_chain[1].reference_artifact_digest_sha256 = sha('8');
         let (report, _) = evaluate(&fixture);
@@ -1177,14 +1205,22 @@ mod tests {
     }
 
     #[test]
-    fn plan_order_does_not_change_digests_or_report() {
-        let mut fixture_a = fixture();
-        let mut fixture_b = fixture();
-        fixture_a.2.policy.reference_standards.reverse();
-        fixture_b.2.claims.reverse();
-        let a = evaluate(&fixture_a);
-        let b = evaluate(&fixture_b);
-        assert_eq!(a, b);
+    fn claim_and_reference_order_do_not_change_digests_or_report() {
+        let mut baseline = fixture();
+        let mut second_observation = baseline.0.observations[0].clone();
+        second_observation.observation_id = "obs-power-02".into();
+        second_observation.pool_id = "pool-power-2".into();
+        baseline.0.observations.push(second_observation);
+        let mut second_claim = baseline.2.claims[0].clone();
+        second_claim.observation_id = "obs-power-02".into();
+        second_claim.pool_id = "pool-power-2".into();
+        baseline.2.claims.push(second_claim);
+
+        let mut permuted = baseline.clone();
+        permuted.0.observations.reverse();
+        permuted.2.claims.reverse();
+        permuted.2.policy.reference_standards.reverse();
+        assert_eq!(evaluate(&baseline), evaluate(&permuted));
     }
 
     #[test]
