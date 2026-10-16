@@ -19,6 +19,7 @@
     "baseline_arm_id",
     "minimum_success_rate_delta",
     "minimum_success_auc_delta",
+    "minimum_best_loss_reduction",
     "arms"
   ],
   "properties": {
@@ -241,6 +242,12 @@
           }
         }
       }
+    },
+    "minimum_best_loss_reduction": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000000000,
+      "description": "Minimum practical reduction in the final-budget best loss; positive reported comparison delta means the candidate lowered loss."
     }
   }
 }
