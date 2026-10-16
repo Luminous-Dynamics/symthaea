@@ -34,6 +34,14 @@ assumed as a universal substrate for animal or unknown communication.
 | `crates/domains/symthaea-broca` native generator | feature-gated / experimental | Intent | Thought-to-text provider. Mock backends and synthetic curricula are test fixtures, never benchmark evidence. |
 | `symthaea-broca` cognitive REPL | disconnected demo | Intent | Uses a mock generator and is not a measured comprehension pipeline. |
 
+## Cetacean research contract
+
+Dolphin and whale work is part of the same evidence ladder, but the acoustic task and input-bandwidth contract must be species/signal-specific. See `docs/research/CETACEAN_COMMUNICATION_RESEARCH_CONTRACT_V1.md` for existing module inventory, data/license admission, profile-specific metrics and next gates.
+
+The safer `CetaceanClassifier::try_new` / `try_classify_audio` paths validate analysis-band Nyquist limits and refuse implicit downsampling via the current linear interpolator. The safer `WhaleSentinel::try_with_config` / `try_process_buffer` paths validate temporal configuration and require the source rate to match the configured sample clock. Older infallible APIs remain for compatibility and do not provide the same input checks.
+
+High-rate dolphin recordings must not be silently converted to the 44.1 kHz default before click analysis. A successful config check is only input-contract evidence; it does not prove click/whistle detection accuracy, coda classification, communicative meaning or dialogue.
+
 ## Expression policy
 
 Animal playback requires reviewed `ExpressionAuthorization` and `CapabilityLevel::Intent`.
