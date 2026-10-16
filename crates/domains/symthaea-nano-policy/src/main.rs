@@ -387,6 +387,21 @@ mod tests {
     }
 
     #[test]
+    fn oversized_request_error_preserves_the_full_line_digest() {
+        let digest = digest_hex(b"abcdef");
+        let output = rejected_request_line(
+            digest.clone(),
+            "request_too_large",
+            "request line exceeds test limit",
+        );
+        let response: symthaea_nano_policy::ErrorResponse =
+            serde_json::from_str(&output).unwrap();
+        assert_eq!(response.request_sha256, digest);
+        assert_eq!(response.error_code, "request_too_large");
+        assert_eq!(response.status, "rejected_input");
+    }
+
+    #[test]
     fn cli_receipt_mode_accepts_an_exact_request_response_pair() {
         let request_line = include_str!("../fixtures/example-request.jsonl").trim_end();
         let response_line = symthaea_nano_policy::handle_line(request_line);
