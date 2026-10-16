@@ -148,6 +148,7 @@ fn fixture() -> (
             provider_component_id: "vehicle".into(),
             provider_hardware_revision: vehicle_revision.into(),
             required_connection_ids: BTreeSet::from(["suit-vehicle-power".into()]),
+            required_interface_kinds: BTreeSet::from([SuitInterfaceKind::ElectricalPower]),
             capacity: PeakQuantityInterval {
                 lower: 1_000,
                 nominal: 1_100,
@@ -313,6 +314,10 @@ fn independent_plan_digest(plan: &PeakResourceReservationPlan) -> String {
         h.string(&pool.provider_hardware_revision);
         h.usize(pool.required_connection_ids.len());
         for id in &pool.required_connection_ids { h.string(id); }
+        h.usize(pool.required_interface_kinds.len());
+        for kind in &pool.required_interface_kinds {
+            h.string(interface_kind_tag(*kind));
+        }
         interval(&mut h, pool.capacity);
         h.string(evidence_tag(pool.evidence_level));
         h.string(&pool.evidence_reference);
@@ -443,6 +448,23 @@ fn resource_tag(value: PeakResourceKind) -> &'static str {
         PeakResourceKind::SharedEquipmentSlots => "shared_equipment_slots",
     }
 }
+fn interface_kind_tag(value: SuitInterfaceKind) -> &'static str {
+    match value {
+        SuitInterfaceKind::PressureBoundary => "pressure_boundary",
+        SuitInterfaceKind::BreathableGas => "breathable_gas",
+        SuitInterfaceKind::Coolant => "coolant",
+        SuitInterfaceKind::ThermalExchange => "thermal_exchange",
+        SuitInterfaceKind::ElectricalPower => "electrical_power",
+        SuitInterfaceKind::GroundingAndEsd => "grounding_and_esd",
+        SuitInterfaceKind::Communications => "communications",
+        SuitInterfaceKind::TelemetryAndData => "telemetry_and_data",
+        SuitInterfaceKind::MechanicalCapture => "mechanical_capture",
+        SuitInterfaceKind::RestraintAndAnchor => "restraint_and_anchor",
+        SuitInterfaceKind::ConsumableTransfer => "consumable_transfer",
+        SuitInterfaceKind::DustMitigationService => "dust_mitigation_service",
+        SuitInterfaceKind::RescueHandling => "rescue_handling",
+    }
+}
 fn evidence_tag(value: SuitEvidenceLevel) -> &'static str {
     match value {
         SuitEvidenceLevel::Declared => "declared",
@@ -496,6 +518,9 @@ fn finding_code_tag(value: PeakResourceFindingCode) -> &'static str {
         PeakResourceFindingCode::MissingProviderConnection => "missing_provider_connection",
         PeakResourceFindingCode::ProviderConnectionDoesNotBindProvider => {
             "provider_connection_does_not_bind_provider"
+        },
+        PeakResourceFindingCode::ProviderConnectionResourceKindMismatch => {
+            "provider_connection_resource_kind_mismatch"
         },
         PeakResourceFindingCode::ProviderConnectionBlocked => "provider_connection_blocked",
         PeakResourceFindingCode::ProviderConnectionEnvironmentMismatch => {
