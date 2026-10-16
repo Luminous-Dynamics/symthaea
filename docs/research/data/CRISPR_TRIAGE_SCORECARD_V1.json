@@ -485,6 +485,27 @@
         "paired_delta_upper_bound": 0.3333333333333333,
         "note": "Both policy rankings use the same candidate IDs and label mapping; bound is conditional on this universe and is not a statistical confidence interval."
       }
+    },
+    {
+      "id": "F7_fixed_budget_underfill",
+      "purpose": "Ensure a candidate ranking with fewer than K candidates is not scored as though it fulfilled a fixed review budget.",
+      "eligible_positive_ids": [
+        "p1",
+        "p2"
+      ],
+      "candidates": [
+        {
+          "id": "p1",
+          "rank": 1,
+          "label": "positive"
+        }
+      ],
+      "k": 2,
+      "expected": {
+        "recall_at_k": "not_estimable_at_budget_K",
+        "partial_label_sensitivity_at_k": "not_estimable_at_budget_K",
+        "rule": "Do not silently reduce K from 2 to 1."
+      }
     }
   ],
   "implementation_artifact": {
