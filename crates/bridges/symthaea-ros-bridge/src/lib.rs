@@ -41,6 +41,8 @@ pub enum RosBridgeError {
     InvalidTrajectory(String),
     #[error("Safety interlock blocked trajectory publication: {0}")]
     SafetyInterlock(String),
+    #[error("Contract violation: {0}")]
+    Contract(String),
 }
 
 /// Normalized consciousness metrics for ROS2 broadcasting.
@@ -113,6 +115,153 @@ pub struct RosBridgeNode {
     scheduler: symthaea_control::ConsciousnessGainScheduler,
     #[cfg(feature = "ros2")]
     spin_thread: Option<std::thread::JoinHandle<()>>,
+}
+
+/// Semantic field emitted for one ROS joint. Unit matching is mandatory because
+/// JointTrajectory itself does not carry quantity/unit metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RosJointQuantityV2 {
+    Position,
+    Velocity,
+    Effort,
+}
+
+impl RosJointQuantityV2 {
+    fn contract_quantity(self) -> &'static str {
+        match self {
+            Self::Position => "position",
+            Self::Velocity => "velocity",
+            Self::Effort => "effort",
+        }
+    }
+}
+
+/// Explicit, profile-specific mapping from a UEC action address to a ROS joint field.
+/// Platform adapters own this mapping; the generic ROS bridge does not infer morphology.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RosJointActionBindingV2 {
+    pub action_address: String,
+    pub joint_name: String,
+    pub quantity: RosJointQuantityV2,
+    pub unit: String,
+}
+
+/// Convert a validated UEC v2 Requested/Projected action frame into a ROS
+/// JointTrajectory value. This function does not publish, authorize, or claim execution.
+/// Applied/Measured/TransportAccepted records cannot be replayed as new command intent.
+pub fn action_frame_to_ros_trajectory_v2(
+    frame: &symthaea_core::embodiment_v2::ActionFrameV2,
+    bindings: &[RosJointActionBindingV2],
+    time_from_start_ns: u64,
+) -> Result<RosTrajectoryCommand, RosBridgeError> {
+    use symthaea_core::embodiment_v2::ActionStageV2;
+
+    frame
+        .validate()
+        .map_err(|error| RosBridgeError::InvalidTrajectory(format!("invalid UEC v2 action frame: {error}")))?;
+    if !matches!(frame.stage, ActionStageV2::Requested | ActionStageV2::Projected) {
+        return Err(RosBridgeError::InvalidTrajectory(
+            "only Requested or Projected action frames may be translated into new ROS commands".into(),
+        ));
+    }
+    if bindings.is_empty() {
+        return Err(RosBridgeError::InvalidTrajectory("joint action bindings must not be empty".into()));
+    }
+
+    let mut names = Vec::<String>::new();
+    let mut addresses = std::collections::HashSet::new();
+    let mut joint_fields = std::collections::HashSet::new();
+    for binding in bindings {
+        if binding.action_address.trim().is_empty()
+            || binding.joint_name.trim().is_empty()
+            || binding.unit.trim().is_empty()
+        {
+            return Err(RosBridgeError::InvalidTrajectory(
+                "action binding address, joint name, and unit must be non-empty".into(),
+            ));
+        }
+        if !addresses.insert(binding.action_address.as_str()) {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "duplicate action binding address {:?}",
+                binding.action_address
+            )));
+        }
+        if !joint_fields.insert((&binding.joint_name, binding.quantity)) {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "duplicate binding for joint {:?} field {:?}",
+                binding.joint_name, binding.quantity
+            )));
+        }
+        if !names.contains(&binding.joint_name) {
+            names.push(binding.joint_name.clone());
+        }
+    }
+
+    let mut positions = std::collections::HashMap::<String, f64>::new();
+    let mut velocities = std::collections::HashMap::<String, f64>::new();
+    let mut efforts = std::collections::HashMap::<String, f64>::new();
+    for action in &frame.actions {
+        let binding = bindings
+            .iter()
+            .find(|binding| binding.action_address == action.address)
+            .ok_or_else(|| RosBridgeError::InvalidTrajectory(format!(
+                "no platform binding for action address {:?}", action.address
+            )))?;
+        if action.quantity != binding.quantity.contract_quantity() {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "action {:?} quantity {:?} does not match binding quantity {:?}",
+                action.address, action.quantity, binding.quantity.contract_quantity()
+            )));
+        }
+        if action.unit != binding.unit {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "action {:?} unit {:?} does not match required unit {:?}",
+                action.address, action.unit, binding.unit
+            )));
+        }
+        let target = match binding.quantity {
+            RosJointQuantityV2::Position => &mut positions,
+            RosJointQuantityV2::Velocity => &mut velocities,
+            RosJointQuantityV2::Effort => &mut efforts,
+        };
+        if target.insert(binding.joint_name.clone(), action.value).is_some() {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "multiple values map to joint {:?} field {:?}",
+                binding.joint_name, binding.quantity
+            )));
+        }
+    }
+
+    fn ordered_values(
+        label: &str,
+        names: &[String],
+        values: &std::collections::HashMap<String, f64>,
+    ) -> Result<Vec<f64>, RosBridgeError> {
+        if values.is_empty() {
+            return Ok(Vec::new());
+        }
+        names
+            .iter()
+            .map(|name| values.get(name).copied().ok_or_else(|| {
+                RosBridgeError::InvalidTrajectory(format!(
+                    "{label} values must cover every declared joint; missing {name:?}"
+                ))
+            }))
+            .collect()
+    }
+
+    let point = RosTrajectoryPoint {
+        positions: ordered_values("position", &names, &positions)?,
+        velocities: ordered_values("velocity", &names, &velocities)?,
+        efforts: ordered_values("effort", &names, &efforts)?,
+        time_from_start_ns,
+    };
+    let command = RosTrajectoryCommand {
+        joint_names: names,
+        points: vec![point],
+    };
+    command.validate()?;
+    Ok(command)
 }
 
 /// Command to control robot joint trajectories via ROS2.
