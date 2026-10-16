@@ -1202,7 +1202,7 @@ impl SecureBootOrchestration {
         }
 
         if let Some(result) = &self.probe_result {
-            if matches!(result.state, SecureBootState::Unknown { .. }) {
+            if matches!(&result.state, SecureBootState::Unknown { .. }) {
                 return Err("Secure Boot state is unknown; repeat the probe or resolve the firmware state before generating configuration".to_string());
             }
         }
@@ -1785,9 +1785,10 @@ mod tests {
     #[test]
     fn test_orchestration_generate_nix_disabled() {
         let mut orch = SecureBootOrchestration::new();
+        orch.record_manual_secure_boot_state(SecureBootState::Disabled, TargetPlatform::Linux);
         orch.apply_guide_result(SecureBootMethod::AlreadyOff).expect("explicit non-Secure-Boot selection");
 
-        let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("explicit guide choice authorizes configuration");
+        let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("known disabled state and explicit choice authorize standard configuration");
         assert!(lanzaboote_nix.contains("systemd-boot.enable = true"));
         assert!(key_nix.is_empty());
     }
