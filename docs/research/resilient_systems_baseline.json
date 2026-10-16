@@ -334,13 +334,13 @@
       "resource_tests_authored": 18,
       "repair_scheduling_tests_authored": 17,
       "robust_repair_evaluation_tests_authored": 10,
-      "total_rust_tests_authored": 114,
-      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, single-crew exact oracle/policy gaps 11, multi-crew exact oracle 8, independent schedule certificate verifier 13. None have been compiled or executed in the current environment.",
+      "total_rust_tests_authored": 115,
+      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, single-crew exact oracle/policy gaps 11, multi-crew exact oracle 8, independent schedule certificate verifier 14. None have been compiled or executed in the current environment.",
       "rolling_horizon_repair_tests_authored": 11,
       "repair_policy_comparison_tests_authored": 6,
       "exact_oracle_tests_authored": 11,
       "multi_crew_oracle_tests_authored": 8,
-      "certificate_verifier_tests_authored": 13
+      "certificate_verifier_tests_authored": 14
     },
     "performance_targets": {
       "status": "proposed_unmeasured_targets",
@@ -1195,7 +1195,7 @@
       "nonfinite service weight or objective",
       "unknown and duplicate dependencies"
     ],
-    "tests_authored": 13,
+    "tests_authored": 14,
     "tests_executed": false,
     "mutation_campaign_target": 10000,
     "performance_status": "not_measured",
@@ -1226,6 +1226,9 @@
         "report_benchmark_native_objectives_separately_from_weighted_completion_loss",
         "only compute best_known_gap when objective_and_constraints_match"
       ]
-    }
+    },
+    "mutation_campaign_test": "deterministic_mutation_campaign_rejects_all_10000_invalid_certificates",
+    "mutation_campaign_cases_authored": 10000,
+    "mutation_campaign_executed": false
   }
 }
