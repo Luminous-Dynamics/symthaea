@@ -618,6 +618,7 @@ mod tests {
             (Policy::HdcMaximin, 100, 8, 10),
             (Policy::HdcMaximin, 1_000, 8, 10),
             (Policy::HdcMaximin, 1_000, 64, 10),
+            (Policy::HdcMaximin, 10_000, 8, 10),
         ];
 
         for (policy, count, dimensions, budget) in cases {
