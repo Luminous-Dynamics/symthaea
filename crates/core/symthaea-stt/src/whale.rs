@@ -84,10 +84,14 @@ impl WhaleConfig {
         }
         if !self.click_tau.is_finite()
             || self.click_tau <= 0.0
+            || self.click_tau > f32::MAX / 2.0
             || !self.rhythm_tau.is_finite()
             || self.rhythm_tau <= 0.0
+            || self.rhythm_tau > f32::MAX / 2.0
         {
-            return Err("LTC time constants must be finite and positive".into());
+            return Err(
+                "LTC time constants must be finite, positive, and safe under scaling".into(),
+            );
         }
         Ok(())
     }
@@ -595,6 +599,14 @@ mod tests {
 
         let mut invalid = WhaleConfig::default();
         invalid.rhythm_tau = f32::NAN;
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = WhaleConfig::default();
+        invalid.click_tau = f32::MAX;
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = WhaleConfig::default();
+        invalid.rhythm_tau = f32::MAX;
         assert!(invalid.validate().is_err());
     }
 
