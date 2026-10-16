@@ -8,6 +8,7 @@
 //! validation overlays, speed/scale modulation, and runtime reconfiguration.
 
 use std::collections::{HashMap, VecDeque};
+use std::time::Instant;
 
 use symthaea_core::hdc::substrate_independence::{
     CorticalRegion, SubstrateRequirements, SubstrateType,
@@ -24,6 +25,10 @@ use super::thresholds::{
 /// Default honest confidence for substrates not in the validation framework.
 /// Matches EvidenceLevel::Theoretical.confidence() = 0.10.
 const THEORETICAL_CONFIDENCE: f64 = 0.10;
+
+/// Do not compare a per-cycle energy estimate to a watts budget until at least
+/// one wall-clock second of monotonic observation has elapsed.
+const ENERGY_RATE_WINDOW_MIN_SECONDS: f64 = 1.0;
 
 /// Record of a substrate transition event.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -115,6 +120,14 @@ pub(crate) struct SubstrateManager {
     /// Energy spent in the most recent tick (for telemetry).
     #[cfg(feature = "jepa")]
     pub(crate) jepa_energy: f64,
+    /// Modeled energy accumulated since the last closed monotonic-rate window.
+    energy_rate_window_joules: f64,
+    /// Monotonic start of the current energy-rate observation window.
+    energy_rate_window_started_at: Instant,
+    /// Average model-estimated energy rate over the most recently closed window (watts).
+    estimated_energy_rate_watts: f64,
+    /// Duration of the most recently closed energy-rate window (seconds).
+    energy_rate_window_seconds: f64,
     last_energy_spent: f64,
 }
 
@@ -157,6 +170,10 @@ impl SubstrateManager {
             transition_history: VecDeque::new(),
             current_substrate: config.substrate_type,
             last_energy_spent: 0.0,
+            energy_rate_window_joules: 0.0,
+            energy_rate_window_started_at: Instant::now(),
+            estimated_energy_rate_watts: 0.0,
+            energy_rate_window_seconds: 0.0,
             #[cfg(feature = "jepa")]
             jepa_energy: 0.0,
         };
@@ -351,24 +368,67 @@ impl SubstrateManager {
         self.scale_pressure = (sub_scale / bio_scale).log10() as f32;
     }
 
-    /// Track energy expenditure for this cycle.
-    /// When energy budget is enabled and exceeded, marks consciousness as non-viable.
+    /// Record this cycle's model-estimated energy and evaluate the configured watts
+    /// budget only after a measured monotonic observation window has closed.
     ///
-    /// Faster substrates (tau_factor > 1.0) complete more cycles per wall-clock
-    /// second, so energy per wall-clock tick scales with tau_factor.
+    /// `energy_per_cycle` and `total_energy_spent` are joules; a budget named
+    /// `energy_budget_joules_per_sec` is watts (joules/second). Comparing those
+    /// quantities directly is dimensionally invalid, so this gate compares the
+    /// window's estimated joules divided by monotonic wall elapsed seconds.
+    ///
+    /// This remains a substrate-model estimate, not a measurement of electrical
+    /// power drawn by the actual processor or robot.
     pub fn tick_energy(&mut self, config: &CognitiveLoopConfig) {
+        self.tick_energy_at(config, Instant::now());
+    }
+
+    /// Deterministic time-injected form used by tests and controlled replay.
+    pub(crate) fn tick_energy_at(&mut self, config: &CognitiveLoopConfig, now: Instant) {
         if !config.enable_energy_budget {
             self.last_energy_spent = 0.0;
+            self.energy_rate_window_joules = 0.0;
+            self.energy_rate_window_started_at = now;
+            self.estimated_energy_rate_watts = 0.0;
+            self.energy_rate_window_seconds = 0.0;
             return;
         }
+
         let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
         self.total_energy_spent += speed_adjusted_energy;
+        self.energy_rate_window_joules += speed_adjusted_energy;
         self.last_energy_spent = speed_adjusted_energy;
-        if let Some(budget) = config.energy_budget_joules_per_sec {
-            if self.total_energy_spent > budget {
+
+        let Some(elapsed) = now.checked_duration_since(self.energy_rate_window_started_at)
+        else {
+            // An earlier monotonic timestamp invalidates this window. Latch non-viable
+            // instead of subtracting incomparable/reversed time values.
+            self.consciousness_viable = false;
+            self.energy_rate_window_started_at = now;
+            self.energy_rate_window_joules = 0.0;
+            self.estimated_energy_rate_watts = 0.0;
+            self.energy_rate_window_seconds = 0.0;
+            return;
+        };
+        let elapsed_seconds = elapsed.as_secs_f64();
+        if elapsed_seconds < ENERGY_RATE_WINDOW_MIN_SECONDS {
+            return;
+        }
+
+        let estimated_rate_watts = self.energy_rate_window_joules / elapsed_seconds;
+        self.estimated_energy_rate_watts = estimated_rate_watts;
+        self.energy_rate_window_seconds = elapsed_seconds;
+
+        if let Some(budget_watts) = config.energy_budget_joules_per_sec {
+            if !budget_watts.is_finite() || budget_watts < 0.0 {
+                // Invalid rate limits fail closed once the rate check can be evaluated.
+                self.consciousness_viable = false;
+            } else if estimated_rate_watts > budget_watts {
                 self.consciousness_viable = false;
             }
         }
+
+        self.energy_rate_window_started_at = now;
+        self.energy_rate_window_joules = 0.0;
     }
 
     /// Smooth transition dynamics via EMA blending each cycle.
@@ -605,6 +665,8 @@ impl SubstrateManager {
             substrate_encoding_noise: encoding_noise,
             total_energy_spent: self.total_energy_spent,
             energy_this_cycle: self.last_energy_spent,
+            estimated_energy_rate_watts: self.estimated_energy_rate_watts,
+            energy_rate_window_seconds: self.energy_rate_window_seconds,
             energy_throughput_multiplier: self.energy_throughput_multiplier,
             effective_dim_fraction: self.effective_dim_fraction(),
             effective_dim_source: self.effective_dim_source(config),
