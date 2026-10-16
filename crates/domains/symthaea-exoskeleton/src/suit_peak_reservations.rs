@@ -901,7 +901,12 @@ fn digest_report(report: &PeakResourceReservationReport) -> String {
         writer.string(resource_kind_tag(pool.resource_kind));
         writer.string(&pool.provider_component_id);
         writer.string(&pool.provider_hardware_revision);
-        write_interval(&mut writer, pool.capacity.lower, pool.capacity.nominal, pool.capacity.upper);
+        write_interval(
+            &mut writer,
+            pool.capacity.lower,
+            pool.capacity.nominal,
+            pool.capacity.upper,
+        );
         writer.u64(pool.reserve_quantity);
         writer.u64(pool.usable_capacity);
         writer.u64(pool.peak_required_demand_upper);
