@@ -1229,7 +1229,7 @@ mod tests {
         assert_eq!(
             evaluate_mission_resource_budget(&configuration, &tasks, &task_receipt, &plan)
                 .unwrap_err(),
-            MissionResourceBudgetError::InvalidDemand
+            MissionResourceBudgetError::InvalidQuantityInterval
         );
     }
 
@@ -1311,6 +1311,78 @@ mod tests {
             evaluate_mission_resource_budget(&configuration, &tasks, &task_receipt, &plan)
                 .unwrap_err(),
             MissionResourceBudgetError::DuplicateProviderResourcePool
+        );
+    }
+
+    #[test]
+    fn provider_environment_scope_must_cover_task_environment() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        plan.pools[0].applicable_environments =
+            BTreeSet::from([SuitOperatingEnvironment::LunarSunlitSurface]);
+        let (report, _) =
+            evaluate_mission_resource_budget(&configuration, &tasks, &task_receipt, &plan).unwrap();
+        assert_eq!(report.status, MissionResourceBudgetStatus::Blocked);
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == MissionResourceFindingCode::EnvironmentScopeMismatch
+                && finding.severity == MissionResourceFindingSeverity::Blocker
+        }));
+    }
+
+    #[test]
+    fn evidence_below_policy_blocks_required_supply_and_demand() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        plan.pools[0].evidence_level = SuitEvidenceLevel::Declared;
+        plan.demands[0].evidence_level = SuitEvidenceLevel::Declared;
+        let (report, _) =
+            evaluate_mission_resource_budget(&configuration, &tasks, &task_receipt, &plan).unwrap();
+        assert_eq!(report.status, MissionResourceBudgetStatus::Blocked);
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == MissionResourceFindingCode::SupplyEvidenceBelowPolicy
+        }));
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == MissionResourceFindingCode::DemandEvidenceBelowPolicy
+        }));
+    }
+
+    #[test]
+    fn missing_supply_provider_is_not_inferred() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        plan.pools[0].provider_component_id = "unlisted-oxygen-tank".into();
+        let (report, _) =
+            evaluate_mission_resource_budget(&configuration, &tasks, &task_receipt, &plan).unwrap();
+        assert_eq!(report.status, MissionResourceBudgetStatus::Blocked);
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == MissionResourceFindingCode::MissingProviderComponent
+                && finding.severity == MissionResourceFindingSeverity::Blocker
+        }));
+    }
+
+    #[test]
+    fn aggregate_demand_overflow_fails_closed() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        let mut overflow = plan.demands[0].clone();
+        overflow.demand_id = "overflow-demand".into();
+        overflow.quantity = ResourceQuantityInterval {
+            lower: u64::MAX,
+            nominal: u64::MAX,
+            upper: u64::MAX,
+        };
+        plan.demands.push(overflow);
+        assert_eq!(
+            evaluate_mission_resource_budget(&configuration, &tasks, &task_receipt, &plan)
+                .unwrap_err(),
+            MissionResourceBudgetError::QuantityOverflow
+        );
+    }
+
+    #[test]
+    fn missing_task_reference_is_rejected_not_ignored() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        plan.demands[0].task_id = "unlisted-task".into();
+        assert_eq!(
+            evaluate_mission_resource_budget(&configuration, &tasks, &task_receipt, &plan)
+                .unwrap_err(),
+            MissionResourceBudgetError::MissingReferencedTask
         );
     }
 
