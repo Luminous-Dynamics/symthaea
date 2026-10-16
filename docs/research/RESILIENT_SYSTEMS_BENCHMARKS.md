@@ -341,7 +341,7 @@ Statistical targets remain proposed and unmeasured: 100 jobs × 20 crews × 20 s
 
 The six-fixture, machine-readable corpus is [repair_scheduling_oracle_corpus.json](./repair_scheduling_oracle_corpus.json). The independent Rust oracle is [repair_small_instance_oracle.rs](../../crates/domains/symthaea-engineering/src/repair_small_instance_oracle.rs). It exhaustively evaluates all permutations for a deliberately limited problem class: up to eight jobs, one hypothetical crew qualified for every job, all outages starting at time zero, no precedence constraints and no spare parts. The objective is weighted completion time. Scope violations fail closed rather than being silently ignored.
 
-This gives us an exact answer on instances small enough to enumerate, while larger instances need separate lower/upper bounds or best-known solutions. The oracle is not intended for operational schedules with travel, constraints or uncertainty. ORACLE-01–ORACLE-05 have hand-checkable expected outcomes; ORACLE-06 enumerates all 40,320 permutations, but its expected optimum remains “computed by executable oracle” until an actual Rust run records the result. Do not turn an authored expected result into a test-pass claim.
+This gives us an exact answer on instances small enough to enumerate, while larger instances need separate lower/upper bounds or best-known solutions. The oracle is not intended for operational schedules with travel, constraints or uncertainty. ORACLE-01–ORACLE-05 have hand-checkable expected outcomes. ORACLE-06 was independently exhaustively enumerated in JavaScript across all 40,320 permutations, giving loss 406 and order b→f→d→h→c→g→e→a. The corresponding Rust test pins that expected reference but has not been executed in this environment; do not turn an authored expected result into a Rust test-pass claim.
 
 ### Current fixture corpus
 
@@ -352,7 +352,7 @@ This gives us an exact answer on instances small enough to enumerate, while larg
 | ORACLE-03 | Four-job policy-quality case | order A→B→C→D; objective 113 |
 | ORACLE-04 | Equal-ratio tie-break | order a→z; objective 14 |
 | ORACLE-05 | Single-job boundary | objective 15 |
-| ORACLE-06 | Maximum supported exhaustive search | 40,320 permutations; record exact optimum from execution |
+| ORACLE-06 | Maximum supported exhaustive search | loss 406; order b→f→d→h→c→g→e→a; 40,320 permutations; independently enumerated in JS, Rust test pending |
 
 The general principle is an **oracle ladder**: exhaustive exact enumeration for tiny inputs; exact MILP/CP-SAT or branch-and-bound for medium validation cases; best-known bounds plus runtime/quality reporting for larger instances; then paired rolling-horizon tests on observed restoration traces. Published road-restoration instances are available, including a systematic network-instance database for repair/restoration studies ([Almeida et al., 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC9679711/)) and benchmark studies of crew scheduling/routing ([Moreno et al., 2024](https://doi.org/10.1287/trsc.2023.0227)). The new module is not yet a solver for those richer problems.
 
