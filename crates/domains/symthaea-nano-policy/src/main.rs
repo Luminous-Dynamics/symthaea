@@ -132,7 +132,7 @@ fn read_bounded_line<R: BufRead>(
                 break;
             }
 
-            let newline = available.iter().position(|byte| *byte == b'\\n');
+            let newline = available.iter().position(|byte| *byte == b'\n');
             let consumed = newline.map_or(available.len(), |position| position + 1);
             let content_len_in_chunk = newline.unwrap_or(consumed);
             let content = &available[..content_len_in_chunk];
@@ -150,7 +150,7 @@ fn read_bounded_line<R: BufRead>(
                             &mut hasher,
                         );
                     }
-                    let logical_content = content.strip_suffix(&[b'\\r']).unwrap_or(content);
+                    let logical_content = content.strip_suffix(&[b'\r']).unwrap_or(content);
                     append_line_content(
                         logical_content,
                         max_bytes,
@@ -160,7 +160,7 @@ fn read_bounded_line<R: BufRead>(
                         &mut hasher,
                     );
                 } else if let Some(previous) = pending.take() {
-                    if previous != b'\\r' {
+                    if previous != b'\r' {
                         append_line_content(
                             &[previous],
                             max_bytes,
