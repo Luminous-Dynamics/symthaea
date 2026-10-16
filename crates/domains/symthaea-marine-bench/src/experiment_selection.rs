@@ -202,21 +202,6 @@ pub struct ConstraintDisposition {
     pub status: ConstraintStatus,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct ScenarioRun {
-    pub scenario_id: u64,
-    pub constraints: Vec<ConstraintDisposition>,
-    pub resolved_constraints: u8,
-    pub robust_feasible_constraints: u8,
-    pub robust_infeasible_constraints: u8,
-    pub fully_resolved: bool,
-    pub budget_spent_units: u32,
-    pub cost_to_full_resolution_units: Option<u32>,
-    pub normalized_interval_width_reduction: f64,
-    pub oracle_regret_constraints: u8,
-}
-
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Policy {
@@ -265,6 +250,8 @@ pub struct BenchmarkBody {
     pub scenario_generator_version: String,
     pub toy_oracle_version: String,
     pub scenario_count: usize,
+    pub scenario_corpus_sha256: String,
+    pub execution_trace_sha256: String,
     pub paired_seeds: Vec<u64>,
     pub budget_units_per_scenario: u32,
     pub experiment_catalog: Vec<Experiment>,
@@ -302,7 +289,7 @@ impl fmt::Display for BenchmarkError {
 
 impl std::error::Error for BenchmarkError {}
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 struct SyntheticScenario {
     id: u64,
     truth: [f64; 6],
@@ -315,7 +302,7 @@ struct ObservedState {
     initial: [Interval; 6],
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 struct RunMetrics {
     scenario_id: u64,
     statuses: [ConstraintStatus; 3],
@@ -328,35 +315,13 @@ struct RunMetrics {
     normalized_interval_width_reduction: f64,
 }
 
-impl RunMetrics {
-    fn to_public(self, oracle_resolved: u8) -> ScenarioRun {
-        ScenarioRun {
-            scenario_id: self.scenario_id,
-            constraints: vec![
-                ConstraintDisposition {
-                    id: "battery_energy_sufficiency".to_owned(),
-                    status: self.statuses[0],
-                },
-                ConstraintDisposition {
-                    id: "under_keel_clearance".to_owned(),
-                    status: self.statuses[1],
-                },
-                ConstraintDisposition {
-                    id: "charge_power_sufficiency".to_owned(),
-                    status: self.statuses[2],
-                },
-            ],
-            resolved_constraints: self.resolved_constraints,
-            robust_feasible_constraints: self.robust_feasible_constraints,
-            robust_infeasible_constraints: self.robust_infeasible_constraints,
-            fully_resolved: self.fully_resolved,
-            budget_spent_units: self.budget_spent_units,
-            cost_to_full_resolution_units: self.cost_to_full_resolution_units,
-            normalized_interval_width_reduction: self.normalized_interval_width_reduction,
-            oracle_regret_constraints: oracle_resolved.saturating_sub(self.resolved_constraints),
-        }
-    }
+#[derive(Clone, Copy, Debug, Serialize)]
+struct ExecutionTraceRow {
+    policy: Policy,
+    seed: Option<u64>,
+    metrics: RunMetrics,
 }
+
 
 #[derive(Clone, Copy, Debug)]
 struct SplitMix64 {
@@ -692,6 +657,12 @@ fn exhaustive_toy_oracle(
     best
 }
 
+fn serialized_sha256<T: Serialize>(value: &T) -> Result<String, BenchmarkError> {
+    let bytes = serde_json::to_vec(value)
+        .map_err(|error| BenchmarkError::Serialization(error.to_string()))?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
 fn summarize_policy(
     policy: Policy,
     seed: Option<u64>,
@@ -768,24 +739,59 @@ pub fn run_reference_benchmark(
     let scenarios: Vec<SyntheticScenario> = (0..scenario_count)
         .map(|id| generate_scenario(id as u64))
         .collect();
+    let mut execution_trace = Vec::new();
     let oracle_results: Vec<RunMetrics> = scenarios.iter()
-        .map(|scenario| exhaustive_toy_oracle(scenario, budget_units_per_scenario, &catalog))
+        .map(|scenario| {
+            let metrics = exhaustive_toy_oracle(
+                scenario,
+                budget_units_per_scenario,
+                &catalog,
+            );
+            execution_trace.push(ExecutionTraceRow {
+                policy: Policy::ExhaustiveToyOracle,
+                seed: None,
+                metrics,
+            });
+            metrics
+        })
         .collect();
 
     let mut summaries = Vec::new();
     for policy in Policy::all_heuristics() {
         for seed in paired_seeds.iter().copied() {
-            let results: Vec<RunMetrics> = scenarios.iter()
-                .map(|scenario| {
-                    run_policy(scenario, policy, seed, budget_units_per_scenario, &catalog)
-                })
-                .collect();
-            summaries.push(summarize_policy(policy, Some(seed), &results, &oracle_results));
+            let mut results = Vec::with_capacity(scenarios.len());
+            for scenario in &scenarios {
+                let metrics = run_policy(
+                    scenario,
+                    policy,
+                    seed,
+                    budget_units_per_scenario,
+                    &catalog,
+                );
+                execution_trace.push(ExecutionTraceRow {
+                    policy,
+                    seed: Some(seed),
+                    metrics,
+                });
+                results.push(metrics);
+            }
+            summaries.push(summarize_policy(
+                policy,
+                Some(seed),
+                &results,
+                &oracle_results,
+            ));
         }
     }
     summaries.push(summarize_policy(
-        Policy::ExhaustiveToyOracle, None, &oracle_results, &oracle_results,
+        Policy::ExhaustiveToyOracle,
+        None,
+        &oracle_results,
+        &oracle_results,
     ));
+
+    let scenario_corpus_sha256 = serialized_sha256(&scenarios)?;
+    let execution_trace_sha256 = serialized_sha256(&execution_trace)?;
 
     let body = BenchmarkBody {
         schema_version: BENCHMARK_SCHEMA_VERSION.to_owned(),
@@ -794,6 +800,8 @@ pub fn run_reference_benchmark(
         scenario_generator_version: SCENARIO_GENERATOR_VERSION.to_owned(),
         toy_oracle_version: TOY_ORACLE_VERSION.to_owned(),
         scenario_count,
+        scenario_corpus_sha256,
+        execution_trace_sha256,
         paired_seeds: paired_seeds.to_vec(),
         budget_units_per_scenario,
         experiment_catalog: catalog,
@@ -827,19 +835,14 @@ pub fn run_reference_benchmark(
             .to_owned(),
         ],
     };
-    let serialized = serde_json::to_vec(&body)
-        .map_err(|error| BenchmarkError::Serialization(error.to_string()))?;
-    let body_sha256 = format!("{:x}", Sha256::digest(serialized));
+    let body_sha256 = serialized_sha256(&body)?;
     Ok(BenchmarkReceipt { body, body_sha256 })
 }
 
 /// Recomputes the digest over the complete benchmark body. It verifies receipt
 /// integrity only, not the scientific validity or authenticity of the inputs.
 pub fn verify_receipt(receipt: &BenchmarkReceipt) -> Result<bool, BenchmarkError> {
-    let serialized = serde_json::to_vec(&receipt.body)
-        .map_err(|error| BenchmarkError::Serialization(error.to_string()))?;
-    let expected = format!("{:x}", Sha256::digest(serialized));
-    Ok(expected == receipt.body_sha256)
+    Ok(serialized_sha256(&receipt.body)? == receipt.body_sha256)
 }
 
 #[cfg(test)]
