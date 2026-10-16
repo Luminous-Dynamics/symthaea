@@ -40,6 +40,9 @@ use symthaea_scenarios::living_city_evidence::{
 use symthaea_scenarios::living_city_hazard_profiles::{
     HazardProfile, evaluate_hazard_profile,
 };
+use symthaea_scenarios::living_city_grid_reference::{
+    GRID_REFERENCE_CASE_ID, GRID_REFERENCE_SUITE_VERSION, run_grid_reference_case,
+};
 
 const BUNDLE_SCHEMA_VERSION: u32 = 2;
 const SERVICE_GRAPH_SCHEMA_VERSION: u32 = 1;
@@ -93,8 +96,11 @@ fn scenario_configuration_sha256(
     let profile_bytes = profile.canonical_bytes()?;
     let binding_bytes = serde_json::to_vec(binding)?;
     let graph_bytes = canonical_service_graph_bytes(graph)?;
+    // Pin the built-in solver reference suite/case identity into the same
+    // config digest that binds the scenario profile and dependency graph.
+    let reference_suite = format!("{GRID_REFERENCE_SUITE_VERSION}:{GRID_REFERENCE_CASE_ID}").into_bytes();
     let mut bytes = Vec::new();
-    for component in [&profile_bytes, &binding_bytes, &graph_bytes] {
+    for component in [&profile_bytes, &binding_bytes, &graph_bytes, &reference_suite] {
         bytes.extend_from_slice(&(component.len() as u64).to_le_bytes());
         bytes.extend_from_slice(component);
     }
@@ -246,6 +252,34 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
     let failed_services = cascade.dependency_assessment.failed_ids();
     let degraded_services = cascade.dependency_assessment.degraded_ids();
     let graph_sha256 = sha256_hex(&canonical_service_graph_bytes(&service_graph)?);
+    let grid_reference = match run_grid_reference_case() {
+        Ok(result) => serde_json::json!({
+            "status": "passed",
+            "suite_version": result.suite_version,
+            "case_id": result.case_id,
+            "analytical_voltage_v": result.analytical_voltage_v,
+            "solver_voltage_v": result.solver_voltage_v,
+            "absolute_voltage_error_v": result.absolute_voltage_error_v,
+            "expected_branch_power_kw": result.expected_branch_power_kw,
+            "solver_branch_power_kw": result.solver_branch_power_kw,
+            "absolute_branch_power_error_kw": result.absolute_branch_power_error_kw,
+            "scope": "Single-branch linearized DistFlow analytical regression only; not nonlinear AC power-flow validation or a real-outage simulation."
+        }),
+        Err(error) => serde_json::json!({
+            "status": "failed",
+            "suite_version": GRID_REFERENCE_SUITE_VERSION,
+            "case_id": GRID_REFERENCE_CASE_ID,
+            "reason": error.to_string(),
+            "scope": "Single-branch linearized DistFlow analytical regression only; not nonlinear AC power-flow validation or a real-outage simulation."
+        }),
+    };
+    let grid_reference_passed = grid_reference["status"] == "passed";
+    let promotion_state = match receipt.promotion_state().as_str() {
+        "failed" => "failed",
+        "blocked" => "blocked",
+        _ if grid_reference_passed => "eligible_for_next_workflow_stage",
+        _ => "failed",
+    };
 
     Ok(serde_json::json!({
         "schema_version": 2,
@@ -257,7 +291,8 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         "manifest_sha256": manifest_sha256,
         "receipt_sha256": receipt_sha256,
         "configuration_sha256": actual_configuration_sha256,
-        "workflow_promotion_state": receipt.promotion_state().as_str(),
+        "workflow_promotion_state": promotion_state,
+        "domain_reference_check": grid_reference,
         "hazard_profile_id": cascade.profile_id,
         "hazard_profile_sha256": cascade.profile_sha256,
         "service_graph_sha256": graph_sha256,
@@ -543,6 +578,15 @@ mod tests {
         assert_eq!(report["verified_source_count"], 2);
         assert_eq!(report["verified_output_count"], 1);
         assert_eq!(report["hazard_profile_id"], "synthetic-compound-profile/r1");
+        assert_eq!(report["domain_reference_check"]["status"], "passed");
+        assert_eq!(
+            report["domain_reference_check"]["case_id"],
+            GRID_REFERENCE_CASE_ID
+        );
+        assert_eq!(
+            report["workflow_promotion_state"],
+            "eligible_for_next_workflow_stage"
+        );
         assert_eq!(report["failed_service_ids"], serde_json::json!(["cooling-centre", "grid", "hospital"]));
         assert!(report["dependency_propagation_rounds"].as_u64().unwrap() >= 1);
         fs::remove_dir_all(root).unwrap();
