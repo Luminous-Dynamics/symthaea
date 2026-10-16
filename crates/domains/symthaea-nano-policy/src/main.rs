@@ -668,6 +668,10 @@ mod tests {
             output_schema["properties"]["policy_version"]["const"].as_str(),
             Some(POLICY_VERSION)
         );
+        assert_eq!(
+            output_schema["properties"]["input_blake3"]["pattern"].as_str(),
+            Some("^[a-f0-9]{64}$")
+        );
     }
 
     #[test]
