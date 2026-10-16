@@ -80,6 +80,10 @@ pub struct SelectionRequest {
     pub seed: u64,
     /// SHA-256 identity for the externally frozen feature/preprocessing contract.
     pub feature_contract_sha256: String,
+    /// Optional unit for all declared candidate costs (e.g. "simulation_seconds").
+    /// Required by CostAwareFarthestFirst and included in the request receipt.
+    #[serde(default)]
+    pub cost_unit: Option<String>,
     /// Complete frozen candidate pool.
     pub candidates: Vec<Candidate>,
 }
@@ -93,6 +97,8 @@ pub struct SelectionDecision {
     pub candidate_id: String,
     /// Family/group used for provenance and diversity analysis.
     pub family_id: String,
+    /// Declared cost carried through from the request, if supplied.
+    pub estimated_cost: Option<f64>,
     /// Minimum Euclidean distance to an already-selected candidate in normalized
     /// descriptor space. None means no distance score was used.
     pub min_distance: Option<f64>,
@@ -115,6 +121,8 @@ pub struct SelectionResponse {
     pub request_sha256: String,
     /// Identity supplied for the frozen feature/preprocessing contract.
     pub feature_contract_sha256: String,
+    /// Cost unit, if the request declared one.
+    pub cost_unit: Option<String>,
     /// Candidate count after validating the input pool.
     pub candidate_count: usize,
     /// Requested maximum selection budget.
@@ -165,6 +173,8 @@ pub enum SelectionError {
     InvalidEstimatedCost,
     /// The cost-aware policy was requested but at least one candidate has no cost.
     MissingEstimatedCost,
+    /// The cost-aware policy was requested without a cost unit.
+    MissingCostUnit,
     /// Request line exceeds the hard byte limit.
     RequestTooLarge,
 }
@@ -183,6 +193,7 @@ impl SelectionError {
             Self::InvalidFeatureValue => "invalid_feature_value",
             Self::InvalidEstimatedCost => "invalid_estimated_cost",
             Self::MissingEstimatedCost => "missing_estimated_cost",
+            Self::MissingCostUnit => "missing_cost_unit",
             Self::RequestTooLarge => "request_too_large",
         }
     }
@@ -214,6 +225,9 @@ impl SelectionError {
             }
             Self::MissingEstimatedCost => {
                 "cost_aware_farthest_first requires estimated_cost for every candidate".to_owned()
+            }
+            Self::MissingCostUnit => {
+                "cost_aware_farthest_first requires a nonempty cost_unit".to_owned()
             }
             Self::RequestTooLarge => format!("request line exceeds {MAX_LINE_BYTES} bytes"),
         };
@@ -304,6 +318,7 @@ fn select(
         seed: request.seed,
         request_sha256: request_sha256.clone(),
         feature_contract_sha256: request.feature_contract_sha256,
+        cost_unit: request.cost_unit,
         candidate_count: request.candidates.len(),
         requested_budget: request.budget,
         selected_count: decisions.len(),
@@ -337,10 +352,17 @@ fn validate(request: &SelectionRequest) -> Result<(), SelectionError> {
         return Err(SelectionError::InvalidFeatureDimensions);
     }
 
-    if request.policy == Policy::CostAwareFarthestFirst
-        && request.candidates.iter().any(|candidate| candidate.estimated_cost.is_none())
-    {
-        return Err(SelectionError::MissingEstimatedCost);
+    if request.policy == Policy::CostAwareFarthestFirst {
+        if request
+            .cost_unit
+            .as_deref()
+            .is_none_or(|unit| unit.trim().is_empty() || unit.len() > 64)
+        {
+            return Err(SelectionError::MissingCostUnit);
+        }
+        if request.candidates.iter().any(|candidate| candidate.estimated_cost.is_none()) {
+            return Err(SelectionError::MissingEstimatedCost);
+        }
     }
 
     let mut ids = BTreeSet::new();
@@ -691,6 +713,7 @@ fn decision(
         rank,
         candidate_id: candidate.candidate_id.clone(),
         family_id: candidate.family_id.clone(),
+        estimated_cost: candidate.estimated_cost,
         min_distance,
         reason: reason.to_owned(),
     }
@@ -750,6 +773,7 @@ mod tests {
             budget,
             seed: 42,
             feature_contract_sha256: digest(),
+            cost_unit: None,
             candidates: vec![
                 candidate("candidate-c", "family-b", 1.0, 1.0),
                 candidate("candidate-a", "family-a", 0.0, 0.0),
@@ -762,6 +786,7 @@ mod tests {
     #[test]
     fn cost_aware_policy_prefers_coverage_per_cost() {
         let mut req = request(Policy::CostAwareFarthestFirst, 2);
+        req.cost_unit = Some("simulation_seconds".to_owned());
         req.candidates[0].estimated_cost = Some(10.0);
         req.candidates[1].estimated_cost = Some(2.0);
         req.candidates[2].estimated_cost = Some(0.5);
@@ -779,6 +804,8 @@ mod tests {
     #[test]
     fn cost_aware_policy_rejects_missing_and_invalid_costs() {
         let mut req = request(Policy::CostAwareFarthestFirst, 1);
+        assert_eq!(validate(&req), Err(SelectionError::MissingCostUnit));
+        req.cost_unit = Some("simulation_seconds".to_owned());
         req.candidates[0].estimated_cost = None;
         assert_eq!(validate(&req), Err(SelectionError::MissingEstimatedCost));
         req.policy = Policy::FarthestFirst;
