@@ -129,7 +129,7 @@ Added \`crates/core/symthaea-core/src/embodiment_v2.rs\` with:
 
 The multirotor simulator now implements \`EmbodimentV2Adapter\`, binding V2 records to a seed-derived simulator-instance identity. It exports 13 state scalar observations with explicit SI units and a four-quantity action record. It retains the V1 \`EmbodimentBridge\` method and includes V1 API parity/conformance tests.
 
-The ROS bridge now accepts generic V2 action frames via an explicit platform mapping contract. A conversion does not itself mean transport-published; transport success does not mean a physical actuator executed it. ROS 2/DDS must remain isolated and appropriately authenticated as configured by the system integrator; this Rust adapter is not a middleware security control.
+The ROS bridge now converts named joint arrays into UEC V2 observations with explicit profile-specific quantity/unit bindings and explicit NotReported missingness; it also accepts V2 action frames through explicit profile/joint/quantity/unit mappings. Conversion does not mean transport-published; transport success does not mean a physical actuator executed it. ROS 2/DDS must remain isolated and appropriately authenticated as configured by the system integrator; this Rust adapter is not a middleware security control.
 
 The HAL now has an explicit \`humanoid\` feature gate around fixed-morphology command, calibration, servo-output, interlock and runtime pieces; \`humanoid\` remains enabled by default for compatibility. Generic sensor/embedded-hal/recording/mock/GPIO interfaces remain available without that feature. This change must be confirmed with \`cargo check -p symthaea-hal --no-default-features\` and the existing default feature suite.
 
