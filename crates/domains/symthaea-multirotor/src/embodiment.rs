@@ -106,6 +106,38 @@ impl FlightEmbodiment {
         }
     }
 
+    /// Construct with a caller-provided logical instance ID.
+    ///
+    /// Use this when the adapter is part of a multi-instance simulation/runtime. The
+    /// default constructor's seed-derived ID is deterministic but is not globally unique.
+    pub fn with_instance_id(
+        genesis: &GenesisSeed,
+        instance_id: impl Into<String>,
+    ) -> Result<Self, String> {
+        let instance_id = instance_id.into();
+        if instance_id.trim().is_empty() {
+            return Err("multirotor instance ID must not be empty".into());
+        }
+        let mut embodiment = Self::new(genesis);
+        embodiment.instance_id = instance_id;
+        Ok(embodiment)
+    }
+
+    /// Construct an already-trained controller with a caller-provided logical instance ID.
+    pub fn with_controller_and_instance_id(
+        genesis: &GenesisSeed,
+        controller: FlightController,
+        instance_id: impl Into<String>,
+    ) -> Result<Self, String> {
+        let instance_id = instance_id.into();
+        if instance_id.trim().is_empty() {
+            return Err("multirotor instance ID must not be empty".into());
+        }
+        let mut embodiment = Self::with_controller(genesis, controller);
+        embodiment.instance_id = instance_id;
+        Ok(embodiment)
+    }
+
     /// Apply moral gate from ethics engine.
     /// A flying quadrotor can strike beings — ahimsa forces Red (which triggers
     /// the StabilizeHover → ControlledDescent → Touchdown fallback chain at
@@ -592,6 +624,19 @@ mod tests {
         assert_eq!(action.stage, ActionStageV2::Applied);
         assert_eq!(action.actions.len(), 4);
         validate_adapter_v2_conformance(&bridge, instance).unwrap();
+    }
+
+    #[test]
+    fn uec_v2_explicit_instance_ids_separate_same_seeded_simulators() {
+        let genesis = GenesisSeed::from_phrase("same-seed");
+        let first = FlightEmbodiment::with_instance_id(&genesis, "sim-a").unwrap();
+        let second = FlightEmbodiment::with_instance_id(&genesis, "sim-b").unwrap();
+        assert_ne!(first.instance_id(), second.instance_id());
+
+        use symthaea_core::embodiment_v2::EmbodimentV2Adapter;
+        assert_eq!(first.descriptor_v2("sim-a").instance_id, "sim-a");
+        assert_eq!(second.descriptor_v2("sim-b").instance_id, "sim-b");
+        assert!(FlightEmbodiment::with_instance_id(&genesis, "  ").is_err());
     }
 
     #[test]
