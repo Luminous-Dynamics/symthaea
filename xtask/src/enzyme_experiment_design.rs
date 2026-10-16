@@ -617,7 +617,7 @@ mod tests {
     #[test]
     fn kinetic_equations_have_expected_values() {
         assert!((michaelis_menten(2.0, 100.0, 2.0) - 50.0).abs() < 1e-12);
-        assert!((substrate_inhibition(2.0, 100.0, 2.0, 20.0) - 100.0 / 4.2).abs() < 1e-12);
+        assert!((substrate_inhibition(2.0, 100.0, 2.0, 20.0) - 200.0 / 4.2).abs() < 1e-12);
     }
 
     #[test]
