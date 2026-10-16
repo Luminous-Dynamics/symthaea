@@ -211,14 +211,19 @@ pub fn evaluate_bioacoustic_events(
     }
     let mut target_labels = BTreeSet::new();
     if bundle.target_labels.iter().any(|label| {
-        label.trim().is_empty() || !target_labels.insert(label.trim().to_owned())
+        label.trim().is_empty()
+            || label.trim() != label
+            || !target_labels.insert(label.trim().to_owned())
     }) {
         return Err("target labels must be non-empty and unique".into());
     }
     validate_match_rule(&bundle.matching_rule)?;
 
     if !bundle.split_policy.require_source_recording_ids {
-        return Err("evaluation requires source-recording lineage; enable require_source_recording_ids".into());
+        return Err(
+            "evaluation requires source-recording lineage; enable require_source_recording_ids"
+                .into(),
+        );
     }
     validate_bioacoustic_corpus(manifest, bundle.split_policy)?;
 
@@ -265,6 +270,7 @@ pub fn evaluate_bioacoustic_events(
             ));
         }
         if prediction.label.trim().is_empty()
+            || prediction.label.trim() != prediction.label
             || !target_labels.contains(prediction.label.trim())
         {
             return Err(format!(
@@ -276,7 +282,10 @@ pub fn evaluate_bioacoustic_events(
             return Err(format!("prediction {} has an invalid interval", prediction.prediction_id));
         }
         if !prediction.score.is_finite() || !(0.0..=1.0).contains(&prediction.score) {
-            return Err(format!("prediction {} score must be finite and in [0, 1]", prediction.prediction_id));
+            return Err(format!(
+                "prediction {} score must be finite and in [0, 1]",
+                prediction.prediction_id
+            ));
         }
         let recording = test_recordings
             .iter()
@@ -549,9 +558,7 @@ fn build_match_adjacency(
         };
         for &truth_index in &candidates[first..last] {
             let actual = &truth[truth_index];
-            if actual.interval.end_s > prediction.interval.start_s
-                && events_match(prediction.interval, actual.interval, rule)
-            {
+            if events_match(prediction.interval, actual.interval, rule) {
                 adjacency[prediction_index].push(truth_index);
             }
         }
@@ -640,7 +647,12 @@ mod tests {
         BioacousticRightsEvidence, RightsAdmissionDecision,
     };
 
-    fn recording(sample_id: &str, split: BioacousticSplit, source: &str, annotations: Vec<BioacousticAnnotation>) -> BioacousticRecording {
+    fn recording(
+        sample_id: &str,
+        split: BioacousticSplit,
+        source: &str,
+        annotations: Vec<BioacousticAnnotation>,
+    ) -> BioacousticRecording {
         BioacousticRecording {
             sample_id: sample_id.into(),
             asset_uri: format!("audio/{sample_id}.wav"),
@@ -689,9 +701,27 @@ mod tests {
                 decision: RightsAdmissionDecision::Approved,
             },
             recordings: vec![
-                recording("train-1", BioacousticSplit::Train, "src-train", vec![annotation("train-event", 1.0, 2.0, "whistle")]),
-                recording("valid-1", BioacousticSplit::Validation, "src-valid", vec![annotation("valid-event", 1.0, 2.0, "whistle")]),
-                recording("test-1", BioacousticSplit::Test, "src-test-1", vec![annotation("truth-1", 1.0, 2.0, "whistle"), annotation("truth-2", 3.0, 4.0, "whistle")]),
+                recording(
+                    "train-1",
+                    BioacousticSplit::Train,
+                    "src-train",
+                    vec![annotation("train-event", 1.0, 2.0, "whistle")],
+                ),
+                recording(
+                    "valid-1",
+                    BioacousticSplit::Validation,
+                    "src-valid",
+                    vec![annotation("valid-event", 1.0, 2.0, "whistle")],
+                ),
+                recording(
+                    "test-1",
+                    BioacousticSplit::Test,
+                    "src-test-1",
+                    vec![
+                        annotation("truth-1", 1.0, 2.0, "whistle"),
+                        annotation("truth-2", 3.0, 4.0, "whistle"),
+                    ],
+                ),
                 recording("test-2", BioacousticSplit::Test, "src-test-2", vec![]),
             ],
         };
@@ -792,12 +822,48 @@ mod tests {
     fn maximum_matching_does_not_double_count_truth_events() {
         let rule = EventMatchRule::StartTolerance { max_start_error_s: 0.2 };
         let truth = vec![
-            Event { id: "a".into(), sample_id: "s".into(), interval: TimeSpan { start_s: 1.0, end_s: 1.1 }, label: "click".into(), score: 1.0 },
-            Event { id: "b".into(), sample_id: "s".into(), interval: TimeSpan { start_s: 1.15, end_s: 1.25 }, label: "click".into(), score: 1.0 },
+            Event {
+                id: "a".into(),
+                sample_id: "s".into(),
+                interval: TimeSpan {
+                    start_s: 1.0,
+                    end_s: 1.1,
+                },
+                label: "click".into(),
+                score: 1.0,
+            },
+            Event {
+                id: "b".into(),
+                sample_id: "s".into(),
+                interval: TimeSpan {
+                    start_s: 1.15,
+                    end_s: 1.25,
+                },
+                label: "click".into(),
+                score: 1.0,
+            },
         ];
         let predictions = vec![
-            Event { id: "p1".into(), sample_id: "s".into(), interval: TimeSpan { start_s: 1.1, end_s: 1.2 }, label: "click".into(), score: 0.9 },
-            Event { id: "p2".into(), sample_id: "s".into(), interval: TimeSpan { start_s: 0.85, end_s: 0.95 }, label: "click".into(), score: 0.8 },
+            Event {
+                id: "p1".into(),
+                sample_id: "s".into(),
+                interval: TimeSpan {
+                    start_s: 1.1,
+                    end_s: 1.2,
+                },
+                label: "click".into(),
+                score: 0.9,
+            },
+            Event {
+                id: "p2".into(),
+                sample_id: "s".into(),
+                interval: TimeSpan {
+                    start_s: 0.85,
+                    end_s: 0.95,
+                },
+                label: "click".into(),
+                score: 0.8,
+            },
         ];
         let (tp, fp, fn_) = match_events(&truth, &predictions, &rule);
         assert_eq!((tp, fp, fn_), (2, 0, 0));
