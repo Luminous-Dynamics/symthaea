@@ -334,12 +334,13 @@
       "resource_tests_authored": 18,
       "repair_scheduling_tests_authored": 17,
       "robust_repair_evaluation_tests_authored": 10,
-      "total_rust_tests_authored": 101,
-      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, single-crew exact oracle/policy gaps 11, multi-crew exact oracle 8. None have been compiled or executed in the current environment.",
+      "total_rust_tests_authored": 112,
+      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, single-crew exact oracle/policy gaps 11, multi-crew exact oracle 8, independent schedule certificate verifier 11. None have been compiled or executed in the current environment.",
       "rolling_horizon_repair_tests_authored": 11,
       "repair_policy_comparison_tests_authored": 6,
       "exact_oracle_tests_authored": 11,
-      "multi_crew_oracle_tests_authored": 8
+      "multi_crew_oracle_tests_authored": 8,
+      "certificate_verifier_tests_authored": 11
     },
     "performance_targets": {
       "status": "proposed_unmeasured_targets",
@@ -1155,6 +1156,57 @@
       "https://doi.org/10.1016/j.ejor.2022.05.049",
       "https://doi.org/10.1016/j.asoc.2022.109253",
       "https://doi.org/10.1016/j.cie.2020.107004"
+    ]
+  },
+  "repair_schedule_certificate": {
+    "status": "independent_feasibility_and_objective_verifier_not_executed",
+    "source_module": "crates/domains/symthaea-engineering/src/repair_schedule_certificate.rs",
+    "accepted_claim": "schedule_feasibility_and_objective_arithmetic_only",
+    "does_not_prove": "global_optimality",
+    "scope": [
+      "all outage_start_step = 0",
+      "all crew available_from_step = 0",
+      "positive integer durations",
+      "one required skill per job",
+      "no spare-part requirements"
+    ],
+    "checks": [
+      "exact job coverage",
+      "unique scheduled job IDs",
+      "known job and crew IDs",
+      "selected crew has required skill",
+      "scheduled duration matches input duration",
+      "no overlapping jobs per crew",
+      "all prerequisites finish before dependent starts",
+      "supported input assumptions",
+      "independently recomputed weighted completion loss"
+    ],
+    "negative_controls": [
+      "missing job",
+      "duplicate job assignment",
+      "unknown scheduled job",
+      "unqualified crew",
+      "overlapping jobs",
+      "precedence violation",
+      "duration mismatch",
+      "false objective",
+      "unsupported spare parts",
+      "late crew availability",
+      "nonfinite service weight or objective",
+      "unknown and duplicate dependencies"
+    ],
+    "tests_authored": 11,
+    "tests_executed": false,
+    "mutation_campaign_target": 10000,
+    "performance_status": "not_measured",
+    "limitations": [
+      "certificate does not establish optimality",
+      "does not validate parts, travel/access, shifts, release times, uncertainty or real-world operational safety",
+      "Rust tests authored but not executed"
+    ],
+    "research_sources": [
+      "https://doi.org/10.1016/j.ejor.2022.05.049",
+      "https://doi.org/10.1016/j.asoc.2022.109253"
     ]
   }
 }
