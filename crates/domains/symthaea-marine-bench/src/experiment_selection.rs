@@ -319,10 +319,17 @@ struct RunMetrics {
     normalized_interval_width_reduction: f64,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
+struct PolicyRun {
+    metrics: RunMetrics,
+    selected_experiment_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
 struct ExecutionTraceRow {
     policy: Policy,
     seed: Option<u64>,
+    selected_experiment_ids: Vec<String>,
     metrics: RunMetrics,
 }
 
@@ -561,12 +568,13 @@ fn run_policy(
     seed: u64,
     budget: u32,
     catalog: &[Experiment],
-) -> RunMetrics {
+) -> PolicyRun {
     let initial = initial_state(scenario);
     let mut current = initial;
     let mut available = vec![true; catalog.len()];
     let mut spent = 0_u32;
     let mut selected = 0_usize;
+    let mut selected_experiment_ids = Vec::new();
     let mut rng = SplitMix64::new(seed ^ scenario.id.wrapping_mul(0xD6E8FEB86659FD93));
     let mut cost_to_resolution = if is_fully_resolved(&current) { Some(0) } else { None };
 
@@ -587,6 +595,7 @@ fn run_policy(
         ) else { break };
         let experiment = &catalog[index];
         simulate_experiment(scenario, &mut current, experiment);
+        selected_experiment_ids.push(experiment.id.clone());
         available[index] = false;
         spent += experiment.cost_units;
         selected += 1;
@@ -595,11 +604,24 @@ fn run_policy(
         }
     }
 
-    summarize_state(scenario.id, &initial, &current, spent, cost_to_resolution)
+    PolicyRun {
+        metrics: summarize_state(
+            scenario.id,
+            &initial,
+            &current,
+            spent,
+            cost_to_resolution,
+        ),
+        selected_experiment_ids,
+    }
 }
 
-fn better_oracle_candidate(candidate: &RunMetrics, candidate_cost: u32,
-                           best: &RunMetrics, best_cost: u32) -> bool {
+fn better_oracle_candidate(
+    candidate: &RunMetrics,
+    candidate_cost: u32,
+    best: &RunMetrics,
+    best_cost: u32,
+) -> bool {
     if candidate.resolved_constraints != best.resolved_constraints {
         return candidate.resolved_constraints > best.resolved_constraints;
     }
@@ -621,11 +643,24 @@ fn exhaustive_toy_oracle(
     scenario: &SyntheticScenario,
     budget: u32,
     catalog: &[Experiment],
-) -> RunMetrics {
+) -> PolicyRun {
     assert!(catalog.len() < usize::BITS as usize);
     let initial = initial_state(scenario);
-    let mut best = summarize_state(scenario.id, &initial, &initial, 0,
-        if is_fully_resolved(&initial) { Some(0) } else { None });
+    let initial_resolution_cost = if is_fully_resolved(&initial) {
+        Some(0)
+    } else {
+        None
+    };
+    let mut best = PolicyRun {
+        metrics: summarize_state(
+            scenario.id,
+            &initial,
+            &initial,
+            0,
+            initial_resolution_cost,
+        ),
+        selected_experiment_ids: Vec::new(),
+    };
     let mut best_cost = 0_u32;
     let subset_count = 1_usize << catalog.len();
 
@@ -653,7 +688,7 @@ fn exhaustive_toy_oracle(
         let mut current = initial;
         let mut cumulative_cost = 0_u32;
         let mut cost_to_resolution = if is_fully_resolved(&current) { Some(0) } else { None };
-        for index in selected_indices {
+        for index in selected_indices.iter().copied() {
             let experiment = &catalog[index];
             simulate_experiment(scenario, &mut current, experiment);
             cumulative_cost += experiment.cost_units;
@@ -669,8 +704,14 @@ fn exhaustive_toy_oracle(
             cost,
             cost_to_resolution,
         );
-        if better_oracle_candidate(&candidate, cost, &best, best_cost) {
-            best = candidate;
+        if better_oracle_candidate(&candidate, cost, &best.metrics, best_cost) {
+            best = PolicyRun {
+                metrics: candidate,
+                selected_experiment_ids: selected_indices
+                    .iter()
+                    .map(|index| catalog[*index].id.clone())
+                    .collect(),
+            };
             best_cost = cost;
         }
     }
@@ -779,9 +820,9 @@ pub fn run_reference_benchmark_with_revision(
         .map(|id| generate_scenario(id as u64))
         .collect();
     let mut execution_trace = Vec::new();
-    let oracle_results: Vec<RunMetrics> = scenarios.iter()
+    let oracle_runs: Vec<PolicyRun> = scenarios.iter()
         .map(|scenario| {
-            let metrics = exhaustive_toy_oracle(
+            let run = exhaustive_toy_oracle(
                 scenario,
                 budget_units_per_scenario,
                 &catalog,
@@ -789,18 +830,21 @@ pub fn run_reference_benchmark_with_revision(
             execution_trace.push(ExecutionTraceRow {
                 policy: Policy::ExhaustiveToyOracle,
                 seed: None,
-                metrics,
+                selected_experiment_ids: run.selected_experiment_ids.clone(),
+                metrics: run.metrics,
             });
-            metrics
+            run
         })
         .collect();
+    let oracle_results: Vec<RunMetrics> =
+        oracle_runs.iter().map(|run| run.metrics).collect();
 
     let mut summaries = Vec::new();
     for policy in Policy::all_heuristics() {
         for seed in paired_seeds.iter().copied() {
             let mut results = Vec::with_capacity(scenarios.len());
             for scenario in &scenarios {
-                let metrics = run_policy(
+                let run = run_policy(
                     scenario,
                     policy,
                     seed,
@@ -810,9 +854,10 @@ pub fn run_reference_benchmark_with_revision(
                 execution_trace.push(ExecutionTraceRow {
                     policy,
                     seed: Some(seed),
-                    metrics,
+                    selected_experiment_ids: run.selected_experiment_ids.clone(),
+                    metrics: run.metrics,
                 });
-                results.push(metrics);
+                results.push(run.metrics);
             }
             summaries.push(summarize_policy(
                 policy,
@@ -961,7 +1006,7 @@ mod tests {
             let scenario = generate_scenario(id);
             for policy in Policy::all_heuristics() {
                 let run = run_policy(&scenario, policy, 23, 6, &catalog);
-                assert!(run.budget_spent_units <= 6);
+                assert!(run.metrics.budget_spent_units <= 6);
             }
         }
     }
@@ -988,8 +1033,10 @@ mod tests {
             let oracle = exhaustive_toy_oracle(&scenario, 6, &catalog);
             for policy in Policy::all_heuristics() {
                 let run = run_policy(&scenario, policy, 1234, 6, &catalog);
-                assert!(oracle.resolved_constraints >= run.resolved_constraints);
-                assert!(oracle.budget_spent_units <= 6);
+                assert!(
+                    oracle.metrics.resolved_constraints >= run.metrics.resolved_constraints
+                );
+                assert!(oracle.metrics.budget_spent_units <= 6);
             }
         }
     }
