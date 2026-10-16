@@ -96,7 +96,7 @@ fn fixture() -> MissionConfiguration {
             right_component_id: "lander".into(),
             policy: SuitInteropPolicy {
                 minimum_evidence_level: SuitEvidenceLevel::Simulated,
-                required_environments: environments,
+                required_environments: environments.clone(),
             },
         }],
     }
