@@ -148,7 +148,38 @@ PolicyRunV1 {
 
 The concrete Rust schema should use strict versioned types and canonical serialization consistent with the existing Living City evidence package, not generic untyped metadata. It should compose with the run receipt and offline verifier rather than create a parallel integrity stack.
 
-## 9. Implementation sequence
+## 9. Domain-model separation and validation ladder
+
+The city should be a **federation of independently testable domain models**, coordinated by a typed Rust experiment/evidence layer—not a single home-grown simulator that approximates every physical discipline. Symthaea can orchestrate candidate policies, observations, actions and receipts; each solver remains responsible for its own state equations, units, discretization, numerical error and applicability limits.
+
+| Domain slice | Independent reference ecosystem | First qualification targets | Important boundary |
+|---|---|---|---|
+| Electrical distribution | EPRI OpenDSS example/test cases and IEEE PES distribution feeders | Node-phase voltages, branch flows/losses, convergence and event response for the exact supported feeder model | The current four analytical regressions only cover balanced radial linearized DistFlow; they are not an OpenDSS differential test |
+| Buildings and local energy control | DOE/LBNL BOPTEST building-control benchmark; CityLearn community-energy coordination environments and fixed scenario datasets | Comfort/service, energy, cost, peak demand, controller actions, delay and fault response under identical boundary conditions | Reproduce each selected environment/version and its scorecard; do not equate a reinforcement-learning reward with occupant wellbeing or city-wide feasibility |
+| Drinking-water distribution | US EPA EPANET | Pressure/head, flow, tank level, water-quality transport and extended-period service on supported networks | Water-quality, contaminant and hydraulic results need their own units, boundary conditions and validation; graph reachability alone is not hydraulics |
+| Stormwater/drainage | US EPA SWMM | Runoff hydrographs, conduit/node state, surcharge/flooding and retention/infiltration behavior for published or locally qualified cases | A hazard label or dependency edge does not predict flood depth, runoff volume or inundation |
+| Mobility and emergency access | SUMO, using a named scenario with calibration evidence | Travel-time and queue distributions, throughput, disruptions, accessible-route reachability and emergency response under the declared demand | A generic traffic network is not validated local mobility; calibration data and held-out conditions must be explicit |
+
+Official entry points: [OpenDSS test cases](https://opendss.epri.com/ExamplesDocsandTestCases.html), [BOPTEST](https://www.energy.gov/cmei/buildings/boptest-building-operations-testing-framework), [CityLearn v3](https://www.citylearn.net/index.html), [EPANET](https://www.epa.gov/water-research/epanet), [EPA SWMM](https://www.epa.gov/water-research/storm-water-management-model-swmm), and [SUMO documentation](https://sumo.dlr.de/docs/). These are benchmark/reference candidates, not claims that this branch already integrates them.
+
+### Adapter contract
+
+Every domain adapter must declare solver/version and licence/basis; exact model/fixture identity and digest; spatial boundary and coordinate/units contract; initial state, boundary conditions and timestep; valid parameter range; observation/action surface; error/convergence state; calibration data and validation cases; output quantities and accepted tolerance; and whether the result is measured, simulated, derived or missing. The adapter emits a domain receipt bound to exact input/output bytes and all conversions.
+
+Keep production orchestration and evidence handling Rust-first. A compatible solver may be run as a separately versioned executable/container or consume/produce frozen interchange files; a Python-based reference client must not silently become a production dependency just because the upstream benchmark uses Python. The interface boundary itself must be tested, versioned and licence-reviewed.
+
+### Coupling ladder
+
+1. **Contract parity:** prove units, identifiers, time semantics, missing-value behavior and boundary-condition conversions on hand-calculated fixtures.
+2. **Domain reproduction:** reproduce a published case or compare against an independent reference solver with tolerance registered before seeing results.
+3. **Domain falsification:** test conservation/balance where physically applicable, sensitivity, edge conditions, solver failure and out-of-range inputs.
+4. **Event-coupling fixtures:** only after each linked domain passes its own gate, test interactions such as grid outage -> pump/cooling/traffic-signal loss, or flood -> blocked routes plus degraded communications. The adapter declares event ordering, latency, stale-data policy and time resolution.
+5. **Held-out coupled scenarios:** evaluate common-cause failures and severity/profile shifts absent from tuning cases; preserve policy-blind hidden cases.
+6. **Prospective shadow validation:** bind predictions to subsequent observations before claiming local predictive validity. Shadow mode must not actuate critical infrastructure.
+
+No coupled city result is eligible for a stronger claim than its least-validated critical component and interface. If a required model/solver is unsupported or fails convergence, mark the affected decision blocked; do not substitute a graph heuristic or the last successful value and call it physical simulation.
+
+## 10. Implementation sequence
 
 1. **Freeze this protocol** and link its version into the Living City research brief; mark every numeric target as provisional until locally authorized.
 2. Build a deterministic, synthetic-only policy harness that executes baseline policies over matched worlds and emits one receipt per policy/case.
@@ -158,14 +189,19 @@ The concrete Rust schema should use strict versioned types and canonical seriali
 6. Validate each physical domain against a suitable independent solver / published case suite before making domain-specific claims; the current grid-reference tests are linearized analytical regression only.
 7. Run controlled comparisons; publish results even when the candidate loses. Only then consider a shadow-mode deployment with no autonomous authority.
 
-## 10. Research anchors
+## 11. Research anchors
 
 - Azadi et al., *What Have Urban Digital Twins Contributed to Urban Planning and Decision Making? From a Systematic Literature Review Toward a Socio-Technical Research and Development Agenda*, Smart Cities 8(1), 32 (2025). The review examines 88 peer-reviewed articles and highlights the persistent gap between technical ambitions and socio-technical implementation: https://doi.org/10.3390/smartcities8010032
 - IEEE 1729-2025, *IEEE Recommended Practice for Electric Power Distribution System Analysis*. Its stated scope includes steady-state, event-based, probabilistic, stochastic and dynamic analysis; it is a useful power-domain benchmark anchor, not a universal urban benchmark: https://standards.ieee.org/ieee/1729/11171/
 - NIST AMS 100-85, *On Methods of Uncertainty Quantification in Computational Modeling and Simulation: Harmonizing Modeling and Metrology Practices*: https://doi.org/10.6028/NIST.AMS.100-85
 - EPRI OpenDSS examples and test cases: https://opendss.epri.com/ExamplesDocsandTestCases.html
+- DOE/LBNL BOPTEST building-control benchmark and standardized KPIs: https://www.energy.gov/cmei/buildings/boptest-building-operations-testing-framework
+- CityLearn v3 shared scenario interfaces and community-energy KPIs: https://www.citylearn.net/index.html
+- US EPA EPANET water distribution and extended-period simulation: https://www.epa.gov/water-research/epanet
+- US EPA SWMM urban stormwater/drainage modeling: https://www.epa.gov/water-research/storm-water-management-model-swmm
+- SUMO microscopic/intermodal mobility simulation and named scenarios: https://sumo.dlr.de/docs/
 
-## 11. Evidence ceiling / non-claims
+## 12. Evidence ceiling / non-claims
 
 This contract defines what to test next; it does not implement or execute the benchmark. The existing Living City vertical slice presently has synthetic fixtures, a constrained point-estimate evaluator, an evidence-bound package, a compound-hazard contract, and four linearized analytical grid regressions. It does **not** yet have a calibrated coupled city model, stochastic policy evaluation harness, validated cohort roster, calibrated interval method, validated hydraulic/thermal/mobility models, or real-world evidence that a policy improves outcomes.
 
