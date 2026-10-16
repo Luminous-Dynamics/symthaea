@@ -43,13 +43,13 @@ jobs:
         shell: bash
         run: |
           cargo run --locked --quiet -p symthaea-nano-policy --bin nano-policy-budget-audit -- --input crates/domains/symthaea-nano-policy/fixtures/synthetic-sim-budget-ledger-equal.json > simulator-budget-equal.json
-          jq -e '.schema_version == "nano-simulator-call-audit-v1" and .audit_pass == true and .expected_simulator_calls == 2 and .observed_simulator_calls == 2 and .reported_count_matches_observed == true and .simulator_failures == 1 and .preflight_rejected == 1' simulator-budget-equal.json
+          jq -e '.schema_version == "nano-simulator-call-audit-v1" and .audit_pass == true and .seed == 42 and .expected_simulator_calls == 2 and .observed_simulator_calls == 2 and .reported_count_matches_observed == true and .simulator_failures == 1 and .preflight_rejected == 1' simulator-budget-equal.json
           set +e
           cargo run --locked --quiet -p symthaea-nano-policy --bin nano-policy-budget-audit -- --input crates/domains/symthaea-nano-policy/fixtures/synthetic-sim-budget-ledger.json > simulator-budget-mismatch.json
           status=$?
           set -e
           test "$status" -eq 3
-          jq -e '.expected_simulator_calls == 2 and .reported_simulator_calls == 1 and .observed_simulator_calls == 2 and .reported_count_matches_observed == false and .audit_pass == false' simulator-budget-mismatch.json
+          jq -e '.seed == 42 and .expected_simulator_calls == 2 and .reported_simulator_calls == 1 and .observed_simulator_calls == 2 and .reported_count_matches_observed == false and .audit_pass == false' simulator-budget-mismatch.json
       - name: Parse committed ledgers and JSON schemas
         run: |
           jq empty crates/domains/symthaea-nano-policy/fixtures/synthetic-outcome-ledger.json
