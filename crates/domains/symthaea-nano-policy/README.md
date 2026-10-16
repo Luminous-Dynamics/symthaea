@@ -4,7 +4,7 @@ A small research-only Rust policy kernel for deterministic candidate selection f
 
 ## Contract
 
-One JSON request per input line; one JSON response per output line. The CLI uses a bounded line reader: it retains at most 16 MiB per request, hashes oversized records incrementally without retaining them, drains the record to its line ending, and rejects it as `request_too_large`. Invalid UTF-8 is rejected instead of terminating the whole JSONL stream. CRLF and LF line endings are normalized by excluding line terminators from the request digest. Example request:
+One JSON request per input line; one JSON response per output line. The CLI uses a bounded line reader: it retains at most 16 MiB per request, hashes oversized records incrementally without retaining them, drains the record to its line ending, and rejects it as `request_too_large`. Invalid UTF-8 is rejected instead of terminating the whole JSONL stream. CRLF and LF line endings are normalized by excluding line terminators from the request digest. Blank or whitespace-only lines are ignored. Example request:
 
     {"schema_version":"nano-policy-request-v1","policy":"farthest_first","budget":2,"seed":42,"feature_contract_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","candidates":[{"candidate_id":"c-a","family_id":"family-a","normalized_features":[0.0,0.0]},{"candidate_id":"c-b","family_id":"family-a","normalized_features":[0.2,0.2]},{"candidate_id":"c-c","family_id":"family-b","normalized_features":[1.0,1.0]}]}
 
