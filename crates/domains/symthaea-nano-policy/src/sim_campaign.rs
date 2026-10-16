@@ -521,14 +521,6 @@ fn validate_text(value: &str, field: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::sim_budget::{
-        ProposalAttempt, PreflightStatus, ProposalStatus, RunStatus, SimulatorCall,
-        SimulatorTerminalStatus, NotCalledReason, SimulatorBudgetLedger,
-    };
-    
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::sim_budget::{
         PreflightStatus, ProposalAttempt, ProposalStatus, RunStatus,
         SimulatorBudgetLedger, SimulatorCall, SimulatorTerminalStatus,
     };
