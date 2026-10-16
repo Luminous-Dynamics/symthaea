@@ -113,6 +113,8 @@ pub struct RosSampleMetadataV1 {
     pub stamp_nanosec: u32,
     pub frame_id: String,
     pub clock_domain: RosClockDomainV1,
+    /// Time-source generation that changes on qualified clock discontinuity or reset.
+    pub source_clock_epoch_id: Option<String>,
     pub received_monotonic_ns: Option<u64>,
     pub receive_sequence: Option<u64>,
     pub receive_epoch_id: Option<String>,
@@ -194,6 +196,7 @@ pub struct RosPartialHumanoidObservationV1 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RosClockNowV1 {
     pub domain: RosClockDomainV1,
+    pub source_clock_epoch_id: String,
     pub timestamp_ns: u64,
 }
 
@@ -206,6 +209,9 @@ pub struct RosTemporalPolicyV1 {
     pub maximum_source_skew_ns: u64,
     pub maximum_bridge_residence_age_ns: u64,
     pub reject_zero_source_stamp: bool,
+    /// Whether two successive samples from one stream may share the same source stamp.
+    /// This is profile-specific because some sources use coarse timestamp resolution.
+    pub reject_duplicate_source_stamp: bool,
 }
 
 /// Identifies which input failed the temporal gate.
@@ -392,6 +398,22 @@ pub fn evaluate_ros_temporal_pair_v1(
         (RosTemporalStreamV1::JointState, joint_state),
         (RosTemporalStreamV1::Imu, imu),
     ] {
+        let sample_epoch = match sample.source_clock_epoch_id.as_deref() {
+            Some(epoch) if !epoch.trim().is_empty() => epoch,
+            _ => {
+                return RosTemporalDispositionV1::Unsynchronized {
+                    reason: format!("{stream:?} source-clock epoch is unbound"),
+                };
+            }
+        };
+        if sample_epoch != now.source_clock_epoch_id {
+            return RosTemporalDispositionV1::Unsynchronized {
+                reason: format!(
+                    "{stream:?} source-clock epoch {sample_epoch:?} does not match current-time epoch {:?}",
+                    now.source_clock_epoch_id
+                ),
+            };
+        }
         match &sample.clock_domain {
             RosClockDomainV1::Unbound => {
                 return RosTemporalDispositionV1::Unsynchronized {
@@ -413,6 +435,11 @@ pub fn evaluate_ros_temporal_pair_v1(
             }
             RosClockDomainV1::Named(_) => {}
         }
+    }
+    if now.source_clock_epoch_id.trim().is_empty() {
+        return RosTemporalDispositionV1::Unsynchronized {
+            reason: "qualified current-time source-clock epoch ID is unbound".into(),
+        };
     }
     match &now.domain {
         RosClockDomainV1::Named(domain) if domain == expected_domain => {}
@@ -524,6 +551,347 @@ pub fn evaluate_ros_temporal_pair_v1(
         source_skew_ns: skew,
         joint_bridge_residence_age_ns: joint_residence_age,
         imu_bridge_residence_age_ns: imu_residence_age,
+    }
+}
+
+/// Per-stream history retained only within one explicit bridge receive epoch.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RosTemporalHistoryEntryV1 {
+    pub receive_sequence: u64,
+    pub source_stamp_ns: u64,
+    pub source_clock_domain: String,
+    pub source_clock_epoch_id: String,
+}
+
+/// Stateful replay/regression guard layered after pairwise temporal admission.
+///
+/// Rebinding to a new receipt epoch clears history explicitly. The gate never
+/// silently resets when it sees a different epoch, because that could allow an
+/// old sample to be replayed into a new run.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RosTemporalHistoryV1 {
+    pub receive_epoch_id: String,
+    pub source_clock_epoch_id: String,
+    pub last_joint_state: Option<RosTemporalHistoryEntryV1>,
+    pub last_imu: Option<RosTemporalHistoryEntryV1>,
+}
+
+impl RosTemporalHistoryV1 {
+    pub fn new(
+        receive_epoch_id: impl Into<String>,
+        source_clock_epoch_id: impl Into<String>,
+    ) -> Result<Self, RosTemporalHistoryDispositionV1> {
+        let receive_epoch_id = receive_epoch_id.into();
+        let source_clock_epoch_id = source_clock_epoch_id.into();
+        if receive_epoch_id.trim().is_empty() || source_clock_epoch_id.trim().is_empty() {
+            return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
+                reason: "receive epoch ID and source-clock epoch ID must not be empty".into(),
+            });
+        }
+        Ok(Self {
+            receive_epoch_id,
+            source_clock_epoch_id,
+            last_joint_state: None,
+            last_imu: None,
+        })
+    }
+
+    /// Explicitly rebind one or both clock epochs and clear retained stream history.
+    /// This must only be called in response to an observed/qualified clock lifecycle
+    /// event, never merely because a stale sample carries a different timestamp.
+    pub fn reset_for_epochs(
+        &mut self,
+        receive_epoch_id: impl Into<String>,
+        source_clock_epoch_id: impl Into<String>,
+    ) -> Result<(), RosTemporalHistoryDispositionV1> {
+        let receive_epoch_id = receive_epoch_id.into();
+        let source_clock_epoch_id = source_clock_epoch_id.into();
+        if receive_epoch_id.trim().is_empty() || source_clock_epoch_id.trim().is_empty() {
+            return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
+                reason: "receive epoch ID and source-clock epoch ID must not be empty".into(),
+            });
+        }
+        self.receive_epoch_id = receive_epoch_id;
+        self.source_clock_epoch_id = source_clock_epoch_id;
+        self.last_joint_state = None;
+        self.last_imu = None;
+        Ok(())
+    }
+}
+
+/// Stateful history-gate rejection. It is deliberately separate from freshness
+/// so callers can tell a stale input from a replay or clock discontinuity.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RosTemporalHistoryDispositionV1 {
+    Accepted {
+        joint_sequence_gap: u64,
+        imu_sequence_gap: u64,
+    },
+    TemporalRejected {
+        disposition: RosTemporalDispositionV1,
+    },
+    HistoryUninitialized {
+        reason: String,
+    },
+    ReceiveEpochChanged {
+        expected_epoch_id: String,
+        observed_epoch_id: String,
+    },
+    InvalidHistory {
+        reason: String,
+    },
+    SequenceNotIncreasing {
+        stream: RosTemporalStreamV1,
+        previous: u64,
+        current: u64,
+    },
+    SourceTimestampRegressed {
+        stream: RosTemporalStreamV1,
+        previous_ns: u64,
+        current_ns: u64,
+    },
+    DuplicateSourceTimestamp {
+        stream: RosTemporalStreamV1,
+        timestamp_ns: u64,
+    },
+    SourceClockChanged {
+        stream: RosTemporalStreamV1,
+        previous_domain: String,
+        current_domain: String,
+    },
+    SourceClockEpochChanged {
+        expected_epoch_id: String,
+        observed_epoch_id: String,
+    },
+}
+
+/// Construct a candidate history entry without mutating the retained history.
+fn prepare_temporal_history_entry(
+    sample: &RosSampleMetadataV1,
+    stream: RosTemporalStreamV1,
+    policy: &RosTemporalPolicyV1,
+    receive_epoch_id: &str,
+) -> Result<RosTemporalHistoryEntryV1, RosTemporalHistoryDispositionV1> {
+    let observed_epoch = sample.receive_epoch_id.as_deref().ok_or_else(|| {
+        RosTemporalHistoryDispositionV1::InvalidHistory {
+            reason: format!("{stream:?} receipt epoch is absent"),
+        }
+    })?;
+    if observed_epoch != receive_epoch_id {
+        return Err(RosTemporalHistoryDispositionV1::ReceiveEpochChanged {
+            expected_epoch_id: receive_epoch_id.to_string(),
+            observed_epoch_id: observed_epoch.to_string(),
+        });
+    }
+    let sequence = sample.receive_sequence.ok_or_else(|| {
+        RosTemporalHistoryDispositionV1::InvalidHistory {
+            reason: format!("{stream:?} receive sequence is absent"),
+        }
+    })?;
+    if sequence == 0 {
+        return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
+            reason: format!("{stream:?} receive sequence must be greater than zero"),
+        });
+    }
+    let source_clock_epoch_id = sample.source_clock_epoch_id.as_deref().ok_or_else(|| {
+        RosTemporalHistoryDispositionV1::InvalidHistory {
+            reason: format!("{stream:?} source-clock epoch is unbound"),
+        }
+    })?;
+    if source_clock_epoch_id.trim().is_empty() {
+        return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
+            reason: format!("{stream:?} source-clock epoch ID is empty"),
+        });
+    }
+    let domain = match &sample.clock_domain {
+        RosClockDomainV1::Unbound => {
+            return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
+                reason: format!("{stream:?} source clock domain is unbound"),
+            });
+        }
+        RosClockDomainV1::Named(domain) if domain.trim().is_empty() => {
+            return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
+                reason: format!("{stream:?} source clock domain name is empty"),
+            });
+        }
+        RosClockDomainV1::Named(domain) => domain.clone(),
+    };
+    if domain != policy.required_source_clock_domain {
+        return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
+            reason: format!(
+                "{stream:?} source clock domain {domain:?} does not match the frozen history profile {:?}",
+                policy.required_source_clock_domain
+            ),
+        });
+    }
+    let source_stamp_ns = ros_source_stamp_ns(
+        sample,
+        stream,
+        policy.reject_zero_source_stamp,
+    )
+    .map_err(|disposition| RosTemporalHistoryDispositionV1::TemporalRejected {
+        disposition,
+    })?;
+
+    Ok(RosTemporalHistoryEntryV1 {
+        receive_sequence: sequence,
+        source_stamp_ns,
+        source_clock_domain: domain,
+        source_clock_epoch_id: source_clock_epoch_id.to_string(),
+    })
+}
+
+/// Check a candidate against the previous accepted sample without committing it.
+fn check_temporal_history_entry(
+    stream: RosTemporalStreamV1,
+    previous: Option<&RosTemporalHistoryEntryV1>,
+    current: &RosTemporalHistoryEntryV1,
+    policy: &RosTemporalPolicyV1,
+) -> Result<u64, RosTemporalHistoryDispositionV1> {
+    let Some(previous) = previous else {
+        return Ok(0);
+    };
+
+    if current.source_clock_epoch_id != previous.source_clock_epoch_id {
+        return Err(RosTemporalHistoryDispositionV1::SourceClockEpochChanged {
+            expected_epoch_id: previous.source_clock_epoch_id.clone(),
+            observed_epoch_id: current.source_clock_epoch_id.clone(),
+        });
+    }
+    if current.source_clock_domain != previous.source_clock_domain {
+        return Err(RosTemporalHistoryDispositionV1::SourceClockChanged {
+            stream,
+            previous_domain: previous.source_clock_domain.clone(),
+            current_domain: current.source_clock_domain.clone(),
+        });
+    }
+    if current.receive_sequence <= previous.receive_sequence {
+        return Err(RosTemporalHistoryDispositionV1::SequenceNotIncreasing {
+            stream,
+            previous: previous.receive_sequence,
+            current: current.receive_sequence,
+        });
+    }
+    if current.source_stamp_ns < previous.source_stamp_ns {
+        return Err(RosTemporalHistoryDispositionV1::SourceTimestampRegressed {
+            stream,
+            previous_ns: previous.source_stamp_ns,
+            current_ns: current.source_stamp_ns,
+        });
+    }
+    if policy.reject_duplicate_source_stamp
+        && current.source_stamp_ns == previous.source_stamp_ns
+    {
+        return Err(RosTemporalHistoryDispositionV1::DuplicateSourceTimestamp {
+            stream,
+            timestamp_ns: current.source_stamp_ns,
+        });
+    }
+
+    Ok(current
+        .receive_sequence
+        .saturating_sub(previous.receive_sequence)
+        .saturating_sub(1))
+}
+
+/// Evaluate temporal validity and per-stream history as one atomic pair admission.
+///
+/// History advances only if both streams pass the temporal policy and both
+/// candidates pass history validation. This prevents half-advancing JointState
+/// history when the paired IMU sample is rejected.
+pub fn evaluate_ros_temporal_pair_with_history_v1(
+    history: &mut RosTemporalHistoryV1,
+    joint_state: &RosSampleMetadataV1,
+    imu: Option<&RosSampleMetadataV1>,
+    now: &RosClockNowV1,
+    policy: &RosTemporalPolicyV1,
+    capture_epoch_id: &str,
+    captured_monotonic_ns: u64,
+) -> RosTemporalHistoryDispositionV1 {
+    if history.receive_epoch_id.trim().is_empty() {
+        return RosTemporalHistoryDispositionV1::HistoryUninitialized {
+            reason: "history is not bound to a receive epoch".into(),
+        };
+    }
+    if history.receive_epoch_id != capture_epoch_id {
+        return RosTemporalHistoryDispositionV1::ReceiveEpochChanged {
+            expected_epoch_id: history.receive_epoch_id.clone(),
+            observed_epoch_id: capture_epoch_id.to_string(),
+        };
+    }
+    if history.source_clock_epoch_id != now.source_clock_epoch_id {
+        return RosTemporalHistoryDispositionV1::SourceClockEpochChanged {
+            expected_epoch_id: history.source_clock_epoch_id.clone(),
+            observed_epoch_id: now.source_clock_epoch_id.clone(),
+        };
+    }
+
+    let temporal = evaluate_ros_temporal_pair_v1(
+        joint_state,
+        imu,
+        now,
+        policy,
+        capture_epoch_id,
+        captured_monotonic_ns,
+    );
+    if !matches!(&temporal, RosTemporalDispositionV1::Fresh { .. }) {
+        return RosTemporalHistoryDispositionV1::TemporalRejected {
+            disposition: temporal,
+        };
+    }
+    let Some(imu) = imu else {
+        return RosTemporalHistoryDispositionV1::TemporalRejected {
+            disposition: RosTemporalDispositionV1::SourceUnavailable {
+                stream: RosTemporalStreamV1::Imu,
+                reason: "IMU source observation is unavailable".into(),
+            },
+        };
+    };
+
+    let joint_candidate = match prepare_temporal_history_entry(
+        joint_state,
+        RosTemporalStreamV1::JointState,
+        policy,
+        capture_epoch_id,
+    ) {
+        Ok(entry) => entry,
+        Err(disposition) => return disposition,
+    };
+    let imu_candidate = match prepare_temporal_history_entry(
+        imu,
+        RosTemporalStreamV1::Imu,
+        policy,
+        capture_epoch_id,
+    ) {
+        Ok(entry) => entry,
+        Err(disposition) => return disposition,
+    };
+
+    let joint_gap = match check_temporal_history_entry(
+        RosTemporalStreamV1::JointState,
+        history.last_joint_state.as_ref(),
+        &joint_candidate,
+        policy,
+    ) {
+        Ok(gap) => gap,
+        Err(disposition) => return disposition,
+    };
+    let imu_gap = match check_temporal_history_entry(
+        RosTemporalStreamV1::Imu,
+        history.last_imu.as_ref(),
+        &imu_candidate,
+        policy,
+    ) {
+        Ok(gap) => gap,
+        Err(disposition) => return disposition,
+    };
+
+    // Commit both histories only after validation for both streams succeeds.
+    history.last_joint_state = Some(joint_candidate);
+    history.last_imu = Some(imu_candidate);
+    RosTemporalHistoryDispositionV1::Accepted {
+        joint_sequence_gap: joint_gap,
+        imu_sequence_gap: imu_gap,
     }
 }
 
@@ -673,6 +1041,7 @@ fn ros_sample_metadata(
         stamp_nanosec: header.stamp.nanosec,
         frame_id: header.frame_id.clone(),
         clock_domain: RosClockDomainV1::Unbound,
+        source_clock_epoch_id: None,
         received_monotonic_ns,
         receive_sequence,
         receive_epoch_id,
@@ -1917,6 +2286,7 @@ mod tests {
             stamp_nanosec,
             frame_id: "base_link".into(),
             clock_domain,
+            source_clock_epoch_id: Some("source-epoch-1".into()),
             received_monotonic_ns: Some(90),
             receive_sequence: Some(1),
             receive_epoch_id: Some("receipt-epoch".into()),
@@ -1932,12 +2302,14 @@ mod tests {
             maximum_source_skew_ns: 20_000_000,
             maximum_bridge_residence_age_ns: 1_000,
             reject_zero_source_stamp: true,
+            reject_duplicate_source_stamp: true,
         }
     }
 
     fn temporal_test_now() -> RosClockNowV1 {
         RosClockNowV1 {
             domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
             timestamp_ns: 100_000_000_000,
         }
     }
@@ -1957,6 +2329,7 @@ mod tests {
 
         let now = RosClockNowV1 {
             domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
             timestamp_ns: 100_010_000_000,
         };
         assert_eq!(
@@ -2096,6 +2469,7 @@ mod tests {
         );
         let now = RosClockNowV1 {
             domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
             timestamp_ns: 100_200_000_000,
         };
         assert!(matches!(
@@ -2247,6 +2621,7 @@ mod tests {
 
         let wrong_now = RosClockNowV1 {
             domain: RosClockDomainV1::Named("wall-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
             timestamp_ns: 100_000_000_000,
         };
         let joint = temporal_test_sample(100, 0, valid_domain);
@@ -2302,6 +2677,323 @@ mod tests {
                 100
             ),
             RosTemporalDispositionV1::InvalidPolicy { .. }
+        ));
+    }
+
+    fn temporal_history_sample(
+        sequence: u64,
+        stamp_sec: i32,
+        stamp_nanosec: u32,
+    ) -> RosSampleMetadataV1 {
+        let mut sample = temporal_test_sample(
+            stamp_sec,
+            stamp_nanosec,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        sample.receive_sequence = Some(sequence);
+        sample.received_monotonic_ns = Some(95);
+        sample.receive_age_at_capture_ns = Some(5);
+        sample
+    }
+
+    fn temporal_history_now() -> RosClockNowV1 {
+        RosClockNowV1 {
+            domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
+            timestamp_ns: 100_010_000_000,
+        }
+    }
+
+    #[test]
+    fn temporal_history_rejects_replay_and_keeps_pair_update_atomic() {
+        let policy = temporal_test_policy();
+        let mut history = RosTemporalHistoryV1::new("receipt-epoch", "source-epoch-1").unwrap();
+        let joint_one = temporal_history_sample(1, 100, 0);
+        let imu_one = temporal_history_sample(1, 100, 0);
+
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_one,
+                Some(&imu_one),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+
+        let joint_two = temporal_history_sample(2, 100, 2_000_000);
+        // A fresh joint sample paired with replayed IMU sequence 1 must reject
+        // atomically; JointState history must not advance on half a pair.
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_two,
+                Some(&imu_one),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::SequenceNotIncreasing {
+                stream: RosTemporalStreamV1::Imu,
+                previous: 1,
+                current: 1
+            }
+        ));
+        assert_eq!(
+            history.last_joint_state.as_ref().unwrap().receive_sequence,
+            1
+        );
+
+        let imu_two = temporal_history_sample(2, 100, 3_000_000);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_two,
+                Some(&imu_two),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted {
+                joint_sequence_gap: 0,
+                imu_sequence_gap: 0
+            }
+        ));
+        assert_eq!(
+            history.last_joint_state.as_ref().unwrap().receive_sequence,
+            2
+        );
+    }
+
+    #[test]
+    fn temporal_history_rejects_source_time_regression_and_duplicates() {
+        let policy = temporal_test_policy();
+        let mut history = RosTemporalHistoryV1::new("receipt-epoch", "source-epoch-1").unwrap();
+        let first_joint = temporal_history_sample(1, 100, 0);
+        let first_imu = temporal_history_sample(1, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &first_joint,
+                Some(&first_imu),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+
+        let regressed_joint = temporal_history_sample(2, 99, 999_000_000);
+        let next_imu = temporal_history_sample(2, 100, 1_000_000);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &regressed_joint,
+                Some(&next_imu),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::SourceTimestampRegressed {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+        assert_eq!(
+            history.last_joint_state.as_ref().unwrap().receive_sequence,
+            1
+        );
+
+        let duplicate_joint = temporal_history_sample(2, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &duplicate_joint,
+                Some(&next_imu),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::DuplicateSourceTimestamp {
+                stream: RosTemporalStreamV1::JointState,
+                timestamp_ns: 100_000_000_000
+            }
+        ));
+
+        // A profile with coarse source-stamp resolution may explicitly permit
+        // identical source timestamps while still rejecting sequence replay.
+        let mut coarse_clock_policy = policy.clone();
+        coarse_clock_policy.reject_duplicate_source_stamp = false;
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &duplicate_joint,
+                Some(&next_imu),
+                &temporal_history_now(),
+                &coarse_clock_policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+    }
+
+    #[test]
+    fn temporal_history_requires_explicit_source_clock_jump_reset() {
+        let policy = temporal_test_policy();
+        let mut history =
+            RosTemporalHistoryV1::new("receipt-epoch", "source-epoch-1").unwrap();
+        let first_joint = temporal_history_sample(1, 100, 0);
+        let first_imu = temporal_history_sample(1, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &first_joint,
+                Some(&first_imu),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+
+        // Simulated source time has rewound while the bridge's local receive
+        // epoch has not. The time adapter must expose a new source-clock epoch.
+        let mut rewound_joint = temporal_history_sample(2, 5, 0);
+        rewound_joint.source_clock_epoch_id = Some("source-epoch-2".into());
+        let mut rewound_imu = temporal_history_sample(2, 5, 1_000_000);
+        rewound_imu.source_clock_epoch_id = Some("source-epoch-2".into());
+        let rewound_now = RosClockNowV1 {
+            domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-2".into(),
+            timestamp_ns: 5_010_000_000,
+        };
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &rewound_joint,
+                Some(&rewound_imu),
+                &rewound_now,
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::SourceClockEpochChanged {
+                expected_epoch_id,
+                observed_epoch_id
+            } if expected_epoch_id == "source-epoch-1" && observed_epoch_id == "source-epoch-2"
+        ));
+        assert_eq!(
+            history.last_joint_state.as_ref().unwrap().source_stamp_ns,
+            100_000_000_000
+        );
+
+        // Reset is an explicit lifecycle action; only after it does the new
+        // source-clock timeline become eligible for fresh history.
+        history
+            .reset_for_epochs("receipt-epoch", "source-epoch-2")
+            .unwrap();
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &rewound_joint,
+                Some(&rewound_imu),
+                &rewound_now,
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted {
+                joint_sequence_gap: 0,
+                imu_sequence_gap: 0
+            }
+        ));
+    }
+
+    #[test]
+    fn temporal_history_requires_explicit_epoch_reset_and_reports_sequence_gaps() {
+        let policy = temporal_test_policy();
+        let mut history = RosTemporalHistoryV1::new("receipt-epoch", "source-epoch-1").unwrap();
+        let joint_one = temporal_history_sample(1, 100, 0);
+        let imu_one = temporal_history_sample(1, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_one,
+                Some(&imu_one),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+
+        let joint_three = temporal_history_sample(3, 100, 3_000_000);
+        let imu_three = temporal_history_sample(3, 100, 4_000_000);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_three,
+                Some(&imu_three),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted {
+                joint_sequence_gap: 1,
+                imu_sequence_gap: 1
+            }
+        ));
+
+        let new_epoch_joint = temporal_history_sample(1, 100, 0);
+        let new_epoch_imu = temporal_history_sample(1, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &new_epoch_joint,
+                Some(&new_epoch_imu),
+                &temporal_history_now(),
+                &policy,
+                "new-receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::ReceiveEpochChanged { .. }
+        ));
+
+        history
+            .reset_for_epochs("new-receipt-epoch", "source-epoch-1")
+            .unwrap();
+        let mut new_joint = new_epoch_joint;
+        new_joint.receive_epoch_id = Some("new-receipt-epoch".into());
+        new_joint.source_clock_epoch_id = Some("source-epoch-1".into());
+        let mut new_imu = new_epoch_imu;
+        new_imu.receive_epoch_id = Some("new-receipt-epoch".into());
+        new_imu.source_clock_epoch_id = Some("source-epoch-1".into());
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &new_joint,
+                Some(&new_imu),
+                &temporal_history_now(),
+                &policy,
+                "new-receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted {
+                joint_sequence_gap: 0,
+                imu_sequence_gap: 0
+            }
         ));
     }
 
