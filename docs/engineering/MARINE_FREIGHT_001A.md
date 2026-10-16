@@ -48,6 +48,7 @@ The turnaround estimate assumes constant power and a constant declared efficienc
 
 - Every known quantity names a provenance record; provenance IDs must be unique.
 - Units are checked by the evaluator, not inferred or silently converted.
+- Per-input uncertainty intervals and calibrated model-bias bounds are not yet represented in v1. This is a deliberate limitation: the synthetic fixture cannot support a real design decision, and measured or solver-derived comparisons must not be promoted until uncertainty/provenance extensions and held-out calibration are implemented.
 - Unknown values remain explicit and produce `indeterminate` findings. Unknown is not zero.
 - Invalid or missing evidence does not produce a successful comparison.
 - Findings remain independent; there is no weighted score that can hide a failed hard constraint.
