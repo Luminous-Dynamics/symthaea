@@ -148,6 +148,12 @@ struct SuiteDigestInput<'a> {
     strategies: &'a [ExperimentSelectionStrategy],
 }
 
+#[derive(Serialize)]
+struct ResultsDigestInput<'a> {
+    results: &'a [ScenarioBenchmarkResult],
+    summaries: &'a [StrategyBenchmarkSummary],
+}
+
 /// Serialize the full benchmark receipt, including raw scenario inputs and digests.
 pub fn benchmark_report_json(
     report: &BenchmarkSuiteReport,
@@ -155,6 +161,162 @@ pub fn benchmark_report_json(
     serde_json::to_string_pretty(report).map_err(|error| BenchmarkError {
         reason: format!("cannot serialize benchmark receipt: {error}"),
     })
+}
+
+/// Parse a receipt and verify its input/output digests by replaying its decisions.
+///
+/// The JSON contains hashes, not a signature: this detects accidental changes
+/// and inconsistent results but does not authenticate who produced the receipt.
+pub fn parse_and_verify_benchmark_report_json(
+    json: &str,
+) -> Result<BenchmarkSuiteReport, BenchmarkError> {
+    let report: BenchmarkSuiteReport = serde_json::from_str(json).map_err(|error| BenchmarkError {
+        reason: format!("invalid benchmark receipt JSON: {error}"),
+    })?;
+    verify_benchmark_receipt(&report)?;
+    Ok(report)
+}
+
+/// Check report hashes, verify per-scenario result receipts, and replay every strategy.
+pub fn verify_benchmark_receipt(
+    report: &BenchmarkSuiteReport,
+) -> Result<(), BenchmarkError> {
+    if report.protocol_version != BENCHMARK_PROTOCOL_VERSION {
+        return Err(BenchmarkError {
+            reason: format!(
+                "unsupported benchmark protocol version {}; expected {}",
+                report.protocol_version, BENCHMARK_PROTOCOL_VERSION
+            ),
+        });
+    }
+    if report.scenarios != report.scenario_inputs.len() || report.scenarios == 0 {
+        return Err(BenchmarkError {
+            reason: "scenario count does not match embedded scenario inputs".into(),
+        });
+    }
+    if report.summaries.is_empty() {
+        return Err(BenchmarkError {
+            reason: "receipt must contain at least one strategy summary".into(),
+        });
+    }
+
+    let strategies: Vec<ExperimentSelectionStrategy> =
+        report.summaries.iter().map(|summary| summary.strategy).collect();
+    let unique_strategies: BTreeSet<ExperimentSelectionStrategy> =
+        strategies.iter().copied().collect();
+    if strategies.len() != unique_strategies.len() {
+        return Err(BenchmarkError {
+            reason: "receipt contains duplicate strategy summaries".into(),
+        });
+    }
+    if report.results.len() != report.scenarios * strategies.len() {
+        return Err(BenchmarkError {
+            reason: "result count does not match scenario x strategy matrix".into(),
+        });
+    }
+
+    if sha256_json(&report.policy)? != report.policy_sha256 {
+        return Err(BenchmarkError {
+            reason: "selection policy SHA-256 mismatch".into(),
+        });
+    }
+    let expected_suite_sha256 = sha256_json(&SuiteDigestInput {
+        protocol_version: report.protocol_version,
+        policy: &report.policy,
+        scenarios: &report.scenario_inputs,
+        strategies: &strategies,
+    })?;
+    if expected_suite_sha256 != report.suite_sha256 {
+        return Err(BenchmarkError {
+            reason: "benchmark suite input SHA-256 mismatch".into(),
+        });
+    }
+    let expected_results_sha256 = sha256_json(&ResultsDigestInput {
+        results: &report.results,
+        summaries: &report.summaries,
+    })?;
+    if expected_results_sha256 != report.results_sha256 {
+        return Err(BenchmarkError {
+            reason: "benchmark output SHA-256 mismatch".into(),
+        });
+    }
+
+    let mut scenario_map = BTreeMap::new();
+    for scenario in &report.scenario_inputs {
+        validate_scenario(scenario)?;
+        if scenario_map.insert(scenario.scenario_id.as_str(), scenario).is_some() {
+            return Err(BenchmarkError {
+                reason: format!("duplicate embedded scenario ID {:?}", scenario.scenario_id),
+            });
+        }
+    }
+
+    let mut seen = BTreeSet::new();
+    for result in &report.results {
+        let scenario = scenario_map.get(result.scenario_id.as_str()).ok_or_else(|| BenchmarkError {
+            reason: format!("result references unknown scenario {:?}", result.scenario_id),
+        })?;
+        if result.scenario_sha256 != sha256_json(*scenario)? {
+            return Err(BenchmarkError {
+                reason: format!("scenario SHA-256 mismatch for {:?}", result.scenario_id),
+            });
+        }
+        if !unique_strategies.contains(&result.strategy) {
+            return Err(BenchmarkError {
+                reason: format!("result references undeclared strategy {}", result.strategy.label()),
+            });
+        }
+        if !seen.insert((result.scenario_id.as_str(), result.strategy)) {
+            return Err(BenchmarkError {
+                reason: format!(
+                    "duplicate result for scenario {:?}, strategy {}",
+                    result.scenario_id,
+                    result.strategy.label()
+                ),
+            });
+        }
+
+        let expected = evaluate_scenario(&report.policy, scenario, result.strategy)?;
+        if *result != expected {
+            return Err(BenchmarkError {
+                reason: format!(
+                    "replayed result differs from receipt for scenario {:?}, strategy {}",
+                    result.scenario_id,
+                    result.strategy.label()
+                ),
+            });
+        }
+    }
+
+    for scenario in &report.scenario_inputs {
+        for strategy in &strategies {
+            if !seen.contains(&(scenario.scenario_id.as_str(), *strategy)) {
+                return Err(BenchmarkError {
+                    reason: format!(
+                        "missing result for scenario {:?}, strategy {}",
+                        scenario.scenario_id,
+                        strategy.label()
+                    ),
+                });
+            }
+        }
+    }
+
+    for summary in &report.summaries {
+        let strategy_results: Vec<&ScenarioBenchmarkResult> = report
+            .results
+            .iter()
+            .filter(|result| result.strategy == summary.strategy)
+            .collect();
+        let expected = summarize_strategy(summary.strategy, &strategy_results)?;
+        if *summary != expected {
+            return Err(BenchmarkError {
+                reason: format!("strategy summary mismatch for {}", summary.strategy.label()),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 fn sha256_json<T: Serialize + ?Sized>(value: &T) -> Result<String, BenchmarkError> {
@@ -232,11 +394,17 @@ pub fn run_selection_benchmark(
         summaries.push(summarize_strategy(*strategy, &strategy_results)?);
     }
 
+    let results_sha256 = sha256_json(&ResultsDigestInput {
+        results: &results,
+        summaries: &summaries,
+    })?;
+
     Ok(BenchmarkSuiteReport {
         protocol_version: BENCHMARK_PROTOCOL_VERSION,
         policy: policy.clone(),
         policy_sha256,
         suite_sha256,
+        results_sha256,
         scenarios: scenarios.len(),
         scenario_inputs: scenarios.to_vec(),
         results,
@@ -832,6 +1000,9 @@ mod tests {
         let receipt = benchmark_report_json(&first_report).unwrap();
         assert!(receipt.contains("\"scenario_inputs\""));
         assert!(receipt.contains("\"suite_sha256\""));
+        assert!(receipt.contains("\"results_sha256\""));
+        let parsed = parse_and_verify_benchmark_report_json(&receipt).unwrap();
+        assert_eq!(parsed, first_report);
     }
 
     #[test]
