@@ -351,6 +351,9 @@ impl ScenarioRunReceipt {
         if self.gates.is_empty() {
             return Err(invalid("gates", "at least one verification gate must be recorded"));
         }
+        if !self.gates.iter().any(|gate| gate.required) {
+            return Err(invalid("gates.required", "at least one gate must be required"));
+        }
         validate_unique_ids("gates.gate_id", self.gates.iter().map(|gate| gate.gate_id.as_str()))?;
         for gate in &self.gates {
             match gate.status {
@@ -631,6 +634,14 @@ mod tests {
     fn invalid_receipt_cannot_be_promoted_even_if_gate_says_pass() {
         let mut input = receipt(GateStatus::Pass);
         input.gates[0].verifier_id = None;
+        assert_eq!(input.promotion_state(), PromotionState::Blocked);
+    }
+
+    #[test]
+    fn receipt_with_no_required_gates_is_rejected() {
+        let mut input = receipt(GateStatus::Pass);
+        input.gates[0].required = false;
+        assert_eq!(input.validate().unwrap_err().field, "gates.required");
         assert_eq!(input.promotion_state(), PromotionState::Blocked);
     }
 
