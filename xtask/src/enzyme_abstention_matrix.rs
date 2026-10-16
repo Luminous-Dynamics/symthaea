@@ -46,8 +46,10 @@ struct Decision {
     selected: &'static str,
     reason: &'static str,
     delta_bic_mm_minus_inhibition: f64,
-    fitted_prediction_gap_in_noise_sd: f64,
-    best_candidate_rmse_in_noise_sd: f64,
+    held_out_prediction_gap_in_noise_sd: f64,
+    best_held_out_rmse_in_noise_sd: f64,
+    held_out_rmse_mm: f64,
+    held_out_rmse_inhibition: f64,
     absolute_fit_gate_passed: bool,
     prediction_gap_resolved: bool,
     bic_decisive: bool,
@@ -256,43 +258,85 @@ fn predict(fit: ModelFit, substrate: f64) -> f64 {
     }
 }
 
-fn decide(observations: &[Observation], mm: ModelFit, inhibition: ModelFit, sigma: f64) -> Decision {
-    let delta_bic = bic(mm, observations.len()) - bic(inhibition, observations.len());
-    let prediction_gap = (observations
+fn rmse_on(observations: &[Observation], fit: ModelFit) -> f64 {
+    (observations
+        .iter()
+        .map(|obs| {
+            let residual = obs.rate - predict(fit, obs.substrate);
+            residual * residual
+        })
+        .sum::<f64>()
+        / observations.len() as f64)
+        .sqrt()
+}
+
+/// Frozen index split: each third observation is held out. The split is deterministic and
+/// independent of the generated rates; all fitted parameters and BIC are computed on training
+/// observations only. This is a small stress-test holdout, not a substitute for independent assays.
+fn split_observations(observations: &[Observation]) -> (Vec<Observation>, Vec<Observation>) {
+    let mut training = Vec::new();
+    let mut held_out = Vec::new();
+    for (index, observation) in observations.iter().copied().enumerate() {
+        if index % 3 == 0 {
+            held_out.push(observation);
+        } else {
+            training.push(observation);
+        }
+    }
+    (training, held_out)
+}
+
+fn decide(
+    training: &[Observation],
+    held_out: &[Observation],
+    mm: ModelFit,
+    inhibition: ModelFit,
+    sigma: f64,
+) -> Decision {
+    let delta_bic = bic(mm, training.len()) - bic(inhibition, training.len());
+    // Assess whether candidate predictions separate on held-out substrate conditions, not only
+    // on the points used to estimate their parameters.
+    let prediction_gap = (held_out
         .iter()
         .map(|obs| {
             let gap = predict(mm, obs.substrate) - predict(inhibition, obs.substrate);
             gap * gap
         })
         .sum::<f64>()
-        / observations.len() as f64)
+        / held_out.len() as f64)
         .sqrt()
         / sigma;
-    let best_normalized_rmse = mm.rmse.min(inhibition.rmse) / sigma;
-    let absolute_fit_gate_passed = best_normalized_rmse <= MAX_NORMALIZED_RMSE_FOR_ADEQUACY;
+    let held_out_rmse_mm = rmse_on(held_out, mm);
+    let held_out_rmse_inhibition = rmse_on(held_out, inhibition);
+    let best_held_out_rmse_in_noise_sd =
+        held_out_rmse_mm.min(held_out_rmse_inhibition) / sigma;
+    let absolute_fit_gate_passed =
+        best_held_out_rmse_in_noise_sd <= MAX_NORMALIZED_RMSE_FOR_ADEQUACY;
     let prediction_gap_resolved = prediction_gap >= MIN_PREDICTION_GAP_IN_NOISE_SDS;
     let bic_decisive = delta_bic.abs() >= DECISIVE_DELTA_BIC;
 
-    // The ordering matters: first reject grossly inadequate candidate families, then preserve
-    // observational equivalence, then allow the BIC threshold to select a family.
+    // Candidate selection is conditional on acceptable held-out predictive error, a resolvable
+    // prediction gap on held-out conditions, and a decisive training-only information criterion.
     let (selected, reason) = if !absolute_fit_gate_passed {
-        ("abstain", "both_candidate_models_fail_absolute_fit_gate")
+        ("abstain", "best_candidate_fails_held_out_absolute_fit_gate")
     } else if !prediction_gap_resolved {
-        ("abstain", "candidate_predictions_not_resolved_at_noise_scale")
+        ("abstain", "candidate_predictions_not_resolved_on_held_out_conditions")
     } else if !bic_decisive {
-        ("abstain", "bic_difference_below_decisive_threshold")
+        ("abstain", "training_bic_difference_below_decisive_threshold")
     } else if delta_bic < 0.0 {
-        ("michaelis_menten", "decisive_bic_favors_michaelis_menten")
+        ("michaelis_menten", "training_bic_favors_michaelis_menten_with_held_out_gates")
     } else {
-        ("substrate_inhibition", "decisive_bic_favors_substrate_inhibition")
+        ("substrate_inhibition", "training_bic_favors_substrate_inhibition_with_held_out_gates")
     };
 
     Decision {
         selected,
         reason,
         delta_bic_mm_minus_inhibition: delta_bic,
-        fitted_prediction_gap_in_noise_sd: prediction_gap,
-        best_candidate_rmse_in_noise_sd: best_normalized_rmse,
+        held_out_prediction_gap_in_noise_sd: prediction_gap,
+        best_held_out_rmse_in_noise_sd,
+        held_out_rmse_mm,
+        held_out_rmse_inhibition,
         absolute_fit_gate_passed,
         prediction_gap_resolved,
         bic_decisive,
@@ -301,9 +345,10 @@ fn decide(observations: &[Observation], mm: ModelFit, inhibition: ModelFit, sigm
 
 fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
     let observations = observations_for(scenario, seed, sigma);
-    let mm = fit_grid(&observations, ModelKind::MichaelisMenten);
-    let inhibition = fit_grid(&observations, ModelKind::SubstrateInhibition);
-    let decision = decide(&observations, mm, inhibition, sigma);
+    let (training, held_out) = split_observations(&observations);
+    let mm = fit_grid(&training, ModelKind::MichaelisMenten);
+    let inhibition = fit_grid(&training, ModelKind::SubstrateInhibition);
+    let decision = decide(&training, &held_out, mm, inhibition, sigma);
     let target_hit = decision.selected == scenario.expected_decision;
 
     json!({
@@ -311,10 +356,13 @@ fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
         "seed": seed,
         "measurement_sd": sigma,
         "observation_count": observations.len(),
+        "training_count": training.len(),
+        "held_out_count": held_out.len(),
         "substrates": scenario.substrate_set,
-        "observations": observations.iter().map(|obs| json!({
+        "observations": observations.iter().enumerate().map(|(index, obs)| json!({
             "substrate": obs.substrate,
-            "observed_rate": obs.rate
+            "observed_rate": obs.rate,
+            "partition": if index % 3 == 0 { "held_out" } else { "training" }
         })).collect::<Vec<_>>(),
         "truth_family": scenario.truth_family,
         "expected_decision": scenario.expected_decision,
@@ -322,8 +370,8 @@ fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
         "target_hit": target_hit,
         "decision_reason": decision.reason,
         "delta_bic_mm_minus_inhibition": decision.delta_bic_mm_minus_inhibition,
-        "fitted_prediction_gap_in_noise_sd": decision.fitted_prediction_gap_in_noise_sd,
-        "best_candidate_rmse_in_noise_sd": decision.best_candidate_rmse_in_noise_sd,
+        "held_out_prediction_gap_in_noise_sd": decision.held_out_prediction_gap_in_noise_sd,
+        "best_held_out_rmse_in_noise_sd": decision.best_held_out_rmse_in_noise_sd,
         "decision_gates": {
             "absolute_fit_gate_passed": decision.absolute_fit_gate_passed,
             "prediction_gap_resolved": decision.prediction_gap_resolved,
@@ -333,15 +381,19 @@ fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
             "michaelis_menten": {
                 "vmax": mm.vmax,
                 "km": mm.km,
-                "rmse": mm.rmse,
-                "bic": bic(mm, observations.len())
+                "training_rmse": mm.rmse,
+                "held_out_rmse": decision.held_out_rmse_mm,
+                "held_out_rmse_in_noise_sd": decision.held_out_rmse_mm / sigma,
+                "training_bic": bic(mm, training.len())
             },
             "substrate_inhibition": {
                 "vmax": inhibition.vmax,
                 "km": inhibition.km,
                 "ki": inhibition.ki,
-                "rmse": inhibition.rmse,
-                "bic": bic(inhibition, observations.len())
+                "training_rmse": inhibition.rmse,
+                "held_out_rmse": decision.held_out_rmse_inhibition,
+                "held_out_rmse_in_noise_sd": decision.held_out_rmse_inhibition / sigma,
+                "training_bic": bic(inhibition, training.len())
             }
         }
     })
@@ -442,8 +494,9 @@ fn build_report() -> Result<Value> {
             ],
             "delta_bic_definition": "BIC(Michaelis-Menten) - BIC(substrate inhibition); negative favors Michaelis-Menten",
             "decisive_absolute_delta_bic": DECISIVE_DELTA_BIC,
-            "maximum_best_candidate_rmse_in_noise_sds": MAX_NORMALIZED_RMSE_FOR_ADEQUACY,
-            "minimum_fitted_prediction_gap_in_noise_sds": MIN_PREDICTION_GAP_IN_NOISE_SDS,
+            "maximum_best_held_out_rmse_in_noise_sds": MAX_NORMALIZED_RMSE_FOR_ADEQUACY,
+            "minimum_held_out_prediction_gap_in_noise_sds": MIN_PREDICTION_GAP_IN_NOISE_SDS,
+            "holdout_rule": "every third observation by frozen substrate-list index; holdout outcomes do not participate in fitting or BIC calculation",
             "calibration_status": "heuristic thresholds; not calibrated against real assay residuals",
             "semantics": "a selected label identifies the better-supported candidate among the two supplied families; it does not establish mechanistic truth or show that the candidate set is exhaustive"
         },
@@ -504,9 +557,9 @@ mod tests {
         ];
         let mm = fit(ModelKind::MichaelisMenten, 100.0, 2.0, None, 0.5);
         let inhibition = fit(ModelKind::SubstrateInhibition, 100.0, 2.0, Some(10_000.0), 0.5);
-        let decision = decide(&observations, mm, inhibition, 1.0);
+        let decision = decide(&observations, &observations, mm, inhibition, 1.0);
         assert_eq!(decision.selected, "abstain");
-        assert_eq!(decision.reason, "candidate_predictions_not_resolved_at_noise_scale");
+        assert_eq!(decision.reason, "candidate_predictions_not_resolved_on_held_out_conditions");
     }
 
     #[test]
@@ -518,9 +571,9 @@ mod tests {
         ];
         let mm = fit(ModelKind::MichaelisMenten, 80.0, 4.0, None, 5.0);
         let inhibition = fit(ModelKind::SubstrateInhibition, 80.0, 4.0, Some(20.0), 4.5);
-        let decision = decide(&observations, mm, inhibition, 1.0);
+        let decision = decide(&observations, &observations, mm, inhibition, 1.0);
         assert_eq!(decision.selected, "abstain");
-        assert_eq!(decision.reason, "both_candidate_models_fail_absolute_fit_gate");
+        assert_eq!(decision.reason, "best_candidate_fails_held_out_absolute_fit_gate");
     }
 
     #[test]
@@ -539,7 +592,11 @@ mod tests {
                 && case["decision_gates"]["absolute_fit_gate_passed"].as_bool().is_some()
                 && case["decision_gates"]["prediction_gap_resolved"].as_bool().is_some()
                 && case["decision_gates"]["bic_decisive"].as_bool().is_some()
+                && case["held_out_prediction_gap_in_noise_sd"].as_f64().is_some()
+                && case["best_held_out_rmse_in_noise_sd"].as_f64().is_some()
+                && case["training_count"].as_u64().unwrap_or(0) + case["held_out_count"].as_u64().unwrap_or(0) == case["observation_count"].as_u64().unwrap_or(u64::MAX)
                 && case["observations"].as_array().map(|rows| rows.len()) == case["observation_count"].as_u64().map(|count| count as usize)
+                && case["observations"].as_array().map(|rows| rows.iter().filter(|row| row["partition"] == "held_out").count()) == case["held_out_count"].as_u64().map(|count| count as usize)
         }));
         assert!(report["scope"].as_str().unwrap().contains("not calibrated biochemical evidence"));
     }
