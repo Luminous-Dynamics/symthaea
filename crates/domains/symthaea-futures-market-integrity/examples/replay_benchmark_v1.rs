@@ -13,14 +13,16 @@ use symthaea_futures_market_integrity::replay::{
 };
 
 const EVENT_COUNT: usize = 60;
+const DAY_SECONDS: u64 = 86_400;
+const HOUR_SECONDS: u64 = 3_600;
 const HORIZONS: [(&str, u64); 5] = [
-    ("90d", 11_000),
-    ("30d", 17_000),
-    ("7d", 19_300),
-    ("1d", 19_900),
-    ("close", 19_990),
+    ("90d", 90 * DAY_SECONDS),
+    ("30d", 30 * DAY_SECONDS),
+    ("7d", 7 * DAY_SECONDS),
+    ("1d", DAY_SECONDS),
+    ("1h", HOUR_SECONDS),
 ];
-const RESOLUTION_OFFSET: u64 = 20_000;
+const RESOLUTION_OFFSET: u64 = 100 * DAY_SECONDS;
 const MAX_STALENESS_SECONDS: u64 = 120;
 
 fn main() {
@@ -50,7 +52,8 @@ fn run() -> Result<(), ReplayError> {
         )?);
 
         for (horizon_index, (horizon_id, cutoff_offset)) in HORIZONS.iter().enumerate() {
-            let cutoff = event_base + *cutoff_offset;
+            // The label is the real elapsed-time horizon before this synthetic resolution.
+            let cutoff = event_base + RESOLUTION_OFFSET - *cutoff_offset;
             let target = ForecastTarget::new(
                 event_id.clone(),
                 *horizon_id,
