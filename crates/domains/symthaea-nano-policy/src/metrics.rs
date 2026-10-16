@@ -1090,6 +1090,36 @@ mod tests {
     }
 
     #[test]
+    fn classifies_improvement_only_when_margin_is_met_and_interval_excludes_zero() {
+        let mut ledger = fixture();
+        for observation in &mut ledger.arms[0]
+            .target_queries
+            .iter_mut()
+            .flat_map(|target| target.observations.iter_mut())
+        {
+            if observation.status == ObservationStatus::Evaluated {
+                observation.loss = Some(0.5);
+            }
+        }
+        for observation in &mut ledger.arms[1]
+            .target_queries
+            .iter_mut()
+            .flat_map(|target| target.observations.iter_mut())
+        {
+            if observation.status == ObservationStatus::Evaluated {
+                observation.loss = Some(0.001);
+            }
+        }
+
+        let report = evaluate_fixture(&ledger);
+        assert!(report.comparisons.iter().all(|comparison| {
+            comparison.disposition == ComparisonDisposition::ImprovementBeyondMargin
+                && comparison.estimated_delta >= comparison.practical_margin
+                && comparison.confidence_interval_lower.unwrap() > 0.0
+        }));
+    }
+
+    #[test]
     fn rejects_mismatched_paired_target_sets() {
         let mut ledger = fixture();
         ledger.arms[1].target_queries.pop();
