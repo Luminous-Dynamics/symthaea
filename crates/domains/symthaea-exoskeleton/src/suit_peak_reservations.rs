@@ -842,7 +842,12 @@ fn digest_plan(plan: &PeakResourceReservationPlan) -> String {
         writer.string(resource_kind_tag(pool.resource_kind));
         writer.string(&pool.provider_component_id);
         writer.string(&pool.provider_hardware_revision);
-        write_interval(&mut writer, pool.capacity.lower, pool.capacity.nominal, pool.capacity.upper);
+        write_interval(
+            &mut writer,
+            pool.capacity.lower,
+            pool.capacity.nominal,
+            pool.capacity.upper,
+        );
         writer.string(evidence_tag(pool.evidence_level));
         writer.string(&pool.evidence_reference);
         writer.usize(pool.applicable_environments.len());
@@ -1532,7 +1537,11 @@ mod tests {
             let overlap_start = start.max(start + duration / 2);
             let overlap_end = (start + duration).min(start + duration + 1);
             let overlaps = overlap_start < overlap_end;
-            let maximum_expected = if overlaps { amount_a + amount_b } else { amount_a.max(amount_b) };
+            let maximum_expected = if overlaps {
+                amount_a + amount_b
+            } else {
+                amount_a.max(amount_b)
+            };
             assert_eq!(
                 report.pools[0].peak_required_demand_upper,
                 maximum_expected,
