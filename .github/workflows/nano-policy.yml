@@ -33,7 +33,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Verify formatting
-        run: cargo fmt --all -- --check
+        run: cargo fmt --package symthaea-nano-policy -- --check
 
       - name: Run unit tests
         run: cargo test -p symthaea-nano-policy --locked
