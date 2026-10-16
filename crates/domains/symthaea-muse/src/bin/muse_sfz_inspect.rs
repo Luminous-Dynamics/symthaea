@@ -62,7 +62,11 @@ fn run() -> Result<(), Box<dyn Error>> {
     manifest.declared_source_revision = source_revision;
 
     let root = sample_root.unwrap_or_else(|| {
-        sfz_file.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
+        sfz_file
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf()
     });
     let mut present = 0usize;
     let mut missing = 0usize;
