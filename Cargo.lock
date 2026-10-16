@@ -19850,6 +19850,7 @@ dependencies = [
  "symthaea-economics",
  "symthaea-epidemiology",
  "symthaea-geodesy",
+ "symthaea-grid-physics",
 ]
 
 [[package]]
