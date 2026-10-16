@@ -55,6 +55,47 @@ pub struct EvidenceRef {
     pub derived_from: Vec<String>,
 }
 
+/// Typed values held only in local reasoning memory. These intentionally do not implement
+/// Serialize, Deserialize, or Debug: proposal/audit receipts should retain EvidenceRef IDs,
+/// not casually persist or log household sensor values.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ObservationUnit {
+    /// Scalar is stored in milli-degrees Celsius; accepted range: -100 to 200 C.
+    Celsius,
+    /// Scalar is stored in milli-lux; accepted range: 0 to 200,000 lux.
+    Lux,
+    /// Scalar is stored in milli-percent; accepted range: 0 to 100 percent.
+    Percent,
+    /// Scalar is stored in milli-watts; accepted range: 0 to 100,000,000 watts.
+    Watt,
+    /// Scalar is stored in milli-watt-hours; accepted range: 0 to 1,000,000,000,000 Wh.
+    WattHour,
+    /// Scalar is stored in milli-ppm; accepted range: 0 to 1,000,000 ppm.
+    PartsPerMillion,
+    /// Scalar is stored in milli-decibels; accepted range: -200 to 200 dB.
+    Decibel,
+}
+
+/// Small, typed value vocabulary for local household reasoning. No free-form text or
+/// arbitrary provider JSON is admitted here.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum EphemeralValue {
+    Boolean(bool),
+    Scalar {
+        /// The declared unit's value multiplied by 1,000.
+        value_milli: i64,
+        unit: ObservationUnit,
+    },
+}
+
+/// One local working-memory sample. It is deliberately non-serializable and non-Debug.
+/// Durable proposals must keep the associated EvidenceRef but never embed this value.
+#[derive(Clone, PartialEq, Eq)]
+pub struct LocalObservation {
+    pub evidence: EvidenceRef,
+    pub value: Option<EphemeralValue>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProposalMode {
     Explain,
@@ -172,6 +213,9 @@ pub enum ProposalValidationError {
     UncertaintyTooHighForCandidate,
     ApprovalRequired,
     ComfortTargetOutOfRange,
+    MissingObservationValue,
+    UnexpectedObservationValue,
+    ObservationValueOutOfRange,
 }
 
 fn valid_identifier(value: &str) -> bool {
@@ -197,6 +241,119 @@ fn validate_detail_list(values: &[String]) -> Result<(), ProposalValidationError
     if values.iter().any(|value| !valid_text(value, MAX_DETAIL_BYTES)) {
         return Err(ProposalValidationError::InvalidText);
     }
+    Ok(())
+}
+
+fn validate_ephemeral_value(value: EphemeralValue) -> Result<(), ProposalValidationError> {
+    let EphemeralValue::Scalar { value_milli, unit } = value else {
+        return Ok(());
+    };
+    let (min, max) = match unit {
+        ObservationUnit::Celsius => (-100_000, 200_000),
+        ObservationUnit::Lux => (0, 200_000_000),
+        ObservationUnit::Percent => (0, 100_000),
+        ObservationUnit::Watt => (0, 100_000_000_000),
+        ObservationUnit::WattHour => (0, 1_000_000_000_000_000),
+        ObservationUnit::PartsPerMillion => (0, 1_000_000_000),
+        ObservationUnit::Decibel => (-200_000, 200_000),
+    };
+    if !(min..=max).contains(&value_milli) {
+        return Err(ProposalValidationError::ObservationValueOutOfRange);
+    }
+    Ok(())
+}
+
+/// Validate an ephemeral local observation batch before it is made available to a
+/// reasoning component. This is a data-quality/currentness check, not authorization.
+///
+/// Fresh Observed/Derived samples must carry bounded typed values and match the current
+/// source session. Unknown/Unavailable/Conflicting samples must carry no value; they may
+/// describe stale/prior-session context for an explanation or abstention. The batch must
+/// remain in process-local working memory and must not be copied wholesale into receipts.
+pub fn validate_local_observations(
+    observations: &[LocalObservation],
+    now_ms: u64,
+    current_session_epochs: &BTreeMap<String, u64>,
+) -> Result<(), ProposalValidationError> {
+    if observations.len() > MAX_EVIDENCE {
+        return Err(ProposalValidationError::TooManyItems);
+    }
+
+    let mut ids = BTreeSet::new();
+    for (current_index, observation) in observations.iter().enumerate() {
+        let evidence = &observation.evidence;
+        if !valid_identifier(&evidence.evidence_id)
+            || !valid_identifier(&evidence.source_ref)
+            || !valid_identifier(&evidence.entity_ref)
+        {
+            return Err(ProposalValidationError::InvalidIdentifier);
+        }
+        if !ids.insert(evidence.evidence_id.as_str()) {
+            return Err(ProposalValidationError::DuplicateEvidence);
+        }
+        if evidence.observed_at_ms > now_ms {
+            return Err(ProposalValidationError::FutureEvidence);
+        }
+        if evidence.fresh_until_ms < evidence.observed_at_ms {
+            return Err(ProposalValidationError::InvalidTimeWindow);
+        }
+
+        match evidence.status {
+            EpistemicStatus::Observed | EpistemicStatus::Derived => {
+                let value = observation
+                    .value
+                    .ok_or(ProposalValidationError::MissingObservationValue)?;
+                validate_ephemeral_value(value)?;
+                if evidence.fresh_until_ms <= now_ms {
+                    return Err(ProposalValidationError::StaleEvidence);
+                }
+                let current_epoch = current_session_epochs
+                    .get(&evidence.source_ref)
+                    .ok_or(ProposalValidationError::MissingCurrentEpoch)?;
+                if *current_epoch != evidence.session_epoch {
+                    return Err(ProposalValidationError::SessionEpochMismatch);
+                }
+
+                if evidence.status == EpistemicStatus::Observed {
+                    if !evidence.derived_from.is_empty() {
+                        return Err(ProposalValidationError::InvalidDerivation);
+                    }
+                } else {
+                    if evidence.derived_from.is_empty()
+                        || evidence.derived_from.len() > MAX_DERIVATION_PARENTS
+                    {
+                        return Err(ProposalValidationError::InvalidDerivation);
+                    }
+                    for parent_id in &evidence.derived_from {
+                        let parent_index = observations
+                            .iter()
+                            .position(|item| item.evidence.evidence_id == *parent_id)
+                            .ok_or(ProposalValidationError::InvalidDerivation)?;
+                        if parent_index >= current_index {
+                            return Err(ProposalValidationError::InvalidDerivation);
+                        }
+                        let parent = &observations[parent_index];
+                        if !matches!(
+                            parent.evidence.status,
+                            EpistemicStatus::Observed | EpistemicStatus::Derived
+                        ) || parent.value.is_none()
+                        {
+                            return Err(ProposalValidationError::UnusableEvidence);
+                        }
+                    }
+                }
+            }
+            EpistemicStatus::Unavailable | EpistemicStatus::Conflicting | EpistemicStatus::Unknown => {
+                if observation.value.is_some() {
+                    return Err(ProposalValidationError::UnexpectedObservationValue);
+                }
+                if !evidence.derived_from.is_empty() {
+                    return Err(ProposalValidationError::InvalidDerivation);
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -471,6 +628,151 @@ mod tests {
 
     fn epochs() -> BTreeMap<String, u64> {
         BTreeMap::from([("ha-source-1".to_string(), 7)])
+    }
+
+    fn local_observation(
+        status: EpistemicStatus,
+        epoch: u64,
+        fresh_until_ms: u64,
+        value: Option<EphemeralValue>,
+    ) -> LocalObservation {
+        let mut item = evidence(status, epoch);
+        item.fresh_until_ms = fresh_until_ms;
+        LocalObservation { evidence: item, value }
+    }
+
+    #[test]
+    fn local_observation_accepts_bounded_fixed_point_value() {
+        let sample = local_observation(
+            EpistemicStatus::Observed,
+            7,
+            2_000,
+            Some(EphemeralValue::Scalar {
+                value_milli: 21_500,
+                unit: ObservationUnit::Celsius,
+            }),
+        );
+        assert_eq!(validate_local_observations(&[sample], 1_000, &epochs()), Ok(()));
+    }
+
+    #[test]
+    fn local_observation_rejects_observed_without_value() {
+        let sample = local_observation(EpistemicStatus::Observed, 7, 2_000, None);
+        assert_eq!(
+            validate_local_observations(&[sample], 1_000, &epochs()),
+            Err(ProposalValidationError::MissingObservationValue)
+        );
+    }
+
+    #[test]
+    fn local_observation_rejects_value_attached_to_unknown_state() {
+        let sample = local_observation(
+            EpistemicStatus::Unknown,
+            7,
+            2_000,
+            Some(EphemeralValue::Boolean(true)),
+        );
+        assert_eq!(
+            validate_local_observations(&[sample], 1_000, &epochs()),
+            Err(ProposalValidationError::UnexpectedObservationValue)
+        );
+    }
+
+    #[test]
+    fn local_observation_rejects_out_of_range_sensor_value() {
+        let sample = local_observation(
+            EpistemicStatus::Observed,
+            7,
+            2_000,
+            Some(EphemeralValue::Scalar {
+                value_milli: 250_000,
+                unit: ObservationUnit::Celsius,
+            }),
+        );
+        assert_eq!(
+            validate_local_observations(&[sample], 1_000, &epochs()),
+            Err(ProposalValidationError::ObservationValueOutOfRange)
+        );
+    }
+
+    #[test]
+    fn local_observation_rejects_stale_observed_sample() {
+        let sample = local_observation(
+            EpistemicStatus::Observed,
+            7,
+            999,
+            Some(EphemeralValue::Boolean(true)),
+        );
+        assert_eq!(
+            validate_local_observations(&[sample], 1_000, &epochs()),
+            Err(ProposalValidationError::StaleEvidence)
+        );
+    }
+
+    #[test]
+    fn local_observation_rejects_prior_session_observed_sample() {
+        let sample = local_observation(
+            EpistemicStatus::Observed,
+            6,
+            2_000,
+            Some(EphemeralValue::Boolean(true)),
+        );
+        assert_eq!(
+            validate_local_observations(&[sample], 1_000, &epochs()),
+            Err(ProposalValidationError::SessionEpochMismatch)
+        );
+    }
+
+    #[test]
+    fn local_observation_allows_unknown_context_without_value_for_abstention() {
+        let sample = local_observation(EpistemicStatus::Unknown, 6, 900, None);
+        assert_eq!(validate_local_observations(&[sample], 1_000, &epochs()), Ok(()));
+    }
+
+    #[test]
+    fn local_observation_rejects_duplicate_evidence_identity() {
+        let sample = local_observation(
+            EpistemicStatus::Observed,
+            7,
+            2_000,
+            Some(EphemeralValue::Boolean(true)),
+        );
+        assert_eq!(
+            validate_local_observations(&[sample.clone(), sample], 1_000, &epochs()),
+            Err(ProposalValidationError::DuplicateEvidence)
+        );
+    }
+
+    #[test]
+    fn local_derived_observation_requires_earlier_current_parent() {
+        let parent = local_observation(
+            EpistemicStatus::Observed,
+            7,
+            2_000,
+            Some(EphemeralValue::Scalar {
+                value_milli: 21_000,
+                unit: ObservationUnit::Celsius,
+            }),
+        );
+        let mut derived = local_observation(
+            EpistemicStatus::Derived,
+            7,
+            2_000,
+            Some(EphemeralValue::Scalar {
+                value_milli: 21_000,
+                unit: ObservationUnit::Celsius,
+            }),
+        );
+        derived.evidence.evidence_id = "derived-2".into();
+        derived.evidence.derived_from = vec!["evidence-1".into()];
+        assert_eq!(
+            validate_local_observations(&[parent.clone(), derived.clone()], 1_000, &epochs()),
+            Ok(())
+        );
+        assert_eq!(
+            validate_local_observations(&[derived, parent], 1_000, &epochs()),
+            Err(ProposalValidationError::InvalidDerivation)
+        );
     }
 
     #[test]
