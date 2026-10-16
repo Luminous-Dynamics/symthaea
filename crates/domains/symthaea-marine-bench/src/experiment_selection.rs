@@ -543,6 +543,11 @@ fn choose_experiment(
             let mut best: Option<(usize, f64)> = None;
             for index in affordable.iter().copied() {
                 let score = criticality_score(&catalog[index], state);
+                // Do not spend budget narrowing parameters that cannot change
+                // any currently indeterminate hard-constraint disposition.
+                if score <= 0.0 {
+                    continue;
+                }
                 match best {
                     None => best = Some((index, score)),
                     Some((best_index, best_score))
@@ -1005,6 +1010,51 @@ mod tests {
                 assert!(run.metrics.budget_spent_units <= 6);
             }
         }
+    }
+
+    #[test]
+    fn criticality_stops_when_affordable_experiments_cannot_resolve_open_constraints() {
+        let state = ObservedState {
+            initial: [
+                Interval { lower: 1.0, upper: 2.0 },
+                Interval { lower: 3.0, upper: 4.0 },
+                Interval { lower: 1.0, upper: 2.0 },
+                Interval { lower: 1.5, upper: 2.5 },
+                Interval { lower: 1.0, upper: 2.0 },
+                Interval { lower: 3.0, upper: 4.0 },
+            ],
+            intervals: [
+                Interval { lower: 1.0, upper: 2.0 },
+                Interval { lower: 3.0, upper: 4.0 },
+                Interval { lower: 1.0, upper: 2.0 },
+                Interval { lower: 1.5, upper: 2.5 },
+                Interval { lower: 1.0, upper: 2.0 },
+                Interval { lower: 3.0, upper: 4.0 },
+            ],
+        };
+        // Only experiments against the already-resolved battery pair are affordable.
+        let catalog = experiment_catalog();
+        let available: Vec<bool> = catalog
+            .iter()
+            .map(|experiment| experiment.target.constraint_index() == 0)
+            .collect();
+        assert_eq!(statuses(&state)[0], ConstraintStatus::RobustFeasible);
+        assert_eq!(statuses(&state)[1], ConstraintStatus::Indeterminate);
+        assert_eq!(statuses(&state)[2], ConstraintStatus::RobustFeasible);
+        assert_eq!(
+            choose_experiment(
+                Policy::ConstraintCriticality,
+                &state,
+                &available,
+                0,
+                6,
+                0,
+                0,
+                &mut SplitMix64::new(1),
+                &catalog,
+            ),
+            None
+        );
     }
 
     #[test]
