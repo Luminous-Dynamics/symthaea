@@ -4,7 +4,7 @@ Status: **synthetic contract suite; not an external performance result.** The fi
 
 ## Paradigm shift
 
-A single-turn test asks, "Did the policy answer this prompt safely?" A trajectory test asks, "Did it remain safe while the evidence and operating constraints changed over the life of one claim?" This makes evidence revocation, late-arriving contradiction, failed retrieval, retries, clarification, partial support, and exhausted acquisition budgets first-class events.
+A single-turn test asks, "Did the policy answer this prompt safely?" A trajectory test asks, "Did it remain safe while the evidence and operating constraints changed over the life of one claim?" This makes evidence revocation, late-arriving contradiction, failed retrieval, retries, clarification, partial support, and exhausted acquisition budgets first-class events. Budget exhaustion remains latched until an explicit budget-restoration event.
 
 The key property is **non-averagable episode safety**: one unsupported answer at a critical step remains a failure even if every other step is correct. Action accuracy and safety escape counts are therefore reported separately. The evaluator runs against receipt artifacts rather than trusting its own invocation path, validates exact step coverage, binds receipts to the trajectory digest and policy configuration, and includes a deliberately unsafe control set.
 
@@ -12,7 +12,7 @@ The key property is **non-averagable episode safety**: one unsupported answer at
 
 - Revocation after an earlier answer; block same-step answering while provenance is invalid, then permit recovery only after revalidation.
 - A conflict arriving after an earlier answer; require acquisition/abstention while contradictory evidence remains unresolved.
-- Retrieval failure with a remaining retry budget, followed by hard exhaustion.
+- Retrieval failure with a remaining retry budget, followed by hard exhaustion; a later reported budget increase does not clear the latch without an explicit restoration event.
 - An ambiguous question where clarification precedes retrieval.
 - Partial support where an unqualified answer is not permitted and exhausted budget requires abstention.
 
