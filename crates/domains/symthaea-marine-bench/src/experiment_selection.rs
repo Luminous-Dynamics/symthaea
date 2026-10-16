@@ -625,15 +625,11 @@ fn better_oracle_candidate(
     if candidate.resolved_constraints != best.resolved_constraints {
         return candidate.resolved_constraints > best.resolved_constraints;
     }
-    if (candidate.normalized_interval_width_reduction
-        - best.normalized_interval_width_reduction)
-        .abs()
-        > 1e-12
-    {
-        return candidate.normalized_interval_width_reduction
-            > best.normalized_interval_width_reduction;
+    if candidate_cost != best_cost {
+        return candidate_cost < best_cost;
     }
-    candidate_cost < best_cost
+    candidate.normalized_interval_width_reduction
+        > best.normalized_interval_width_reduction + 1e-12
 }
 
 /// Enumerates every experiment subset within the declared budget. It uses the
