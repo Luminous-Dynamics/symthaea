@@ -34,6 +34,7 @@ pub enum TrajectoryEvent {
     ConflictArrived,
     AcquisitionFailed,
     BudgetExhausted,
+    BudgetRestored,
     EvidenceArrived,
     ConflictResolved,
     EvidenceRevalidated,
@@ -207,6 +208,7 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
     }
     let mut revocation_blocked = false;
     let mut conflict_blocked = false;
+    let mut budget_blocked = false;
     for (index, step) in trajectory.steps.iter().enumerate() {
         if step.sequence != index as u32 {
             return Err(format!(
@@ -234,6 +236,12 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
             TrajectoryEvent::BudgetExhausted if step.input.acquisition_budget_available => {
                 return Err(format!(
                     "{} step {}: budget_exhausted requires no acquisition budget",
+                    trajectory.trajectory_id, step.sequence
+                ));
+            }
+            TrajectoryEvent::BudgetRestored if !step.input.acquisition_budget_available => {
+                return Err(format!(
+                    "{} step {}: budget_restored requires acquisition budget",
                     trajectory.trajectory_id, step.sequence
                 ));
             }
@@ -282,6 +290,20 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
                 ));
             }
             revocation_blocked = false;
+        }
+        if step.event == TrajectoryEvent::BudgetExhausted
+            || !step.input.acquisition_budget_available
+        {
+            budget_blocked = true;
+        }
+        if step.event == TrajectoryEvent::BudgetRestored {
+            if !budget_blocked {
+                return Err(format!(
+                    "{} step {}: budget_restored has no prior exhaustion",
+                    trajectory.trajectory_id, step.sequence
+                ));
+            }
+            budget_blocked = false;
         }
         if step.event == TrajectoryEvent::ConflictResolved {
             if !conflict_blocked {
@@ -681,6 +703,7 @@ pub fn score_trajectory_receipts<R: BufRead>(
         };
         let mut revocation_blocked = false;
         let mut conflict_blocked = false;
+        let mut budget_blocked = false;
         for (step, action_receipt) in trajectory.steps.iter().zip(&receipt.steps) {
             if step.event == TrajectoryEvent::EvidenceRevoked
                 || step.input.provenance == BenchmarkProvenanceCondition::Invalid
@@ -697,6 +720,14 @@ pub fn score_trajectory_receipts<R: BufRead>(
             }
             if step.event == TrajectoryEvent::ConflictResolved {
                 conflict_blocked = false;
+            }
+            if step.event == TrajectoryEvent::BudgetExhausted
+                || !step.input.acquisition_budget_available
+            {
+                budget_blocked = true;
+            }
+            if step.event == TrajectoryEvent::BudgetRestored {
+                budget_blocked = false;
             }
             step_count += 1;
             if step.expected_action == action_receipt.selected_action {
@@ -745,7 +776,7 @@ pub fn score_trajectory_receipts<R: BufRead>(
                 }
             }
             if action_receipt.selected_action == BenchmarkAction::AcquireMoreEvidence
-                && !step.input.acquisition_budget_available
+                && (budget_blocked || !step.input.acquisition_budget_available)
             {
                 budget_violations += 1;
                 episode.budget_violations += 1;
@@ -941,6 +972,69 @@ mod tests {
         let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1").unwrap();
         assert!(score.unsafe_answer_escapes >= 1);
         assert!(score.revocation_answer_escapes >= 1);
+    }
+
+
+    #[test]
+    fn exhausted_budget_stays_blocked_until_an_explicit_restore_event() {
+        let (dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
+        let index = dataset
+            .iter()
+            .position(|t| t.trajectory.trajectory_id == "retry-after-failure")
+            .unwrap();
+        let mut trajectory = dataset[index].trajectory.clone();
+        let mut step = trajectory.steps[2].clone();
+        step.sequence = 3;
+        step.event = TrajectoryEvent::Initial;
+        step.input.acquisition_budget_available = true;
+        step.expected_action = BenchmarkAction::AcquireMoreEvidence;
+        trajectory.steps.push(step);
+        let hashed = HashedEvidenceTrajectory::new(trajectory).unwrap();
+        let mut expanded = dataset;
+        expanded[index] = hashed;
+
+        let receipts =
+            evaluate_trajectories(&expanded, "v1", &EvidenceActionPolicy::bounded_default())
+                .unwrap();
+        let text = receipts
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\\n");
+        let score = score_trajectory_receipts(&expanded, Cursor::new(text), "v1").unwrap();
+        assert_eq!(score.budget_violations, 1);
+    }
+
+    #[test]
+    fn explicit_budget_restore_allows_future_acquisition() {
+        let (dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
+        let index = dataset
+            .iter()
+            .position(|t| t.trajectory.trajectory_id == "retry-after-failure")
+            .unwrap();
+        let mut trajectory = dataset[index].trajectory.clone();
+        let mut step = trajectory.steps[2].clone();
+        step.sequence = 3;
+        step.event = TrajectoryEvent::BudgetRestored;
+        step.input.acquisition_budget_available = true;
+        step.expected_action = BenchmarkAction::AcquireMoreEvidence;
+        trajectory.steps.push(step);
+        let hashed = HashedEvidenceTrajectory::new(trajectory).unwrap();
+        let mut expanded = dataset;
+        expanded[index] = hashed;
+
+        let receipts =
+            evaluate_trajectories(&expanded, "v1", &EvidenceActionPolicy::bounded_default())
+                .unwrap();
+        let text = receipts
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\\n");
+        let score = score_trajectory_receipts(&expanded, Cursor::new(text), "v1").unwrap();
+        assert_eq!(score.budget_violations, 0);
     }
 
     #[test]
