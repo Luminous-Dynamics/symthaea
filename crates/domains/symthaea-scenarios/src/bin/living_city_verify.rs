@@ -198,3 +198,47 @@ fn main() {
         process::exit(2);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verifier_rejects_empty_absolute_and_parent_traversal_paths() {
+        let root = Path::new("/does/not/need/to/exist/for-this-guard-test");
+        assert!(safe_file_path(root, "").is_err());
+        assert!(safe_file_path(root, "/etc/passwd").is_err());
+        assert!(safe_file_path(root, "../outside.txt").is_err());
+        assert!(safe_file_path(root, "subdir/../../outside.txt").is_err());
+    }
+
+    #[test]
+    fn bundle_parser_rejects_unknown_fields() {
+        let bundle = r#"{
+            "schema_version": 1,
+            "manifest_path": "manifest.json",
+            "receipt_path": "receipt.json",
+            "receipt_sha256_path": "receipt.sha256",
+            "source_files": [],
+            "output_files": [],
+            "unexpected_authority": "trusted"
+        }"#;
+        assert!(serde_json::from_str::<VerificationBundle>(bundle).is_err());
+    }
+
+    #[test]
+    fn bundle_parser_accepts_the_declared_schema() {
+        let bundle = r#"{
+            "schema_version": 1,
+            "manifest_path": "manifest.json",
+            "receipt_path": "receipt.json",
+            "receipt_sha256_path": "receipt.sha256",
+            "source_files": [{"id": "survey", "path": "sources/survey.geojson"}],
+            "output_files": [{"id": "metrics", "path": "outputs/metrics.json"}]
+        }"#;
+        let parsed = serde_json::from_str::<VerificationBundle>(bundle).unwrap();
+        assert_eq!(parsed.schema_version, BUNDLE_SCHEMA_VERSION);
+        assert_eq!(parsed.source_files.len(), 1);
+        assert_eq!(parsed.output_files.len(), 1);
+    }
+}
