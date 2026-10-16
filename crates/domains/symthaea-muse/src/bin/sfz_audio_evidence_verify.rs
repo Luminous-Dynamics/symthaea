@@ -148,16 +148,15 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
             "manifest exceeds 8 MiB size limit",
         ).into());
     }
-    let manifest_bytes = fs::read(&arguments.manifest)?;
+    let canonical_manifest_path = fs::canonicalize(&arguments.manifest)?;
+    let manifest_bytes = fs::read(&canonical_manifest_path)?;
     let manifest_sha256 = sha256_hex(&manifest_bytes);
     let manifest: EvidenceBundleV1 = serde_json::from_slice(&manifest_bytes)?;
     validate_manifest_contract(&manifest)?;
 
-    let root = arguments
-        .manifest
+    let root = canonical_manifest_path
         .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."));
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "manifest has no parent directory"))?;
 
     let mut artifact_checks = Vec::new();
     artifact_checks.push(check_artifact(
@@ -602,10 +601,15 @@ fn resolve_artifact(root: &Path, relative: &str) -> Result<PathBuf, Box<dyn Erro
 
     let mut current = root.to_path_buf();
     for component in candidate.components() {
-        let Component::Normal(name) = component else {
-            unreachable!("path components were validated above");
-        };
-        current.push(name);
+        match component {
+            Component::Normal(name) => current.push(name),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "artifact path contains an unsafe component",
+                ).into());
+            }
+        }
     }
     Ok(current)
 }
@@ -687,6 +691,8 @@ mod tests {
         assert!(resolve_artifact(Path::new("/tmp/bundle"), "../escape.wav").is_err());
         assert!(resolve_artifact(Path::new("/tmp/bundle"), "/tmp/audio.wav").is_err());
         assert!(resolve_artifact(Path::new("/tmp/bundle"), "").is_err());
+        assert!(resolve_artifact(Path::new("/tmp/bundle"), "C:\\outside.wav").is_err());
+        assert!(resolve_artifact(Path::new("/tmp/bundle"), "folder\\capture.wav").is_err());
         assert!(resolve_artifact(Path::new("/tmp/bundle"), "artifacts/capture.wav").is_ok());
     }
 
