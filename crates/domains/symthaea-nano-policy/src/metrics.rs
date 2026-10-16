@@ -43,6 +43,9 @@ pub struct OracleObservation {
     pub candidate_id: String,
     /// Outcome status of this oracle attempt.
     pub status: ObservationStatus,
+    /// SHA-256 of the exact raw oracle response or durable failure receipt for this attempt.
+    /// The evaluator validates digest shape but does not open or recompute this artifact.
+    pub observation_artifact_sha256: String,
     /// Task loss; required for evaluated attempts and forbidden for failed attempts.
     #[serde(default)]
     pub loss: Option<f64>,
@@ -405,6 +408,7 @@ pub fn evaluate_json_ledger(
             "Success and loss semantics are only as valid as the frozen task contract; this evaluator does not validate the physics.".to_string(),
             "Group independence is asserted by the external evaluation manifest and cannot be proven from IDs alone.".to_string(),
             "The evaluator uses provided post-outcome observations; it does not run a selector, oracle, simulator, or experiment.".to_string(),
+            "The evaluator checks observation artifact digest shape but does not dereference artifacts or recompute each loss from raw spectra/predictions; a separate scientific checker must validate those links.".to_string(),
             "A report does not establish transfer to another material family, physical regime, laboratory, or application.".to_string(),
             "The selector's structural receipt must be independently checked by receipt::verify_receipt; this metrics evaluator does not replace that check.".to_string(),
             "Pairwise 95% intervals are pointwise and unadjusted for multiple arms/metrics; use a single preregistered primary comparison for confirmatory claims or apply a declared multiplicity adjustment externally.".to_string(),
@@ -508,6 +512,12 @@ fn validate_ledger(ledger: &OutcomeLedger) -> Result<(), String> {
                 if observation.query_rank != index + 1 {
                     return Err(format!(
                         "target query {:?} query_rank must be contiguous from 1",
+                        target.target_query_id
+                    ));
+                }
+                if !is_hex_digest(&observation.observation_artifact_sha256, 64) {
+                    return Err(format!(
+                        "target query {:?} has invalid observation artifact digest",
                         target.target_query_id
                     ));
                 }
@@ -913,6 +923,7 @@ mod tests {
             query_rank: rank,
             candidate_id: candidate_id.to_string(),
             status,
+            observation_artifact_sha256: hex('9', 64),
             loss,
             cost: 1.0,
         }
