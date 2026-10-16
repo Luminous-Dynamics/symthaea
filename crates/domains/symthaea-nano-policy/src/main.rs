@@ -657,7 +657,12 @@ mod tests {
             let p95_ms = samples_ms[p95_index];
             let digest = expected_digest.expect("five deterministic samples");
             eprintln!(
-                "nano_selector_profile policy={policy:?} candidates={count} dimensions={dimensions} budget={budget} repeats=5 p50_ms={median_ms:.3} p95_ms={p95_ms:.3} selected_digest={digest}"
+                concat!(
+                    "nano_selector_profile policy={policy:?} ",
+                    "candidates={count} dimensions={dimensions} budget={budget} ",
+                    "repeats=5 p50_ms={median_ms:.3} p95_ms={p95_ms:.3} ",
+                    "selected_digest={digest}"
+                )
             );
         }
     }
