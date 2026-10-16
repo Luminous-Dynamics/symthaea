@@ -24,6 +24,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "docs/research/data/evidence_action_benchmark.synthetic.jsonl"
+      - "docs/research/data/evidence_action_benchmark.unsafe-control.synthetic.jsonl"
       - "docs/research/schemas/**"
       - ".github/workflows/evidence-action-benchmark.yml"
 
