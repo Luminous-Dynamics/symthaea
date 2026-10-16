@@ -207,7 +207,10 @@ fn kinetic_energy_and_temperature(velocities: &[[f64; 3]], masses: &[f64]) -> (f
     for (v, &m) in velocities.iter().zip(masses.iter()) {
         ke += 0.5 * m * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
     }
-    let n_dof = velocities.len().saturating_mul(3).saturating_sub(3); // subtract 3 for CM translation
+    let n_dof = velocities
+        .len()
+        .saturating_mul(3)
+        .saturating_sub(3); // subtract 3 for CM translation
     let temp = if n_dof > 0 {
         2.0 * ke / (n_dof as f64 * crate::stat_mech::K_BOLTZMANN_HARTREE)
     } else {
@@ -220,8 +223,14 @@ fn kinetic_energy_and_temperature(velocities: &[[f64; 3]], masses: &[f64]) -> (f
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MdInputError {
     EmptyMolecule,
-    UnsupportedElement { atom_index: usize, atomic_number: u8 },
-    NonFiniteCoordinate { atom_index: usize, axis: usize },
+    UnsupportedElement {
+        atom_index: usize,
+        atomic_number: u8,
+    },
+    NonFiniteCoordinate {
+        atom_index: usize,
+        axis: usize,
+    },
     UnsupportedMultiplicity { multiplicity: u32 },
     InvalidElectronCount { electron_count: i32 },
     OddElectronCount { electron_count: i32 },
@@ -237,27 +246,35 @@ impl std::fmt::Display for MdInputError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyMolecule => write!(f, "molecule has no atoms"),
-            Self::UnsupportedElement { atom_index, atomic_number } => write!(
-                f, "atom {atom_index} has atomic number {atomic_number}, unsupported by STO-3G"
+            Self::UnsupportedElement {
+                atom_index,
+                atomic_number,
+            } => write!(
+                f,
+                "atom {atom_index} has atomic number {atomic_number}, unsupported by STO-3G"
             ),
-            Self::NonFiniteCoordinate { atom_index, axis } => write!(
-                f, "atom {atom_index} coordinate axis {axis} is non-finite"
-            ),
+            Self::NonFiniteCoordinate { atom_index, axis } => {
+                write!(f, "atom {atom_index} coordinate axis {axis} is non-finite")
+            }
             Self::UnsupportedMultiplicity { multiplicity } => write!(
-                f, "multiplicity {multiplicity} is unsupported by restricted Hartree-Fock AIMD; expected singlet (1)"
+                f,
+                "multiplicity {multiplicity} is unsupported by restricted Hartree-Fock AIMD; expected singlet (1)"
             ),
-            Self::InvalidElectronCount { electron_count } => write!(
-                f, "electron count {electron_count} is not positive"
-            ),
+            Self::InvalidElectronCount { electron_count } => {
+                write!(f, "electron count {electron_count} is not positive")
+            }
             Self::OddElectronCount { electron_count } => write!(
-                f, "electron count {electron_count} is odd; restricted closed-shell AIMD requires an even count"
+                f,
+                "electron count {electron_count} is odd; restricted closed-shell AIMD requires an even count"
             ),
             Self::NonFiniteTimeStep => write!(f, "time step dt must be finite"),
             Self::NonPositiveTimeStep => write!(f, "time step dt must be greater than zero"),
             Self::NonFiniteTemperature => write!(f, "temperature must be finite"),
             Self::NegativeTemperature => write!(f, "temperature must be non-negative"),
             Self::NonFiniteFiniteDifferenceStep => write!(f, "finite-difference step must be finite"),
-            Self::NonPositiveFiniteDifferenceStep => write!(f, "finite-difference step must be greater than zero"),
+            Self::NonPositiveFiniteDifferenceStep => {
+                write!(f, "finite-difference step must be greater than zero")
+            }
         }
     }
 }
@@ -311,7 +328,11 @@ pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), 
             multiplicity: molecule.multiplicity,
         });
     }
-    let nuclear_charge: i32 = molecule.atoms.iter().map(|atom| atom.atomic_number as i32).sum();
+    let nuclear_charge: i32 = molecule
+        .atoms
+        .iter()
+        .map(|atom| atom.atomic_number as i32)
+        .sum();
     let electron_count = nuclear_charge - molecule.charge;
     if electron_count <= 0 {
         return Err(MdInputError::InvalidElectronCount { electron_count });
@@ -324,7 +345,10 @@ pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), 
 }
 
 /// Checked molecular AIMD entry point using the fixed default seed.
-pub fn run_md_checked(molecule: &Molecule, config: &MdConfig) -> Result<MdResult, MdInputError> {
+pub fn run_md_checked(
+    molecule: &Molecule,
+    config: &MdConfig,
+) -> Result<MdResult, MdInputError> {
     run_md_checked_with_seed(molecule, config, DEFAULT_MD_SEED)
 }
 
@@ -533,7 +557,9 @@ mod tests {
     #[test]
     fn zero_temperature_initialization_is_exactly_stationary() {
         let velocities = initialize_velocities(&h2_masses(), 0.0, 19);
-        assert!(velocities.iter().flatten().all(|velocity| *velocity == 0.0));
+        assert!(
+            velocities.iter().flatten().all(|velocity| *velocity == 0.0)
+        );
     }
 
     #[test]
@@ -578,9 +604,15 @@ mod tests {
         let molecule = Molecule::h2();
         let mut config = MdConfig::default();
         config.dt = 0.0;
-        assert_eq!(validate_md_inputs(&molecule, &config), Err(MdInputError::NonPositiveTimeStep));
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonPositiveTimeStep)
+        );
         config.dt = f64::NAN;
-        assert_eq!(validate_md_inputs(&molecule, &config), Err(MdInputError::NonFiniteTimeStep));
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteTimeStep)
+        );
         config.dt = 1.0;
         config.fd_step = 0.0;
         assert_eq!(
@@ -600,13 +632,19 @@ mod tests {
         molecule.atoms[0].position[1] = f64::NAN;
         assert_eq!(
             validate_md_inputs(&molecule, &MdConfig::default()),
-            Err(MdInputError::NonFiniteCoordinate { atom_index: 0, axis: 1 })
+            Err(MdInputError::NonFiniteCoordinate {
+                atom_index: 0,
+                axis: 1,
+            })
         );
 
         let unsupported = Molecule::new(vec![crate::molecule::Atom::new(55, 0.0, 0.0, 0.0)]);
         assert_eq!(
             validate_md_inputs(&unsupported, &MdConfig::default()),
-            Err(MdInputError::UnsupportedElement { atom_index: 0, atomic_number: 55 })
+            Err(MdInputError::UnsupportedElement {
+                atom_index: 0,
+                atomic_number: 55,
+            })
         );
     }
 
