@@ -8,9 +8,9 @@ use crate::experiment_selection::{
     rank_experiments, DecisionRelevance, ExperimentProposal, RejectedExperiment,
     SafetyReview, SelectionError, SelectionPolicy,
 };
-use std::collections::{BTreeMap, BTreeSet};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 /// A synthetic experiment with separate proposer estimates and oracle-known value.
@@ -19,7 +19,7 @@ use std::fmt;
 /// experiment independently resolves the benchmark's hidden decision. This is
 /// deliberately a toy oracle model, not a thermodynamic quantity or calibrated
 /// estimate of real-world information gain.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SyntheticExperiment {
     pub proposal: ExperimentProposal,
     /// One-dimensional normalized design-space coordinate in [0, 1].
@@ -29,7 +29,7 @@ pub struct SyntheticExperiment {
 }
 
 /// One known-answer synthetic decision task with a fixed resource budget.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SyntheticScenario {
     pub scenario_id: String,
     pub resource_budget: f64,
@@ -39,7 +39,7 @@ pub struct SyntheticScenario {
     pub experiments: Vec<SyntheticExperiment>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub enum ExperimentSelectionStrategy {
     PhaseA,
     Random { seed: u64 },
@@ -60,7 +60,7 @@ impl ExperimentSelectionStrategy {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ScenarioBenchmarkResult {
     pub scenario_id: String,
     /// SHA-256 over deterministic JSON serialization of the complete scenario input.
@@ -84,7 +84,7 @@ pub struct ScenarioBenchmarkResult {
     pub oracle_resolved: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StrategyBenchmarkSummary {
     pub strategy: ExperimentSelectionStrategy,
     pub scenario_count: usize,
@@ -102,7 +102,7 @@ pub struct StrategyBenchmarkSummary {
     pub mean_oracle_minimum_cost_to_resolve: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct BenchmarkSuiteReport {
     pub protocol_version: u32,
     pub policy: SelectionPolicy,
@@ -110,6 +110,8 @@ pub struct BenchmarkSuiteReport {
     pub policy_sha256: String,
     /// SHA-256 of protocol version, policy, full scenario inputs, and strategies.
     pub suite_sha256: String,
+    /// SHA-256 of computed per-scenario results and summaries.
+    pub results_sha256: String,
     pub scenarios: usize,
     /// Full synthetic inputs are embedded so the receipt is independently replayable.
     pub scenario_inputs: Vec<SyntheticScenario>,
