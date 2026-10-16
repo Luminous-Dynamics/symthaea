@@ -101,6 +101,8 @@ pub struct SelectionResponse {
     pub status: String,
     /// Selection policy.
     pub policy: Policy,
+    /// Seed used for reproducible policy replay.
+    pub seed: u64,
     /// SHA-256 of exact request-line bytes, excluding line terminator.
     pub request_sha256: String,
     /// Identity supplied for the frozen feature/preprocessing contract.
@@ -270,6 +272,7 @@ pub fn select(
         schema_version: SCHEMA_VERSION.to_owned(),
         status: "completed".to_owned(),
         policy: request.policy,
+        seed: request.seed,
         request_sha256: request_sha256.clone(),
         feature_contract_sha256: request.feature_contract_sha256,
         candidate_count: request.candidates.len(),
