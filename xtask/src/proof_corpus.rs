@@ -230,14 +230,9 @@ entries:
 
     #[test]
     fn rejects_duplicate_ids() {
-        let duplicate = VALID.replace(
-            "  - id: \"TEST-001\"",
-            "  - id: \"TEST-001\"",
-        );
         // Add a second identical entry so validation has a duplicate identity.
         let entry = VALID.split("entries:\n").nth(1).unwrap();
         let mutated = format!("{VALID}{}", entry);
         assert!(validate_manifest_text(&mutated).is_err());
-        assert!(!duplicate.is_empty());
     }
 }
