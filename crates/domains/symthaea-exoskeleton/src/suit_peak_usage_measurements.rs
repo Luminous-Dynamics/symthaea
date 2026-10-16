@@ -11,13 +11,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::suit_interop::SuitOperatingEnvironment;
 use crate::suit_mission_configuration::MissionConfiguration;
 use crate::suit_mission_tasks::{MissionTaskError, MissionTaskReceipt, MissionTaskRequirement};
 use crate::suit_peak_reservations::{
     evaluate_peak_resource_reservations, MissionTimeWindow, PeakQuantityInterval,
     PeakResourceKind, PeakResourceReservationPlan, PeakResourceReservationReceipt,
-    PeakResourceReservationReport, PeakResourceReservationStatus,
+    PeakResourceReservationError, PeakResourceReservationReport, PeakResourceReservationStatus,
 };
 use crate::suit_profile::SuitEvidenceLevel;
 
@@ -192,6 +191,7 @@ pub enum PeakResourceUsageMeasurementError {
     ReservationReceiptDigestMismatch,
     TaskReceiptMismatch,
     TaskEvaluationFailed(MissionTaskError),
+    ReservationBaselineEvaluationFailed(PeakResourceReservationError),
 }
 
 pub fn evaluate_peak_resource_usage(
@@ -217,7 +217,7 @@ pub fn evaluate_peak_resource_usage(
         task_receipt,
         reservation_plan,
     )
-    .map_err(|_| PeakResourceUsageMeasurementError::ReservationPlanDigestMismatch)?;
+    .map_err(PeakResourceUsageMeasurementError::ReservationBaselineEvaluationFailed)?;
     if &fresh_report != reservation_report {
         return Err(PeakResourceUsageMeasurementError::ReservationReportDigestMismatch);
     }
@@ -392,7 +392,7 @@ pub fn evaluate_peak_resource_usage(
                     Some(forecast_upper),
                 );
             }
-        } else if observation.observed_peak.upper > 0 {
+        } else {
             unmodeled_observation_count += 1;
             add_finding(
                 PeakUsageFindingCode::NoDeclaredForecast,
@@ -412,6 +412,10 @@ pub fn evaluate_peak_resource_usage(
             PeakUsageObservationStatus::PossibleBudgetLimitExceeded
         } else if forecast_peak_upper.is_none() && observation.observed_peak.upper > 0 {
             PeakUsageObservationStatus::UnmodeledUsage
+        } else if forecast_peak_upper.is_none() || observation_findings.iter().any(|finding| {
+            finding.code == PeakUsageFindingCode::NoDeclaredForecast
+        }) {
+            PeakUsageObservationStatus::EvidenceInsufficient
         } else if observation_findings.iter().any(|finding| {
             finding.code == PeakUsageFindingCode::ForecastDefinitelyUnderestimated
         }) {
@@ -1093,13 +1097,21 @@ mod tests {
 
     #[test]
     fn observed_peak_inside_forecast_and_capacity_meets_policy() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, plan) = fixture();
+        let (
+            config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, plan,
+        ) = fixture();
         let (report, receipt) = evaluate_peak_resource_usage(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
         ).unwrap();
-        assert_eq!(report.status, PeakResourceUsageMeasurementStatus::MeetsDeclaredMeasurementPolicy);
+        assert_eq!(
+            report.status,
+            PeakResourceUsageMeasurementStatus::MeetsDeclaredMeasurementPolicy
+        );
         assert_eq!(report.observations[0].forecast_peak_upper, Some(500));
-        assert_eq!(report.observations[0].status, PeakUsageObservationStatus::WithinDeclaredForecast);
+        assert_eq!(
+            report.observations[0].status,
+            PeakUsageObservationStatus::WithinDeclaredForecast
+        );
         assert!(!report.represents_physical_qualification);
         assert!(verify_peak_resource_usage_receipt(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report,
@@ -1109,8 +1121,14 @@ mod tests {
 
     #[test]
     fn definite_forecast_underprediction_degrades_without_claiming_capacity_failure() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) = fixture();
-        plan.observations[0].observed_peak = PeakQuantityInterval { lower: 600, nominal: 650, upper: 700 };
+        let (
+            config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan,
+        ) = fixture();
+        plan.observations[0].observed_peak = PeakQuantityInterval {
+            lower: 600,
+            nominal: 650,
+            upper: 700,
+        };
         let (report, _) = evaluate_peak_resource_usage(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
         ).unwrap();
@@ -1123,8 +1141,14 @@ mod tests {
 
     #[test]
     fn definite_budget_limit_exceedance_blocks() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) = fixture();
-        plan.observations[0].observed_peak = PeakQuantityInterval { lower: 950, nominal: 1_000, upper: 1_050 };
+        let (
+            config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan,
+        ) = fixture();
+        plan.observations[0].observed_peak = PeakQuantityInterval {
+            lower: 950,
+            nominal: 1_000,
+            upper: 1_050,
+        };
         let (report, _) = evaluate_peak_resource_usage(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
         ).unwrap();
@@ -1138,8 +1162,14 @@ mod tests {
 
     #[test]
     fn possible_budget_limit_exceedance_is_review_not_definite_failure() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) = fixture();
-        plan.observations[0].observed_peak = PeakQuantityInterval { lower: 850, nominal: 900, upper: 950 };
+        let (
+            config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan,
+        ) = fixture();
+        plan.observations[0].observed_peak = PeakQuantityInterval {
+            lower: 850,
+            nominal: 900,
+            upper: 950,
+        };
         let (report, _) = evaluate_peak_resource_usage(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
         ).unwrap();
@@ -1150,20 +1180,28 @@ mod tests {
 
     #[test]
     fn low_sample_count_and_slow_sampling_are_explicit_degradations() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) = fixture();
+        let (
+            config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan,
+        ) = fixture();
         plan.observations[0].sample_count = 2;
         plan.observations[0].sampling_interval_ms = 200;
         let (report, _) = evaluate_peak_resource_usage(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
         ).unwrap();
         assert_eq!(report.status, PeakResourceUsageMeasurementStatus::Degraded);
-        assert!(report.findings.iter().any(|finding| finding.code == PeakUsageFindingCode::SampleCountBelowPolicy));
-        assert!(report.findings.iter().any(|finding| finding.code == PeakUsageFindingCode::SamplingIntervalAbovePolicy));
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == PeakUsageFindingCode::SampleCountBelowPolicy
+        }));
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == PeakUsageFindingCode::SamplingIntervalAbovePolicy
+        }));
     }
 
     #[test]
     fn provider_revision_mismatch_does_not_masquerade_as_current_evidence() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) = fixture();
+        let (
+            config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan,
+        ) = fixture();
         plan.observations[0].provider_hardware_revision = "vehicle-m0".into();
         let (report, _) = evaluate_peak_resource_usage(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
@@ -1176,23 +1214,35 @@ mod tests {
 
     #[test]
     fn no_declared_forecast_for_positive_observation_is_reported() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) = fixture();
+        let (
+            config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan,
+        ) = fixture();
         plan.observations[0].window = MissionTimeWindow { start_ms: 200, end_ms: 300 };
         let (report, _) = evaluate_peak_resource_usage(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
         ).unwrap();
         assert_eq!(report.status, PeakResourceUsageMeasurementStatus::Degraded);
         assert_eq!(report.unmodeled_observation_count, 1);
-        assert!(report.findings.iter().any(|finding| finding.code == PeakUsageFindingCode::NoDeclaredForecast));
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == PeakUsageFindingCode::NoDeclaredForecast
+        }));
     }
 
     #[test]
     fn stale_baseline_receipt_is_rejected() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, mut reserve_receipt, plan) = fixture();
+        let (
+            config, tasks, task_receipt, reserve_plan, reserve_report, mut reserve_receipt, plan,
+        ) = fixture();
         reserve_receipt.receipt_digest_sha256.push_str("tampered");
         assert_eq!(
             evaluate_peak_resource_usage(
-                &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
+                &config,
+                &tasks,
+                &task_receipt,
+                &reserve_plan,
+                &reserve_report,
+                &reserve_receipt,
+                &plan
             ).unwrap_err(),
             PeakResourceUsageMeasurementError::ReservationReceiptDigestMismatch
         );
@@ -1200,11 +1250,19 @@ mod tests {
 
     #[test]
     fn wrong_resource_kind_and_invalid_observation_window_are_rejected() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) = fixture();
+        let (
+            config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan,
+        ) = fixture();
         plan.observations[0].resource_kind = PeakResourceKind::DataRateBytesPerSecond;
         assert_eq!(
             evaluate_peak_resource_usage(
-                &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
+                &config,
+                &tasks,
+                &task_receipt,
+                &reserve_plan,
+                &reserve_report,
+                &reserve_receipt,
+                &plan
             ).unwrap_err(),
             PeakResourceUsageMeasurementError::ResourceKindMismatch
         );
@@ -1212,7 +1270,13 @@ mod tests {
         plan.observations[0].window.end_ms = plan.observations[0].window.start_ms;
         assert_eq!(
             evaluate_peak_resource_usage(
-                &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
+                &config,
+                &tasks,
+                &task_receipt,
+                &reserve_plan,
+                &reserve_report,
+                &reserve_receipt,
+                &plan
             ).unwrap_err(),
             PeakResourceUsageMeasurementError::InvalidTimeWindow
         );
