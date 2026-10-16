@@ -1,0 +1,43 @@
+name: NANO Policy Prototype
+
+on:
+  pull_request:
+    paths:
+      - "tools/nano-policy/**"
+      - ".github/workflows/nano-policy-prototype.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/nano-policy/**"
+      - ".github/workflows/nano-policy-prototype.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/nano-policy/Cargo.toml -- --check
+      - name: Run deterministic unit tests
+        run: cargo test --locked --manifest-path tools/nano-policy/Cargo.toml
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/nano-policy/Cargo.toml --all-targets -- -D warnings
+      - name: Exercise both policies on synthetic fixtures
+        shell: bash
+        run: |
+          cargo run --locked --quiet --manifest-path tools/nano-policy/Cargo.toml -- --input tools/nano-policy/examples/synthetic_candidates.tsv --policy random --budget 4 --seed 42 > random.tsv
+          cargo run --locked --quiet --manifest-path tools/nano-policy/Cargo.toml -- --input tools/nano-policy/examples/synthetic_candidates.tsv --policy maxmin --budget 4 --seed 42 > maxmin.tsv
+          grep -q $'^# policy=random$' random.tsv
+          grep -q $'^# policy=maxmin$' maxmin.tsv
+          grep -q $'^# candidate_count=9$' maxmin.tsv
+          grep -q $'^# unique_feature_vectors=8$' maxmin.tsv
+          test "$(grep -c $'^design-c-duplicate\t' maxmin.tsv)" -eq 1
