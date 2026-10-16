@@ -518,6 +518,7 @@ fn validate_relative_path(path: &str) -> Result<(), String> {
     if path.len() > MAX_CAMPAIGN_TEXT_BYTES
         || path.starts_with('/')
         || path.contains('\\')
+        || path.contains(':')
         || path.split('/').any(|part| part.is_empty() || part == "." || part == "..")
     {
         return Err(format!(
