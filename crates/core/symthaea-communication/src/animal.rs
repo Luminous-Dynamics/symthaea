@@ -118,7 +118,7 @@ fn validate_unique_ids(
     }
     let mut unique = BTreeSet::new();
     for id in ids {
-        if id.trim().is_empty() || !unique.insert(id) {
+        if id.trim().is_empty() || !unique.insert(id.as_str()) {
             return Err(format!(
                 "{kind} IDs must be non-empty and unique in split {split_id}"
             ));
@@ -134,8 +134,8 @@ fn reject_overlap(
     left_split: &str,
     right_split: &str,
 ) -> Result<(), String> {
-    let left: BTreeSet<_> = left_ids.iter().collect();
-    if right_ids.iter().any(|id| left.contains(id)) {
+    let left: BTreeSet<_> = left_ids.iter().map(String::as_str).collect();
+    if right_ids.iter().any(|id| left.contains(id.as_str())) {
         return Err(format!(
             "{kind} leakage between splits {left_split} and {right_split}"
         ));
