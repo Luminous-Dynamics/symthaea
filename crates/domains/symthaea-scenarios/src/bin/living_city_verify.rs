@@ -797,6 +797,12 @@ mod tests {
         assert_eq!(report["package_integrity"], "verified");
         assert_eq!(report["verified_source_count"], 6);
         assert_eq!(report["verified_output_count"], 1);
+        assert_eq!(report["city_design_feasibility"]["status"], "feasible");
+        assert_eq!(
+            report["city_design_feasibility"]["scenario_id"],
+            "heat-plus-72h-grid-outage"
+        );
+        assert_eq!(report["city_design_feasibility"]["violations"], serde_json::json!([]));
         assert_eq!(report["hazard_profile_id"], "synthetic-compound-profile/r1");
         assert_eq!(report["domain_reference_suite"]["status"], "passed");
         assert_eq!(
@@ -821,6 +827,35 @@ mod tests {
         );
         assert_eq!(report["failed_service_ids"], serde_json::json!(["cooling-centre", "grid", "hospital"]));
         assert!(report["dependency_propagation_rounds"].as_u64().unwrap() >= 1);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn infeasible_city_floors_block_promotion_even_when_artifacts_are_valid() {
+        let root = write_test_package(0.60);
+        let report = verify_run_package(&root).unwrap();
+        assert_eq!(report["package_integrity"], "verified");
+        assert_eq!(report["city_design_feasibility"]["status"], "infeasible");
+        assert_eq!(report["workflow_promotion_state"], "failed");
+        assert!(
+            report["city_design_feasibility"]["violations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|violation| violation["metric_id"] == "essential_access_share")
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn tampered_metrics_payload_is_rejected_before_feasibility_promotion() {
+        let root = write_valid_test_package();
+        let path = root.join("sources/city-metrics.json");
+        let bytes = fs::read(&path).unwrap();
+        let mut metrics: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        metrics["essential_access_share"] = serde_json::Value::from(0.60);
+        fs::write(&path, serde_json::to_vec(&metrics).unwrap()).unwrap();
+        assert!(verify_run_package(&root).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
