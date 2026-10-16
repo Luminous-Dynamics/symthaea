@@ -181,6 +181,22 @@ No coupled city result is eligible for a stronger claim than its least-validated
 
 ## 10. Implementation sequence
 
+### Executable synthetic prototype added
+
+The research branch now contains `crates/domains/symthaea-scenarios/src/living_city_policy_benchmark.rs`, exported from the scenario crate. It currently provides:
+
+- A deterministic, one-abstract-service discrete-time harness with separate hidden actual supply/demand and a policy-facing observation record.
+- Four transparent baselines: no-intervention, reactive-greedy, cost-first and floor-first.
+- Stale/missing sensor handling, a delayed and duration-limited backup intervention, an intervention budget, service-floor breach accounting and unmet-service/cost totals.
+- Paired policy comparison that rejects mismatched scenario IDs, step counts or full configs and leaves percentage reduction undefined when baseline service loss is zero.
+- A 12-test authored synthetic suite covering immediate deficits, stale/missing observation controls, delayed actions, hidden-future truth isolation, paired comparison preconditions, boundary arithmetic, duplicate cases/policies, invalid forecast ratios and repeatability.
+
+**Verification ceiling:** this is an executable prototype in source, but its tests have not been compiled or run in the current authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. A queued workflow is not a pass. The harness contains no calibrated physical model, no stochastic hazard probabilities, no cohort roster, no canonical evidence receipt/signature, and no integrated Symthaea candidate policy. It cannot support a real-city performance or safety claim.
+
+### Remaining sequence
+
+
+
 1. **Freeze this protocol** and link its version into the Living City research brief; mark every numeric target as provisional until locally authorized.
 2. Build a deterministic, synthetic-only policy harness that executes baseline policies over matched worlds and emits one receipt per policy/case.
 3. Add service-loss, recovery, regret and resource accounting with hand-calculated fixtures and negative controls. Keep physical dynamics behind domain-model interfaces.
