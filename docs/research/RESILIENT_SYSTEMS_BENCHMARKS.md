@@ -314,3 +314,25 @@ These are targets, not measured results or universal standards.
 The initial adaptive fixture is synthetic. On its one-crew, three-job trace, fixed nominal dispatch order is A→C→B. With A taking 10 rather than its nominal 1 step and B becoming eligible at step 5, event-triggered priority dispatch reorders the still-pending work to A→B→C. The fixed-order realized loss is 922 versus 724 for adaptive dispatch on the declared weights: a 21.5% reduction for this one designed witness. This is a reproducible scenario claim only; it is not an average improvement claim, nor evidence of real-world predictive value.
 
 Current source-level coverage is 11 authored unit tests for this module. None of the Rust tests in this portfolio have been compiled or run in the current environment; the full rolling-horizon benchmark protocol is not implemented as a batch statistical evaluator.
+
+
+## 9. Paired fixed-plan versus adaptive evaluation
+
+The paired evaluator, [repair_policy_comparison.rs](../../crates/domains/symthaea-engineering/src/repair_policy_comparison.rs), connects the frozen-plan robust replay and rolling-horizon dispatcher. For each of the three repair policies, it sends the same nominal jobs, crew pool, spare stocks, horizon and realized-duration scenarios through both methods. Each comparison retains fixed-plan schedule, adaptive event trace and per-case loss delta.
+
+Use the sign convention **adaptive loss minus fixed-plan loss**: negative is better for the adaptive run; positive is worse. Report expected loss, worst specified loss, upper-tail CVaR, expected delta, relative expected reduction when defined, counts of improved/worsened/tied scenarios, the sum of scenario weights for wins/losses, and the trace for every paired case. Scenario weight totals are descriptive weighted mass—not empirical probabilities unless backed by evidence.
+
+### PC acceptance gates
+
+- **PC-01 — Exact pairing:** fixed and adaptive records have the same scenario IDs, weights, horizon, and job-duration realization.
+- **PC-02 — Arithmetic integrity:** paired delta equals adaptive loss minus fixed-plan loss for every scenario; expected delta equals the weighted sum of paired deltas.
+- **PC-03 — Risk visibility:** fixed and adaptive expected loss, worst-case loss and CVaR appear side by side.
+- **PC-04 — No winner-only reporting:** retain improved, worsened and tied cases with the decision trace. The aggregate cannot imply universal dominance.
+- **PC-05 — Reproducibility:** identical inputs reproduce an identical comparison report.
+- **PC-06 — Honest baseline:** the fixed strategy remains the existing nominal-plan replay, not a weakened straw man; a clairvoyant optimizer, if ever added, is separately labeled as an unattainable upper bound.
+
+### Targets and next research gate
+
+The paired harness now exists and has six authored tests, but none have been executed in this environment. The synthetic A→C→B versus A→B→C witness is a proof-of-concept fixture, not a benchmark distribution. Next, publish a deterministic corpus with small exact-optimality cases, paired scenario IDs and a holdout split; include both adaptive wins and regressions. Then add uncertainty calibration, travel/access and resupply only behind dedicated fixtures.
+
+Statistical targets remain proposed and unmeasured: 100 jobs × 20 crews × 20 scenarios in under 1 second for a release-build batch, and 500 jobs × 50 crews × 100 scenarios in under 15 seconds on a documented reference host. Report both compute cost and policy quality; do not relax information boundaries or remove traces to meet runtime.
