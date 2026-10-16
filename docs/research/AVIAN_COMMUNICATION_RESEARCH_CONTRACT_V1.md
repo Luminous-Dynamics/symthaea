@@ -79,6 +79,8 @@ This is a later milestone, not an MVP. A successful exchange must show that the 
 
 These are initial engineering goals to evaluate and refine during pilot data characterization; they are **not results** and do not substitute for a preregistered study.
 
+The animal communication module now contains `BinaryDetectionCounts` for a declared operating point (precision, recall, specificity, false-positive rate, F1 and balanced accuracy) and `binary_average_precision` for a score-ranked, tie-aware average-precision calculation. These are metric implementations only: no BirdVox examples have been evaluated, and no benchmark score is implied. The metric convention must be recorded in each run; average precision is not interchangeable with every trapezoidal PR-AUC implementation.
+
 | Dimension | Initial target / gate |
 |---|---|
 | Dataset integrity | 100% of evaluated samples have stable IDs, source/license attribution, content hashes and immutable split manifests; reject cross-split sample, recording/session, individual or site overlap for each claimed scope. |
@@ -128,7 +130,7 @@ Pin the exact dataset/version and each artifact's license before use. Public ava
 
 1. **Contract hardening (this tranche):** require all registered context controls; reject incomplete/duplicate/blank split identities, non-finite temporal-permutation evidence, and train/test overlap in source-recording lineage.
 2. **Passive corpus audit:** start with BirdVox-DCASE-20k as the explicitly CC BY 4.0 clip-level detection preflight; pin a manifest and source-recording split, and report its narrow nocturnal-flight-call scope. Audit broader taxa/sites with other corpora only after their file-level licenses and source lineage are recorded. No communication or training-quality claim yet.
-3. **Baseline harness:** emit BEANS-compatible detection results and a separate unit-discovery report using Symthaea's existing immutable run bundle.
+3. **Baseline harness:** connect BirdVox-DCASE-20k's source manifest to the new binary detection metrics, declare the average-precision convention, emit per-sample predictions and a separate unit-discovery report using Symthaea's existing immutable run bundle. The metric functions alone do not qualify a run or establish performance.
 4. **Context prediction:** preregister one observable target and run every required control on held-out identities/sites/time.
 5. **Expert review:** reconcile annotation uncertainty and review negative controls before using words like “meaning.”
 6. **Intervention proposal:** only after the passive prediction gate passes, submit a species-specific welfare-reviewed protocol.
