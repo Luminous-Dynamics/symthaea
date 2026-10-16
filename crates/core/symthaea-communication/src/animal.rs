@@ -10,6 +10,85 @@ pub trait BioacousticEncoder {
     fn encode(&mut self, mono_audio: &[f32], sample_rate_hz: u32) -> Result<Vec<Vec<f32>>, String>;
 }
 
+/// Confusion counts for a single binary detection operating point.
+/// Undefined ratios return None instead of silently reporting zero.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BinaryDetectionCounts {
+    pub true_positives: u64,
+    pub false_positives: u64,
+    pub true_negatives: u64,
+    pub false_negatives: u64,
+}
+
+impl BinaryDetectionCounts {
+    pub fn from_predictions(truth: &[bool], predicted: &[bool]) -> Result<Self, String> {
+        if truth.is_empty() || truth.len() != predicted.len() {
+            return Err("binary evaluation requires equal, non-empty truth and prediction lists".into());
+        }
+
+        let mut counts = Self::default();
+        for (actual, estimate) in truth.iter().zip(predicted) {
+            match (*actual, *estimate) {
+                (true, true) => counts.true_positives += 1,
+                (false, true) => counts.false_positives += 1,
+                (false, false) => counts.true_negatives += 1,
+                (true, false) => counts.false_negatives += 1,
+            }
+        }
+        Ok(counts)
+    }
+
+    pub fn sample_count(&self) -> u64 {
+        self.true_positives
+            + self.false_positives
+            + self.true_negatives
+            + self.false_negatives
+    }
+
+    pub fn precision(&self) -> Option<f64> {
+        ratio(
+            self.true_positives,
+            self.true_positives + self.false_positives,
+        )
+    }
+
+    pub fn recall(&self) -> Option<f64> {
+        ratio(
+            self.true_positives,
+            self.true_positives + self.false_negatives,
+        )
+    }
+
+    pub fn specificity(&self) -> Option<f64> {
+        ratio(
+            self.true_negatives,
+            self.true_negatives + self.false_positives,
+        )
+    }
+
+    pub fn false_positive_rate(&self) -> Option<f64> {
+        ratio(
+            self.false_positives,
+            self.false_positives + self.true_negatives,
+        )
+    }
+
+    pub fn f1(&self) -> Option<f64> {
+        ratio(
+            2 * self.true_positives,
+            2 * self.true_positives + self.false_positives + self.false_negatives,
+        )
+    }
+
+    pub fn balanced_accuracy(&self) -> Option<f64> {
+        Some((self.recall()? + self.specificity()?) / 2.0)
+    }
+}
+
+fn ratio(numerator: u64, denominator: u64) -> Option<f64> {
+    (denominator > 0).then(|| numerator as f64 / denominator as f64)
+}
+
 /// Declared source lineage for one dataset split. IDs refer to provenance
 /// records, not authenticated facts; this type prevents accidental leakage
 /// when the caller supplies complete and truthful source metadata.
@@ -330,6 +409,59 @@ impl PlaybackProtocol {
 mod tests {
     use super::*;
     use crate::{DatasetSplit, EvidenceDomain, EvidenceKind, EvidenceRecord, ReplicationStatus};
+
+    #[test]
+    fn binary_detection_counts_perfect_predictions() {
+        let counts = BinaryDetectionCounts::from_predictions(
+            &[true, true, false, false],
+            &[true, true, false, false],
+        )
+        .unwrap();
+        assert_eq!(counts.sample_count(), 4);
+        assert_eq!(counts.true_positives, 2);
+        assert_eq!(counts.true_negatives, 2);
+        assert_eq!(counts.precision(), Some(1.0));
+        assert_eq!(counts.recall(), Some(1.0));
+        assert_eq!(counts.specificity(), Some(1.0));
+        assert_eq!(counts.false_positive_rate(), Some(0.0));
+        assert_eq!(counts.f1(), Some(1.0));
+        assert_eq!(counts.balanced_accuracy(), Some(1.0));
+    }
+
+    #[test]
+    fn binary_detection_counts_expose_false_alarms_and_misses() {
+        let counts = BinaryDetectionCounts::from_predictions(
+            &[true, true, false, false],
+            &[true, false, true, false],
+        )
+        .unwrap();
+        assert_eq!(counts.true_positives, 1);
+        assert_eq!(counts.false_positives, 1);
+        assert_eq!(counts.true_negatives, 1);
+        assert_eq!(counts.false_negatives, 1);
+        assert_eq!(counts.precision(), Some(0.5));
+        assert_eq!(counts.recall(), Some(0.5));
+        assert_eq!(counts.false_positive_rate(), Some(0.5));
+        assert_eq!(counts.f1(), Some(0.5));
+        assert_eq!(counts.balanced_accuracy(), Some(0.5));
+    }
+
+    #[test]
+    fn binary_detection_metrics_mark_missing_class_support_undefined() {
+        let counts =
+            BinaryDetectionCounts::from_predictions(&[false, false], &[false, false]).unwrap();
+        assert_eq!(counts.specificity(), Some(1.0));
+        assert_eq!(counts.recall(), None);
+        assert_eq!(counts.precision(), None);
+        assert_eq!(counts.f1(), None);
+        assert_eq!(counts.balanced_accuracy(), None);
+    }
+
+    #[test]
+    fn binary_detection_counts_reject_empty_or_mismatched_inputs() {
+        assert!(BinaryDetectionCounts::from_predictions(&[], &[]).is_err());
+        assert!(BinaryDetectionCounts::from_predictions(&[true], &[]).is_err());
+    }
 
     fn split(
         split_id: &str,
