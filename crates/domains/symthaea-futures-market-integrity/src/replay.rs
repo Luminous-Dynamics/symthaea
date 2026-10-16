@@ -34,6 +34,19 @@ pub enum ReplayError {
         /// Horizon whose target was duplicated.
         horizon_id: String,
     },
+    /// No paired comparisons were supplied.
+    EmptyComparisonSet,
+    /// The same event/horizon pair appeared more than once in a paired comparison corpus.
+    DuplicateComparison {
+        /// Event whose comparison key collided.
+        event_id: String,
+        /// Horizon whose comparison key collided.
+        horizon_id: String,
+    },
+    /// Bootstrap replication count was below the documented minimum.
+    InvalidBootstrapReplicates,
+    /// A non-finite numeric input was supplied to the comparison evaluator.
+    InvalidComparisonValue,
 }
 
 /// A forecast available at one timestamp for one event and method.
@@ -350,6 +363,168 @@ fn required_identifier(value: String, field: &'static str) -> Result<String, Rep
     Ok(value.trim().to_owned())
 }
 
+/// One paired comparison between a candidate and baseline forecast.
+///
+/// The cluster identifier should identify the independent unit for inference (for example, a
+/// parent event that generated multiple related markets). Every row from one cluster is averaged
+/// within that cluster before clusters receive equal weight in the bootstrap.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PairedForecastComparison {
+    event_id: String,
+    horizon_id: String,
+    cluster_id: String,
+    outcome: bool,
+    baseline_probability: f64,
+    candidate_probability: f64,
+}
+
+impl PairedForecastComparison {
+    /// Construct one paired forecast comparison with explicit event and dependence-cluster IDs.
+    pub fn new(
+        event_id: impl Into<String>,
+        horizon_id: impl Into<String>,
+        cluster_id: impl Into<String>,
+        outcome: bool,
+        baseline_probability: f64,
+        candidate_probability: f64,
+    ) -> Result<Self, ReplayError> {
+        let event_id = required_identifier(event_id.into(), "event_id")?;
+        let horizon_id = required_identifier(horizon_id.into(), "horizon_id")?;
+        let cluster_id = required_identifier(cluster_id.into(), "cluster_id")?;
+        if !baseline_probability.is_finite()
+            || !candidate_probability.is_finite()
+            || !(0.0..=1.0).contains(&baseline_probability)
+            || !(0.0..=1.0).contains(&candidate_probability)
+        {
+            return Err(ReplayError::InvalidComparisonValue);
+        }
+        Ok(Self {
+            event_id,
+            horizon_id,
+            cluster_id,
+            outcome,
+            baseline_probability,
+            candidate_probability,
+        })
+    }
+}
+
+/// Paired, parent-event-cluster bootstrap summary for Brier-score differences.
+///
+/// Difference is defined as candidate Brier score minus baseline Brier score, so a negative
+/// value favors the candidate. The percentile interval is a deterministic nonparametric bootstrap
+/// interval, not a guarantee of frequentist coverage under arbitrary dependence or selection.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClusterBootstrapSummary {
+    /// Number of paired event/horizon rows.
+    pub comparison_count: usize,
+    /// Number of independent cluster labels represented.
+    pub cluster_count: usize,
+    /// Number of bootstrap resamples used.
+    pub bootstrap_replicates: usize,
+    /// Seed used by the reproducible xorshift resampler.
+    pub seed: u64,
+    /// Mean cluster-weighted candidate-minus-baseline Brier score.
+    pub mean_brier_difference: f64,
+    /// Lower 2.5th percentile of bootstrap mean differences.
+    pub lower_95_brier_difference: f64,
+    /// Upper 97.5th percentile of bootstrap mean differences.
+    pub upper_95_brier_difference: f64,
+    /// Fraction of bootstrap means strictly below zero; not a p-value.
+    pub bootstrap_share_candidate_better: f64,
+}
+
+/// Compute paired Brier differences with an equal-weight event-cluster bootstrap.
+///
+/// Rows sharing one cluster ID are averaged first, then clusters—not rows—are resampled with
+/// replacement. This prevents repeated horizons or sibling contracts from masquerading as
+/// independent observations. At least 1,000 replicates and a nonzero seed are required. The
+/// custom xorshift PRNG is for deterministic research replay only, not security or cryptography.
+///
+/// The caller is responsible for defining valid event clusters before observing benchmark
+/// results. If clusters are not independent, this interval may still be overconfident.
+pub fn paired_cluster_bootstrap(
+    comparisons: &[PairedForecastComparison],
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<ClusterBootstrapSummary, ReplayError> {
+    if comparisons.is_empty() {
+        return Err(ReplayError::EmptyComparisonSet);
+    }
+    if bootstrap_replicates < 1_000 || seed == 0 {
+        return Err(ReplayError::InvalidBootstrapReplicates);
+    }
+
+    let mut seen_pairs = BTreeSet::new();
+    let mut cluster_differences: std::collections::BTreeMap<String, Vec<f64>> =
+        std::collections::BTreeMap::new();
+
+    for row in comparisons {
+        let key = (row.event_id.clone(), row.horizon_id.clone());
+        if !seen_pairs.insert(key) {
+            return Err(ReplayError::DuplicateComparison {
+                event_id: row.event_id.clone(),
+                horizon_id: row.horizon_id.clone(),
+            });
+        }
+        let outcome = if row.outcome { 1.0 } else { 0.0 };
+        let baseline_brier = (row.baseline_probability - outcome).powi(2);
+        let candidate_brier = (row.candidate_probability - outcome).powi(2);
+        cluster_differences
+            .entry(row.cluster_id.clone())
+            .or_default()
+            .push(candidate_brier - baseline_brier);
+    }
+
+    let cluster_means = cluster_differences
+        .values()
+        .map(|values| values.iter().sum::<f64>() / values.len() as f64)
+        .collect::<Vec<_>>();
+    let cluster_count = cluster_means.len();
+    let mean_brier_difference =
+        cluster_means.iter().sum::<f64>() / cluster_count as f64;
+
+    let mut rng_state = seed;
+    let mut bootstrap_means = Vec::with_capacity(bootstrap_replicates);
+    let mut candidate_better_count = 0usize;
+    for _ in 0..bootstrap_replicates {
+        let mut sum = 0.0;
+        for _ in 0..cluster_count {
+            let index = (next_replay_random(&mut rng_state) as usize) % cluster_count;
+            sum += cluster_means[index];
+        }
+        let mean = sum / cluster_count as f64;
+        if mean < 0.0 {
+            candidate_better_count += 1;
+        }
+        bootstrap_means.push(mean);
+    }
+    bootstrap_means.sort_by(f64::total_cmp);
+
+    let lower_index = ((bootstrap_replicates - 1) as f64 * 0.025).floor() as usize;
+    let upper_index = ((bootstrap_replicates - 1) as f64 * 0.975).floor() as usize;
+
+    Ok(ClusterBootstrapSummary {
+        comparison_count: comparisons.len(),
+        cluster_count,
+        bootstrap_replicates,
+        seed,
+        mean_brier_difference,
+        lower_95_brier_difference: bootstrap_means[lower_index],
+        upper_95_brier_difference: bootstrap_means[upper_index],
+        bootstrap_share_candidate_better: candidate_better_count as f64
+            / bootstrap_replicates as f64,
+    })
+}
+
+fn next_replay_random(state: &mut u64) -> u64 {
+    // Xorshift64*: deterministic non-cryptographic generator. Seed zero is rejected above.
+    *state ^= *state >> 12;
+    *state ^= *state << 25;
+    *state ^= *state >> 27;
+    state.wrapping_mul(0x2545_F491_4F6C_DD1D)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -368,6 +543,102 @@ mod tests {
     ) -> ForecastTarget {
         ForecastTarget::new(event, horizon, cutoff, resolved, outcome, max_age)
             .expect("valid target fixture")
+    }
+
+
+    fn paired(
+        event: &str,
+        horizon: &str,
+        cluster: &str,
+        outcome: bool,
+        baseline: f64,
+        candidate: f64,
+    ) -> PairedForecastComparison {
+        PairedForecastComparison::new(event, horizon, cluster, outcome, baseline, candidate)
+            .expect("valid paired comparison fixture")
+    }
+
+    #[test]
+    fn clustered_bootstrap_is_reproducible_for_identical_input_and_seed() {
+        let rows = vec![
+            paired("e1", "30d", "parent-a", true, 0.45, 0.60),
+            paired("e1", "7d", "parent-a", true, 0.70, 0.80),
+            paired("e2", "30d", "parent-b", false, 0.35, 0.20),
+            paired("e3", "30d", "parent-c", true, 0.50, 0.70),
+            paired("e4", "30d", "parent-d", false, 0.50, 0.30),
+        ];
+        let a = paired_cluster_bootstrap(&rows, 2_000, 0x5eed).expect("valid bootstrap");
+        let b = paired_cluster_bootstrap(&rows, 2_000, 0x5eed).expect("same deterministic run");
+        assert_eq!(a, b);
+        assert_eq!(a.comparison_count, 5);
+        assert_eq!(a.cluster_count, 4);
+        assert_eq!(a.bootstrap_replicates, 2_000);
+    }
+
+    #[test]
+    fn clustered_bootstrap_weights_clusters_not_repeated_horizons() {
+        let rows = vec![
+            paired("a", "h1", "parent-a", true, 0.1, 0.9),
+            paired("a", "h2", "parent-a", true, 0.1, 0.9),
+            paired("a", "h3", "parent-a", true, 0.1, 0.9),
+            paired("a", "h4", "parent-a", true, 0.1, 0.9),
+            paired("a", "h5", "parent-a", true, 0.1, 0.9),
+            paired("a", "h6", "parent-a", true, 0.1, 0.9),
+            paired("a", "h7", "parent-a", true, 0.1, 0.9),
+            paired("a", "h8", "parent-a", true, 0.1, 0.9),
+            paired("a", "h9", "parent-a", true, 0.1, 0.9),
+            paired("a", "h10", "parent-a", true, 0.1, 0.9),
+            paired("b", "h1", "parent-b", true, 0.9, 0.1),
+        ];
+        let summary = paired_cluster_bootstrap(&rows, 2_000, 123).expect("valid bootstrap");
+        assert_eq!(summary.comparison_count, 11);
+        assert_eq!(summary.cluster_count, 2);
+        assert!(summary.mean_brier_difference.abs() < 1e-12);
+    }
+
+    #[test]
+    fn clustered_bootstrap_rejects_empty_duplicate_or_invalid_input() {
+        assert_eq!(
+            paired_cluster_bootstrap(&[], 1_000, 1),
+            Err(ReplayError::EmptyComparisonSet)
+        );
+        let row = paired("e1", "30d", "p1", true, 0.4, 0.6);
+        assert_eq!(
+            paired_cluster_bootstrap(&[row.clone(), row], 1_000, 1),
+            Err(ReplayError::DuplicateComparison {
+                event_id: "e1".to_owned(),
+                horizon_id: "30d".to_owned(),
+            })
+        );
+        assert_eq!(
+            paired_cluster_bootstrap(&[paired("e", "h", "c", true, 0.4, 0.5)], 999, 1),
+            Err(ReplayError::InvalidBootstrapReplicates)
+        );
+        assert_eq!(
+            paired_cluster_bootstrap(&[paired("e", "h", "c", true, 0.4, 0.5)], 1_000, 0),
+            Err(ReplayError::InvalidBootstrapReplicates)
+        );
+        assert_eq!(
+            PairedForecastComparison::new("e", "h", "c", true, f64::NAN, 0.5),
+            Err(ReplayError::InvalidComparisonValue)
+        );
+        assert_eq!(
+            PairedForecastComparison::new("e", "h", "c", true, 0.4, 1.1),
+            Err(ReplayError::InvalidComparisonValue)
+        );
+    }
+
+    #[test]
+    fn clustered_bootstrap_difference_is_candidate_minus_baseline() {
+        let rows = vec![
+            paired("e1", "30d", "p1", true, 0.2, 0.8),
+            paired("e2", "30d", "p2", true, 0.3, 0.9),
+            paired("e3", "30d", "p3", true, 0.1, 0.7),
+        ];
+        let summary = paired_cluster_bootstrap(&rows, 1_000, 7).expect("valid bootstrap");
+        assert!(summary.mean_brier_difference > 0.0);
+        assert_eq!(summary.bootstrap_share_candidate_better, 0.0);
+        assert!(summary.lower_95_brier_difference > 0.0);
     }
 
     #[test]
