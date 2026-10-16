@@ -14,7 +14,8 @@ use std::fmt;
 pub const EXPERIMENT_CATALOG_VERSION: &str = "marine-experiment-catalog-v1";
 pub const SCENARIO_GENERATOR_VERSION: &str = "marine-synthetic-scenarios-v1";
 pub const TOY_ORACLE_VERSION: &str = "exhaustive-subset-oracle-v1";
-pub const BENCHMARK_SCHEMA_VERSION: &str = "1.0.0";
+pub const BENCHMARK_SCHEMA_VERSION: &str = "2.0.0";
+pub const PAIRED_COMPARISON_METHOD_VERSION: &str = "paired-scenario-means-z95-v1";
 pub const DEFAULT_SCENARIOS: usize = 1_000;
 pub const DEFAULT_PAIRED_SEEDS: usize = 30;
 pub const DEFAULT_BUDGET_UNITS: u32 = 6;
@@ -241,6 +242,32 @@ pub struct PolicySummary {
     pub mean_oracle_regret_constraints: f64,
 }
 
+/// An effect estimate for policy minus baseline. The interval is a normal-approximation
+/// 95% confidence interval over scenario-level paired means. Bounds are None when fewer
+/// than two scenarios are evaluated; an undefined interval is not replaced with zero.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct EstimateWithNormal95Ci {
+    pub mean_difference: f64,
+    pub lower_95_ci: Option<f64>,
+    pub upper_95_ci: Option<f64>,
+}
+
+/// Paired comparison against a baseline policy over the same scenario corpus and seed list.
+/// The exhaustive toy oracle is intentionally excluded because it is clairvoyant.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PairedPolicyComparison {
+    pub policy: Policy,
+    pub baseline_policy: Policy,
+    pub paired_scenario_count: u64,
+    pub paired_seed_count: u64,
+    pub mean_resolved_constraints_difference: EstimateWithNormal95Ci,
+    pub full_resolution_fraction_difference: EstimateWithNormal95Ci,
+    pub mean_budget_spent_units_difference: EstimateWithNormal95Ci,
+    pub mean_normalized_interval_width_reduction_difference: EstimateWithNormal95Ci,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct BenchmarkBody {
@@ -251,6 +278,8 @@ pub struct BenchmarkBody {
     pub experiment_catalog_version: String,
     pub scenario_generator_version: String,
     pub toy_oracle_version: String,
+    /// Defines paired scenario-level mean differences and the normal-approximation 95% CI.
+    pub paired_comparison_method_version: String,
     pub scenario_count: usize,
     pub scenario_corpus_sha256: String,
     pub execution_trace_sha256: String,
@@ -258,6 +287,7 @@ pub struct BenchmarkBody {
     pub budget_units_per_scenario: u32,
     pub experiment_catalog: Vec<Experiment>,
     pub summaries: Vec<PolicySummary>,
+    pub paired_policy_comparisons: Vec<PairedPolicyComparison>,
     pub limitations: Vec<String>,
 }
 
@@ -775,6 +805,59 @@ fn summarize_policy(
     }
 }
 
+/// Computes policy-minus-baseline paired effects. Each scenario contributes one difference
+/// averaged over the identical supplied seeds, so uncertainty is estimated across scenario
+/// clusters rather than pretending every scenario-seed pair is independent.
+fn paired_difference_estimate<F>(
+    candidate_by_seed: &[Vec<RunMetrics>],
+    baseline_by_seed: &[Vec<RunMetrics>],
+    metric: F,
+) -> EstimateWithNormal95Ci
+where
+    F: Fn(&RunMetrics) -> f64,
+{
+    debug_assert_eq!(candidate_by_seed.len(), baseline_by_seed.len());
+    let seed_count = candidate_by_seed.len();
+    let scenario_count = candidate_by_seed.first().map_or(0, Vec::len);
+    debug_assert!(seed_count > 0);
+    debug_assert!(scenario_count > 0);
+    debug_assert!(candidate_by_seed.iter().all(|row| row.len() == scenario_count));
+    debug_assert!(baseline_by_seed.iter().all(|row| row.len() == scenario_count));
+
+    let mut scenario_differences = Vec::with_capacity(scenario_count);
+    for scenario_index in 0..scenario_count {
+        let mut seed_sum = 0.0;
+        for seed_index in 0..seed_count {
+            seed_sum += metric(&candidate_by_seed[seed_index][scenario_index])
+                - metric(&baseline_by_seed[seed_index][scenario_index]);
+        }
+        scenario_differences.push(seed_sum / seed_count as f64);
+    }
+
+    let n = scenario_differences.len() as f64;
+    let mean = scenario_differences.iter().sum::<f64>() / n;
+    let (lower_95_ci, upper_95_ci) = if scenario_differences.len() < 2 {
+        (None, None)
+    } else {
+        let sum_squared_deviation = scenario_differences
+            .iter()
+            .map(|difference| (difference - mean).powi(2))
+            .sum::<f64>();
+        let sample_variance = sum_squared_deviation / (n - 1.0);
+        let standard_error = (sample_variance / n).sqrt();
+        // Large-sample normal critical value. This method is versioned in the receipt;
+        // future work may add a prespecified cluster bootstrap or t-interval sensitivity.
+        let margin = 1.959_963_984_540_054 * standard_error;
+        (Some(mean - margin), Some(mean + margin))
+    };
+
+    EstimateWithNormal95Ci {
+        mean_difference: mean,
+        lower_95_ci,
+        upper_95_ci,
+    }
+}
+
 /// Runs paired synthetic scenarios against four executable policies plus an
 /// exhaustive, clairvoyant toy-model subset oracle. Inputs, catalog, seed list,
 /// budget, generator/oracle revisions, summary metrics and serialized report hash
@@ -840,9 +923,12 @@ pub fn run_reference_benchmark_with_revision(
     let oracle_results: Vec<RunMetrics> =
         oracle_runs.iter().map(|run| run.metrics).collect();
 
+    let policies = Policy::all_heuristics();
     let mut summaries = Vec::new();
-    for policy in Policy::all_heuristics() {
-        for seed in paired_seeds.iter().copied() {
+    let mut results_by_policy_and_seed: Vec<Vec<Vec<RunMetrics>>> =
+        vec![vec![Vec::new(); paired_seeds.len()]; policies.len()];
+    for (policy_index, policy) in policies.iter().copied().enumerate() {
+        for (seed_index, seed) in paired_seeds.iter().copied().enumerate() {
             let mut results = Vec::with_capacity(scenarios.len());
             for scenario in &scenarios {
                 let run = run_policy(
@@ -866,8 +952,44 @@ pub fn run_reference_benchmark_with_revision(
                 &results,
                 &oracle_results,
             ));
+            results_by_policy_and_seed[policy_index][seed_index] = results;
         }
     }
+
+    let baseline_index = policies
+        .iter()
+        .position(|policy| *policy == Policy::CheapestFirst)
+        .expect("cheapest-first is part of the heuristic policy set");
+    let paired_policy_comparisons: Vec<PairedPolicyComparison> = policies
+        .iter()
+        .copied()
+        .enumerate()
+        .filter(|(_, policy)| *policy != Policy::CheapestFirst)
+        .map(|(policy_index, policy)| {
+            let candidate = &results_by_policy_and_seed[policy_index];
+            let baseline = &results_by_policy_and_seed[baseline_index];
+            PairedPolicyComparison {
+                policy,
+                baseline_policy: policies[baseline_index],
+                paired_scenario_count: scenario_count as u64,
+                paired_seed_count: paired_seeds.len() as u64,
+                mean_resolved_constraints_difference: paired_difference_estimate(
+                    candidate, baseline, |metrics| metrics.resolved_constraints as f64,
+                ),
+                full_resolution_fraction_difference: paired_difference_estimate(
+                    candidate, baseline, |metrics| if metrics.fully_resolved { 1.0 } else { 0.0 },
+                ),
+                mean_budget_spent_units_difference: paired_difference_estimate(
+                    candidate, baseline, |metrics| metrics.budget_spent_units as f64,
+                ),
+                mean_normalized_interval_width_reduction_difference: paired_difference_estimate(
+                    candidate, baseline,
+                    |metrics| metrics.normalized_interval_width_reduction,
+                ),
+            }
+        })
+        .collect();
+
     summaries.push(summarize_policy(
         Policy::ExhaustiveToyOracle,
         None,
@@ -880,11 +1002,12 @@ pub fn run_reference_benchmark_with_revision(
 
     let body = BenchmarkBody {
         schema_version: BENCHMARK_SCHEMA_VERSION.to_owned(),
-        suite_id: "marine-experiment-selection-synthetic-v1".to_owned(),
+        suite_id: "marine-experiment-selection-synthetic-v2".to_owned(),
         benchmark_source_revision: source_revision.to_owned(),
         experiment_catalog_version: EXPERIMENT_CATALOG_VERSION.to_owned(),
         scenario_generator_version: SCENARIO_GENERATOR_VERSION.to_owned(),
         toy_oracle_version: TOY_ORACLE_VERSION.to_owned(),
+        paired_comparison_method_version: PAIRED_COMPARISON_METHOD_VERSION.to_owned(),
         scenario_count,
         scenario_corpus_sha256,
         execution_trace_sha256,
@@ -892,6 +1015,7 @@ pub fn run_reference_benchmark_with_revision(
         budget_units_per_scenario,
         experiment_catalog: catalog,
         summaries,
+        paired_policy_comparisons,
         limitations: vec![
             concat!(
                 "Every scenario and simulated measurement is synthetic; no real route, ship, ",
@@ -907,6 +1031,17 @@ pub fn run_reference_benchmark_with_revision(
                 "The exhaustive subset oracle sees hidden truth and is a clairvoyant upper bound ",
                 "only for this finite toy measurement model; it is not deployable and is not a ",
                 "general global bound for real engineering.",
+            )
+            .to_owned(),
+            concat!(
+                "Paired effect intervals are normal-approximation 95% confidence intervals over ",
+                "scenario-cluster means, conditional on the generator version and supplied seed ",
+                "list; they are not physical uncertainty bounds or a universal policy ranking.",
+            )
+            .to_owned(),
+            concat!(
+                "A 95% interval is omitted when fewer than two scenarios are evaluated; interval ",
+                "estimation does not repair synthetic measurement-model misspecification.",
             )
             .to_owned(),
             concat!(
@@ -1107,6 +1242,42 @@ mod tests {
             run_reference_benchmark_with_revision(1, &[0], 2, "  ").unwrap_err(),
             BenchmarkError::EmptySourceRevision
         );
+    }
+
+    #[test]
+    fn paired_policy_comparisons_are_baseline_matched_and_have_finite_ci() {
+        let receipt = run_reference_benchmark(40, &[1, 2, 3], 6).expect("benchmark runs");
+        let comparisons = &receipt.body.paired_policy_comparisons;
+        assert_eq!(comparisons.len(), 3);
+        assert!(comparisons.iter().all(|comparison| {
+            comparison.baseline_policy == Policy::CheapestFirst
+                && comparison.paired_scenario_count == 40
+                && comparison.paired_seed_count == 3
+        }));
+        for comparison in comparisons {
+            for estimate in [
+                comparison.mean_resolved_constraints_difference,
+                comparison.full_resolution_fraction_difference,
+                comparison.mean_budget_spent_units_difference,
+                comparison.mean_normalized_interval_width_reduction_difference,
+            ] {
+                let lower = estimate.lower_95_ci.expect("CI defined with at least two scenarios");
+                let upper = estimate.upper_95_ci.expect("CI defined with at least two scenarios");
+                assert!(lower.is_finite() && upper.is_finite() && estimate.mean_difference.is_finite());
+                assert!(lower <= estimate.mean_difference && estimate.mean_difference <= upper);
+            }
+        }
+    }
+
+    #[test]
+    fn paired_policy_comparison_ci_is_unknown_for_one_scenario() {
+        let receipt = run_reference_benchmark(1, &[1, 2], 6).expect("benchmark runs");
+        for comparison in &receipt.body.paired_policy_comparisons {
+            assert!(comparison.mean_resolved_constraints_difference.lower_95_ci.is_none());
+            assert!(comparison.mean_resolved_constraints_difference.upper_95_ci.is_none());
+            assert!(comparison.full_resolution_fraction_difference.lower_95_ci.is_none());
+            assert!(comparison.full_resolution_fraction_difference.upper_95_ci.is_none());
+        }
     }
 
     #[test]
