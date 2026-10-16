@@ -461,7 +461,7 @@ fn critical_path_lower_bound(
             .iter()
             .filter(|operation_id| {
                 indexed
-                    .get(operation_id)
+                    .get(operation_id.as_str())
                     .expect("pending operation was validated and indexed")
                     .predecessors
                     .iter()
