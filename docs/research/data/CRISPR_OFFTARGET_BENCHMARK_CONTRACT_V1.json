@@ -22,10 +22,22 @@
       "reproduction_repository_observed_commit": "e82954897a77e95df46370923e9a5213ed7b1e19",
       "zenodo_record": "https://zenodo.org/records/20627722",
       "declared_code_license": "MIT (pyproject.toml)",
-      "dataset_rights_status": "not_yet_audited",
-      "exact_artifact_digests_status": "not_downloaded_or_verified",
-      "permitted_use_status": "blocked_pending_source_artifact_rights_review",
-      "note": "The companion code reproduces analysis from standardized tool outputs; it does not rerun every tool in its native environment. Code license is not automatically a data license."
+      "dataset_rights_status": "unresolved_record_view_has_no_visible_license_value",
+      "exact_artifact_digests_status": "only_record_exposed_md5_observed; archive_not_downloaded; sha256_not_verified",
+      "permitted_use_status": "blocked_until_explicit_artifact_license_or_rights_holder_confirmation",
+      "note": "The companion code reproduces analysis from standardized tool outputs; it does not rerun every tool in its native environment. Code license is not automatically a data license.",
+      "zenodo_artifact_audit": {
+        "record_url": "https://zenodo.org/records/20627722",
+        "record_doi": "10.5281/zenodo.20627722",
+        "archive_filename": "offtarget_prediction_benchmark_zenodo_artifacts_v1.zip",
+        "published_archive_size": "190.7 MB",
+        "record_exposed_md5": "611cb28ab0516e471c5dc59ea44a330a",
+        "sha256_verified": false,
+        "observed_rights_state": "Zenodo record view exposes a Rights/License section but no license value was visible in the retrieved record content",
+        "permission_status": "unresolved_blocked_until_explicit_data_license_or_rights_holder_confirmation",
+        "rule": "Do not download, ingest, or use the archive for benchmark/model development until intended use and data rights are explicitly verified. The reproduction repository's MIT code declaration does not grant dataset rights.",
+        "source_observation_url": "https://zenodo.org/records/20627722"
+      }
     },
     {
       "source_id": "Kinney-2026-UNCOVERseq",
@@ -149,7 +161,8 @@
         "source generation and exact artifacts pinned",
         "dataset/model rights reviewed separately from code license",
         "artifact bytes and SHA-256 recorded",
-        "unresolved rights block use"
+        "unresolved rights block use",
+        "Zenodo record license is explicit and permits intended use, or written rights-holder confirmation is recorded; an empty/not-visible license field is not treated as permission."
       ]
     },
     {
@@ -262,7 +275,9 @@
     "rust_unit_tests_executed": false,
     "partial_label_bounds_executed": false,
     "paired_delta_label_sensitivity_bounds_executed": false,
-    "fixed_budget_cardinality_fixtures_executed": false
+    "fixed_budget_cardinality_fixtures_executed": false,
+    "dataset_license_explicitly_verified": false,
+    "zenodo_archive_downloaded": false
   },
   "implementation_artifact": {
     "path": "scripts/crispr_triage_verifier.rs",
