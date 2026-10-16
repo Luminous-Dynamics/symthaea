@@ -17,7 +17,6 @@
 //! assert!((wavelength(440.0, c) - 0.78).abs() < 0.01); // A4 ≈ 0.78 m
 //! ```
 
-/// Speed of sound in dry air at `temp_celsius`: `c = 331.3·√(1 + T/273.15)` (m/s).
 pub mod response_curve;
 
 /// Speed of sound in dry air at `temp_celsius`: `c = 331.3·√(1 + T/273.15)` (m/s).
