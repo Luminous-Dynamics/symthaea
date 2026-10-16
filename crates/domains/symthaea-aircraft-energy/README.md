@@ -43,7 +43,7 @@ peak_bus_power_W =
   × power_derating_fraction
 ```
 
-The energy factors are treated multiplicatively because that is the declared input contract; users must not count the same loss/derate twice. The energy and power values are estimates at a declared aircraft bus. Use pack-level, not cell-level, performance inputs.
+The energy factors are treated multiplicatively because that is the declared input contract; users must not count the same loss/derate twice. The energy and power values are estimates at a declared aircraft bus. Use pack-level, not cell-level, performance inputs. Pack mass determines battery energy and power; a separately declared complete installed-system mass must include the pack plus the other hardware inside the comparison boundary. The model rejects an installed-system mass lower than the pack mass.
 
 `evaluate_mission` sums each segment's `required_bus_power_W × duration_s / 3600`, withholds the declared reserve from bus energy, checks each continuous segment against continuous power, checks peak segments against peak power, and sums peak-segment durations against the mission peak-duration budget.
 
@@ -64,7 +64,7 @@ For hybrid-electric, fission, or fusion concepts, the upstream analysis must pro
 
 ## Initial adversarial tests
 
-The 14 unit tests include hand-computed battery derating, mission-energy arithmetic, energy shortfall despite sufficient power, peak-power shortfall despite sufficient energy, continuous-power shortfall, cumulative peak-duration limit, missing energy and duty-class evidence, non-finite inputs, duplicate segment identity, invalid battery derating, invalid reserve, energy arithmetic overflow, and zero-duration rejection.
+The 15 unit tests include hand-computed battery derating, mission-energy arithmetic, energy shortfall despite sufficient power, peak-power shortfall despite sufficient energy, continuous-power shortfall, cumulative peak-duration limit, missing energy and duty-class evidence, non-finite inputs, duplicate segment identity, invalid battery derating, invalid reserve, energy arithmetic overflow, zero-duration rejection, and an installed-system mass lower than the pack mass.
 
 These are software-contract tests, not empirical battery characterization or aircraft validation. Before external performance claims, add an independently frozen mission corpus, independent expected values/oracle, source/model provenance, held-out reference measurements, uncertainty bounds, and comparisons against conventional tools.
 
