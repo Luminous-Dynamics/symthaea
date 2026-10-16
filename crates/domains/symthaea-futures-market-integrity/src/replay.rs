@@ -49,6 +49,12 @@ pub enum ReplayError {
     InvalidBootstrapConfig,
     /// A non-finite numeric input was supplied to the comparison evaluator.
     InvalidComparisonValue,
+    /// No eligible forecast scores were supplied for calibration reporting.
+    EmptyCalibrationSet,
+    /// The requested equal-width calibration bin count was outside 1..=100.
+    InvalidCalibrationBinCount,
+    /// Calibration bins were asked to combine multiple horizons or forecast methods.
+    MixedCalibrationGroup,
 }
 
 /// A forecast available at one timestamp for one event and method.
@@ -237,6 +243,114 @@ pub struct ReplayReport {
     pub scored: Vec<ForecastScore>,
     /// Missing and stale combinations that were excluded from scoring.
     pub excluded: Vec<ReplayExclusion>,
+}
+
+/// One bin in a reliability table for a single method and horizon.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalibrationBin {
+    /// Zero-based bin index.
+    pub index: usize,
+    /// Inclusive lower probability bound.
+    pub lower_bound: f64,
+    /// Exclusive upper probability bound, except the last bin includes probability 1.0.
+    pub upper_bound: f64,
+    /// Number of eligible forecasts in the bin.
+    pub count: usize,
+    /// Mean forecast probability; none when the bin is empty.
+    pub mean_forecast_probability: Option<f64>,
+    /// Empirical positive-outcome frequency; none when the bin is empty.
+    pub observed_frequency: Option<f64>,
+}
+
+/// Horizon- and method-specific calibration report.
+///
+/// Empty bins are retained explicitly. Weighted absolute calibration error is provided only as a
+/// secondary summary because its value depends on the selected bin count and edges; it must not
+/// replace the reliability table or uncertainty/count reporting.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalibrationReport {
+    /// Forecast method identifier shared by all input rows.
+    pub forecaster_id: String,
+    /// Frozen horizon identifier shared by all input rows.
+    pub horizon_id: String,
+    /// Total number of forecast scores in the report.
+    pub observation_count: usize,
+    /// Equal-width probability bins from zero through one, including empty bins.
+    pub bins: Vec<CalibrationBin>,
+    /// Count-weighted absolute difference between bin mean and observed frequency.
+    pub weighted_absolute_calibration_error: f64,
+}
+
+/// Build a reliability table for exactly one forecast method and one target horizon.
+///
+/// Probabilities at bin boundaries are assigned to the bin on their right, except probability
+/// 1.0, which is assigned to the final bin. Mixed methods/horizons are rejected to prevent
+/// accidental pooling of incomparable estimands. The reported weighted absolute calibration
+/// error is bin-dependent and is not a proper scoring rule or a substitute for Brier/log score.
+pub fn calibration_report(
+    scores: &[ForecastScore],
+    bin_count: usize,
+) -> Result<CalibrationReport, ReplayError> {
+    if scores.is_empty() {
+        return Err(ReplayError::EmptyCalibrationSet);
+    }
+    if !(1..=100).contains(&bin_count) {
+        return Err(ReplayError::InvalidCalibrationBinCount);
+    }
+    let forecaster_id = scores[0].forecaster_id.clone();
+    let horizon_id = scores[0].horizon_id.clone();
+    let mut counts = vec![0usize; bin_count];
+    let mut probability_sums = vec![0.0_f64; bin_count];
+    let mut positive_counts = vec![0usize; bin_count];
+
+    for score in scores {
+        if score.forecaster_id != forecaster_id || score.horizon_id != horizon_id {
+            return Err(ReplayError::MixedCalibrationGroup);
+        }
+        if !score.probability.is_finite() || !(0.0..=1.0).contains(&score.probability) {
+            return Err(ReplayError::InvalidProbability);
+        }
+        let index = if score.probability >= 1.0 {
+            bin_count - 1
+        } else {
+            ((score.probability * bin_count as f64).floor() as usize).min(bin_count - 1)
+        };
+        counts[index] += 1;
+        probability_sums[index] += score.probability;
+        positive_counts[index] += usize::from(score.outcome);
+    }
+
+    let mut weighted_absolute_calibration_error = 0.0;
+    let mut bins = Vec::with_capacity(bin_count);
+    for index in 0..bin_count {
+        let count = counts[index];
+        let mean_forecast_probability = (count > 0)
+            .then(|| probability_sums[index] / count as f64);
+        let observed_frequency =
+            (count > 0).then(|| positive_counts[index] as f64 / count as f64);
+        if let (Some(mean_probability), Some(observed)) =
+            (mean_forecast_probability, observed_frequency)
+        {
+            weighted_absolute_calibration_error +=
+                (count as f64 / scores.len() as f64) * (mean_probability - observed).abs();
+        }
+        bins.push(CalibrationBin {
+            index,
+            lower_bound: index as f64 / bin_count as f64,
+            upper_bound: (index + 1) as f64 / bin_count as f64,
+            count,
+            mean_forecast_probability,
+            observed_frequency,
+        });
+    }
+
+    Ok(CalibrationReport {
+        forecaster_id,
+        horizon_id,
+        observation_count: scores.len(),
+        bins,
+        weighted_absolute_calibration_error,
+    })
 }
 
 /// Replay all method/event/horizon combinations using only forecasts known by each cutoff.
@@ -558,6 +672,97 @@ mod tests {
     ) -> ForecastTarget {
         ForecastTarget::new(event, horizon, cutoff, resolved, outcome, max_age)
             .expect("valid target fixture")
+    }
+
+    fn score(
+        event: &str,
+        horizon: &str,
+        method: &str,
+        probability: f64,
+        outcome: bool,
+    ) -> ForecastScore {
+        let outcome_value = if outcome { 1.0 } else { 0.0 };
+        let realized_probability = if outcome { probability } else { 1.0 - probability };
+        ForecastScore {
+            event_id: event.to_owned(),
+            horizon_id: horizon.to_owned(),
+            forecaster_id: method.to_owned(),
+            probability,
+            outcome,
+            forecast_at_unix_seconds: 10,
+            cutoff_at_unix_seconds: 20,
+            forecast_age_seconds: 10,
+            brier_score: (probability - outcome_value).powi(2),
+            log_loss: -realized_probability.ln(),
+        }
+    }
+
+    #[test]
+    fn calibration_report_keeps_empty_bins_and_includes_probability_one() {
+        let scores = vec![
+            score("e1", "30d", "market", 0.0, false),
+            score("e2", "30d", "market", 0.2, true),
+            score("e3", "30d", "market", 0.5, false),
+            score("e4", "30d", "market", 1.0, true),
+        ];
+        let report = calibration_report(&scores, 4).expect("one horizon/method");
+        assert_eq!(report.observation_count, 4);
+        assert_eq!(report.bins.len(), 4);
+        assert_eq!(report.bins[0].count, 2);
+        assert_eq!(report.bins[1].count, 0);
+        assert_eq!(report.bins[1].mean_forecast_probability, None);
+        assert_eq!(report.bins[1].observed_frequency, None);
+        assert_eq!(report.bins[2].count, 1);
+        assert_eq!(report.bins[3].count, 1);
+        assert_eq!(report.bins[3].mean_forecast_probability, Some(1.0));
+        assert_eq!(report.bins[3].observed_frequency, Some(1.0));
+        assert!((report.weighted_absolute_calibration_error - 0.325).abs() < 1e-12);
+    }
+
+    #[test]
+    fn calibration_report_rejects_mixed_methods_or_horizons() {
+        assert_eq!(
+            calibration_report(&[], 10),
+            Err(ReplayError::EmptyCalibrationSet)
+        );
+        assert_eq!(
+            calibration_report(&[score("e1", "30d", "market", 0.5, true)], 0),
+            Err(ReplayError::InvalidCalibrationBinCount)
+        );
+        assert_eq!(
+            calibration_report(&[score("e1", "30d", "market", 0.5, true)], 101),
+            Err(ReplayError::InvalidCalibrationBinCount)
+        );
+        assert_eq!(
+            calibration_report(
+                &[
+                    score("e1", "30d", "market", 0.5, true),
+                    score("e2", "7d", "market", 0.5, false),
+                ],
+                10
+            ),
+            Err(ReplayError::MixedCalibrationGroup)
+        );
+        assert_eq!(
+            calibration_report(
+                &[
+                    score("e1", "30d", "market", 0.5, true),
+                    score("e2", "30d", "symthaea", 0.5, false),
+                ],
+                10
+            ),
+            Err(ReplayError::MixedCalibrationGroup)
+        );
+    }
+
+    #[test]
+    fn calibration_report_rejects_invalid_public_score_probability() {
+        let mut invalid = score("e1", "30d", "market", 0.5, true);
+        invalid.probability = f64::NAN;
+        assert_eq!(
+            calibration_report(&[invalid], 10),
+            Err(ReplayError::InvalidProbability)
+        );
     }
 
     fn paired(
