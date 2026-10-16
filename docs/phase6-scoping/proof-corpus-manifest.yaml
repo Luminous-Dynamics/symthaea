@@ -23,6 +23,23 @@ policy:
     - stale_environment_receipt
     - timeout_or_incomplete_output
 
+
+retrieval_baselines:
+  - id: "LEANSEARCH-V2-MPR-001"
+    repository_url: "https://github.com/frenzymath/LeanSearch-v2"
+    commit: "94f4888cbaf9f4322535755f86cbac690ec18080"
+    artifact_path: "benchmark/MathlibMPR.json"
+    artifact_url: "https://github.com/frenzymath/LeanSearch-v2/blob/94f4888cbaf9f4322535755f86cbac690ec18080/benchmark/MathlibMPR.json"
+    artifact_blob_sha: "00f1539e5528fa9fb59d253259b4372c58bea09c"
+    reported_scope: "69 research-level Mathlib theorems with premise-group ground truth"
+    license: "Repository LICENSE is Apache-2.0; verify dataset-specific provenance/terms before redistribution"
+    status: "reference_baseline_only_not_a_prover_dependency"
+    limitations:
+      - "Upstream corpus uses Mathlib v4.28.0-rc1; this is not automatically compatible with Symthaea's admitted Mathlib environment."
+      - "Repository README describes GPU/embedding/reranker dependencies for full local reproduction; do not introduce it as a production Rust dependency."
+      - "Treat benchmark queries as evaluation-only and prevent tuning/training on held-out test cases."
+      - "A retrieval ranking or premise hit does not constitute a proof; downstream Lean checking remains mandatory."
+
 entries:
   - id: "OAI-ENTROPY-LPDIM-001"
     title: "Entropy and logarithmic inequalities"
