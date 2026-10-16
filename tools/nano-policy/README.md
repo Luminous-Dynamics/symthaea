@@ -58,9 +58,9 @@ For nanophotonics, downstream utility could be the best-so-far spectral error or
 
 ## Algorithm bounds
 
-- Maximum 10,000 candidates per request.
+- Maximum 10,000 combined candidate and reference-feature vectors per request.
 - Maximum 1,024 feature dimensions.
-- Diversity policy work estimate is capped at 100,000,000 candidate-pair-dimension units; large pools or batches must be split using a predeclared method.
+- Diversity work estimate is capped at 100,000,000 pair-dimension units and includes candidate-to-reference comparisons, within-batch distance comparisons, and feature-normalization work. Large histories or batches are rejected before distance evaluation if they exceed the cap.
 - Candidate costs must be finite and positive. A total budget must be finite and nonnegative.
 - The random baseline uses an internal SplitMix64 generator with rejection sampling for bounded indices; results are deterministic for a fixed seed and input order.
 
