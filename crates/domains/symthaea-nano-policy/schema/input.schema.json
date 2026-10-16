@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-selection-input-v1",
+  "title": "Symthaea nano-policy selector input",
+  "description": "Candidate IDs plus allowed numeric descriptors only. Target labels, energies, spectra and outcome fields are intentionally not part of this contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy",
+    "budget",
+    "seed",
+    "candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "nano-selection-input-v1"
+    },
+    "policy": {
+      "enum": [
+        "maximin",
+        "hdc_maximin",
+        "random"
+      ]
+    },
+    "budget": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "already_selected": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "features"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "features": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$comment": "Runtime also enforces a 64 MiB request limit, at most 10,000,000 candidate-feature cells, equal feature dimensions, finite numeric inputs and a budget no larger than the unselected candidate count. For policy hdc_maximin, runtime additionally limits the pool to 10,000 candidates and 256 features per candidate."
+}

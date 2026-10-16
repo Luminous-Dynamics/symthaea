@@ -1,0 +1,4 @@
+{
+  "expected_policy": "hdc_maximin",
+  "purpose": "deterministic HDC descriptor-selection plumbing only; not a scientific benchmark"
+}
