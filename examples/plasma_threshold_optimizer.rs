@@ -706,8 +706,13 @@ fn classify_regime_with_dynamics(
 // OBJECTIVE FUNCTION
 // =============================================================================
 
-/// Objective function for optimization
-/// Returns negative infinity if constraint violated (infeasible)
+/// Illustrative utility weight for this synthetic example: 100 ms of mean warning lead time
+/// offsets one full unit of event-level false-positive rate. This is a transparent demonstration
+/// preference, not an empirically calibrated or operationally approved risk tradeoff.
+const FPR_PENALTY_MS_PER_UNIT: f64 = 100.0;
+
+/// Objective function for optimization. Returns negative infinity when metrics are unscoreable
+/// or the synthetic event-recall constraint is violated.
 fn objective(config: &ThresholdConfig, shots: &[CModShot]) -> f64 {
     let results = evaluate_config(config, shots);
 
@@ -721,8 +726,9 @@ fn objective(config: &ThresholdConfig, shots: &[CModShot]) -> f64 {
         return f64::NEG_INFINITY;
     }
 
-    // Synthetic-example objective only; this is not a validated operational safety criterion.
-    results.mean_warning_time_ms - 100.0 * false_positive_rate
+    // The scalar utility is an explicitly declared synthetic-example convention. The separate
+    // Pareto report is needed because different stakeholders may value these tradeoffs differently.
+    results.mean_warning_time_ms - FPR_PENALTY_MS_PER_UNIT * false_positive_rate
 }
 
 // =============================================================================
@@ -1275,6 +1281,7 @@ pub enum DatasetProvenance {
 pub struct OptimizationOutput {
     pub schema_version: u32,
     pub dataset_provenance: DatasetProvenance,
+    pub objective_definition: String,
     pub grid_search: Option<SearchResult>,
     pub random_search: Option<SearchResult>,
     pub bayesian_search: Option<SearchResult>,
@@ -1638,6 +1645,7 @@ fn main() {
             source_revision: option_env!("GIT_COMMIT_SHA").unwrap_or("unrecorded-at-build").to_string(),
             qualification_note: "Synthetic demonstration only; not measured evidence and not qualified for device operation or safety decisions.".to_string(),
         },
+        objective_definition: "Synthetic example only: maximize mean event-level warning lead time in milliseconds minus 100 ms times event-level false-positive rate; require scoreable event recall >= 0.95. The 100 ms tradeoff weight is illustrative, not empirically calibrated or approved for operation.".to_string(),
         grid_search: Some(grid_result),
         random_search: Some(random_result),
         bayesian_search: Some(bayesian_result),
