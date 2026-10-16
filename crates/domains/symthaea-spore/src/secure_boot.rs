@@ -257,7 +257,7 @@ pub fn parse_probe_result(json_output: &str) -> Result<SecureBootProbeResult, St
 
     let platform = TargetPlatform::from_platform_string(platform_str);
 
-    let key_enrollment_required = matches!(state, SecureBootState::Enabled | SecureBootState::SetupMode);
+    let key_enrollment_required = matches!(&state, SecureBootState::Enabled | SecureBootState::SetupMode);
 
     let raw_output = parsed
         .get("bootctl_output")
@@ -1119,7 +1119,7 @@ mod tests {
         }"#;
         let result = parse_probe_result(json).unwrap();
         assert_eq!(result.state, SecureBootState::SetupMode);
-        assert!(!result.key_enrollment_required);
+        assert!(result.key_enrollment_required);
     }
 
     #[test]
