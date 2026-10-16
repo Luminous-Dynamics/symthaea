@@ -88,6 +88,19 @@ pub struct RosSampleReceiptV1 {
     pub receive_epoch_id: String,
 }
 
+/// Compute residence age only when receipt and capture belong to the same
+/// monotonic epoch and the receipt does not postdate the capture.
+fn receive_age_at_capture_ns(
+    receipt: &RosSampleReceiptV1,
+    capture_epoch_id: &str,
+    captured_monotonic_ns: u64,
+) -> Option<u64> {
+    if receipt.receive_epoch_id != capture_epoch_id {
+        return None;
+    }
+    captured_monotonic_ns.checked_sub(receipt.received_monotonic_ns)
+}
+
 /// Provenance metadata preserved from one ROS Header and its local receipt.
 ///
 /// The publisher's source clock remains unbound until a deployment profile
@@ -291,6 +304,7 @@ fn ros_sample_metadata(
     header: &std_msgs::msg::Header,
     receipt: Option<RosSampleReceiptV1>,
     captured_monotonic_ns: u64,
+    capture_epoch_id: &str,
 ) -> Result<RosSampleMetadataV1, RosBridgeError> {
     if header.stamp.nanosec >= 1_000_000_000 {
         return Err(RosBridgeError::InvalidSensorData(
@@ -307,8 +321,12 @@ fn ros_sample_metadata(
         Some(receipt) => (
             Some(receipt.received_monotonic_ns),
             Some(receipt.sequence),
-            Some(receipt.receive_epoch_id),
-            Some(captured_monotonic_ns.saturating_sub(receipt.received_monotonic_ns)),
+            Some(receipt.receive_epoch_id.clone()),
+            receive_age_at_capture_ns(
+                &receipt,
+                capture_epoch_id,
+                captured_monotonic_ns,
+            ),
         ),
         None => (None, None, None, None),
     };
@@ -869,6 +887,7 @@ impl RosBridgeNode {
             &joint_state.header,
             joint_receipt,
             captured_monotonic_ns,
+            &receive_epoch_id,
         )?;
         let expected = &symthaea_humanoid::types::JOINT_NAMES;
         let positions = canonicalize_joint_values(
@@ -920,6 +939,7 @@ impl RosBridgeNode {
                     &imu.header,
                     imu_receipt.clone(),
                     captured_monotonic_ns,
+                    &receive_epoch_id,
                 )?;
                 let orientation_covariance =
                     ros_covariance_v1(imu.orientation_covariance, "orientation")?;
@@ -1536,6 +1556,18 @@ mod tests {
             canonicalize_joint_values(&names, &values[..2], &expected, "position"),
             Err(RosBridgeError::InvalidJointState(_))
         ));
+    }
+
+    #[test]
+    fn receive_age_requires_same_epoch_and_nonfuture_receipt() {
+        let receipt = RosSampleReceiptV1 {
+            sequence: 7,
+            received_monotonic_ns: 100,
+            receive_epoch_id: "epoch-A".into(),
+        };
+        assert_eq!(receive_age_at_capture_ns(&receipt, "epoch-A", 135), Some(35));
+        assert_eq!(receive_age_at_capture_ns(&receipt, "epoch-B", 135), None);
+        assert_eq!(receive_age_at_capture_ns(&receipt, "epoch-A", 99), None);
     }
 
     #[test]
