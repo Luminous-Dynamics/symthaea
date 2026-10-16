@@ -687,6 +687,21 @@ mod tests {
     }
 
     #[test]
+    fn reference_suite_runs_one_thousand_known_answer_scenarios() {
+        let scenarios = generate_synthetic_scenarios(1_000, 0x51ec7, &policy());
+        let report = run_selection_benchmark(&policy(), &scenarios, &STRATEGIES).unwrap();
+
+        assert_eq!(report.scenarios, 1_000);
+        assert_eq!(report.results.len(), 1_000 * STRATEGIES.len());
+        assert_eq!(report.summaries.len(), STRATEGIES.len());
+        for summary in &report.summaries {
+            assert_eq!(summary.scenario_count, 1_000);
+            assert!(summary.mean_decision_regret.is_finite());
+            assert!((0.0..=1.0).contains(&summary.resolution_rate));
+        }
+    }
+
+    #[test]
     fn rejects_oversized_or_duplicate_scenarios() {
         let mut scenarios = generate_synthetic_scenarios(1, 2, &policy());
         scenarios.push(scenarios[0].clone());
