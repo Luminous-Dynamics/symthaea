@@ -127,9 +127,24 @@ These gates are for Symthaea's evidence and software workflow. They are not a cl
 
 For B8, an optional stretch goal is ≥10% improvement in a predeclared Pareto metric at equal solver budget. Do not choose or change the metric after seeing outcomes. If the baseline already performs as well or better, report that result and keep the simpler method.
 
-### External reference baseline
+### External reference baseline — exact candidate pinned
 
-Use official [UKAEA PROCESS](https://github.com/ukaea/PROCESS) as the first whole-plant system-code lane, starting with the named [v3.4.1 release](https://github.com/ukaea/PROCESS/releases/tag/v3.4.1) only after confirming the official reference case is supported by that pinned release. Do not call it reproduced until output artifacts and independent comparisons exist. PROCESS is a reference model, not an oracle; convergence does not prove physical validation.
+The official release tag `v3.4.1` currently resolves to PROCESS commit `04a8363725f26b59dda0f5aa1520e67aa7014fde` (root tree `154167c7c914407dc58ed3595f86b66b7822eac6`). Use the immutable commit SHA as the subject identity; keep the human-readable tag as metadata.
+
+Recommended first case: the officially documented fixed-design evaluation input `examples/data/large_tokamak_eval_IN.DAT`, Git blob `464a9a84baf8b9a6dd3987725cd67c60c8f47b53`. The v3.4.1 official example `examples/single_model_evaluation.ex.py` initializes a `SingleRun` from this input and describes it as a no-optimization evaluation point. This is preferable as the first deterministic engineering baseline because it separates a fixed-input model run from optimizer behaviour.
+
+Secondary case: `examples/data/large_tokamak_IN.DAT`, Git blob `b489fca8ab110655ae622d13a8d093dc152e962e`. The official introduction example documents running it with `process -i data/large_tokamak_IN.DAT`; include it as a later end-to-end scenario after the fixed evaluation case is stable. Do not mix the two cases into one baseline.
+
+Source-pinned references:
+- [PROCESS v3.4.1 release](https://github.com/ukaea/PROCESS/releases/tag/v3.4.1)
+- [Pinned release commit](https://github.com/ukaea/PROCESS/commit/04a8363725f26b59dda0f5aa1520e67aa7014fde)
+- [Documented evaluation input](https://github.com/ukaea/PROCESS/blob/v3.4.1/examples/data/large_tokamak_eval_IN.DAT)
+- [Official single-model evaluation example](https://github.com/ukaea/PROCESS/blob/v3.4.1/examples/single_model_evaluation.ex.py)
+- [Official introduction example](https://github.com/ukaea/PROCESS/blob/v3.4.1/examples/introduction.ex.py)
+
+Before declaring reproduction, still capture the runner/OS, compiler/interpreter and lock/environment identity, install/build log, exact command, exit status, stdout/stderr, raw `MFILE.DAT`/`OUT.DAT` outputs and an independently recomputed normalized manifest. Record missing/unstable fields and define field-specific comparison rules before examining the actual output. The upstream Git blob ID pins source bytes, not the output or runtime environment.
+
+PROCESS is a reference model, not an oracle; an exact reproduction establishes reproducibility of a model run, not physical validation.
 
 Research supports integrated lifecycle modelling: the 2025 STEP concept study describes a trade-off in which a larger radial build raises capital cost but can lower through-life replacement costs by extending component life. A separate 2025 PROCESS-based availability sensitivity study shows strong coupling among component lifetime, maintenance duration, availability and LCOE. Those are exactly the non-local trade-offs the benchmark should expose, but their numerical results remain conditional on the selected concept and assumptions.
 
