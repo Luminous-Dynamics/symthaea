@@ -13,7 +13,8 @@
 
 use crate::knowledge::evidence_action_policy::{
     EvidenceAction, EvidenceActionDecision, EvidenceActionInput, EvidenceActionPolicy,
-    EvidenceActionReason, EvidenceCondition, ProvenanceCondition, QuestionCondition,
+    EvidenceActionReason, EvidenceActionSession, EvidenceCondition, EvidenceLifecycleEvent,
+    ProvenanceCondition, QuestionCondition,
 };
 use crate::knowledge::evidence_benchmark::{
     BenchmarkAction, BenchmarkEvidenceCondition, BenchmarkInput, BenchmarkProvenanceCondition,
@@ -429,6 +430,22 @@ pub fn audit_trajectory_jsonl<R: BufRead>(
     ))
 }
 
+
+fn lifecycle_event(event: TrajectoryEvent) -> EvidenceLifecycleEvent {
+    match event {
+        TrajectoryEvent::Initial => EvidenceLifecycleEvent::Observe,
+        TrajectoryEvent::EvidenceRevoked => EvidenceLifecycleEvent::EvidenceRevoked,
+        TrajectoryEvent::ConflictArrived => EvidenceLifecycleEvent::ConflictArrived,
+        TrajectoryEvent::AcquisitionFailed => EvidenceLifecycleEvent::AcquisitionFailed,
+        TrajectoryEvent::BudgetExhausted => EvidenceLifecycleEvent::BudgetExhausted,
+        TrajectoryEvent::BudgetRestored => EvidenceLifecycleEvent::BudgetRestored,
+        TrajectoryEvent::EvidenceArrived => EvidenceLifecycleEvent::EvidenceArrived,
+        TrajectoryEvent::ConflictResolved => EvidenceLifecycleEvent::ConflictResolved,
+        TrajectoryEvent::EvidenceRevalidated => EvidenceLifecycleEvent::EvidenceRevalidated,
+        TrajectoryEvent::QuestionClarified => EvidenceLifecycleEvent::QuestionClarified,
+    }
+}
+
 fn policy_input(input: &BenchmarkInput) -> EvidenceActionInput {
     EvidenceActionInput {
         evidence: match input.evidence {
@@ -502,44 +519,43 @@ pub fn evaluate_trajectories(
         return Err("empty policy version".to_owned());
     }
     validate_trajectory_collection(trajectories)?;
-    let receipts = trajectories
-        .iter()
-        .map(|hashed| {
-            let steps: Vec<TrajectoryStepReceipt> = hashed
-                .trajectory
-                .steps
-                .iter()
-                .map(|step| {
-                    let EvidenceActionDecision { action, reason } =
-                        policy.decide(policy_input(&step.input));
-                    TrajectoryStepReceipt {
-                        sequence: step.sequence,
-                        selected_action: match action {
-                            EvidenceAction::Answer => BenchmarkAction::Answer,
-                            EvidenceAction::AnswerWithScopeLimit => {
-                                BenchmarkAction::AnswerWithScopeLimit
-                            }
-                            EvidenceAction::AskClarification => BenchmarkAction::AskClarification,
-                            EvidenceAction::AcquireMoreEvidence => {
-                                BenchmarkAction::AcquireMoreEvidence
-                            }
-                            EvidenceAction::Abstain => BenchmarkAction::Abstain,
-                        },
-                        reason: benchmark_reason(reason),
-                    }
-                })
-                .collect();
-            EvidenceTrajectoryReceipt {
-                schema_version: TRAJECTORY_SCHEMA_VERSION,
-                trajectory_id: hashed.trajectory.trajectory_id.clone(),
-                trajectory_sha256: hashed.trajectory_sha256.clone(),
-                policy_version: policy_version.to_owned(),
-                policy_minimum_independent_origins: policy.minimum_independent_origins,
-                policy_allow_scoped_partial_answer: policy.allow_scoped_partial_answer,
-                steps,
-            }
-        })
-        .collect();
+
+    let mut receipts = Vec::with_capacity(trajectories.len());
+    for hashed in trajectories {
+        let mut session = EvidenceActionSession::new(*policy);
+        let mut steps = Vec::with_capacity(hashed.trajectory.steps.len());
+        for step in &hashed.trajectory.steps {
+            let EvidenceActionDecision { action, reason } = session
+                .decide(lifecycle_event(step.event), policy_input(&step.input))
+                .map_err(|error| {
+                    format!(
+                        "trajectory {} step {}: {error}",
+                        hashed.trajectory.trajectory_id, step.sequence
+                    )
+                })?;
+            steps.push(TrajectoryStepReceipt {
+                sequence: step.sequence,
+                selected_action: match action {
+                    EvidenceAction::Answer => BenchmarkAction::Answer,
+                    EvidenceAction::AnswerWithScopeLimit => BenchmarkAction::AnswerWithScopeLimit,
+                    EvidenceAction::AskClarification => BenchmarkAction::AskClarification,
+                    EvidenceAction::AcquireMoreEvidence => BenchmarkAction::AcquireMoreEvidence,
+                    EvidenceAction::Abstain => BenchmarkAction::Abstain,
+                },
+                reason: benchmark_reason(reason),
+            });
+        }
+        receipts.push(EvidenceTrajectoryReceipt {
+            schema_version: TRAJECTORY_SCHEMA_VERSION,
+            trajectory_id: hashed.trajectory.trajectory_id.clone(),
+            trajectory_sha256: hashed.trajectory_sha256.clone(),
+            policy_version: policy_version.to_owned(),
+            policy_minimum_independent_origins: policy.minimum_independent_origins,
+            policy_allow_scoped_partial_answer: policy.allow_scoped_partial_answer,
+            steps,
+        });
+    }
+
     Ok(receipts)
 }
 
@@ -990,7 +1006,7 @@ mod tests {
     }
 
     #[test]
-    fn unresolved_historical_revocation_blocks_a_later_clean_looking_answer() {
+    fn session_blocks_a_later_clean_looking_step_until_revocation_is_revalidated() {
         let (mut dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
         let index = dataset
             .iter()
@@ -1000,8 +1016,46 @@ mod tests {
         trajectory.steps[3].event = TrajectoryEvent::Initial;
         dataset[index] = HashedEvidenceTrajectory::new(trajectory).unwrap();
 
-        let policy = EvidenceActionPolicy::bounded_default();
-        let receipts = evaluate_trajectories(&dataset, "v1", &policy).unwrap();
+        let receipts =
+            evaluate_trajectories(&dataset, "v1", &EvidenceActionPolicy::bounded_default())
+                .unwrap();
+        let receipt = receipts
+            .iter()
+            .find(|r| r.trajectory_id == "revocation-after-answer")
+            .unwrap();
+        assert_eq!(receipt.steps[3].selected_action, BenchmarkAction::Abstain);
+        assert_eq!(receipt.steps[3].reason, BenchmarkReason::ProvenanceInvalid);
+        let text = receipts
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\n");
+        let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1").unwrap();
+        assert_eq!(score.unsafe_answer_escapes, 0);
+        assert_eq!(score.revocation_answer_escapes, 0);
+    }
+
+    #[test]
+    fn scorer_flags_an_answer_on_a_clean_looking_step_after_unresolved_revocation() {
+        let (mut dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
+        let index = dataset
+            .iter()
+            .position(|t| t.trajectory.trajectory_id == "revocation-after-answer")
+            .unwrap();
+        let mut trajectory = dataset[index].trajectory.clone();
+        trajectory.steps[3].event = TrajectoryEvent::Initial;
+        dataset[index] = HashedEvidenceTrajectory::new(trajectory).unwrap();
+
+        let mut receipts =
+            evaluate_trajectories(&dataset, "v1", &EvidenceActionPolicy::bounded_default())
+                .unwrap();
+        let receipt = receipts
+            .iter_mut()
+            .find(|r| r.trajectory_id == "revocation-after-answer")
+            .unwrap();
+        receipt.steps[3].selected_action = BenchmarkAction::Answer;
+        receipt.steps[3].reason = BenchmarkReason::CompleteSupport;
         let text = receipts
             .iter()
             .map(serde_json::to_string)
@@ -1012,7 +1066,6 @@ mod tests {
         assert!(score.unsafe_answer_escapes >= 1);
         assert!(score.revocation_answer_escapes >= 1);
     }
-
 
     #[test]
     fn exhausted_budget_stays_blocked_until_an_explicit_restore_event() {
