@@ -1,7 +1,7 @@
 # Symthaea Nano Policy (research-only prototype)
 
 A small Rust CLI that selects a subset of a supplied candidate pool using either:
-- maximin: greedy farthest-point selection over min-max-normalized numeric descriptors;
+- maximin: greedy farthest-point selection over min-max-normalized numeric descriptors, maintaining nearest-selected distances incrementally;
 - random: a seeded, deterministic random-control policy.
 
 It is intentionally **not** an atomistic model, optical solver, candidate generator, toxicity model, or materials predictor. It has no target-label, energy, spectrum, physics-engine, network, file-system, or model-checkpoint interface. Strict Serde structs reject unknown fields, so an attempted extra target/label field in a candidate record fails closed at JSON parsing.
@@ -60,6 +60,8 @@ Software acceptance before scientific use:
 - unknown target/outcome fields fail parsing;
 - all candidate IDs and budget slots are accounted for, and no candidate is selected twice;
 - the locked dependency graph is unchanged except for this package.
+
+The maximin loop has target complexity O(N · D · (P + K)) where N is pool size, D is descriptor count, P is the number of already-selected IDs used for initialization, and K is the new selection budget; this is a complexity analysis, not a measured runtime claim.
 
 Profile in release mode using synthetic descriptor pools first (synthetic data is a software test, not a scientific result): pool sizes 1,000 / 10,000 / 100,000; dimensions 8 / 64 / 256; budgets 1 / 10 / 100, then higher only within memory/time limits. Record p50/p95 wall time, peak resident memory, input size, selected count and deterministic output digest on a named CPU. Benchmark random and maximin separately. Do not set an absolute runtime pass target until a reference machine and baseline are measured; once measured, preregister the selector-overhead budget relative to the actual forward oracle.
 
