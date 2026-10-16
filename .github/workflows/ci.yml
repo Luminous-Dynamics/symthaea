@@ -75,6 +75,8 @@ jobs:
         run: cargo test --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml
 
       - name: Run deterministic synthetic replay negative controls
+        env:
+          BENCHMARK_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: cargo run --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --example replay_benchmark_v1
 
       - name: Enforce strict Clippy
