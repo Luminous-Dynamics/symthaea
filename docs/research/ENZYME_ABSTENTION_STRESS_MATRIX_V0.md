@@ -37,9 +37,11 @@ The current policy is deliberately explicit and ordered:
 1. **Absolute fit:** abstain if the lower of the two candidates' RMSE values exceeds 3 times the declared noise SD.
 2. **Observational resolution:** abstain if the RMS difference between the two fitted predictions on tested substrate conditions is below 1 declared noise SD.
 3. **Model-selection evidence:** abstain if (|\Delta BIC| < 10).
-4. Otherwise choose the candidate favored by BIC, where (Delta BIC = BIC_{MM} - BIC_{inhibition}); negative values favor Michaelis–Menten.
+4. Otherwise choose the candidate favored by BIC, where `ΔBIC = BIC(Michaelis–Menten) - BIC(substrate inhibition)`; negative values favor Michaelis–Menten.
 
 These cutoffs are **heuristics, not calibrated confidence levels**. The fitted-prediction gap is a screening proxy—not a power calculation or a formal identifiability result. The absolute-fit gate is not a substitute for inspecting residual structure. The use of BIC also needs review against each model's likelihood assumptions and the actual experimental error model.
+
+A hard boundary is intentional: **noise can conceal model misspecification**. In a high-noise Hill-generated case, both candidate fits may look plausible at the declared noise scale even though the known generator is outside the candidate set. The policy can then choose the better of two inadequate explanations. The report exposes this as a false-decisive outcome against the known synthetic target; that outcome must not be hidden by reporting only the winners. It also demonstrates why these controls need a power/detectability annotation before they become a pass/fail gate for a calibrated decision rule.
 
 The report stores both the *expected decision* for each prespecified stratum and the *observed decision*, plus the reason for each outcome. A target hit-rate is descriptive. The matrix generator does not turn its own target rate into a scientific pass.
 
@@ -55,7 +57,7 @@ That creates separate, auditable error categories:
 - **Candidate-set failure:** both models fit poorly, regardless of their relative ranking.
 - **Unresolved parameter:** model-family selection is possible but one or more parameter values are not practically identifiable.
 
-Do not collapse these into a single accuracy number. Preserve the full confusion table, all abstentions, failed fits, exclusions, and denominators.
+Do not collapse these into a single accuracy number. Preserve the full confusion table, all abstentions, failed fits, exclusions, and denominators. The report's current 96 cases are a smoke matrix for the logic, not evidence that the proposed ≤5% future target has been achieved.
 
 ## Proposed benchmark gates
 
@@ -66,7 +68,7 @@ These are future acceptance targets, not current results.
 | Deterministic replay | 100% byte-identical reports for repeated runs on the same pinned toolchain; every specified input mutation detected | Frozen fixture, toolchain, artifact hashes, mutation suite |
 | Scenario accounting | 100% of generated cases appear exactly once in the report and in a declared stratum | Independent report validator and count-conservation tests |
 | Separable model discrimination | Balanced accuracy ≥ 0.90 on preregistered separable cases at the declared operating conditions | At least 1,000 scenarios across independent seeds, model parameters, substrate grids, and noise regimes |
-| False-decisive control | ≤ 5% decisive selections on genuinely ambiguous or candidate-misspecified held-out scenarios | At least 1,000 held-out control cases; scenarios used to tune thresholds must be disjoint |
+| False-decisive control | ≤ 5% decisive selections on *detectably* ambiguous or candidate-misspecified held-out scenarios | At least 1,000 held-out control cases, disjoint from threshold tuning; preregister an independent detectability/power criterion. Also report the rate for noise-obscured misspecification, without silently dropping those cases. |
 | Noise robustness | Report selection, abstention, and wrong-selection rates separately at each noise level | No aggregation that hides high-noise failure modes |
 | Uncertainty calibration | 90–98% empirical coverage for nominal 95% intervals, with interval width reported | Proper interval procedure and independent synthetic coverage suite |
 | Experiment-design utility | ≥ 25% fewer measurements than a preregistered uniform-random baseline to meet the same recovery/coverage gates | Matched measurement budgets, repeated independent simulated studies, no degraded coverage |
