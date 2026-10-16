@@ -242,7 +242,7 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
                     || step.input.provenance != BenchmarkProvenanceCondition::Verified =>
             {
                 return Err(format!(
-                    "{} step {}: conflict resolution requires clean provenance and non-conflicting evidence",
+                    "{} step {}: conflict resolution requires clean evidence and provenance",
                     trajectory.trajectory_id, step.sequence
                 ));
             }
