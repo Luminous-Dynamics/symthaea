@@ -310,7 +310,9 @@ fn validate_ledger(ledger: &SimulatorBudgetLedger) -> Result<(), String> {
             return Err(format!("{name} must be 64 lowercase hexadecimal characters"));
         }
     }
-    if ledger.expected_simulator_calls == 0 || ledger.expected_simulator_calls > MAX_SIMULATOR_CALLS {
+    if ledger.expected_simulator_calls == 0
+        || ledger.expected_simulator_calls > MAX_SIMULATOR_CALLS
+    {
         return Err(format!(
             "expected_simulator_calls must be in 1..={MAX_SIMULATOR_CALLS}"
         ));
@@ -364,6 +366,9 @@ fn validate_ledger(ledger: &SimulatorBudgetLedger) -> Result<(), String> {
                 "attempt {} proposal_elapsed_ms exceeds the maximum",
                 attempt.attempt_id
             ));
+        }
+        if let Some(reason) = &attempt.attempt_reason {
+            validate_text(reason, "attempt_reason")?;
         }
 
         match attempt.proposal_status {
@@ -536,7 +541,8 @@ fn audit_ledger(ledger: &SimulatorBudgetLedger, ledger_sha256: String) -> Simula
         }
     }
     let unique_candidate_digests = candidate_digests.len();
-    let repeated_candidate_attempts = generated_digest_count.saturating_sub(unique_candidate_digests);
+    let repeated_candidate_attempts =
+        generated_digest_count.saturating_sub(unique_candidate_digests);
 
     let call_positions: Vec<usize> = ledger
         .attempts
@@ -582,7 +588,8 @@ fn audit_ledger(ledger: &SimulatorBudgetLedger, ledger_sha256: String) -> Simula
         .map(|attempt| attempt.proposal_elapsed_ms)
         .fold(0u64, u64::saturating_add);
     let exact_call_budget_match = observed_simulator_calls == ledger.expected_simulator_calls;
-    let reported_count_matches_observed = ledger.reported_simulator_calls == observed_simulator_calls;
+    let reported_count_matches_observed =
+        ledger.reported_simulator_calls == observed_simulator_calls;
     let any_calls_unresolved = unresolved_simulator_calls > 0;
 
     let disposition = if observed_simulator_calls > ledger.expected_simulator_calls {
@@ -724,7 +731,12 @@ mod tests {
         }
     }
 
-    fn call(id: &str, terminal_status: SimulatorTerminalStatus, result_hash: Option<String>, cost: f64) -> SimulatorCall {
+    fn call(
+        id: &str,
+        terminal_status: SimulatorTerminalStatus,
+        result_hash: Option<String>,
+        cost: f64,
+    ) -> SimulatorCall {
         SimulatorCall {
             invocation_id: id.to_string(),
             started_receipt_sha256: digest('d'),
@@ -992,7 +1004,8 @@ mod tests {
 
     #[test]
     fn rejects_unknown_fields_fail_closed() {
-        let serialized = String::from_utf8(serialized(&sample_ledger(RunStatus::Completed))).unwrap();
+        let serialized =
+            String::from_utf8(serialized(&sample_ledger(RunStatus::Completed))).unwrap();
         let mutated = serialized.replacen(
             "\"expected_simulator_calls\":2",
             "\"expected_simulator_calls\":2,\"hidden_target\":0.5",
