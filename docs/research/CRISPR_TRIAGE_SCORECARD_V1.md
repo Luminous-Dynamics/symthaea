@@ -257,3 +257,5 @@ rustc --edition=2024 --test scripts/crispr_triage_verifier.rs -o /tmp/crispr-tri
 ```
 
 The SHA-256 helper validates two already-computed digest claims; it does not hash artifact bytes. The production orchestrator must compute hashes from retrieved bytes using a trusted implementation.
+
+**Independent formula check (2026-10-16):** a separate deterministic checker compared the paired closed-form sensitivity bounds with brute-force assignments of all unknown labels across 1,763,520 paired-ranking cases; no bound mismatches were found. This verifies the formula design against the enumerated cases, not the Rust implementation. Rust compilation/unit tests and any biological cohort replay remain unexecuted.
