@@ -32,16 +32,31 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify formatting
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-nano-policy/src/lib.rs crates/domains/symthaea-nano-policy/src/main.rs crates/domains/symthaea-nano-policy/src/receipt.rs crates/domains/symthaea-nano-policy/src/metrics.rs crates/domains/symthaea-nano-policy/src/bin/nano-policy-metrics.rs
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-nano-policy/src/lib.rs crates/domains/symthaea-nano-policy/src/main.rs crates/domains/symthaea-nano-policy/src/receipt.rs crates/domains/symthaea-nano-policy/src/metrics.rs crates/domains/symthaea-nano-policy/src/bin/nano-policy-metrics.rs crates/domains/symthaea-nano-policy/src/sim_budget.rs crates/domains/symthaea-nano-policy/src/bin/nano-policy-budget-audit.rs
       - name: Test selector contract and policies
         run: cargo test --locked -p symthaea-nano-policy --all-targets
       - name: Smoke-test independent outcome metrics CLI
         run: |
           cargo run --locked --quiet -p symthaea-nano-policy --bin nano-policy-metrics -- --input crates/domains/symthaea-nano-policy/fixtures/synthetic-outcome-ledger.json --bootstrap-replicates 200 --seed 17 > metrics-report.json
           jq -e '.schema_version == "nano-benchmark-metrics-v1" and (.arms | length == 2) and any(.arms[]; .arm_id == "baseline" and .oracle_attempts == 11 and .failed_attempts == 1) and any(.arms[]; .arm_id == "candidate" and ((.success_rate_at_budget - 0.6) | abs < 0.000000001)) and (.outcome_ledger_sha256 | test("^[a-f0-9]{64}$"))' metrics-report.json
-      - name: Parse committed ledger and JSON schemas
+      - name: Smoke-test actual simulator-call reconciliation
+        shell: bash
+        run: |
+          cargo run --locked --quiet -p symthaea-nano-policy --bin nano-policy-budget-audit -- --input crates/domains/symthaea-nano-policy/fixtures/synthetic-sim-budget-ledger-equal.json > simulator-budget-equal.json
+          jq -e '.schema_version == "nano-simulator-call-audit-v1" and .audit_pass == true and .expected_simulator_calls == 2 and .observed_simulator_calls == 2 and .reported_count_matches_observed == true and .simulator_failures == 1 and .preflight_rejected == 1' simulator-budget-equal.json
+          set +e
+          cargo run --locked --quiet -p symthaea-nano-policy --bin nano-policy-budget-audit -- --input crates/domains/symthaea-nano-policy/fixtures/synthetic-sim-budget-ledger.json > simulator-budget-mismatch.json
+          status=$?
+          set -e
+          test "$status" -eq 3
+          jq -e '.expected_simulator_calls == 2 and .reported_simulator_calls == 1 and .observed_simulator_calls == 2 and .reported_count_matches_observed == false and .audit_pass == false' simulator-budget-mismatch.json
+      - name: Parse committed ledgers and JSON schemas
         run: |
           jq empty crates/domains/symthaea-nano-policy/fixtures/synthetic-outcome-ledger.json
+          jq empty crates/domains/symthaea-nano-policy/fixtures/synthetic-sim-budget-ledger.json
+          jq empty crates/domains/symthaea-nano-policy/fixtures/synthetic-sim-budget-ledger-equal.json
           jq empty crates/domains/symthaea-nano-policy/schema/outcome-ledger.schema.json
           jq empty crates/domains/symthaea-nano-policy/schema/benchmark-metrics-report.schema.json
+          jq empty crates/domains/symthaea-nano-policy/schema/simulator-call-ledger.schema.json
+          jq empty crates/domains/symthaea-nano-policy/schema/simulator-call-audit.schema.json
 
