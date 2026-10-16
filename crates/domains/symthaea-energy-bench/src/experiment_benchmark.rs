@@ -277,7 +277,7 @@ pub fn verify_benchmark_receipt(
         }
 
         let expected = evaluate_scenario(&report.policy, scenario, result.strategy)?;
-        if *result != expected {
+        if result != &expected {
             return Err(BenchmarkError {
                 reason: format!(
                     "replayed result differs from receipt for scenario {:?}, strategy {}",
@@ -309,7 +309,7 @@ pub fn verify_benchmark_receipt(
             .filter(|result| result.strategy == summary.strategy)
             .collect();
         let expected = summarize_strategy(summary.strategy, &strategy_results)?;
-        if *summary != expected {
+        if summary != &expected {
             return Err(BenchmarkError {
                 reason: format!("strategy summary mismatch for {}", summary.strategy.label()),
             });
@@ -1003,6 +1003,10 @@ mod tests {
         assert!(receipt.contains("\"results_sha256\""));
         let parsed = parse_and_verify_benchmark_report_json(&receipt).unwrap();
         assert_eq!(parsed, first_report);
+
+        let mut tampered = first_report.clone();
+        tampered.results[0].achieved_utility = (tampered.results[0].achieved_utility + 0.01).min(1.0);
+        assert!(verify_benchmark_receipt(&tampered).is_err());
     }
 
     #[test]
