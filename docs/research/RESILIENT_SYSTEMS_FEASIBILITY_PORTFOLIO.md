@@ -484,3 +484,12 @@ The fifth engineering model, [rolling_horizon_repair.rs](../../crates/domains/sy
 This is a shift from static resilience plans to **closed-loop recovery policies**. It allows the simulation to respond to delayed repairs and newly eligible work without giving the policy future realized durations: pending work is ranked by nominal durations, and the scenario's actual duration is used only after the dispatch choice to schedule the completion event. A paired synthetic witness changes fixed order A→C→B to adaptive order A→B→C and reduces weighted loss from 922 to 724. That is a fixture-specific result, not a general superiority or field-validation claim.
 
 The next critical implementation work is a batch evaluator comparing fixed-plan and adaptive policies on the same scenario corpus, with per-case deltas, expected/worst/CVaR loss, exact tiny-instance oracles, counterexamples and a held-out split. Full travel/access, crew shifts, replenishment, and calibration to observed restoration records remain out of scope. See the [RH benchmark fixtures and targets](./RESILIENT_SYSTEMS_BENCHMARKS.md#8-event-triggered-rolling-horizon-repair-dispatch).
+
+
+## Implementation update — paired fixed-versus-adaptive policy evaluation
+
+A sixth Rust module, [repair_policy_comparison.rs](../../crates/domains/symthaea-engineering/src/repair_policy_comparison.rs), now evaluates fixed nominal-plan replay and event-triggered repair dispatch against the same scenarios. It reports the fixed and adaptive expected loss, worst-case loss and upper-tail CVaR, per-case loss deltas, win/loss/tie counts, and both the fixed schedule and adaptive event trace.
+
+This closes the first methodological loop: resilience planning is no longer only about a single chosen schedule or a single synthetic win. The evaluator can show where adaptation helps, where it regresses and how the tail changes, while retaining scenario identity. Scenario weights remain caller-supplied and are not empirical probabilities by default.
+
+Six source-level tests now exercise the paired synthetic witness, scenario retention for all three policies, separate CVaR values, invalid-weight rejection, determinism and delta arithmetic. They remain authored but unexecuted. The next research gate is a published paired scenario corpus with an exact small-case oracle and a holdout split; actual operations data are still needed before prediction claims.
