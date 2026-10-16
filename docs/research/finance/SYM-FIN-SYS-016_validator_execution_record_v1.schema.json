@@ -14,6 +14,8 @@
     "source_revision",
     "event_sha",
     "workflow",
+    "workflow_ref",
+    "workflow_sha",
     "job",
     "event",
     "run_id",
@@ -55,6 +57,14 @@
     "workflow": {
       "type": "string",
       "minLength": 1
+    },
+    "workflow_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
     },
     "job": {
       "type": "string",
