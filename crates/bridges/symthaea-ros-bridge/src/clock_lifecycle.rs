@@ -364,11 +364,8 @@ impl RosClockLifecycleTrackerV1 {
         let Some(baseline) = self.baseline.clone() else {
             return RosClockLifecycleDispositionV1::Uninitialized;
         };
-        if captured_monotonic_ns < baseline.last_observation_received_monotonic_ns {
-            return RosClockLifecycleDispositionV1::InvalidObservation {
-                reason: "watchdog capture time predates the last clock receipt".into(),
-            };
-        }
+        // A monotonic timestamp is only comparable inside the same receive
+        // epoch. Detect epoch replacement before comparing raw nanoseconds.
         if capture_receive_epoch_id != baseline.receive_epoch_id {
             let transition = RosClockTransitionV1 {
                 kind: RosClockTransitionKindV1::ReceiveEpochChanged,
@@ -382,6 +379,11 @@ impl RosClockLifecycleTrackerV1 {
             };
             self.pending_transition = Some(transition.clone());
             return RosClockLifecycleDispositionV1::TransitionRequired { transition };
+        }
+        if captured_monotonic_ns < baseline.last_observation_received_monotonic_ns {
+            return RosClockLifecycleDispositionV1::InvalidObservation {
+                reason: "watchdog capture time predates the last clock receipt".into(),
+            };
         }
 
         let silence_ns =
@@ -809,8 +811,10 @@ mod tests {
             tracker.check_liveness("bridge-run-1", 0),
             RosClockLifecycleDispositionV1::InvalidObservation { .. }
         ));
+        // A restarted monotonic clock may start below its prior epoch's value.
+        // Epoch replacement must be detected before comparing those unrelated counters.
         assert!(matches!(
-            tracker.check_liveness("bridge-run-2", 2),
+            tracker.check_liveness("bridge-run-2", 0),
             RosClockLifecycleDispositionV1::TransitionRequired {
                 transition: RosClockTransitionV1 {
                     kind: RosClockTransitionKindV1::ReceiveEpochChanged,
