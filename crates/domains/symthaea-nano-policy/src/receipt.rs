@@ -44,6 +44,58 @@ fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn euclidean_distance(left: &[f64], right: &[f64]) -> f64 {
+    left.iter()
+        .zip(right)
+        .map(|(left, right)| {
+            let delta = left - right;
+            delta * delta
+        })
+        .sum::<f64>()
+        .sqrt()
+}
+
+fn distance_trace_is_valid(
+    request: &SelectionRequest,
+    response: &SelectionResponse,
+    candidates: &BTreeMap<&str, &crate::Candidate>,
+) -> bool {
+    let mut prior = Vec::with_capacity(response.selected.len());
+    for (index, decision) in response.selected.iter().enumerate() {
+        let Some(candidate) = candidates.get(decision.candidate_id.as_str()) else {
+            return false;
+        };
+        if index == 0 {
+            if decision.min_distance.is_some() {
+                return false;
+            }
+        } else if request.policy == crate::Policy::RandomSeeded {
+            if decision.min_distance.is_some() {
+                return false;
+            }
+        } else {
+            let expected = prior
+                .iter()
+                .map(|previous: &&crate::Candidate| {
+                    euclidean_distance(
+                        &candidate.normalized_features,
+                        &previous.normalized_features,
+                    )
+                })
+                .fold(f64::INFINITY, f64::min);
+            let Some(reported) = decision.min_distance else {
+                return false;
+            };
+            let tolerance = 1e-12 * expected.max(1.0);
+            if !reported.is_finite() || (reported - expected).abs() > tolerance {
+                return false;
+            }
+        }
+        prior.push(*candidate);
+    }
+    true
+}
+
 fn push_check(
     checks: &mut Vec<ReceiptCheck>,
     check: &str,
@@ -293,6 +345,12 @@ pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
         diagnostics_finite,
         "Distances and present estimated costs are finite and in their allowed ranges.",
     );
+    push_check(
+        &mut checks,
+        "distance_trace",
+        distance_trace_is_valid(&request, &response, &candidates),
+        "Reported nearest-selected distances are independently recomputed from the frozen descriptors.",
+    );
 
     let passed = checks.iter().all(|check| check.passed);
     ReceiptAudit {
@@ -405,6 +463,23 @@ mod tests {
         );
         assert_eq!(report.status, "failed");
         assert_eq!(report.checks[0].check, "response_parse");
+    }
+
+    #[test]
+    fn detects_tampered_distance_diagnostic() {
+        let request_line = serde_json::to_string(&request()).unwrap();
+        let response: serde_json::Value =
+            serde_json::from_str(&handle_line(&request_line)).unwrap();
+        let mut tampered = response;
+        tampered["selected"][1]["min_distance"] = serde_json::Value::from(123.0);
+        let report = verify_receipt(
+            &request_line,
+            &serde_json::to_string(&tampered).unwrap(),
+        );
+        assert_eq!(report.status, "failed");
+        assert!(report.checks.iter().any(|check| {
+            check.check == "distance_trace" && !check.passed
+        }));
     }
 
     #[test]
