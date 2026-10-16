@@ -351,3 +351,7 @@ After the exhaustive-oracle independence fix, PR #7536 advanced to `e2668f5b3911
 
 At this exact-head check, no CI or PR Governance run had yet been returned for `e2668f5b3911c736896675e1960da545cbcba69c`. The earlier CI/Governance records belong to a superseded head and cannot qualify the current source. The optimized scanner's exhaustive-oracle parity test is authored, and the scaling probe remains ignored/non-gating; neither has run locally.
 
+#### Current workflow lookup for PR #7536 head `e2668f5b3911c736896675e1960da545cbcba69c`
+
+Workflow records have since appeared for the same exact head: CI [38861067238](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38861067238) and PR Governance [38861067463](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38861067463) are both **queued**. Neither is a pass. The earlier note above records the initial lookup; use these exact-head links for the current status.
+
