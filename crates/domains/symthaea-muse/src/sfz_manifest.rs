@@ -364,7 +364,10 @@ fn normalize_sample_path(
         if raw.is_empty() {
             continue;
         }
-        if raw.starts_with('/') || raw.contains('\\') {
+        let bytes = raw.as_bytes();
+        let drive_prefixed =
+            bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
+        if raw.starts_with('/') || raw.contains('\\') || drive_prefixed {
             return Err(parse_error(line, "absolute or backslash-separated sample paths are not supported"));
         }
         for component in Path::new(raw).components() {
@@ -508,6 +511,9 @@ mod tests {
 
         let invalid_key = "<region> key=128 sample=samples/test.wav";
         assert!(parse_sfz_mapping(invalid_key).unwrap_err().message.contains("numeric value"));
+
+        let windows_absolute = "<region> sample=C:/Windows/tone.wav";
+        assert!(parse_sfz_mapping(windows_absolute).unwrap_err().message.contains("absolute"));
 
         let invalid_sequence = "<group> seq_length=2\n<region> seq_position=3 sample=samples/test.wav";
         assert!(parse_sfz_mapping(invalid_sequence).unwrap_err().message.contains("exceeds"));
