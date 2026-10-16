@@ -4,6 +4,7 @@
 **Implementation:** [symthaea-nano-policy](./README.md)  
 **MOCLIP domain plan:** https://github.com/Luminous-Dynamics/symthaea/blob/research/nano-001-atomistic-discovery/docs/engineering/NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md  
 **General benchmark charter:** https://github.com/Luminous-Dynamics/symthaea/blob/research/nano-001-atomistic-discovery/docs/engineering/NANOTECHNOLOGY_BENCHMARK_CHARTER.md
+**Actual simulator-call accounting:** [SIMULATOR_BUDGET_LEDGER.md](./SIMULATOR_BUDGET_LEDGER.md), tracked by [NANO-006](https://github.com/Luminous-Dynamics/symthaea/issues/7586).
 
 ## 1. What this kernel can and cannot establish
 
