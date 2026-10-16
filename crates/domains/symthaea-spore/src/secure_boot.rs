@@ -9,7 +9,7 @@
 //! - **Delegated probe**: SSH-based remote detection of Secure Boot state
 //! - **Socratic guide**: Interactive dialogue for USB Forge mode (no SSH)
 //! - **Lanzaboote integration**: NixOS configuration for Secure Boot-compatible boot
-//! - **MOK enrollment guide**: Step-by-step instructions for the blue UEFI screen
+//! - **Explicit key enrollment guide**: Profile-bound manual procedure and post-reboot checks
 //! - **Boot chain visualization**: 5-stage UEFI chain status for the Inoculation UI
 //!
 //! # Philosophy
@@ -67,7 +67,7 @@ pub enum SecureBootState {
     Enabled,
     /// Secure Boot is disabled in firmware.
     Disabled,
-    /// Secure Boot is in setup mode (keys can be enrolled without MOK).
+    /// Firmware Setup Mode is observed; explicit key enrollment may be possible after profile/recovery review.
     SetupMode,
     /// Could not determine state (e.g., virtual machine, no mokutil).
     Unknown { reason: String },
@@ -78,8 +78,8 @@ pub enum SecureBootState {
 pub struct SecureBootProbeResult {
     /// Detected Secure Boot state.
     pub state: SecureBootState,
-    /// Whether MOK enrollment will be needed.
-    pub mok_required: bool,
+    /// Whether the target requires explicit machine-key enrollment/verification.
+    pub key_enrollment_required: bool,
     /// Whether the target has mokutil installed.
     pub mokutil_available: bool,
     /// Platform type detected.
@@ -257,7 +257,7 @@ pub fn parse_probe_result(json_output: &str) -> Result<SecureBootProbeResult, St
 
     let platform = TargetPlatform::from_platform_string(platform_str);
 
-    let mok_required = state == SecureBootState::Enabled;
+    let key_enrollment_required = matches!(state, SecureBootState::Enabled | SecureBootState::SetupMode);
 
     let raw_output = parsed
         .get("bootctl_output")
@@ -267,7 +267,7 @@ pub fn parse_probe_result(json_output: &str) -> Result<SecureBootProbeResult, St
 
     Ok(SecureBootProbeResult {
         state,
-        mok_required,
+        key_enrollment_required,
         mokutil_available,
         platform,
         raw_output,
@@ -354,7 +354,7 @@ impl SecureBootGuide {
         self.current_step = SecureBootGuideStep::BiosDisableGuide { manufacturer_hint };
     }
 
-    /// The user wants to keep Secure Boot enabled (use MOK enrollment).
+    /// Legacy serialized step name for explicit Secure Boot key enrollment.
     pub fn choose_mok(&mut self) {
         self.current_step = SecureBootGuideStep::MokExplanation;
     }
@@ -473,7 +473,7 @@ fn narration_for_step(step: &SecureBootGuideStep) -> Vec<String> {
             "Return to the guide only after the state and recovery path are understood.",
         ],
         SecureBootGuideStep::MokExplanation => vec![
-            "The supported Lanzaboote path uses machine-specific signing keys and signed Unified Kernel Images; it does not use the MOK Manager/password process described in older guidance."
+"The supported Lanzaboote path uses machine-specific signing keys and signed Unified Kernel Images. Firmware enrollment is a separate, explicit step."
                 .to_string(),
             "First pin the exact NixOS and Lanzaboote profile, protect a recovery path, and verify the generated signing keys and boot artifacts."
                 .to_string(),
@@ -687,7 +687,7 @@ impl SecureBootEnrollmentGuide {
 pub enum BootStageStatus {
     /// This stage's signature has been verified.
     Verified,
-    /// Waiting for MOK enrollment to complete.
+    /// Waiting for explicit firmware key enrollment and boot verification to complete.
     PendingEnrollment,
     /// This stage is not applicable (e.g., no shim when Secure Boot is off).
     NotApplicable,
@@ -754,9 +754,9 @@ impl BootChainStatus {
     /// lanzaboote is configured:
     ///
     /// 1. **Firmware** — always verified (it trusts itself)
-    /// 2. **Shim** — signed by Microsoft (bridges to MOK), or N/A
-    /// 3. **systemd-boot / lanzaboote** — signed by Symthaea or unsigned
-    /// 4. **Linux Kernel** — signed by Symthaea or unsigned
+    /// 2. **Shim** — not applicable to the direct Lanzaboote signed-UKI path.
+    /// 3. **systemd-boot / Lanzaboote** — signed-UKI path, pending independent verification
+    /// 4. **Linux Kernel** — covered by the signed UKI when the exact boot artifact is verified
     /// 5. **Symthaea** — the consciousness engine (always the final stage)
     pub fn sovereign_boot_chain(
         secure_boot: &SecureBootState,
@@ -782,7 +782,7 @@ impl BootChainStatus {
                             name: "Shim".to_string(),
                             status: BootStageStatus::NotApplicable,
                             signer: "N/A".to_string(),
-                            description: "This Lanzaboote configuration uses the direct signed-UKI path; a shim/MOK enrollment stage does not apply."
+                            description: "This Lanzaboote configuration uses the direct signed-UKI path; a shim/shim/MOK stage does not apply."
                                 .to_string(),
                         },
                         BootStage {
@@ -1071,7 +1071,7 @@ mod tests {
         }"#;
         let result = parse_probe_result(json).unwrap();
         assert_eq!(result.state, SecureBootState::Enabled);
-        assert!(result.mok_required);
+        assert!(result.key_enrollment_required);
         assert!(result.mokutil_available);
         assert_eq!(result.platform, TargetPlatform::Linux);
     }
@@ -1087,7 +1087,7 @@ mod tests {
         }"#;
         let result = parse_probe_result(json).unwrap();
         assert_eq!(result.state, SecureBootState::Disabled);
-        assert!(!result.mok_required);
+        assert!(!result.key_enrollment_required);
     }
 
     #[test]
@@ -1119,7 +1119,7 @@ mod tests {
         }"#;
         let result = parse_probe_result(json).unwrap();
         assert_eq!(result.state, SecureBootState::SetupMode);
-        assert!(!result.mok_required);
+        assert!(!result.key_enrollment_required);
     }
 
     #[test]
@@ -1331,18 +1331,15 @@ mod tests {
     }
 
     #[test]
-    fn test_narration_mok_explanation_content() {
+    fn test_narration_key_enrollment_explanation_content() {
         let lines = narration_for_step(&SecureBootGuideStep::MokExplanation);
         let full = lines.join(" ");
-        assert!(
-            full.contains("sovereign"),
-            "MOK explanation should mention sovereignty"
-        );
-        assert!(full.contains("key"), "MOK explanation must mention keys");
-        assert!(
-            full.contains("consent") || full.contains("trust"),
-            "MOK explanation should frame enrollment as consent"
-        );
+        assert!(full.contains("Setup Mode"));
+        assert!(full.contains("sbctl enroll-keys --microsoft"));
+        assert!(full.contains("After reboot"));
+        assert!(full.contains("recovery"));
+        assert!(!full.contains("MOK Manager"));
+        assert!(!full.contains("one-time password"));
     }
 
     #[test]
@@ -1459,7 +1456,7 @@ mod tests {
         let mut orch = SecureBootOrchestration::new();
         let result = SecureBootProbeResult {
             state: SecureBootState::Enabled,
-            mok_required: true,
+            key_enrollment_required: true,
             mokutil_available: true,
             platform: TargetPlatform::Linux,
             raw_output: String::new(),
@@ -1478,7 +1475,7 @@ mod tests {
         let mut orch = SecureBootOrchestration::new();
         let result = SecureBootProbeResult {
             state: SecureBootState::Disabled,
-            mok_required: false,
+            key_enrollment_required: false,
             mokutil_available: true,
             platform: TargetPlatform::Linux,
             raw_output: String::new(),
@@ -1542,7 +1539,7 @@ mod tests {
         let mut orch = SecureBootOrchestration::new();
         orch.apply_probe_result(SecureBootProbeResult {
             state: SecureBootState::Enabled,
-            mok_required: true,
+            key_enrollment_required: true,
             mokutil_available: true,
             platform: TargetPlatform::Linux,
             raw_output: String::new(),
@@ -1556,7 +1553,7 @@ mod tests {
         let mut orch = SecureBootOrchestration::new();
         orch.apply_probe_result(SecureBootProbeResult {
             state: SecureBootState::Unknown { reason: "missing SecureBoot EFI variable".to_string() },
-            mok_required: false,
+            key_enrollment_required: false,
             mokutil_available: false,
             platform: TargetPlatform::Linux,
             raw_output: String::new(),
