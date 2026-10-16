@@ -1,8 +1,9 @@
 //! Deterministic synthetic replay smoke benchmark.
 //!
-//! This is a test fixture generator, not empirical evidence or a market simulator validated
-//! against venue behavior. Forecast probabilities are intentionally constructed from synthetic
-//! outcomes so the evaluator can be checked against known structure.
+//! This is a test-fixture generator, not empirical evidence or a market simulator validated
+//! against venue behavior. Each event has a latent probability; outcomes and horizon signals are
+//! drawn from deterministic, independent streams. Forecast methods see only signals available at
+//! their horizon. An explicit future-only oracle stream is a negative control for cutoff leakage.
 
 use std::collections::BTreeMap;
 
@@ -21,7 +22,6 @@ const HORIZONS: [(&str, u64); 5] = [
 ];
 const RESOLUTION_OFFSET: u64 = 20_000;
 const MAX_STALENESS_SECONDS: u64 = 120;
-const BASE_CORRECT_PROBABILITY: [f64; 5] = [0.53, 0.59, 0.67, 0.77, 0.86];
 
 fn main() {
     run().expect("synthetic replay benchmark should be internally consistent");
@@ -35,11 +35,13 @@ fn run() -> Result<(), ReplayError> {
     for event_index in 0..EVENT_COUNT {
         let event_id = format!("synthetic-event-{event_index:03}");
         let cluster_id = format!("synthetic-parent-{:03}", event_index / 2);
-        let outcome = (event_index * 7 + event_index / 3) % 11 < 5;
+        let latent_yes_probability = 0.1 + 0.8 * deterministic_unit(event_index, 0);
+        let outcome = deterministic_unit(event_index, 1) < latent_yes_probability;
         let event_base = 1_000_000 + event_index as u64 * 100_000;
+        let mut positive_signals = 0usize;
 
         for (horizon_index, (horizon_id, cutoff_offset)) in HORIZONS.iter().enumerate() {
-            let cutoff = event_base + cutoff_offset;
+            let cutoff = event_base + *cutoff_offset;
             let target = ForecastTarget::new(
                 event_id.clone(),
                 *horizon_id,
@@ -51,11 +53,16 @@ fn run() -> Result<(), ReplayError> {
             cluster_by_target.insert((event_id.clone(), (*horizon_id).to_owned()), cluster_id.clone());
             targets.push(target);
 
-            let market_correct = synthetic_correct_probability(event_index, horizon_index);
-            let candidate_delta = if event_index % 5 == 0 { -0.06 } else { 0.04 };
-            let symthaea_correct = (market_correct + candidate_delta).clamp(0.05, 0.95);
-            let market_probability = probability_for_outcome(market_correct, outcome);
-            let symthaea_probability = probability_for_outcome(symthaea_correct, outcome);
+            // Each signal is drawn from the latent event probability, not from the realized
+            // outcome. Forecast methods only aggregate signals observed by this horizon.
+            let public_signal = deterministic_unit(event_index, 10 + horizon_index as u64)
+                < latent_yes_probability;
+            positive_signals += usize::from(public_signal);
+            let signal_count = (horizon_index + 1) as f64;
+            let market_probability =
+                (positive_signals as f64 / signal_count).clamp(0.02, 0.98);
+            let shrinkage_probability =
+                ((positive_signals as f64 + 1.0) / (signal_count + 2.0)).clamp(0.02, 0.98);
 
             observations.push(ForecastObservation::new(
                 event_id.clone(),
@@ -70,21 +77,21 @@ fn run() -> Result<(), ReplayError> {
                 0.5,
             )?);
 
-            // Deliberate missing snapshots create explicit missing/stale coverage loss.
+            // Deliberate missing snapshots create explicit coverage loss.
             if (event_index * 3 + horizon_index) % 23 != 0 {
                 observations.push(ForecastObservation::new(
                     event_id.clone(),
-                    "symthaea_synthetic",
+                    "shrinkage_candidate",
                     cutoff,
-                    symthaea_probability,
+                    shrinkage_probability,
                 )?);
             }
 
-            // Negative-control quote: an outcome-revealing market observation after this cutoff.
-            // It must never affect this horizon's score. Later horizons have their own later quote.
+            // Negative control: an outcome-revealing forecast is timestamped after this cutoff.
+            // It is never valid for this target, and is too stale to be reused by later horizons.
             observations.push(ForecastObservation::new(
                 event_id.clone(),
-                "market",
+                "oracle_future_only",
                 cutoff + 1,
                 if outcome { 0.999 } else { 0.001 },
             )?);
@@ -99,7 +106,6 @@ fn run() -> Result<(), ReplayError> {
             .iter()
             .filter(|target| target.horizon_id() == *horizon)
             .count();
-        let methods = ["base_rate", "market", "symthaea_synthetic"];
 
         let horizon_scores = report
             .scored
@@ -107,7 +113,7 @@ fn run() -> Result<(), ReplayError> {
             .filter(|score| score.horizon_id == *horizon)
             .collect::<Vec<_>>();
         let mut metric_rows = Vec::new();
-        for method in methods {
+        for method in ["base_rate", "market", "shrinkage_candidate"] {
             let scores = horizon_scores
                 .iter()
                 .filter(|score| score.forecaster_id == method)
@@ -116,8 +122,10 @@ fn run() -> Result<(), ReplayError> {
                 continue;
             }
             let count = scores.len();
-            let mean_brier = scores.iter().map(|score| score.brier_score).sum::<f64>() / count as f64;
-            let mean_log_loss = scores.iter().map(|score| score.log_loss).sum::<f64>() / count as f64;
+            let mean_brier =
+                scores.iter().map(|score| score.brier_score).sum::<f64>() / count as f64;
+            let mean_log_loss =
+                scores.iter().map(|score| score.log_loss).sum::<f64>() / count as f64;
             let coverage = count as f64 / horizon_targets as f64;
             metric_rows.push((method, count, coverage, mean_brier, mean_log_loss));
         }
@@ -129,7 +137,7 @@ fn run() -> Result<(), ReplayError> {
             .collect::<BTreeMap<_, _>>();
         let candidate_scores = horizon_scores
             .iter()
-            .filter(|score| score.forecaster_id == "symthaea_synthetic");
+            .filter(|score| score.forecaster_id == "shrinkage_candidate");
         let mut paired = Vec::new();
         for candidate in candidate_scores {
             let Some(baseline) = market_by_event.get(&candidate.event_id) else {
@@ -148,10 +156,11 @@ fn run() -> Result<(), ReplayError> {
                 candidate.probability,
             )?);
         }
-        let bootstrap = paired_cluster_bootstrap(&paired, 10_000, 0xC0FFEE + horizon_index as u64)?;
+        let bootstrap =
+            paired_cluster_bootstrap(&paired, 10_000, 0xC0FFEE + horizon_index as u64)?;
 
         for (method, count, coverage, brier, log_loss) in metric_rows {
-            if method == "symthaea_synthetic" {
+            if method == "shrinkage_candidate" {
                 println!(
                     "{horizon},{method},{count},{horizon_targets},{coverage:.6},{brier:.6},{log_loss:.6},{:.6},{:.6},{:.6},{:.6},{}",
                     bootstrap.mean_brier_difference,
@@ -171,23 +180,13 @@ fn run() -> Result<(), ReplayError> {
     Ok(())
 }
 
-fn synthetic_correct_probability(event_index: usize, horizon_index: usize) -> f64 {
-    let regime_adjustment = match event_index % 7 {
-        0 => -0.10,
-        1 => -0.05,
-        2 => 0.00,
-        3 => 0.02,
-        4 => 0.04,
-        5 => 0.06,
-        _ => 0.08,
-    };
-    (BASE_CORRECT_PROBABILITY[horizon_index] + regime_adjustment).clamp(0.05, 0.95)
-}
-
-fn probability_for_outcome(probability_of_correct_outcome: f64, outcome: bool) -> f64 {
-    if outcome {
-        probability_of_correct_outcome
-    } else {
-        1.0 - probability_of_correct_outcome
-    }
+fn deterministic_unit(event_index: usize, salt: u64) -> f64 {
+    // SplitMix64-derived deterministic draws for an offline fixture, never for cryptography.
+    let mut value = (event_index as u64 + 1)
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ salt.wrapping_mul(0xD1B5_4A32_D192_ED03);
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^= value >> 31;
+    (value >> 11) as f64 / ((1_u64 << 53) as f64)
 }
