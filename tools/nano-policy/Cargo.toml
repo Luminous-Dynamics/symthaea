@@ -1,0 +1,11 @@
+[package]
+name = "nano-policy-prototype"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Deterministic, dependency-free candidate-selection baselines for nanotechnology discovery experiments"
+
+# This tool is intentionally a nested standalone workspace, excluded from the production
+# Symthaea workspace and dependency graph.
+[workspace]
