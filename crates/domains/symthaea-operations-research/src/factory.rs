@@ -190,7 +190,7 @@ pub fn plan_factory_line(
 
         for operation_id in &pending {
             let operation = operation_map
-                .get(operation_id.as_str())
+                .get(operation_id)
                 .expect("pending operation was validated and indexed");
             if !operation
                 .predecessors
@@ -315,7 +315,7 @@ pub fn plan_factory_line(
 
 fn index_operations<'a>(
     operations: &'a [FactoryOperation],
-) -> Result<BTreeMap<&'a str, &'a FactoryOperation>, FactoryScheduleError> {
+) -> Result<BTreeMap<String, &'a FactoryOperation>, FactoryScheduleError> {
     let mut indexed = BTreeMap::new();
     for operation in operations {
         validate_non_empty("operation ID", &operation.id)?;
@@ -337,7 +337,7 @@ fn index_operations<'a>(
             &format!("predecessors for operation {:?}", operation.id),
             &operation.predecessors,
         )?;
-        if indexed.insert(operation.id.as_str(), operation).is_some() {
+        if indexed.insert(operation.id.clone(), operation).is_some() {
             return Err(FactoryScheduleError::InvalidInput(format!(
                 "duplicate operation ID {:?}",
                 operation.id
@@ -349,11 +349,11 @@ fn index_operations<'a>(
 
 fn validate_predecessors(
     operations: &[FactoryOperation],
-    indexed: &BTreeMap<&str, &FactoryOperation>,
+    indexed: &BTreeMap<String, &FactoryOperation>,
 ) -> Result<(), FactoryScheduleError> {
     for operation in operations {
         for predecessor in &operation.predecessors {
-            if !indexed.contains_key(predecessor.as_str()) {
+            if !indexed.contains_key(predecessor) {
                 return Err(FactoryScheduleError::InvalidInput(format!(
                     "operation {:?} references unknown predecessor {:?}",
                     operation.id, predecessor
@@ -448,7 +448,7 @@ fn contains_all(declared: &[String], required: &[String]) -> bool {
 /// bound for any feasible schedule, not a promised achievable makespan.
 fn critical_path_lower_bound(
     operations: &[FactoryOperation],
-    indexed: &BTreeMap<&str, &FactoryOperation>,
+    indexed: &BTreeMap<String, &FactoryOperation>,
 ) -> Result<u64, FactoryScheduleError> {
     let mut pending: BTreeSet<String> = operations
         .iter()
@@ -461,7 +461,7 @@ fn critical_path_lower_bound(
             .iter()
             .filter(|operation_id| {
                 indexed
-                    .get(operation_id.as_str())
+                    .get(operation_id)
                     .expect("pending operation was validated and indexed")
                     .predecessors
                     .iter()
@@ -476,7 +476,7 @@ fn critical_path_lower_bound(
         }
 
         for operation_id in ready {
-            let operation = indexed[operation_id.as_str()];
+            let operation = indexed.get(&operation_id).expect("operation was validated and indexed");
             let predecessor_finish = operation
                 .predecessors
                 .iter()
