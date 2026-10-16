@@ -3,7 +3,8 @@
 **Status:** Candidate benchmark specification and source audit; no dataset bytes have been downloaded, parsed, or benchmarked in this work.  
 **Date:** 2026-10-16  
 **Tracking issue:** [NANO-007](https://github.com/Luminous-Dynamics/symthaea/issues/7644) (dataset/rights qualification)  
-**Rust policy prototype:** [tools/nano-policy](../../tree/research/nano-001-atomistic-discovery/tools/nano-policy)  
+**Canonical Rust selector/evaluator:** [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568), tracked by [NANO-005 #7570](https://github.com/Luminous-Dynamics/symthaea/issues/7570)  
+**Small reference baseline:** [tools/nano-policy](../../tree/research/nano-001-atomistic-discovery/tools/nano-policy)  
 **Benchmark policy:** [NANOTECHNOLOGY_BENCHMARK_CHARTER.md](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md)  
 **Domain map:** [NANOTECHNOLOGY_DOMAIN_ATLAS.md](./NANOTECHNOLOGY_DOMAIN_ATLAS.md)
 
@@ -57,8 +58,8 @@ The 921 observed measurements can be used as a finite-pool oracle simulator only
 ### Primary arms
 
 1. **Random selection**, repeated over frozen seeds.
-2. **Rust max-min diversity**, using composition features only (and reference features for previously selected candidates).
-3. **Cost-aware diversity**, only if heterogeneous query costs are evidenced and preregistered. If every sample has equal cost, this arm is identical to max-min diversity at cost exponent zero; don't report it as a separate winning method.
+2. **Canonical-kernel farthest-first and family-balanced farthest-first**, using composition features only and stable family groups where scientifically justified; the separate `tools/nano-policy` crate can remain a simple reference baseline.
+3. **Cost-aware farthest-first**, only if heterogeneous query costs are evidenced and preregistered. If all samples have equal costs, cost-aware selection is not a distinct policy and must not be presented as a separate win.
 4. **Expected Improvement (EI)** using the published GP baseline and exact applicable preprocessing.
 5. **Add-GP-UCB**, which the paper reports as strong on the smoother Kerr task.
 6. **CAMEO or another physics-informed baseline**, only if source, algorithm, preprocessing and license are pinned and the published setup is reproduced.
@@ -107,7 +108,7 @@ This is an experimental threshold, not a result from the paper or a universal be
 
 ## 6. Design caveats learned from newer active-learning research
 
-The 2026 review “A critical examination of active learning workflows in materials science” highlights that active learning can introduce sampling bias, overrepresent noisy or distorted regions, and produce evaluation results that look better than genuine generalization. It also warns that acceleration/enhancement factors relative to random selection are not always fair, and that performance depends on candidate-pool quality and task difficulty. Source: https://doi.org/10.1039/D6DD00081A
+Nair & Foppa's 2026 critical review of materials-science active learning emphasizes that hidden workflow choices, candidate-pool construction, surrogate setup, sampling bias and metric selection can materially affect conclusions. Random sampling is necessary but not a sufficient baseline, and a single acceleration/enhancement factor is not enough. Source: https://doi.org/10.1039/D6DD00081A
 
 Therefore:
 - random is required, but **not sufficient** as the only baseline;
@@ -127,7 +128,7 @@ Before executing:
 3. Parse the MAT file in an isolated research environment; record actual arrays, shapes, units, non-finite/missing values and row alignment.
 4. Freeze the preprocessing transform, candidate IDs, pool snapshot, allowed feature schema, target task and query budgets.
 5. Capture all policy requests, exposed oracle responses, selected/rejected/failed decisions, outputs, seeds and version identities.
-6. Independently recompute regret/attainment metrics from the run receipt.
+6. Write outcome observations only after selection, then use the independent post-outcome evaluator in [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568) to recompute simple-regret/target-attainment metrics. Never pass the ledger or aggregate outcomes back to a selector.
 
 No dataset download or benchmark run has happened yet; a previous binary-fetch attempt was blocked by the available download tool. Do not claim the file was locally verified or parsed.
 
