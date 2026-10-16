@@ -7,9 +7,13 @@
 //!
 //! ## Capabilities
 //!
-//! - **Proprioception**: Subscribes to `/joint_states` and transforms them into HDC vectors.
-//! - **Consciousness Telemetry**: Publishes Φ (Phi), neuromodulator levels, and Eight Harmonies activations.
-//! - **Motor Output**: Translates `RobotActuatorCommand` into `trajectory_msgs`.
+//! - **Generic transport**: validates and publishes typed ROS joint trajectories, and consumes sensor data.
+//! - **Consciousness Telemetry**: publishes Φ (Phi), neuromodulator levels, and Eight Harmonies activations.
+//! - **Optional platform adapters**: Humanoid conversion helpers are gated behind `humanoid-adapter`.
+//!
+//! Build without default features for the transport-neutral bridge surface; enable `ros2`
+//! for the ROS middleware bindings. The ROS/DDS network must be isolated and authenticated
+//! externally; successful publication is not evidence of device execution or safe actuation.
 //!
 //! ## ROS2 Setup
 //!
@@ -369,7 +373,7 @@ impl RosBridgeNode {
     }
 
     /// Estimate and return the current `HumanoidState` using sensor fusion over JointState and IMU.
-    #[cfg(feature = "ros2")]
+    #[cfg(all(feature = "ros2", feature = "humanoid-adapter"))]
     pub fn get_current_humanoid_state(
         &self,
     ) -> Result<symthaea_humanoid::types::HumanoidState, RosBridgeError> {
@@ -685,6 +689,7 @@ impl RosBridgeNode {
     }
 
     /// Converts a Symthaea HumanoidCommand into a ROS2 JointTrajectory format, using torque/effort control.
+    #[cfg(feature = "humanoid-adapter")]
     pub fn command_to_ros_trajectory(
         &self,
         command: &symthaea_humanoid::types::HumanoidCommand,
@@ -706,6 +711,7 @@ impl RosBridgeNode {
 
     /// Converts ROS2 joint state arrays back into Symthaea's HumanoidState.
     /// Since ROS2 JointState lacks root pose/IMU, those defaults are injected or assumed.
+    #[cfg(feature = "humanoid-adapter")]
     pub fn ros_joint_states_to_humanoid(
         &self,
         positions: &[f64],
@@ -878,6 +884,7 @@ mod tests {
         assert!(matches!(result, Err(RosBridgeError::InvalidStatus(_))));
     }
 
+    #[cfg(all(feature = "ros2", feature = "humanoid-adapter"))]
     #[test]
     fn test_hdc_encoding_and_surprise() {
         let node = RosBridgeNode::new(RosBridgeConfig::default());
