@@ -81,6 +81,8 @@ The oracle must never expose `Coer`, `Kerr`, or hidden outcome-derived fields be
 
 For each outcome independently, report:
 - **Simple regret by query budget**: best value not yet discovered relative to the pool's true optimum, in raw physical units and a normalized value based on the source-pool range. Lower is better.
+
+For the canonical outcome ledger, encode each maximization result as a **normalized simple-regret loss** computed by the independent evaluation harness after the query: `loss = (pool_max - observed_value) / (pool_max - pool_min)`. The pool extrema and observed value must never enter the selector request. This yields a dimensionless loss in [0, 1] for non-degenerate pools. An evaluator success threshold of 0.001 means within 0.1% of the observed pool range; this is a new normalization and must not be called an exact reproduction of the paper's “0.1% of maximum” criterion unless the paper's original formula is matched separately. If the pool range is zero, the task is degenerate and must be marked not evaluable.
 - **Target attainment / queries-to-target**: number of measurements needed to get within a preregistered tolerance of the optimum. Report the distribution across episodes/seeds, not only the average.
 - **Area under the best-so-far curve** over a shared, preregistered query range.
 - **Budgeted utility** at fixed query counts (including an early budget and 5% of the pool, about 46 of 921 samples).
@@ -100,11 +102,11 @@ These targets can only be used when the paper's exact normalization, initial con
 
 ### Proposed go/no-go for the Rust policy
 
-Before exposing any held-out evaluation run, choose one primary objective/metric and a practical improvement margin. A provisional policy pilot target is:
-- at least 10% lower median simple regret at a preregistered low budget (for example, 11 and 46 queried samples) relative to random selection, with a 95% seed-bootstrap interval excluding no improvement, **and**
-- no worse than random by more than a predeclared tolerance on the other outcome task.
+Before exposing any held-out evaluation run, choose one primary metric and justify the practical margin and replication/power plan. For the canonical evaluator, a provisional primary is paired **best-loss reduction at budget** on the normalized simple-regret scale, with a proposed minimum margin of 0.05 (five percentage points of the observed pool-property range). The evaluator computes the mean paired reduction and a group-bootstrap interval only when every target has a valid observation in both arms; missing coverage blocks the inferential comparison. This is a proposed engineering threshold, not a result from the paper or a universal standard.
 
-This is an experimental threshold, not a result from the paper or a universal benchmark rule. Since this historical pool has only 921 points and correlated composition neighborhoods, use repeated episode seeds and examine uncertainty; don't treat each selected row as an independent material family.
+As a secondary descriptive outcome, report median best-so-far normalized regret at budgets 11 and 46 and its relative reduction versus the baseline; do not present that median as statistically confirmed unless the independent checker also supplies an appropriate paired interval. For Kerr, separately attempt to reproduce the paper's original criterion and report the exact formula rather than silently substituting the normalized-range definition.
+
+Because this is a finite 921-point historic pool with correlated composition neighborhoods, separate algorithmic seed variation from material-family generalization. Repeated random seeds quantify stochastic policy variability on this pool; they do not create independent physical material systems. A successful offline replay remains a benchmark result for this pool, not evidence of fresh synthesis or broad materials generalization.
 
 ## 6. Design caveats learned from newer active-learning research
 
