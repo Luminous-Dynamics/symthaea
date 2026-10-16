@@ -24,6 +24,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "xtask/src/enzyme_abstention_matrix.rs"
       - "xtask/src/enzyme_bench.rs"
       - "xtask/src/enzyme_calibration.rs"
       - "xtask/src/enzyme_evidence_graph.rs"
@@ -36,6 +37,7 @@ on:
       - "docs/research/ENZYME_KINETICS_PARADIGM_SHIFT_ROADMAP_V0.md"
       - "docs/research/ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json"
       - "docs/research/ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md"
+      - "docs/research/ENZYME_ABSTENTION_STRESS_MATRIX_V0.md"
       - "docs/research/ENZYME_MODEL_FALSIFICATION_BENCHMARK_V0.md"
       - "docs/research/KCAT_ADMISSION_PROFILE_V0.json"
       - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
@@ -93,6 +95,8 @@ jobs:
             .matrix.case_count == 96 and
             (.cases | length) == 96 and
             (.summary_by_stratum | length) == 4 and
+            .abstention_control_summary.control_case_count == 48 and
+            (.abstention_control_summary | has("false_decisive_rate")) and
             (.cases | all(has("decision_reason") and has("observed_decision") and has("target_hit"))) and
             (.decision_policy.calibration_status | contains("not calibrated"))
           ' "$report" >/dev/null
