@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+/// Out-of-sample repair-policy evaluation under duration uncertainty.
+pub mod robust_repair_evaluation;
+
 /// Deterministic repair crew and finite-spares scheduling policies.
 pub mod repair_crew_scheduling;
 
