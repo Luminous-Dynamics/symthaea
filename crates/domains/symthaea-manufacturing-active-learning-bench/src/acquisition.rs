@@ -1185,6 +1185,41 @@ mod tests {
     }
 
     #[test]
+    fn acquisition_uses_updated_posterior_not_the_original_prior() {
+        let model = model(
+            "perfect",
+            Feasibility::Feasible,
+            [1_000_000, 0],
+            [0, 1_000_000],
+            opposing_decisions(),
+        );
+        let initial = initial_posterior_state(&model).unwrap();
+        let prior_metrics = expected_information_gain_for_state(&model, &initial, "perfect")
+            .unwrap();
+        assert!(
+            (prior_metrics.expected_information_gain_nats - std::f64::consts::LN_2).abs()
+                < 1e-12
+        );
+
+        let posterior =
+            condition_posterior(&model, &initial, "evidence-1", "perfect", "O1").unwrap();
+        let next_metrics =
+            expected_information_gain_for_state(&model, &posterior.next_state, "perfect")
+                .unwrap();
+        assert!(next_metrics.expected_information_gain_nats.abs() < 1e-12);
+        assert_eq!(next_metrics.model_digest, posterior.next_state.state_digest);
+
+        let ranking = rank_feasible_actions_for_state(
+            &model,
+            &posterior.next_state,
+            AcquisitionObjective::ExpectedInformationGain,
+        )
+        .unwrap();
+        assert_eq!(ranking.model_digest, posterior.next_state.state_digest);
+        assert!(ranking.ranked_actions[0].objective_score.abs() < 1e-12);
+    }
+
+    #[test]
     fn conditioning_noisy_observation_preserves_exact_ppm_normalization() {
         let model = model(
             "noisy",
