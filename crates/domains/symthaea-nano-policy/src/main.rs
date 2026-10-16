@@ -391,6 +391,12 @@ fn select(request: &Request) -> Result<Response, String> {
     )
 }
 
+fn select_with_request_digest(request: &Request, raw_request: &[u8]) -> Result<Response, String> {
+    let mut response = select(request)?;
+    response.input_blake3 = Some(blake3::hash(raw_request).to_hex().to_string());
+    Ok(response)
+}
+
 fn execute() -> Result<(), String> {
     let mut bytes = Vec::new();
     std::io::stdin()
@@ -403,8 +409,7 @@ fn execute() -> Result<(), String> {
 
     let request: Request = serde_json::from_slice(&bytes)
         .map_err(|error| format!("invalid request JSON: {error}"))?;
-    let mut response = select(&request)?;
-    response.input_blake3 = Some(blake3::hash(&bytes).to_hex().to_string());
+    let response = select_with_request_digest(&request, &bytes)?;
     let stdout = std::io::stdout();
     let mut output = stdout.lock();
     serde_json::to_writer(&mut output, &response)
@@ -627,8 +632,8 @@ mod tests {
     fn cli_receipt_binds_selection_to_exact_request_bytes() {
         let raw = include_bytes!("../fixtures/smoke-request.json");
         let req: Request = serde_json::from_slice(raw).expect("valid smoke fixture");
-        let mut response = select(&req).expect("valid selection");
-        response.input_blake3 = Some(blake3::hash(raw).to_hex().to_string());
+        let response =
+            select_with_request_digest(&req, raw).expect("valid selection with request digest");
         let expected = blake3::hash(raw).to_hex().to_string();
         assert_eq!(response.input_blake3.as_deref(), Some(expected.as_str()));
     }
