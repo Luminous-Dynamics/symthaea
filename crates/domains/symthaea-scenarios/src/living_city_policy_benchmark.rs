@@ -687,6 +687,8 @@ pub struct PolicyCaseComparison {
     pub unmet_service_change_units: i128,
     pub candidate_floor_breach_steps: usize,
     pub baseline_floor_breach_steps: usize,
+    pub candidate_run_sha256: String,
+    pub baseline_run_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -890,6 +892,18 @@ pub fn assess_policy_suite(
     })
 }
 
+impl PolicyRobustnessAssessment {
+    /// Canonical compact JSON bytes in declared field order. Case entries follow
+    /// the caller's frozen required-case order; no unordered maps are included.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, BenchmarkError> {
+        canonical_json_bytes(self, "robustness_assessment")
+    }
+
+    pub fn sha256(&self) -> Result<String, BenchmarkError> {
+        Ok(hash_sha256_hex(&self.canonical_bytes()?))
+    }
+}
+
 /// Compare two policy suites only after every required case and run is present,
 /// input receipts replay, and paired policy runs bind the exact same scenario
 /// and configuration digests. This deliberately assigns no probabilities to
@@ -957,6 +971,8 @@ pub fn assess_policy_robustness(
                     - baseline_run.unmet_service_units as i128,
                 candidate_floor_breach_steps: candidate_run.floor_breach_steps,
                 baseline_floor_breach_steps: baseline_run.floor_breach_steps,
+                candidate_run_sha256: candidate_run.sha256()?,
+                baseline_run_sha256: baseline_run.sha256()?,
             });
         }
     }
@@ -1148,6 +1164,12 @@ mod tests {
         assert_eq!(assessment.baseline.total_unmet_service_units, Some(5));
         assert_eq!(assessment.worst_case_loss_reduction_per_mille, Some(1_000));
         assert_eq!(assessment.total_suite_loss_reduction_per_mille, Some(1_000));
+        assert_eq!(assessment.per_case[0].candidate_run_sha256, candidate[0].sha256().unwrap());
+        assert_eq!(assessment.per_case[0].baseline_run_sha256, baseline[0].sha256().unwrap());
+        let canonical = assessment.canonical_bytes().unwrap();
+        let decoded = serde_json::from_slice::<PolicyRobustnessAssessment>(&canonical).unwrap();
+        assert_eq!(decoded, assessment);
+        assert_eq!(assessment.sha256().unwrap(), decoded.sha256().unwrap());
     }
 
     #[test]
