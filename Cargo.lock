@@ -19843,6 +19843,7 @@ dependencies = [
 name = "symthaea-scenarios"
 version = "0.1.0"
 dependencies = [
+ "sha2",
  "symthaea-control-theory",
  "symthaea-economics",
  "symthaea-epidemiology",
