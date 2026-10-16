@@ -14,6 +14,7 @@
 pub mod aging;
 pub mod compound_stability;
 pub mod database;
+pub mod discovery_policy;
 pub mod encoder;
 pub mod haptic_prober;
 pub mod mining;
@@ -22,6 +23,10 @@ pub mod strategic;
 
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
 pub use database::{MaterialDatabase, MaterialSearchResult};
+pub use discovery_policy::{
+    DiscoveryCandidate, DiscoverySelectionDecision, DiscoverySelectionError,
+    DiscoverySelectionPolicy, select_next_candidate,
+};
 pub use encoder::MaterialHdcEncoder;
 pub use mining::{
     MINING_HORIZON_LABELS, MINING_HORIZONS, MiningFepAction, MiningFepAgent, MiningHdcEncoder,
