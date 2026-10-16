@@ -1304,7 +1304,7 @@ mod tests {
                 nominal,
                 upper,
             };
-            let (report, _) = evaluate_peak_resource_usage(
+            let (report, receipt) = evaluate_peak_resource_usage(
                 &config,
                 &tasks,
                 &task_receipt,
@@ -1333,12 +1333,12 @@ mod tests {
             );
             assert_eq!(
                 report.definite_budget_limit_exceedance_count,
-                usize::from(lower > 900),
+                if lower > 900 { 1 } else { 0 },
                 "seed {seed}"
             );
             assert_eq!(
                 report.possible_budget_limit_exceedance_count,
-                usize::from(lower <= 900 && upper > 900),
+                if lower <= 900 && upper > 900 { 1 } else { 0 },
                 "seed {seed}"
             );
             assert_eq!(report.forecasted_observation_count, 1, "seed {seed}");
@@ -1353,17 +1353,7 @@ mod tests {
                     &reserve_receipt,
                     &plan,
                     &report,
-                    &evaluate_peak_resource_usage(
-                        &config,
-                        &tasks,
-                        &task_receipt,
-                        &reserve_plan,
-                        &reserve_report,
-                        &reserve_receipt,
-                        &plan,
-                    )
-                    .unwrap()
-                    .1,
+                    &receipt,
                 ));
             }
         }
