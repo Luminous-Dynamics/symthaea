@@ -243,12 +243,33 @@ impl FiniteHypothesisModel {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PosteriorEvidenceReceipt {
+    pub evidence_id: String,
+    pub action_id: String,
+    pub observed_outcome_id: String,
+    pub measurement_model_id: String,
+    pub parent_state_digest: String,
+    pub posterior_after: Vec<HypothesisPrior>,
+    pub posterior_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PosteriorState {
+    pub root_model_digest: String,
+    pub current_prior: Vec<HypothesisPrior>,
+    pub evidence_receipts: Vec<PosteriorEvidenceReceipt>,
+    pub state_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PosteriorUpdate {
-    pub parent_model_digest: String,
+    pub parent_state_digest: String,
+    pub evidence_id: String,
     pub action_id: String,
     pub observed_outcome_id: String,
     pub posterior: Vec<HypothesisPrior>,
     pub posterior_model_digest: String,
+    pub next_state: PosteriorState,
 }
 
 /// Condition the finite prior on one admitted action's observed categorical outcome.
