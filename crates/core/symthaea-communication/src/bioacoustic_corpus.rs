@@ -77,6 +77,9 @@ pub struct BioacousticRecording {
     pub sample_count: u64,
     /// Original continuous recording ID; distinct crops must share this value.
     pub source_recording_id: Option<String>,
+    /// Start offset (seconds) of this asset/crop within its original source recording.
+    /// Required by event evaluation when multiple Test assets share a source ID.
+    pub source_start_s: Option<f64>,
     pub session_id: Option<String>,
     pub site_id: Option<String>,
     pub individual_ids: Vec<String>,
@@ -265,6 +268,15 @@ pub fn validate_bioacoustic_corpus(
         if !duration_s.is_finite() || duration_s <= 0.0 {
             return Err(format!("sample {} has invalid derived duration", recording.sample_id));
         }
+        if recording
+            .source_start_s
+            .is_some_and(|offset| !offset.is_finite() || offset < 0.0 || !(offset + duration_s).is_finite())
+        {
+            return Err(format!(
+                "sample {} has an invalid source-recording start offset",
+                recording.sample_id
+            ));
+        }
         let nyquist_hz = recording.sample_rate_hz as f64 / 2.0;
         let mut annotation_ids = BTreeSet::new();
         for annotation in &recording.annotations {
@@ -441,6 +453,7 @@ mod tests {
             channels: 1,
             sample_count: 512_000,
             source_recording_id: Some(source_id.into()),
+            source_start_s: None,
             session_id: Some(format!("session-{source_id}")),
             site_id: Some(site_id.into()),
             individual_ids: vec![individual_id.into()],
