@@ -12,7 +12,8 @@
     "repair_durations": "deterministic positive integer time steps",
     "horizon": "must exceed or equal the latest completion; horizon truncation is not part of the exact objective",
     "weights": "caller-defined positive service weights; not an ethically complete objective",
-    "tie_break": "lexicographically smallest job-ID sequence among objectives equal within 1e-9"
+    "tie_break": "lexicographically smallest job-ID sequence among objectives equal within 1e-9",
+    "classical_baseline_note": "For this single-machine weighted-completion objective, nonincreasing service-value/duration (Smith WSPT rule) is already optimal; the oracle verifies implementation and measures alternative heuristics, not novelty."
   },
   "fixtures": [
     {
@@ -282,6 +283,7 @@
   "research_sources": [
     "https://doi.org/10.1287/trsc.2023.0227",
     "https://doi.org/10.1016/j.cor.2020.104935",
-    "https://pmc.ncbi.nlm.nih.gov/articles/PMC9679711/"
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC9679711/",
+    "https://doi.org/10.1016/j.orl.2013.08.001"
   ]
 }
