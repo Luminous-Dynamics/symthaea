@@ -89,7 +89,8 @@ pub struct BioacousticEventMetrics {
     pub f1: Option<f64>,
     /// Micro event average precision across all scored Test recordings.
     pub average_precision: Option<f64>,
-    pub false_alarms_per_hour: Option<f64>,
+    /// False-positive event rate per hour of non-overlapping audio included in this score.
+    pub false_alarms_per_scored_hour: Option<f64>,
 }
 
 impl BioacousticEventMetrics {
@@ -119,7 +120,7 @@ impl BioacousticEventMetrics {
             recall,
             f1,
             average_precision: None,
-            false_alarms_per_hour,
+            false_alarms_per_scored_hour: false_alarms_per_hour,
         }
     }
 }
@@ -236,6 +237,7 @@ pub fn evaluate_bioacoustic_events(
     if test_recordings.is_empty() {
         return Err("corpus manifest has no Test recordings".into());
     }
+    validate_non_overlapping_source_coverage(&test_recordings)?;
     let test_sample_ids: BTreeSet<_> = test_recordings
         .iter()
         .map(|recording| recording.sample_id.as_str())
@@ -413,6 +415,50 @@ pub fn evaluate_bioacoustic_events(
         prediction_provenance_authenticated_by_this_evaluator: false,
         validation_threshold_selection_authenticated_by_this_evaluator: false,
     })
+}
+
+fn validate_non_overlapping_source_coverage(
+    test_recordings: &[&crate::bioacoustic_corpus::BioacousticRecording],
+) -> Result<(), String> {
+    let mut by_source: std::collections::BTreeMap<&str, Vec<(&crate::bioacoustic_corpus::BioacousticRecording, f64, f64)>> =
+        std::collections::BTreeMap::new();
+
+    for recording in test_recordings {
+        let source_id = recording
+            .source_recording_id
+            .as_deref()
+            .ok_or_else(|| format!("sample {} has no source-recording ID", recording.sample_id))?;
+        let duration = recording.sample_count as f64 / recording.sample_rate_hz as f64;
+        let start = recording.source_start_s.unwrap_or(0.0);
+        let end = start + duration;
+        by_source
+            .entry(source_id)
+            .or_default()
+            .push((*recording, start, end));
+    }
+
+    for (source_id, assets) in &mut by_source {
+        if assets.len() > 1 && assets.iter().any(|(recording, _, _)| recording.source_start_s.is_none()) {
+            return Err(format!(
+                "multiple Test assets share source {source_id}; every crop needs source_start_s to audit overlap"
+            ));
+        }
+        assets.sort_by(|left, right| {
+            left.1.total_cmp(&right.1)
+                .then_with(|| left.0.sample_id.cmp(&right.0.sample_id))
+        });
+        for pair in assets.windows(2) {
+            let (previous, _, previous_end) = pair[0];
+            let (current, current_start, _) = pair[1];
+            if current_start < previous_end {
+                return Err(format!(
+                    "overlapping Test assets within source {source_id}: {} and {}",
+                    previous.sample_id, current.sample_id
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_match_rule(rule: &EventMatchRule) -> Result<(), String> {
@@ -695,6 +741,7 @@ mod tests {
             channels: 1,
             sample_count: 100,
             source_recording_id: Some(source.into()),
+            source_start_s: None,
             session_id: Some(source.into()),
             site_id: Some(format!("site-{source}")),
             individual_ids: vec![format!("animal-{source}")],
