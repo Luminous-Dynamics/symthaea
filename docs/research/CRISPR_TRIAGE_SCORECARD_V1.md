@@ -432,3 +432,21 @@ Thirteen Rust tests are authored in the new module; they are not compiled/execut
 
     rustc --edition=2024 --test scripts/crispr_shift_robustness_radius.rs -o /tmp/crispr-shift-radius-tests
     /tmp/crispr-shift-radius-tests
+
+
+### P. From convenience verification to probability-sampled audit
+
+Unknown-label bounds remain essential, but they do not make the *measured subset* representative when outcomes are preferentially verified for candidates already nominated or highly ranked by a tool. Diagnostic-test literature calls an analogous failure partial-verification or work-up bias: the score being evaluated can influence who receives the reference test ([overview and correction strategies](https://pubmed.ncbi.nlm.nih.gov/35124189/)). The 2026 CRISPR benchmark separately describes genome-wide nomination tools and pair scorers, and reconstructs a union of nominated sites; ranking-only evaluation on that constructed universe cannot establish full nomination coverage ([Kaufmann et al., 2026](https://doi.org/10.1177/10430342261466407)).
+
+The next experimental-design paradigm is a **probability-sampled verification audit** over a frozen, complete candidate frame. A design may deliberately oversample score bands or model disagreements, but each candidate must have a known, nonzero inclusion probability and the selection mechanism must not use the unobserved outcome. Freeze the full ranking and K before revealing newly measured outcomes. Then use inverse-inclusion-probability (Horvitz–Thompson) sums to estimate the total positive count and the positive count within top K; report design-weighted ratio estimates for recall and precision alongside the unweighted audit-subset metrics.
+
+This estimates performance *within the declared frame*, not sites absent from every tool's candidate universe. A convenience sample with unknown inclusion probabilities, any zero-probability stratum, a changed rank after outcomes are seen, or an unverified ranking census must fail closed. The kernel reports effective sample size as a diagnostic but computes **no confidence intervals**; any real-cohort comparison still needs a design-appropriate uncertainty procedure, guide/Cas9-group reporting, permitted sources, and independent replay. It does not mark unassayed sites as negatives.
+
+Tracking task: [CRISPR-OT-008 #7633 — probability-sampled verification to correct ascertainment bias](https://github.com/Luminous-Dynamics/symthaea/issues/7633).
+
+**F14 synthetic contract check (2026-10-16):** four audited outcomes are drawn from a declared ten-candidate ranking, with unequal inclusion probabilities. The hand-computed inverse-probability sums estimate 10 candidates, six positives overall, four candidates in top K=4, and two positives in top K. The weighted ratio recall is 1/3, while naïve audit-subset recall is 0.5. This is a synthetic arithmetic demonstration—not a Rust test, a real sampling audit, a biological result, or evidence of Symthaea improvement.
+
+Dependency-free Rust module: [scripts/crispr_verification_bias.rs](../../scripts/crispr_verification_bias.rs). The 18 authored unit tests are not compiled or executed in this authoring environment because `rustc` is unavailable. The kernel validates declared design fields and sampled row identity/propensity structure, but cannot prove the sample was truly randomized or that the caller's full-frame manifest is true.
+
+    rustc --edition=2024 --test scripts/crispr_verification_bias.rs -o /tmp/crispr-verification-bias-tests
+    /tmp/crispr-verification-bias-tests
