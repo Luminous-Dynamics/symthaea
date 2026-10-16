@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const BIOACOUSTIC_CORPUS_SCHEMA_VERSION: u32 = 2;
+pub const BIOACOUSTIC_CORPUS_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum BioacousticSplit {
@@ -63,6 +63,15 @@ pub struct BioacousticAnnotation {
     pub frequency_max_hz: Option<f64>,
 }
 
+/// Explicitly unscored time span (e.g. ambiguous call, overlapping caller,
+/// occlusion, or annotation uncertainty). Predictions sufficiently contained in
+/// these spans are excluded from detection metrics, not counted as negatives.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BioacousticUnscoredRegion {
+    pub interval: crate::TimeSpan,
+    pub reason: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BioacousticRecording {
     /// Stable ID for this exact evaluated sample/file/crop.
@@ -85,6 +94,9 @@ pub struct BioacousticRecording {
     pub site_id: Option<String>,
     pub individual_ids: Vec<String>,
     pub annotations: Vec<BioacousticAnnotation>,
+    /// Regions explicitly excluded from scoring because annotation is uncertain.
+    #[serde(default)]
+    pub unscored_regions: Vec<BioacousticUnscoredRegion>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -115,6 +127,13 @@ impl BioacousticCorpusManifest {
             recording
                 .annotations
                 .sort_by(|left, right| left.annotation_id.cmp(&right.annotation_id));
+            recording.unscored_regions.sort_by(|left, right| {
+                left.interval
+                    .start_s
+                    .total_cmp(&right.interval.start_s)
+                    .then_with(|| left.interval.end_s.total_cmp(&right.interval.end_s))
+                    .then_with(|| left.reason.cmp(&right.reason))
+            });
         }
         let bytes = serde_json::to_vec(&canonical)
             .map_err(|error| format!("cannot serialize bioacoustic manifest: {error}"))?;
@@ -278,6 +297,31 @@ pub fn validate_bioacoustic_corpus(
                 recording.sample_id
             ));
         }
+        let mut previous_unscored_end = None;
+        for region in &recording.unscored_regions {
+            if !region.interval.start_s.is_finite()
+                || !region.interval.end_s.is_finite()
+                || region.interval.start_s < 0.0
+                || region.interval.end_s <= region.interval.start_s
+                || region.interval.end_s > duration_s
+                || region.reason.trim().is_empty()
+            {
+                return Err(format!(
+                    "sample {} has an invalid unscored region",
+                    recording.sample_id
+                ));
+            }
+            if previous_unscored_end
+                .is_some_and(|previous_end| region.interval.start_s < previous_end)
+            {
+                return Err(format!(
+                    "sample {} has overlapping or unsorted unscored regions",
+                    recording.sample_id
+                ));
+            }
+            previous_unscored_end = Some(region.interval.end_s);
+        }
+
         let nyquist_hz = recording.sample_rate_hz as f64 / 2.0;
         let mut annotation_ids = BTreeSet::new();
         for annotation in &recording.annotations {
@@ -459,6 +503,7 @@ mod tests {
             site_id: Some(site_id.into()),
             individual_ids: vec![individual_id.into()],
             annotations: vec![annotation("ann-1", 0.1, 0.2, Some(1_000.0), Some(150_000.0))],
+            unscored_regions: Vec::new(),
         }
     }
 
