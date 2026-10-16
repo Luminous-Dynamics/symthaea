@@ -129,7 +129,7 @@ Added `crates/core/symthaea-core/src/embodiment_v2.rs` with:
 - a read-only shared `validate_adapter_v2_conformance` gate to check descriptor/frame identity and source consistency;
 - negative tests for non-finite values, duplicate addresses, bad digest, ambiguous missingness and invalid uncertainty.
 
-The multirotor simulator now implements `EmbodimentV2Adapter`, binding V2 records to a seed-derived simulator-instance identity. It exports 13 state scalar observations with explicit SI units and a four-quantity action record. It retains the V1 `EmbodimentBridge` method and includes V1 API parity/conformance tests.
+The multirotor simulator now implements `EmbodimentV2Adapter`, using a deterministic seed-derived logical ID by default and offering a caller-provided ID for multi-instance runs. It exports 13 state scalar observations with explicit SI units and a four-quantity action record. Reset increments a clock-domain epoch so simulation timestamps do not rewind within the same domain. It retains the V1 `EmbodimentBridge` method and includes V1 API parity/conformance tests.
 
 The ROS bridge now converts named joint arrays into UEC V2 observations with explicit profile-specific quantity/unit bindings and explicit NotReported missingness; it also accepts V2 action frames through explicit profile/joint/quantity/unit mappings. Conversion does not mean transport-published; transport success does not mean a physical actuator executed it. ROS 2/DDS must remain isolated and appropriately authenticated as configured by the system integrator; this Rust adapter is not a middleware security control.
 
