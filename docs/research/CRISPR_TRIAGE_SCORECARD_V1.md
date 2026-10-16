@@ -231,7 +231,7 @@ The machine-readable companion contract contains four small fixtures intended to
 
 5. **F5 — partial-label sensitivity bounds.** Two measured positives and two unknown candidates with K=2 produce observed known-label recall 0.5, conditional recall bounds [1/3, 2/3], and precision bounds [0.5, 1.0]. The bounds vary unknown labels only inside this exact universe.
 
-The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F5 plus invalid targets and duplicate identities.
+The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F5 plus invalid targets and duplicate identities.
 
 Run the unit tests with an installed Rust toolchain:
 
