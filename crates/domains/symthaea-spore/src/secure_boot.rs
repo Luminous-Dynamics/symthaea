@@ -1192,6 +1192,9 @@ impl SecureBootOrchestration {
             return Err("the legacy unresolved UseShim choice cannot authorize configuration".to_string());
         }
         if matches!(method, SecureBootMethod::Disabled | SecureBootMethod::AlreadyOff) {
+            if self.current_platform() != Some(TargetPlatform::Linux) {
+                return Err("standard NixOS boot configuration requires an identified Linux target".to_string());
+            }
             let state = self.current_observed_state().ok_or_else(|| {
                 "current Secure Boot state is required before generating standard boot configuration".to_string()
             })?;
@@ -1771,6 +1774,14 @@ mod tests {
         assert!(key_nix.contains("boot.lanzaboote.autoGenerateKeys.enable = true"));
         assert!(!key_nix.contains("sbctl create-keys"));
         assert!(!key_nix.contains("/var/lib/sbctl/GUID"));
+    }
+
+    #[test]
+    fn test_standard_boot_config_requires_linux_target() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.record_manual_secure_boot_state(SecureBootState::Disabled, TargetPlatform::Windows);
+        orch.apply_guide_result(SecureBootMethod::AlreadyOff).expect("explicit method selection");
+        assert!(orch.generate_nix_config().is_err());
     }
 
     #[test]
