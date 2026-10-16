@@ -26,6 +26,7 @@
 //! cargo run --example plasma_threshold_optimizer
 //! ```
 
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write as IoWrite;
 use std::path::Path;
@@ -265,6 +266,7 @@ fn has_valid_phi_inputs(sample: &symthaea::physics::cmod_adapter::CModSample) ->
 pub enum ShotUnscoredReason {
     NoValidSampleInWarningWindow,
     NoValidSamples,
+    DuplicateShotId,
 }
 
 /// Per-shot audit record. A missing prediction means that this shot was not scoreable.
@@ -302,12 +304,39 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
     let mut total_disruption_shots = 0;
     let mut total_non_disruption_shots = 0;
     let mut shot_records = Vec::with_capacity(shots.len());
+    let mut shot_id_counts = HashMap::<u32, usize>::new();
+    for shot in shots {
+        *shot_id_counts.entry(shot.shot_id).or_insert(0) += 1;
+    }
 
     for shot in shots {
         if shot.disrupted {
             total_disruption_shots += 1;
         } else {
             total_non_disruption_shots += 1;
+        }
+
+        // Count raw samples even when the whole shot is rejected for duplicate identity.
+        total_samples += shot.samples.len();
+        if shot_id_counts.get(&shot.shot_id).copied().unwrap_or(0) > 1 {
+            invalid_samples += shot.samples.len();
+            let invalid_sample_indices = (0..shot.samples.len()).collect::<Vec<_>>();
+            if shot.disrupted {
+                unscored_disruption_shots += 1;
+            } else {
+                unscored_non_disruption_shots += 1;
+            }
+            shot_records.push(ShotEvaluationRecord {
+                shot_id: shot.shot_id,
+                actual_disruption: shot.disrupted,
+                predicted_disruption: None,
+                warning_lead_time_ms: None,
+                sample_count: shot.samples.len(),
+                valid_sample_count: 0,
+                invalid_sample_indices,
+                unscored_reason: Some(ShotUnscoredReason::DuplicateShotId),
+            });
+            continue;
         }
 
         let labels = label_samples(
@@ -328,7 +357,6 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         for (sample_index, (sample, label)) in
             shot.samples.iter().zip(labels.iter()).enumerate()
         {
-            total_samples += 1;
             if !has_valid_phi_inputs(sample) {
                 invalid_samples += 1;
                 invalid_sample_indices.push(sample_index);
@@ -1885,6 +1913,25 @@ mod tests {
             classify_regime_with_dynamics(0.7, None, Some(volatility), &config),
             StabilityRegime::Warning
         );
+    }
+
+    #[test]
+    fn duplicate_shot_ids_are_unscored_instead_of_double_counted() {
+        let first = shot_for_test(21, false, &[(0.0, false)]);
+        let second = shot_for_test(21, true, &[(10.0, true)]);
+        let results = evaluate_config(&ThresholdConfig::default(), &[first, second]);
+        assert_eq!(results.total_samples, 2);
+        assert_eq!(results.invalid_samples, 2);
+        assert_eq!(results.unscored_non_disruption_shots, 1);
+        assert_eq!(results.unscored_disruption_shots, 1);
+        assert_eq!(results.true_positives, 0);
+        assert_eq!(results.false_positives, 0);
+        assert_eq!(results.true_negatives, 0);
+        assert_eq!(results.false_negatives, 0);
+        assert!(results.shot_records.iter().all(|record| {
+            record.predicted_disruption.is_none()
+                && record.unscored_reason == Some(ShotUnscoredReason::DuplicateShotId)
+        }));
     }
 
     #[test]
