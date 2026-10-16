@@ -123,7 +123,7 @@ pub(crate) struct SubstrateManager {
     /// Modeled energy accumulated since the last closed monotonic-rate window.
     energy_rate_window_joules: f64,
     /// Monotonic start of the current energy-rate observation window.
-    energy_rate_window_started_at: Instant,
+    energy_rate_window_started_at: Option<Instant>,
     /// Average model-estimated energy rate over the most recently closed window (watts).
     estimated_energy_rate_watts: f64,
     /// Duration of the most recently closed energy-rate window (seconds).
@@ -171,7 +171,7 @@ impl SubstrateManager {
             current_substrate: config.substrate_type,
             last_energy_spent: 0.0,
             energy_rate_window_joules: 0.0,
-            energy_rate_window_started_at: Instant::now(),
+            energy_rate_window_started_at: None,
             estimated_energy_rate_watts: 0.0,
             energy_rate_window_seconds: 0.0,
             #[cfg(feature = "jepa")]
@@ -383,54 +383,68 @@ impl SubstrateManager {
     }
 
     /// Deterministic time-injected form used by tests and controlled replay.
+    ///
+    /// Each call occurs at the start of a cognitive cycle. The previously
+    /// accumulated cycle energy is compared with elapsed start-to-start wall time;
+    /// the current cycle estimate is added only after the prior interval is closed.
     pub(crate) fn tick_energy_at(&mut self, config: &CognitiveLoopConfig, now: Instant) {
         if !config.enable_energy_budget {
             self.last_energy_spent = 0.0;
             self.energy_rate_window_joules = 0.0;
-            self.energy_rate_window_started_at = now;
+            self.energy_rate_window_started_at = None;
             self.estimated_energy_rate_watts = 0.0;
             self.energy_rate_window_seconds = 0.0;
             return;
         }
 
         let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
-        self.total_energy_spent += speed_adjusted_energy;
-        self.energy_rate_window_joules += speed_adjusted_energy;
         self.last_energy_spent = speed_adjusted_energy;
 
-        let Some(elapsed) = now.checked_duration_since(self.energy_rate_window_started_at)
-        else {
+        // The first call starts a fresh window. Do not include idle time between
+        // manager construction and the first cognitive cycle in the denominator.
+        let Some(window_started_at) = self.energy_rate_window_started_at else {
+            self.energy_rate_window_started_at = Some(now);
+            self.energy_rate_window_joules = speed_adjusted_energy;
+            self.total_energy_spent += speed_adjusted_energy;
+            return;
+        };
+
+        let Some(elapsed) = now.checked_duration_since(window_started_at) else {
             // An earlier monotonic timestamp invalidates this window. Latch non-viable
-            // instead of subtracting incomparable/reversed time values.
+            // instead of subtracting incomparable/reversed time values, then start anew.
             self.consciousness_viable = false;
-            self.energy_rate_window_started_at = now;
-            self.energy_rate_window_joules = 0.0;
+            self.energy_rate_window_started_at = Some(now);
+            self.energy_rate_window_joules = speed_adjusted_energy;
+            self.total_energy_spent += speed_adjusted_energy;
             self.estimated_energy_rate_watts = 0.0;
             self.energy_rate_window_seconds = 0.0;
             return;
         };
         let elapsed_seconds = elapsed.as_secs_f64();
-        if elapsed_seconds < ENERGY_RATE_WINDOW_MIN_SECONDS {
-            return;
-        }
+        if elapsed_seconds >= ENERGY_RATE_WINDOW_MIN_SECONDS {
+            let estimated_rate_watts = self.energy_rate_window_joules / elapsed_seconds;
+            self.estimated_energy_rate_watts = estimated_rate_watts;
+            self.energy_rate_window_seconds = elapsed_seconds;
 
-        let estimated_rate_watts = self.energy_rate_window_joules / elapsed_seconds;
-        self.estimated_energy_rate_watts = estimated_rate_watts;
-        self.energy_rate_window_seconds = elapsed_seconds;
-
-        if let Some(budget_watts) = config.energy_budget_joules_per_sec {
-            if !budget_watts.is_finite() || budget_watts < 0.0 {
-                // Invalid rate limits fail closed once the rate check can be evaluated.
-                self.consciousness_viable = false;
-            } else if estimated_rate_watts > budget_watts {
-                self.consciousness_viable = false;
+            if let Some(budget_watts) = config.energy_budget_joules_per_sec {
+                if !budget_watts.is_finite() || budget_watts < 0.0 {
+                    // Invalid rate limits fail closed once the rate check can be evaluated.
+                    self.consciousness_viable = false;
+                } else if estimated_rate_watts > budget_watts {
+                    self.consciousness_viable = false;
+                }
             }
+
+            self.energy_rate_window_started_at = Some(now);
+            self.energy_rate_window_joules = 0.0;
         }
 
-        self.energy_rate_window_started_at = now;
-        self.energy_rate_window_joules = 0.0;
+        // Attribute this cycle's estimate after checking the previously completed
+        // start-to-start interval, so the numerator and denominator refer to the
+        // same completed cycles.
+        self.energy_rate_window_joules += speed_adjusted_energy;
+        self.total_energy_spent += speed_adjusted_energy;
     }
-
     /// Smooth transition dynamics via EMA blending each cycle.
     ///
     /// When `substrate_transition_alpha` < 1.0, effective_feasibility and
@@ -1274,7 +1288,7 @@ mod tests {
         cfg.energy_budget_joules_per_sec = Some(mgr_ref.energy_per_cycle * 0.5);
         let mut mgr = SubstrateManager::new(&cfg);
         let window_start = std::time::Instant::now();
-        mgr.energy_rate_window_started_at = window_start;
+        mgr.energy_rate_window_started_at = Some(window_start);
         assert!(mgr.consciousness_viable);
 
         mgr.tick_energy_at(&cfg, window_start + std::time::Duration::from_secs(1));
@@ -1322,7 +1336,7 @@ mod tests {
         config.enable_energy_budget = true;
         let mut mgr = SubstrateManager::new(&config);
         let window_start = std::time::Instant::now();
-        mgr.energy_rate_window_started_at = window_start;
+        mgr.energy_rate_window_started_at = Some(window_start);
         config.energy_budget_joules_per_sec = Some(1e-20);
 
         mgr.tick_energy_at(&config, window_start + std::time::Duration::from_millis(100));
@@ -1389,7 +1403,7 @@ mod tests {
         config.energy_budget_joules_per_sec = Some(1e-20); // impossibly small modeled-watt budget
         let mut mgr = SubstrateManager::new(&config);
         let window_start = std::time::Instant::now();
-        mgr.energy_rate_window_started_at = window_start;
+        mgr.energy_rate_window_started_at = Some(window_start);
         assert!(!mgr.should_degrade_consciousness());
         mgr.tick_energy_at(&config, window_start + std::time::Duration::from_secs(1));
         assert!(
