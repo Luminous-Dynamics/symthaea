@@ -41,7 +41,7 @@ pub struct PolicyAggregate {
     pub full_rank_design_rate: f64,
     /// Baseline restricted mean / this policy's restricted mean; >1 means lower discovery cost.
     pub acceleration_factor_vs_fixed_design: Option<f64>,
-    /// Utility per trial / fixed-design utility per trial; evaluated independently of discovery rate.
+    /// Utility per trial / fixed-design utility per trial, independent of discovery rate.
     pub enhancement_factor_vs_fixed_design: Option<f64>,
 }
 
@@ -108,7 +108,10 @@ pub fn summarize_paired_campaigns(
         if sample.budget_units == 0 || report.total_cost_units > sample.budget_units {
             return Err("evaluation report exceeds or lacks the declared budget".into());
         }
-        if report.first_conforming_cost_units.is_some_and(|cost| cost > report.total_cost_units) {
+        if report
+            .first_conforming_cost_units
+            .is_some_and(|cost| cost == 0 || cost > report.total_cost_units)
+        {
             return Err("discovery cost exceeds total campaign cost".into());
         }
 
@@ -177,8 +180,14 @@ pub fn summarize_paired_campaigns(
     let mut policy_aggregates = Vec::new();
     for scenario in &scenarios {
         let baseline_trials = &groups[&(*scenario, Policy::FixedSpaceFilling)];
-        let baseline_costs: Vec<f64> = baseline_trials.iter().map(|trial| trial.restricted_cost).collect();
-        let baseline_utilities: Vec<f64> = baseline_trials.iter().map(|trial| trial.utility_per_trial).collect();
+        let baseline_costs: Vec<f64> = baseline_trials
+            .iter()
+            .map(|trial| trial.restricted_cost)
+            .collect();
+        let baseline_utilities: Vec<f64> = baseline_trials
+            .iter()
+            .map(|trial| trial.utility_per_trial)
+            .collect();
         let baseline_mean_cost = mean(&baseline_costs);
         let baseline_mean_utility = mean(&baseline_utilities);
 
@@ -189,9 +198,18 @@ pub fn summarize_paired_campaigns(
                 .iter()
                 .filter_map(|trial| trial.successful_discovery_cost)
                 .collect();
-            let utilities_all: Vec<f64> = trials.iter().map(|trial| trial.utility_per_trial).collect();
-            let utilities_found: Vec<f64> = trials.iter().filter_map(|trial| trial.utility_if_found).collect();
-            let throughput_all: Vec<f64> = trials.iter().map(|trial| trial.throughput_per_trial).collect();
+            let utilities_all: Vec<f64> = trials
+                .iter()
+                .map(|trial| trial.utility_per_trial)
+                .collect();
+            let utilities_found: Vec<f64> = trials
+                .iter()
+                .filter_map(|trial| trial.utility_if_found)
+                .collect();
+            let throughput_all: Vec<f64> = trials
+                .iter()
+                .map(|trial| trial.throughput_per_trial)
+                .collect();
             let resources: Vec<f64> = trials.iter().map(|trial| trial.resource_units).collect();
             let full_rank_count = trials.iter().filter(|trial| trial.full_rank).count() as f64;
             let (cost_low, cost_high) = mean_interval(&costs);
@@ -203,21 +221,35 @@ pub fn summarize_paired_campaigns(
                 trials: trials.len() as u32,
                 discoveries: found_costs.len() as u32,
                 discovery_rate: found_costs.len() as f64 / trials.len() as f64,
-                mean_discovery_cost_when_found: (!found_costs.is_empty()).then(|| mean(&found_costs)),
+                mean_discovery_cost_when_found: if found_costs.is_empty() {
+                    None
+                } else {
+                    Some(mean(&found_costs))
+                },
                 restricted_mean_cost_to_discovery_units: mean_cost,
                 restricted_mean_cost_ci95_lower: cost_low.max(0.0),
                 restricted_mean_cost_ci95_upper: cost_high.min(
                     trials.iter().map(|trial| f64::from(trial.budget)).fold(0.0, f64::max),
                 ),
                 mean_conforming_utility_per_trial: mean_utility,
-                mean_best_utility_when_found: (!utilities_found.is_empty()).then(|| mean(&utilities_found)),
+                mean_best_utility_when_found: if utilities_found.is_empty() {
+                    None
+                } else {
+                    Some(mean(&utilities_found))
+                },
                 mean_conforming_throughput_per_trial: mean(&throughput_all),
                 mean_resource_units_per_trial: mean(&resources),
                 full_rank_design_rate: full_rank_count / trials.len() as f64,
-                acceleration_factor_vs_fixed_design: (mean_cost > 0.0)
-                    .then_some(baseline_mean_cost / mean_cost),
-                enhancement_factor_vs_fixed_design: (baseline_mean_utility > 0.0)
-                    .then_some(mean_utility / baseline_mean_utility),
+                acceleration_factor_vs_fixed_design: if mean_cost > 0.0 {
+                    Some(baseline_mean_cost / mean_cost)
+                } else {
+                    None
+                },
+                enhancement_factor_vs_fixed_design: if baseline_mean_utility > 0.0 {
+                    Some(mean_utility / baseline_mean_utility)
+                } else {
+                    None
+                },
             });
         }
     }
@@ -230,20 +262,44 @@ pub fn summarize_paired_campaigns(
             let seeds: Vec<u32> = baseline_trials.keys().copied().collect();
             let cost_deltas: Vec<f64> = seeds
                 .iter()
-                .map(|seed| candidate_trials[seed].restricted_cost - baseline_trials[seed].restricted_cost)
+                .map(|seed| {
+                    candidate_trials[seed].restricted_cost - baseline_trials[seed].restricted_cost
+                })
                 .collect();
             let utility_deltas: Vec<f64> = seeds
                 .iter()
-                .map(|seed| candidate_trials[seed].utility_per_trial - baseline_trials[seed].utility_per_trial)
+                .map(|seed| {
+                    candidate_trials[seed].utility_per_trial - baseline_trials[seed].utility_per_trial
+                })
                 .collect();
             let mean_cost_delta = mean(&cost_deltas);
             let (cost_delta_low, cost_delta_high) = mean_interval(&cost_deltas);
             let mean_utility_delta = mean(&utility_deltas);
             let (utility_delta_low, utility_delta_high) = mean_interval(&utility_deltas);
-            let baseline_mean_cost = mean(&baseline_trials.values().map(|trial| trial.restricted_cost).collect::<Vec<_>>());
-            let candidate_mean_cost = mean(&candidate_trials.values().map(|trial| trial.restricted_cost).collect::<Vec<_>>());
-            let baseline_mean_utility = mean(&baseline_trials.values().map(|trial| trial.utility_per_trial).collect::<Vec<_>>());
-            let candidate_mean_utility = mean(&candidate_trials.values().map(|trial| trial.utility_per_trial).collect::<Vec<_>>());
+            let baseline_mean_cost = mean(
+                &baseline_trials
+                    .values()
+                    .map(|trial| trial.restricted_cost)
+                    .collect::<Vec<_>>(),
+            );
+            let candidate_mean_cost = mean(
+                &candidate_trials
+                    .values()
+                    .map(|trial| trial.restricted_cost)
+                    .collect::<Vec<_>>(),
+            );
+            let baseline_mean_utility = mean(
+                &baseline_trials
+                    .values()
+                    .map(|trial| trial.utility_per_trial)
+                    .collect::<Vec<_>>(),
+            );
+            let candidate_mean_utility = mean(
+                &candidate_trials
+                    .values()
+                    .map(|trial| trial.utility_per_trial)
+                    .collect::<Vec<_>>(),
+            );
 
             paired_comparisons.push(PairedPolicyComparison {
                 scenario: *scenario,
@@ -257,10 +313,16 @@ pub fn summarize_paired_campaigns(
                 paired_delta_utility_ci95_lower: utility_delta_low,
                 paired_delta_utility_ci95_upper: utility_delta_high,
                 interval_excludes_zero_for_cost: cost_delta_low > 0.0 || cost_delta_high < 0.0,
-                acceleration_factor: (candidate_mean_cost > 0.0)
-                    .then_some(baseline_mean_cost / candidate_mean_cost),
-                enhancement_factor: (baseline_mean_utility > 0.0)
-                    .then_some(candidate_mean_utility / baseline_mean_utility),
+                acceleration_factor: if candidate_mean_cost > 0.0 {
+                    Some(baseline_mean_cost / candidate_mean_cost)
+                } else {
+                    None
+                },
+                enhancement_factor: if baseline_mean_utility > 0.0 {
+                    Some(candidate_mean_utility / baseline_mean_utility)
+                } else {
+                    None
+                },
             });
         }
     }
