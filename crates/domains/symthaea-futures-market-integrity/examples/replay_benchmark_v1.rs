@@ -8,8 +8,8 @@
 use std::collections::BTreeMap;
 
 use symthaea_futures_market_integrity::replay::{
-    paired_cluster_bootstrap, replay_horizons, ForecastObservation, ForecastTarget,
-    PairedForecastComparison, ReplayError, ReplayExclusionReason,
+    calibration_report, paired_cluster_bootstrap, replay_horizons, ForecastObservation,
+    ForecastTarget, PairedForecastComparison, ReplayError, ReplayExclusionReason,
 };
 
 const EVENT_COUNT: usize = 60;
@@ -137,6 +137,39 @@ fn run() -> Result<(), ReplayError> {
             .iter()
             .filter(|score| score.horizon_id == *horizon)
             .collect::<Vec<_>>();
+
+        for method in ["base_rate", "market", "shrinkage_candidate"] {
+            let method_scores = horizon_scores
+                .iter()
+                .filter(|score| score.forecaster_id == method)
+                .map(|score| (**score).clone())
+                .collect::<Vec<_>>();
+            if method_scores.is_empty() {
+                continue;
+            }
+            let calibration = calibration_report(&method_scores, 10)?;
+            for bin in &calibration.bins {
+                let mean_probability = bin
+                    .mean_forecast_probability
+                    .map(|value| format!("{value:.6}"))
+                    .unwrap_or_default();
+                let observed_frequency = bin
+                    .observed_frequency
+                    .map(|value| format!("{value:.6}"))
+                    .unwrap_or_default();
+                eprintln!(
+                    "CALIBRATION,{horizon},{method},{},{:.2},{:.2},{},{},{:.6}",
+                    bin.index,
+                    bin.lower_bound,
+                    bin.upper_bound,
+                    bin.count,
+                    mean_probability,
+                    observed_frequency,
+                    calibration.weighted_absolute_calibration_error
+                );
+            }
+        }
+
         let mut metric_rows = Vec::new();
         for method in ["base_rate", "market", "shrinkage_candidate"] {
             let scores = horizon_scores
