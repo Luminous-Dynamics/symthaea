@@ -812,23 +812,49 @@ mod tests {
         let first_report = run_selection_benchmark(&policy(), &first, &STRATEGIES).unwrap();
         let second_report = run_selection_benchmark(&policy(), &second, &STRATEGIES).unwrap();
         assert_eq!(first_report, second_report);
+        assert_eq!(first_report.policy_sha256.len(), 64);
+        assert_eq!(first_report.suite_sha256, second_report.suite_sha256);
+        assert_eq!(first_report.policy_sha256, second_report.policy_sha256);
+        assert!(first_report.results.iter().all(|result| result.scenario_sha256.len() == 64));
+        let receipt = benchmark_report_json(&first_report).unwrap();
+        assert!(receipt.contains("\"scenario_inputs\""));
+        assert!(receipt.contains("\"suite_sha256\""));
     }
 
     #[test]
     fn deceptive_proxy_scenarios_expose_nonzero_phase_a_regret() {
-        let scenarios = generate_synthetic_scenarios(100, 0xdec0, &policy());
-        let report = run_selection_benchmark(
+        let mut scenario = generate_synthetic_scenarios(1, 0xdec0, &policy()).remove(0);
+        scenario.resource_budget = 1.0;
+        scenario.resolution_threshold = 0.80;
+        for experiment in &mut scenario.experiments {
+            experiment.proposal.decision_relevance = DecisionRelevance::Exploratory;
+            experiment.proposal.expected_uncertainty_reduction_fraction = 0.01;
+            experiment.proposal.estimated_resource_cost.amount = 2.0;
+            experiment.oracle_information_gain = 0.05;
+        }
+
+        let misleading = &mut scenario.experiments[0];
+        misleading.proposal.decision_relevance =
+            DecisionRelevance::CanChangeFeasibilityOrDesignDecision;
+        misleading.proposal.expected_uncertainty_reduction_fraction = 0.99;
+        misleading.proposal.estimated_resource_cost.amount = 1.0;
+        misleading.oracle_information_gain = 0.05;
+
+        let decisive = &mut scenario.experiments[1];
+        decisive.proposal.decision_relevance = DecisionRelevance::Exploratory;
+        decisive.proposal.expected_uncertainty_reduction_fraction = 0.10;
+        decisive.proposal.estimated_resource_cost.amount = 1.0;
+        decisive.oracle_information_gain = 0.95;
+
+        let result = evaluate_scenario(
             &policy(),
-            &scenarios,
-            &[ExperimentSelectionStrategy::PhaseA, ExperimentSelectionStrategy::OracleUpperBound],
+            &scenario,
+            ExperimentSelectionStrategy::PhaseA,
         )
         .unwrap();
-        let phase_a: Vec<&ScenarioBenchmarkResult> = report
-            .results
-            .iter()
-            .filter(|result| result.strategy == ExperimentSelectionStrategy::PhaseA)
-            .collect();
-        assert!(phase_a.iter().any(|result| result.decision_regret > 1e-9));
+        assert_eq!(result.selected_experiment_ids, vec![misleading.proposal.experiment_id.clone()]);
+        assert!(result.decision_regret > 0.85);
+        assert!((result.oracle_minimum_cost_to_resolve.unwrap() - 1.0).abs() <= 1e-12);
     }
 
     #[test]
