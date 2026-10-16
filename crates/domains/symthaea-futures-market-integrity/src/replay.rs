@@ -324,10 +324,16 @@ pub fn calibration_report(
     let mut bins = Vec::with_capacity(bin_count);
     for index in 0..bin_count {
         let count = counts[index];
-        let mean_forecast_probability = (count > 0)
-            .then(|| probability_sums[index] / count as f64);
-        let observed_frequency =
-            (count > 0).then(|| positive_counts[index] as f64 / count as f64);
+        let mean_forecast_probability = if count > 0 {
+            Some(probability_sums[index] / count as f64)
+        } else {
+            None
+        };
+        let observed_frequency = if count > 0 {
+            Some(positive_counts[index] as f64 / count as f64)
+        } else {
+            None
+        };
         if let (Some(mean_probability), Some(observed)) =
             (mean_forecast_probability, observed_frequency)
         {
