@@ -1,0 +1,352 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:marine-measurement-observation:v1",
+  "title": "Symthaea policy-visible marine measurement observation v1",
+  "description": "Allow-listed evidence available to an experiment-selection policy. Must never contain simulator truth, applied noise/bias parameters, held-out labels, or evaluator keys.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_id",
+    "scenario_id",
+    "parameter",
+    "unit",
+    "outcome_status",
+    "observed_value",
+    "reported_interval",
+    "measurement_noise",
+    "systematic_bias",
+    "dependence",
+    "method_validity",
+    "operating_envelope_id",
+    "cost",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque join key; must not encode truth, split, noise seed, or fault assignment."
+    },
+    "parameter": {
+      "$ref": "#/$defs/parameter"
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome_status": {
+      "enum": [
+        "valid",
+        "inconclusive",
+        "invalid"
+      ]
+    },
+    "observed_value": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "reported_interval": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/interval"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "measurement_noise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "characterization",
+        "repeatability_sd",
+        "bounded_abs_error",
+        "model_id"
+      ],
+      "properties": {
+        "characterization": {
+          "enum": [
+            "characterized",
+            "uncharacterized",
+            "not_applicable"
+          ]
+        },
+        "repeatability_sd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "bounded_abs_error": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "model_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "systematic_bias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "bias_interval",
+        "justification_ref"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "bounded",
+            "unknown_unbounded",
+            "not_assessed"
+          ]
+        },
+        "bias_interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "justification_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "dependence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "group_id",
+        "justification_ref"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "independence_justified",
+            "correlated",
+            "unknown"
+          ]
+        },
+        "group_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "justification_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "method_validity": {
+      "enum": [
+        "validated_for_envelope",
+        "unsupported",
+        "calibration_failed",
+        "domain_mismatch",
+        "unknown"
+      ]
+    },
+    "operating_envelope_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "unit",
+        "basis_ref"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "source_revision",
+        "canonical_uri",
+        "content_sha256",
+        "rights_disposition",
+        "evaluator_id"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "canonical_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "content_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "rights_disposition": {
+          "enum": [
+            "verified_use",
+            "metadata_only",
+            "unknown_needs_review",
+            "restricted"
+          ]
+        },
+        "evaluator_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "parameter": {
+      "enum": [
+        "propulsion_energy_demand",
+        "usable_battery_energy",
+        "required_water_depth",
+        "available_water_depth",
+        "required_charge_power",
+        "available_charge_power"
+      ]
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper",
+        "unit",
+        "construction_method",
+        "coverage_level",
+        "method_id"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "construction_method": {
+          "enum": [
+            "validated_sensor_bounds",
+            "measurement_uncertainty_model",
+            "declared_range",
+            "unknown"
+          ]
+        },
+        "coverage_level": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "method_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome_status": {
+            "const": "valid"
+          }
+        },
+        "required": [
+          "outcome_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "observed_value": {
+            "type": "number"
+          },
+          "reported_interval": {
+            "$ref": "#/$defs/interval"
+          }
+        }
+      }
+    }
+  ]
+}
