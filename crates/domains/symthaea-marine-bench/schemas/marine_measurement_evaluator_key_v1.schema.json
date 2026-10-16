@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:marine-measurement-evaluator-key:v1",
+  "title": "Symthaea evaluator-only marine measurement oracle key v1",
+  "description": "Private scoring-side synthetic labels. This schema MUST NOT be imported, serialized into policy input, or exposed before action traces are sealed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "split",
+    "scenario_family",
+    "truth_parameters",
+    "disturbances",
+    "evaluator_manifest_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "development",
+        "calibration",
+        "held_out"
+      ]
+    },
+    "scenario_family": {
+      "enum": [
+        "clean",
+        "heteroscedastic_noise",
+        "outlier",
+        "systematic_bias",
+        "drift",
+        "correlated_measurements",
+        "missing_or_censored",
+        "invalid_test",
+        "calibration_failure",
+        "domain_mismatch",
+        "boundary_adversarial",
+        "unknown_unbounded_bias"
+      ]
+    },
+    "truth_parameters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/truth_parameter"
+      }
+    },
+    "disturbances": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/disturbance"
+      }
+    },
+    "evaluator_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "$defs": {
+    "parameter": {
+      "enum": [
+        "propulsion_energy_demand",
+        "usable_battery_energy",
+        "required_water_depth",
+        "available_water_depth",
+        "required_charge_power",
+        "available_charge_power"
+      ]
+    },
+    "truth_parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "truth_value",
+        "unit"
+      ],
+      "properties": {
+        "parameter": {
+          "$ref": "#/$defs/parameter"
+        },
+        "truth_value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "disturbance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "parameter",
+        "noise_seed",
+        "noise_draw",
+        "systematic_bias_applied",
+        "correlation_group_id",
+        "fault_injection"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameter": {
+          "$ref": "#/$defs/parameter"
+        },
+        "noise_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "noise_draw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "systematic_bias_applied": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "correlation_group_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "fault_injection": {
+          "enum": [
+            "none",
+            "outlier",
+            "drift",
+            "sensor_saturation",
+            "censored",
+            "missing",
+            "calibration_failure",
+            "domain_mismatch",
+            "biased_offset",
+            "contradicts_prior_interval"
+          ]
+        }
+      }
+    }
+  }
+}
