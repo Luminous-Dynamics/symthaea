@@ -38,7 +38,7 @@ It is intentionally **not** an atomistic model, optical solver, candidate genera
 }
 ~~~
 
-Output contains the policy/version, pool dimensions, requested budget, prior selections and ordered selected candidate IDs with policy-specific scores. The CLI also emits input_blake3, the BLAKE3 digest of the exact raw request bytes (including whitespace); orchestration should hash exact response bytes separately for a complete run receipt. Scores are selection diagnostics—not probabilities, uncertainty, physical properties, novelty, stability, safety or optical performance.
+Output contains the echoed input_schema_version, policy/version, pool dimensions, requested budget, prior selections and ordered selected candidate IDs with policy-specific scores. The CLI also emits input_blake3, the BLAKE3 digest of the exact raw request bytes (including whitespace); orchestration should hash exact response bytes separately for a complete run receipt. Scores are selection diagnostics—not probabilities, uncertainty, physical properties, novelty, stability, safety or optical performance.
 
 ## Build and test
 
