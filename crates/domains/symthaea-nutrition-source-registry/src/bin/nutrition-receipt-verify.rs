@@ -284,7 +284,134 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_strict_json;
+    use super::{parse_strict_json, verify_bundle, ReplayBundle};
+    use symthaea_nutrition_source_registry::{
+        assess_nutrition_source, ArtifactIntegrity, DataQualityEligibility, EvidenceClass,
+        Eligibility, FoodGeographicMatch, FoodIdentityConfidence, FoodMatchQuality,
+        NutritionAssessability, NutritionFoodFactV1, NutritionSourceManifestV1, NutrientUnit,
+        PermissionDecision, PermissionEvidenceBasisV1, PermissionEvidenceLifecycleV1,
+        PermissionEvidenceV1, SourceLifecycle, SourcePermissionReferencesV1, SourcePermissionsV1,
+        SourceRightV1, SourceUseRequestV1, NutritionTransformationStepV1,
+        sha256_hex,
+    };
+
+    const EVALUATION_DATE: &str = "2026-10-15";
+    const TEST_ARTIFACT: &[u8] = b"synthetic nutrition source artifact v1";
+
+    fn manifest() -> NutritionSourceManifestV1 {
+        let evidence = [
+            ("license:assessment-clause", SourceRightV1::Assessment),
+            ("license:cache-clause", SourceRightV1::Cache),
+            ("license:transformation-clause", SourceRightV1::Transformation),
+            ("license:redistribution-clause", SourceRightV1::Redistribution),
+            ("license:commercial-use-clause", SourceRightV1::CommercialUse),
+            ("license:public-fixture-clause", SourceRightV1::PublicFixture),
+        ]
+        .into_iter()
+        .map(|(evidence_id, right)| PermissionEvidenceV1 {
+            evidence_id: evidence_id.to_owned(),
+            source_id: "fixture:food-table-v1".to_owned(),
+            right,
+            basis: PermissionEvidenceBasisV1::LicenseTerms,
+            evidence_uri: "https://example.invalid/license".to_owned(),
+            reviewed_on: "2026-01-01".to_owned(),
+            valid_until: "2027-01-01".to_owned(),
+            lifecycle: PermissionEvidenceLifecycleV1::Active,
+        })
+        .collect();
+
+        NutritionSourceManifestV1 {
+            schema_version: 1,
+            source_id: "fixture:food-table-v1".to_owned(),
+            publisher: "Synthetic test publisher".to_owned(),
+            dataset_title: "Synthetic food composition fixture".to_owned(),
+            dataset_edition: "v1".to_owned(),
+            source_uri: "https://example.invalid/food-table".to_owned(),
+            terms_uri: "https://example.invalid/terms".to_owned(),
+            license_id: "synthetic-fixture-only".to_owned(),
+            permission_references: SourcePermissionReferencesV1 {
+                use_for_assessment: Some("license:assessment-clause".to_owned()),
+                cache: Some("license:cache-clause".to_owned()),
+                transform: Some("license:transformation-clause".to_owned()),
+                redistribute: Some("license:redistribution-clause".to_owned()),
+                commercial_use: Some("license:commercial-use-clause".to_owned()),
+                public_fixture: Some("license:public-fixture-clause".to_owned()),
+            },
+            permission_evidence: evidence,
+            permissions: SourcePermissionsV1 {
+                use_for_assessment: PermissionDecision::AllowedByLicense,
+                cache: PermissionDecision::AllowedByLicense,
+                transform: PermissionDecision::AllowedByLicense,
+                redistribute: PermissionDecision::AllowedByLicense,
+                commercial_use: PermissionDecision::AllowedByLicense,
+                public_fixture: PermissionDecision::AllowedByLicense,
+            },
+            artifact_sha256: Some(sha256_hex(TEST_ARTIFACT)),
+            retrieved_on: "2026-01-02".to_owned(),
+            reviewed_on: "2026-01-01".to_owned(),
+            review_valid_until: "2027-01-01".to_owned(),
+            lifecycle: SourceLifecycle::Active,
+        }
+    }
+
+    fn fact() -> NutritionFoodFactV1 {
+        NutritionFoodFactV1 {
+            schema_version: 1,
+            source_id: "fixture:food-table-v1".to_owned(),
+            source_record_id: "row-001".to_owned(),
+            source_record_citation: "Synthetic fixture row 001".to_owned(),
+            food_id: "food:test-leaf".to_owned(),
+            food_description: "Synthetic leafy food".to_owned(),
+            food_taxon_ref: Some("taxon:synthetic-leaf".to_owned()),
+            cultivar_id: None,
+            identity_confidence: FoodIdentityConfidence::Reviewed,
+            food_state_id: "cooked_edible".to_owned(),
+            match_quality: FoodMatchQuality::ExactReviewedMatch,
+            geographic_match: FoodGeographicMatch::SouthAfricanLocal,
+            evidence_class: EvidenceClass::SyntheticFixture,
+            nutrient_id: "iron".to_owned(),
+            nutrient_definition_ref: "nutrient-definition:iron-v1".to_owned(),
+            unit: NutrientUnit::Milligrams,
+            value_scaled: Some(1250),
+            value_scale: 1000,
+            basis_grams: 100,
+            quality_notes: Vec::new(),
+            transformation_applied: false,
+            transformation_lineage: Vec::<NutritionTransformationStepV1>::new(),
+        }
+    }
+
+    fn use_request() -> SourceUseRequestV1 {
+        SourceUseRequestV1 {
+            retain_source_data: true,
+            transform_record: false,
+            commercial_use: false,
+            public_fixture: false,
+        }
+    }
+
+    fn valid_bundle() -> (ReplayBundle, Option<String>) {
+        let manifest = manifest();
+        let fact = fact();
+        let use_request = use_request();
+        let assessment = assess_nutrition_source(
+            &manifest,
+            &fact,
+            EVALUATION_DATE,
+            &use_request,
+            Some(TEST_ARTIFACT),
+        );
+        (
+            ReplayBundle {
+                manifest,
+                fact,
+                evaluation_date: EVALUATION_DATE.to_owned(),
+                use_request,
+                assessment,
+            },
+            Some(sha256_hex(TEST_ARTIFACT)),
+        )
+    }
 
     #[test]
     fn rejects_duplicate_top_level_property_names() {
@@ -302,5 +429,34 @@ mod tests {
             .expect("valid strict JSON parses");
         assert_eq!(parsed["food"], "Maïs 🥬");
         assert!(parsed["missing"].is_null());
+    }
+
+    #[test]
+    fn accepts_hash_consistent_receipt_without_calling_assessor_in_verifier() {
+        let (bundle, artifact_hash) = valid_bundle();
+        assert!(verify_bundle(&bundle, artifact_hash).is_ok());
+    }
+
+    #[test]
+    fn rejects_changed_outcome_when_decision_digest_is_stale() {
+        let (mut bundle, artifact_hash) = valid_bundle();
+        bundle.assessment.source_eligibility = Eligibility::Blocked;
+        let error = verify_bundle(&bundle, artifact_hash).expect_err("tampered outcome must fail");
+        assert!(error.to_string().contains("decision receipt digest mismatch"));
+    }
+
+    #[test]
+    fn rejects_changed_fact_when_component_digest_is_stale() {
+        let (mut bundle, artifact_hash) = valid_bundle();
+        bundle.fact.value_scaled = Some(1251);
+        let error = verify_bundle(&bundle, artifact_hash).expect_err("changed fact must fail");
+        assert!(error.to_string().contains("food fact digest mismatch"));
+    }
+
+    #[test]
+    fn rejects_missing_artifact_bytes_when_receipt_records_them() {
+        let (bundle, _) = valid_bundle();
+        let error = verify_bundle(&bundle, None).expect_err("artifact bytes must be provided");
+        assert!(error.to_string().contains("supplied artifact bytes"));
     }
 }
