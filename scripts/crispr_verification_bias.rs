@@ -30,6 +30,8 @@ pub struct VerificationDesign {
     pub top_k: usize,
     /// Attestation from the frozen design manifest; this module cannot prove it from rows.
     pub probability_sample: bool,
+    /// Inclusion probabilities refer to resolved, analyzable outcomes—not merely invitations.
+    pub resolved_outcome_inclusion_probabilities_verified: bool,
     /// All population members had nonzero chance of audit selection.
     pub all_candidates_have_nonzero_inclusion_probability: bool,
     /// Candidate order and K were frozen before audit outcomes were revealed.
@@ -40,15 +42,21 @@ pub struct VerificationDesign {
     pub full_ranking_census_verified: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AuditOutcome {
+    Positive,
+    AssayDefinedNegative,
+    UnknownUnassayed,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct AuditedCandidate {
     pub candidate_id: String,
     /// One-based position in the independently frozen complete ranking.
     pub rank: usize,
-    /// True for a positive under the pinned assay/reference definition; false only for an
-    /// assay-defined negative in the declared assay scope. Unknowns do not belong in this sample.
-    pub is_positive: bool,
-    /// Known probability that this candidate was included in the verification audit.
+    /// An unresolved outcome is a hard error; it must never be coerced to an assay-negative.
+    pub outcome: AuditOutcome,
+    /// Known probability that this candidate appears in the final resolved-label audit sample.
     pub inclusion_probability: f64,
 }
 
@@ -86,6 +94,8 @@ pub enum VerificationBiasError {
     InvalidPopulationSize,
     InvalidTopK { top_k: usize, population_size: usize },
     NonProbabilitySample,
+    ResolvedOutcomeInclusionProbabilitiesNotVerified,
+    UnresolvedOutcomeIncludedInAudit(String),
     ZeroInclusionProbabilityInFrame,
     RankingNotFrozen,
     OutcomeDependentSelection,
@@ -106,6 +116,8 @@ impl fmt::Display for VerificationBiasError {
             Self::InvalidPopulationSize => write!(f, "population size must be positive"),
             Self::InvalidTopK { top_k, population_size } => write!(f, "top_k {top_k} must be in 1..={population_size}"),
             Self::NonProbabilitySample => write!(f, "non-probability verification samples cannot identify population metrics"),
+            Self::ResolvedOutcomeInclusionProbabilitiesNotVerified => write!(f, "inclusion probabilities for resolved, analyzable outcomes are not independently verified"),
+            Self::UnresolvedOutcomeIncludedInAudit(id) => write!(f, "candidate {id} has an unknown/unresolved outcome; it cannot be treated as negative or silently dropped from the audit"),
             Self::ZeroInclusionProbabilityInFrame => write!(f, "every candidate in the target frame must have nonzero audit inclusion probability"),
             Self::RankingNotFrozen => write!(f, "ranking and K must be frozen before audit outcomes are revealed"),
             Self::OutcomeDependentSelection => write!(f, "audit selection must be outcome-blind conditional on the declared design"),
@@ -143,6 +155,9 @@ fn validate(
     }
     if !design.probability_sample {
         return Err(VerificationBiasError::NonProbabilitySample);
+    }
+    if !design.resolved_outcome_inclusion_probabilities_verified {
+        return Err(VerificationBiasError::ResolvedOutcomeInclusionProbabilitiesNotVerified);
     }
     if !design.all_candidates_have_nonzero_inclusion_probability {
         return Err(VerificationBiasError::ZeroInclusionProbabilityInFrame);
@@ -185,6 +200,9 @@ fn validate(
         if !ranks.insert(row.rank) {
             return Err(VerificationBiasError::DuplicateSampledRank(row.rank));
         }
+        if row.outcome == AuditOutcome::UnknownUnassayed {
+            return Err(VerificationBiasError::UnresolvedOutcomeIncludedInAudit(row.candidate_id.clone()));
+        }
         let p = row.inclusion_probability;
         if !p.is_finite() || p <= 0.0 || p > 1.0 {
             return Err(VerificationBiasError::InvalidInclusionProbability {
@@ -219,14 +237,14 @@ pub fn verification_bias_report(
     for row in sample {
         let weight = 1.0 / row.inclusion_probability;
         population_weights.push(weight);
-        if row.is_positive {
+        if row.outcome == AuditOutcome::Positive {
             total_positive_hat += weight;
             total_positive_observed += 1;
         }
         if row.rank <= design.top_k {
             top_k_observed += 1;
             top_k_weights.push(weight);
-            if row.is_positive {
+            if row.outcome == AuditOutcome::Positive {
                 top_k_positive_hat += weight;
                 top_k_positive_observed += 1;
             }
@@ -280,6 +298,7 @@ mod tests {
             top_k: k,
             probability_sample: true,
             all_candidates_have_nonzero_inclusion_probability: true,
+            resolved_outcome_inclusion_probabilities_verified: true,
             ranking_frozen_before_outcome_reveal: true,
             selection_outcome_blind: true,
             full_ranking_census_verified: true,
@@ -290,7 +309,7 @@ mod tests {
         AuditedCandidate {
             candidate_id: id.to_owned(),
             rank,
-            is_positive: positive,
+            outcome: if positive { AuditOutcome::Positive } else { AuditOutcome::AssayDefinedNegative },
             inclusion_probability: pi,
         }
     }
@@ -381,6 +400,19 @@ mod tests {
     fn outcome_dependent_sampling_is_rejected() {
         let mut d = design(4, 2); d.selection_outcome_blind = false;
         assert_eq!(verification_bias_report(&d, &[row("a", 1, true, 1.0)]), Err(VerificationBiasError::OutcomeDependentSelection));
+    }
+
+    #[test]
+    fn resolved_outcome_inclusion_probabilities_must_be_verified() {
+        let mut d = design(4, 2); d.resolved_outcome_inclusion_probabilities_verified = false;
+        assert_eq!(verification_bias_report(&d, &[row("a", 1, true, 1.0)]), Err(VerificationBiasError::ResolvedOutcomeInclusionProbabilitiesNotVerified));
+    }
+
+    #[test]
+    fn unknown_outcome_in_probability_audit_fails_closed() {
+        let mut unknown = row("u", 1, false, 1.0);
+        unknown.outcome = AuditOutcome::UnknownUnassayed;
+        assert_eq!(verification_bias_report(&design(4, 2), &[unknown]), Err(VerificationBiasError::UnresolvedOutcomeIncludedInAudit("u".to_owned())));
     }
 
     #[test]
