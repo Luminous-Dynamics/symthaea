@@ -982,6 +982,10 @@ mod tests {
 
         let incomplete = vec![bindings[1].clone()];
         assert!(action_frame_to_ros_trajectory_v2(&frame, &incomplete, 20_000_000).is_err());
+
+        let mut wrong_profile = test_uec_effort_bindings();
+        wrong_profile[0].profile_id = "different.robot-profile.v1".into();
+        assert!(action_frame_to_ros_trajectory_v2(&frame, &wrong_profile, 20_000_000).is_err());
     }
 
     #[test]
