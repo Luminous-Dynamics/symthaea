@@ -189,6 +189,21 @@ An independent checker reads the frozen manifest and raw output/trajectory recei
 
 A passing computational benchmark supports only the tested model, task, chemistry, conditions and horizon. It does not establish experimental agreement, synthesizability, safety, device performance or universal transfer. Those are distinct gates.
 
+### Experimental reality-gap gate (separate from computational qualification)
+
+A further paradigm shift is to qualify predictions against the observable that matters in a real material—not merely against another computational label. *UniFFBench* (published 14 July 2026) evaluates universal machine-learning force fields against experimental reference values across 1,500+ mineral systems and reports that impressive computational benchmark performance did not guarantee the density accuracy needed for practical use. It also reports a disconnect between simulation stability and mechanical-property accuracy: https://doi.org/10.1038/s43588-026-01019-4
+
+This study is not a nanocrystal benchmark and its numerical thresholds must not be transferred to CdSe or other nanosystems. It supports a general evaluation principle: whenever a claim extends beyond computational emulation, add a separate experiment-anchored gate with the exact observable and material-specific conditions.
+
+Before an experimental comparison, preregister:
+- the measured observable, units, specimen state, composition/morphology, processing/passivation, temperature/pressure/environment, and measurement protocol;
+- sample/data provenance, use rights, measurement uncertainty, instrument/batch lineage, missingness, and whether each label is experimental, derived, or simulated;
+- a group-aware holdout by specimen/material family or experimental batch, as applicable, preventing near-duplicate measurements or simulations of the same specimen from leaking across splits;
+- the physically appropriate acceptance tolerance based on measurement uncertainty and intended use, not an arbitrary universal nanotechnology error threshold;
+- an independent metric reconstruction using saved predictions and measurement records.
+
+Do not substitute a DFT value for experimental validation, infer a measured property from trajectory survival, or call a model “experimentally validated” after fitting the same measurements it is scored against. If no matched experimental dataset exists, mark this gate unavailable and keep any result explicitly computational.
+
 ## 6. Mandatory negative controls
 
 - **Trajectory-family leak canary:** deliberately place related frames/replicas across a synthetic split; the independent checker must detect forbidden overlap.
