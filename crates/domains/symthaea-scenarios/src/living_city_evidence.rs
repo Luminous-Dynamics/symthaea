@@ -541,6 +541,7 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 /// file into memory. Suitable for large BIM, GIS and simulation result files.
 pub fn sha256_reader_hex<R: std::io::Read>(mut reader: R) -> std::io::Result<String> {
     use sha2::{Digest, Sha256};
+    use std::io::Read as _;
 
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 64 * 1024];
