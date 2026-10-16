@@ -832,6 +832,20 @@
       },
       "result": "Independent inverse-inclusion-weight sums matched F14 exactly. Complete-case audit-sample recall is 0.5 while the design-weighted ratio estimate is 1/3, demonstrating that they answer different questions under unequal inclusion probabilities.",
       "scope_limit": "Direct synthetic arithmetic only; it does not execute Rust, verify a real sample design, produce confidence intervals, validate biology, or demonstrate Symthaea improvement."
+    },
+    "verification_bias_ht_count_unbiasedness_oracle": {
+      "status": "passed_independent_conditional_bernoulli_ht_count_oracle_only",
+      "executed_on": "2026-10-16",
+      "deterministic_fixtures": 2048,
+      "nonempty_sample_subsets_enumerated": 128512,
+      "maximum_absolute_expectation_errors": {
+        "population_candidate_count": 5.329070518200751e-15,
+        "population_positive_count": 1.3322676295501878e-15,
+        "top_k_candidate_count": 5.329070518200751e-15,
+        "top_k_positive_count": 8.881784197001252e-16
+      },
+      "result": "Conditional independent-Bernoulli audit designs were exhaustively enumerated for non-empty samples. Inverse-inclusion-probability totals recovered the exact finite-population candidate, positive, top-K candidate and top-K positive counts in design expectation, with maximum absolute errors below 6e-15.",
+      "scope_limit": "This checks Horvitz-Thompson count-estimator mathematics on the enumerated designs only. It does not test Rust, validate real sampling declarations, establish ratio-estimator unbiasedness, produce confidence interval coverage, or support biological or Symthaea performance claims."
     }
   }
 }
