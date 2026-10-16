@@ -43,6 +43,8 @@ pub enum ReplayError {
         /// Horizon whose comparison key collided.
         horizon_id: String,
     },
+    /// Fewer than two distinct cluster labels were supplied for uncertainty estimation.
+    InsufficientClusters,
     /// Bootstrap replication count was too small or the reproducibility seed was invalid.
     InvalidBootstrapConfig,
     /// A non-finite numeric input was supplied to the comparison evaluator.
@@ -481,6 +483,9 @@ pub fn paired_cluster_bootstrap(
         .map(|values| values.iter().sum::<f64>() / values.len() as f64)
         .collect::<Vec<_>>();
     let cluster_count = cluster_means.len();
+    if cluster_count < 2 {
+        return Err(ReplayError::InsufficientClusters);
+    }
     let mean_brier_difference = cluster_means.iter().sum::<f64>() / cluster_count as f64;
 
     let mut rng_state = seed;
@@ -608,6 +613,10 @@ mod tests {
 
     #[test]
     fn clustered_bootstrap_rejects_empty_duplicate_or_invalid_input() {
+        assert_eq!(
+            paired_cluster_bootstrap(&[paired("e", "h", "only-parent", true, 0.4, 0.5)], 1_000, 1),
+            Err(ReplayError::InsufficientClusters)
+        );
         assert_eq!(
             paired_cluster_bootstrap(&[], 1_000, 1),
             Err(ReplayError::EmptyComparisonSet)
