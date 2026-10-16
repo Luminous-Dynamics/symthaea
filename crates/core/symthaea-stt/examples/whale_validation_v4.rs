@@ -645,7 +645,7 @@ fn main() -> std::io::Result<()> {
             for _ in 0..20 {
                 grammar.train_sequence(events);
             }
-            println!("    Trained: {} ({} events)", filename, events.len());
+            println!("    Adapted on first partition: {} ({} events)", filename, events.len());
         }
     }
 
@@ -660,7 +660,7 @@ fn main() -> std::io::Result<()> {
     let mut train_scores = Vec::new();
     let mut test_scores = Vec::new();
 
-    println!("    Training set:");
+    println!("    First list partition (used for adaptation):");
     for (filename, events) in train_set {
         if events.len() >= 3 {
             let score = grammar.score_sequence(events);
@@ -669,7 +669,7 @@ fn main() -> std::io::Result<()> {
         }
     }
 
-    println!("\n    Test set:");
+    println!("\n    Second list partition (not a verified independent holdout):");
     for (filename, events) in test_set {
         if events.len() >= 3 {
             let score = grammar.score_sequence(events);
