@@ -68,6 +68,7 @@ pub mod suit_mission_tasks;
 pub mod suit_resource_budget;
 pub mod suit_peak_reservations;
 pub mod suit_peak_usage_measurements;
+pub mod suit_measurement_traceability;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
 pub mod simulator;
