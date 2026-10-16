@@ -21,9 +21,12 @@ use std::fs::{self, File};
 use std::io;
 use std::path::{Component, Path, PathBuf};
 use std::process;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use symthaea_scenarios::living_city_evidence::{
-    EvidenceManifest, ScenarioRunReceipt, evidence_manifest_sha256,
+    EVIDENCE_SCHEMA_VERSION, RECEIPT_SCHEMA_VERSION, EvidenceItem, EvidenceKind,
+    EvidenceManifest, GateStatus, OutputArtifact, ScenarioRunReceipt, ToolExecution,
+    ToolRunStatus, ValidationGate, evidence_manifest_sha256, sha256_hex,
     sha256_reader_hex, scenario_run_receipt_sha256, verify_manifest_source_digests,
     verify_receipt_manifest_link, verify_receipt_output_digests,
     verify_scenario_run_receipt_digest,
@@ -226,6 +229,151 @@ mod tests {
             "unexpected_authority": "trusted"
         }"#;
         assert!(serde_json::from_str::<VerificationBundle>(bundle).is_err());
+    }
+
+    fn write_valid_test_package() -> PathBuf {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        let unique = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let root = env::temp_dir().join(format!(
+            "symthaea-living-city-verify-{}-{unique}",
+            process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("sources")).unwrap();
+        fs::create_dir_all(root.join("outputs")).unwrap();
+
+        let source_bytes = b"synthetic survey source bytes";
+        let output_bytes = b"synthetic living-city metrics bytes";
+        fs::write(root.join("sources/survey.dat"), source_bytes).unwrap();
+        fs::write(root.join("outputs/metrics.dat"), output_bytes).unwrap();
+
+        let manifest = EvidenceManifest {
+            schema_version: EVIDENCE_SCHEMA_VERSION,
+            project_id: "integration-test-project".into(),
+            scenario_id: "integration-test-scenario".into(),
+            study_boundary_id: "synthetic-boundary".into(),
+            coordinate_reference_system: "synthetic-local-crs".into(),
+            items: vec![EvidenceItem {
+                id: "survey".into(),
+                kind: EvidenceKind::Measured,
+                source_uri: "fixture://survey".into(),
+                content_sha256: Some(sha256_hex(source_bytes)),
+                license_or_basis: "synthetic test fixture".into(),
+                units: "metres".into(),
+                spatial_scope: "synthetic site".into(),
+                temporal_scope: "synthetic instant".into(),
+                acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+                transformation_chain: vec!["fixture-generator/1".into()],
+                uncertainty_note: "synthetic fixture only".into(),
+                missing_reason: None,
+            }],
+        };
+        let manifest_digest = evidence_manifest_sha256(&manifest).unwrap();
+        fs::write(
+            root.join("manifest.json"),
+            serde_json::to_vec_pretty(&manifest).unwrap(),
+        )
+        .unwrap();
+
+        let output_digest = sha256_hex(output_bytes);
+        let receipt = ScenarioRunReceipt {
+            schema_version: RECEIPT_SCHEMA_VERSION,
+            run_id: "integration-run-001".into(),
+            scenario_id: "integration-test-scenario".into(),
+            repository: "Luminous-Dynamics/symthaea".into(),
+            commit_sha: "b".repeat(40),
+            dependency_lock_sha256: "1".repeat(64),
+            build_profile: "test-fixture".into(),
+            toolchain: "test-fixture".into(),
+            evidence_manifest_sha256: manifest_digest,
+            configuration_sha256: "2".repeat(64),
+            seed: Some(7),
+            tools: vec![ToolExecution {
+                tool_id: "synthetic-model".into(),
+                version: "fixture/1".into(),
+                executable_sha256: Some("3".repeat(64)),
+                arguments_sha256: "4".repeat(64),
+                status: ToolRunStatus::Succeeded,
+            }],
+            outputs: vec![OutputArtifact {
+                id: "metrics".into(),
+                media_type: "application/octet-stream".into(),
+                sha256: output_digest.clone(),
+            }],
+            gates: vec![ValidationGate {
+                gate_id: "artifact-integrity".into(),
+                required: true,
+                status: GateStatus::Pass,
+                reason: None,
+                not_applicable_approval_ref: None,
+                verifier_id: Some("test-verifier/1".into()),
+                evidence_sha256: Some(output_digest),
+            }],
+        };
+        let receipt_digest = scenario_run_receipt_sha256(&receipt).unwrap();
+        fs::write(
+            root.join("receipt.json"),
+            serde_json::to_vec_pretty(&receipt).unwrap(),
+        )
+        .unwrap();
+        fs::write(root.join("receipt.sha256"), format!("{receipt_digest}\n")).unwrap();
+
+        let bundle = serde_json::json!({
+            "schema_version": BUNDLE_SCHEMA_VERSION,
+            "manifest_path": "manifest.json",
+            "receipt_path": "receipt.json",
+            "receipt_sha256_path": "receipt.sha256",
+            "source_files": [
+                {"id": "survey", "path": "sources/survey.dat"}
+            ],
+            "output_files": [
+                {"id": "metrics", "path": "outputs/metrics.dat"}
+            ]
+        });
+        fs::write(
+            root.join("bundle.json"),
+            serde_json::to_vec_pretty(&bundle).unwrap(),
+        )
+        .unwrap();
+        root
+    }
+
+    #[test]
+    fn valid_run_package_verifies_end_to_end() {
+        let root = write_valid_test_package();
+        let report = verify_run_package(&root).unwrap();
+        assert_eq!(report["package_integrity"], "verified");
+        assert_eq!(report["verified_source_count"], 1);
+        assert_eq!(report["verified_output_count"], 1);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn corrupt_output_is_rejected_by_end_to_end_verifier() {
+        let root = write_valid_test_package();
+        fs::write(root.join("outputs/metrics.dat"), b"tampered metrics").unwrap();
+        assert!(verify_run_package(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn package_path_escape_is_rejected_end_to_end() {
+        let root = write_valid_test_package();
+        let bundle_path = root.join("bundle.json");
+        let bytes = fs::read(&bundle_path).unwrap();
+        let mut bundle: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        bundle["source_files"][0]["path"] = serde_json::Value::String("../outside.dat".into());
+        fs::write(&bundle_path, serde_json::to_vec_pretty(&bundle).unwrap()).unwrap();
+        assert!(verify_run_package(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn receipt_digest_sidecar_mismatch_is_rejected() {
+        let root = write_valid_test_package();
+        fs::write(root.join("receipt.sha256"), format!("{}\n", "0".repeat(64))).unwrap();
+        assert!(verify_run_package(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
