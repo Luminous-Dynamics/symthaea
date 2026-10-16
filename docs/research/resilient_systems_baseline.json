@@ -334,11 +334,11 @@
       "resource_tests_authored": 18,
       "repair_scheduling_tests_authored": 17,
       "robust_repair_evaluation_tests_authored": 10,
-      "total_rust_tests_authored": 91,
-      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, tiny exact oracle 9. None have been compiled or executed in the current environment.",
+      "total_rust_tests_authored": 93,
+      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, tiny exact oracle and policy-gap evaluator 11. None have been compiled or executed in the current environment.",
       "rolling_horizon_repair_tests_authored": 11,
       "repair_policy_comparison_tests_authored": 6,
-      "exact_oracle_tests_authored": 9
+      "exact_oracle_tests_authored": 11
     },
     "performance_targets": {
       "status": "proposed_unmeasured_targets",
@@ -939,7 +939,7 @@
       "7": 5040,
       "8": 40320
     },
-    "tests_authored": 9,
+    "tests_authored": 11,
     "tests_executed": false,
     "reference_fixtures": [
       {
@@ -1018,6 +1018,29 @@
       "https://doi.org/10.1287/trsc.2023.0227",
       "https://doi.org/10.1016/j.cor.2020.104935",
       "https://pmc.ncbi.nlm.nih.gov/articles/PMC9679711/"
-    ]
+    ],
+    "policy_gap_evaluator": {
+      "function": "evaluate_repair_policies_against_exact_optimum",
+      "policies": [
+        "priority_first",
+        "shortest_job_first",
+        "weighted_recovery_per_step"
+      ],
+      "outputs": [
+        "exact_optimum",
+        "policy_schedule_order",
+        "policy_weighted_completion_loss",
+        "absolute_optimality_gap",
+        "relative_optimality_gap"
+      ],
+      "reference_witness": {
+        "id": "ORACLE-01",
+        "priority_first_loss": 1110,
+        "priority_first_absolute_gap": 999,
+        "priority_first_relative_gap": 9,
+        "shortest_job_first_loss": 111,
+        "weighted_recovery_loss": 111
+      }
+    }
   }
 }
