@@ -512,6 +512,19 @@ mod tests {
         let fixed = schedule_repairs(&jobs, &crews, &[],
             &RepairSchedulingConfig::new(20, RepairSchedulingPolicy::PriorityFirst)).unwrap();
         assert_eq!(fixed.schedule.iter().map(|r| r.job_id.as_str()).collect::<Vec<_>>(), vec!["A", "C", "B"]);
+        // Replay only the fixed dispatch order, retiming each repair with the same
+        // realized durations. This is a paired comparison, not a clairvoyant oracle.
+        let mut crew_ready = 0usize;
+        let mut fixed_loss = 0.0;
+        for planned in &fixed.schedule {
+            let j = jobs.iter().find(|j| j.id == planned.job_id).unwrap();
+            let actual_duration = match planned.job_id.as_str() { "A" => 10, "B" => 2, "C" => 2, _ => unreachable!() };
+            let start = crew_ready.max(j.outage_start_step);
+            let finish = start + actual_duration;
+            crew_ready = finish;
+            fixed_loss += finish.min(20).saturating_sub(j.outage_start_step) as f64 * j.recovered_service_value_per_step;
+        }
+        assert!((fixed_loss - 922.0).abs() < 1.0e-9);
         let adaptive = run(&jobs, &crews, &[], &durations(&[("A", 10), ("B", 2), ("C", 2)]),
             20, RepairSchedulingPolicy::PriorityFirst);
         assert_eq!(adaptive.schedule.iter().map(|r| r.job_id.as_str()).collect::<Vec<_>>(), vec!["A", "B", "C"]);
@@ -581,7 +594,7 @@ mod tests {
     #[test]
     fn exact_horizon_completion_and_overrun_are_distinguished() {
         let jobs = vec![job("done", "g", 1, 0, 1.0, 0, &[], vec![]), job("long", "g", 1, 1, 2.0, 0, &[], vec![])];
-        let crews = vec![crew("crew", &["g"], 0)];
+        let crews = vec![crew("crew1", &["g"], 0), crew("crew2", &["g"], 0)];
         let report = run(&jobs, &crews, &[], &durations(&[("done", 2), ("long", 8)]), 2, RepairSchedulingPolicy::PriorityFirst);
         assert_eq!(report.jobs_completed_within_horizon, 1);
         assert_eq!(report.jobs_in_progress_at_horizon, 1);
