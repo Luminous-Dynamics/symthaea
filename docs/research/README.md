@@ -352,3 +352,8 @@ Open an issue on GitHub for research discussions.
 - [Robust repair evaluation](../../crates/domains/symthaea-engineering/src/robust_repair_evaluation.rs) — out-of-sample duration-scenario replay with nonanticipative baseline decisions, expected/worst/CVaR loss and per-scenario traces; not an adaptive optimizer.
 
 - [Robust repair evaluation](../../crates/domains/symthaea-engineering/src/robust_repair_evaluation.rs) — out-of-sample repair-duration scenarios, fixed nominal crew/job decisions, expected/worst/CVaR loss, and per-scenario replay traces; not an adaptive optimizer.
+
+
+## Resilient-systems feasibility program
+
+The deterministic service, resource, crew-scheduling, uncertainty, and event-triggered dispatch models are indexed by [the feasibility portfolio](./RESILIENT_SYSTEMS_FEASIBILITY_PORTFOLIO.md) and [benchmark protocol](./RESILIENT_SYSTEMS_BENCHMARKS.md). The newest adaptive dispatcher is [rolling_horizon_repair.rs](../../crates/domains/symthaea-engineering/src/rolling_horizon_repair.rs); use its decision traces to review information boundaries rather than inferring correctness from a single summary score.
