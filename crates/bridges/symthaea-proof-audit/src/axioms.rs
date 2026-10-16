@@ -206,7 +206,7 @@ mod tests {
     #[test]
     fn rejects_ambiguous_multiple_reports_including_output_spoofing() {
         let output = concat!(
-            "'thm' does not depend on any axioms\\n",
+            "'thm' does not depend on any axioms\n",
             "'thm' depends on axioms: [sorryAx]"
         );
         assert!(matches!(
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn binds_name_to_report_not_unrelated_quoted_diagnostic() {
-        let output = "warning: unrelated theorem 'other' was skipped\\n'foo' does not depend on any axioms";
+        let output = "warning: unrelated theorem 'other' was skipped\n'foo' does not depend on any axioms";
         let report = AxiomReport::parse(output).unwrap();
         assert_eq!(report.theorem, "foo");
         assert!(report.axioms.is_empty());
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn rejects_truncated_output_even_when_a_complete_report_precedes_it() {
         let output = concat!(
-            "'thm' does not depend on any axioms\\n",
+            "'thm' does not depend on any axioms\n",
             "[... output truncated at the capture limit ...]"
         );
         assert!(matches!(
