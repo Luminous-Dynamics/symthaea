@@ -183,10 +183,6 @@ fn fit_grid(observations: &[Observation], kind: ModelKind) -> ModelFit {
         let vmax = 60.0 + vmax_index as f64 * 2.0;
         for km_index in 1..=40 {
             let km = km_index as f64 * 0.25;
-            let ki_values: &[f64] = match kind {
-                ModelKind::MichaelisMenten => &[20.0],
-                ModelKind::SubstrateInhibition => &[],
-            };
             if kind == ModelKind::MichaelisMenten {
                 let squared_error = sse(observations, kind, vmax, km, 20.0);
                 if squared_error < best.sse {
@@ -215,7 +211,6 @@ fn fit_grid(observations: &[Observation], kind: ModelKind) -> ModelFit {
                     }
                 }
             }
-            let _ = ki_values;
         }
     }
     best
