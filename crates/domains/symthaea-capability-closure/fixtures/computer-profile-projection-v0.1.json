@@ -1,0 +1,889 @@
+{
+  "schema_version": "computer-profile-closure-projection-v0.1",
+  "source_atlas_corpus": {
+    "repository": "Luminous-Dynamics/mycelix",
+    "path": "docs/research/CIV_BOOT_COMPUTER_REPRO_CORPUS_V0_1.json",
+    "git_blob_sha": "e9a7a8bce54d0ec89151ee011a5bb3d7002b5134"
+  },
+  "disclaimer": "Synthetic structural projection only. Inputs are declared scenario facts; output does not establish physical build success, current inventory quantities, calibration adequacy, host removal, manufacturing safety, economics, or semiconductor fab capability.",
+  "fixtures": [
+    {
+      "id": "CP01_local_support_import_dependent_computer",
+      "equivalence_group": "support-vs-compute-import-boundary",
+      "unresolved_prerequisites": [],
+      "problem": {
+        "local_primitives": [
+          "basic_tools",
+          "measurement_capability",
+          "polymer_stock",
+          "board_assembly_bench",
+          "electrical_test_fixture"
+        ],
+        "imports": [
+          "bare_pcb",
+          "cpu_module",
+          "memory_module",
+          "passives",
+          "power_module",
+          "storage_module",
+          "boot_image"
+        ],
+        "targets": [
+          "local_enclosure",
+          "assembled_board",
+          "repairable_computer",
+          "bare_pcb_local_fabrication",
+          "die_fabrication"
+        ],
+        "routes": [
+          {
+            "id": "make-enclosure",
+            "output": "local_enclosure",
+            "required_capabilities": [
+              "basic_tools",
+              "measurement_capability",
+              "polymer_stock"
+            ]
+          },
+          {
+            "id": "assemble-board",
+            "output": "assembled_board",
+            "required_capabilities": [
+              "board_assembly_bench",
+              "bare_pcb",
+              "cpu_module",
+              "passives"
+            ]
+          },
+          {
+            "id": "assemble-computer",
+            "output": "repairable_computer",
+            "required_capabilities": [
+              "local_enclosure",
+              "assembled_board",
+              "memory_module",
+              "power_module",
+              "storage_module",
+              "boot_image",
+              "electrical_test_fixture"
+            ]
+          },
+          {
+            "id": "fabricate-bare-pcb",
+            "output": "bare_pcb_local_fabrication",
+            "required_capabilities": [
+              "board_chemistry",
+              "lamination_press",
+              "conductor_processing",
+              "pcb_inspection"
+            ]
+          },
+          {
+            "id": "fabricate-die",
+            "output": "die_fabrication",
+            "required_capabilities": [
+              "wafer_materials",
+              "lithography_system",
+              "deposition_etch",
+              "process_metrology",
+              "advanced_facility"
+            ]
+          }
+        ]
+      },
+      "expected_disposition": "Valid",
+      "expected": {
+        "reachability": {
+          "locally_reproducible": [
+            "basic_tools",
+            "board_assembly_bench",
+            "electrical_test_fixture",
+            "local_enclosure",
+            "measurement_capability",
+            "polymer_stock"
+          ],
+          "operationally_reachable": [
+            "assembled_board",
+            "bare_pcb",
+            "basic_tools",
+            "board_assembly_bench",
+            "boot_image",
+            "cpu_module",
+            "electrical_test_fixture",
+            "local_enclosure",
+            "measurement_capability",
+            "memory_module",
+            "passives",
+            "polymer_stock",
+            "power_module",
+            "repairable_computer",
+            "storage_module"
+          ],
+          "targets": [
+            {
+              "target": "assembled_board",
+              "status": "ImportDependent"
+            },
+            {
+              "target": "bare_pcb_local_fabrication",
+              "status": "Unavailable"
+            },
+            {
+              "target": "die_fabrication",
+              "status": "Unavailable"
+            },
+            {
+              "target": "local_enclosure",
+              "status": "LocallyClosed"
+            },
+            {
+              "target": "repairable_computer",
+              "status": "ImportDependent"
+            }
+          ]
+        },
+        "import_leverage": [
+          {
+            "import": "bare_pcb",
+            "targets_lost_if_removed": [
+              "assembled_board",
+              "repairable_computer"
+            ],
+            "capability_count_lost": 3
+          },
+          {
+            "import": "boot_image",
+            "targets_lost_if_removed": [
+              "repairable_computer"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "cpu_module",
+            "targets_lost_if_removed": [
+              "assembled_board",
+              "repairable_computer"
+            ],
+            "capability_count_lost": 3
+          },
+          {
+            "import": "memory_module",
+            "targets_lost_if_removed": [
+              "repairable_computer"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "passives",
+            "targets_lost_if_removed": [
+              "assembled_board",
+              "repairable_computer"
+            ],
+            "capability_count_lost": 3
+          },
+          {
+            "import": "power_module",
+            "targets_lost_if_removed": [
+              "repairable_computer"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "storage_module",
+            "targets_lost_if_removed": [
+              "repairable_computer"
+            ],
+            "capability_count_lost": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP02_finished_computer_does_not_imply_reproduction",
+      "equivalence_group": null,
+      "unresolved_prerequisites": [],
+      "problem": {
+        "local_primitives": [
+          "diagnostic_tools",
+          "operator_skill"
+        ],
+        "imports": [
+          "finished_computer"
+        ],
+        "targets": [
+          "operational_computer",
+          "reproducible_computer"
+        ],
+        "routes": [
+          {
+            "id": "use-finished-computer",
+            "output": "operational_computer",
+            "required_capabilities": [
+              "finished_computer"
+            ]
+          },
+          {
+            "id": "reproduce-computer",
+            "output": "reproducible_computer",
+            "required_capabilities": [
+              "bare_pcb",
+              "cpu_module",
+              "toolchain_archive",
+              "board_assembly_bench"
+            ]
+          }
+        ]
+      },
+      "expected_disposition": "Valid",
+      "expected": {
+        "reachability": {
+          "locally_reproducible": [
+            "diagnostic_tools",
+            "operator_skill"
+          ],
+          "operationally_reachable": [
+            "diagnostic_tools",
+            "finished_computer",
+            "operational_computer",
+            "operator_skill"
+          ],
+          "targets": [
+            {
+              "target": "operational_computer",
+              "status": "ImportDependent"
+            },
+            {
+              "target": "reproducible_computer",
+              "status": "Unavailable"
+            }
+          ]
+        },
+        "import_leverage": [
+          {
+            "import": "finished_computer",
+            "targets_lost_if_removed": [
+              "operational_computer"
+            ],
+            "capability_count_lost": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP03_local_controller_alternative_keeps_bounded_capability",
+      "equivalence_group": null,
+      "unresolved_prerequisites": [],
+      "problem": {
+        "local_primitives": [
+          "local_mcu",
+          "local_controller_board",
+          "diagnostics",
+          "board_assembly_bench"
+        ],
+        "imports": [
+          "controller_som",
+          "som_carrier",
+          "cpu_module",
+          "memory_module",
+          "gpu_module",
+          "workstation_pcb"
+        ],
+        "targets": [
+          "repairable_controller",
+          "high_compute_workstation"
+        ],
+        "routes": [
+          {
+            "id": "controller-from-local-mcu",
+            "output": "repairable_controller",
+            "required_capabilities": [
+              "local_mcu",
+              "local_controller_board",
+              "diagnostics",
+              "board_assembly_bench"
+            ]
+          },
+          {
+            "id": "controller-from-imported-som",
+            "output": "repairable_controller",
+            "required_capabilities": [
+              "controller_som",
+              "som_carrier",
+              "diagnostics",
+              "board_assembly_bench"
+            ]
+          },
+          {
+            "id": "assemble-high-compute-workstation",
+            "output": "high_compute_workstation",
+            "required_capabilities": [
+              "cpu_module",
+              "memory_module",
+              "gpu_module",
+              "workstation_pcb",
+              "board_assembly_bench"
+            ]
+          }
+        ]
+      },
+      "expected_disposition": "Valid",
+      "expected": {
+        "reachability": {
+          "locally_reproducible": [
+            "board_assembly_bench",
+            "diagnostics",
+            "local_controller_board",
+            "local_mcu",
+            "repairable_controller"
+          ],
+          "operationally_reachable": [
+            "board_assembly_bench",
+            "controller_som",
+            "cpu_module",
+            "diagnostics",
+            "gpu_module",
+            "high_compute_workstation",
+            "local_controller_board",
+            "local_mcu",
+            "memory_module",
+            "repairable_controller",
+            "som_carrier",
+            "workstation_pcb"
+          ],
+          "targets": [
+            {
+              "target": "high_compute_workstation",
+              "status": "ImportDependent"
+            },
+            {
+              "target": "repairable_controller",
+              "status": "LocallyClosed"
+            }
+          ]
+        },
+        "import_leverage": [
+          {
+            "import": "controller_som",
+            "targets_lost_if_removed": [],
+            "capability_count_lost": 1
+          },
+          {
+            "import": "cpu_module",
+            "targets_lost_if_removed": [
+              "high_compute_workstation"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "gpu_module",
+            "targets_lost_if_removed": [
+              "high_compute_workstation"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "memory_module",
+            "targets_lost_if_removed": [
+              "high_compute_workstation"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "som_carrier",
+            "targets_lost_if_removed": [],
+            "capability_count_lost": 1
+          },
+          {
+            "import": "workstation_pcb",
+            "targets_lost_if_removed": [
+              "high_compute_workstation"
+            ],
+            "capability_count_lost": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP04_missing_cpu_blocks_copy_but_not_local_support",
+      "equivalence_group": null,
+      "unresolved_prerequisites": [],
+      "problem": {
+        "local_primitives": [
+          "basic_tools",
+          "measurement_capability",
+          "polymer_stock",
+          "board_assembly_bench",
+          "electrical_test_fixture"
+        ],
+        "imports": [
+          "bare_pcb",
+          "memory_module",
+          "passives",
+          "power_module",
+          "storage_module",
+          "boot_image"
+        ],
+        "targets": [
+          "local_enclosure",
+          "assembled_board",
+          "repairable_computer"
+        ],
+        "routes": [
+          {
+            "id": "make-enclosure",
+            "output": "local_enclosure",
+            "required_capabilities": [
+              "basic_tools",
+              "measurement_capability",
+              "polymer_stock"
+            ]
+          },
+          {
+            "id": "assemble-board",
+            "output": "assembled_board",
+            "required_capabilities": [
+              "board_assembly_bench",
+              "bare_pcb",
+              "cpu_module",
+              "passives"
+            ]
+          },
+          {
+            "id": "assemble-computer",
+            "output": "repairable_computer",
+            "required_capabilities": [
+              "local_enclosure",
+              "assembled_board",
+              "memory_module",
+              "power_module",
+              "storage_module",
+              "boot_image",
+              "electrical_test_fixture"
+            ]
+          }
+        ]
+      },
+      "expected_disposition": "Valid",
+      "expected": {
+        "reachability": {
+          "locally_reproducible": [
+            "basic_tools",
+            "board_assembly_bench",
+            "electrical_test_fixture",
+            "local_enclosure",
+            "measurement_capability",
+            "polymer_stock"
+          ],
+          "operationally_reachable": [
+            "bare_pcb",
+            "basic_tools",
+            "board_assembly_bench",
+            "boot_image",
+            "electrical_test_fixture",
+            "local_enclosure",
+            "measurement_capability",
+            "memory_module",
+            "passives",
+            "polymer_stock",
+            "power_module",
+            "storage_module"
+          ],
+          "targets": [
+            {
+              "target": "assembled_board",
+              "status": "Unavailable"
+            },
+            {
+              "target": "local_enclosure",
+              "status": "LocallyClosed"
+            },
+            {
+              "target": "repairable_computer",
+              "status": "Unavailable"
+            }
+          ]
+        },
+        "import_leverage": [
+          {
+            "import": "bare_pcb",
+            "targets_lost_if_removed": [],
+            "capability_count_lost": 1
+          },
+          {
+            "import": "boot_image",
+            "targets_lost_if_removed": [],
+            "capability_count_lost": 1
+          },
+          {
+            "import": "memory_module",
+            "targets_lost_if_removed": [],
+            "capability_count_lost": 1
+          },
+          {
+            "import": "passives",
+            "targets_lost_if_removed": [],
+            "capability_count_lost": 1
+          },
+          {
+            "import": "power_module",
+            "targets_lost_if_removed": [],
+            "capability_count_lost": 1
+          },
+          {
+            "import": "storage_module",
+            "targets_lost_if_removed": [],
+            "capability_count_lost": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP05_unsupported_cycle_cannot_bootstrap",
+      "equivalence_group": null,
+      "unresolved_prerequisites": [],
+      "problem": {
+        "local_primitives": [],
+        "imports": [],
+        "targets": [
+          "controller",
+          "firmware_toolchain"
+        ],
+        "routes": [
+          {
+            "id": "controller-needs-toolchain",
+            "output": "controller",
+            "required_capabilities": [
+              "firmware_toolchain"
+            ]
+          },
+          {
+            "id": "toolchain-needs-controller",
+            "output": "firmware_toolchain",
+            "required_capabilities": [
+              "controller"
+            ]
+          }
+        ]
+      },
+      "expected_disposition": "Valid",
+      "expected": {
+        "reachability": {
+          "locally_reproducible": [],
+          "operationally_reachable": [],
+          "targets": [
+            {
+              "target": "controller",
+              "status": "Unavailable"
+            },
+            {
+              "target": "firmware_toolchain",
+              "status": "Unavailable"
+            }
+          ]
+        },
+        "import_leverage": []
+      }
+    },
+    {
+      "id": "CP06_shuffled_declarations_are_equivalent",
+      "equivalence_group": "support-vs-compute-import-boundary",
+      "unresolved_prerequisites": [],
+      "problem": {
+        "local_primitives": [
+          "board_assembly_bench",
+          "polymer_stock",
+          "measurement_capability",
+          "basic_tools",
+          "electrical_test_fixture"
+        ],
+        "imports": [
+          "storage_module",
+          "passives",
+          "bare_pcb",
+          "boot_image",
+          "power_module",
+          "cpu_module",
+          "memory_module"
+        ],
+        "targets": [
+          "die_fabrication",
+          "repairable_computer",
+          "assembled_board",
+          "bare_pcb_local_fabrication",
+          "local_enclosure"
+        ],
+        "routes": [
+          {
+            "id": "fabricate-die",
+            "output": "die_fabrication",
+            "required_capabilities": [
+              "advanced_facility",
+              "process_metrology",
+              "lithography_system",
+              "wafer_materials",
+              "deposition_etch"
+            ]
+          },
+          {
+            "id": "assemble-computer",
+            "output": "repairable_computer",
+            "required_capabilities": [
+              "electrical_test_fixture",
+              "boot_image",
+              "power_module",
+              "memory_module",
+              "storage_module",
+              "assembled_board",
+              "local_enclosure"
+            ]
+          },
+          {
+            "id": "fabricate-bare-pcb",
+            "output": "bare_pcb_local_fabrication",
+            "required_capabilities": [
+              "pcb_inspection",
+              "conductor_processing",
+              "lamination_press",
+              "board_chemistry"
+            ]
+          },
+          {
+            "id": "assemble-board",
+            "output": "assembled_board",
+            "required_capabilities": [
+              "passives",
+              "cpu_module",
+              "bare_pcb",
+              "board_assembly_bench"
+            ]
+          },
+          {
+            "id": "make-enclosure",
+            "output": "local_enclosure",
+            "required_capabilities": [
+              "polymer_stock",
+              "measurement_capability",
+              "basic_tools"
+            ]
+          }
+        ]
+      },
+      "expected_disposition": "Valid",
+      "expected": {
+        "reachability": {
+          "locally_reproducible": [
+            "basic_tools",
+            "board_assembly_bench",
+            "electrical_test_fixture",
+            "local_enclosure",
+            "measurement_capability",
+            "polymer_stock"
+          ],
+          "operationally_reachable": [
+            "assembled_board",
+            "bare_pcb",
+            "basic_tools",
+            "board_assembly_bench",
+            "boot_image",
+            "cpu_module",
+            "electrical_test_fixture",
+            "local_enclosure",
+            "measurement_capability",
+            "memory_module",
+            "passives",
+            "polymer_stock",
+            "power_module",
+            "repairable_computer",
+            "storage_module"
+          ],
+          "targets": [
+            {
+              "target": "assembled_board",
+              "status": "ImportDependent"
+            },
+            {
+              "target": "bare_pcb_local_fabrication",
+              "status": "Unavailable"
+            },
+            {
+              "target": "die_fabrication",
+              "status": "Unavailable"
+            },
+            {
+              "target": "local_enclosure",
+              "status": "LocallyClosed"
+            },
+            {
+              "target": "repairable_computer",
+              "status": "ImportDependent"
+            }
+          ]
+        },
+        "import_leverage": [
+          {
+            "import": "bare_pcb",
+            "targets_lost_if_removed": [
+              "assembled_board",
+              "repairable_computer"
+            ],
+            "capability_count_lost": 3
+          },
+          {
+            "import": "boot_image",
+            "targets_lost_if_removed": [
+              "repairable_computer"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "cpu_module",
+            "targets_lost_if_removed": [
+              "assembled_board",
+              "repairable_computer"
+            ],
+            "capability_count_lost": 3
+          },
+          {
+            "import": "memory_module",
+            "targets_lost_if_removed": [
+              "repairable_computer"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "passives",
+            "targets_lost_if_removed": [
+              "assembled_board",
+              "repairable_computer"
+            ],
+            "capability_count_lost": 3
+          },
+          {
+            "import": "power_module",
+            "targets_lost_if_removed": [
+              "repairable_computer"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "storage_module",
+            "targets_lost_if_removed": [
+              "repairable_computer"
+            ],
+            "capability_count_lost": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP07_unknown_inventory_stays_unresolved",
+      "equivalence_group": null,
+      "unresolved_prerequisites": [
+        "availability:cpu_module_stock"
+      ],
+      "problem": null,
+      "expected_disposition": "UnresolvedInput",
+      "expected": {
+        "reachability": null,
+        "import_leverage": null
+      }
+    },
+    {
+      "id": "CP08_board_assembly_does_not_close_die_fabrication",
+      "equivalence_group": null,
+      "unresolved_prerequisites": [],
+      "problem": {
+        "local_primitives": [
+          "board_assembly_bench",
+          "electrical_test_fixture",
+          "measurement_capability"
+        ],
+        "imports": [
+          "bare_pcb",
+          "cpu_module",
+          "passives"
+        ],
+        "targets": [
+          "assembled_board",
+          "die_fabrication"
+        ],
+        "routes": [
+          {
+            "id": "assemble-board",
+            "output": "assembled_board",
+            "required_capabilities": [
+              "board_assembly_bench",
+              "electrical_test_fixture",
+              "bare_pcb",
+              "cpu_module",
+              "passives"
+            ]
+          },
+          {
+            "id": "fabricate-die",
+            "output": "die_fabrication",
+            "required_capabilities": [
+              "wafer_materials",
+              "lithography_system",
+              "deposition_etch",
+              "process_metrology",
+              "advanced_facility"
+            ]
+          }
+        ]
+      },
+      "expected_disposition": "Valid",
+      "expected": {
+        "reachability": {
+          "locally_reproducible": [
+            "board_assembly_bench",
+            "electrical_test_fixture",
+            "measurement_capability"
+          ],
+          "operationally_reachable": [
+            "assembled_board",
+            "bare_pcb",
+            "board_assembly_bench",
+            "cpu_module",
+            "electrical_test_fixture",
+            "measurement_capability",
+            "passives"
+          ],
+          "targets": [
+            {
+              "target": "assembled_board",
+              "status": "ImportDependent"
+            },
+            {
+              "target": "die_fabrication",
+              "status": "Unavailable"
+            }
+          ]
+        },
+        "import_leverage": [
+          {
+            "import": "bare_pcb",
+            "targets_lost_if_removed": [
+              "assembled_board"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "cpu_module",
+            "targets_lost_if_removed": [
+              "assembled_board"
+            ],
+            "capability_count_lost": 2
+          },
+          {
+            "import": "passives",
+            "targets_lost_if_removed": [
+              "assembled_board"
+            ],
+            "capability_count_lost": 2
+          }
+        ]
+      }
+    }
+  ]
+}
