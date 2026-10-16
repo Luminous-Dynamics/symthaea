@@ -459,6 +459,8 @@ pub enum PlantStepTimingErrorV1 {
     UnexpectedClockMetadata,
     MissingSourceTimestamps,
     InconsistentDuration,
+    /// A legacy step adapter cannot consume measured-clock provenance safely.
+    MeasuredTimingRequiresExplicitBridge,
 }
 
 impl PlantStepTimingV1 {
@@ -619,6 +621,11 @@ pub trait EmbodimentBridge: Send + Sync {
         phi: f64,
     ) -> Result<EmbodimentResult, PlantStepTimingErrorV1> {
         timing.validate()?;
+        if timing.source != PlantStepTimeSourceV1::ConfiguredSimulationStep {
+            // Legacy step(dt) has no way to preserve or interpret the measured clock
+            // evidence. Measured timing must be consumed by an explicit bridge override.
+            return Err(PlantStepTimingErrorV1::MeasuredTimingRequiresExplicitBridge);
+        }
         Ok(self.step(thought_hv, timing.dt_seconds, phi))
     }
 
@@ -1024,6 +1031,33 @@ mod tests {
         assert_eq!(
             bridge.step_calls, 0,
             "invalid time evidence must not reach a legacy actuator/plant adapter"
+        );
+    }
+
+    #[test]
+    fn legacy_adapter_rejects_measured_time_until_bridge_handles_provenance() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+        };
+        let timing = PlantStepTimingV1::measured_interval(
+            9,
+            PlantStepTimeSourceV1::MeasuredMonotonicClock,
+            "robot-steady-clock",
+            "boot-17",
+            1_000_000,
+            6_000_000,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::MeasuredTimingRequiresExplicitBridge)
+        ));
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(
+            bridge.step_calls, 0,
+            "legacy dt-only adapter must not discard measured clock provenance"
         );
     }
 
