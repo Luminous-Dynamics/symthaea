@@ -1424,6 +1424,19 @@
       },
       "result": "Independent grid enumeration matched both bounded-simplex extrema and witness weights.",
       "scope_limit": "Synthetic finite-grid check only; not Rust compilation, statistical interval estimation, target-population estimation, or biological validation."
+    },
+    "transportability_exhaustive_grid_oracle": {
+      "status": "passed_independent_bounded_simplex_grid_oracle_only",
+      "executed_on": "2026-10-16",
+      "deterministic_fixture_count": 2000,
+      "contexts_per_fixture": 3,
+      "feasible_prevalence_weight_vectors_enumerated": 10856,
+      "endpoint_assignments_checked": 86848,
+      "prevalence_grid_step": 0.1,
+      "effect_delta_endpoints_grid_step": 0.1,
+      "mismatches": 0,
+      "result": "Greedy lower/upper target-mixture envelopes matched exhaustive feasible 0.1-grid weight enumeration and all per-context interval endpoint combinations for every tested fixture.",
+      "scope_limit": "This validates bounded-simplex arithmetic for deterministic grid fixtures only. It does not compile/run Rust, estimate real target-group prevalences, derive group confidence intervals, establish exchangeability, or establish biological/clinical validity."
     }
   },
   "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571",
