@@ -312,6 +312,12 @@ For policy comparisons, use paired label-sensitivity bounds on the same candidat
 
 **Exact-budget cardinality:** every policy compared at budget K must supply at least K candidates, and K must be positive. If it cannot, label the metric `not_estimable_at_budget_K`; do not evaluate a shorter list and report it as the same budget.
 
+**Multi-objective decision frontier:** report a Pareto frontier over preregistered, context-appropriate metrics rather than manufacturing a universal CRISPR score. Possible axes include macro recall at a fixed candidate budget, review slots at fixed recall, worst-group performance, label-sensitivity bounds, valid calibration loss, and measured compute. Every compared policy must use the same objective definitions, units, directions, episodes and availability rules. Do not replace missing/not-estimable values with zero; list excluded policies and reasons. Pareto membership is not, by itself, proof of improvement.
+
+The dependency-free helper [scripts/crispr_decision_frontier.rs](../../scripts/crispr_decision_frontier.rs) implements objective-direction-aware dominance. Its ten Rust unit tests are authored but not compiled or run in this authoring environment because rustc is unavailable.
+
+Context matters: recent reviews stress that off-target activity and its clinical interpretation differ by endpoint, editing system, cell/tissue context, and intended use. See [Stewart et al., Nature Genetics (2026)](https://doi.org/10.1038/s41588-025-02428-3) and [On-target and off-target activities of CRISPR therapeutics across scales, Trends in Biotechnology (2026)](https://doi.org/10.1016/j.tibtech.2026.07.015). V1 is a computational triage benchmark, not a universal biological or clinical-risk model.
+
 Keep efficiency, specificity, bystander outcomes, indels, delivery, immune outcomes, manufacturability and economics as separate axes unless an externally justified utility function is preregistered. Missing values mean “not measured,” not zero risk.
 
 ## Rust-first implementation shape
