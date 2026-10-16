@@ -125,7 +125,7 @@ The fixture pack generator writes the tree digest as the first whitespace-delimi
 
 - Every declared SFZ, MIDI, sample, engine executable, build-configuration file, captured WAV and comparison JSON file exists as a regular, non-symlink file and matches the declared SHA-256.
 - The fixture-pack receipt content matches the declared tree digest, and the full pack tree is independently rehashed. Symlinks and non-regular entries fail closed; `pack.sha256` is excluded only to avoid a self-referential digest.
-- The selected `fixture_id` exists in `fixtures.json`; its SFZ hash and byte length match the declared SFZ, and its sample-asset hash multiset matches the bundle declaration.
+- The selected `fixture_id` exists in `fixtures.json`; its SFZ hash and byte length match the declared SFZ, and its sample-asset paths, hashes, and byte lengths match the bundle declaration.
 - The differential receipt uses `muse-sfz-audio-differential-receipt-v1`, has a `measured_not_quality_qualified` status and metrics, and names the same candidate/reference WAV hashes as the bundle.
 - Failures are included in the JSON receipt, rather than converting absent, corrupt or mismatched artifacts into a pass.
 
