@@ -9,7 +9,7 @@
 
 SX-033 asks whether cumulative required consumption plus a declared reserve fits conservative supply. A system can satisfy that sum while two simultaneously active tasks overbook power, coolant throughput, data rate, compute budget or shared equipment.
 
-SX-034 models those as separate, dimensionally typed peak resource pools. It represents time in mission-relative integer milliseconds, not wall clock, and each reservation occupies a half-open interval [start, end). The sweep partitions each pool at every reservation boundary and computes worst-case concurrent demand on each elementary slice.
+SX-034 models those as separate, dimensionally typed peak resource pools. It represents time in mission-relative integer milliseconds, not wall clock, and each reservation occupies a half-open interval [start, end). An event-driven sweep partitions each pool at reservation boundaries and incrementally updates active required/optional demand. It processes endings before starts at the same tick, so half-open semantics are exact without rescanning every reservation at every slice.
 
 ## Conservative capacity and task priority
 
@@ -31,7 +31,7 @@ A plan pins the exact mission/configuration revision and SX-031/SX-032 digests. 
 
 The evaluator also checks pool and reservation evidence floors, provider revision, path reachability, environment scope and resource-kind identity. It rejects duplicate pool IDs, duplicate reservations, duplicate provider/resource pools, mismatched resource kinds, invalid or zero-length windows, invalid quantity intervals, unknown task/pool references and arithmetic overflow. It does not silently combine distinct supply pools.
 
-Plan, report and receipt SHA-256 digests have distinct domain tags and deterministic ordering. Receipt verification recomputes the SX-032 task plan and the reservation analysis from the exact inputs. The integration replay independently reimplements the canonical digest encodings. Digests are change evidence, not signatures, evidence authentication or qualification.
+Plan, report and receipt SHA-256 digests have distinct domain tags and deterministic ordering. Non-overbooked slices retain active-reservation count but omit the full ID list to keep normal-case output compact; overloaded slices include sorted active IDs for diagnosis. Receipt verification recomputes the SX-032 task plan and the reservation analysis from the exact inputs. The integration replay independently reimplements the canonical digest encodings. Digests are change evidence, not signatures, evidence authentication or qualification.
 
 ## Current synthetic tests
 
