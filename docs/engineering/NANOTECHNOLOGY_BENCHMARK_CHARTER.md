@@ -131,7 +131,7 @@ The repository's [recipe-sensitivity audit](https://github.com/pberlizov/nanopho
 - A candidate acceptance target for further work is **at least 18 in-spec designs per 100 actual calls** or **at least 20% lower best-error metric than the reproduced strongest baseline**, with paired/seed-aware 95% uncertainty intervals excluding no improvement. These are proposed go/no-go targets, not published standards. Finalize the primary endpoint/effect-size and sample size before holdout evaluation and do not switch endpoints afterwards.
 - Run mesh-stability and fabrication-robustness as separate gates. A split-ratio success under one frozen 2D TE simulation is not foundry DRC, calibrated insertion loss, fabricated yield, or a general photonic-device qualification.
 
-The Rust policy prototype in `tools/nano-policy-prototype` only selects candidates; a downstream harness owns the actual solver-call ledger and must not conflate selected IDs with completed simulations.
+The target-blind Rust selection kernel in [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568) only selects candidate IDs; a downstream harness owns the actual solver-call ledger and must not conflate selected IDs with completed simulations. Its cost-aware geometric coverage arm is not expected information gain, and predictive/uncertainty-guided arms require separate validation.
 
 ## 5. MOCLIP metasurface inverse design: a separate worked example
 
