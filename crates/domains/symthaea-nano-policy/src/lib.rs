@@ -219,7 +219,10 @@ pub fn handle_line(line: &str) -> String {
                 .unwrap_or_else(|_| fallback_error_json(&digest)),
             Err(error) => error_json(&digest, &error),
         },
-        Err(error) => error_json(&digest, &SelectionError::InvalidJson(error.to_string())),
+        Err(error) => error_json(
+            &digest,
+            &SelectionError::InvalidJson(error.to_string()),
+        ),
     }
 }
 
@@ -382,11 +385,21 @@ fn farthest_first(
         None,
         "lexicographic_seed",
     ));
-    update_distances(request, first, sorted, &selected_flags, &mut minimum_squared_distances);
+    update_distances(
+        request,
+        first,
+        sorted,
+        &selected_flags,
+        &mut minimum_squared_distances,
+    );
 
     while selected_count < budget {
-        let next = select_farthest(sorted, &selected_flags, &minimum_squared_distances)
-            .expect("budget is bounded by validated candidate count");
+        let next = select_farthest(
+            sorted,
+            &selected_flags,
+            &minimum_squared_distances,
+        )
+        .expect("budget is bounded by validated candidate count");
         let distance = minimum_squared_distances[next].sqrt();
         selected_flags[next] = true;
         selected_count += 1;
@@ -396,7 +409,13 @@ fn farthest_first(
             Some(distance),
             "maximin_normalized_descriptor_distance",
         ));
-        update_distances(request, next, sorted, &selected_flags, &mut minimum_squared_distances);
+        update_distances(
+            request,
+            next,
+            sorted,
+            &selected_flags,
+            &mut minimum_squared_distances,
+        );
     }
     decisions
 }
@@ -448,7 +467,9 @@ fn group_balanced_farthest_first(
                     .unwrap_or(0)
                     == least_represented_count
         });
-        let mut best = candidates.next().expect("a least-represented candidate exists");
+        let mut best = candidates
+            .next()
+            .expect("a least-represented candidate exists");
         for candidate_index in candidates {
             if minimum_squared_distances[candidate_index]
                 > minimum_squared_distances[best]
@@ -468,7 +489,13 @@ fn group_balanced_farthest_first(
             Some(distance),
             "least_represented_family_then_maximin_distance",
         ));
-        update_distances(request, best, sorted, &selected_flags, &mut minimum_squared_distances);
+        update_distances(
+            request,
+            best,
+            sorted,
+            &selected_flags,
+            &mut minimum_squared_distances,
+        );
     }
     decisions
 }
@@ -622,14 +649,26 @@ mod tests {
         let first = select(req.clone(), b"random-test").unwrap();
         let second = select(req, b"random-test").unwrap();
         assert_eq!(first, second);
-        let ids: BTreeSet<_> = first.selected.iter().map(|item| item.candidate_id.as_str()).collect();
+        let ids: BTreeSet<_> = first
+            .selected
+            .iter()
+            .map(|item| item.candidate_id.as_str())
+            .collect();
         assert_eq!(ids.len(), first.selected_count);
     }
 
     #[test]
     fn group_balanced_policy_spreads_across_families() {
-        let result = select(request(Policy::GroupBalancedFarthestFirst, 3), b"group-test").unwrap();
-        let family_count = result.selected.iter().map(|item| item.family_id.as_str()).collect::<BTreeSet<_>>();
+        let result = select(
+            request(Policy::GroupBalancedFarthestFirst, 3),
+            b"group-test",
+        )
+        .unwrap();
+        let family_count = result
+            .selected
+            .iter()
+            .map(|item| item.family_id.as_str())
+            .collect::<BTreeSet<_>>();
         assert_eq!(family_count.len(), 3);
     }
 
@@ -640,8 +679,16 @@ mod tests {
         second_req.candidates.reverse();
         let first = select(first_req, b"order-test-one").unwrap();
         let second = select(second_req, b"order-test-two").unwrap();
-        let first_ids: Vec<_> = first.selected.iter().map(|item| item.candidate_id.clone()).collect();
-        let second_ids: Vec<_> = second.selected.iter().map(|item| item.candidate_id.clone()).collect();
+        let first_ids: Vec<_> = first
+            .selected
+            .iter()
+            .map(|item| item.candidate_id.clone())
+            .collect();
+        let second_ids: Vec<_> = second
+            .selected
+            .iter()
+            .map(|item| item.candidate_id.clone())
+            .collect();
         assert_eq!(first_ids, second_ids);
     }
 
@@ -688,7 +735,8 @@ mod tests {
     fn handle_line_returns_receipt_for_valid_request() {
         let req = request(Policy::FarthestFirst, 2);
         let json = serde_json::to_string(&req).unwrap();
-        let response: SelectionResponse = serde_json::from_str(&handle_line(&json)).unwrap();
+        let response: SelectionResponse =
+            serde_json::from_str(&handle_line(&json)).unwrap();
         assert_eq!(response.status, "completed");
         assert_eq!(response.request_sha256, sha256_hex(json.as_bytes()));
     }
