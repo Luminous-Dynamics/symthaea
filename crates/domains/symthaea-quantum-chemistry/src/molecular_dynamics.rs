@@ -20,6 +20,7 @@
 //! to 0.1 Hartree (~63 kcal/mol) over a short trajectory -- a deliberately
 //! loose bound, not a validated conservation guarantee. This molecular,
 //! non-periodic HF/STO-3G implementation is not a qualified nanocrystal solver.
+//!
 //! References:
 //! - Car & Parrinello (1985). Phys. Rev. Lett. 55, 2471.
 //! - Marx & Hutter (2009). *Ab Initio Molecular Dynamics*. Cambridge UP.
@@ -389,15 +390,27 @@ mod tests {
             }
         }
         for component in momentum {
-            assert!(component.abs() < 1e-9, "center-of-mass momentum was not removed: {component:e}");
+            assert!(
+                component.abs() < 1e-9,
+                "center-of-mass momentum was not removed: {component:e}"
+            );
         }
         let (_, temperature) = kinetic_energy_and_temperature(&velocities, &masses);
-        assert!((temperature - 300.0).abs() < 1e-8, "initial temperature was {temperature}, expected 300 K");
+        assert!(
+            (temperature - 300.0).abs() < 1e-8,
+            "initial temperature was {temperature}, expected 300 K"
+        );
     }
 
     #[test]
     fn zero_temperature_initialization_is_exactly_stationary() {
         let velocities = initialize_velocities(&h2_masses(), 0.0, 19);
+        assert!(velocities.iter().flatten().all(|velocity| *velocity == 0.0));
+    }
+
+    #[test]
+    fn non_finite_temperature_does_not_create_non_finite_velocities() {
+        let velocities = initialize_velocities(&h2_masses(), f64::NAN, 19);
         assert!(velocities.iter().flatten().all(|velocity| *velocity == 0.0));
     }
 
