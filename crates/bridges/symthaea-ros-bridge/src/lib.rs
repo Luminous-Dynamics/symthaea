@@ -2827,6 +2827,96 @@ mod tests {
                 timestamp_ns: 100_000_000_000
             }
         ));
+
+        // A profile with coarse source-stamp resolution may explicitly permit
+        // identical source timestamps while still rejecting sequence replay.
+        let mut coarse_clock_policy = policy.clone();
+        coarse_clock_policy.reject_duplicate_source_stamp = false;
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &duplicate_joint,
+                Some(&next_imu),
+                &temporal_history_now(),
+                &coarse_clock_policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+    }
+
+    #[test]
+    fn temporal_history_requires_explicit_source_clock_jump_reset() {
+        let policy = temporal_test_policy();
+        let mut history =
+            RosTemporalHistoryV1::new("receipt-epoch", "source-epoch-1").unwrap();
+        let first_joint = temporal_history_sample(1, 100, 0);
+        let first_imu = temporal_history_sample(1, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &first_joint,
+                Some(&first_imu),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+
+        // Simulated source time has rewound while the bridge's local receive
+        // epoch has not. The time adapter must expose a new source-clock epoch.
+        let mut rewound_joint = temporal_history_sample(2, 5, 0);
+        rewound_joint.source_clock_epoch_id = Some("source-epoch-2".into());
+        let mut rewound_imu = temporal_history_sample(2, 5, 1_000_000);
+        rewound_imu.source_clock_epoch_id = Some("source-epoch-2".into());
+        let rewound_now = RosClockNowV1 {
+            domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-2".into(),
+            timestamp_ns: 5_010_000_000,
+        };
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &rewound_joint,
+                Some(&rewound_imu),
+                &rewound_now,
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::SourceClockEpochChanged {
+                expected_epoch_id,
+                observed_epoch_id
+            } if expected_epoch_id == "source-epoch-1" && observed_epoch_id == "source-epoch-2"
+        ));
+        assert_eq!(
+            history.last_joint_state.as_ref().unwrap().source_stamp_ns,
+            100_000_000_000
+        );
+
+        // Reset is an explicit lifecycle action; only after it does the new
+        // source-clock timeline become eligible for fresh history.
+        history
+            .reset_for_epochs("receipt-epoch", "source-epoch-2")
+            .unwrap();
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &rewound_joint,
+                Some(&rewound_imu),
+                &rewound_now,
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted {
+                joint_sequence_gap: 0,
+                imu_sequence_gap: 0
+            }
+        ));
     }
 
     #[test]
