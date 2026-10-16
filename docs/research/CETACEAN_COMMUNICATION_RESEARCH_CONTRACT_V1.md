@@ -22,13 +22,15 @@ The repository's own `crates/core/symthaea-stt/README.md` and `docs/communicatio
 
 This branch adds guarded paths in `cetacean_classifier.rs`:
 
+- `CetaceanConfig::dolphin_high_rate_research()` supplies an explicitly experimental 512 kHz / 150 kHz upper-band configuration for high-rate dolphin-audio exploration. This makes the declared front-end profile bandwidth-consistent; it does **not** qualify an echolocation-click detector or whistle-contour tracker.
 - `CetaceanConfig::validate` checks finite/ordered analysis bands, Nyquist limit, frame/hop geometry, FFT length and threshold ranges;
 - `CetaceanConfig::validate_source_sample_rate` rejects source bandwidth incompatible with the declared analysis band and refuses implicit downsampling through the current linear interpolator;
 - `CetaceanClassifier::try_new` and `try_classify_audio` provide checked construction and source-rate-aware processing; file classification uses the checked path.
 
 It also adds guarded paths in `whale.rs`:
 
-- `WhaleConfig::validate` checks the sample clock, timing bounds, click-count limits and LTC time constants;
+- `WhaleConfig::for_native_sample_rate()` binds the sperm-whale ICI timing profile to a declared native recording clock without resampling;
+- `WhaleConfig::validate` checks the sample clock, timing bounds, click-count limits and overflow-prone LTC time constants;
 - `try_with_config` / `try_process_buffer` reject invalid configurations, empty/non-finite input and sample-rate mismatch;
 - the coda ICI buffer now retains at most `max_coda_clicks - 1` intervals, matching the advertised maximum number of clicks.
 
