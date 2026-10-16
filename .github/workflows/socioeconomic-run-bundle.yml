@@ -10,6 +10,7 @@ on:
       - "scripts/socioeconomic_run_receipt_requirements.txt"
       - "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json"
       - "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_validator_attestation_predicate_v1.schema.json"
       - "docs/research/finance/SYM-FIN-SYS-016_RUN_BUNDLE_V1.md"
       - ".github/workflows/socioeconomic-run-bundle.yml"
   push:
@@ -23,6 +24,7 @@ on:
       - "scripts/socioeconomic_run_receipt_requirements.txt"
       - "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json"
       - "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_validator_attestation_predicate_v1.schema.json"
       - "docs/research/finance/SYM-FIN-SYS-016_RUN_BUNDLE_V1.md"
       - ".github/workflows/socioeconomic-run-bundle.yml"
   workflow_dispatch:
@@ -68,7 +70,8 @@ jobs:
           python3 scripts/write_socioeconomic_run_bundle_ci_report.py \
             --root . \
             --test-log evidence/test-output.txt \
-            --output evidence/qualification-report.json
+            --output evidence/qualification-report.json \
+            --predicate-output evidence/attestation-predicate.json
       - name: Validate execution record schema
         run: |
           python3 - <<'PY'
@@ -84,6 +87,20 @@ jobs:
                   print(f"FAIL: {list(error.absolute_path)}: {error.message}")
               raise SystemExit(1)
           print("PASS: execution record satisfies the versioned schema")
+          predicate_schema = json.loads(Path("docs/research/finance/SYM-FIN-SYS-016_validator_attestation_predicate_v1.schema.json").read_text())
+          predicate = json.loads(Path("evidence/attestation-predicate.json").read_text())
+          Draft202012Validator.check_schema(predicate_schema)
+          predicate_errors = sorted(Draft202012Validator(predicate_schema).iter_errors(predicate), key=lambda error: list(error.absolute_path))
+          if predicate_errors:
+              for error in predicate_errors:
+                  print(f"FAIL: predicate {list(error.absolute_path)}: {error.message}")
+              raise SystemExit(1)
+          import hashlib
+          report_bytes = Path("evidence/qualification-report.json").read_bytes()
+          expected = "sha256:" + hashlib.sha256(report_bytes).hexdigest()
+          if predicate.get("execution_record_digest") != expected:
+              raise SystemExit("FAIL: attestation predicate does not bind exact report bytes")
+          print("PASS: attestation predicate schema and exact report-byte binding verified")
           PY
       - name: Upload exact-head test evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -114,4 +131,4 @@ jobs:
         with:
           subject-path: evidence/qualification-report.json
           predicate-type: https://luminousdynamics.io/attestations/socioeconomic-run-bundle-validation/v1
-          predicate-path: evidence/qualification-report.json
+          predicate-path: evidence/attestation-predicate.json
