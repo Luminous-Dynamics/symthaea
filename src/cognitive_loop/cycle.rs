@@ -381,19 +381,29 @@ impl CognitiveLoopService {
                         self.config.cfc_config.delta_t,
                     ) {
                         Ok(timing) => {
-                            let result = bridge.step_with_timing(&thought_hv, &timing, phi);
-                            if result.success {
-                                let proprioceptive_hv = bridge.encode_perception();
-                                let w = self.config.embodiment_blend_weight;
-                                if w > 0.0 {
-                                    perception.encoding.encoding_result.hdv.lerp_in_place(
-                                        &proprioceptive_hv,
-                                        1.0 - w,
-                                        w,
+                            match bridge.step_with_timing(&thought_hv, &timing, phi) {
+                                Ok(result) if result.success => {
+                                    let proprioceptive_hv = bridge.encode_perception();
+                                    let w = self.config.embodiment_blend_weight;
+                                    if w > 0.0 {
+                                        perception.encoding.encoding_result.hdv.lerp_in_place(
+                                            &proprioceptive_hv,
+                                            1.0 - w,
+                                            w,
+                                        );
+                                    }
+                                    self.sensorimotor.last_proprioceptive_hv =
+                                        Some(proprioceptive_hv);
+                                }
+                                Ok(_) => {}
+                                Err(error) => {
+                                    tracing::error!(
+                                        target: "symthaea::embodiment",
+                                        cycle = cycle_num,
+                                        error = ?error,
+                                        "bridge rejected plant timing; embodiment step not authorized"
                                     );
                                 }
-                                self.sensorimotor.last_proprioceptive_hv =
-                                    Some(proprioceptive_hv);
                             }
                         }
                         Err(error) => {
