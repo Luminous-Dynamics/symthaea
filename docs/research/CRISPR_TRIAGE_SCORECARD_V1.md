@@ -84,7 +84,25 @@ For a **paired policy comparison**, do not infer superiority merely from overlap
 
 This is a sharp worst/best-case bound for Recall@K(A) - Recall@K(B) under unrestricted binary assignments to unknown labels inside the shared universe. A positive lower bound supports label-robust superiority *within that universe*; a bound spanning zero means observed-label improvement is not robust to all unresolved-label assignments. Neither outcome addresses positive sites omitted from every nomination method.
 
-### I. From price claims to causal cost accounting
+### I. From a universal score to a context-stratified Pareto frontier
+
+Recent work makes clear that “off-target activity,” “specificity,” and “risk” change meaning across contexts and scales; therapeutic interpretation may depend on cell/tissue context and functional consequences, not just a molecular edit score. See [Stewart et al., *Nature Genetics* (2026)](https://doi.org/10.1038/s41588-025-02428-3) and [On-target and off-target activities of CRISPR therapeutics across scales, *Trends in Biotechnology* (2026)](https://doi.org/10.1016/j.tibtech.2026.07.015). Uncertainty-aware prediction itself is already an established line of work (for example, [crispAI, *Nucleic Acids Research* (2024)](https://doi.org/10.1093/nar/gkae759)); Symthaea must demonstrate an incremental value rather than relabel existing ideas.
+
+The evaluation should **not** collapse molecular nomination, conditional ranking, editing magnitude, genomic/functional consequence, cell/tissue context, delivery, and treatment-access economics into one universal “CRISPR safety” score. These are distinct endpoints with different evidence requirements. This first vertical measures only computational candidate-triage performance; it cannot infer clinical harm from an off-target rank.
+
+Instead, report a **Pareto frontier** across a preregistered vector of supported objectives, potentially including:
+- maximize macro Recall@K at an exact review budget;
+- minimize candidate review slots at a fixed achieved recall;
+- maximize worst-guide/Cas9-group recall;
+- minimize the paired label-sensitivity interval width, while still reporting the interval's position;
+- minimize calibration loss only when probability and label semantics are valid;
+- minimize measured runtime/compute.
+
+The frontier keeps nondominated policies: no other policy is at least as good on every declared objective and strictly better on one. Different nondominated policies may represent legitimate trade-offs. Do not invent universal weights to force one winner, and do not convert missing/not-estimable values to zero. A policy enters a given frontier only when all of that frontier's preregistered metrics are available and comparable; report excluded policies and reasons separately.
+
+**Frontier acceptance gate:** 100% of compared vectors use the same objective definitions, units, direction, held-out episodes and metric availability rules. The output includes every nondominated policy and its full vector. Frontier membership is not a benchmark win by itself: any claim of improvement still requires the primary predeclared outcome, uncertainty interval and ablations to pass.
+
+### J. From price claims to causal cost accounting
 
 Report computational resources and review slots first. Progress to human review minutes only when measured. Report per-qualified-finding cost only when numerator and denominator are observed end-to-end. Do not convert fewer ranked candidates into claims of lower experimental costs, clinical costs, or treatment prices without prospective accounting.
 
@@ -101,6 +119,7 @@ Report computational resources and review slots first. Progress to human review 
 | T6 Incrementality | Does Symthaea add value over the same specialist predictions? | paired delta at equal budget; paired partial-label bounds; ablations; runtime/resource delta | benefit attributable to an upstream model unless ablated |
 | T7 Evidence/replay integrity | Can an independent evaluator detect tampering or leakage? | deterministic replay, exact manifest, negative controls, digest/count agreement | biological truth from cryptography alone |
 | T8 Partial-label identification | How much do unresolved labels change metric interpretation? | observed-label estimate, worst/best-case recall and precision bounds, unknown-label census | sites omitted from every nomination method; truth outside the fixed candidate universe |
+| T9 Multi-objective frontier | Which policies offer genuine trade-offs without arbitrary score weights? | complete objective vectors, dominated-policy count, Pareto membership, excluded-policy reasons | a universal safety score or proof of biological/clinical improvement |
 
 Tracks are reported separately. A composite “CRISPR score” that hides failed nomination, calibration, or generalization is prohibited.
 
@@ -244,6 +263,10 @@ The machine-readable companion contract contains four small fixtures intended to
 5. **F5 — partial-label sensitivity bounds.** Two measured positives and two unknown candidates with K=2 produce observed known-label recall 0.5, conditional recall bounds [1/3, 2/3], and precision bounds [0.5, 1.0]. The bounds vary unknown labels only inside this exact universe.
 
 6. **F6 — paired policy delta.** Two policies have the same five candidate IDs and labels, two measured positives, and three unknowns. At K=2 each finds one measured positive; they each uniquely select one different unknown, and one unknown is neutral. The observed known-label delta is 0, but the sharp paired label-sensitivity bounds are [-1/3, +1/3]. This is a comparison bound, not a confidence interval.
+
+8. **F8 — Pareto frontier without scalarization.** Compare four synthetic policies on macro recall (maximize), review slots (minimize), and worst-group recall (maximize). Three policies have real trade-offs and remain on the frontier; a fourth is worse than at least one policy on every objective and is removed. No weighted sum or universal “safety score” is produced.
+
+The second dependency-free Rust helper, [scripts/crispr_decision_frontier.rs](../../scripts/crispr_decision_frontier.rs), implements objective-direction-aware dominance and sorted Pareto membership, rejecting duplicate IDs/objective names, non-finite or incomplete vectors. Its 10 unit tests are authored but have not been compiled or executed because `rustc` is unavailable in this authoring environment.
 
 7. **F7 — underfilled fixed budget.** A ranking contains one candidate, but the declared review budget is K=2. Recall@2 and its partial-label sensitivity metric must return `not_estimable_at_budget_K`; neither metric may silently score the one-candidate list as a two-slot comparison.
 
