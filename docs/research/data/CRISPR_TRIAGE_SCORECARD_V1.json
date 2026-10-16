@@ -17,7 +17,9 @@
     "specialist_baseline_reproduced": false,
     "symthaea_policy_evaluated": false,
     "independent_verification_completed": false,
-    "improvement_demonstrated": false
+    "improvement_demonstrated": false,
+    "rust_metric_kernel_compiled": false,
+    "rust_unit_tests_executed": false
   },
   "label_states": [
     {
@@ -63,7 +65,9 @@
         "micro_recall_at_k",
         "precision_at_k_when_labels_support_it",
         "pr_auc_when_valid",
-        "false_negative_census"
+        "false_negative_census",
+        "recall_label_sensitivity_bounds",
+        "precision_label_sensitivity_bounds"
       ],
       "denominator_rule": "Freeze and identify one exact candidate universe; report whether positive sites were seeded into it. Ranking performance is not nomination performance."
     },
@@ -121,6 +125,25 @@
         "source_and_lineage_completeness"
       ],
       "denominator_rule": "Evidence receipts establish provenance/integrity only; they cannot by themselves establish biological truth."
+    },
+    {
+      "id": "T8_partial_label_identification",
+      "required_when_unknown_candidates_exist": true,
+      "metrics": [
+        "observed_known_label_recall_at_k",
+        "worst_case_recall_bound",
+        "best_case_recall_bound",
+        "worst_case_precision_bound",
+        "best_case_precision_bound",
+        "unknown_count_inside_and_outside_review_budget"
+      ],
+      "assumptions": [
+        "only label assignments of unknown candidates inside the exact declared ranking universe are varied",
+        "known positives use the frozen reference definition",
+        "known negatives are negatives only under the declared assay, threshold and detection scope",
+        "unknowns outside the candidate universe and positives missed by every nomination method are not bounded by this conditional calculation"
+      ],
+      "interpretation": "These are sharp worst/best-case label-assignment bounds, not statistical confidence intervals, posterior probabilities or safety guarantees."
     }
   ],
   "primary_targets": {
@@ -180,6 +203,11 @@
       "id": "G5_evidence_ceiling",
       "target": "Prediction/schema/signature receipts cannot promote prediction evidence to observation, assessment or replication",
       "failure_action": "Reject the invalid evidence-state transition."
+    },
+    {
+      "id": "G6_partial_label_reporting",
+      "target": "100% of metrics affected by unknown/unassayed candidates report explicit label-sensitivity bounds or a declared not-estimable state",
+      "failure_action": "Reject any report that silently coerces unknown outcomes into negatives or presents known-label metrics as complete-reference truth."
     }
   ],
   "comparator_policies": [
@@ -332,6 +360,68 @@
         "split_status": "invalid",
         "generalization_claim_allowed": false
       }
+    },
+    {
+      "id": "F5_partial_labels_have_bounds",
+      "purpose": "Use label-sensitivity bounds rather than treating unknown candidates as negatives.",
+      "eligible_positive_ids": [
+        "p1",
+        "p2"
+      ],
+      "candidates_by_rank": [
+        {
+          "id": "p1",
+          "label": "positive"
+        },
+        {
+          "id": "u1",
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "p2",
+          "label": "positive"
+        },
+        {
+          "id": "u2",
+          "label": "unknown_unassayed"
+        }
+      ],
+      "k": 2,
+      "expected": {
+        "known_label_recall_at_k": 0.5,
+        "recall_lower_bound": 0.3333333333333333,
+        "recall_upper_bound": 0.6666666666666666,
+        "precision_lower_bound": 0.5,
+        "precision_upper_bound": 1,
+        "note": "Conditional on this exact candidate universe; not a bound on positives outside it."
+      }
     }
-  ]
+  ],
+  "implementation_artifact": {
+    "source_path": "scripts/crispr_triage_verifier.rs",
+    "style": "dependency-free Rust; no biological artifacts required for synthetic unit tests",
+    "suggested_command": "rustc --edition=2024 --test scripts/crispr_triage_verifier.rs -o /tmp/crispr-triage-tests && /tmp/crispr-triage-tests",
+    "current_local_execution_status": "not_executed_rust_toolchain_unavailable_in_authoring_environment"
+  },
+  "partial_label_identification": {
+    "status": "method_specified_synthetic_test_added_not_compiled",
+    "recall_at_k": {
+      "symbols": {
+        "P": "count of eligible measured-positive reference sites",
+        "p_k": "measured-positive sites in top K",
+        "U": "unknown/unassayed candidates in the fixed ranking universe",
+        "u_k": "unknown/unassayed candidates in top K"
+      },
+      "lower_bound": "p_k / (P + U - u_k)",
+      "upper_bound": "(p_k + u_k) / (P + u_k)",
+      "known_label_point_estimate": "p_k / P",
+      "note": "Bounds result from worst/best-case assignments to unknown labels within the fixed universe; they do not cover positive sites absent from the universe."
+    },
+    "precision_at_k": {
+      "lower_bound": "p_k / K",
+      "upper_bound": "(p_k + u_k) / K",
+      "precondition": "at least K candidates exist in the declared ranking universe and K > 0",
+      "note": "Do not report the lower bound as a point estimate when selected outcomes are unknown."
+    }
+  }
 }
