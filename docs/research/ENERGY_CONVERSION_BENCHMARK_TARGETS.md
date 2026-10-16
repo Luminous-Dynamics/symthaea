@@ -101,6 +101,16 @@ The grid's outputs define:
 
 Run it with `cargo run -p symthaea-energy-bench --example candidate_decision_benchmark > candidate-decision-benchmark.json`. Receipt verification replays the scenario grid against the embedded accounting fixture. The grid deliberately decouples truth from observed output; therefore it measures comparator behavior under its constructed assumptions, not an empirical deployment risk estimate. A strict physical-superiority claim also requires calibrated systematics/model discrepancy, source authenticity, and independent reference data. NIST decision-rule literature emphasizes documenting both false-acceptance and false-rejection risks rather than reporting only a point estimate: https://www.nist.gov/publications/assessment-conformity-decision-rules-and-risk-analysis and https://www.nist.gov/publications/estimating-instrument-performance-confidence-intervals-and-confidence-bounds.
 
+#### Proposed Gate 1B graduation criteria
+
+These criteria apply to an expanded calibrated decision-oracle suite, not to the current deliberately biased grid:
+
+- **Unknown/correlated uncertainty:** 100% of cases without supported correlation propagation must abstain as `Indeterminate`; no affirmative superiority claims.
+- **Calibrated non-superior cases:** target a one-sided 95% upper confidence bound of at most 1% on the false-superiority rate across representative held-out conditions. Under an independent binomial model, observing zero false-superiority claims in 300 non-superior trials gives an upper bound of about 1%; clustered or distribution-shifted cases require an appropriate analysis, not a naïve trial count.
+- **Unmodeled bias:** the current module deliberately includes cases where the observed result looks superior while oracle truth is not. At least one such case should remain a failing negative control until an explicit model-discrepancy/systematic-error mechanism causes the system to abstain or otherwise correctly control risk. Hiding or deleting the case is not a valid fix.
+- **False negatives:** preregister the acceptable miss rate and its consequences for the intended engineering use before evaluating results. Do not optimize false positives in isolation if the system then rejects nearly all genuinely useful designs.
+- **Replay and calibration:** every rate must be tied to immutable scenario inputs, the decision-rule revision, calibration evidence, and an exact source revision. Report counts and confidence intervals; do not describe the current deterministic grid as an estimate of production risk.
+
 ### Gate 2 — calibrated multifidelity selection
 
 Only graduate to expected information gain (EIG) or expected value of sample information when there are predictive distributions and credible reference observations.
