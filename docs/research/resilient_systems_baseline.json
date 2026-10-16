@@ -1017,7 +1017,8 @@
     "research_sources": [
       "https://doi.org/10.1287/trsc.2023.0227",
       "https://doi.org/10.1016/j.cor.2020.104935",
-      "https://pmc.ncbi.nlm.nih.gov/articles/PMC9679711/"
+      "https://pmc.ncbi.nlm.nih.gov/articles/PMC9679711/",
+      "https://doi.org/10.1016/j.orl.2013.08.001"
     ],
     "policy_gap_evaluator": {
       "function": "evaluate_repair_policies_against_exact_optimum",
@@ -1041,6 +1042,7 @@
         "shortest_job_first_loss": 111,
         "weighted_recovery_loss": 111
       }
-    }
+    },
+    "classical_baseline_note": "For this single-machine weighted-completion objective, nonincreasing service-value/duration (Smith WSPT rule) is already optimal. The oracle verifies implementation and measures alternative heuristics; it is not novel general scheduling."
   }
 }
