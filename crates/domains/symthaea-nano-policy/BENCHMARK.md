@@ -173,7 +173,24 @@ Keep primary outcomes distinct:
 
 For active-learning experiments, fit the surrogate/model only on revealed training observations, expose each query's label only after selection, and measure across a preregistered set of random seeds and held-out systems. A diversity-policy win on a synthetic geometry fixture is only a software behavior test, never a nanotechnology discovery claim.
 
-## 9. Current status
+## 9. Independent post-outcome metrics evaluator
+
+A separate `src/metrics.rs` module and `nano-policy-metrics` binary now evaluate a frozen JSON outcome ledger after all selector/oracle actions are complete. The ledger includes task/source/evaluation manifest digests, policy revision and run/selection-receipt digests, paired target IDs, caller-declared independent groups, chronological candidate attempts, evaluated loss/status and per-call cost.
+
+The evaluator rejects:
+- mismatched target or group sets across policy arms;
+- non-contiguous query ranks or query count beyond the common budget;
+- missing/non-finite/negative loss on an evaluated attempt, or a loss attached to a failed attempt;
+- non-finite/negative cost, invalid digests, duplicate arm/target IDs, and unknown fields;
+- unbounded ledger size, arm count, target count, bootstrap replicates, or observation count.
+
+Computed metrics include success-at-budget (all target queries are in the denominator; no usable outcome is failure), normalized success AUC over the full budget curve, coverage, valid/failure rate, repeated candidate attempts, best loss conditional on coverage, mean cost per target, and cost-to-first-success. Failure/timeout cost stays in the cost denominator. Metrics reports are tied to the exact raw input JSON bytes with SHA-256.
+
+For each non-baseline arm, it computes paired deltas for final-budget success and normalized success AUC, grouping target-level paired deltas by the independent group ID declared in the frozen split manifest and bootstrap-resampling group means. For fewer than five declared groups, the report omits interval endpoints and marks the comparison `insufficient_independent_groups`. Five is a minimal anti-pseudo-precision guard, **not** a power guarantee; the charter's sample/power and domain-validity requirements still apply. The checker cannot prove independence of group IDs, validity of loss semantics, or scientific utility. It is separate from the existing receipt verifier, which checks selection-output structure only.
+
+Unit tests use a synthetic five-group ledger fixture to test budget success, full-curve AUC, all-target denominators, failure and repeat counting, cost aggregation, exact raw-byte digest binding, paired deterministic bootstrap, insufficient group count, mismatched target sets, query ranks, failed-loss rejection, unknown fields and malformed digests. The CLI's fixture is explicitly synthetic and is not a science result.
+
+## 10. Current status
 
 - Source files, request JSON Schema, JSONL fixture, Cargo.lock entry and focused CI workflow are committed on the draft PR branch.
 - The test definitions and fixture are not yet executed locally; no Rust compiler is installed in the current environment.
