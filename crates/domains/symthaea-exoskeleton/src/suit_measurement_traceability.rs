@@ -230,7 +230,12 @@ pub fn evaluate_measurement_traceability(
 
     for (observation_id, observation) in observation_by_id {
         let claim = claim_by_id[observation_id];
-        let assessment = assess_claim(observation, claim, &traceability_plan.policy);
+        let assessment = assess_claim(
+            observation,
+            claim,
+            &traceability_plan.policy,
+            measurement_plan.maximum_sampling_interval_ms,
+        );
         findings.extend(assessment.findings.iter().cloned());
         assessments.push(assessment);
     }
@@ -380,6 +385,7 @@ fn assess_claim(
     observation: &crate::suit_peak_usage_measurements::PeakResourceUsageObservation,
     claim: &MeasurementTraceabilityClaim,
     policy: &MeasurementTraceabilityPolicy,
+    measurement_policy_maximum_gap_ms: u64,
 ) -> MeasurementTraceabilityAssessment {
     let mut findings = Vec::new();
     let mut add = |code, severity| {
@@ -451,7 +457,10 @@ fn assess_claim(
             },
         );
     }
-    if claim.maximum_observed_inter_sample_gap_ms > policy.maximum_inter_sample_gap_ms {
+    if claim.maximum_observed_inter_sample_gap_ms > policy.maximum_inter_sample_gap_ms
+        || claim.maximum_observed_inter_sample_gap_ms > measurement_policy_maximum_gap_ms
+        || claim.maximum_observed_inter_sample_gap_ms > observation.sampling_interval_ms
+    {
         add(
             TraceabilityFindingCode::InterSampleGapAbovePolicy,
             TraceabilityFindingSeverity::Blocker,
