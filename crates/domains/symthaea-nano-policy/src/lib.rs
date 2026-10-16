@@ -756,6 +756,21 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_json_schemas_are_parseable_and_fail_closed() {
+        let request_schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/request.schema.json")).unwrap();
+        let response_schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/response.schema.json")).unwrap();
+
+        assert_eq!(request_schema["additionalProperties"], false);
+        assert_eq!(
+            request_schema["properties"]["candidates"]["items"]["additionalProperties"],
+            false
+        );
+        assert_eq!(response_schema["oneOf"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
     fn malformed_line_returns_json_error_instead_of_panicking() {
         let response: ErrorResponse = serde_json::from_str(&handle_line("{")).unwrap();
         assert_eq!(response.status, "rejected_input");
