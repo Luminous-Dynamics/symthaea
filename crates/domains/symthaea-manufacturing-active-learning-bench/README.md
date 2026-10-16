@@ -17,7 +17,7 @@ The example runs six policies across five deterministic scenario families for 30
 
 The analysis groups results by scenario and policy, verifies every expected policy arm has the same paired-seed set, and reports:
 - discovery rate separately from discovery cost conditional on success;
-- restricted mean cost-to-discovery (the preregistered budget horizon is used for NotFound campaigns) with a descriptive normal-approximation 95% interval;
+- restricted mean cost-to-discovery (the preregistered budget horizon is used for NotFound campaigns) with a descriptive normal-approximation 95% interval only when at least two paired-seed observations are available; otherwise interval fields are null;
 - fixed-design-relative acceleration factor and enhancement factor, with definitions and denominators included in the output;
 - paired candidate-minus-fixed-design cost and utility differences with intervals;
 - best conforming utility/throughput, resources, and design-rank rate as separate outcomes.
