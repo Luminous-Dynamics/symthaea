@@ -841,6 +841,9 @@ mod tests {
                 assert_eq!(report.total_cost_units, a.claimed_total_cost_units);
                 assert!(report.total_cost_units <= manifest.budget_units);
                 let expected_max_throughput = a.records.iter().filter_map(|record| {
+                    if record.action.fidelity != Fidelity::Reference {
+                        return None;
+                    }
                     let margin = record.measurements.quality_margin_milli?;
                     let throughput = record.measurements.throughput_units?;
                     (margin >= manifest.minimum_quality_margin_milli).then_some(throughput)
@@ -881,9 +884,12 @@ mod tests {
             run_campaign(&manifest, Policy::FixedSpaceFilling, 77).unwrap();
         let report = evaluate_transcript(&manifest, &transcript).unwrap();
         assert_eq!(transcript.records[0].action, manifest.initial_actions[0]);
-        assert!(transcript.records.iter().all(|record| record.claimed_conforming
-            == record.measurements.quality_margin_milli
-                .is_some_and(|margin| margin >= manifest.minimum_quality_margin_milli)));
+        assert!(transcript.records.iter().all(|record| {
+            let expected_conforming = record.action.fidelity == Fidelity::Reference
+                && record.measurements.quality_margin_milli
+                    .is_some_and(|margin| margin >= manifest.minimum_quality_margin_milli);
+            record.claimed_conforming == expected_conforming
+        }));
         assert!(report.total_cost_units <= manifest.budget_units);
         assert!(report.factor_design_full_rank, "selector should add an off-diagonal experiment");
         assert!(report.first_conforming_cost_units.is_some());
