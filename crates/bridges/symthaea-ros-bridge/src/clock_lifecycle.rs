@@ -34,6 +34,9 @@ pub struct RosClockLifecyclePolicyV1 {
     pub maximum_forward_jump_ns: u64,
     /// Repeated source time for at least this much local monotonic time is a pause.
     pub pause_after_ns: u64,
+    /// Maximum local-monotonic silence between received clock messages.
+    /// This is separate from a published clock whose source timestamp is paused.
+    pub maximum_clock_silence_ns: u64,
     /// ROS time zero is uninitialized; deployments with other semantics must opt out.
     pub reject_zero_timestamp: bool,
 }
@@ -49,6 +52,9 @@ impl RosClockLifecyclePolicyV1 {
         if self.pause_after_ns == 0 {
             return Err("pause detection threshold must be greater than zero".into());
         }
+        if self.maximum_clock_silence_ns == 0 {
+            return Err("maximum clock silence must be greater than zero".into());
+        }
         Ok(())
     }
 }
@@ -63,6 +69,8 @@ pub enum RosClockTransitionKindV1 {
     ClockDomainChanged,
     SourceEpochChanged,
     ReceiveEpochChanged,
+    /// The clock publisher stopped delivering observations beyond the watchdog threshold.
+    ClockSourceSilent,
 }
 
 /// Auditable transition evidence. The tracker will not self-clear this condition.
@@ -75,6 +83,11 @@ pub struct RosClockTransitionV1 {
     pub observed_clock_id: String,
     pub observed_clock_domain: String,
     pub observed_source_epoch_id: String,
+    /// True only when this transition was triggered by a concrete source-clock
+    /// observation. If false, the transition came from the independent watchdog;
+    /// acknowledge_transition is an explicit source rebind and its caller must
+    /// validate the candidate identity against the frozen deployment allowlist.
+    pub source_identity_observed: bool,
     pub observed_receive_epoch_id: String,
 }
 
@@ -98,6 +111,18 @@ pub enum RosClockLifecycleDispositionV1 {
     ClockObservationStale {
         age_ns: u64,
         maximum_age_ns: u64,
+    },
+    /// The clock publisher has been heard from within the configured silence window.
+    /// This is liveness evidence only; it does not establish that source time advances.
+    ClockSourceRecentlyObserved {
+        silence_ns: u64,
+        maximum_silence_ns: u64,
+    },
+    /// No clock observation arrived before the configured watchdog threshold.
+    /// The tracker is locked pending an explicit rebind.
+    ClockSourceSilent {
+        silence_ns: u64,
+        maximum_silence_ns: u64,
     },
     TransitionRequired {
         transition: RosClockTransitionV1,
@@ -316,6 +341,86 @@ impl RosClockLifecycleTrackerV1 {
         }
     }
 
+    /// Check whether any clock message has arrived recently using bridge-local
+    /// monotonic time. The caller must invoke this from an independent watchdog
+    /// cadence; it cannot detect publisher silence if called only from the clock
+    /// subscription callback.
+    ///
+    /// Published-but-repeated simulation time is handled by `observe` and is
+    /// distinct from a publisher that stops emitting `/clock` entirely.
+    pub fn check_liveness(
+        &mut self,
+        capture_receive_epoch_id: &str,
+        captured_monotonic_ns: u64,
+    ) -> RosClockLifecycleDispositionV1 {
+        if let Err(reason) = self.policy.validate() {
+            return RosClockLifecycleDispositionV1::InvalidPolicy { reason };
+        }
+        if let Some(transition) = self.pending_transition.as_ref() {
+            return RosClockLifecycleDispositionV1::AwaitingExplicitRebind {
+                kind: transition.kind.clone(),
+            };
+        }
+        if capture_receive_epoch_id.trim().is_empty() {
+            return RosClockLifecycleDispositionV1::InvalidObservation {
+                reason: "capture receive epoch ID must not be empty".into(),
+            };
+        }
+        let Some(baseline) = self.baseline.clone() else {
+            return RosClockLifecycleDispositionV1::Uninitialized;
+        };
+        // A monotonic timestamp is only comparable inside the same receive
+        // epoch. Detect epoch replacement before comparing raw nanoseconds.
+        if capture_receive_epoch_id != baseline.receive_epoch_id {
+            let transition = RosClockTransitionV1 {
+                kind: RosClockTransitionKindV1::ReceiveEpochChanged,
+                previous_generation: baseline.generation,
+                previous_timestamp_ns: baseline.timestamp_ns,
+                observed_timestamp_ns: baseline.timestamp_ns,
+                observed_clock_id: baseline.clock_id.clone(),
+                observed_clock_domain: baseline.clock_domain.clone(),
+                observed_source_epoch_id: baseline.source_epoch_id.clone(),
+                source_identity_observed: false,
+                observed_receive_epoch_id: capture_receive_epoch_id.to_string(),
+            };
+            self.pending_transition = Some(transition.clone());
+            return RosClockLifecycleDispositionV1::TransitionRequired { transition };
+        }
+        if captured_monotonic_ns < baseline.last_observation_received_monotonic_ns {
+            return RosClockLifecycleDispositionV1::InvalidObservation {
+                reason: "watchdog capture time predates the last clock receipt".into(),
+            };
+        }
+
+        let silence_ns =
+            captured_monotonic_ns - baseline.last_observation_received_monotonic_ns;
+        if silence_ns > self.policy.maximum_clock_silence_ns {
+            let transition = RosClockTransitionV1 {
+                kind: RosClockTransitionKindV1::ClockSourceSilent,
+                previous_generation: baseline.generation,
+                previous_timestamp_ns: baseline.timestamp_ns,
+                // There is no observed new source stamp: preserve the last known
+                // value rather than fabricating one at watchdog time.
+                observed_timestamp_ns: baseline.timestamp_ns,
+                observed_clock_id: baseline.clock_id.clone(),
+                observed_clock_domain: baseline.clock_domain.clone(),
+                observed_source_epoch_id: baseline.source_epoch_id.clone(),
+                source_identity_observed: false,
+                observed_receive_epoch_id: baseline.receive_epoch_id.clone(),
+            };
+            self.pending_transition = Some(transition);
+            return RosClockLifecycleDispositionV1::ClockSourceSilent {
+                silence_ns,
+                maximum_silence_ns: self.policy.maximum_clock_silence_ns,
+            };
+        }
+
+        RosClockLifecycleDispositionV1::ClockSourceRecentlyObserved {
+            silence_ns,
+            maximum_silence_ns: self.policy.maximum_clock_silence_ns,
+        }
+    }
+
     /// Acknowledge a previously reported transition only after the caller has
     /// decided that downstream state may be reset/rebound. The new observation
     /// must still be fresh and belong to the transition's observed source identity.
@@ -341,12 +446,13 @@ impl RosClockLifecycleTrackerV1 {
                 reason: "cannot rebind to an uninitialized zero timestamp".into(),
             };
         }
-        if observation.clock_id != transition.observed_clock_id
-            || observation.clock_domain != transition.observed_clock_domain
-            || observation.source_epoch_id != transition.observed_source_epoch_id
+        if transition.source_identity_observed
+            && (observation.clock_id != transition.observed_clock_id
+                || observation.clock_domain != transition.observed_clock_domain
+                || observation.source_epoch_id != transition.observed_source_epoch_id)
         {
             return RosClockLifecycleDispositionV1::InvalidObservation {
-                reason: "rebind observation does not match the pending transition's source identity".into(),
+                reason: "rebind observation does not match the source identity that triggered the transition".into(),
             };
         }
         if observation.receive_epoch_id != capture_receive_epoch_id {
@@ -423,6 +529,7 @@ impl RosClockLifecycleTrackerV1 {
             observed_clock_id: observation.clock_id.clone(),
             observed_clock_domain: observation.clock_domain.clone(),
             observed_source_epoch_id: observation.source_epoch_id.clone(),
+            source_identity_observed: true,
             observed_receive_epoch_id: observation.receive_epoch_id.clone(),
         };
         self.pending_transition = Some(transition.clone());
@@ -469,6 +576,7 @@ mod tests {
             maximum_observation_age_ns: 100,
             maximum_forward_jump_ns: 500,
             pause_after_ns: 20,
+            maximum_clock_silence_ns: 50,
             reject_zero_timestamp: true,
         }
     }
@@ -515,7 +623,7 @@ mod tests {
         let mut tracker = initialized_tracker();
         let outcome = tracker.observe(&observation(1_010, 2), "bridge-run-1", 2);
         assert!(matches!(
-            outcome,
+            &outcome,
             RosClockLifecycleDispositionV1::Advancing {
                 generation: 1,
                 delta_ns: 10
@@ -636,6 +744,118 @@ mod tests {
                 }
             }
         ));
+    }
+
+    #[test]
+    fn publisher_silence_is_distinct_from_a_published_paused_clock() {
+        let mut tracker = initialized_tracker();
+        assert!(matches!(
+            tracker.check_liveness("bridge-run-1", 30),
+            RosClockLifecycleDispositionV1::ClockSourceRecentlyObserved {
+                silence_ns: 29,
+                maximum_silence_ns: 50,
+            }
+        ));
+
+        // New /clock message arrives but its source timestamp has not changed.
+        // This is a paused clock, not a publisher-liveness failure.
+        assert!(matches!(
+            tracker.observe(&observation(1_000, 31), "bridge-run-1", 31),
+            RosClockLifecycleDispositionV1::NotAdvancing { paused: true, .. }
+        ));
+        assert!(matches!(
+            tracker.check_liveness("bridge-run-1", 40),
+            RosClockLifecycleDispositionV1::ClockSourceRecentlyObserved {
+                silence_ns: 9,
+                maximum_silence_ns: 50,
+            }
+        ));
+        assert!(tracker.pending_transition().is_none());
+    }
+
+    #[test]
+    fn silent_publisher_locks_until_explicit_rebind() {
+        let mut tracker = initialized_tracker();
+        assert!(matches!(
+            tracker.check_liveness("bridge-run-1", 52),
+            RosClockLifecycleDispositionV1::ClockSourceSilent {
+                silence_ns: 51,
+                maximum_silence_ns: 50,
+            }
+        ));
+        assert!(matches!(
+            tracker.check_liveness("bridge-run-1", 60),
+            RosClockLifecycleDispositionV1::AwaitingExplicitRebind {
+                kind: RosClockTransitionKindV1::ClockSourceSilent
+            }
+        ));
+        assert!(matches!(
+            tracker.observe(&observation(1_010, 61), "bridge-run-1", 61),
+            RosClockLifecycleDispositionV1::AwaitingExplicitRebind {
+                kind: RosClockTransitionKindV1::ClockSourceSilent
+            }
+        ));
+        let rebound =
+            tracker.acknowledge_transition(&observation(1_010, 61), "bridge-run-1", 61);
+        assert!(matches!(
+            &rebound,
+            RosClockLifecycleDispositionV1::TransitionRebound {
+                kind: RosClockTransitionKindV1::ClockSourceSilent,
+                generation: 2,
+                ..
+            }
+        ));
+        // Rebinding establishes the new generation but is not itself an advancing tick.
+        assert!(!rebound.permits_temporal_admission());
+        assert!(matches!(
+            tracker.observe(&observation(1_020, 62), "bridge-run-1", 62),
+            RosClockLifecycleDispositionV1::Advancing { generation: 2, .. }
+        ));
+    }
+
+    #[test]
+    fn silence_recovery_can_explicitly_bind_a_replacement_clock_source() {
+        let mut tracker = initialized_tracker();
+        assert!(matches!(
+            tracker.check_liveness("bridge-run-1", 52),
+            RosClockLifecycleDispositionV1::ClockSourceSilent { .. }
+        ));
+        let mut replacement = observation(50, 61);
+        replacement.clock_id = "ros:/clock-replacement".into();
+        replacement.source_epoch_id = "bag-run-2".into();
+        let outcome = tracker.acknowledge_transition(&replacement, "bridge-run-1", 61);
+        assert!(matches!(
+            &outcome,
+            RosClockLifecycleDispositionV1::TransitionRebound {
+                kind: RosClockTransitionKindV1::ClockSourceSilent,
+                generation: 2,
+                timestamp_ns: 50,
+            }
+        ));
+        assert_eq!(tracker.generation(), Some(2));
+        // Rebinding is not itself permission to admit any downstream sample.
+        assert!(!outcome.permits_temporal_admission());
+    }
+
+    #[test]
+    fn watchdog_rejects_capture_before_last_receipt_and_epoch_change() {
+        let mut tracker = initialized_tracker();
+        assert!(matches!(
+            tracker.check_liveness("bridge-run-1", 0),
+            RosClockLifecycleDispositionV1::InvalidObservation { .. }
+        ));
+        // A restarted monotonic clock may start below its prior epoch's value.
+        // Epoch replacement must be detected before comparing those unrelated counters.
+        assert!(matches!(
+            tracker.check_liveness("bridge-run-2", 0),
+            RosClockLifecycleDispositionV1::TransitionRequired {
+                transition: RosClockTransitionV1 {
+                    kind: RosClockTransitionKindV1::ReceiveEpochChanged,
+                    ..
+                }
+            }
+        ));
+        assert!(tracker.pending_transition().is_some());
     }
 
     #[test]
