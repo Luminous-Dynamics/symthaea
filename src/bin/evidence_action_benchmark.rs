@@ -121,15 +121,21 @@ fn run() -> Result<(), (u8, String)> {
             })).map_err(internal_error)?);
             Ok(())
         }
-        Some("trajectory-score") if args.len() == 5 => {
+        Some("trajectory-score") if args.len() == 7 => {
             let dataset_file = File::open(&args[2]).map_err(input_error)?;
             let (trajectories, _) = audit_trajectory_jsonl(BufReader::new(dataset_file))
                 .map_err(|e| (1, format!("trajectory audit failed: {e}")))?;
             let receipt_file = File::open(&args[3]).map_err(input_error)?;
+            let minimum_origins = args[5].parse::<u32>()
+                .map_err(|e| (2, format!("invalid minimum origin count: {e}")))?;
+            let allow_scoped = args[6].parse::<bool>()
+                .map_err(|e| (2, format!("allow-scoped must be true or false: {e}")))?;
             let score = score_trajectory_receipts(
                 &trajectories,
                 BufReader::new(receipt_file),
                 &args[4],
+                minimum_origins,
+                allow_scoped,
             )
             .map_err(|e| (1, format!("trajectory receipt verification/scoring failed: {e}")))?;
             println!("{}", serde_json::to_string_pretty(&score).map_err(internal_error)?);
