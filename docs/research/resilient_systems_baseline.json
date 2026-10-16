@@ -334,10 +334,11 @@
       "resource_tests_authored": 18,
       "repair_scheduling_tests_authored": 17,
       "robust_repair_evaluation_tests_authored": 10,
-      "total_rust_tests_authored": 82,
-      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6. None have been compiled or executed in the current environment.",
+      "total_rust_tests_authored": 91,
+      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, tiny exact oracle 9. None have been compiled or executed in the current environment.",
       "rolling_horizon_repair_tests_authored": 11,
-      "repair_policy_comparison_tests_authored": 6
+      "repair_policy_comparison_tests_authored": 6,
+      "exact_oracle_tests_authored": 9
     },
     "performance_targets": {
       "status": "proposed_unmeasured_targets",
@@ -913,5 +914,99 @@
         "measure_worst_case_and_cvar"
       ]
     }
+  },
+  "repair_small_instance_oracle": {
+    "status": "exhaustive_exact_oracle_narrow_scope_not_executed",
+    "source_module": "crates/domains/symthaea-engineering/src/repair_small_instance_oracle.rs",
+    "fixture_corpus": "docs/research/repair_scheduling_oracle_corpus.json",
+    "objective": "sum(recovered_service_value_per_step * completion_step)",
+    "scope": [
+      "1 to 8 jobs",
+      "one hypothetical crew qualified for every job",
+      "all outage_start_step = 0",
+      "no precedence dependencies",
+      "no spare-part requirements",
+      "positive integer durations",
+      "positive finite caller-supplied service values"
+    ],
+    "exact_permutations_by_job_count": {
+      "1": 1,
+      "2": 2,
+      "3": 6,
+      "4": 24,
+      "5": 120,
+      "6": 720,
+      "7": 5040,
+      "8": 40320
+    },
+    "tests_authored": 9,
+    "tests_executed": false,
+    "reference_fixtures": [
+      {
+        "id": "ORACLE-01",
+        "expected_order": [
+          "fast_high",
+          "slow_low"
+        ],
+        "expected_objective": 111,
+        "permutations": 2
+      },
+      {
+        "id": "ORACLE-02",
+        "expected_order": [
+          "B",
+          "C",
+          "A"
+        ],
+        "expected_objective": 28,
+        "permutations": 6
+      },
+      {
+        "id": "ORACLE-03",
+        "expected_order": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "expected_objective": 113,
+        "permutations": 24
+      },
+      {
+        "id": "ORACLE-04",
+        "expected_order": [
+          "a",
+          "z"
+        ],
+        "expected_objective": 14,
+        "permutations": 2
+      },
+      {
+        "id": "ORACLE-05",
+        "expected_order": [
+          "only"
+        ],
+        "expected_objective": 15,
+        "permutations": 1
+      },
+      {
+        "id": "ORACLE-06",
+        "expected_objective": "computed_by_executable_oracle",
+        "permutations": 40320
+      }
+    ],
+    "limitations": [
+      "not multi-crew",
+      "no precedence or spare constraints",
+      "no travel or access times",
+      "no uncertainty",
+      "no horizon truncation",
+      "not calibrated and not executed in current tool environment"
+    ],
+    "research_sources": [
+      "https://doi.org/10.1287/trsc.2023.0227",
+      "https://doi.org/10.1016/j.cor.2020.104935",
+      "https://pmc.ncbi.nlm.nih.gov/articles/PMC9679711/"
+    ]
   }
 }
