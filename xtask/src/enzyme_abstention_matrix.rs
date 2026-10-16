@@ -23,13 +23,6 @@ enum ModelKind {
 }
 
 impl ModelKind {
-    fn label(self) -> &'static str {
-        match self {
-            Self::MichaelisMenten => "michaelis_menten",
-            Self::SubstrateInhibition => "substrate_inhibition",
-        }
-    }
-
     fn parameter_count(self) -> usize {
         match self {
             Self::MichaelisMenten => 2,
@@ -370,6 +363,9 @@ fn build_report() -> Result<Value> {
             let outcome_counts = grouped.get(scenario.stratum).cloned().unwrap_or_default();
             let total = *target_totals.get(scenario.stratum).unwrap_or(&0);
             let hits = *target_hits.get(scenario.stratum).unwrap_or(&0);
+            let selected_models = outcome_counts.get("michaelis_menten").copied().unwrap_or(0)
+                + outcome_counts.get("substrate_inhibition").copied().unwrap_or(0);
+            let is_abstention_control = scenario.expected_decision == "abstain";
             json!({
                 "stratum": scenario.stratum,
                 "truth_family": scenario.truth_family,
@@ -377,6 +373,8 @@ fn build_report() -> Result<Value> {
                 "case_count": total,
                 "target_hits": hits,
                 "target_hit_rate": if total > 0 { hits as f64 / total as f64 } else { 0.0 },
+                "false_decisive_count": if is_abstention_control { json!(selected_models) } else { Value::Null },
+                "false_decisive_rate": if is_abstention_control && total > 0 { json!(selected_models as f64 / total as f64) } else { Value::Null },
                 "outcome_counts": outcome_counts
             })
         })
@@ -384,6 +382,19 @@ fn build_report() -> Result<Value> {
 
     ensure!(total_cases == scenarios().len() * NOISE_SDS.len() * SEEDS.len(),
         "synthetic scenario matrix has unexpected case count");
+
+    let control_case_count = cases
+        .iter()
+        .filter(|case| case["expected_decision"].as_str() == Some("abstain"))
+        .count();
+    let false_decisive_count = cases
+        .iter()
+        .filter(|case| {
+            case["expected_decision"].as_str() == Some("abstain")
+                && case["observed_decision"].as_str() != Some("abstain")
+        })
+        .count();
+    let correct_abstention_count = control_case_count - false_decisive_count;
 
     Ok(json!({
         "schema_version": 1,
@@ -413,6 +424,13 @@ fn build_report() -> Result<Value> {
             "calibration_status": "heuristic thresholds; not calibrated against real assay residuals"
         },
         "summary_by_stratum": summary,
+        "abstention_control_summary": {
+            "control_case_count": control_case_count,
+            "false_decisive_count": false_decisive_count,
+            "false_decisive_rate": if control_case_count > 0 { false_decisive_count as f64 / control_case_count as f64 } else { 0.0 },
+            "correct_abstention_count": correct_abstention_count,
+            "note": "Known-generator synthetic control summary; not an estimate of real-world false-certainty probability."
+        },
         "cases": cases,
         "next_gates": [
             "increase to at least 1000 preregistered scenario/seed combinations and freeze scenario-generation code before scoring",
@@ -488,6 +506,8 @@ mod tests {
         assert_eq!(report["matrix"]["case_count"].as_u64().unwrap(), (scenarios().len() * NOISE_SDS.len() * SEEDS.len()) as u64);
         assert_eq!(report["cases"].as_array().unwrap().len(), 96);
         assert_eq!(report["summary_by_stratum"].as_array().unwrap().len(), 4);
+        assert_eq!(report["abstention_control_summary"]["control_case_count"].as_u64().unwrap(), 48);
+        assert!(report["abstention_control_summary"]["false_decisive_rate"].as_f64().is_some());
         assert!(report["cases"].as_array().unwrap().iter().all(|case| {
             case["observed_decision"].as_str().is_some()
                 && case["decision_reason"].as_str().is_some()
