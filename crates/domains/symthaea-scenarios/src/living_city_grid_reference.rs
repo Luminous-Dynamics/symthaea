@@ -20,12 +20,17 @@ pub const GRID_REFERENCE_CASE_IDS: [&str; 4] = [
 ];
 pub const GRID_REFERENCE_VOLTAGE_TOLERANCE_V: f64 = 1e-6;
 pub const GRID_REFERENCE_POWER_TOLERANCE_KW: f64 = 1e-9;
+pub const GRID_REFERENCE_VALIDATION_KIND: &str = "analytical_equation_regression";
+pub const GRID_REFERENCE_SOLVER_ENVELOPE: &str =
+    "linearized DistFlow; single-phase equivalent; balanced radial topology; quadratic branch-loss term omitted; no unbalanced phases, meshed networks, transient/dynamic stability, or nonlinear AC validation";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GridReferenceResult {
     pub suite_version: u32,
     pub suite_id: &'static str,
     pub case_id: &'static str,
+    pub validation_kind: &'static str,
+    pub solver_envelope: &'static str,
     /// Analytical voltage at the terminal/monitored bus.
     pub analytical_voltage_v: f64,
     /// Solver voltage at the same bus.
@@ -183,6 +188,8 @@ fn solve_and_check(
         suite_version: GRID_REFERENCE_SUITE_VERSION,
         suite_id: GRID_REFERENCE_SUITE_ID,
         case_id,
+        validation_kind: GRID_REFERENCE_VALIDATION_KIND,
+        solver_envelope: GRID_REFERENCE_SOLVER_ENVELOPE,
         analytical_voltage_v,
         solver_voltage_v,
         absolute_voltage_error_v: (solver_voltage_v - analytical_voltage_v).abs(),
