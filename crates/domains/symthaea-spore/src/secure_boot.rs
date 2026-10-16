@@ -777,22 +777,20 @@ impl BootChainStatus {
                     vec![
                         BootStage {
                             name: "Firmware".to_string(),
-                            status: BootStageStatus::Verified,
-                            signer: "OEM".to_string(),
-                            description: "UEFI firmware with Secure Boot enforcing. \
-                                Only signed code will execute."
-                                .to_string(),
-                        },
-                        BootStage {
-                            name: "Shim".to_string(),
                             status: if lanzaboote.enrollment_required {
                                 BootStageStatus::PendingEnrollment
                             } else {
                                 BootStageStatus::Verified
                             },
-                            signer: "Microsoft".to_string(),
-                            description: "Microsoft-signed shim bootstraps the MOK \
-                                trust chain. Bridges OEM trust to machine-owner keys."
+                            signer: "OEM".to_string(),
+                            description: "Firmware Secure Boot state was observed; trust in the intended machine-specific signing key still requires explicit enrollment and post-reboot verification."
+                                .to_string(),
+                        },
+                        BootStage {
+                            name: "Shim".to_string(),
+                            status: BootStageStatus::NotApplicable,
+                            signer: "N/A".to_string(),
+                            description: "This Lanzaboote configuration uses the direct signed-UKI path; a shim/MOK enrollment stage does not apply."
                                 .to_string(),
                         },
                         BootStage {
