@@ -136,6 +136,32 @@ def _digest_fields(document: Any, pointer: str = "") -> dict[str, str]:
     return found
 
 
+def _expected_artifact_role(pointer: str) -> str | None:
+    fixed = {
+        "/run/scenario_registry_digest": "scenario_registry",
+        "/run/world_seed_digest": "world_seed",
+        "/run/environment_digest": "environment",
+        "/run/shock_schedule_digest": "shock_schedule",
+        "/run/agent_model_digest": "agent_model",
+        "/profiles/governance_profile_digest": "governance_profile",
+        "/profiles/settlement_finality_profile_digest": "settlement_finality_profile",
+        "/world/initial_state_digest": "initial_state",
+        "/world/final_state_digest": "final_state",
+        "/world/resource_state_digest": "resource_state",
+        "/evaluation/evaluator_digest": "evaluator",
+        "/evaluation/counterexamples_digest": "counterexamples",
+    }
+    if pointer in fixed:
+        return fixed[pointer]
+    if re.fullmatch(r"/profiles/regime_assignments/\d+/profile_digest", pointer):
+        return "regime_profile"
+    if re.fullmatch(r"/profiles/bridge_profiles/\d+/profile_digest", pointer):
+        return "bridge_profile"
+    if re.fullmatch(r"/events/\d+/payload_digest", pointer):
+        return "event_payload"
+    return None
+
+
 def validate_bundle(root_path: str | Path, manifest_relative_path: str) -> dict[str, Any]:
     root = Path(root_path).resolve(strict=True)
     if not root.is_dir():
@@ -168,6 +194,9 @@ def validate_bundle(root_path: str | Path, manifest_relative_path: str) -> dict[
         raise ValidationFailure("receipt record_kind must be synthetic_simulation_receipt")
     if receipt.get("claim_ceiling") != CLAIM_CEILING:
         raise ValidationFailure("receipt claim ceiling is missing or too permissive")
+    receipt_run = receipt.get("run")
+    if not isinstance(receipt_run, dict) or receipt_run.get("run_id") != manifest["run_id"]:
+        raise ValidationFailure("manifest run_id must exactly match receipt run.run_id")
 
     boundary = receipt.get("authority_boundary")
     if not isinstance(boundary, dict):
@@ -241,6 +270,13 @@ def validate_bundle(root_path: str | Path, manifest_relative_path: str) -> dict[
             value = _at_pointer(receipt, pointer)
             if value != digest:
                 raise ValidationFailure(f"{pointer}: receipt digest disagrees with artifact {artifact_id}")
+            expected_role = _expected_artifact_role(pointer)
+            if expected_role is None:
+                raise ValidationFailure(f"{pointer}: no versioned artifact-role mapping exists")
+            if role != expected_role:
+                raise ValidationFailure(
+                    f"{pointer}: expected artifact role {expected_role!r}, got {role!r}"
+                )
             bound_pointers[pointer] = artifact_id
 
     if MANIFEST_DIGEST_POINTER not in receipt_digests:
