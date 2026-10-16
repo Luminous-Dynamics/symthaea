@@ -194,6 +194,17 @@ pub fn recall_at_k(
             NotEstimableReason::NoEligiblePositives,
         ));
     }
+    if k == 0 {
+        return Ok(Estimate::NotEstimable(NotEstimableReason::ZeroBudget));
+    }
+    if ranked.len() < k {
+        return Ok(Estimate::NotEstimable(
+            NotEstimableReason::TooFewCandidates {
+                requested: k,
+                available: ranked.len(),
+            },
+        ));
+    }
 
     let selected = ranked.iter().take(k);
     let hits = selected
@@ -218,6 +229,17 @@ pub fn recall_label_sensitivity_at_k(
     if eligible_positive_ids.is_empty() {
         return Ok(Estimate::NotEstimable(
             NotEstimableReason::NoEligiblePositives,
+        ));
+    }
+    if k == 0 {
+        return Ok(Estimate::NotEstimable(NotEstimableReason::ZeroBudget));
+    }
+    if ranked.len() < k {
+        return Ok(Estimate::NotEstimable(
+            NotEstimableReason::TooFewCandidates {
+                requested: k,
+                available: ranked.len(),
+            },
         ));
     }
 
@@ -610,6 +632,30 @@ mod tests {
     }
 
     /// Mirrors F2: an unknown among reviewed candidates blocks precision.
+    #[test]
+    fn fixed_budget_recall_is_not_estimable_when_budget_is_unavailable() {
+        let reference = positives(&["p1", "p2"]);
+        let candidates = vec![candidate("p1", 1, LabelState::Positive, true)];
+        assert_eq!(
+            recall_at_k(&candidates, &reference, 2).unwrap(),
+            Estimate::NotEstimable(NotEstimableReason::TooFewCandidates {
+                requested: 2,
+                available: 1,
+            })
+        );
+        assert_eq!(
+            recall_label_sensitivity_at_k(&candidates, &reference, 2).unwrap(),
+            Estimate::NotEstimable(NotEstimableReason::TooFewCandidates {
+                requested: 2,
+                available: 1,
+            })
+        );
+        assert_eq!(
+            recall_at_k(&candidates, &reference, 0).unwrap(),
+            Estimate::NotEstimable(NotEstimableReason::ZeroBudget)
+        );
+    }
+
     #[test]
     fn f2_unknown_outcome_is_not_a_true_negative() {
         let reference = positives(&["p1"]);
