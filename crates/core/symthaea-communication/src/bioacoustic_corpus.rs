@@ -130,7 +130,9 @@ pub fn validate_bioacoustic_corpus(
         || manifest.rights.source_asset_terms_uri.trim().is_empty()
         || manifest.rights.decision_reference.trim().is_empty()
     {
-        return Err("rights decision must reference the license and exact source-asset terms".into());
+        return Err(
+            "rights decision must reference the license and exact source-asset terms".into(),
+        );
     }
     if manifest.rights.intended_use != manifest.intended_use {
         return Err("rights evidence does not match the corpus intended use".into());
@@ -146,6 +148,13 @@ pub fn validate_bioacoustic_corpus(
     }
     if manifest.recordings.is_empty() {
         return Err("corpus manifest must contain at least one recording".into());
+    }
+    let distinct_splits: BTreeSet<_> =
+        manifest.recordings.iter().map(|recording| recording.split).collect();
+    if (policy.hold_out_sessions || policy.hold_out_sites || policy.hold_out_individuals)
+        && distinct_splits.len() < 2
+    {
+        return Err("a declared holdout policy requires at least two distinct data splits".into());
     }
 
     let mut sample_ids = BTreeSet::new();
@@ -168,7 +177,10 @@ pub fn validate_bioacoustic_corpus(
                 recording.sample_id
             ));
         }
-        if recording.sample_rate_hz < 2 || recording.channels == 0 || recording.sample_count == 0 {
+        if recording.sample_rate_hz < 2
+            || recording.channels == 0
+            || recording.sample_count == 0
+        {
             return Err(format!(
                 "sample {} has invalid sample rate, channel count, or sample count",
                 recording.sample_id
@@ -404,8 +416,22 @@ mod tests {
                 decision: RightsAdmissionDecision::Approved,
             },
             recordings: vec![
-                recording("sample-a", 'a', "recording-a", BioacousticSplit::Train, "site-a", "animal-a"),
-                recording("sample-b", 'b', "recording-b", BioacousticSplit::Test, "site-b", "animal-b"),
+                recording(
+                    "sample-a",
+                    'a',
+                    "recording-a",
+                    BioacousticSplit::Train,
+                    "site-a",
+                    "animal-a",
+                ),
+                recording(
+                    "sample-b",
+                    'b',
+                    "recording-b",
+                    BioacousticSplit::Test,
+                    "site-b",
+                    "animal-b",
+                ),
             ],
         }
     }
@@ -437,6 +463,19 @@ mod tests {
         let mut corpus = manifest();
         corpus.intended_use = BioacousticIntendedUse::CommercialResearch;
         assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
+    }
+
+    #[test]
+    fn holdout_policy_requires_distinct_split_partitions() {
+        let mut corpus = manifest();
+        corpus.recordings.truncate(1);
+        assert!(validate_bioacoustic_corpus(
+            &corpus,
+            BioacousticSplitPolicy {
+                hold_out_sessions: true,
+                ..BioacousticSplitPolicy::default()
+            },
+        ).is_err());
     }
 
     #[test]
