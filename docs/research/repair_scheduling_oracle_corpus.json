@@ -42,7 +42,27 @@
         ],
         "minimum_weighted_completion_loss": 111
       },
-      "notes": "Priority-first yields 1110; weighted-recovery scheduling matches the exact optimum. This is a deliberate objective illustration."
+      "notes": "Priority-first yields 1110; weighted-recovery scheduling matches the exact optimum. This is a deliberate objective illustration.",
+      "expected_policy_results": [
+        {
+          "policy": "priority_first",
+          "weighted_completion_loss": 1110,
+          "absolute_gap": 999,
+          "relative_gap": 9
+        },
+        {
+          "policy": "shortest_job_first",
+          "weighted_completion_loss": 111,
+          "absolute_gap": 0,
+          "relative_gap": 0
+        },
+        {
+          "policy": "weighted_recovery_per_step",
+          "weighted_completion_loss": 111,
+          "absolute_gap": 0,
+          "relative_gap": 0
+        }
+      ]
     },
     {
       "id": "ORACLE-02",
@@ -256,7 +276,8 @@
     "exactness": "enumerate every permutation for every instance; do not report heuristic result as exact",
     "determinism": "same fixture and code revision yield identical objective and lexicographic tie-break",
     "scope": "reject precedence, spare parts, nonzero outage release, duplicate identifiers, invalid values and more than eight jobs",
-    "split_policy": "these hand-built cases are correctness fixtures, not a statistical holdout or evidence of field performance"
+    "split_policy": "these hand-built cases are correctness fixtures, not a statistical holdout or evidence of field performance",
+    "heuristic_gap_reporting": "for each fixture report the three policy losses, absolute gap and relative gap against exact optimum"
   },
   "research_sources": [
     "https://doi.org/10.1287/trsc.2023.0227",
