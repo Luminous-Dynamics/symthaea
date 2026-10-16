@@ -453,6 +453,7 @@ pub enum PlantStepTimingErrorV1 {
     NonFiniteDuration,
     NonPositiveDuration,
     MissingClockDomain,
+    MissingClockEpoch,
     NonIncreasingTimestamps,
     ConfiguredSourceCannotBeMeasured,
 }
@@ -504,7 +505,7 @@ impl PlantStepTimingV1 {
         }
         let clock_epoch_id = clock_epoch_id.into();
         if clock_epoch_id.trim().is_empty() {
-            return Err(PlantStepTimingErrorV1::MissingClockDomain);
+            return Err(PlantStepTimingErrorV1::MissingClockEpoch);
         }
         let elapsed_ns = end_timestamp_ns
             .checked_sub(start_timestamp_ns)
@@ -817,6 +818,17 @@ mod tests {
                 6,
             ),
             Err(PlantStepTimingErrorV1::MissingClockDomain)
+        );
+        assert_eq!(
+            PlantStepTimingV1::measured_interval(
+                10,
+                PlantStepTimeSourceV1::MeasuredDeviceClock,
+                "device-ptp",
+                " ",
+                5,
+                6,
+            ),
+            Err(PlantStepTimingErrorV1::MissingClockEpoch)
         );
     }
 
