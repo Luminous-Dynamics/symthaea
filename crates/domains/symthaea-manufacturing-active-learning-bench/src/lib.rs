@@ -737,12 +737,12 @@ pub fn evaluate_transcript(
     let blocked_count = manifest
         .candidates
         .iter()
-        .filter(|candidate| matches!(candidate.feasibility, Feasibility::Blocked { .. }))
+        .filter(|candidate| matches!(&candidate.feasibility, Feasibility::Blocked { .. }))
         .count() as u32;
     let unknown_count = manifest
         .candidates
         .iter()
-        .filter(|candidate| matches!(candidate.feasibility, Feasibility::Unknown { .. }))
+        .filter(|candidate| matches!(&candidate.feasibility, Feasibility::Unknown { .. }))
         .count() as u32;
 
     Ok(EvaluationReport {
