@@ -94,6 +94,7 @@ struct ComparisonBindingV1 {
     comparison_schema_verified: bool,
     candidate_output_hash_matches: bool,
     reference_output_hash_matches: bool,
+    capture_shape_verified: bool,
     comparison_status: Option<String>,
     metrics_present: bool,
     quality_qualified: bool,
@@ -246,6 +247,7 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
             comparison_schema_verified: false,
             candidate_output_hash_matches: false,
             reference_output_hash_matches: false,
+            capture_shape_verified: false,
             comparison_status: None,
             metrics_present: false,
             quality_qualified: false,
@@ -295,6 +297,7 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
         && comparison_binding.comparison_schema_verified
         && comparison_binding.candidate_output_hash_matches
         && comparison_binding.reference_output_hash_matches
+        && comparison_binding.capture_shape_verified
         && comparison_binding.metrics_present;
 
     let receipt = VerificationReceiptV1 {
@@ -838,9 +841,21 @@ fn validate_comparison_binding(
         .pointer("/comparison/status")
         .and_then(Value::as_str)
         .map(str::to_owned);
+    let capture_shape_verified = value.get("comparison").is_some_and(|comparison| {
+        comparison.get("sample_rate_matches").and_then(Value::as_bool) == Some(true)
+            && comparison.get("channel_count_matches").and_then(Value::as_bool) == Some(true)
+            && comparison
+                .get("compared_frames")
+                .and_then(Value::as_u64)
+                .is_some_and(|frames| frames > 0)
+            && comparison
+                .get("compared_duration_seconds")
+                .and_then(Value::as_f64)
+                .is_some_and(|duration| duration.is_finite() && duration > 0.0)
+    });
     let metrics_present = value
-        .pointer("/comparison/metrics")
-        .is_some_and(|metrics| !metrics.is_null() && metrics.is_object());
+        .pointer("/comparison")
+        .is_some_and(comparison_metrics_contract_is_valid);
 
     let mut failures = Vec::new();
     if !schema_ok {
@@ -854,6 +869,11 @@ fn validate_comparison_binding(
     if !reference_ok {
         failures.push("comparison reference WAV hash does not match declared capture".to_owned());
     }
+    if !capture_shape_verified {
+        failures.push(
+            "comparison receipt does not describe a non-empty capture with matching sample rate and channel count".to_owned(),
+        );
+    }
     if status.as_deref() != Some("measured_not_quality_qualified") {
         failures.push(format!(
             "comparison status is not a completed measurement: {:?}",
@@ -861,19 +881,79 @@ fn validate_comparison_binding(
         ));
     }
     if !metrics_present {
-        failures.push("comparison receipt does not contain a metrics object".to_owned());
+        failures.push(
+            "comparison receipt metrics are missing required v1 fields or contain invalid values".to_owned(),
+        );
     }
 
     ComparisonBindingV1 {
         comparison_schema_verified: schema_ok,
         candidate_output_hash_matches: candidate_ok,
         reference_output_hash_matches: reference_ok,
+        capture_shape_verified,
         comparison_status: status,
         metrics_present,
         // This verifier never upgrades measurements into quality qualification.
         quality_qualified: false,
         failures,
     }
+}
+
+/// Validate the v1 measurement contract without treating measurements as quality evidence.
+/// This prevents a hash-linked but fabricated/empty metrics object from looking complete.
+fn comparison_metrics_contract_is_valid(comparison: &Value) -> bool {
+    let Some(metrics) = comparison.get("metrics").and_then(Value::as_object) else {
+        return false;
+    };
+
+    let finite_number = |name: &str| {
+        metrics
+            .get(name)
+            .and_then(Value::as_f64)
+            .is_some_and(f64::is_finite)
+    };
+    let finite_nonnegative = |name: &str| {
+        metrics
+            .get(name)
+            .and_then(Value::as_f64)
+            .is_some_and(|number| number.is_finite() && number >= 0.0)
+    };
+    let correlation_valid = metrics.get("waveform_correlation").is_some_and(|value| {
+        value.is_null()
+            || value.as_f64().is_some_and(|number| {
+                number.is_finite() && (-1.000_001..=1.000_001).contains(&number)
+            })
+    });
+    let integer_positive = |name: &str| {
+        metrics
+            .get(name)
+            .and_then(Value::as_u64)
+            .is_some_and(|number| number > 0)
+    };
+
+    finite_nonnegative("waveform_rmse")
+        && finite_nonnegative("waveform_nrmse_reference")
+        && finite_nonnegative("waveform_max_absolute_error")
+        && correlation_valid
+        && finite_number("rms_delta_db_candidate_minus_reference")
+        && finite_nonnegative("log_spectral_distance_db")
+        && metrics
+            .get("normalized_power_spectrum_l1")
+            .and_then(Value::as_f64)
+            .is_some_and(|number| number.is_finite() && (0.0..=2.000_001).contains(&number))
+        && metrics
+            .get("spectral_magnitude_cosine_similarity")
+            .and_then(Value::as_f64)
+            .is_some_and(|number| {
+                number.is_finite() && (-1.000_001..=1.000_001).contains(&number)
+            })
+        && finite_number("spectral_centroid_delta_hz_candidate_minus_reference")
+        && integer_positive("fft_size")
+        && integer_positive("fft_hop")
+        && metrics
+            .get("window")
+            .and_then(Value::as_str)
+            .is_some_and(|window| !window.trim().is_empty())
 }
 
 fn renderer_receipt(renderer: &RendererCaptureV1) -> RendererReceiptV1 {
@@ -1172,6 +1252,86 @@ mod tests {
         assert!(!binding.comparison_schema_verified);
         assert!(!binding.metrics_present);
         assert!(!binding.quality_qualified);
-        assert_eq!(binding.failures.len(), 4);
+        assert!(binding.failures.len() >= 5);
     }
+    #[test]
+    fn comparison_binding_requires_complete_finite_metrics_and_nonempty_capture() {
+        let candidate_hash = "a".repeat(64);
+        let reference_hash = "b".repeat(64);
+        let receipt = serde_json::json!({
+            "schema": EXPECTED_COMPARISON_SCHEMA,
+            "candidate": { "sha256": candidate_hash },
+            "reference": { "sha256": reference_hash },
+            "quality_qualified": true,
+            "comparison": {
+                "status": "measured_not_quality_qualified",
+                "sample_rate_matches": true,
+                "channel_count_matches": true,
+                "compared_frames": 2048,
+                "compared_duration_seconds": 0.046,
+                "metrics": {
+                    "waveform_rmse": 0.0,
+                    "waveform_nrmse_reference": 0.0,
+                    "waveform_max_absolute_error": 0.0,
+                    "waveform_correlation": null,
+                    "rms_delta_db_candidate_minus_reference": 0.0,
+                    "log_spectral_distance_db": 0.0,
+                    "normalized_power_spectrum_l1": 0.0,
+                    "spectral_magnitude_cosine_similarity": 1.0,
+                    "spectral_centroid_delta_hz_candidate_minus_reference": 0.0,
+                    "fft_size": 4096,
+                    "fft_hop": 1024,
+                    "window": "hann"
+                }
+            }
+        });
+        let bytes = serde_json::to_vec(&receipt).unwrap();
+        let binding = validate_comparison_binding(&bytes, &candidate_hash, &reference_hash);
+        assert!(binding.comparison_schema_verified);
+        assert!(binding.candidate_output_hash_matches);
+        assert!(binding.reference_output_hash_matches);
+        assert!(binding.capture_shape_verified);
+        assert!(binding.metrics_present);
+        assert!(!binding.quality_qualified);
+        assert!(binding.failures.is_empty());
+
+        let malformed_metrics = serde_json::json!({
+            "schema": EXPECTED_COMPARISON_SCHEMA,
+            "candidate": { "sha256": candidate_hash },
+            "reference": { "sha256": reference_hash },
+            "comparison": {
+                "status": "measured_not_quality_qualified",
+                "sample_rate_matches": true,
+                "channel_count_matches": true,
+                "compared_frames": 2048,
+                "compared_duration_seconds": 0.046,
+                "metrics": { "waveform_rmse": 0.0 }
+            }
+        });
+        let bytes = serde_json::to_vec(&malformed_metrics).unwrap();
+        let rejected = validate_comparison_binding(&bytes, &candidate_hash, &reference_hash);
+        assert!(!rejected.metrics_present);
+        assert!(!rejected.failures.is_empty());
+        assert!(!rejected.quality_qualified);
+
+        let zero_frames = serde_json::json!({
+            "schema": EXPECTED_COMPARISON_SCHEMA,
+            "candidate": { "sha256": candidate_hash },
+            "reference": { "sha256": reference_hash },
+            "comparison": {
+                "status": "measured_not_quality_qualified",
+                "sample_rate_matches": true,
+                "channel_count_matches": true,
+                "compared_frames": 0,
+                "compared_duration_seconds": 0.0,
+                "metrics": receipt["comparison"]["metrics"]
+            }
+        });
+        let bytes = serde_json::to_vec(&zero_frames).unwrap();
+        let rejected = validate_comparison_binding(&bytes, &candidate_hash, &reference_hash);
+        assert!(!rejected.capture_shape_verified);
+        assert!(!rejected.failures.is_empty());
+        assert!(!rejected.quality_qualified);
+    }
+
 }
