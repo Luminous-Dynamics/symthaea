@@ -810,3 +810,7 @@ mod tests {
         assert_eq!(one.regions, two.regions);
     }
 }
+
+// Executable one-shot sample path, separate from SFZ mapping/selection evidence.
+#[path = "sfz_playback.rs"]
+pub mod playback;
