@@ -304,6 +304,17 @@ pub fn paired_recall_delta_label_sensitivity_at_k(
             NotEstimableReason::NoEligiblePositives,
         ));
     }
+    if k == 0 {
+        return Ok(Estimate::NotEstimable(NotEstimableReason::ZeroBudget));
+    }
+    if ranked_a.len() < k {
+        return Ok(Estimate::NotEstimable(
+            NotEstimableReason::TooFewCandidates {
+                requested: k,
+                available: ranked_a.len(),
+            },
+        ));
+    }
 
     let by_id_a: HashMap<&str, LabelState> = policy_a
         .iter()
@@ -683,6 +694,22 @@ mod tests {
             }
             other => panic!("expected paired delta bounds, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn paired_delta_refuses_budget_larger_than_shared_universe() {
+        let reference = positives(&["p1"]);
+        let policy_a = vec![candidate("p1", 1, LabelState::Positive, true)];
+        let policy_b = vec![candidate("p1", 1, LabelState::Positive, true)];
+        assert_eq!(
+            paired_recall_delta_label_sensitivity_at_k(
+                &policy_a, &policy_b, &reference, 2
+            ).unwrap(),
+            Estimate::NotEstimable(NotEstimableReason::TooFewCandidates {
+                requested: 2,
+                available: 1,
+            })
+        );
     }
 
     #[test]
