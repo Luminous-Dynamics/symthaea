@@ -247,12 +247,10 @@ fn resolve_fraction(
     input: &EvidenceValue,
     label: &str,
     sources: &BTreeMap<&str, &ProvenanceRecord>,
-    allow_one: bool,
 ) -> Result<f64, String> {
     let value = resolve(input, "fraction", sources)?;
-    if value > 1.0 || (!allow_one && value == 1.0) {
-        let interval = if allow_one { "[0, 1]" } else { "[0, 1)" };
-        return Err(format!("{label} must be in interval {interval}"));
+    if value > 1.0 {
+        return Err(format!("{label} must be in interval [0, 1]"));
     }
     Ok(value)
 }
@@ -292,19 +290,16 @@ fn usable_battery_energy_kwh(
         &case.energy_system.temperature_capacity_factor,
         "temperature capacity factor",
         sources,
-        true,
     )?;
     let end_of_life = resolve_fraction(
         &case.energy_system.end_of_life_capacity_factor,
         "end-of-life capacity factor",
         sources,
-        true,
     )?;
     let reserve = resolve_fraction(
         &case.energy_system.reserve_fraction,
         "reserve fraction",
         sources,
-        true,
     )?;
     finite_result(
         nominal * temperature * end_of_life * (1.0 - reserve),
@@ -331,7 +326,6 @@ fn charge_energy_available_kwh(
         &case.terminal.charging_efficiency,
         "charging efficiency",
         sources,
-        true,
     )?;
     finite_result(effective_power * window * efficiency, "available battery-side recharge energy")
 }
@@ -347,7 +341,6 @@ fn charge_duration_h(
         &case.terminal.charging_efficiency,
         "charging efficiency",
         sources,
-        true,
     )?;
     let rate = effective_power * efficiency;
     if rate == 0.0 {
