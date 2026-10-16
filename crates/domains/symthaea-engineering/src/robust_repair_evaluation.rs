@@ -258,7 +258,10 @@ fn replay_nominal_plan(
         .map(|duration| (duration.job_id.as_str(), duration.duration_steps))
         .collect();
 
-    let mut crew_available: HashMap<&str, usize> = crews\n        .iter()\n        .map(|crew| (crew.id.as_str(), crew.available_from_step))\n        .collect();
+    let mut crew_available: HashMap<&str, usize> = crews
+        .iter()
+        .map(|crew| (crew.id.as_str(), crew.available_from_step))
+        .collect();
     let mut finish_by_job: HashMap<&str, usize> = HashMap::new();
     let mut schedule = Vec::with_capacity(nominal_schedule.len());
     let mut total_loss = 0.0_f64;
