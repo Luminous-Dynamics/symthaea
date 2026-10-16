@@ -481,6 +481,39 @@ mod tests {
     }
 
     #[test]
+    fn timeline_asset_references_are_resolvable_or_explicit_negative_controls() {
+        for fixture in fixture_definitions() {
+            for step in &fixture.timeline {
+                if let Some(sample_path) = step.expected_sample_path.as_deref() {
+                    if fixture.fixture_id == "missing_sample_asset" {
+                        assert_eq!(sample_path, "intentionally_missing.wav");
+                        assert!(!fixture.assets.iter().any(|asset| asset.path == sample_path));
+                    } else {
+                        assert!(
+                            fixture.assets.iter().any(|asset| asset.path == sample_path),
+                            "{} event {} references absent fixture asset {}",
+                            fixture.fixture_id,
+                            step.ordinal,
+                            sample_path
+                        );
+                    }
+                }
+            }
+            for (index, step) in fixture.timeline.iter().enumerate() {
+                assert_eq!(step.ordinal, index + 1, "{} timeline ordinals must be contiguous", fixture.fixture_id);
+            }
+        }
+    }
+
+    #[test]
+    fn sha256_receipts_use_the_standard_digest() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
     fn velocity_split_fixture_preserves_the_incomplete_high_layer() {
         let fixture = fixture_definitions()
             .into_iter()
