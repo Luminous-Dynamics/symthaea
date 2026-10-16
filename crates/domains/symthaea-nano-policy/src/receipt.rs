@@ -133,6 +133,17 @@ pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
         response.feature_contract_sha256 == request.feature_contract_sha256,
         "Feature/preprocessing contract digest matches the request.",
     );
+    let feature_digest_valid = request.feature_contract_sha256.len() == 64
+        && request
+            .feature_contract_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+    push_check(
+        &mut checks,
+        "feature_contract_digest_syntax",
+        feature_digest_valid,
+        "Feature-contract identity is a lowercase 64-character SHA-256 hex digest.",
+    );
     push_check(
         &mut checks,
         "policy_identity",
