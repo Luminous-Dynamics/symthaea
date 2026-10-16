@@ -12,6 +12,7 @@ struct Manifest {
     status: String,
     policy: Policy,
     entries: Vec<Entry>,
+    retrieval_baselines: Vec<RetrievalBaseline>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +39,20 @@ struct Entry {
     limitations: Vec<String>,
     status: String,
     license: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RetrievalBaseline {
+    id: String,
+    repository_url: String,
+    commit: String,
+    artifact_path: String,
+    artifact_url: String,
+    artifact_blob_sha: String,
+    reported_scope: String,
+    license: String,
+    status: String,
+    limitations: Vec<String>,
 }
 
 /// Validate the local shape and immutable upstream references of the candidate
@@ -159,6 +174,55 @@ fn validate_manifest_text(raw: &str) -> Result<usize> {
         }
     }
 
+    if manifest.retrieval_baselines.is_empty() {
+        bail!("manifest must name at least one retrieval baseline");
+    }
+
+    let mut baseline_ids = BTreeSet::new();
+    for baseline in &manifest.retrieval_baselines {
+        if baseline.id.trim().is_empty() || !baseline_ids.insert(baseline.id.as_str()) {
+            bail!("retrieval baseline IDs must be non-empty and unique: {:?}", baseline.id);
+        }
+        if !baseline.repository_url.starts_with("https://github.com/") {
+            bail!("baseline {} must use a pinned GitHub repository URL", baseline.id);
+        }
+        if !valid_git_sha(&baseline.commit) {
+            bail!("baseline {} commit must be a lowercase 40-hex Git SHA", baseline.id);
+        }
+        if baseline.artifact_path.is_empty()
+            || baseline.artifact_path.starts_with('/')
+            || baseline.artifact_path.split('/').any(|part| part == ".." || part.is_empty())
+        {
+            bail!("baseline {} has an unsafe artifact_path", baseline.id);
+        }
+        let expected_url = format!(
+            "{}/blob/{}/{}",
+            baseline.repository_url.trim_end_matches('/'),
+            baseline.commit,
+            baseline.artifact_path
+        );
+        if baseline.artifact_url != expected_url {
+            bail!(
+                "baseline {} artifact_url must bind its pinned commit and exact artifact_path",
+                baseline.id
+            );
+        }
+        if !valid_git_sha(&baseline.artifact_blob_sha) {
+            bail!("baseline {} artifact_blob_sha must be a lowercase 40-hex Git SHA", baseline.id);
+        }
+        if baseline.reported_scope.trim().is_empty() || baseline.license.trim().is_empty() {
+            bail!("baseline {} must state its scope and license/provenance", baseline.id);
+        }
+        if baseline.status != "reference_baseline_only_not_a_prover_dependency" {
+            bail!("baseline {} must remain reference-only, not a prover dependency", baseline.id);
+        }
+        if baseline.limitations.is_empty()
+            || baseline.limitations.iter().any(|limitation| limitation.trim().is_empty())
+        {
+            bail!("baseline {} must state limitations explicitly", baseline.id);
+        }
+    }
+
     Ok(manifest.entries.len())
 }
 
@@ -184,6 +248,19 @@ policy:
     - missing_domain_premises
     - stale_environment_receipt
     - timeout_or_incomplete_output
+retrieval_baselines:
+  - id: "LEANSEARCH-V2-MPR-001"
+    repository_url: "https://github.com/frenzymath/LeanSearch-v2"
+    commit: "94f4888cbaf9f4322535755f86cbac690ec18080"
+    artifact_path: "benchmark/MathlibMPR.json"
+    artifact_url: "https://github.com/frenzymath/LeanSearch-v2/blob/94f4888cbaf9f4322535755f86cbac690ec18080/benchmark/MathlibMPR.json"
+    artifact_blob_sha: "00f1539e5528fa9fb59d253259b4372c58bea09c"
+    reported_scope: "69 research-level Mathlib theorems with premise-group ground truth"
+    license: "Apache-2.0 repository license; check dataset-specific terms"
+    status: "reference_baseline_only_not_a_prover_dependency"
+    limitations:
+      - "Not production dependency"
+      - "Requires compatible benchmark environment"
 entries:
   - id: "TEST-001"
     title: "Test theorem"
@@ -208,6 +285,15 @@ entries:
     fn rejects_floating_branch_urls() {
         let mutated = VALID.replace(
             "blob/1581d4cbdd69a0faf34b2089614fe2a814316a6a/",
+            "blob/main/",
+        );
+        assert!(validate_manifest_text(&mutated).is_err());
+    }
+
+    #[test]
+    fn rejects_floating_retrieval_baseline_urls() {
+        let mutated = VALID.replace(
+            "blob/94f4888cbaf9f4322535755f86cbac690ec18080/",
             "blob/main/",
         );
         assert!(validate_manifest_text(&mutated).is_err());
