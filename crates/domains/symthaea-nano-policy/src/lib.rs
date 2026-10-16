@@ -506,7 +506,13 @@ fn group_balanced_farthest_first(
         None,
         "seeded_initial_candidate",
     ));
-    update_distances(request, first, sorted, &selected_flags, &mut minimum_squared_distances);
+    update_distances(
+        request,
+        first,
+        sorted,
+        &selected_flags,
+        &mut minimum_squared_distances,
+    );
 
     while decisions.len() < budget {
         let least_represented_count = sorted
@@ -619,14 +625,16 @@ fn cost_aware_farthest_first(
             let cost = request.candidates[candidate_index]
                 .estimated_cost
                 .expect("cost-aware requests are validated");
-            let score = minimum_squared_distances[candidate_index].sqrt() / cost;
+            let score =
+                minimum_squared_distances[candidate_index].sqrt() / cost;
             if score > best_score {
                 best = Some(candidate_index);
                 best_score = score;
             }
         }
 
-        let next = best.expect("budget is bounded by validated candidate count");
+        let next = best
+            .expect("budget is bounded by validated candidate count");
         let distance = minimum_squared_distances[next].sqrt();
         selected_flags[next] = true;
         decisions.push(decision(
@@ -807,10 +815,16 @@ mod tests {
         assert_eq!(validate(&req), Err(SelectionError::MissingCostUnit));
         req.cost_unit = Some("simulation_seconds".to_owned());
         req.candidates[0].estimated_cost = None;
-        assert_eq!(validate(&req), Err(SelectionError::MissingEstimatedCost));
+        assert_eq!(
+            validate(&req),
+            Err(SelectionError::MissingEstimatedCost)
+        );
         req.policy = Policy::FarthestFirst;
         req.candidates[0].estimated_cost = Some(0.0);
-        assert_eq!(validate(&req), Err(SelectionError::InvalidEstimatedCost));
+        assert_eq!(
+            validate(&req),
+            Err(SelectionError::InvalidEstimatedCost)
+        );
     }
 
     #[test]
@@ -818,7 +832,10 @@ mod tests {
         let mut req = request(Policy::CostAwareFarthestFirst, 1);
         req.cost_unit = Some("simulation_seconds".to_owned());
         let result = select(req, b"cost-receipt-test").unwrap();
-        assert_eq!(result.cost_unit.as_deref(), Some("simulation_seconds"));
+        assert_eq!(
+            result.cost_unit.as_deref(),
+            Some("simulation_seconds")
+        );
         assert_eq!(result.selected[0].estimated_cost, Some(1.0));
     }
 
