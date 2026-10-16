@@ -35,6 +35,8 @@ pub enum FlightFallbackStage {
 /// Quadrotor embodiment bridge.
 pub struct FlightEmbodiment {
     controller: FlightController,
+    /// Deterministic identity for this seeded simulator instance; not hardware identity.
+    instance_id: String,
     simulator: SimplePhysicsSimulator,
     /// Last command accepted by the in-process simulator. This is not hardware evidence.
     last_applied_command: Option<QuadrotorCommand>,
@@ -51,6 +53,11 @@ pub struct FlightEmbodiment {
 }
 
 impl FlightEmbodiment {
+    /// Deterministic identity of this simulator instance (seed-derived; not a device certificate).
+    pub fn instance_id(&self) -> &str {
+        &self.instance_id
+    }
+
     /// Emergency descent thrust as a fraction of hover thrust.
     /// Produces a controlled descent instead of freefall.
     const EMERGENCY_DESCENT_FRACTION: f32 = 0.3;
@@ -76,6 +83,7 @@ impl FlightEmbodiment {
     pub fn with_controller(genesis: &GenesisSeed, controller: FlightController) -> Self {
         Self {
             controller,
+            instance_id: format!("symthaea.multirotor:{}", genesis.timeline_id()),
             simulator: SimplePhysicsSimulator::new(),
             last_applied_command: None,
             encoder: QuadrotorHdcEncoder::new(genesis, 32),
@@ -302,7 +310,7 @@ impl symthaea_core::embodiment_v2::EmbodimentV2Adapter for FlightEmbodiment {
             contract_version: symthaea_core::embodiment_v2::EMBODIMENT_CONTRACT_VERSION_V2,
             profile_id: "symthaea.multirotor.simple-physics-quadrotor.v1".into(),
             platform_family_id: "aerial.multirotor".into(),
-            instance_id: instance_id.into(),
+            instance_id: self.instance_id.clone(),
             morphology_id: "quadrotor.simple-physics-27g.v1".into(),
             observation_schema_id: "symthaea.observation.scalar-quantity.v2".into(),
             action_schema_id: "symthaea.action.scalar-quantity.v2".into(),
@@ -331,6 +339,9 @@ impl symthaea_core::embodiment_v2::EmbodimentV2Adapter for FlightEmbodiment {
         &self,
         instance_id: &str,
     ) -> Result<symthaea_core::embodiment_v2::ObservationFrameV2, String> {
+        if instance_id != self.instance_id {
+            return Err(format!("requested instance {instance_id:?} does not match bound instance {:?}", self.instance_id));
+        }
         use symthaea_core::embodiment_v2::{
             ClockStampV2, EMBODIMENT_CONTRACT_VERSION_V2, ObservationFrameV2, ObservationValueV2,
         };
@@ -369,7 +380,7 @@ impl symthaea_core::embodiment_v2::EmbodimentV2Adapter for FlightEmbodiment {
         let frame = ObservationFrameV2 {
             contract_version: EMBODIMENT_CONTRACT_VERSION_V2,
             profile_id: "symthaea.multirotor.simple-physics-quadrotor.v1".into(),
-            instance_id: instance_id.into(),
+            instance_id: self.instance_id.clone(),
             clock: ClockStampV2 {
                 clock_domain_id: "symthaea.multirotor.sim-time".into(),
                 sequence: Some(self.total_steps as u64),
@@ -387,6 +398,9 @@ impl symthaea_core::embodiment_v2::EmbodimentV2Adapter for FlightEmbodiment {
         &self,
         instance_id: &str,
     ) -> Result<Option<symthaea_core::embodiment_v2::ActionFrameV2>, String> {
+        if instance_id != self.instance_id {
+            return Err(format!("requested instance {instance_id:?} does not match bound instance {:?}", self.instance_id));
+        }
         use symthaea_core::embodiment_v2::{
             ActionFrameV2, ActionStageV2, ActionValueV2, ClockStampV2, EMBODIMENT_CONTRACT_VERSION_V2,
         };
@@ -554,7 +568,7 @@ mod tests {
             validate_adapter_v2_conformance, ActionStageV2, EmbodimentV2Adapter,
         };
         let mut bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("uec-v2-test"));
-        let instance = "conformance-quadrotor";
+        let instance = bridge.instance_id().to_string();
         let before = bridge.observation_frame_v2(instance).unwrap();
         assert_eq!(before.observations.len(), 13);
         assert!(bridge.last_action_frame_v2(instance).unwrap().is_none());
@@ -578,6 +592,7 @@ mod tests {
         let bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("uec-v2-test"));
         let failures = validate_adapter_v2_conformance(&bridge, "requested-instance");
         assert!(failures.is_err());
+        assert!(bridge.observation_frame_v2("requested-instance").is_err());
     }
 
     #[test]
