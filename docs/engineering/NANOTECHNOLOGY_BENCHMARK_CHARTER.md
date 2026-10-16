@@ -184,7 +184,7 @@ This fourth objective is not identical to maximizing immediate Success@K. Report
 
 ## 9. Active Rust selector baseline
 
-A first candidate-policy primitive is being developed separately from this research-document branch: [PR #7628](https://github.com/Luminous-Dynamics/symthaea/pull/7628), tracked by [NANO-005](https://github.com/Luminous-Dynamics/symthaea/issues/7627). It provides deterministic maximin descriptor-diversity selection and a seeded random control, strict input/output JSON schemas, smoke fixtures, 16 unit tests, and a targeted Rust workflow with a CLI smoke check.
+A first candidate-policy primitive is being developed separately from this research-document branch: [PR #7628](https://github.com/Luminous-Dynamics/symthaea/pull/7628), tracked by [NANO-005](https://github.com/Luminous-Dynamics/symthaea/issues/7627). It provides deterministic maximin descriptor-diversity selection and a seeded random control, strict input/output JSON schemas, smoke fixtures, 17 unit tests, exact-request BLAKE3 receipts, and a targeted Rust workflow with a CLI smoke check.
 
 This is an implementation baseline only. It is not yet an HDC-backed policy, atomistic predictor, optical solver, or scientific result. Its input contains only candidate IDs and numeric descriptors; future integration must use a permitted, frozen representation and demonstrate improvement over this and task-native baselines. Rust compilation/tests remain pending the targeted workflow and must not be reported as passing before exact-head evidence exists.
 
