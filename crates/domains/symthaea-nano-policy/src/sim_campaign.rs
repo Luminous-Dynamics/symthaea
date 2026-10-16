@@ -321,7 +321,10 @@ pub fn audit_campaign_json(
             if !run_audit.audit_pass {
                 identity_blockers.push("single-run simulator-call budget audit did not pass".to_string());
             }
-            if !identity_blockers.is_empty() {
+            if !report.digest_matches {
+                report.status = CampaignRunStatus::DigestMismatch;
+                report.blockers.extend(identity_blockers);
+            } else if !identity_blockers.is_empty() {
                 report.status = CampaignRunStatus::IdentityMismatch;
                 report.blockers.extend(identity_blockers);
             } else {
@@ -533,4 +536,320 @@ mod tests {
         ProposalAttempt, PreflightStatus, ProposalStatus, RunStatus, SimulatorCall,
         SimulatorTerminalStatus, NotCalledReason, SimulatorBudgetLedger,
     };
-    use std::path::Path;
+    
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sim_budget::{
+        NotCalledReason, PreflightStatus, ProposalAttempt, ProposalStatus, RunStatus,
+        SimulatorBudgetLedger, SimulatorCall, SimulatorTerminalStatus,
+    };
+
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn test_call(
+        id: &str,
+        status: SimulatorTerminalStatus,
+        result_digest: Option<String>,
+        cost: f64,
+    ) -> SimulatorCall {
+        SimulatorCall {
+            invocation_id: id.to_string(),
+            started_receipt_sha256: digest('d'),
+            terminal_receipt_sha256: digest('e'),
+            terminal_status: status,
+            result_artifact_sha256: result_digest,
+            elapsed_ms: 100,
+            cost,
+        }
+    }
+
+    fn test_attempt(
+        sequence: usize,
+        id: &str,
+        candidate_id: &str,
+        candidate_digest: char,
+        call: SimulatorCall,
+    ) -> ProposalAttempt {
+        ProposalAttempt {
+            sequence,
+            attempt_id: id.to_string(),
+            candidate_id: Some(candidate_id.to_string()),
+            candidate_sha256: Some(digest(candidate_digest)),
+            proposal_status: ProposalStatus::Generated,
+            preflight_status: PreflightStatus::Passed,
+            attempt_reason: None,
+            not_called_reason: None,
+            proposal_cost: 0.1,
+            proposal_elapsed_ms: 5,
+            simulator_call: Some(call),
+        }
+    }
+
+    fn test_ledger(
+        seed: u64,
+        run_id: &str,
+        arm_id: &str,
+        policy_id: &str,
+        policy_revision: String,
+    ) -> Vec<u8> {
+        let ledger = SimulatorBudgetLedger {
+            schema_version: crate::sim_budget::SIMULATOR_LEDGER_SCHEMA_VERSION.to_string(),
+            benchmark_id: "campaign-synthetic".to_string(),
+            run_id: run_id.to_string(),
+            seed,
+            arm_id: arm_id.to_string(),
+            policy_id: policy_id.to_string(),
+            policy_revision,
+            run_manifest_sha256: digest('1'),
+            task_contract_sha256: digest('2'),
+            evaluation_manifest_sha256: digest('3'),
+            source_manifest_sha256: digest('4'),
+            simulator_recipe_sha256: digest('5'),
+            expected_simulator_calls: 2,
+            reported_simulator_calls: 2,
+            proposal_attempt_cap: 10,
+            cost_unit: "cost_units".to_string(),
+            run_status: RunStatus::Completed,
+            attempts: vec![
+                test_attempt(
+                    1,
+                    &format!("{run_id}-attempt-1"),
+                    &format!("{run_id}-candidate-1"),
+                    'a',
+                    test_call(
+                        &format!("{run_id}-call-1"),
+                        SimulatorTerminalStatus::ReturnedFiniteResult,
+                        Some(digest('f')),
+                        1.0,
+                    ),
+                ),
+                test_attempt(
+                    2,
+                    &format!("{run_id}-attempt-2"),
+                    &format!("{run_id}-candidate-2"),
+                    'b',
+                    test_call(
+                        &format!("{run_id}-call-2"),
+                        SimulatorTerminalStatus::Failed,
+                        None,
+                        1.0,
+                    ),
+                ),
+            ],
+        };
+        serde_json::to_vec_pretty(&ledger).expect("test ledger serializes")
+    }
+
+    fn add_run(
+        manifest: &mut CampaignManifest,
+        bytes: &mut BTreeMap<String, Vec<u8>>,
+        arm_index: usize,
+        seed: u64,
+        path: &str,
+    ) {
+        let arm = &manifest.arms[arm_index];
+        let run_id = format!("run-{}-{seed}", arm.arm_id);
+        let raw = test_ledger(
+            seed,
+            &run_id,
+            &arm.arm_id,
+            &arm.policy_id,
+            arm.policy_revision.clone(),
+        );
+        manifest.arms[arm_index].ledgers.push(CampaignLedgerReference {
+            seed,
+            relative_path: path.to_string(),
+            sha256: sha256_hex(&raw),
+        });
+        bytes.insert(path.to_string(), raw);
+    }
+
+    fn sample_campaign() -> (CampaignManifest, BTreeMap<String, Vec<u8>>) {
+        let mut manifest = CampaignManifest {
+            schema_version: CAMPAIGN_MANIFEST_SCHEMA_VERSION.to_string(),
+            benchmark_id: "campaign-synthetic".to_string(),
+            campaign_id: "campaign-fixture-001".to_string(),
+            expected_simulator_calls: 2,
+            proposal_attempt_cap: 10,
+            cost_unit: "cost_units".to_string(),
+            task_contract_sha256: digest('2'),
+            evaluation_manifest_sha256: digest('3'),
+            simulator_recipe_sha256: digest('5'),
+            expected_seeds: vec![42, 43],
+            arms: vec![
+                CampaignArmManifest {
+                    arm_id: "random".to_string(),
+                    policy_id: "random_seeded".to_string(),
+                    policy_revision: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+                    ledgers: Vec::new(),
+                },
+                CampaignArmManifest {
+                    arm_id: "maxmin".to_string(),
+                    policy_id: "farthest_first".to_string(),
+                    policy_revision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+                    ledgers: Vec::new(),
+                },
+            ],
+        };
+        let mut bytes = BTreeMap::new();
+        add_run(
+            &mut manifest,
+            &mut bytes,
+            0,
+            42,
+            "runs/random/seed-42.json",
+        );
+        add_run(
+            &mut manifest,
+            &mut bytes,
+            0,
+            43,
+            "runs/random/seed-43.json",
+        );
+        add_run(
+            &mut manifest,
+            &mut bytes,
+            1,
+            42,
+            "runs/maxmin/seed-42.json",
+        );
+        add_run(
+            &mut manifest,
+            &mut bytes,
+            1,
+            43,
+            "runs/maxmin/seed-43.json",
+        );
+        (manifest, bytes)
+    }
+
+    fn raw_manifest(manifest: &CampaignManifest) -> Vec<u8> {
+        serde_json::to_vec_pretty(manifest).expect("test manifest serializes")
+    }
+
+    #[test]
+    fn matching_seed_rosters_and_ledgers_pass_campaign_audit() {
+        let (manifest, bytes) = sample_campaign();
+        let report = audit_campaign_json(&raw_manifest(&manifest), &bytes)
+            .expect("valid campaign manifest audits");
+        assert!(report.audit_pass);
+        assert_eq!(report.expected_run_count, 4);
+        assert_eq!(report.referenced_run_count, 4);
+        assert_eq!(report.verified_run_count, 4);
+        assert!(report.arms.iter().all(|arm| arm.audit_pass));
+        assert_eq!(report.arms[0].missing_verified_seeds, Vec::<u64>::new());
+        assert_eq!(report.arms[1].missing_verified_seeds, Vec::<u64>::new());
+    }
+
+    #[test]
+    fn missing_seed_reference_is_reported_instead_of_shrinking_roster() {
+        let (mut manifest, bytes) = sample_campaign();
+        manifest.arms[0].ledgers.retain(|reference| reference.seed != 43);
+        let report = audit_campaign_json(&raw_manifest(&manifest), &bytes)
+            .expect("valid but incomplete roster audits");
+        assert!(!report.audit_pass);
+        assert_eq!(report.arms[0].missing_seed_references, vec![43]);
+        assert_eq!(report.arms[0].missing_verified_seeds, vec![43]);
+        assert!(report.arms[1].audit_pass);
+    }
+
+    #[test]
+    fn referenced_but_missing_file_is_not_counted_as_verified_seed() {
+        let (manifest, mut bytes) = sample_campaign();
+        bytes.remove("runs/maxmin/seed-43.json");
+        let report = audit_campaign_json(&raw_manifest(&manifest), &bytes)
+            .expect("missing file is reported as audit failure");
+        assert!(!report.audit_pass);
+        assert_eq!(report.arms[1].missing_verified_seeds, vec![43]);
+        let missing = report.arms[1]
+            .runs
+            .iter()
+            .find(|run| run.expected_seed == 43)
+            .expect("seed-43 run report");
+        assert_eq!(missing.status, CampaignRunStatus::MissingFile);
+    }
+
+    #[test]
+    fn raw_ledger_hash_mismatch_blocks_campaign_pass() {
+        let (mut manifest, bytes) = sample_campaign();
+        manifest.arms[0].ledgers[0].sha256 = digest('9');
+        let report = audit_campaign_json(&raw_manifest(&manifest), &bytes)
+            .expect("digest mismatch is a reportable campaign audit failure");
+        assert!(!report.audit_pass);
+        let run = report.arms[0]
+            .runs
+            .iter()
+            .find(|run| run.expected_seed == 42)
+            .expect("seed-42 report");
+        assert_eq!(run.status, CampaignRunStatus::DigestMismatch);
+        assert!(!run.digest_matches);
+    }
+
+    #[test]
+    fn declared_seed_must_match_seed_inside_run_ledger() {
+        let (mut manifest, mut bytes) = sample_campaign();
+        let path = "runs/random/seed-42.json";
+        let raw = test_ledger(
+            99,
+            "run-random-99",
+            "random",
+            "random_seeded",
+            manifest.arms[0].policy_revision.clone(),
+        );
+        bytes.insert(path.to_string(), raw.clone());
+        manifest.arms[0].ledgers[0].sha256 = sha256_hex(&raw);
+        let report = audit_campaign_json(&raw_manifest(&manifest), &bytes)
+            .expect("seed identity mismatch is reportable");
+        assert!(!report.audit_pass);
+        let run = report.arms[0]
+            .runs
+            .iter()
+            .find(|run| run.expected_seed == 42)
+            .expect("seed-42 report");
+        assert_eq!(run.observed_seed, Some(99));
+        assert_eq!(run.status, CampaignRunStatus::IdentityMismatch);
+        assert!(run.blockers.iter().any(|message| message.contains("seed")));
+    }
+
+    #[test]
+    fn repeated_seed_reference_and_duplicate_run_id_fail_campaign() {
+        let (mut manifest, mut bytes) = sample_campaign();
+        let duplicate = manifest.arms[0].ledgers[0].clone();
+        let new_path = "runs/random/seed-42-duplicate.json";
+        bytes.insert(
+            new_path.to_string(),
+            bytes.get(&duplicate.relative_path).unwrap().clone(),
+        );
+        manifest.arms[0].ledgers.push(CampaignLedgerReference {
+            seed: duplicate.seed,
+            relative_path: new_path.to_string(),
+            sha256: duplicate.sha256,
+        });
+        let report = audit_campaign_json(&raw_manifest(&manifest), &bytes)
+            .expect("duplicate seed is reportable");
+        assert!(!report.audit_pass);
+        assert_eq!(report.arms[0].duplicate_seed_references, vec![42]);
+        assert_eq!(report.duplicate_run_ids, vec!["run-random-42".to_string()]);
+    }
+
+    #[test]
+    fn parent_directory_paths_are_rejected() {
+        let (mut manifest, bytes) = sample_campaign();
+        manifest.arms[0].ledgers[0].relative_path = "../outside.json".to_string();
+        let error = audit_campaign_json(&raw_manifest(&manifest), &bytes).unwrap_err();
+        assert!(error.contains("safe forward-slash relative path"));
+    }
+
+    #[test]
+    fn unreferenced_extra_ledger_bytes_do_not_enter_campaign_denominator() {
+        let (manifest, mut bytes) = sample_campaign();
+        bytes.insert("extra.json".to_string(), b"not part of the manifest".to_vec());
+        let report = audit_campaign_json(&raw_manifest(&manifest), &bytes)
+            .expect("extra external files do not expand campaign");
+        assert!(report.audit_pass);
+        assert_eq!(report.referenced_run_count, 4);
+    }
+}
