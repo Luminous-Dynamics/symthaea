@@ -76,12 +76,27 @@ pub fn magnetic_reynolds_number(conductivity: f64, length: f64, velocity: f64) -
     MU_0 * conductivity * length * velocity
 }
 
-/// Spitzer resistivity (collisional): η = π Z e² m_e^(1/2) ln(Λ) / (2(2πk_BT)^(3/2))
-/// Simplified: η ∝ T^(-3/2)
+/// Classical Spitzer resistivity approximation in SI units, returning ohm-m.
+///
+/// Inputs: electron temperature in kelvin, dimensionless effective ion charge,
+/// and dimensionless Coulomb logarithm. This scalar approximation assumes a
+/// fully ionized Maxwellian plasma under the selected classical transport
+/// convention; it does not model neoclassical, Hall, or regime-specific
+/// transport corrections.
+///
+/// The SI expression includes (4π ε₀)² in the denominator. Values from this
+/// helper are analytical estimates, not a validated discharge/torch simulation.
 pub fn spitzer_resistivity(temperature: f64, z_eff: f64, coulomb_log: f64) -> f64 {
-    let coeff = PI * z_eff * E_CHARGE * E_CHARGE * M_ELECTRON.sqrt() * coulomb_log;
-    let denom = 2.0 * (2.0 * PI * K_B * temperature).powf(1.5);
-    coeff / denom
+    let eps_0 = crate::maxwell::EPS_0;
+    let coeff = (4.0 * (2.0 * PI).sqrt() / 3.0)
+        * z_eff
+        * E_CHARGE
+        * E_CHARGE
+        * M_ELECTRON.sqrt()
+        * coulomb_log;
+    let charge_factor = (4.0 * PI * eps_0).powi(2);
+    let thermal_energy = K_B * temperature;
+    coeff / (charge_factor * thermal_energy.powf(1.5))
 }
 
 /// Coulomb logarithm: ln(Λ) ≈ ln(λ_D / b_min)
@@ -114,6 +129,36 @@ pub fn safety_factor(r: f64, major_radius: f64, b_toroidal: f64, b_poloidal: f64
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_spitzer_resistivity_against_published_si_reference() {
+        // PlasmaPy documents approximately 2.4915e-6 ohm m for T=1e6 K,
+        // electron-proton collisions and n=1e19 m^-3. With a fixed
+        // Coulomb logarithm near 19.33, this scalar classical expression
+        // should agree at the few-percent level; it is not the same
+        // collision-frequency implementation.
+        let eta = spitzer_resistivity(1.0e6, 1.0, 19.33);
+        let reference = 2.4915e-6;
+        let relative_error = (eta - reference).abs() / reference;
+        assert!(
+            relative_error < 0.05,
+            "Spitzer resistivity = {eta:.6e} ohm m; reference = {reference:.6e}; relative error = {relative_error:.3}"
+        );
+    }
+
+    #[test]
+    fn test_spitzer_resistivity_temperature_scaling() {
+        // Holding Z_eff and Coulomb logarithm fixed, the classical
+        // approximation scales as T_e^(-3/2).
+        let eta_t = spitzer_resistivity(1.0e6, 1.0, 20.0);
+        let eta_8t = spitzer_resistivity(8.0e6, 1.0, 20.0);
+        let expected_ratio = 8.0_f64.powf(1.5);
+        let observed_ratio = eta_t / eta_8t;
+        assert!(
+            (observed_ratio - expected_ratio).abs() / expected_ratio < 1e-12,
+            "observed ratio = {observed_ratio}, expected = {expected_ratio}"
+        );
+    }
 
     #[test]
     fn test_debye_length_order() {
