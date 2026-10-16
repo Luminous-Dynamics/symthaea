@@ -1,0 +1,47 @@
+name: INTX Equipment Corpus
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/intx-program-bench.yml"
+      - "crates/intx-program-bench/**"
+      - "docs/INTX-PROGRAM-001-*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  corpus-contract:
+    name: Exact-head corpus contract checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/intx-program-bench/Cargo.toml -- --check
+
+      - name: Run dependency-free corpus tests
+        run: cargo test --manifest-path crates/intx-program-bench/Cargo.toml --locked
+
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path crates/intx-program-bench/Cargo.toml --locked -- -D warnings
