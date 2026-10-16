@@ -2,6 +2,7 @@
   "schema_version": "nano-simulator-call-ledger-v1",
   "benchmark_id": "synthetic-budget-accounting",
   "run_id": "fixture-run-001",
+  "seed": 42,
   "arm_id": "surrogate_rank",
   "policy_id": "synthetic_policy",
   "policy_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
