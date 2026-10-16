@@ -294,6 +294,12 @@ pub fn validate_bioacoustic_corpus(
         if !duration_s.is_finite() || duration_s <= 0.0 {
             return Err(format!("sample {} has invalid derived duration", recording.sample_id));
         }
+        if recording.source_start_s.is_some() && recording.source_recording_id.is_none() {
+            return Err(format!(
+                "sample {} declares a source offset without a source-recording ID",
+                recording.sample_id
+            ));
+        }
         if recording
             .source_start_s
             .is_some_and(|offset| !offset.is_finite() || offset < 0.0 || !(offset + duration_s).is_finite())
@@ -825,6 +831,14 @@ mod tests {
             .insert("source_start_s".into(), serde_json::Value::Null);
         recording.as_object_mut().unwrap().remove("unscored_regions");
         assert!(serde_json::from_value::<BioacousticCorpusManifest>(json).is_err());
+    }
+
+    #[test]
+    fn rejects_source_offsets_without_source_recording_ids() {
+        let mut corpus = manifest();
+        corpus.recordings[0].source_recording_id = None;
+        corpus.recordings[0].source_start_s = Some(3.0);
+        assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
     }
 
     #[test]
