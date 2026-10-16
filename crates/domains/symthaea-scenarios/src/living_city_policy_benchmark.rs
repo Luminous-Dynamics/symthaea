@@ -33,6 +33,16 @@ pub enum PolicyKind {
     FloorFirst,
 }
 
+/// Baselines used by the built-in synthetic smoke suite. A Symthaea policy is
+/// intentionally not represented here until one is integrated through the same
+/// information/action contract and can be compared without privileged inputs.
+pub const STANDARD_BASELINE_POLICIES: [PolicyKind; 4] = [
+    PolicyKind::NoIntervention,
+    PolicyKind::ReactiveGreedy,
+    PolicyKind::CostFirst,
+    PolicyKind::FloorFirst,
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Observation {
@@ -83,6 +93,19 @@ pub struct BenchmarkConfig {
     /// An observation older than this is stale.
     pub maximum_observation_age_steps: usize,
 }
+
+/// Fixed configuration for the built-in synthetic-only test suite. These values
+/// are fixture parameters, not recommended capacities or real-world targets.
+pub const SYNTHETIC_SMOKE_CONFIG: BenchmarkConfig = BenchmarkConfig {
+    backup_capacity_units: 5,
+    backup_duration_steps: 2,
+    deployment_delay_steps: 1,
+    max_deployments: 2,
+    minimum_service_ratio_per_mille: 950,
+    deployment_cost_units: 2,
+    unmet_service_cost_per_unit: 1,
+    maximum_observation_age_steps: 0,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BenchmarkError {
@@ -533,6 +556,76 @@ pub fn compare_service_loss(
     })
 }
 
+fn synthetic_observation(
+    supply: Option<u32>,
+    demand: Option<u32>,
+    age_steps: usize,
+    forecast_service_ratio_per_mille: Option<u16>,
+) -> Observation {
+    Observation {
+        reported_supply_units: supply,
+        reported_demand_units: demand,
+        age_steps,
+        forecast_service_ratio_per_mille,
+    }
+}
+
+fn synthetic_step(
+    actual_supply_units: u32,
+    actual_demand_units: u32,
+    observation: Observation,
+) -> ScenarioStep {
+    ScenarioStep {
+        actual_supply_units,
+        actual_demand_units,
+        observation,
+    }
+}
+
+/// Four fixed deterministic cases for harness smoke/negative-control testing:
+/// healthy baseline, an observed compound-time shortfall forecast, stale
+/// telemetry during an outage, and a repeated outage before full recovery.
+/// These are abstract unitless fixtures, not a calibrated urban model.
+pub fn built_in_synthetic_smoke_scenarios() -> Vec<PolicyScenario> {
+    vec![
+        PolicyScenario {
+            scenario_id: "synthetic-healthy-baseline".into(),
+            steps: vec![
+                synthetic_step(10, 10, synthetic_observation(Some(10), Some(10), 0, Some(1_000))),
+                synthetic_step(10, 10, synthetic_observation(Some(10), Some(10), 0, Some(1_000))),
+                synthetic_step(10, 10, synthetic_observation(Some(10), Some(10), 0, Some(1_000))),
+            ],
+        },
+        PolicyScenario {
+            scenario_id: "synthetic-forecasted-shortfall".into(),
+            steps: vec![
+                synthetic_step(10, 10, synthetic_observation(Some(10), Some(10), 0, Some(500))),
+                synthetic_step(5, 10, synthetic_observation(Some(5), Some(10), 0, None)),
+                synthetic_step(5, 10, synthetic_observation(Some(5), Some(10), 0, None)),
+            ],
+        },
+        PolicyScenario {
+            scenario_id: "synthetic-stale-telemetry-outage".into(),
+            steps: vec![
+                synthetic_step(5, 10, synthetic_observation(Some(20), Some(10), 3, Some(1_000))),
+                synthetic_step(5, 10, synthetic_observation(Some(20), Some(10), 3, Some(1_000))),
+                synthetic_step(5, 10, synthetic_observation(Some(20), Some(10), 3, Some(1_000))),
+            ],
+        },
+        PolicyScenario {
+            scenario_id: "synthetic-recurrent-outage".into(),
+            steps: vec![
+                synthetic_step(5, 10, synthetic_observation(Some(5), Some(10), 0, None)),
+                synthetic_step(5, 10, synthetic_observation(Some(5), Some(10), 0, None)),
+                synthetic_step(10, 10, synthetic_observation(Some(10), Some(10), 0, None)),
+                synthetic_step(5, 10, synthetic_observation(Some(5), Some(10), 0, None)),
+                synthetic_step(5, 10, synthetic_observation(Some(5), Some(10), 0, None)),
+                synthetic_step(10, 10, synthetic_observation(Some(10), Some(10), 0, None)),
+            ],
+        },
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -572,6 +665,73 @@ mod tests {
             scenario_id: id.into(),
             steps,
         }
+    }
+
+    #[test]
+    fn built_in_smoke_suite_is_paired_deterministic_and_receipt_verifiable() {
+        let scenarios = built_in_synthetic_smoke_scenarios();
+        let first = evaluate_suite(
+            &scenarios,
+            &STANDARD_BASELINE_POLICIES,
+            SYNTHETIC_SMOKE_CONFIG,
+        )
+        .unwrap();
+        let second = evaluate_suite(
+            &scenarios,
+            &STANDARD_BASELINE_POLICIES,
+            SYNTHETIC_SMOKE_CONFIG,
+        )
+        .unwrap();
+
+        assert_eq!(scenarios.len(), 4);
+        assert_eq!(first.len(), 16);
+        assert_eq!(first, second);
+
+        for run in &first {
+            let scenario = scenarios
+                .iter()
+                .find(|scenario| scenario.scenario_id == run.scenario_id)
+                .unwrap();
+            let receipt = run.receipt().unwrap();
+            assert!(verify_policy_run_receipt(
+                scenario,
+                SYNTHETIC_SMOKE_CONFIG,
+                run,
+                &receipt,
+            )
+            .is_ok());
+        }
+
+        let healthy = first
+            .iter()
+            .filter(|run| run.scenario_id == "synthetic-healthy-baseline");
+        assert!(healthy.all(|run| run.unmet_service_units == 0));
+    }
+
+    #[test]
+    fn floor_first_forecast_reduces_service_loss_vs_reactive_on_frozen_fixture() {
+        let scenarios = built_in_synthetic_smoke_scenarios();
+        let case = scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == "synthetic-forecasted-shortfall")
+            .unwrap();
+        let floor_first = evaluate_policy(
+            case,
+            PolicyKind::FloorFirst,
+            SYNTHETIC_SMOKE_CONFIG,
+        )
+        .unwrap();
+        let reactive = evaluate_policy(
+            case,
+            PolicyKind::ReactiveGreedy,
+            SYNTHETIC_SMOKE_CONFIG,
+        )
+        .unwrap();
+
+        assert_eq!(floor_first.unmet_service_units, 0);
+        assert!(reactive.unmet_service_units > floor_first.unmet_service_units);
+        let comparison = compare_service_loss(&floor_first, &reactive).unwrap();
+        assert_eq!(comparison.service_loss_reduction_per_mille, Some(1_000));
     }
 
     #[test]
