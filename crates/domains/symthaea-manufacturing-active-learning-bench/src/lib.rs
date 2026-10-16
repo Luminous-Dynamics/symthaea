@@ -419,9 +419,10 @@ pub fn run_campaign(
             return Err("initial design exceeds the remaining budget".into());
         }
         let measurements = synthetic_oracle(manifest, candidate, action.fidelity);
-        let claimed_conforming = measurements
-            .quality_margin_milli
-            .is_some_and(|margin| margin >= public_view.minimum_quality_margin_milli);
+        let claimed_conforming = action.fidelity == Fidelity::Reference
+            && measurements
+                .quality_margin_milli
+                .is_some_and(|margin| margin >= public_view.minimum_quality_margin_milli);
         let measurement_digest = measurement_digest(
             &manifest_digest,
             action,
@@ -469,9 +470,10 @@ pub fn run_campaign(
         }
 
         let measurements = synthetic_oracle(manifest, candidate, action.fidelity);
-        let claimed_conforming = measurements
-            .quality_margin_milli
-            .is_some_and(|margin| margin >= public_view.minimum_quality_margin_milli);
+        let claimed_conforming = action.fidelity == Fidelity::Reference
+            && measurements
+                .quality_margin_milli
+                .is_some_and(|margin| margin >= public_view.minimum_quality_margin_milli);
         let measurement_digest = measurement_digest(
             &manifest_digest,
             &action,
@@ -613,8 +615,11 @@ fn nearest_observed_margin(
     candidate: &Candidate,
     history: &[ObservationForPolicy],
 ) -> Option<i32> {
+    // Until the multifidelity issue supplies a calibrated discrepancy model, do not
+    // use cheap proxy responses to make a conformance-sensitive decision estimate.
     history
         .iter()
+        .filter(|item| item.action.fidelity == Fidelity::Reference)
         .filter_map(|item| {
             item.measurements
                 .quality_margin_milli
@@ -718,6 +723,11 @@ fn campaign_claims(
         let margin = record.measurements.quality_margin_milli;
         let throughput = record.measurements.throughput_units;
         let resource = record.measurements.resource_units;
+        // Proxy-fidelity observations can inform future selection, but cannot qualify a
+        // conforming candidate or production utility. Qualification requires reference fidelity.
+        if record.action.fidelity != Fidelity::Reference {
+            continue;
+        }
         if let (Some(margin), Some(throughput), Some(resource)) = (margin, throughput, resource) {
             if margin >= view.minimum_quality_margin_milli {
                 if first_conforming.is_none() {
@@ -882,6 +892,38 @@ mod tests {
         transcript.records[0].action.candidate_id = "C00-10".into();
         assert!(evaluate_transcript(&manifest, &transcript)
             .unwrap_err().contains("blocked or unknown"));
+    }
+
+    #[test]
+    fn biased_proxy_response_cannot_qualify_a_conforming_candidate() {
+        let manifest =
+            CampaignManifest::reference(ScenarioFamily::MultiFidelityDiscrepancy, 7, 20);
+        let candidate = manifest
+            .candidates
+            .iter()
+            .find(|candidate| candidate.factor_x == 8 && candidate.factor_y == 2)
+            .unwrap();
+        let proxy = synthetic_oracle(&manifest, candidate, Fidelity::Proxy);
+        let reference = synthetic_oracle(&manifest, candidate, Fidelity::Reference);
+        assert!(proxy.quality_margin_milli.unwrap() >= manifest.minimum_quality_margin_milli);
+        assert!(reference.quality_margin_milli.unwrap() < manifest.minimum_quality_margin_milli);
+
+        let record = ExperimentRecord {
+            step_index: 0,
+            action: ExperimentAction {
+                candidate_id: candidate.id.clone(),
+                fidelity: Fidelity::Proxy,
+            },
+            reported_cost_units: 1,
+            measurements: proxy,
+            claimed_conforming: false,
+            measurement_digest: String::new(),
+        };
+        assert_eq!(
+            campaign_claims(&[record], &manifest.public_view()),
+            (None, None),
+            "proxy predictions are exploratory evidence, not conformity evidence"
+        );
     }
 
     #[test]
