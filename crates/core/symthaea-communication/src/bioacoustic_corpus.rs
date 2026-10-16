@@ -126,6 +126,9 @@ impl BioacousticCorpusManifest {
             .recordings
             .sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
         for recording in &mut canonical.recordings {
+            // Hex digests are case-insensitive; canonicalize their spelling so
+            // equivalent manifests do not acquire different identities.
+            recording.content_sha256 = recording.content_sha256.to_ascii_lowercase();
             recording.individual_ids.sort();
             recording
                 .annotations
@@ -577,6 +580,14 @@ mod tests {
         left.rights.intended_use = BioacousticIntendedUse::CommercialResearch;
         let changed_rights_scope_hash = left.computed_manifest_blake3().unwrap();
         assert_ne!(left_hash, changed_rights_scope_hash);
+
+        let mut upper_case_digest = manifest();
+        upper_case_digest.recordings[0].content_sha256 =
+            upper_case_digest.recordings[0].content_sha256.to_ascii_uppercase();
+        assert_eq!(
+            manifest().computed_manifest_blake3().unwrap(),
+            upper_case_digest.computed_manifest_blake3().unwrap()
+        );
 
         let mut offset_changed = manifest();
         offset_changed.recordings[0].source_start_s = Some(12.5);
