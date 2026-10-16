@@ -36,6 +36,7 @@ pub mod causal_reasoning_bridge;
 #[cfg(feature = "epistemic")]
 pub mod claim_priority;
 pub mod encoding;
+pub mod evidence_action_policy;
 pub mod evidence_lineage;
 pub mod evidence_proof_formula;
 pub mod evidence_provenance_graph;
@@ -55,6 +56,10 @@ pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use causal_bridge::CausalKnowledgeBridge;
 pub use causal_reasoning_bridge::CausalReasoningBridge;
 pub use encoding::{FactEncoding, KnowledgeEncoder, RoleBoundVector};
+pub use evidence_action_policy::{
+    EvidenceAction, EvidenceActionDecision, EvidenceActionInput, EvidenceActionPolicy,
+    EvidenceActionReason, EvidenceCondition, ProvenanceCondition, QuestionCondition,
+};
 pub use evidence_lineage::{
     EvidenceLineageAbstentionReason, EvidenceLineageAssessment, EvidenceLineageDecision,
     EvidenceLineageGroup, EvidenceLineagePolicy, EvidenceWitness,
