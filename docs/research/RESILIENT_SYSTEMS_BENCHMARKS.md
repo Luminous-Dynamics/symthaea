@@ -90,7 +90,7 @@ Require external domain review, traceable input data, uncertainty and sensitivit
 
 ## 4. Proposed performance and reproducibility budgets
 
-These are **unmeasured engineering targets**, not results or guaranteed requirements. Establish a named reference host and actual benchmark harness before treating them as release gates.
+These are **unmeasured engineering targets**, not results or guaranteed requirements. Establish a named reference host and actual benchmark harness before treating them as release gates. The resource-constrained model has separate, looser targets below because it also tracks inventories and per-service consumption.
 
 - **Small reference case:** 100 services, up to 200 dependency edges, 20 disruption records and 730 time steps; target p95 runtime below 100 ms in a release build.
 - **Batch case:** 1,000 scenarios of that size; target completion below 60 seconds on the same host.
@@ -98,7 +98,7 @@ These are **unmeasured engineering targets**, not results or guaranteed requirem
 - **Reproducibility:** the same Rust toolchain, binary, inputs and configuration must produce identical per-service trajectories; any intentional numerical-method change must update a versioned reference fixture.
 - **Traceability:** record CPU, OS, `rustc -Vv`, build profile, commit SHA, configuration digest, service count, dependency-edge count, disruption count, horizon and timing statistic.
 
-If the implementation misses a budget, profile it before weakening model detail. Do not reduce time resolution, discard per-service traces, skip validation or drop scenarios merely to meet a speed target. These targets should be revised using measured data from a documented reference machine before becoming normative.
+For the finite-resource model, proposed targets are: 100 services, 20 resources, up to 500 service-resource requirements, 200 dependency edges and 730 time steps below 250 ms per scenario; 1,000 such scenarios below 120 seconds; and a 1,000-service / 2,000-requirement / 730-step case below 5 seconds. All are unmeasured planning targets. If either implementation misses a budget, profile it before weakening model detail. Do not reduce time resolution, discard per-service/resource traces, skip validation or drop scenarios merely to meet a speed target. These targets should be revised using measured data from a documented reference machine before becoming normative.
 
 ## Resource-coupling benchmark extension
 
@@ -190,9 +190,9 @@ This first Rust tranche implements a minimal version of the model and unit tests
 - Report subgroup-level service loss as well as total deficit.
 - Treat governance and rights as constraints requiring accountable human deliberation, not weights automatically optimized by a simulator.
 
-## 7. Implementation limits of the current Rust model
+## 7. Implementation limits of the current Rust models
 
-The first implementation deliberately uses a small abstraction:
+The service-continuity implementation deliberately uses a small abstraction:
 
 - service capacity and demand share a caller-defined unit;
 - dependencies propagate the weakest upstream fulfillment fraction;
