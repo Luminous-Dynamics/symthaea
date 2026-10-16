@@ -491,6 +491,69 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_alternative_proofs_are_deduplicated() {
+        let formula = any(vec![
+            evidence("A"),
+            evidence("A"),
+            evidence("B"),
+            evidence("B"),
+        ]);
+        assert_eq!(
+            formula.assess(&default_policy()).minimal_witness_sets,
+            Some(vec![vec!["A".to_owned()], vec!["B".to_owned()]])
+        );
+    }
+
+    #[test]
+    fn child_order_does_not_change_canonical_minimal_witnesses() {
+        let left = any(vec![
+            all(vec![evidence("A"), evidence("B")]),
+            all(vec![evidence("A"), evidence("C")]),
+            all(vec![evidence("B"), evidence("C")]),
+        ]);
+        let right = any(vec![
+            all(vec![evidence("B"), evidence("C")]),
+            all(vec![evidence("A"), evidence("C")]),
+            all(vec![evidence("A"), evidence("B")]),
+        ]);
+
+        assert_eq!(
+            left.assess(&default_policy()).minimal_witness_sets,
+            right.assess(&default_policy()).minimal_witness_sets
+        );
+    }
+
+    #[test]
+    fn generated_pairwise_proofs_always_return_an_antichain() {
+        let ids = ["A", "B", "C", "D", "E", "F"];
+        let mut alternatives = Vec::new();
+        for left in 0..ids.len() {
+            for right in (left + 1)..ids.len() {
+                alternatives.push(all(vec![evidence(ids[left]), evidence(ids[right])]));
+            }
+        }
+
+        let result = any(alternatives).assess(&default_policy());
+        assert!(result.complete);
+        let sets: Vec<BTreeSet<String>> = result
+            .minimal_witness_sets
+            .unwrap()
+            .into_iter()
+            .map(|witnesses| witnesses.into_iter().collect())
+            .collect();
+
+        for (index, left) in sets.iter().enumerate() {
+            for (other_index, right) in sets.iter().enumerate() {
+                if index != other_index {
+                    assert!(!left.is_subset(right));
+                    assert!(!right.is_subset(left));
+                }
+            }
+        }
+        assert_eq!(sets.len(), 15);
+    }
+
+    #[test]
     fn benchmark_minimal_witness_evaluation_scaling() {
         let formula = any(vec![
             all(vec![evidence("sensor-A"), evidence("calibration-A")]),
