@@ -91,6 +91,13 @@ class ExecutionReportTests(unittest.TestCase):
         with self.assertRaisesRegex(ReportFailure, "test log summaries do not match"):
             build_report(self.root, self.env, TEST_LOG_PATH)
 
+    def test_symlinked_source_artifact_is_rejected(self) -> None:
+        target = self.root / "scripts" / "validate_socioeconomic_run_bundle.py"
+        target.unlink()
+        target.symlink_to(self.root / "scripts" / "test_validate_socioeconomic_run_bundle.py")
+        with self.assertRaisesRegex(ReportFailure, "symlink components are forbidden"):
+            build_report(self.root, self.env, TEST_LOG_PATH)
+
     def test_empty_test_log_is_rejected(self) -> None:
         (self.root / TEST_LOG_PATH).write_bytes(b"")
         with self.assertRaisesRegex(ReportFailure, "test log is empty"):
