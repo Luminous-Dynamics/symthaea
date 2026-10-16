@@ -303,3 +303,21 @@ The final refinement adds:
 
 Additional regression tests are authored for no-role-hit conflict reporting and for the opt-in permissive override. They have **not** run locally. On exact head `f93d564113cb1cc505be0568ff8c06214a22b4fc`, CI [38815984209](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38815984209) is **pending** and PR Governance [38815984217](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38815984217) is **queued**. Neither is a pass; all qualification remains pending exact-head completion.
 
+## Evidence-sufficiency benchmark and selective-retrieval targets (2026-10-16)
+
+Public [PR #7534](https://github.com/Luminous-Dynamics/symthaea/pull/7534) adds a deterministic five-condition regression contract and the protocol [`RETRIEVAL_EVIDENCE_SUFFICIENCY_BENCHMARK_2026-10-16.md`](https://github.com/Luminous-Dynamics/symthaea/blob/test/knowledge-evidence-sufficiency-benchmark-2026-10-16/docs/research/RETRIEVAL_EVIDENCE_SUFFICIENCY_BENCHMARK_2026-10-16.md).
+
+The regression contract covers full support, partial role evidence, irrelevant evidence, no context, and conflicting polarity. It records decision agreement, false eligibility, selective risk and selective coverage as deterministic fixture metrics. For this five-row fixture, 1/5 eligible is **fixture coverage**, not generalization or a deployment target.
+
+The benchmark protocol requires:
+- Split by source and counterfactual family to prevent transformed-example leakage.
+- L1–L5 evidence strata, with L2 subtyped by adjudicated answerability rather than assuming all partial evidence must abstain.
+- Role-only, maximum-weight role matching, relation-constrained retrieval, lexical and conventional structural baselines over the same candidate universe.
+- Retrieval metrics (Recall@k, MRR@10), constraint satisfaction, false eligibility, eligible precision, abstention recall, false-abstention rate, risk–coverage curves, p50/p95/p99 latency, memory, and confidence intervals clustered by source/family.
+- Proposed, not measured, targets: 1,000 adjudicated query families per evidence level; fully supported Recall@10 ≥0.95; eligible precision ≥0.99; false eligibility ≤1% separately on irrelevant, absent-context and conflict sets; abstention recall ≥0.95 on clearly insufficient/conflicting cases; false-abstention rate ≤10% on adjudicated answerable cases.
+- Performance measurements at 1k/10k/100k facts/relations; set hard 100k latency SLOs only after a pinned release-mode baseline exists.
+
+Research background: Zhang & Wu (2026) evaluate answer-abstention over full, partial, irrelevant, absent and conflicting evidence ([DOI: 10.32604/cmc.2026.086343](https://doi.org/10.32604/cmc.2026.086343)); Qiu et al.'s SURE-RAG (2026) treats evidence sufficiency as a set-level property with coverage, relation support and conflict signals ([arXiv:2605.03534](https://arxiv.org/abs/2605.03534)). These works motivate the evaluation design. Their published scores do not validate Symthaea or directly transfer as its baseline.
+
+PR #7534 exact branch head at creation: `68361fb2fb3cee81fb5737a32187e2d3f39e5baf`; base is PR #7522 head `f93d564113cb1cc505be0568ff8c06214a22b4fc). Tests are authored but not run locally. A passing result has not been claimed. The default production retrieval path remains unchanged pending reproducible held-out evidence.
+
