@@ -121,6 +121,9 @@ pub enum ProposedEffect {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidatePlan {
     pub summary: String,
+    /// Exact evidence IDs supporting this candidate. Unknown or stale context may be
+    /// included at proposal level to explain abstention, but cannot support a candidate.
+    pub evidence_ids: Vec<String>,
     pub effects: Vec<ProposedEffect>,
     pub tradeoffs: Vec<String>,
 }
@@ -231,7 +234,7 @@ pub fn validate_home_proposal(
     }
 
     let mut evidence_ids = BTreeSet::new();
-    for evidence in &proposal.evidence {
+    for (current_index, evidence) in proposal.evidence.iter().enumerate() {
         if !valid_identifier(&evidence.evidence_id)
             || !valid_identifier(&evidence.source_ref)
             || !valid_identifier(&evidence.entity_ref)
@@ -247,15 +250,6 @@ pub fn validate_home_proposal(
         if evidence.fresh_until_ms < evidence.observed_at_ms {
             return Err(ProposalValidationError::InvalidTimeWindow);
         }
-        if evidence.fresh_until_ms <= now_ms {
-            return Err(ProposalValidationError::StaleEvidence);
-        }
-        let current_epoch = current_session_epochs
-            .get(&evidence.source_ref)
-            .ok_or(ProposalValidationError::MissingCurrentEpoch)?;
-        if *current_epoch != evidence.session_epoch {
-            return Err(ProposalValidationError::SessionEpochMismatch);
-        }
 
         match evidence.status {
             EpistemicStatus::Observed => {
@@ -270,12 +264,7 @@ pub fn validate_home_proposal(
                     return Err(ProposalValidationError::InvalidDerivation);
                 }
                 // Parent IDs must occur earlier in the evidence vector. This defines a
-                // simple canonical topological order and prevents cycles/self-reference.
-                let current_index = proposal
-                    .evidence
-                    .iter()
-                    .position(|item| item.evidence_id == evidence.evidence_id)
-                    .ok_or(ProposalValidationError::InvalidDerivation)?;
+                // canonical topological order and prevents cycles/self-reference.
                 for parent_id in &evidence.derived_from {
                     let parent_index = proposal
                         .evidence
@@ -290,7 +279,9 @@ pub fn validate_home_proposal(
             EpistemicStatus::Unavailable
             | EpistemicStatus::Conflicting
             | EpistemicStatus::Unknown => {
-                return Err(ProposalValidationError::UnusableEvidence);
+                if !evidence.derived_from.is_empty() {
+                    return Err(ProposalValidationError::InvalidDerivation);
+                }
             }
         }
     }
@@ -351,6 +342,8 @@ pub fn validate_home_proposal(
         if !valid_text(&candidate.summary, MAX_SUMMARY_BYTES)
             || candidate.effects.is_empty()
             || candidate.effects.len() > MAX_EFFECTS_PER_CANDIDATE
+            || candidate.evidence_ids.is_empty()
+            || candidate.evidence_ids.len() > MAX_EVIDENCE
             || candidate.tradeoffs.len() > MAX_TRADEOFFS
             || candidate
                 .tradeoffs
@@ -359,6 +352,53 @@ pub fn validate_home_proposal(
         {
             return Err(ProposalValidationError::InvalidCandidate);
         }
+
+        // Context may describe unknown/stale observations for an explanation or refusal.
+        // A candidate is different: every fact it relies on must be explicitly cited and
+        // current for this source's session epoch.
+        let mut candidate_evidence_ids = BTreeSet::new();
+        for evidence_id in &candidate.evidence_ids {
+            if !valid_identifier(evidence_id) {
+                return Err(ProposalValidationError::InvalidIdentifier);
+            }
+            if !candidate_evidence_ids.insert(evidence_id.as_str()) {
+                return Err(ProposalValidationError::DuplicateEvidence);
+            }
+        }
+        for evidence_id in &candidate.evidence_ids {
+            let evidence = proposal
+                .evidence
+                .iter()
+                .find(|item| item.evidence_id == *evidence_id)
+                .ok_or(ProposalValidationError::MissingEvidence)?;
+            if evidence.fresh_until_ms <= now_ms {
+                return Err(ProposalValidationError::StaleEvidence);
+            }
+            let current_epoch = current_session_epochs
+                .get(&evidence.source_ref)
+                .ok_or(ProposalValidationError::MissingCurrentEpoch)?;
+            if *current_epoch != evidence.session_epoch {
+                return Err(ProposalValidationError::SessionEpochMismatch);
+            }
+            match evidence.status {
+                EpistemicStatus::Observed => {}
+                EpistemicStatus::Derived => {
+                    if evidence
+                        .derived_from
+                        .iter()
+                        .any(|parent| !candidate_evidence_ids.contains(parent.as_str()))
+                    {
+                        return Err(ProposalValidationError::MissingEvidence);
+                    }
+                }
+                EpistemicStatus::Unavailable
+                | EpistemicStatus::Conflicting
+                | EpistemicStatus::Unknown => {
+                    return Err(ProposalValidationError::UnusableEvidence);
+                }
+            }
+        }
+
         for effect in &candidate.effects {
             match effect {
                 ProposedEffect::SetLightState { entity_ref, .. }
@@ -419,6 +459,7 @@ mod tests {
             approval_requirement: ApprovalRequirement::ResidentConfirmation,
             candidates: vec![CandidatePlan {
                 summary: "Turn on the named lamp.".into(),
+                evidence_ids: vec!["evidence-1".into()],
                 effects: vec![ProposedEffect::SetLightState {
                     entity_ref: "light.living_room".into(),
                     enabled: true,
@@ -489,6 +530,7 @@ mod tests {
 
         proposal.candidates.push(CandidatePlan {
             summary: "Unexpected effect".into(),
+            evidence_ids: vec!["evidence-1".into()],
             effects: vec![ProposedEffect::NotifyResident {
                 topic: NotificationTopic::Recommendation,
             }],
@@ -560,6 +602,62 @@ mod tests {
     }
 
     #[test]
+    fn abstention_can_explain_unknown_or_stale_context_without_using_it_as_action_evidence() {
+        let mut proposal = valid_proposal();
+        proposal.mode = ProposalMode::Abstain;
+        proposal.candidates.clear();
+        proposal.evidence[0].status = EpistemicStatus::Unknown;
+        proposal.evidence[0].fresh_until_ms = 999;
+        proposal.unknowns = vec!["The temperature observation is stale and unavailable.".into()];
+        assert_eq!(validate_home_proposal(&proposal, 1_000, &epochs()), Ok(()));
+    }
+
+    #[test]
+    fn a_candidate_cannot_cite_unknown_or_conflicting_evidence() {
+        let mut proposal = valid_proposal();
+        proposal.evidence[0].status = EpistemicStatus::Conflicting;
+        assert_eq!(
+            validate_home_proposal(&proposal, 1_000, &epochs()),
+            Err(ProposalValidationError::UnusableEvidence)
+        );
+    }
+
+    #[test]
+    fn a_candidate_cannot_omit_its_evidence_citation() {
+        let mut proposal = valid_proposal();
+        proposal.candidates[0].evidence_ids.clear();
+        assert_eq!(
+            validate_home_proposal(&proposal, 1_000, &epochs()),
+            Err(ProposalValidationError::InvalidCandidate)
+        );
+    }
+
+    #[test]
+    fn abstention_can_describe_prior_session_context_but_candidate_cannot_use_it() {
+        let mut proposal = valid_proposal();
+        proposal.mode = ProposalMode::Abstain;
+        proposal.candidates.clear();
+        proposal.evidence[0].session_epoch = 6;
+        proposal.unknowns = vec!["The provider reconnected; prior observations are no longer current.".into()];
+        assert_eq!(validate_home_proposal(&proposal, 1_000, &epochs()), Ok(()));
+
+        proposal.mode = ProposalMode::Recommend;
+        proposal.candidates.push(CandidatePlan {
+            summary: "Use old state".into(),
+            evidence_ids: vec!["evidence-1".into()],
+            effects: vec![ProposedEffect::SetLightState {
+                entity_ref: "light.living_room".into(),
+                enabled: true,
+            }],
+            tradeoffs: Vec::new(),
+        });
+        assert_eq!(
+            validate_home_proposal(&proposal, 1_000, &epochs()),
+            Err(ProposalValidationError::SessionEpochMismatch)
+        );
+    }
+
+    #[test]
     fn rejects_invalid_or_unbounded_summary() {
         let mut proposal = valid_proposal();
         proposal.summary = "  ".into();
@@ -588,6 +686,7 @@ mod tests {
     #[test]
     fn rejects_comfort_target_outside_initial_bounds() {
         let mut proposal = valid_proposal();
+        proposal.candidates[0].evidence_ids = vec!["evidence-1".into()];
         proposal.candidates[0].effects = vec![ProposedEffect::SuggestComfortTarget {
             entity_ref: "climate.living_room".into(),
             target_millicelsius: 35_000,
