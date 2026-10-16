@@ -21,6 +21,9 @@
 
 #![deny(unsafe_code)]
 
+/// Pure, fail-closed source-clock lifecycle tracking.
+pub mod clock_lifecycle;
+
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
 use thiserror::Error;
