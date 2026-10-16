@@ -2,12 +2,145 @@
 
 use crate::{CapabilityLevel, CommunicationEvidence, ExpressionAuthorization, ReplicationStatus};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub trait BioacousticEncoder {
     fn provider_id(&self) -> &str;
     fn model_hash(&self) -> &str;
     fn encode(&mut self, mono_audio: &[f32], sample_rate_hz: u32) -> Result<Vec<Vec<f32>>, String>;
+}
+
+/// Declared source lineage for one dataset split. IDs refer to provenance
+/// records, not authenticated facts; this type prevents accidental leakage
+/// when the caller supplies complete and truthful source metadata.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AnimalSplitLineage {
+    pub split_id: String,
+    pub sample_ids: Vec<String>,
+    pub source_recording_ids: Vec<String>,
+    #[serde(default)]
+    pub individual_ids: Vec<String>,
+    #[serde(default)]
+    pub site_ids: Vec<String>,
+}
+
+/// Claims the evaluation intends to test through disjoint holdouts.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AnimalSplitPolicy {
+    pub hold_out_individuals: bool,
+    pub hold_out_sites: bool,
+}
+
+/// Rejects sample/recording leakage and enforces optional individual/site
+/// holdouts. Source-recording separation is always required because clips
+/// or crops from one recording must not straddle evaluation splits.
+pub fn validate_animal_split_lineage(
+    splits: &[AnimalSplitLineage],
+    policy: &AnimalSplitPolicy,
+) -> Result<(), String> {
+    if splits.len() < 2 {
+        return Err("animal evaluation requires at least two splits".into());
+    }
+
+    let mut split_ids = BTreeSet::new();
+    for split in splits {
+        if split.split_id.trim().is_empty() || !split_ids.insert(&split.split_id) {
+            return Err("split identifiers must be non-empty and unique".into());
+        }
+        validate_unique_ids(&split.sample_ids, "sample", &split.split_id, true)?;
+        validate_unique_ids(
+            &split.source_recording_ids,
+            "source recording",
+            &split.split_id,
+            true,
+        )?;
+        validate_unique_ids(
+            &split.individual_ids,
+            "individual",
+            &split.split_id,
+            policy.hold_out_individuals,
+        )?;
+        validate_unique_ids(
+            &split.site_ids,
+            "site",
+            &split.split_id,
+            policy.hold_out_sites,
+        )?;
+    }
+
+    for (index, left) in splits.iter().enumerate() {
+        for right in &splits[index + 1..] {
+            reject_overlap(
+                &left.sample_ids,
+                &right.sample_ids,
+                "sample",
+                &left.split_id,
+                &right.split_id,
+            )?;
+            reject_overlap(
+                &left.source_recording_ids,
+                &right.source_recording_ids,
+                "source recording",
+                &left.split_id,
+                &right.split_id,
+            )?;
+            if policy.hold_out_individuals {
+                reject_overlap(
+                    &left.individual_ids,
+                    &right.individual_ids,
+                    "individual",
+                    &left.split_id,
+                    &right.split_id,
+                )?;
+            }
+            if policy.hold_out_sites {
+                reject_overlap(
+                    &left.site_ids,
+                    &right.site_ids,
+                    "site",
+                    &left.split_id,
+                    &right.split_id,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_unique_ids(
+    ids: &[String],
+    kind: &str,
+    split_id: &str,
+    required: bool,
+) -> Result<(), String> {
+    if required && ids.is_empty() {
+        return Err(format!("{kind} lineage is required for split {split_id}"));
+    }
+    let mut unique = BTreeSet::new();
+    for id in ids {
+        if id.trim().is_empty() || !unique.insert(id) {
+            return Err(format!(
+                "{kind} IDs must be non-empty and unique in split {split_id}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn reject_overlap(
+    left_ids: &[String],
+    right_ids: &[String],
+    kind: &str,
+    left_split: &str,
+    right_split: &str,
+) -> Result<(), String> {
+    let left: BTreeSet<_> = left_ids.iter().collect();
+    if right_ids.iter().any(|id| left.contains(id)) {
+        return Err(format!(
+            "{kind} leakage between splits {left_split} and {right_split}"
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -164,6 +297,101 @@ impl PlaybackProtocol {
 mod tests {
     use super::*;
     use crate::{DatasetSplit, EvidenceDomain, EvidenceKind, EvidenceRecord, ReplicationStatus};
+
+    fn split(
+        split_id: &str,
+        samples: &[&str],
+        recordings: &[&str],
+        individuals: &[&str],
+        sites: &[&str],
+    ) -> AnimalSplitLineage {
+        AnimalSplitLineage {
+            split_id: split_id.into(),
+            sample_ids: samples.iter().map(|value| (*value).into()).collect(),
+            source_recording_ids: recordings.iter().map(|value| (*value).into()).collect(),
+            individual_ids: individuals.iter().map(|value| (*value).into()).collect(),
+            site_ids: sites.iter().map(|value| (*value).into()).collect(),
+        }
+    }
+
+    #[test]
+    fn animal_lineage_rejects_two_crops_from_same_source_recording() {
+        let splits = vec![
+            split("train", &["crop-a"], &["recording-1"], &[], &[]),
+            split("test", &["crop-b"], &["recording-1"], &[], &[]),
+        ];
+        assert!(validate_animal_split_lineage(&splits, &AnimalSplitPolicy::default()).is_err());
+    }
+
+    #[test]
+    fn animal_lineage_rejects_missing_source_recording_provenance() {
+        let splits = vec![
+            split("train", &["clip-a"], &[], &[], &[]),
+            split("test", &["clip-b"], &["recording-b"], &[], &[]),
+        ];
+        assert!(validate_animal_split_lineage(&splits, &AnimalSplitPolicy::default()).is_err());
+    }
+
+    #[test]
+    fn animal_lineage_requires_disjoint_individuals_when_claimed() {
+        let splits = vec![
+            split("train", &["a"], &["rec-a"], &["bird-1"], &["site-a"]),
+            split("test", &["b"], &["rec-b"], &["bird-1"], &["site-b"]),
+        ];
+        let policy = AnimalSplitPolicy {
+            hold_out_individuals: true,
+            hold_out_sites: false,
+        };
+        assert!(validate_animal_split_lineage(&splits, &policy).is_err());
+    }
+
+    #[test]
+    fn animal_lineage_requires_disjoint_sites_when_claimed() {
+        let splits = vec![
+            split("train", &["a"], &["rec-a"], &["bird-1"], &["site-a"]),
+            split("test", &["b"], &["rec-b"], &["bird-2"], &["site-a"]),
+        ];
+        let policy = AnimalSplitPolicy {
+            hold_out_individuals: false,
+            hold_out_sites: true,
+        };
+        assert!(validate_animal_split_lineage(&splits, &policy).is_err());
+    }
+
+    #[test]
+    fn animal_lineage_allows_known_individual_overlap_when_not_claiming_holdout() {
+        let splits = vec![
+            split("train", &["a"], &["rec-a"], &["bird-1"], &["site-a"]),
+            split("test", &["b"], &["rec-b"], &["bird-1"], &["site-b"]),
+        ];
+        assert!(validate_animal_split_lineage(&splits, &AnimalSplitPolicy::default()).is_ok());
+    }
+
+    #[test]
+    fn animal_lineage_rejects_duplicate_and_blank_ids() {
+        let duplicate = vec![
+            split("train", &["a", "a"], &["rec-a"], &[], &[]),
+            split("test", &["b"], &["rec-b"], &[], &[]),
+        ];
+        assert!(validate_animal_split_lineage(&duplicate, &AnimalSplitPolicy::default()).is_err());
+
+        let blank_source = vec![
+            split("train", &["a"], &[" "], &[], &[]),
+            split("test", &["b"], &["rec-b"], &[], &[]),
+        ];
+        assert!(
+            validate_animal_split_lineage(&blank_source, &AnimalSplitPolicy::default()).is_err()
+        );
+    }
+
+    #[test]
+    fn animal_lineage_rejects_duplicate_split_ids() {
+        let splits = vec![
+            split("same", &["a"], &["rec-a"], &[], &[]),
+            split("same", &["b"], &["rec-b"], &[], &[]),
+        ];
+        assert!(validate_animal_split_lineage(&splits, &AnimalSplitPolicy::default()).is_err());
+    }
 
     fn make_context_prediction(primary: f64, margin: f64) -> ContextPredictionEvaluation {
         ContextPredictionEvaluation {
