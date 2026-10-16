@@ -37,6 +37,18 @@ jobs:
         with:
           components: clippy, rustfmt
 
+      - name: Record exact qualification inputs
+        shell: bash
+        run: |
+          echo "source_head=$(git rev-parse HEAD)"
+          rustc --version --verbose
+          cargo --version
+          sha256sum \
+            crates/intx-program-bench/Cargo.toml \
+            crates/intx-program-bench/Cargo.lock \
+            crates/intx-program-bench/fixtures/cases.tsv \
+            crates/intx-program-bench/src/lib.rs
+
       - name: Check formatting
         run: cargo fmt --manifest-path crates/intx-program-bench/Cargo.toml -- --check
 
