@@ -27,7 +27,7 @@
             "required": ["sequence", "event", "input", "expected_action"],
             "properties": {
               "sequence": {"type": "integer", "minimum": 0},
-              "event": {"enum": ["initial", "evidence_revoked", "conflict_arrived", "acquisition_failed", "budget_exhausted", "evidence_arrived", "conflict_resolved", "evidence_revalidated", "question_clarified"]},
+              "event": {"enum": ["initial", "evidence_revoked", "conflict_arrived", "acquisition_failed", "budget_exhausted", "budget_restored", "evidence_arrived", "conflict_resolved", "evidence_revalidated", "question_clarified"]},
               "expected_action": {"enum": ["answer", "answer_with_scope_limit", "ask_clarification", "acquire_more_evidence", "abstain"]},
               "input": {
                 "type": "object",
