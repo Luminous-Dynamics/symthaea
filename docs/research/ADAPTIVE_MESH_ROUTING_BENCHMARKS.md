@@ -62,6 +62,16 @@ The result is a local CPU-cost baseline only. Preserve raw output, CPU, OS, Rust
 
 The router rejects non-finite and out-of-range peer metrics, unknown governance tiers, and obviously stale cycle updates before they alter cached peer state. Regression tests cover those conditions. These checks reduce malformed-input hazards; they do not replace authenticated sequence numbers or establish that a peer is trustworthy.
 
+## Provisional numeric project targets (not protocol standards)
+
+These are initial engineering decision thresholds. Confirm they fit the deployment profile before using them as release gates.
+
+- **Hard safety gates:** zero accepted malformed or replayed safety-critical packets; zero authentication/TTL bypasses; zero persistent routing loops in the bounded adversarial corpus. Any violation rejects the candidate.
+- **Held-out performance target:** at least 10% improvement in one predeclared primary end-to-end metric (for example p95 recovery time or deadline-miss cost) versus the strongest applicable baseline, with a 95% paired confidence interval excluding zero across independent held-out runs.
+- **No-hidden-regression budget:** no statistically supported degradation in delivery ratio for safety-critical traffic; control-plane bytes per delivered payload and energy per delivered byte must remain within a predeclared budget (initial default: no more than 5% worse than baseline).
+- **Controller overhead:** measure policy CPU and memory separately. A route-policy microbenchmark win alone is not an end-to-end routing win.
+- **Evaluation breadth:** use at least 30 held-out seeds per scenario family for initial research claims, with training/tuning seeds separated and the failure-prone scenarios reported individually.
+
 ## Acceptance gates
 
 An adaptive configuration is eligible for further consideration only if it:
