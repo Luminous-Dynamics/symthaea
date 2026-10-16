@@ -164,8 +164,8 @@ fn normalize_features(candidates: &[Candidate]) -> Result<Vec<Vec<f64>>, String>
     }
 
     let mut ranges = Vec::with_capacity(dimensions);
-    for dimension in 0..dimensions {
-        let range = maxs[dimension] - mins[dimension];
+    for (dimension, (min, max)) in mins.iter().zip(&maxs).enumerate() {
+        let range = max - min;
         if !range.is_finite() {
             return Err(format!(
                 "feature dimension {dimension} has a non-finite numeric span"
