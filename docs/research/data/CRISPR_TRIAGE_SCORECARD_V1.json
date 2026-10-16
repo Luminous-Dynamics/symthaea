@@ -528,6 +528,17 @@
     "current_local_execution_status": "not_executed_rust_toolchain_unavailable_in_authoring_environment",
     "test_cases_to_run": [
       "fixed_budget_recall_is_not_estimable_when_budget_is_unavailable"
+    ],
+    "unit_test_count": 15,
+    "test_coverage_summary": [
+      "F1: nomination coverage remains distinct from seeded ranking recall",
+      "F2: unknown outcome blocks point precision",
+      "F3: malformed or mismatched SHA-256 claims rejected",
+      "F4: train/holdout group overlap rejected",
+      "F5: individual partial-label bounds",
+      "F6: paired partial-label policy delta bounds",
+      "F7: underfilled fixed-budget ranking is not estimable",
+      "invalid recall targets, duplicate IDs/ranks, contradictory reference labels, mismatched policy universes/labels, and positive IDs outside the reference are rejected"
     ]
   },
   "partial_label_identification": {
