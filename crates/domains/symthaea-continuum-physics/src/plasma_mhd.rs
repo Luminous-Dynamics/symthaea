@@ -105,8 +105,11 @@ pub fn bennett_current(line_density: f64, temperature: f64) -> f64 {
     (8.0 * PI * line_density * K_B * temperature / MU_0).sqrt()
 }
 
-/// Tokamak safety factor: q = r B_φ / (R B_θ)
-/// For stability: q(edge) > 2 (Kruskal-Shafranov limit)
+/// Tokamak safety factor: q = r B_φ / (R B_θ).
+///
+/// This helper computes the scalar geometric quantity only. Stability interpretation
+/// depends on the equilibrium, profile, mode, boundary conditions, and regime; q > 2
+/// alone is not a universal stability certificate.
 pub fn safety_factor(r: f64, major_radius: f64, b_toroidal: f64, b_poloidal: f64) -> f64 {
     r * b_toroidal / (major_radius * b_poloidal)
 }
@@ -161,10 +164,16 @@ mod tests {
     }
 
     #[test]
-    fn test_safety_factor_kruskal_shafranov() {
-        // Stable tokamak: q > 2 at the edge
+    fn test_safety_factor_reference_geometry() {
+        // Independent arithmetic fixture for the documented scalar definition:
+        // q = r * B_toroidal / (R * B_poloidal) = 0.5 * 5 / (1.5 * 0.5) = 10/3.
+        // This checks the calculator, not tokamak stability.
         let q = safety_factor(0.5, 1.5, 5.0, 0.5);
-        assert!(q > 2.0, "q = {:.2}, should be > 2 for stability", q);
+        let reference = 10.0 / 3.0;
+        assert!(
+            (q - reference).abs() < 1e-12,
+            "q = {q:.12}, arithmetic reference = {reference:.12}"
+        );
     }
 
     #[test]
