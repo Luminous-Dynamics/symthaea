@@ -64,6 +64,8 @@ class ExecutionReportTests(unittest.TestCase):
             "CIVOS_SOURCE_REVISION": self.revision,
             "GITHUB_REPOSITORY": "example/repo",
             "GITHUB_WORKFLOW": "run-bundle-tests",
+            "GITHUB_WORKFLOW_REF": "example/repo/.github/workflows/run-bundle-tests.yml@refs/heads/main",
+            "GITHUB_WORKFLOW_SHA": self.revision,
             "GITHUB_RUN_ID": "123",
             "GITHUB_RUN_ATTEMPT": "1",
             "GITHUB_EVENT_NAME": "pull_request",
@@ -78,6 +80,8 @@ class ExecutionReportTests(unittest.TestCase):
         report = build_report(self.root, self.env, TEST_LOG_PATH)
         self.assertEqual(report["source_revision"], self.revision)
         self.assertEqual(report["event_sha"], self.revision)
+        self.assertEqual(report["workflow_sha"], self.revision)
+        self.assertEqual(report["workflow_ref"], self.env["GITHUB_WORKFLOW_REF"])
         self.assertEqual(report["result"], "passed")
         self.assertEqual(report["claim_ceiling"], "synthetic_deterministic_only")
         self.assertEqual(report["scope"], "run_bundle_validator_and_execution_record_unit_tests")
