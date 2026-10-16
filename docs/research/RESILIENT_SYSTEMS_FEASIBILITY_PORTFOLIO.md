@@ -493,3 +493,11 @@ A sixth Rust module, [repair_policy_comparison.rs](../../crates/domains/symthaea
 This closes the first methodological loop: resilience planning is no longer only about a single chosen schedule or a single synthetic win. The evaluator can show where adaptation helps, where it regresses and how the tail changes, while retaining scenario identity. Scenario weights remain caller-supplied and are not empirical probabilities by default.
 
 Six source-level tests now exercise the paired synthetic witness, scenario retention for all three policies, separate CVaR values, invalid-weight rejection, determinism and delta arithmetic. They remain authored but unexecuted. The next research gate is a published paired scenario corpus with an exact small-case oracle and a holdout split; actual operations data are still needed before prediction claims.
+
+## Implementation update — exhaustive small-instance oracle and fixture corpus
+
+A seventh engineering module, [repair_small_instance_oracle.rs](../../crates/domains/symthaea-engineering/src/repair_small_instance_oracle.rs), exhaustively enumerates all job permutations for up to eight independent repairs on a single qualified crew. It rejects unsupported prerequisites, spare-part requirements, nonzero outage starts, invalid weights and oversized instances. This creates a stricter ladder for measuring heuristic quality against an exact answer instead of a hand-picked comparison.
+
+The public [JSON corpus](./repair_scheduling_oracle_corpus.json) contains six cases: a 1,110-vs-111 priority-policy counterexample, three-/four-job weighted-completion cases, a deterministic tie-break, a one-job boundary, and an eight-job / 40,320-permutation stress case. The first five expected results are hand-checkable; the stress case intentionally requires an executable oracle run before its exact optimum is recorded.
+
+Nine source-level tests cover the oracle, increasing the portfolio total to 91 authored Rust tests. They are not compiled or executed in this tool environment. The exact oracle is narrowly scoped and must not be presented as a general optimizer; next work should bring the same correctness ladder to multi-crew feasibility, dependencies, finite stock and adaptive policies.
