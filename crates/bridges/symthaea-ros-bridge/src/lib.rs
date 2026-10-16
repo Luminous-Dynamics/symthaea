@@ -1372,7 +1372,7 @@ mod tests {
     fn ros_covariance_semantics_keep_unknown_separate_from_unavailable() {
         // A zero matrix means the uncertainty is unknown; it is not zero uncertainty.
         assert!(matches!(
-            classify_ros_covariance([0.0; 9]),
+            classify_ros_covariance([0.0; 9]).unwrap(),
             RosCovarianceV1::Unknown
         ));
 
@@ -1381,7 +1381,7 @@ mod tests {
         unavailable[0] = -1.0;
         unavailable[4] = f64::NAN; // remaining entries must not revive this unavailable estimate
         assert!(matches!(
-            classify_ros_covariance(unavailable),
+            classify_ros_covariance(unavailable).unwrap(),
             RosCovarianceV1::Unavailable
         ));
 
