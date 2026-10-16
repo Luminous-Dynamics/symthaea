@@ -28,6 +28,8 @@ cargo run --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo
 
 These are reproduction commands, not evidence of passing checks. The example emits synthetic Brier/log-loss summaries and a future-only oracle exclusion control; it is not a real forecast-quality result. Only exact-head completed runs count as qualification.
 
+The example emits a CSV summary to stdout and reliability-bin, paired-common-cohort, negative-control, and manifest records to stderr. In CI, the manifest binds the actual expected PR head SHA supplied by the workflow. A local run without that environment variable explicitly reports `unbound-local-run` rather than inventing provenance.
+
 ## New comparative replay
 
 The `replay` module selects the latest observation at or before a caller-frozen event/horizon cutoff, rejects duplicate observation keys, and records missing/stale combinations as explicit exclusions. The new `calibration_report` builds equal-width reliability bins for one method and one horizon, preserves empty bins, and publishes bin counts, mean forecast probabilities, observed frequencies, and a secondary bin-dependent weighted absolute calibration error. It rejects mixed horizons/methods to avoid a silently pooled reliability diagram.
