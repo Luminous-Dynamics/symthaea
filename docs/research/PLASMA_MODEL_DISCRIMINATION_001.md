@@ -244,6 +244,8 @@ Do not blend information gain, physical error and decision regret into a single 
 
 All policies receive the same candidate pool, costs, initial evidence, high-fidelity budget and hidden evaluation cases. The experiment-selection policy must not read the high-fidelity target for a candidate before choosing that candidate. The final candidate must still be confirmed against the high-fidelity reference or a physical measurement appropriate to the claim.
 
+Implementation follow-on: [PLASMA-ACT-001 #7685](https://github.com/Luminous-Dynamics/symthaea/issues/7685). Reuse the generic deterministic active-selection/evaluator/receipt architecture proposed in [MFG-ACTIVE-002 #7638](https://github.com/Luminous-Dynamics/symthaea/issues/7638); add only plasma-specific quantities, solver-fidelity adapters, decision boundaries, physical validity envelopes and reference cases.
+
 ### Decision-reversal challenge set
 
 Include cases where the low-cost model:
