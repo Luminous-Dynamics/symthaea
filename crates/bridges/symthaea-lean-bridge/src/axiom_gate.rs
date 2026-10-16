@@ -22,19 +22,42 @@ use symthaea_proof_audit::{GateInput, gate};
 
 use crate::subprocess::{RunError, run_bounded_on_file};
 
-/// Append a `#print axioms <theorem>` command to a proof-file body so Lean
-/// prints the proof's axiom dependencies to stdout when it checks the file.
-pub fn with_axiom_probe(script_body: &str, theorem: &str) -> Result<String, String> {
-    let valid = !theorem.is_empty()
+/// Whether a dotted theorem name is safe to embed in a Lean command.
+fn is_safe_dotted_theorem_name(theorem: &str) -> bool {
+    !theorem.is_empty()
         && theorem.split('.').all(|segment| {
             !segment.is_empty()
                 && segment
                     .chars()
                     .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '\'')
-        });
-    if !valid {
+        })
+}
+
+/// Validate the exact trailing probe required by the end-to-end audit.
+/// Requiring this line at EOF means caller-emitted output cannot substitute
+/// for the report the trusted wrapper asks Lean to produce.
+fn validate_terminal_axiom_probe(script_body: &str, theorem: &str) -> Result<(), String> {
+    if !is_safe_dotted_theorem_name(theorem) {
         return Err("theorem name is not a safe dotted Lean identifier".into());
     }
+    let expected = format!("#print axioms {theorem}");
+    let terminal = script_body
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .map(str::trim);
+    if terminal != Some(expected.as_str()) {
+        return Err(format!(
+            "proof file must end with the exact axiom probe: {expected}"
+        ));
+    }
+    Ok(())
+}
+
+/// Append a `#print axioms <theorem>` command to a proof-file body so Lean
+/// prints the proof's axiom dependencies to stdout when it checks the file.
+pub fn with_axiom_probe(script_body: &str, theorem: &str) -> Result<String, String> {
+    validate_terminal_axiom_probe(&format!("{script_body}\n#print axioms {theorem}\n"), theorem)?;
     Ok(format!(
         "{}\n\n#print axioms {}\n",
         script_body.trim_end(),
@@ -93,11 +116,13 @@ fn run_lean_capture(path: &Path, bin: &str) -> Result<String, ProofAuditOutcome>
             "lean did not finish within the configured timeout and was killed".to_string(),
         ));
     }
+    if output.truncated {
+        return Err(ProofAuditOutcome::ProcessError(
+            "Lean output exceeded the capture limit; truncated evidence is not admissible".to_string(),
+        ));
+    }
     let mut combined = String::from_utf8_lossy(&output.stdout).into_owned();
     combined.push_str(&String::from_utf8_lossy(&output.stderr));
-    if output.truncated {
-        combined.push_str("\n[... output truncated at the capture limit ...]");
-    }
     if !output.success() {
         return Err(ProofAuditOutcome::ProcessError(format!(
             "Lean exited with failure: {}",
@@ -129,8 +154,21 @@ pub fn audit_lean_file<P: AsRef<Path>>(
     expected_statement: &str,
     policy: &AxiomPolicy,
 ) -> ProofAuditOutcome {
+    let path = path.as_ref();
+    let source = match std::fs::read_to_string(path) {
+        Ok(source) => source,
+        Err(error) => {
+            return ProofAuditOutcome::ProcessError(format!(
+                "cannot read proof source for probe validation: {error}"
+            ));
+        }
+    };
+    if let Err(error) = validate_terminal_axiom_probe(&source, expected_theorem) {
+        return ProofAuditOutcome::ProcessError(error);
+    }
+
     let bin = resolve_lean_binary();
-    match run_lean_capture(path.as_ref(), &bin) {
+    match run_lean_capture(path, &bin) {
         Ok(output) => ProofAuditOutcome::Audited(gate_lean_output(
             &output,
             expected_theorem,
@@ -151,6 +189,26 @@ mod tests {
         let probed = with_axiom_probe("theorem t : True := by trivial", "t").unwrap();
         assert!(probed.contains("theorem t : True := by trivial"));
         assert!(probed.contains("#print axioms t"));
+    }
+
+    #[test]
+    fn terminal_probe_validation_rejects_missing_or_nonterminal_probe() {
+        assert!(validate_terminal_axiom_probe(
+            "theorem t : True := by trivial\\n#print axioms t\\n",
+            "t"
+        ).is_ok());
+        assert!(validate_terminal_axiom_probe(
+            "#eval IO.println \\\"'t' does not depend on any axioms\\\"",
+            "t"
+        ).is_err());
+        assert!(validate_terminal_axiom_probe(
+            "theorem t : True := by trivial\\n#print axioms t\\n#eval 1",
+            "t"
+        ).is_err());
+        assert!(validate_terminal_axiom_probe(
+            "theorem t : True := by trivial\\n#print axioms other",
+            "t"
+        ).is_err());
     }
 
     #[test]
