@@ -63,7 +63,6 @@
 #[cfg(feature = "humanoid")]
 pub mod calibration;
 pub mod error;
-#[cfg(feature = "humanoid")]
 pub mod gpio_estop;
 pub mod imu;
 pub mod ina219;
@@ -84,7 +83,6 @@ pub mod servo;
 #[cfg(feature = "humanoid")]
 pub use calibration::{CalibrationProfile, JointCalibration};
 pub use error::{HalError, HalResult};
-#[cfg(feature = "humanoid")]
 pub use gpio_estop::{EstopPoller, GpioEstop};
 pub use imu::{ComplementaryFilter, Mpu6050Decoder};
 pub use ina219::Ina219Decoder;
