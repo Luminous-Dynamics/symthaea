@@ -154,6 +154,107 @@ pub fn binary_average_precision(truth: &[bool], scores: &[f64]) -> Result<f64, S
     Ok(area)
 }
 
+/// A score threshold selected on validation data under a false-positive
+/// rate constraint. The recorded counts are validation-only evidence and must
+/// not be presented as held-out test results.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BinaryThresholdSelection {
+    pub threshold: f64,
+    pub validation_counts: BinaryDetectionCounts,
+}
+
+/// Select the threshold with highest validation recall subject to
+/// `false_positive_rate <= maximum_false_positive_rate`.
+///
+/// Selection must be performed on a declared validation/calibration split;
+/// freeze the returned threshold before evaluating on the test split.
+/// Both positive and negative examples are required so the FPR constraint is
+/// measurable. If no positive prediction satisfies the budget, a threshold
+/// just above the highest score is returned and predicts no positives.
+pub fn select_threshold_at_max_false_positive_rate(
+    truth: &[bool],
+    scores: &[f64],
+    maximum_false_positive_rate: f64,
+) -> Result<BinaryThresholdSelection, String> {
+    if truth.is_empty() || truth.len() != scores.len() {
+        return Err("threshold selection requires aligned, non-empty labels and scores".into());
+    }
+    if !maximum_false_positive_rate.is_finite()
+        || !(0.0..=1.0).contains(&maximum_false_positive_rate)
+    {
+        return Err("maximum false-positive rate must be finite and within [0, 1]".into());
+    }
+    if truth.iter().all(|label| *label) || truth.iter().all(|label| !*label) {
+        return Err("threshold selection requires both positive and negative labels".into());
+    }
+    if scores
+        .iter()
+        .any(|score| !score.is_finite() || !(0.0..=1.0).contains(score))
+    {
+        return Err("threshold selection scores must be finite and within [0, 1]".into());
+    }
+
+    let canonical_score = |score: f64| if score == 0.0 { 0.0 } else { score };
+    let normalized_scores: Vec<_> = scores.iter().map(|score| canonical_score(*score)).collect();
+    let maximum_score = normalized_scores
+        .iter()
+        .copied()
+        .max_by(f64::total_cmp)
+        .ok_or_else(|| "threshold selection received no scores".to_string())?;
+
+    let mut thresholds = normalized_scores.clone();
+    thresholds.sort_by(|left, right| right.total_cmp(left));
+    thresholds.dedup_by(|left, right| *left == *right);
+    // Scores are in [0, 1], so the next representable float is finite and
+    // strictly above every supplied score, including the exact value 1.0.
+    thresholds.push(f64::from_bits(maximum_score.to_bits() + 1));
+
+    let mut best: Option<BinaryThresholdSelection> = None;
+    for threshold in thresholds {
+        let predicted: Vec<_> = normalized_scores
+            .iter()
+            .map(|score| *score >= threshold)
+            .collect();
+        let counts = BinaryDetectionCounts::from_predictions(truth, &predicted)?;
+        let false_positive_rate = counts
+            .false_positive_rate()
+            .ok_or_else(|| "false-positive rate is undefined for validation data".to_string())?;
+        if false_positive_rate > maximum_false_positive_rate {
+            continue;
+        }
+        let recall = counts
+            .recall()
+            .ok_or_else(|| "recall is undefined for validation data".to_string())?;
+
+        let replace = match best {
+            None => true,
+            Some(current) => {
+                let current_recall = current
+                    .validation_counts
+                    .recall()
+                    .ok_or_else(|| "stored validation recall is undefined".to_string())?;
+                let current_fpr = current
+                    .validation_counts
+                    .false_positive_rate()
+                    .ok_or_else(|| "stored validation FPR is undefined".to_string())?;
+                recall > current_recall
+                    || (recall == current_recall && false_positive_rate < current_fpr)
+                    || (recall == current_recall
+                        && false_positive_rate == current_fpr
+                        && threshold > current.threshold)
+            }
+        };
+        if replace {
+            best = Some(BinaryThresholdSelection {
+                threshold,
+                validation_counts: counts,
+            });
+        }
+    }
+
+    best.ok_or_else(|| "no threshold satisfies the declared false-positive budget".into())
+}
+
 /// Declared source lineage for one dataset split. IDs refer to provenance
 /// records, not authenticated facts; this type prevents accidental leakage
 /// when the caller supplies complete and truthful source metadata.
@@ -520,6 +621,73 @@ mod tests {
         assert_eq!(counts.precision(), None);
         assert_eq!(counts.f1(), None);
         assert_eq!(counts.balanced_accuracy(), None);
+    }
+
+    #[test]
+    fn threshold_selection_maximizes_recall_under_zero_false_alarm_budget() {
+        let selection = select_threshold_at_max_false_positive_rate(
+            &[true, true, false, false],
+            &[0.9, 0.4, 0.8, 0.1],
+            0.0,
+        )
+        .unwrap();
+        assert_eq!(selection.threshold, 0.9);
+        assert_eq!(selection.validation_counts.true_positives, 1);
+        assert_eq!(selection.validation_counts.false_positives, 0);
+        assert_eq!(selection.validation_counts.recall(), Some(0.5));
+        assert_eq!(selection.validation_counts.false_positive_rate(), Some(0.0));
+    }
+
+    #[test]
+    fn threshold_selection_uses_allowed_false_alarm_budget() {
+        let selection = select_threshold_at_max_false_positive_rate(
+            &[true, true, false, false],
+            &[0.9, 0.4, 0.8, 0.1],
+            0.5,
+        )
+        .unwrap();
+        assert_eq!(selection.threshold, 0.4);
+        assert_eq!(selection.validation_counts.recall(), Some(1.0));
+        assert_eq!(selection.validation_counts.false_positive_rate(), Some(0.5));
+    }
+
+    #[test]
+    fn threshold_selection_handles_ties_conservatively() {
+        let selection = select_threshold_at_max_false_positive_rate(
+            &[true, false],
+            &[0.5, 0.5],
+            0.0,
+        )
+        .unwrap();
+        assert!(selection.threshold > 0.5);
+        assert_eq!(selection.validation_counts.true_positives, 0);
+        assert_eq!(selection.validation_counts.false_positives, 0);
+    }
+
+    #[test]
+    fn threshold_selection_rejects_invalid_validation_inputs() {
+        assert!(
+            select_threshold_at_max_false_positive_rate(&[], &[], 0.1).is_err()
+        );
+        assert!(
+            select_threshold_at_max_false_positive_rate(&[true], &[0.8], 0.1).is_err()
+        );
+        assert!(
+            select_threshold_at_max_false_positive_rate(
+                &[true, false],
+                &[f64::NAN, 0.2],
+                0.1,
+            )
+            .is_err()
+        );
+        assert!(
+            select_threshold_at_max_false_positive_rate(
+                &[true, false],
+                &[0.8, 0.2],
+                f64::NAN,
+            )
+            .is_err()
+        );
     }
 
     #[test]
