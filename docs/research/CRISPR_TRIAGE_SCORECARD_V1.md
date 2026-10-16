@@ -114,6 +114,18 @@ On label-eligible cases, report Brier score, log loss (without silently clipping
 
 Produce the same curve and calibration summary separately for every preregistered context (at minimum the guide/Cas9 group when supported). A pooled curve may be reported as a supplement, never as a substitute for per-context results. Contexts with no observed labels have calibration marked not estimable, while their coverage and unknown-label census remain visible.
 
+### L. From static candidate ranking to decision-critical measurement allocation
+
+The next question is not only which policy ranks better, but **which unknown outcome should be measured next to determine whether the policy comparison changes?** For a frozen shared candidate universe and top-K comparison, an unknown candidate that is in exactly one policy's top K can directly change the paired positive-hit-count numerator (hits in A minus hits in B) if it proves positive. Measuring such a label resolves one unit of that specific ambiguity. This is a narrow structural value-of-measurement objective, not an expected-value-of-information estimate.
+
+The initial planner ranks these decision-differential unknowns by declared positive cost units, selecting the cheapest first to maximize the number measured under a fixed budget when each has equal unit value. It explicitly counts unknowns selected by both policies or by neither; those may matter to denominator uncertainty, absolute recall bounds, or other questions, but they do not directly change this numerator component. The planner therefore reports residual ambiguity and must never claim it has resolved the entire paired sensitivity interval.
+
+Benchmark the allocation against random, highest-confidence/score-first, and top-ranked-unknown-first allocation at identical cost budgets and on identical preregistered episodes. Report measurement spend, differential unknown labels resolved, unresolved count, context coverage, and full paired sensitivity bounds before/after actual permitted outcomes become available. Do not use post-hoc outcome knowledge to select labels for the planner; do not treat cost units as laboratory-dollar savings.
+
+A related generalization warning applies to conformal or nominally calibrated uncertainty: distribution-free marginal coverage depends on exchangeability, and distribution shift can invalidate its guarantee. This project must evaluate coverage and selective risk by held-out guide/Cas9 and assay context instead of assuming in-distribution calibration transfers ([coverage under shift, 2026](https://arxiv.org/abs/2602.14913); [calibration failure diagnostics, UAI 2026](https://proceedings.mlr.press/v337/lee26g.html)). These are evaluation motivations, not evidence that conformal methods or any Symthaea policy has been tested here.
+
+Research task: [CRISPR-OT-004 #7589 — allocate measurements to resolve decision-critical unknown labels](https://github.com/Luminous-Dynamics/symthaea/issues/7589).
+
 ### J. From price claims to causal cost accounting
 
 Report computational resources and review slots first. Progress to human review minutes only when measured. Report per-qualified-finding cost only when numerator and denominator are observed end-to-end. Do not convert fewer ranked candidates into claims of lower experimental costs, clinical costs, or treatment prices without prospective accounting.
@@ -133,6 +145,7 @@ Report computational resources and review slots first. Progress to human review 
 | T8 Partial-label identification | How much do unresolved labels change metric interpretation? | observed-label estimate, worst/best-case recall and precision bounds, unknown-label census | sites omitted from every nomination method; truth outside the fixed candidate universe |
 | T9 Multi-objective frontier | Which policies offer genuine trade-offs without arbitrary score weights? | complete objective vectors, dominated-policy count, Pareto membership, excluded-policy reasons | a universal safety score or proof of biological/clinical improvement |
 | T10 Selective prediction | What error/uncertainty trade-off occurs as the policy abstains, and where does calibration fail? | Brier/log loss on measured labels, fixed-bin reliability, full risk–coverage curve, unknown-aware error bounds, per-context label completeness | clinical safety or outcomes missing from the evidence universe |
+| T11 Decision-critical measurement allocation | Which unknown outcomes most directly resolve disagreement in a preregistered top-K policy comparison? | differential unknown labels resolved at fixed declared cost, residual numerator-ambiguity count, context coverage, before/after paired label-sensitivity bounds | full expected value of information, total uncertainty resolved, experimental savings, biological safety |
 
 Tracks are reported separately. A composite “CRISPR score” that hides failed nomination, calibration, or generalization is prohibited.
 
@@ -276,7 +289,7 @@ The credible breakthrough would be evidence that a general-purpose reasoning/evi
 
 ## 11. Synthetic contract fixtures
 
-The machine-readable companion contract contains nine synthetic fixtures intended to become deterministic unit tests for the Rust scorer/verifier:
+The machine-readable companion contract contains ten synthetic fixtures intended to become deterministic unit tests for the Rust scorer/verifier:
 
 1. **F1 — nomination vs seeded ranking.** Four eligible positives, two in the native nominations: expected native coverage is 2/4 = 0.5. Later seeding the two missing positives into a ranking universe allows Recall@5 to reach 1.0, but native nomination coverage remains 0.5.
 2. **F2 — unknown is not negative.** If an unknown/unassayed candidate is inside the review set, precision is not estimable under the declared label semantics; it may not be silently counted as a true negative.
@@ -326,3 +339,13 @@ The new dependency-free Rust implementation is [scripts/crispr_selective_risk.rs
 Tracking issue: [CRISPR-OT-003 #7580 — calibration-first selective prediction](https://github.com/Luminous-Dynamics/symthaea/issues/7580).
 
 These code and fixture additions are methodological tooling only. No data cohort, biological model, or Symthaea improvement has been evaluated.
+
+
+10. **F10 — decision-critical measurement allocation.** On a shared six-candidate universe with K=3, two unknown outcomes are differentially selected (one top-K only in policy A with cost 2, and one top-K only in policy B with cost 1). Another unknown is selected by both and one by neither. With cost budget 2, the plan selects the cheaper B-only outcome, spends 1 unit, leaves 1 unit unused, and reduces the unresolved direct paired-numerator ambiguity count from 2 to 1. It does not claim to resolve common-label denominator uncertainty or the full paired sensitivity bounds.
+
+The dependency-free implementation is [scripts/crispr_measurement_priority.rs](../../scripts/crispr_measurement_priority.rs). It computes top-K membership from complete one-based rankings for both policies on the shared universe; it does not accept caller-supplied disagreement flags. The 19 authored tests cover cost-bounded allocation, policy-exclusive membership, ties, labels, cardinality, duplicate/gapped rankings, invalid identities, and zero cost. They have not been compiled or executed because `rustc` is unavailable in the authoring environment. Run:
+
+    rustc --edition=2024 --test scripts/crispr_measurement_priority.rs -o /tmp/crispr-measurement-tests
+    /tmp/crispr-measurement-tests
+
+This allocation method is deliberately narrow and deterministic. Its proposed 20% improvement over random allocation at equal cost is an evaluation target, not a current result; compare score-first and top-ranked-unknown baselines as well. No assay or biological data have been run.
