@@ -329,11 +329,10 @@ fn validate_trajectory_collection(trajectories: &[HashedEvidenceTrajectory]) -> 
 }
 
 fn split_name(split: DatasetSplit) -> &'static str {
-    use DatasetSplit::*;
     match split {
-        Train => "train",
-        Development => "development",
-        Test => "test",
+        DatasetSplit::Train => "train",
+        DatasetSplit::Development => "development",
+        DatasetSplit::Test => "test",
     }
 }
 
@@ -782,7 +781,6 @@ pub fn score_trajectory_receipts<R: BufRead>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use DatasetSplit;
     use std::io::Cursor;
 
     const FIXTURE: &str =
