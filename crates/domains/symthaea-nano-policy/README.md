@@ -1,7 +1,8 @@
 # Symthaea Nano Policy (research-only prototype)
 
-A small Rust CLI that selects a subset of a supplied candidate pool using either:
+A small Rust CLI that selects a subset of a supplied candidate pool using three policies:
 - maximin: greedy farthest-point selection over min-max-normalized numeric descriptors, maintaining nearest-selected distances incrementally;
+- hdc_maximin: encode each normalized descriptor row as a Symthaea BinaryHV using dimension-role binding and a correlated 256-level scalar codebook, bundle it, then select by normalized Hamming distance;
 - random: a seeded, deterministic random-control policy.
 
 It is intentionally **not** an atomistic model, optical solver, candidate generator, toxicity model, or materials predictor. It has no target-label, energy, spectrum, physics-engine, network, file-system, or model-checkpoint interface. Strict Serde structs reject unknown fields, so an attempted extra target/label field in a candidate record fails closed at JSON parsing.
@@ -11,13 +12,15 @@ It is intentionally **not** an atomistic model, optical solver, candidate genera
 - Interface: one JSON request from stdin; one JSON response to stdout; errors to stderr and exit code 2.
 - Request schema version: nano-selection-input-v1.
 - Machine-readable input/output contracts: schema/input.schema.json and schema/output.schema.json (JSON Schema Draft 2020-12).
-- A deterministic plumbing fixture is provided in fixtures/smoke-request.json with expected selected IDs in fixtures/smoke-expected.json.
+- Deterministic plumbing fixtures are provided for maximin (fixtures/smoke-request.json and fixtures/smoke-expected.json) and HDC (fixtures/hdc-smoke-request.json and fixtures/hdc-smoke-expected.json).
 - Candidate input fields: id, features only.
 - Input budgets/candidate/feature cells are bounded.
-- Maximin normalizes features with min/max across the permitted unlabeled candidate pool; this is a declared transductive descriptor operation, not a use of target labels. The random-control arm deliberately skips normalization to avoid irrelevant overhead.
+- Maximin and hdc_maximin normalize features with min/max across the permitted unlabeled candidate pool; this is a declared transductive descriptor operation, not a use of target labels. The random-control arm deliberately skips normalization to avoid irrelevant overhead.
+- HDC uses Symthaea core's 16,384-bit BinaryHV. Its 256 scalar levels are constructed by progressively flipping a deterministic permutation of half the bits, so level-code Hamming distance from level zero increases monotonically with normalized descriptor value. Descriptor dimension is positional: callers must freeze feature order, meaning, and units. This is a descriptor-encoding hypothesis, not a physical prior.
 - Ties are deterministic by lexicographically sorted candidate ID.
 - Random control uses a pinned local SplitMix64 implementation, with no OS entropy.
-- Maximin scores are squared Euclidean distances in normalized feature space. The first selection, if there is no prior selection, uses distance to the candidate-pool centroid; later selections use minimum distance to any selected candidate.
+- Maximin scores are squared Euclidean distances in normalized feature space. HDC scores are normalized Hamming distances in encoded hypervector space. The first selection, when no prior selection exists, uses distance to the pool centroid/bundle; later selections use minimum distance to any selected candidate. Random outputs no score.
+- HDC is capped at 10,000 candidates and 256 descriptor features per candidate. Stored candidate vectors use 2 KiB each; the maximum pool therefore needs about 20 MiB for encoded vectors, excluding feature arrays and transient bindings. These are defensive implementation ceilings, not measured performance limits.
 - already_selected IDs must be members of the input pool and are excluded from new selections.
 
 ## Example
@@ -49,21 +52,21 @@ cargo test -p symthaea-nano-policy --locked
 cargo run -p symthaea-nano-policy --release --locked < request.json
 ~~~
 
-This crate is intentionally small and uses the workspace's pinned serde and serde_json dependencies. A dedicated targeted workflow checks format, tests, and Clippy. If the Rust toolchain is unavailable locally, don't claim local compilation; rely on exact-head workflow evidence only when its job actually completes successfully.
+This crate uses workspace-pinned serde, serde_json, and blake3 plus the existing symthaea-core BinaryHV API. That path dependency pulls in Symthaea core's scientific/utility dependency graph. A dedicated targeted workflow checks format, tests, and Clippy. If the Rust toolchain is unavailable locally, don't claim local compilation; rely on exact-head workflow evidence only when its job actually completes successfully.
 
 ## Prototype acceptance and performance profile
 
 Software acceptance before scientific use:
-- all 12 unit tests pass on the exact commit;
+- all 20 unit tests pass on the exact commit;
 - formatting and Clippy pass with warnings denied;
-- same canonical request produces the same ordered IDs for both policies, independent of input row order;
+- same canonical request produces the same ordered IDs for all three policies, independent of input row order;
 - unknown target/outcome fields fail parsing;
 - all candidate IDs and budget slots are accounted for, and no candidate is selected twice;
 - the locked dependency graph is unchanged except for this package.
 
 The maximin loop has target complexity O(N · D · (P + K)) where N is pool size, D is descriptor count, P is the number of already-selected IDs used for initialization, and K is the new selection budget; this is a complexity analysis, not a measured runtime claim.
 
-Profile in release mode using synthetic descriptor pools first (synthetic data is a software test, not a scientific result): pool sizes 1,000 / 10,000 / 100,000; dimensions 8 / 64 / 256; budgets 1 / 10 / 100, then higher only within memory/time limits. Record p50/p95 wall time, peak resident memory, input size, selected count and deterministic output digest on a named CPU. Benchmark random and maximin separately. Do not set an absolute runtime pass target until a reference machine and baseline are measured; once measured, preregister the selector-overhead budget relative to the actual forward oracle.
+Profile in release mode using synthetic descriptor pools first (synthetic data is a software test, not a scientific result): random/maximin at pool sizes 1,000 / 10,000 / 100,000; HDC at 1,000 / 10,000; dimensions 8 / 64 / 256; budgets 1 / 10 / 100. Record p50/p95 wall time, peak resident memory, input size, selected count and deterministic output digest on a named CPU. Benchmark all three policies separately. HDC has a lower hard candidate cap than the descriptor-only arms. Do not set an absolute runtime pass target until a reference machine and baseline are measured; once measured, preregister the selector-overhead budget relative to the actual forward oracle.
 
 ## Required next steps before scientific use
 
