@@ -182,19 +182,53 @@ Use a high-risk adversarial suite in which revocation or contradiction arrives a
 
 Trajectory-level risk aggregation is supported as a research direction by TRACER (ICML 2026), which studies critical failures in tool-agent-user episodes. Its metrics do not transfer as a guarantee to this policy. Any online/conformal guarantee would require a separately stated target risk, calibration/feedback process, dependence or exchangeability assumptions, and evidence that those assumptions hold under update and acquisition behavior. This prototype currently offers no such guarantee.
 
-## 9. Implementation sequence
+## 9. Executable dataset, receipt, and policy contract
 
-1. **Current PR:** add and unit-test the standalone deterministic action-policy kernel.
-2. **Next:** create an immutable JSONL case format and an independent receipt checker; reject unknown fields, duplicate IDs, missing labels, family leakage, and altered case digests.
-3. Generate synthetic counterfactual families and verify the negative controls before collecting human labels.
-4. Add expert-adjudicated, source-family-disjoint cases and blind disagreement review.
-5. Join policy input assessments to the already separate provenance, lineage, derivation graph, and proof-formula results; retain component outputs as evidence, not as truth.
-6. Evaluate baselines, paired perturbations, calibration if a probabilistic selector is later introduced, and clustered uncertainty.
-7. Add episode-level replay and risk evaluation, including revocation and post-acquisition failure traces.
-8. Wire into the live answer path only after the end-to-end test shows that it receives trustworthy upstream assessments and that action receipts are auditable.
+The follow-on verifier implementation adds:
 
-## 10. Acceptance rule
+- \`src/knowledge/evidence_benchmark.rs\`: strict versioned case types, source-family split audit, domain-separated SHA-256 case binding, receipt coverage/version/config checks, action/reason coherence, and safety/action metrics.
+- \`src/bin/evidence_action_benchmark.rs\`: \`audit\`, \`evaluate\`, and \`score\` commands.
+- \`docs/research/schemas/evidence-benchmark-case-v1.schema.json\` and \`docs/research/schemas/evidence-action-receipt-v1.schema.json\`: machine-readable format contracts.
+- \`docs/research/data/evidence_action_benchmark.synthetic.jsonl\`: seven synthetic cases spanning full/partial/irrelevant/missing/conflicting evidence, invalid provenance, and question ambiguity. These are contract fixtures, not human-labeled evidence or a population sample.
 
-A passing structural suite establishes only that the code follows its declared action contract on those tests. A passing synthetic benchmark establishes only behavior on that fixture. A source-disjoint, adjudicated test suite is needed for meaningful external validity. Production integration additionally needs end-to-end evidence of provenance inputs, budget enforcement, repair results, action receipts, latency, and policy-version binding.
+A case digest is computed over the versioned typed payload preceded by the domain separator \`SYMTHAEA-EVIDENCE-BENCHMARK-CASE-V1\\0\`. This prevents accidental cross-artifact digest reuse, but it is **not a digital signature** and does not authenticate who authored the case. The code calls the payload \`HashedBenchmarkCase\`, not a signed case, to avoid implying authenticity.
 
-Queued CI is pending, not passing. No Rust compile, unit test, or benchmark result is claimed by this research document.
+Receipt scoring revalidates every case digest even if a caller bypasses the JSONL audit. It rejects missing/duplicate/unknown receipts, mixed policy thresholds under one policy version, unsupported schema fields, mismatched action/reason pairs, scoped answers when the policy disables them, and case/policy digest mismatches. The scorer treats an answer on invalid/incomplete provenance, unresolved conflict, missing/irrelevant evidence, ambiguous questions, or origins below the recorded policy threshold as a critical safety escape.
+
+Usage from the repository root:
+
+\`\`\`sh
+cargo run --features evidence-benchmark --bin evidence_action_benchmark -- audit docs/research/data/evidence_action_benchmark.synthetic.jsonl
+cargo run --features evidence-benchmark --bin evidence_action_benchmark -- evaluate docs/research/data/evidence_action_benchmark.synthetic.jsonl /tmp/evidence-receipts.jsonl baseline-v1 1 false
+cargo run --features evidence-benchmark --bin evidence_action_benchmark -- score docs/research/data/evidence_action_benchmark.synthetic.jsonl /tmp/evidence-receipts.jsonl baseline-v1
+\`\`\`
+
+CLI exit contract: 0 means the requested command completed without a hard safety escape; 1 means the dataset/receipt contract could not be verified; 2 means usage or I/O/serialization failed; 3 means the score was computable but the hard unsupported-answer safety gate failed. A zero exit on a seven-case synthetic fixture only means the declared software gate did not detect an escape in this fixture—it is not statistical evidence of low real-world risk.
+
+### Benchmark lifecycle and contamination boundary
+
+Source/claim family split checks prevent declared families from crossing train/development/test, but cannot determine whether a model saw a benchmark during pretraining, whether labels were incorrectly adjudicated, or whether two different IDs conceal the same source. Dataset leakage work has studied contamination as a separate validity threat (Choi et al., ICML 2025, [How Contaminated Is Your Benchmark?](https://proceedings.mlr.press/v267/choi25b.html)). The protocol therefore keeps three benchmark layers separate:
+
+1. **Frozen regression set:** versioned, immutable cases with known digests, used for repeatable software regression.
+2. **Discovery/adversarial set:** newly generated mutations and red-team trajectories used to discover failures; it must not be treated as an unbiased final evaluation after the system has been optimized against it.
+3. **Sealed external set:** source-family-disjoint, time-held-out or private cases adjudicated independently and evaluated only after policy/version freeze.
+
+AgenticEval (Findings of ACL 2026, [paper](https://aclanthology.org/2026.findings-acl.727/)) motivates continuously evolving safety probes because static benchmarks can miss dynamic failure modes. We should adopt the lifecycle idea without self-certifying generated test labels: a generated case moves into the frozen suite only after deterministic contract checks and independent adjudication. The system under evaluation must not be permitted to silently rewrite labels, hashes, or prior receipts.
+
+## 10. Implementation sequence
+
+1. **Implemented in this branch:** strict typed JSONL dataset parser, domain-separated payload digest, declared family leakage detector, receipt scorer, policy configuration binding, schema files, synthetic fixture, and CLI.
+2. Add integration/replay tests that run the CLI end to end, including the required exit code 3 for a deliberately unsafe receipt.
+3. Generate synthetic counterfactual families and verify negative controls before collecting human labels.
+4. Add expert-adjudicated, source-family-disjoint cases and blind disagreement review; preserve labels and adjudicator disagreement rather than force unsupported consensus.
+5. Join case inputs to the provenance, lineage, derivation graph, proof-formula, and action-policy results. Retain component outputs as evidence, not as truth.
+6. Evaluate answer-always, binary answer/abstain, raw-source-count, lineage-aware, provenance-ablated, conflict-ablated, and full action-policy baselines under identical case universes and cost budgets.
+7. Add episode-level replay for source withdrawal, post-answer contradictions, failed acquisition, retry loops, and exhausted budgets.
+8. Add a model-exposure/contamination audit and an independently held-out, time-shifted evaluation before reporting external generalization.
+9. Wire into the live answer path only after end-to-end tests prove the system receives trustworthy upstream assessments and emits auditable receipts.
+
+## 11. Acceptance rule
+
+A passing structural suite establishes only that code follows its declared contract on those test inputs. A passing synthetic fixture establishes only behavior on that fixture. Source-disjoint adjudicated data is needed for external validity; an independent temporal or private test is needed to reduce repeated benchmark tuning. Production integration additionally needs end-to-end evidence of provenance inputs, budget enforcement, actual acquisition outcomes, action receipts, latency/cost, policy-version binding, and correction behavior after an earlier answer is invalidated.
+
+Queued CI is pending, not passing. Rust compilation, unit tests, JSON Schema-engine validation, fixture CLI replay, and benchmark execution have not been confirmed in this authoring environment. No empirical policy gain or real-world risk bound is claimed.
