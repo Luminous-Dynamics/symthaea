@@ -21,9 +21,9 @@ The first executable matrix contains 96 cases: four frozen scenario strata, thre
 
 | Stratum | Data-generating curve | Intended decision |
 |---|---|---|
-| Well-separated Michaelis–Menten | Michaelis–Menten, (V_{max}=100, K_m=2) | Select Michaelis–Menten when evidence is decisive |
-| Well-separated substrate inhibition | Substrate inhibition, (V_{max}=100, K_m=2, K_i=20) | Select substrate inhibition when evidence is decisive |
-| Observationally ambiguous | Substrate inhibition with (K_i=10{,}000), using only low substrate concentrations | Preserve ambiguity and abstain |
+| Well-separated Michaelis–Menten | Michaelis–Menten, `Vmax = 100`, `Km = 2` | Select Michaelis–Menten when evidence is decisive |
+| Well-separated substrate inhibition | Substrate inhibition, `Vmax = 100`, `Km = 2`, `Ki = 20` | Select substrate inhibition when evidence is decisive |
+| Observationally ambiguous | Substrate inhibition with `Ki = 10,000`, using only low substrate concentrations | Preserve ambiguity and abstain |
 | Candidate-set misspecification | Hill curve with exponent 1.6 | Abstain when both candidate families fail the absolute-fit gate |
 
 Noise is deterministic bounded uniform noise, scaled to the declared standard deviation. This makes the software replayable; it is not a claim that real enzyme assay errors are uniform, independent, homoscedastic, or fully described by a single standard deviation.
@@ -36,7 +36,7 @@ The current policy is deliberately explicit and ordered:
 
 1. **Absolute fit:** abstain if the lower of the two candidates' RMSE values exceeds 3 times the declared noise SD.
 2. **Observational resolution:** abstain if the RMS difference between the two fitted predictions on tested substrate conditions is below 1 declared noise SD.
-3. **Model-selection evidence:** abstain if (|\Delta BIC| < 10).
+3. **Model-selection evidence:** abstain if `abs(ΔBIC) < 10`.
 4. Otherwise choose the candidate favored by BIC, where `ΔBIC = BIC(Michaelis–Menten) - BIC(substrate inhibition)`; negative values favor Michaelis–Menten.
 
 These cutoffs are **heuristics, not calibrated confidence levels**. The fitted-prediction gap is a screening proxy—not a power calculation or a formal identifiability result. The absolute-fit gate is not a substitute for inspecting residual structure. The use of BIC also needs review against each model's likelihood assumptions and the actual experimental error model.
