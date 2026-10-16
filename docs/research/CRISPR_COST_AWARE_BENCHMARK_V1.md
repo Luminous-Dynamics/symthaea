@@ -385,3 +385,14 @@ This contract does not claim:
 - any laboratory experiment has been run, authorized or independently replicated.
 
 Success means producing a fair, reproducible result—including a negative result—about whether Symthaea improves genome-editing research efficiency without weakening evidence or safety requirements.
+
+
+## Additional gate: probability-sampled verification audit (T15 / G15)
+
+Outcome labels can be selectively observed because candidate nomination or rank affects which sites receive experimental verification. Complete-case metrics on that observed subset can therefore be optimistic or otherwise unrepresentative. Add a retrospective audit lane that freezes the full ranking and candidate frame, then samples candidates with known, nonzero inclusion probabilities under a declared outcome-blind design. This is motivated by partial-verification bias in diagnostic evaluation ([methodological overview](https://pubmed.ncbi.nlm.nih.gov/35124189/)) and the CRISPR-specific separation between candidate nomination and conditional ranking ([Kaufmann et al., 2026](https://doi.org/10.1177/10430342261466407)).
+
+For audited candidate i with label y_i and inclusion probability pi_i, estimate totals using sum(y_i / pi_i); separately calculate the corresponding top-K positive total using only ranks in the frozen top K. Form ratio estimates for recall and precision, and publish naïve audit-subset metrics beside them. The count estimators require a valid probability sample; the ratio estimates are not finite-sample unbiased. The point-estimate kernel does not compute confidence intervals.
+
+**Hard requirements:** independently verify the complete rank census; freeze frame, ranking and K before outcome reveal; provide known, nonzero inclusion probabilities for every target-frame candidate; make selection outcome-blind conditional on the declared design; retain unknown labels as unknown; reject convenience samples with missing propensities and zero-probability strata. These estimates apply only within the declared frame and do not bound positives omitted from all nomination tools. Real-cohort claims require design-appropriate uncertainty, group-aware evaluation, source permissions and independent replay.
+
+Implementation: [scripts/crispr_verification_bias.rs](../../scripts/crispr_verification_bias.rs). Scorecard and synthetic fixture: [CRISPR_TRIAGE_SCORECARD_V1.md](CRISPR_TRIAGE_SCORECARD_V1.md), [machine-readable scorecard](data/CRISPR_TRIAGE_SCORECARD_V1.json), and [CRISPR-OT-008 #7633](https://github.com/Luminous-Dynamics/symthaea/issues/7633). The Rust kernel remains authored but uncompiled/unexecuted; the F14 arithmetic check is synthetic only.
