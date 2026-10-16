@@ -23,10 +23,9 @@ use std::path::{Component, Path, PathBuf};
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use symthaea_scenarios::living_city::CityMetrics;
 use symthaea_scenarios::living_city_assessment_package::{
     CITY_ASSESSMENT_PACKAGE_EVIDENCE_ID, CITY_ASSESSMENT_PACKAGE_SCHEMA_VERSION,
-    CITY_METRICS_PAYLOAD_EVIDENCE_ID, CityAssessmentPackage, REQUIRED_CITY_METRIC_IDS,
+    CITY_METRICS_PAYLOAD_EVIDENCE_ID, CityAssessmentPackage,
 };
 use symthaea_scenarios::living_city_benchmarks::{
     BenchmarkProfileBinding, LIVING_CITY_BENCHMARKS,
@@ -417,6 +416,7 @@ fn main() {
 mod tests {
     use super::*;
     use symthaea_scenarios::living_city::{CityFloors, CityMetrics};
+    use symthaea_scenarios::living_city_assessment_package::REQUIRED_CITY_METRIC_IDS;
     use symthaea_scenarios::living_city_assessment_package::{
         CITY_ASSESSMENT_PACKAGE_EVIDENCE_ID, CITY_METRICS_PAYLOAD_EVIDENCE_ID,
         CityAssessmentPackage, MetricEvidenceBinding, REQUIRED_CITY_METRIC_IDS,
