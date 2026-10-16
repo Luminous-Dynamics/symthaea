@@ -357,7 +357,28 @@
         "preserve_per_service_traces",
         "no_semantic_or_time_resolution_reduction_to_meet_performance_target",
         "measure_on_documented_reference_host_before_adopting_as_release_gate"
-      ]
+      ],
+      "resource_constrained_case": {
+        "status": "proposed_unmeasured_target",
+        "services": 100,
+        "resources": 20,
+        "service_resource_requirements_max": 500,
+        "dependency_edges_max": 200,
+        "time_steps": 730,
+        "target_single_scenario_ms": 250,
+        "target_1000_scenarios_seconds": 120,
+        "large_case": {
+          "services": 1000,
+          "service_resource_requirements": 2000,
+          "time_steps": 730,
+          "target_single_scenario_seconds": 5
+        },
+        "requirements": [
+          "benchmark_on_a_documented_reference_host",
+          "report_per_service_and_per_resource_traces",
+          "do_not_sacrifice_validation_or_resolution_to_meet_speed_targets"
+        ]
+      }
     }
   },
   "resource_constrained_screening": {
@@ -396,7 +417,7 @@
         "unlike service units must not be summed without justified normalization"
       ]
     },
-    "tests_authored": 12,
+    "tests_authored": 16,
     "tests_executed": false,
     "reference_fixtures": [
       {
