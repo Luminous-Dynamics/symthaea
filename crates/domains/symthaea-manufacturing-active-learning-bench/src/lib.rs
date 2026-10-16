@@ -10,7 +10,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod analysis;
 pub mod evaluator;
+pub use analysis::{
+    BenchmarkSummary, CampaignEvaluationSample, PairedPolicyComparison, PolicyAggregate,
+    summarize_paired_campaigns,
+};
 pub use evaluator::evaluate_transcript;
 
 pub const BENCHMARK_ID: &str = "MFG-ACTIVE-001";
