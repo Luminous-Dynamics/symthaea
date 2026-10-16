@@ -87,12 +87,12 @@ fn run() -> Result<(), ReplayError> {
                 )?);
             }
 
-            // Negative control: an outcome-revealing forecast is timestamped after this cutoff.
-            // It is never valid for this target, and is too stale to be reused by later horizons.
+            // Negative control: an outcome-revealing forecast is timestamped after every target cutoff.
+            // It can never be selected for any horizon in this event.
             observations.push(ForecastObservation::new(
                 event_id.clone(),
                 "oracle_future_only",
-                cutoff + 1,
+                event_base + RESOLUTION_OFFSET - 1,
                 if outcome { 0.999 } else { 0.001 },
             )?);
         }
