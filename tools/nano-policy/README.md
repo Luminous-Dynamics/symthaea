@@ -25,7 +25,7 @@ The example input is synthetic and is included to exercise parsing and selection
 
 ## Input contract
 
-Input is UTF-8 TSV with exactly one header row. The first header must be candidate_id; every remaining header is a numeric feature column using ASCII letters, digits, underscore, dot or hyphen. Each candidate ID must be unique, and feature values must be finite and have absolute value at most 1e12. Blank lines are ignored. Limits: 256 MiB input, 100,000 rows, 512 features, 20,000,000 feature cells and 100,000,000 estimated distance-feature operations.
+Input is UTF-8 TSV with exactly one header row. The first header must be candidate_id; every remaining header is a numeric feature column using ASCII letters, digits, underscore, dot or hyphen. Each candidate ID must be unique, must not begin with #, and must not contain control characters. Feature values must be finite and have absolute value at most 1e12. Blank lines are ignored. Limits: 256 MiB input, 100,000 rows, 512 features, 20,000,000 feature cells and 100,000,000 estimated distance-feature operations.
 
 Example header:
 
