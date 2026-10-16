@@ -2286,6 +2286,7 @@ mod tests {
             stamp_nanosec,
             frame_id: "base_link".into(),
             clock_domain,
+            source_clock_epoch_id: Some("source-epoch-1".into()),
             received_monotonic_ns: Some(90),
             receive_sequence: Some(1),
             receive_epoch_id: Some("receipt-epoch".into()),
@@ -2308,6 +2309,7 @@ mod tests {
     fn temporal_test_now() -> RosClockNowV1 {
         RosClockNowV1 {
             domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
             timestamp_ns: 100_000_000_000,
         }
     }
@@ -2327,6 +2329,7 @@ mod tests {
 
         let now = RosClockNowV1 {
             domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
             timestamp_ns: 100_010_000_000,
         };
         assert_eq!(
@@ -2466,6 +2469,7 @@ mod tests {
         );
         let now = RosClockNowV1 {
             domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
             timestamp_ns: 100_200_000_000,
         };
         assert!(matches!(
@@ -2617,6 +2621,7 @@ mod tests {
 
         let wrong_now = RosClockNowV1 {
             domain: RosClockDomainV1::Named("wall-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
             timestamp_ns: 100_000_000_000,
         };
         let joint = temporal_test_sample(100, 0, valid_domain);
@@ -2694,6 +2699,7 @@ mod tests {
     fn temporal_history_now() -> RosClockNowV1 {
         RosClockNowV1 {
             domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            source_clock_epoch_id: "source-epoch-1".into(),
             timestamp_ns: 100_010_000_000,
         }
     }
@@ -2701,7 +2707,7 @@ mod tests {
     #[test]
     fn temporal_history_rejects_replay_and_keeps_pair_update_atomic() {
         let policy = temporal_test_policy();
-        let mut history = RosTemporalHistoryV1::new("receipt-epoch").unwrap();
+        let mut history = RosTemporalHistoryV1::new("receipt-epoch", "source-epoch-1").unwrap();
         let joint_one = temporal_history_sample(1, 100, 0);
         let imu_one = temporal_history_sample(1, 100, 0);
 
@@ -2767,7 +2773,7 @@ mod tests {
     #[test]
     fn temporal_history_rejects_source_time_regression_and_duplicates() {
         let policy = temporal_test_policy();
-        let mut history = RosTemporalHistoryV1::new("receipt-epoch").unwrap();
+        let mut history = RosTemporalHistoryV1::new("receipt-epoch", "source-epoch-1").unwrap();
         let first_joint = temporal_history_sample(1, 100, 0);
         let first_imu = temporal_history_sample(1, 100, 0);
         assert!(matches!(
@@ -2826,7 +2832,7 @@ mod tests {
     #[test]
     fn temporal_history_requires_explicit_epoch_reset_and_reports_sequence_gaps() {
         let policy = temporal_test_policy();
-        let mut history = RosTemporalHistoryV1::new("receipt-epoch").unwrap();
+        let mut history = RosTemporalHistoryV1::new("receipt-epoch", "source-epoch-1").unwrap();
         let joint_one = temporal_history_sample(1, 100, 0);
         let imu_one = temporal_history_sample(1, 100, 0);
         assert!(matches!(
@@ -2875,11 +2881,15 @@ mod tests {
             RosTemporalHistoryDispositionV1::ReceiveEpochChanged { .. }
         ));
 
-        history.reset_for_epoch("new-receipt-epoch").unwrap();
+        history
+            .reset_for_epochs("new-receipt-epoch", "source-epoch-1")
+            .unwrap();
         let mut new_joint = new_epoch_joint;
         new_joint.receive_epoch_id = Some("new-receipt-epoch".into());
+        new_joint.source_clock_epoch_id = Some("source-epoch-1".into());
         let mut new_imu = new_epoch_imu;
         new_imu.receive_epoch_id = Some("new-receipt-epoch".into());
+        new_imu.source_clock_epoch_id = Some("source-epoch-1".into());
         assert!(matches!(
             evaluate_ros_temporal_pair_with_history_v1(
                 &mut history,
