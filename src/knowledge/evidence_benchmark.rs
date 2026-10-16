@@ -575,6 +575,60 @@ mod tests {
     }
 
     #[test]
+    fn scorer_revalidates_case_digest_even_if_audit_was_bypassed() {
+        let original = case(
+            "a", "claim-a", &["origin-a"], DatasetSplit::Test,
+            BenchmarkEvidenceCondition::FullSupport, BenchmarkProvenanceCondition::Verified,
+            Some(1), BenchmarkAction::Answer,
+        );
+        let receipts = evaluate_cases(
+            &[original.clone()], "policy-v1", &EvidenceActionPolicy::bounded_default(),
+        );
+        let mut mutated = original;
+        mutated.case.input.evidence = BenchmarkEvidenceCondition::Conflicting;
+        assert!(score_receipts_jsonl(
+            &[mutated], Cursor::new(receipts_text(&receipts)), "policy-v1",
+        ).is_err());
+    }
+
+    #[test]
+    fn rejects_receipts_with_mixed_policy_thresholds() {
+        let a = case(
+            "a", "claim-a", &["origin-a"], DatasetSplit::Test,
+            BenchmarkEvidenceCondition::FullSupport, BenchmarkProvenanceCondition::Verified,
+            Some(2), BenchmarkAction::Answer,
+        );
+        let b = case(
+            "b", "claim-b", &["origin-b"], DatasetSplit::Test,
+            BenchmarkEvidenceCondition::FullSupport, BenchmarkProvenanceCondition::Verified,
+            Some(2), BenchmarkAction::Answer,
+        );
+        let p1 = EvidenceActionPolicy::new(1, false).unwrap();
+        let p2 = EvidenceActionPolicy::new(2, false).unwrap();
+        let mut receipts = evaluate_cases(&[a.clone()], "policy-v1", &p1);
+        receipts.extend(evaluate_cases(&[b.clone()], "policy-v1", &p2));
+        assert!(score_receipts_jsonl(
+            &[a, b], Cursor::new(receipts_text(&receipts)), "policy-v1",
+        ).is_err());
+    }
+
+    #[test]
+    fn rejects_action_and_reason_mismatch() {
+        let a = case(
+            "a", "claim-a", &["origin-a"], DatasetSplit::Test,
+            BenchmarkEvidenceCondition::FullSupport, BenchmarkProvenanceCondition::Verified,
+            Some(1), BenchmarkAction::Answer,
+        );
+        let mut receipts = evaluate_cases(
+            &[a.clone()], "policy-v1", &EvidenceActionPolicy::bounded_default(),
+        );
+        receipts[0].reason = BenchmarkReason::EvidenceMissing;
+        assert!(score_receipts_jsonl(
+            &[a], Cursor::new(receipts_text(&receipts)), "policy-v1",
+        ).is_err());
+    }
+
+    #[test]
     fn blank_and_empty_datasets_fail_closed() {
         assert!(audit_dataset_jsonl(Cursor::new("\n")).is_err());
         assert!(audit_dataset_jsonl(Cursor::new("")).is_err());
