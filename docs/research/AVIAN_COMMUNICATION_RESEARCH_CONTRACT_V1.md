@@ -39,7 +39,7 @@ No level implies access to subjective experience. Keep observed call, behavioral
 
 ### Suite A — Detection and taxonomic context
 
-Use a pinned subset of **BEANS** for standardized animal-audio detection/classification, and consider **BEANS-ZERO** for zero-shot generalization to unfamiliar species and vocalizations. For strong event-boundary evaluation, assess **WABAD** only under its declared non-commercial scope and after per-recording terms are reviewed: its expert annotations include vocalization start/end times and frequency bounds. Compare multiple baseline families where lawful and technically compatible: a taxonomic detector such as BirdNET, and a self-supervised representation such as BirdAVES/AVES. They are complementary baselines, not semantic oracles. Report precision, recall, PR-AUC and false positives at event, recording, site, taxon and region levels.
+Start the first permissively licensed acoustic preflight with **BirdVox-DCASE-20k** (CC BY 4.0) for its bounded 10-second bird-presence/absence task. This is weak clip-level supervision, so it can evaluate detection but not call boundaries or communicative function. Then use a pinned subset of **BEANS** for standardized animal-audio detection/classification, and consider **BEANS-ZERO** for zero-shot generalization to unfamiliar species and vocalizations. For strong event-boundary evaluation, assess **WABAD** only under its declared non-commercial scope and after per-recording terms are reviewed: its expert annotations include vocalization start/end times and frequency bounds. Compare multiple baseline families where lawful and technically compatible: a taxonomic detector such as BirdNET, and a self-supervised representation such as BirdAVES/AVES. They are complementary baselines, not semantic oracles. Report precision, recall, PR-AUC and false positives at event, recording, site, taxon and region levels.
 
 The global BirdNET assessment used 4,224 one-minute recordings from 67 sites and reported substantial geographic and species-level variation, with recall generally more heterogeneous than precision. That argues against random clip-only splits and aggregate-only reporting.
 
@@ -107,12 +107,16 @@ If a target proves unrealistic on an independently characterized corpus, amend t
 ## 6. Data and license discipline
 
 Candidate starting points:
+- BirdVox-DCASE-20k dataset and explicit CC BY 4.0 terms: https://zenodo.org/records/1208080
+- DCASE 2018 Bird Audio Detection task description (10-second manually labelled clips): https://dcase.community/challenge2018/task-bird-audio-detection
 - BEANS benchmark and datasets: https://arxiv.org/abs/2210.12300 and https://github.com/earthspecies/beans
 - WABAD data paper: https://doi.org/10.1002/ecy.70317; full dataset record and dataset description: https://zenodo.org/records/17293588
 - AVES/BirdAVES reference implementation and documented embedding/batching caveat: https://github.com/earthspecies/aves
 - BEANS-ZERO background via Earth Species Project benchmarks: https://earthspecies.org/what-we-do/
 - BirdNET model documentation (including model scope and license): https://birdnet-team.github.io/BirdNET-Analyzer/stable/models.html
 - Global BirdNET evaluation: https://doi.org/10.1016/j.ecolind.2025.114550
+
+**BirdVox first-pass scope:** the publisher states BirdVox-DCASE-20k is offered under CC BY 4.0. Still pin the exact record/version, record the license source, retain attribution and citation, verify all files came from that record, and avoid inferring more detailed semantics than the clip labels provide.
 
 **WABAD license-admission gate:** the dataset description on the Zenodo record states CC BY-NC 4.0 for the dataset; the journal article itself is published under CC BY-NC-ND 4.0. These refer to distinct assets and should not be described as a CC BY 4.0 grant. Treat commercial use of the dataset as blocked unless rights holders give clear permission. Before use, verify the terms attached to the exact files and their underlying recording sources, determine whether contemplated derived artifacts or redistribution are permitted, and preserve this decision with source evidence in the corpus manifest. No recordings should be checked into the repo.
 
@@ -123,7 +127,7 @@ Pin the exact dataset/version and each artifact's license before use. Public ava
 ## 7. Implementation sequence
 
 1. **Contract hardening (this tranche):** require all registered context controls; reject incomplete/duplicate/blank split identities, non-finite temporal-permutation evidence, and train/test overlap in source-recording lineage.
-2. **Passive corpus audit:** choose one legally usable bird corpus, inspect taxa/site/recording imbalance, pin a manifest and split by source session/site/identity where known. No training claim yet.
+2. **Passive corpus audit:** start with BirdVox-DCASE-20k as the explicitly CC BY 4.0 clip-level detection preflight; pin a manifest and source-recording split, and report its narrow nocturnal-flight-call scope. Audit broader taxa/sites with other corpora only after their file-level licenses and source lineage are recorded. No communication or training-quality claim yet.
 3. **Baseline harness:** emit BEANS-compatible detection results and a separate unit-discovery report using Symthaea's existing immutable run bundle.
 4. **Context prediction:** preregister one observable target and run every required control on held-out identities/sites/time.
 5. **Expert review:** reconcile annotation uncertainty and review negative controls before using words like “meaning.”
