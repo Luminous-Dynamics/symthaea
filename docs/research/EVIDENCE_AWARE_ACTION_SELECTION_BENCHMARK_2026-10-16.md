@@ -34,7 +34,7 @@ Selective prediction and conformal abstention research also makes clear that red
 
 ## 3. Prototype contract
 
-The Rust module \`src/knowledge/evidence_action_policy.rs\` consumes explicit upstream assessments:
+The Rust module `src/knowledge/evidence_action_policy.rs` consumes explicit upstream assessments:
 
 - Evidence condition: full support, partial support, irrelevant, missing, or conflicting.
 - Provenance condition: verified, incomplete, or invalidated.
@@ -47,11 +47,11 @@ It returns one of five actions:
 
 | Action | Meaning |
 |---|---|
-| \`Answer\` | Return the supported claim at the requested scope. |
-| \`AnswerWithScopeLimit\` | Return only an explicitly supported narrower conclusion. |
-| \`AskClarification\` | Resolve question ambiguity before further retrieval. |
-| \`AcquireMoreEvidence\` | Seek missing lineage, sufficient support, or conflict resolution. |
-| \`Abstain\` | Do not return a substantive answer when policy cannot proceed. |
+| `Answer` | Return the supported claim at the requested scope. |
+| `AnswerWithScopeLimit` | Return only an explicitly supported narrower conclusion. |
+| `AskClarification` | Resolve question ambiguity before further retrieval. |
+| `AcquireMoreEvidence` | Seek missing lineage, sufficient support, or conflict resolution. |
+| `Abstain` | Do not return a substantive answer when policy cannot proceed. |
 
 Hard invalidation, unresolved conflict, and incomplete provenance cannot produce a substantive answer. Origin counts must be lineage-deduplicated; the policy must not receive raw citation counts as a substitute. Exhausted acquisition budget must lead to abstention, not a weaker proof silently promoted to a complete one.
 
@@ -186,22 +186,24 @@ Trajectory-level risk aggregation is supported as a research direction by TRACER
 
 The follow-on verifier implementation adds:
 
-- \`src/knowledge/evidence_benchmark.rs\`: strict versioned case types, source-family split audit, domain-separated SHA-256 case binding, receipt coverage/version/config checks, action/reason coherence, and safety/action metrics.
-- \`src/bin/evidence_action_benchmark.rs\`: \`audit\`, \`evaluate\`, and \`score\` commands.
-- \`docs/research/schemas/evidence-benchmark-case-v1.schema.json\` and \`docs/research/schemas/evidence-action-receipt-v1.schema.json\`: machine-readable format contracts.
-- \`docs/research/data/evidence_action_benchmark.synthetic.jsonl\`: seven synthetic cases spanning full/partial/irrelevant/missing/conflicting evidence, invalid provenance, and question ambiguity. These are contract fixtures, not human-labeled evidence or a population sample.
+- `src/knowledge/evidence_benchmark.rs`: strict versioned case types, source-family split audit, domain-separated SHA-256 case binding, receipt coverage/version/config checks, action/reason coherence, and safety/action metrics.
+- `src/bin/evidence_action_benchmark.rs`: `audit`, `evaluate`, and `score` commands.
+- `docs/research/schemas/evidence-benchmark-case-v1.schema.json` and `docs/research/schemas/evidence-action-receipt-v1.schema.json`: machine-readable format contracts.
+- `docs/research/data/evidence_action_benchmark.synthetic.jsonl`: seven synthetic cases spanning full/partial/irrelevant/missing/conflicting evidence, invalid provenance, and question ambiguity.
+- `docs/research/data/evidence_action_benchmark.unsafe-control.synthetic.jsonl`: deliberately unsafe receipt set that marks unresolved conflicting evidence as an answer; the CLI must return the hard safety-gate exit code. Both files are synthetic contract fixtures, not human-labeled evidence or a population sample.
+- `.github/workflows/evidence-action-benchmark.yml`: focused workflow for Rust formatting, tests, fixture audit/scoring, and the unsafe-receipt control.
 
-A case digest is computed over the versioned typed payload preceded by the domain separator \`SYMTHAEA-EVIDENCE-BENCHMARK-CASE-V1\\0\`. This prevents accidental cross-artifact digest reuse, but it is **not a digital signature** and does not authenticate who authored the case. The code calls the payload \`HashedBenchmarkCase\`, not a signed case, to avoid implying authenticity.
+A case digest is computed over the versioned typed payload preceded by the domain separator `SYMTHAEA-EVIDENCE-BENCHMARK-CASE-V1\\0`. This prevents accidental cross-artifact digest reuse, but it is **not a digital signature** and does not authenticate who authored the case. The code calls the payload `HashedBenchmarkCase`, not a signed case, to avoid implying authenticity.
 
-Receipt scoring revalidates every case digest even if a caller bypasses the JSONL audit. It rejects missing/duplicate/unknown receipts, mixed policy thresholds under one policy version, unsupported schema fields, mismatched action/reason pairs, scoped answers when the policy disables them, and case/policy digest mismatches. The scorer treats an answer on invalid/incomplete provenance, unresolved conflict, missing/irrelevant evidence, ambiguous questions, or origins below the recorded policy threshold as a critical safety escape.
+Receipt scoring revalidates every case digest and source/claim-family split integrity even if a caller bypasses the JSONL audit. It rejects missing/duplicate/unknown receipts, mixed policy thresholds under one policy version, unsupported schema fields, mismatched action/reason pairs, scoped answers when the policy disables them, and case/policy digest mismatches. The scorer treats an answer on invalid/incomplete provenance, unresolved conflict, missing/irrelevant evidence, ambiguous questions, partial support without a valid scoped-answer path, or origins below the recorded policy threshold as a critical safety escape. The checked-in negative control validates this fail-closed path only on synthetic inputs.
 
 Usage from the repository root:
 
-\`\`\`sh
+```sh
 cargo run --features evidence-benchmark --bin evidence_action_benchmark -- audit docs/research/data/evidence_action_benchmark.synthetic.jsonl
 cargo run --features evidence-benchmark --bin evidence_action_benchmark -- evaluate docs/research/data/evidence_action_benchmark.synthetic.jsonl /tmp/evidence-receipts.jsonl baseline-v1 1 false
 cargo run --features evidence-benchmark --bin evidence_action_benchmark -- score docs/research/data/evidence_action_benchmark.synthetic.jsonl /tmp/evidence-receipts.jsonl baseline-v1
-\`\`\`
+```
 
 CLI exit contract: 0 means the requested command completed without a hard safety escape; 1 means the dataset/receipt contract could not be verified; 2 means usage or I/O/serialization failed; 3 means the score was computable but the hard unsupported-answer safety gate failed. A zero exit on a seven-case synthetic fixture only means the declared software gate did not detect an escape in this fixture—it is not statistical evidence of low real-world risk.
 
