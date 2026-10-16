@@ -786,10 +786,11 @@ fn compare_arms(
             .ok_or_else(|| format!("comparison arm lacks target {target_id:?}"))?;
         let delta = match metric {
             ComparisonMetric::SuccessRateAtBudget | ComparisonMetric::NormalizedSuccessAuc => {
-                Some(
-                    target_metric(&candidate_target.metrics, metric)
-                        - target_metric(&baseline_target.metrics, metric),
-                )
+                let candidate_value = target_metric(&candidate_target.metrics, metric)
+                    .ok_or_else(|| "paired target metric was unavailable".to_string())?;
+                let baseline_value = target_metric(&baseline_target.metrics, metric)
+                    .ok_or_else(|| "paired baseline metric was unavailable".to_string())?;
+                Some(candidate_value - baseline_value)
             }
             ComparisonMetric::BestLossReductionAtBudget => {
                 match (
@@ -912,17 +913,11 @@ fn compare_arms(
     })
 }
 
-fn target_metric(target: &TargetMetrics, metric: ComparisonMetric) -> f64 {
+fn target_metric(target: &TargetMetrics, metric: ComparisonMetric) -> Option<f64> {
     match metric {
-        ComparisonMetric::SuccessRateAtBudget => {
-            if target.success_at_budget { 1.0 } else { 0.0 }
-        }
-        ComparisonMetric::NormalizedSuccessAuc => target.normalized_success_auc,
-        ComparisonMetric::BestLossReductionAtBudget => {
-            // This metric requires the paired baseline and candidate values and is
-            // handled directly in compare_arms; it must not be evaluated per-arm.
-            unreachable!("best-loss reduction is a paired comparison metric")
-        }
+        ComparisonMetric::SuccessRateAtBudget => Some(if target.success_at_budget { 1.0 } else { 0.0 }),
+        ComparisonMetric::NormalizedSuccessAuc => Some(target.normalized_success_auc),
+        ComparisonMetric::BestLossReductionAtBudget => None,
     }
 }
 
