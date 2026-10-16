@@ -7,7 +7,7 @@
 
 ## 1. What this kernel can and cannot establish
 
-The crate implements four selector policies over a supplied, frozen descriptor pool: seeded random, farthest-first, family-balanced farthest-first, and cost-aware farthest-first. The JSONL CLI also offers a separate `--verify-receipt` mode for independent structural verification of request/response pairs. It is not an atomistic or electromagnetic predictor; it does not query an oracle; and it has no HDC/FEP integration yet.
+The crate implements four selector policies over a supplied, frozen descriptor pool: seeded random, farthest-first, family-balanced farthest-first, and cost-aware farthest-first. The JSONL CLI also offers a separate `--verify-receipt` mode for independent structural verification of request/response pairs. A separate post-outcome evaluator computes success rate, normalized success AUC, and paired best-loss reduction from a frozen observation ledger. For loss reduction, positive delta means baseline best loss minus candidate best loss; any target without a valid outcome in either arm yields an `insufficient_target_coverage` disposition and no confidence interval. The kernel is not an atomistic or electromagnetic predictor; it does not query an oracle; and it has no HDC/FEP integration yet.
 
 The tests establish contract behavior only when executed. They cannot establish that descriptor-space diversity maps to physical utility. That must be measured using held-out outcomes in an appropriate external benchmark.
 
@@ -92,6 +92,7 @@ These diagnose what a policy optimizes. They are not a proxy for energy, spectra
 
 - **Photonics:** Success@K, wavelength/polarization-aware spectrum error, robustness under geometry perturbation, cost per valid design.
 - **MADE:** source-implemented discovery curves and budgeted discovery utility, independently recomputed from trajectory receipts.
+- **Measured optimization pools (e.g. NIST Fe–Co–Ni):** normalized simple-regret / best-loss reduction at budget, target-attainment curves and success-at-threshold; report Kerr and coercivity separately. The continuous-loss comparison requires complete paired target coverage, otherwise it emits no inferential interval.
 - **Other domains:** task-specific metrics and units only; define them in their own scorecard before scoring.
 
 ## 4. Statistical protocol
