@@ -69,25 +69,43 @@ fn rejected_receipt_envelope(message: impl Into<String>) -> String {
     })
 }
 
-/// Commit a byte to the rolling raw-line digest and retain it only while within
-/// the configured size limit. After overflow, continue hashing and draining but
-/// never retain more bytes for this input line.
-fn commit_line_byte(
-    byte: u8,
+/// Append a contiguous portion of line content. Retain at most `max_bytes`
+/// bytes. Once the limit is crossed, hash existing retained bytes and subsequent
+/// chunks without retaining the oversized request in memory.
+fn append_line_content(
+    chunk: &[u8],
     max_bytes: usize,
-    line_len: &mut usize,
+    content_len: &mut usize,
     too_large: &mut bool,
     kept: &mut Vec<u8>,
-    hasher: &mut Sha256,
+    hasher: &mut Option<Sha256>,
 ) {
-    hasher.update([byte]);
-    *line_len = (*line_len).saturating_add(1);
-    if *line_len > max_bytes {
-        *too_large = true;
-        kept.clear();
-    } else if !*too_large {
-        kept.push(byte);
+    if chunk.is_empty() {
+        return;
     }
+
+    let next_len = content_len.saturating_add(chunk.len());
+    if *too_large {
+        if let Some(hash) = hasher.as_mut() {
+            hash.update(chunk);
+        }
+        *content_len = next_len;
+        return;
+    }
+
+    if next_len <= max_bytes {
+        kept.extend_from_slice(chunk);
+        *content_len = next_len;
+        return;
+    }
+
+    let mut hash = Sha256::new();
+    hash.update(kept.as_slice());
+    hash.update(chunk);
+    kept.clear();
+    *too_large = true;
+    *content_len = next_len;
+    *hasher = Some(hash);
 }
 
 /// Read one line without allowing an unterminated or oversized line to grow
@@ -97,9 +115,10 @@ fn read_bounded_line<R: BufRead>(
     max_bytes: usize,
 ) -> io::Result<Option<BoundedLine>> {
     let mut kept = Vec::with_capacity(max_bytes.min(64 * 1024));
-    let mut hasher = Sha256::new();
-    let mut line_len = 0usize;
+    let mut hasher: Option<Sha256> = None;
+    let mut content_len = 0usize;
     let mut too_large = false;
+    // Hold the final byte of each buffer until we know whether it is the CR in CRLF.
     let mut pending: Option<u8> = None;
     let mut saw_any_byte = false;
 
@@ -113,51 +132,83 @@ fn read_bounded_line<R: BufRead>(
                 break;
             }
 
-            let newline = available.iter().position(|byte| *byte == b'\n');
+            let newline = available.iter().position(|byte| *byte == b'\\n');
             let consumed = newline.map_or(available.len(), |position| position + 1);
-            let content_len = newline.unwrap_or(consumed);
+            let content_len_in_chunk = newline.unwrap_or(consumed);
+            let content = &available[..content_len_in_chunk];
 
-            for &byte in &available[..content_len] {
+            if newline.is_some() {
                 saw_any_byte = true;
-                if let Some(previous) = pending.replace(byte) {
-                    commit_line_byte(
-                        previous,
+                if !content.is_empty() {
+                    if let Some(previous) = pending.take() {
+                        append_line_content(
+                            &[previous],
+                            max_bytes,
+                            &mut content_len,
+                            &mut too_large,
+                            &mut kept,
+                            &mut hasher,
+                        );
+                    }
+                    let logical_content = content.strip_suffix(&[b'\\r']).unwrap_or(content);
+                    append_line_content(
+                        logical_content,
                         max_bytes,
-                        &mut line_len,
+                        &mut content_len,
+                        &mut too_large,
+                        &mut kept,
+                        &mut hasher,
+                    );
+                } else if let Some(previous) = pending.take() {
+                    if previous != b'\\r' {
+                        append_line_content(
+                            &[previous],
+                            max_bytes,
+                            &mut content_len,
+                            &mut too_large,
+                            &mut kept,
+                            &mut hasher,
+                        );
+                    }
+                }
+            } else if !content.is_empty() {
+                saw_any_byte = true;
+                if let Some(previous) = pending.take() {
+                    append_line_content(
+                        &[previous],
+                        max_bytes,
+                        &mut content_len,
                         &mut too_large,
                         &mut kept,
                         &mut hasher,
                     );
                 }
+                let split_at = content.len() - 1;
+                append_line_content(
+                    &content[..split_at],
+                    max_bytes,
+                    &mut content_len,
+                    &mut too_large,
+                    &mut kept,
+                    &mut hasher,
+                );
+                pending = Some(content[split_at]);
             }
             (consumed, newline.is_some())
         };
         reader.consume(consumed);
 
         if newline_found {
-            // The pending CR in CRLF is a line terminator, not JSON content.
-            if let Some(last) = pending.take() {
-                if last != b'\r' {
-                    commit_line_byte(
-                        last,
-                        max_bytes,
-                        &mut line_len,
-                        &mut too_large,
-                        &mut kept,
-                        &mut hasher,
-                    );
-                }
-            }
             break;
         }
     }
 
-    // EOF without LF: a pending byte is ordinary line content (including CR).
+    // EOF without LF: the final pending byte is content, even if it is CR.
     if let Some(last) = pending.take() {
-        commit_line_byte(
-            last,
+        append_line_content(
+            &[last],
             max_bytes,
-            &mut line_len,
+            &mut content_len,
             &mut too_large,
             &mut kept,
             &mut hasher,
@@ -165,8 +216,9 @@ fn read_bounded_line<R: BufRead>(
     }
 
     if too_large {
+        let hash = hasher.expect("oversized lines always initialize the streaming digest");
         Ok(Some(BoundedLine::TooLarge {
-            sha256: format!("{:x}", hasher.finalize()),
+            sha256: format!("{:x}", hash.finalize()),
         }))
     } else {
         Ok(Some(BoundedLine::Accepted(kept)))
