@@ -15,6 +15,8 @@
 
 use std::collections::HashSet;
 
+pub mod scenario_sweep;
+
 const SECONDS_PER_HOUR: f64 = 3_600.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
