@@ -27,7 +27,7 @@ use thiserror::Error;
 pub enum RosBridgeError {
     #[error("ROS2 context not initialized")]
     NotInitialized,
-    #[error("ROS2 trajectory transport is unavailable; telemetry-only mode cannot report a robot command as published")]
+    #[error("ROS2 trajectory publisher unavailable; command was not published")]
     RosTransportUnavailable,
     #[error("Communication error: {0}")]
     Communication(String),
@@ -832,8 +832,12 @@ mod tests {
                 timestamp: "now".to_string(),
             })
             .unwrap();
+            // A lower gain must not clear an already latched emergency stop.
             let cmd = normal_cmd.clone();
-            node.publish_trajectory(cmd).unwrap();
+            assert!(matches!(
+                node.publish_trajectory(cmd),
+                Err(RosBridgeError::SafetyInterlock(_))
+            ));
         }
     }
 
