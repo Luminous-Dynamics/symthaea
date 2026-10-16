@@ -404,6 +404,8 @@ impl SubstrateManager {
             if !budget_watts.is_finite() || budget_watts < 0.0 {
                 self.consciousness_viable = false;
                 self.last_energy_spent = 0.0;
+                self.energy_rate_window_joules = 0.0;
+                self.energy_rate_window_started_at = None;
                 self.estimated_energy_rate_watts = 0.0;
                 self.energy_rate_window_seconds = 0.0;
                 return;
@@ -1371,7 +1373,7 @@ mod tests {
 
     #[test]
     fn test_invalid_energy_rate_budgets_fail_closed_before_first_window() {
-        for invalid_budget in [ -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY ] {
+        for invalid_budget in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             let mut config = default_config();
             config.enable_energy_budget = true;
             config.energy_budget_joules_per_sec = Some(invalid_budget);
@@ -1388,8 +1390,28 @@ mod tests {
                 mgr.total_energy_spent, 0.0,
                 "invalid configuration must not record an apparently valid energy sample"
             );
+            assert_eq!(mgr.energy_rate_window_joules, 0.0);
+            assert_eq!(mgr.energy_rate_window_started_at, None);
             assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
             assert_eq!(mgr.energy_rate_window_seconds, 0.0);
+
+            // The same invalid input must invalidate an already-open window too.
+            let mut open_window_mgr = SubstrateManager::new(&config);
+            let start = std::time::Instant::now();
+            open_window_mgr.energy_rate_window_started_at = Some(start);
+            open_window_mgr.energy_rate_window_joules = 123.0;
+            open_window_mgr.tick_energy_at(
+                &config,
+                start + std::time::Duration::from_millis(500),
+            );
+            assert!(
+                !open_window_mgr.consciousness_viable,
+                "invalid watt budget {:?} must invalidate an open window immediately",
+                invalid_budget
+            );
+            assert_eq!(open_window_mgr.energy_rate_window_joules, 0.0);
+            assert_eq!(open_window_mgr.energy_rate_window_started_at, None);
+            assert_eq!(open_window_mgr.total_energy_spent, 0.0);
         }
     }
 
