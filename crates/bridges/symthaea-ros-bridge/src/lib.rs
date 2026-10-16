@@ -895,6 +895,84 @@ impl RosBridgeNode {
 mod tests {
     use super::*;
 
+    fn test_uec_action_frame(stage: symthaea_core::embodiment_v2::ActionStageV2) -> symthaea_core::embodiment_v2::ActionFrameV2 {
+        use symthaea_core::embodiment_v2::*;
+        ActionFrameV2 {
+            contract_version: EMBODIMENT_CONTRACT_VERSION_V2,
+            profile_id: "test.robot-joints.v1".into(),
+            instance_id: "test-robot-1".into(),
+            clock: ClockStampV2 {
+                clock_domain_id: "test-sim-clock".into(),
+                sequence: Some(7),
+                timestamp_ns: Some(70_000_000),
+            },
+            frame_graph_id: Some("world/base".into()),
+            source_id: "test-controller".into(),
+            stage,
+            actions: vec![
+                ActionValueV2 { address: "joint/left/effort".into(), quantity: "effort".into(), unit: "N*m".into(), value: 0.25 },
+                ActionValueV2 { address: "joint/right/effort".into(), quantity: "effort".into(), unit: "N*m".into(), value: -0.25 },
+            ],
+        }
+    }
+
+    fn test_uec_effort_bindings() -> Vec<RosJointActionBindingV2> {
+        vec![
+            RosJointActionBindingV2 {
+                action_address: "joint/left/effort".into(),
+                joint_name: "left_joint".into(),
+                quantity: RosJointQuantityV2::Effort,
+                unit: "N*m".into(),
+            },
+            RosJointActionBindingV2 {
+                action_address: "joint/right/effort".into(),
+                joint_name: "right_joint".into(),
+                quantity: RosJointQuantityV2::Effort,
+                unit: "N*m".into(),
+            },
+        ]
+    }
+
+    #[test]
+    fn uec_v2_ros_adapter_maps_actions_only_via_explicit_platform_bindings() {
+        use symthaea_core::embodiment_v2::ActionStageV2;
+        let command = action_frame_to_ros_trajectory_v2(
+            &test_uec_action_frame(ActionStageV2::Projected),
+            &test_uec_effort_bindings(),
+            20_000_000,
+        ).unwrap();
+        assert_eq!(command.joint_names, vec!["left_joint", "right_joint"]);
+        assert!(command.points[0].positions.is_empty());
+        assert!(command.points[0].velocities.is_empty());
+        assert_eq!(command.points[0].efforts, vec![0.25, -0.25]);
+    }
+
+    #[test]
+    fn uec_v2_ros_adapter_rejects_execution_receipts_replayed_as_commands() {
+        use symthaea_core::embodiment_v2::ActionStageV2;
+        for stage in [ActionStageV2::TransportAccepted, ActionStageV2::Applied, ActionStageV2::Measured] {
+            assert!(action_frame_to_ros_trajectory_v2(
+                &test_uec_action_frame(stage),
+                &test_uec_effort_bindings(),
+                20_000_000,
+            ).is_err());
+        }
+    }
+
+    #[test]
+    fn uec_v2_ros_adapter_rejects_missing_bindings_and_unit_mismatch() {
+        use symthaea_core::embodiment_v2::ActionStageV2;
+        let frame = test_uec_action_frame(ActionStageV2::Requested);
+        assert!(action_frame_to_ros_trajectory_v2(&frame, &[], 20_000_000).is_err());
+
+        let mut bindings = test_uec_effort_bindings();
+        bindings[0].unit = "rad".into();
+        assert!(action_frame_to_ros_trajectory_v2(&frame, &bindings, 20_000_000).is_err());
+
+        let incomplete = vec![bindings[1].clone()];
+        assert!(action_frame_to_ros_trajectory_v2(&frame, &incomplete, 20_000_000).is_err());
+    }
+
     #[test]
     fn test_config_defaults() {
         let config = RosBridgeConfig::default();
