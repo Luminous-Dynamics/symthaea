@@ -1,7 +1,7 @@
 {
   "schema_version": "nano-policy-input-v1",
   "request_id": "toy-photonic-batch-001",
-  "policy": "hybrid",
+  "policy": "diversity_only",
   "seed": 20261016,
   "batch_size": 2,
   "feature_space": {
@@ -24,9 +24,9 @@
         0,
         0
       ],
-      "predicted_goal_error": 0.12,
-      "uncertainty": 0.2,
-      "estimated_cost": 1,
+      "predicted_goal_error": null,
+      "uncertainty": null,
+      "estimated_cost": null,
       "eligible": true,
       "already_queried": false
     },
@@ -36,9 +36,9 @@
         0.02,
         0.02
       ],
-      "predicted_goal_error": 0.1,
-      "uncertainty": 0.3,
-      "estimated_cost": 1.1,
+      "predicted_goal_error": null,
+      "uncertainty": null,
+      "estimated_cost": null,
       "eligible": true,
       "already_queried": false
     },
@@ -48,9 +48,9 @@
         0.8,
         0.8
       ],
-      "predicted_goal_error": 0.2,
-      "uncertainty": 0.8,
-      "estimated_cost": 1.5,
+      "predicted_goal_error": null,
+      "uncertainty": null,
+      "estimated_cost": null,
       "eligible": true,
       "already_queried": false
     },
@@ -60,9 +60,9 @@
         -0.8,
         0.8
       ],
-      "predicted_goal_error": 0.25,
-      "uncertainty": 0.6,
-      "estimated_cost": 1.2,
+      "predicted_goal_error": null,
+      "uncertainty": null,
+      "estimated_cost": null,
       "eligible": true,
       "already_queried": false
     },
@@ -72,21 +72,21 @@
         0.5,
         -0.5
       ],
-      "predicted_goal_error": 0.15,
-      "uncertainty": 0.4,
-      "estimated_cost": 0.9,
+      "predicted_goal_error": null,
+      "uncertainty": null,
+      "estimated_cost": null,
       "eligible": true,
       "already_queried": true
     }
   ],
   "estimate_provenance": {
-    "predicted_goal_error_model_id": "toy-prequery-goal-model-v1",
-    "predicted_goal_error_model_sha256": "106e028be1f1ba742cff35f33db40ce3fa27db974d2d1ef4e2661e7fa418699a",
-    "uncertainty_method_id": "toy-uncertainty-estimator-v1",
-    "uncertainty_method_sha256": "3ade88dde4e76fd4bd910d9a088b6e9584589bf2c46512bc6ef0841f2667795a",
-    "estimated_cost_model_id": "toy-cost-estimator-v1",
-    "estimated_cost_model_sha256": "6206e804b6f1d23644dd89d832852f7403c150295ef0a4d6266359fb268991a8"
+    "predicted_goal_error_model_id": null,
+    "predicted_goal_error_model_sha256": null,
+    "uncertainty_method_id": null,
+    "uncertainty_method_sha256": null,
+    "estimated_cost_model_id": null,
+    "estimated_cost_model_sha256": null
   },
   "policy_revision": "toy-policy-prototype-fixture-v1",
-  "candidate_pool_sha256": "6bdcc4618809d168e1d249d84f345bf6595841db4344f63c0aa9f66509182636"
+  "candidate_pool_sha256": "b341116f24e0f3249a80e96f67e6c96e66f87e95053184caf042c572adda36ed"
 }
