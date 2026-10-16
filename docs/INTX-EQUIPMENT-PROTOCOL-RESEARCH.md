@@ -108,3 +108,37 @@ A separate source audit on the default-branch commit `5e83cea4986ba3845aa50e0d5d
 This is a better immediate bridge target than building another machine-control stack from scratch. However, it is **not** a generic industrial adapter, and the live OctoPrint/Moonraker clients are still stubs at that baseline. The next focused issue is [INTX-FAB-ADAPTER-001 / #7706](https://github.com/Luminous-Dynamics/symthaea/issues/7706): expose read-only observations and artifact evidence while preserving the current machine/session/authorization owners, and only later evaluate real transport. It must not expose raw G-code submission directly to cognition.
 
 This domain adapter is a complementary first implementation slice; the independently implemented OPC UA test-server pilot in [#7704](https://github.com/Luminous-Dynamics/symthaea/issues/7704) remains the standards-based industrial interoperability tranche. Neither should be advertised as generalized support for existing medical, utility, or factory devices.
+
+
+## Offline PLC programming/compiler candidate: Beremiz + MatIEC
+
+Sources:
+- [Official Beremiz project overview](https://beremiz.org/)
+- [Beremiz getting-started / PLCopen XML model](https://beremiz.org/getting-started)
+- [Beremiz upstream repository and component licenses](https://github.com/beremiz/beremiz)
+
+Beremiz provides an IEC 61131-oriented IDE and command-line build/control tools; project data is stored as PLCopen TC6 XML. Its toolchain uses MatIEC to translate supported IEC 61131 program forms to C, and the project lists both Python and C++ runtime implementations. The official project describes GPL licensing for the IDE/CLI, LGPL for the Python reference runtime, and GPLv3 for the C++ runtime. These make it a promising **external offline/test-tool candidate** for validating PLCopen artifacts and deterministic small logic fixtures, but not an automatically acceptable in-process production dependency.
+
+Recommended use in the research phase:
+- containerize/pin the exact Beremiz/MatIEC source, executable/toolchain, runtime and project schema;
+- feed synthetic PLCopen XML or supported textual PLC code through a narrowly allowlisted offline build/test path;
+- capture compiler diagnostics, artifact hashes, versions, task/scan configuration, and the exact supported-language/profile boundary;
+- run generated logic against a deterministic virtual I/O fixture and compare output traces to an independent oracle;
+- record compile/build errors as failures, not as permission to fall back to unchecked generated artifacts;
+- review component licenses and output/licensing implications before using the toolchain in Luminous Dynamics products or a commercial workflow;
+- do not deploy generated output to a live PLC from the benchmark or expose the tool runtime to unrestricted network access.
+
+Important limitations:
+- Beremiz/MatIEC support is not equivalent to full current-edition IEC 61131-3 conformance for every language feature, vendor extension or target.
+- An open-source compiler passing a test does not substitute for the exact target manufacturer's compiler, static analysis, simulation, safety lifecycle, or site acceptance.
+- The Python runtime is a test option only if explicitly approved for the test environment; it is not a reason to change Symthaea's Rust-first production constraint.
+- Do not treat compilation as a safe control proof. Runtime behavior must be separately tested with explicit I/O, timing, scan, state-transition and failure semantics.
+
+Candidate benchmark seed:
+1. Validate and canonicalize PLCopen XML with schema/version binding.
+2. Compile a restricted Structured Text subset with the pinned compiler.
+3. Run counter/timer/state-machine known-answer traces in virtual I/O.
+4. Mutate units/ranges, program variables, scan configuration, initial values, and target profile; require divergence or an explicit unsupported-feature rejection.
+5. Differentially compare expected traces against an independently written test oracle and, later, the target-vendor compiler/simulator where licensed access exists.
+
+This is an engineering-tool qualification candidate only. It neither selects a production compiler nor establishes interoperability or safety for any actual controller.
