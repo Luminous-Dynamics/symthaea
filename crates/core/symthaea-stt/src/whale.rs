@@ -355,7 +355,7 @@ impl WhaleSentinel {
     /// coda never exceeds its configured maximum number of clicks.
     fn push_ici(&mut self, ici: f32) {
         self.ici_buffer.push_back(ici);
-        let max_intervals = self.config.max_coda_clicks - 1;
+        let max_intervals = self.config.max_coda_clicks.saturating_sub(1);
         while self.ici_buffer.len() > max_intervals {
             self.ici_buffer.pop_front();
         }
@@ -381,7 +381,9 @@ impl WhaleSentinel {
 
     /// Finalize a coda and generate its signature
     fn finalize_coda(&mut self) -> Option<DetectedCoda> {
-        if self.ici_buffer.len() < self.config.min_coda_clicks - 1 {
+        if self.config.validate().is_err()
+            || self.ici_buffer.len() < self.config.min_coda_clicks.saturating_sub(1)
+        {
             return None; // Not enough clicks for a valid coda
         }
 
