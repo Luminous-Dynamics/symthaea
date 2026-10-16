@@ -77,6 +77,20 @@ The command is intentionally metadata-only. It validates the schema version, req
 
 This provides a deterministic low-cost gate before any proof retrieval/qualification work. Its own compile/test result is still unverified until executed against this exact branch head.
 
+## Reuse existing Symthaea provenance work
+
+Symthaea main now also contains an explicit [evidence provenance derivation graph](https://github.com/Luminous-Dynamics/symthaea/blob/main/src/knowledge/evidence_provenance_graph.rs) and its [benchmark RFC](https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/PROVENANCE_DERIVATION_GRAPH_BENCHMARK_2026-10-16.md). The proof corpus should reuse that work where the abstraction fits rather than build a competing generic origin/derivation graph.
+
+The connection needs a typed adapter, not a semantic shortcut:
+
+- A proof-corpus entry can be a derived evidence artifact with pinned repository revision, source path/blob SHA, declared theorem, formalization status, environment identity, and license/attribution provenance.
+- A proof-check receipt is a separate qualification event bound to that exact entry and exact source/checker environment.
+- A derivative article, repository README, formalization source, successful compile, and verified theorem are different evidence kinds; ancestry must not silently promote one to another.
+- Multiple sources in a derivation graph do not establish mathematical truth or independent corroboration. The Lean checker still owns proof acceptance, and the provenance graph only records/validates lineage.
+- Unknown source lineage, stale check receipts, missing exact-head identity, or ambiguous theorem mapping must remain explicit blockers rather than being filled by similarity scores.
+
+This gives us a coherent platform-level design: Symthaea's existing provenance graph tracks **where evidence came from and how it was derived**; the proof corpus adds **what exact mathematical statement the evidence concerns and whether the pinned checker accepted it**. Do not duplicate the provenance graph implementation in this RFC branch or claim integration before a reviewed adapter exists.
+
 ## External retrieval baseline: LeanSearch v2
 
 The pinned candidate manifest also records [LeanSearch v2](https://github.com/frenzymath/LeanSearch-v2/tree/94f4888cbaf9f4322535755f86cbac690ec18080) as an **evaluation reference**, not a Symthaea production dependency. Its authors distinguish standard semantic retrieval from a reasoning loop for **global premise retrieval**—recovering a set of lemmas needed by a complete theorem rather than selecting only the next tactic's premise.
