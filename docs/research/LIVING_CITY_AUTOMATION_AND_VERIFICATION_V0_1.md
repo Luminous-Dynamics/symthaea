@@ -390,3 +390,23 @@ cargo run -p symthaea-scenarios --bin living_city_verify -- path/to/run-package
 On success, stdout contains a JSON report with package_integrity set to verified, the scenario/commit identifiers, recomputed manifest/receipt digests, and verified source/output counts. Verification errors exit with status 2 and a diagnostic on stderr. Tests now include end-to-end synthetic package verification plus corruption, receipt-sidecar mismatch, path traversal, unknown-field and bundle-schema negative controls; these tests are added but not executed in the current environment.
 
 **Security and evidence scope:** the executable checks content integrity and internal package consistency. It does not authenticate the author's identity or signer's authority, prove that a declared verifier actually ran an engineering check, validate physical equations, establish jurisdictional compliance, or authorize construction. A package can be internally consistent and still contain a false claim if all files were maliciously replaced together. For tamper-evident authorship and custody, a separate trusted signing/attestation policy is needed. This executable has been added but not compiled or run in the current environment because Cargo/rustc are unavailable; treat it as unverified until tested on the exact head.
+
+## 17. Infrastructure dependency propagation pre-screen
+
+The active Rust module crates/domains/symthaea-scenarios/src/living_city_dependencies.rs adds an explicit cross-sector dependency graph. It accepts declared services, required/degraded dependency edges, and a set of initiating failures. Required dependencies propagate outages to a fixed point; degraded dependencies report reduced service without automatically declaring it unavailable. The result lists each service's status and the failed prerequisites that explain it.
+
+The initial negative-control fixture models a grid outage propagating through a water pump, cooling centre and telecom tower to emergency dispatch and a hospital. Other tests cover degraded-only dependencies, cyclic dependency graphs, empty initiating failures, duplicate nodes/edges/initiators, self-dependencies and unknown endpoints.
+
+This is a **deterministic topology/logic pre-screen**, not a physical simulator. It cannot calculate electrical flows, hydraulic pressure, cooling demand, capacity thresholds, failure probability, restoration time or common-cause failures. Initial failures must come from a versioned hazard profile, field observations or a validated domain solver. Use the graph to expose which subsystems become unavailable under declared assumptions before launching expensive multiphysics analysis.
+
+### Acceptance benchmarks for the dependency layer
+
+- Deterministic result ordering for a fixed graph and initiating-failure set.
+- 100% detection of undeclared endpoints, duplicate IDs/edges, self-dependencies and unknown initiating failures in the negative-control suite.
+- Monotonic failure propagation: adding initiating failures cannot restore a previously failed node in the same static scenario.
+- All reported failed/degraded services include explicit direct failed-prerequisite references where applicable.
+- Cycles terminate, and the number of propagation rounds remains bounded by the finite number of graph nodes.
+- Permuting input node/edge order does not change canonical outcome statuses or causal prerequisite sets.
+- A static graph pass never gets interpreted as a reliability, safety or outage-duration prediction.
+
+The next integration is to map stress-case profiles to initiating-failure sets and compare the graph's expected cascades with the results from at least one reference-domain solver. Keep capacity and timing effects in the relevant physical model; do not add arbitrary edge weights just to make this graph imitate physics.
