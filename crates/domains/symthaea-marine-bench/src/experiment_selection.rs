@@ -106,18 +106,78 @@ pub struct Experiment {
 
 pub fn experiment_catalog() -> Vec<Experiment> {
     vec![
-        Experiment { id: "propulsion_log_review".to_owned(), target: Parameter::PropulsionEnergyDemand, cost_units: 1, retained_width_fraction: 0.65 },
-        Experiment { id: "instrumented_propulsion_trial".to_owned(), target: Parameter::PropulsionEnergyDemand, cost_units: 3, retained_width_fraction: 0.25 },
-        Experiment { id: "battery_data_audit".to_owned(), target: Parameter::UsableBatteryEnergy, cost_units: 1, retained_width_fraction: 0.60 },
-        Experiment { id: "battery_capacity_test".to_owned(), target: Parameter::UsableBatteryEnergy, cost_units: 2, retained_width_fraction: 0.30 },
-        Experiment { id: "waterway_chart_review".to_owned(), target: Parameter::RequiredWaterDepth, cost_units: 1, retained_width_fraction: 0.60 },
-        Experiment { id: "bathymetric_survey".to_owned(), target: Parameter::RequiredWaterDepth, cost_units: 3, retained_width_fraction: 0.25 },
-        Experiment { id: "available_depth_reference_audit".to_owned(), target: Parameter::AvailableWaterDepth, cost_units: 1, retained_width_fraction: 0.60 },
-        Experiment { id: "route_depth_survey".to_owned(), target: Parameter::AvailableWaterDepth, cost_units: 2, retained_width_fraction: 0.30 },
-        Experiment { id: "charge_schedule_audit".to_owned(), target: Parameter::RequiredChargePower, cost_units: 1, retained_width_fraction: 0.60 },
-        Experiment { id: "instrumented_charge_cycle".to_owned(), target: Parameter::RequiredChargePower, cost_units: 2, retained_width_fraction: 0.30 },
-        Experiment { id: "shore_power_availability_audit".to_owned(), target: Parameter::AvailableChargePower, cost_units: 1, retained_width_fraction: 0.60 },
-        Experiment { id: "terminal_load_bank_test".to_owned(), target: Parameter::AvailableChargePower, cost_units: 2, retained_width_fraction: 0.30 },
+        Experiment {
+            id: "propulsion_log_review".to_owned(),
+            target: Parameter::PropulsionEnergyDemand,
+            cost_units: 1,
+            retained_width_fraction: 0.65,
+        },
+        Experiment {
+            id: "instrumented_propulsion_trial".to_owned(),
+            target: Parameter::PropulsionEnergyDemand,
+            cost_units: 3,
+            retained_width_fraction: 0.25,
+        },
+        Experiment {
+            id: "battery_data_audit".to_owned(),
+            target: Parameter::UsableBatteryEnergy,
+            cost_units: 1,
+            retained_width_fraction: 0.60,
+        },
+        Experiment {
+            id: "battery_capacity_test".to_owned(),
+            target: Parameter::UsableBatteryEnergy,
+            cost_units: 2,
+            retained_width_fraction: 0.30,
+        },
+        Experiment {
+            id: "waterway_chart_review".to_owned(),
+            target: Parameter::RequiredWaterDepth,
+            cost_units: 1,
+            retained_width_fraction: 0.60,
+        },
+        Experiment {
+            id: "bathymetric_survey".to_owned(),
+            target: Parameter::RequiredWaterDepth,
+            cost_units: 3,
+            retained_width_fraction: 0.25,
+        },
+        Experiment {
+            id: "available_depth_reference_audit".to_owned(),
+            target: Parameter::AvailableWaterDepth,
+            cost_units: 1,
+            retained_width_fraction: 0.60,
+        },
+        Experiment {
+            id: "route_depth_survey".to_owned(),
+            target: Parameter::AvailableWaterDepth,
+            cost_units: 2,
+            retained_width_fraction: 0.30,
+        },
+        Experiment {
+            id: "charge_schedule_audit".to_owned(),
+            target: Parameter::RequiredChargePower,
+            cost_units: 1,
+            retained_width_fraction: 0.60,
+        },
+        Experiment {
+            id: "instrumented_charge_cycle".to_owned(),
+            target: Parameter::RequiredChargePower,
+            cost_units: 2,
+            retained_width_fraction: 0.30,
+        },
+        Experiment {
+            id: "shore_power_availability_audit".to_owned(),
+            target: Parameter::AvailableChargePower,
+            cost_units: 1,
+            retained_width_fraction: 0.60,
+        },
+        Experiment {
+            id: "terminal_load_bank_test".to_owned(),
+            target: Parameter::AvailableChargePower,
+            cost_units: 2,
+            retained_width_fraction: 0.30,
+        },
     ]
 }
 
@@ -233,7 +293,9 @@ impl fmt::Display for BenchmarkError {
             Self::EmptyScenarioSet => write!(f, "scenario_count must be greater than zero"),
             Self::EmptySeeds => write!(f, "at least one paired seed is required"),
             Self::DuplicateSeed(seed) => write!(f, "paired seed is duplicated: {seed}"),
-            Self::Serialization(message) => write!(f, "could not serialize benchmark receipt: {message}"),
+            Self::Serialization(message) => {
+                write!(f, "could not serialize benchmark receipt: {message}")
+            }
         }
     }
 }
@@ -271,9 +333,18 @@ impl RunMetrics {
         ScenarioRun {
             scenario_id: self.scenario_id,
             constraints: vec![
-                ConstraintDisposition { id: "battery_energy_sufficiency".to_owned(), status: self.statuses[0] },
-                ConstraintDisposition { id: "under_keel_clearance".to_owned(), status: self.statuses[1] },
-                ConstraintDisposition { id: "charge_power_sufficiency".to_owned(), status: self.statuses[2] },
+                ConstraintDisposition {
+                    id: "battery_energy_sufficiency".to_owned(),
+                    status: self.statuses[0],
+                },
+                ConstraintDisposition {
+                    id: "under_keel_clearance".to_owned(),
+                    status: self.statuses[1],
+                },
+                ConstraintDisposition {
+                    id: "charge_power_sufficiency".to_owned(),
+                    status: self.statuses[2],
+                },
             ],
             resolved_constraints: self.resolved_constraints,
             robust_feasible_constraints: self.robust_feasible_constraints,
@@ -335,7 +406,9 @@ fn generate_scenario(id: u64) -> SyntheticScenario {
         100.0 + rng.unit() * 180.0,
         100.0 + rng.unit() * 180.0,
     ];
-    let initial = std::array::from_fn(|index| interval_around_truth(truth[index], half_widths[index]));
+    let initial = std::array::from_fn(|index| {
+        interval_around_truth(truth[index], half_widths[index])
+    });
     SyntheticScenario { id, truth, initial }
 }
 
@@ -393,8 +466,14 @@ fn width_reduction(initial: &ObservedState, current: &ObservedState) -> f64 {
 fn summarize_state(scenario_id: u64, initial: &ObservedState, current: &ObservedState,
                    spent: u32, cost_to_full_resolution_units: Option<u32>) -> RunMetrics {
     let disposition = statuses(current);
-    let feasible = disposition.iter().filter(|s| **s == ConstraintStatus::RobustFeasible).count() as u8;
-    let infeasible = disposition.iter().filter(|s| **s == ConstraintStatus::RobustInfeasible).count() as u8;
+    let feasible = disposition
+        .iter()
+        .filter(|s| **s == ConstraintStatus::RobustFeasible)
+        .count() as u8;
+    let infeasible = disposition
+        .iter()
+        .filter(|s| **s == ConstraintStatus::RobustInfeasible)
+        .count() as u8;
     let resolved = feasible + infeasible;
     RunMetrics {
         scenario_id,
@@ -409,7 +488,11 @@ fn summarize_state(scenario_id: u64, initial: &ObservedState, current: &Observed
     }
 }
 
-fn simulate_experiment(scenario: &SyntheticScenario, state: &mut ObservedState, experiment: &Experiment) {
+fn simulate_experiment(
+    scenario: &SyntheticScenario,
+    state: &mut ObservedState,
+    experiment: &Experiment,
+) {
     let index = experiment.target.index();
     let current = state.intervals[index];
     let truth = scenario.truth[index];
@@ -450,7 +533,9 @@ fn choose_experiment(
     catalog: &[Experiment],
 ) -> Option<usize> {
     let affordable: Vec<usize> = catalog.iter().enumerate()
-        .filter(|(index, item)| available[*index] && item.cost_units <= budget.saturating_sub(spent))
+        .filter(|(index, item)| {
+            available[*index] && item.cost_units <= budget.saturating_sub(spent)
+        })
         .map(|(index, _)| index)
         .collect();
     if affordable.is_empty() {
@@ -458,14 +543,21 @@ fn choose_experiment(
     }
 
     match policy {
-        Policy::CheapestFirst => affordable.into_iter().min_by_key(|index| (catalog[*index].cost_units, *index)),
+        Policy::CheapestFirst => affordable
+            .into_iter()
+            .min_by_key(|index| (catalog[*index].cost_units, *index)),
         Policy::RoundRobin => {
             let desired = Parameter::ALL[selection_count % Parameter::ALL.len()];
             affordable.iter()
                 .copied()
                 .filter(|index| catalog[*index].target == desired)
                 .min_by_key(|index| (catalog[*index].cost_units, *index))
-                .or_else(|| affordable.into_iter().min_by_key(|index| (catalog[*index].cost_units, *index)))
+                .or_else(|| {
+                    affordable
+                        .iter()
+                        .copied()
+                        .min_by_key(|index| (catalog[*index].cost_units, *index))
+                })
         }
         Policy::SeededRandom => Some(affordable[(rng.next_u64() as usize) % affordable.len()]),
         Policy::ConstraintCriticality => {
@@ -531,8 +623,13 @@ fn better_oracle_candidate(candidate: &RunMetrics, candidate_cost: u32,
     if candidate.resolved_constraints != best.resolved_constraints {
         return candidate.resolved_constraints > best.resolved_constraints;
     }
-    if (candidate.normalized_interval_width_reduction - best.normalized_interval_width_reduction).abs() > 1e-12 {
-        return candidate.normalized_interval_width_reduction > best.normalized_interval_width_reduction;
+    if (candidate.normalized_interval_width_reduction
+        - best.normalized_interval_width_reduction)
+        .abs()
+        > 1e-12
+    {
+        return candidate.normalized_interval_width_reduction
+            > best.normalized_interval_width_reduction;
     }
     candidate_cost < best_cost
 }
@@ -608,7 +705,9 @@ fn summarize_policy(
         fully += if result.fully_resolved { 1.0 } else { 0.0 };
         spent += result.budget_spent_units as f64;
         width_reduction += result.normalized_interval_width_reduction;
-        regret += oracle_results[index].resolved_constraints.saturating_sub(result.resolved_constraints) as f64;
+        regret += oracle_results[index]
+            .resolved_constraints
+            .saturating_sub(result.resolved_constraints) as f64;
         if let Some(cost) = result.cost_to_full_resolution_units {
             resolution_cost_sum += cost as f64;
             resolution_cost_count += 1.0;
@@ -666,7 +765,9 @@ pub fn run_reference_benchmark(
     for policy in Policy::all_heuristics() {
         for seed in paired_seeds.iter().copied() {
             let results: Vec<RunMetrics> = scenarios.iter()
-                .map(|scenario| run_policy(scenario, policy, seed, budget_units_per_scenario, &catalog))
+                .map(|scenario| {
+                    run_policy(scenario, policy, seed, budget_units_per_scenario, &catalog)
+                })
                 .collect();
             summaries.push(summarize_policy(policy, Some(seed), &results, &oracle_results));
         }
@@ -687,11 +788,32 @@ pub fn run_reference_benchmark(
         experiment_catalog: catalog,
         summaries,
         limitations: vec![
-            "Every scenario and simulated measurement is synthetic; no real route, ship, battery, charger, or hydrodynamic solver is represented.".to_owned(),
-            "Experiment outcome intervals are idealized nested bounds centered on hidden synthetic truth; real tests can be noisy, biased, correlated, invalid, or inconclusive.".to_owned(),
-            "The exhaustive subset oracle sees hidden truth and is a clairvoyant upper bound only for this finite toy measurement model; it is not deployable and is not a general global bound for real engineering.".to_owned(),
-            "Interval-width reduction is not calibrated probability, expected information gain, model-bias correction, or physical evidence.".to_owned(),
-            "Budget units are dimensionless synthetic comparison units, not monetary amounts, lab-hours, or resource estimates.".to_owned(),
+            concat!(
+                "Every scenario and simulated measurement is synthetic; no real route, ship, battery, ",
+                "charger, or hydrodynamic solver is represented.",
+            )
+            .to_owned(),
+            concat!(
+                "Experiment outcome intervals are idealized nested bounds centered on hidden synthetic ",
+                "truth; real tests can be noisy, biased, correlated, invalid, or inconclusive.",
+            )
+            .to_owned(),
+            concat!(
+                "The exhaustive subset oracle sees hidden truth and is a clairvoyant upper bound only ",
+                "for this finite toy measurement model; it is not deployable and is not a general ",
+                "global bound for real engineering.",
+            )
+            .to_owned(),
+            concat!(
+                "Interval-width reduction is not calibrated probability, expected information gain, ",
+                "model-bias correction, or physical evidence.",
+            )
+            .to_owned(),
+            concat!(
+                "Budget units are dimensionless synthetic comparison units, not monetary amounts, ",
+                "lab-hours, or resource estimates.",
+            )
+            .to_owned(),
         ],
     };
     let serialized = serde_json::to_vec(&body)
@@ -719,7 +841,9 @@ mod tests {
         let ids: std::collections::BTreeSet<&str> = catalog.iter().map(|e| e.id.as_str()).collect();
         assert_eq!(ids.len(), catalog.len());
         assert!(catalog.iter().all(|e| e.cost_units > 0));
-        assert!(catalog.iter().all(|e| e.retained_width_fraction > 0.0 && e.retained_width_fraction < 1.0));
+        assert!(catalog
+            .iter()
+            .all(|e| e.retained_width_fraction > 0.0 && e.retained_width_fraction < 1.0));
     }
 
     #[test]
@@ -740,8 +864,14 @@ mod tests {
         let before = state.intervals;
         let experiment = experiment_catalog().remove(0);
         simulate_experiment(&scenario, &mut state, &experiment);
-        assert!(state.intervals[experiment.target.index()].width() < before[experiment.target.index()].width());
-        assert!(state.intervals[experiment.target.index()].contains(scenario.truth[experiment.target.index()]));
+        assert!(
+            state.intervals[experiment.target.index()].width()
+                < before[experiment.target.index()].width()
+        );
+        assert!(
+            state.intervals[experiment.target.index()]
+                .contains(scenario.truth[experiment.target.index()])
+        );
         for parameter in Parameter::ALL {
             if parameter != experiment.target {
                 assert_eq!(state.intervals[parameter.index()], before[parameter.index()]);
@@ -754,8 +884,20 @@ mod tests {
         let demand = Interval { lower: 100.0, upper: 200.0 };
         let capacity = Interval { lower: 150.0, upper: 250.0 };
         assert_eq!(classify_pair(demand, capacity), ConstraintStatus::Indeterminate);
-        assert_eq!(classify_pair(Interval { lower: 1.0, upper: 2.0 }, Interval { lower: 2.0, upper: 3.0 }), ConstraintStatus::RobustFeasible);
-        assert_eq!(classify_pair(Interval { lower: 3.1, upper: 4.0 }, Interval { lower: 1.0, upper: 3.0 }), ConstraintStatus::RobustInfeasible);
+        assert_eq!(
+            classify_pair(
+                Interval { lower: 1.0, upper: 2.0 },
+                Interval { lower: 2.0, upper: 3.0 },
+            ),
+            ConstraintStatus::RobustFeasible
+        );
+        assert_eq!(
+            classify_pair(
+                Interval { lower: 3.1, upper: 4.0 },
+                Interval { lower: 1.0, upper: 3.0 },
+            ),
+            ConstraintStatus::RobustInfeasible
+        );
     }
 
     #[test]
@@ -778,7 +920,10 @@ mod tests {
         let right = run_policy(&scenario, Policy::SeededRandom, 77, 6, &catalog);
         assert_eq!(left.resolved_constraints, right.resolved_constraints);
         assert_eq!(left.budget_spent_units, right.budget_spent_units);
-        assert_eq!(left.normalized_interval_width_reduction, right.normalized_interval_width_reduction);
+        assert_eq!(
+            left.normalized_interval_width_reduction,
+            right.normalized_interval_width_reduction
+        );
     }
 
     #[test]
@@ -821,14 +966,22 @@ mod tests {
 
     #[test]
     fn zero_scenarios_and_empty_seed_list_are_rejected() {
-        assert_eq!(run_reference_benchmark(0, &[1], 4).unwrap_err(), BenchmarkError::EmptyScenarioSet);
+        assert_eq!(
+            run_reference_benchmark(0, &[1], 4).unwrap_err(),
+            BenchmarkError::EmptyScenarioSet
+        );
         assert_eq!(run_reference_benchmark(1, &[], 4).unwrap_err(), BenchmarkError::EmptySeeds);
     }
 
     #[test]
     fn oracle_regret_is_nonnegative() {
         let receipt = run_reference_benchmark(25, &[1, 2], 6).expect("benchmark runs");
-        for summary in receipt.body.summaries.iter().filter(|s| s.policy != Policy::ExhaustiveToyOracle) {
+        for summary in receipt
+            .body
+            .summaries
+            .iter()
+            .filter(|s| s.policy != Policy::ExhaustiveToyOracle)
+        {
             assert!(summary.mean_oracle_regret_constraints >= 0.0);
         }
     }
