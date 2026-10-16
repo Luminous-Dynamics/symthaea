@@ -142,6 +142,22 @@ The Rust utility consumes intervals; it does not compute them. The caller must d
 
 Research task: [CRISPR-OT-005 #7602 — interval-aware robust Pareto frontier](https://github.com/Luminous-Dynamics/symthaea/issues/7602).
 
+### N. From source-cohort performance to bounded target-population transportability
+
+A pooled source-cohort improvement is not automatically an improvement in a target population with different proportions of guides, assays, cell contexts, or editor families. Group shifts can alter policy utility even when every source row and metric is computed correctly. Target-group prevalence may itself be uncertain.
+
+The transportability utility accepts context-specific paired Recall@K delta intervals plus preregistered lower/upper target-prevalence bounds. It computes the minimum and maximum mixture delta over all target weight vectors satisfying those bounds and summing to one, and emits the witness weight vector for each endpoint. This is exact for the declared bounded-simplex linear objective while allowing each context's delta to vary anywhere inside its interval; treating group deltas and weights as independent can be conservative where actual dependence is known but not represented.
+
+- **Robustly positive:** the entire target-mixture interval is strictly above zero.
+- **Robustly non-positive:** the entire interval is at or below zero.
+- **Inconclusive:** the interval includes positive and non-positive values.
+
+Every target-relevant context must be supported by a permitted metric episode. Unsupported contexts fail closed; they are never assigned a zero effect. Intervals must identify the group unit, evaluation episodes, paired/group-aware method, source/target population, and joint-coverage limitations. This is not a generic shift detector or a clinical transportability proof.
+
+The research motivation is established rather than novel: group-weighted conformal prediction analyzes how group proportions affect coverage under covariate shift ([Bhattacharyya & Barber, 2026](https://doi.org/10.1214/26-EJS2506)); KMM-CP highlights support-overlap and selective-correction limits under shift ([UAI 2026](https://proceedings.mlr.press/v337/laghuvarapu26a.html)); and CS-WCP explicitly considers uncertain group proportions in a preprint ([2026 preprint](https://arxiv.org/abs/2609.27955)). This project does not claim novelty for shift-aware or mixture-robust evaluation. The proposed integration is the target-mixture envelope for paired CRISPR benchmark policy deltas, connected to the existing partial-label and interval-frontier contracts.
+
+Research task: [CRISPR-OT-006 #7615 — robust target-mixture transportability](https://github.com/Luminous-Dynamics/symthaea/issues/7615).
+
 ### J. From price claims to causal cost accounting
 
 Report computational resources and review slots first. Progress to human review minutes only when measured. Report per-qualified-finding cost only when numerator and denominator are observed end-to-end. Do not convert fewer ranked candidates into claims of lower experimental costs, clinical costs, or treatment prices without prospective accounting.
@@ -163,6 +179,7 @@ Report computational resources and review slots first. Progress to human review 
 | T10 Selective prediction | What error/uncertainty trade-off occurs as the policy abstains, and where does calibration fail? | Brier/log loss on measured labels, fixed-bin reliability, full risk–coverage curve, unknown-aware error bounds, per-context label completeness | clinical safety or outcomes missing from the evidence universe |
 | T11 Decision-critical measurement allocation | Which unknown outcomes most directly resolve disagreement in a preregistered top-K policy comparison? | differential unknown labels resolved at fixed declared cost, residual numerator-ambiguity count, context coverage, before/after paired label-sensitivity bounds | full expected value of information, total uncertainty resolved, experimental savings, biological safety |
 | T12 Interval-aware robust frontier | Which policy dominance claims survive interval uncertainty in every objective? | robust frontier, definitely dominated policies, robust dominance pairs, possible-only dominance pairs, point-frontier disagreements | intervals generated, simultaneous coverage, biological/clinical safety |
+| T13 Target-mixture transportability | Does policy improvement survive every preregistered plausible target-context mixture? | lower/upper target-mixture delta, endpoint witness weights, robust-positive/non-positive/inconclusive classification, source-versus-target sign change | unsupported contexts, target-population truth beyond declared bounds, clinical safety |
 
 Tracks are reported separately. A composite “CRISPR score” that hides failed nomination, calibration, or generalization is prohibited.
 
@@ -306,7 +323,7 @@ The credible breakthrough would be evidence that a general-purpose reasoning/evi
 
 ## 11. Synthetic contract fixtures
 
-The machine-readable companion contract contains eleven synthetic fixtures intended to become deterministic unit tests for the Rust scorer/verifier:
+The machine-readable companion contract contains twelve synthetic fixtures intended to become deterministic unit tests for the Rust scorer/verifier:
 
 1. **F1 — nomination vs seeded ranking.** Four eligible positives, two in the native nominations: expected native coverage is 2/4 = 0.5. Later seeding the two missing positives into a ranking universe allows Recall@5 to reach 1.0, but native nomination coverage remains 0.5.
 2. **F2 — unknown is not negative.** If an unknown/unassayed candidate is inside the review set, precision is not estimable under the declared label semantics; it may not be silently counted as a true negative.
@@ -378,3 +395,13 @@ The dependency-free Rust utility is [scripts/crispr_interval_frontier.rs](../../
 Independent F11 arithmetic matches the expected robust frontier and all three possible-only dominance pairs. A separate endpoint oracle checked 5,184 two-objective interval-pair vectors across all four maximize/minimize direction combinations, and 82,944 endpoint assignments; possible- and robust-dominance relations had zero mismatches. This validates only the mathematical relation definitions for those enumerated intervals, not the Rust source or any statistical/biological claim.
 
 The next acceptance check is independent F11 evaluation plus point-frontier vs interval-frontier disagreement reporting on exactly the same metric episodes. No biological cohort or Symthaea improvement has been evaluated.
+
+
+12. **F12 — bounded target-context mixture.** Context A has paired Recall@K delta interval [0.08, 0.12] and target prevalence [0.2, 0.5]; B has [0.02, 0.07] and [0.3, 0.6]; C has [-0.25, -0.15] and [0.1, 0.4]. Feasible weight vectors must sum to one. A representative permitted nominal mix (A=0.35, B=0.45, C=0.20) evaluated at interval midpoints produces +0.01525; however the bounded-mixture envelope is [-0.076, +0.073], therefore the target-mixture conclusion is **inconclusive**. Lower-bound witness is A=0.2, B=0.4, C=0.4; upper-bound witness is A=0.5, B=0.4, C=0.1. This demonstrates how a positive point estimate can fail transportability robustness.
+
+The dependency-free implementation is [scripts/crispr_transportability.rs](../../scripts/crispr_transportability.rs). Sixteen Rust unit tests are authored but not compiled or executed because `rustc` is unavailable. It rejects unsupported target contexts and infeasible prevalence bounds; emits both witness mixtures; and never fills an unsupported context with zero. The interval bounds are provided inputs, not estimated by this utility.
+
+    rustc --edition=2024 --test scripts/crispr_transportability.rs -o /tmp/crispr-transport-tests
+    /tmp/crispr-transport-tests
+
+An independent grid oracle checked all 12 feasible tenth-step prevalence vectors for F12 and all 8 endpoint combinations of the three context delta intervals (96 assignments total). It reproduced the exact lower bound -0.076 at [0.2, 0.4, 0.4] and upper bound +0.073 at [0.5, 0.4, 0.1]. This is a direct synthetic calculation, not Rust execution or biological evidence.
