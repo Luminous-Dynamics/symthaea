@@ -201,6 +201,8 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
     if trajectory.steps.is_empty() {
         return Err(format!("trajectory {} has no steps", trajectory.trajectory_id));
     }
+    let mut revocation_blocked = false;
+    let mut conflict_blocked = false;
     for (index, step) in trajectory.steps.iter().enumerate() {
         if step.sequence != index as u32 {
             return Err(format!(
@@ -245,6 +247,30 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
                     trajectory.trajectory_id, step.sequence));
             }
             _ => {}
+        }
+        if step.event == TrajectoryEvent::EvidenceRevoked
+            || step.input.provenance == BenchmarkProvenanceCondition::Invalid
+        {
+            revocation_blocked = true;
+        }
+        if step.event == TrajectoryEvent::ConflictArrived
+            || step.input.evidence == BenchmarkEvidenceCondition::Conflicting
+        {
+            conflict_blocked = true;
+        }
+        if step.event == TrajectoryEvent::EvidenceRevalidated {
+            if !revocation_blocked {
+                return Err(format!("{} step {}: evidence_revalidated has no prior invalidation",
+                    trajectory.trajectory_id, step.sequence));
+            }
+            revocation_blocked = false;
+        }
+        if step.event == TrajectoryEvent::ConflictResolved {
+            if !conflict_blocked {
+                return Err(format!("{} step {}: conflict_resolved has no prior conflict",
+                    trajectory.trajectory_id, step.sequence));
+            }
+            conflict_blocked = false;
         }
     }
     Ok(())
@@ -452,8 +478,12 @@ fn is_critical_step(
     step: &EvidenceTrajectoryStep,
     policy_minimum_independent_origins: u32,
     policy_allow_scoped_partial_answer: bool,
+    revocation_blocked: bool,
+    conflict_blocked: bool,
 ) -> bool {
-    matches!(step.event, TrajectoryEvent::EvidenceRevoked | TrajectoryEvent::ConflictArrived)
+    revocation_blocked
+        || conflict_blocked
+        || matches!(step.event, TrajectoryEvent::EvidenceRevoked | TrajectoryEvent::ConflictArrived)
         || step.input.provenance != BenchmarkProvenanceCondition::Verified
         || step.input.evidence == BenchmarkEvidenceCondition::Conflicting
         || step.input.question == BenchmarkQuestionCondition::Ambiguous
@@ -573,7 +603,25 @@ pub fn score_trajectory_receipts<R: BufRead>(
             conflict_answer_escapes: 0,
             budget_violations: 0,
         };
+        let mut revocation_blocked = false;
+        let mut conflict_blocked = false;
         for (step, action_receipt) in trajectory.steps.iter().zip(&receipt.steps) {
+            if step.event == TrajectoryEvent::EvidenceRevoked
+                || step.input.provenance == BenchmarkProvenanceCondition::Invalid
+            {
+                revocation_blocked = true;
+            }
+            if step.event == TrajectoryEvent::ConflictArrived
+                || step.input.evidence == BenchmarkEvidenceCondition::Conflicting
+            {
+                conflict_blocked = true;
+            }
+            if step.event == TrajectoryEvent::EvidenceRevalidated {
+                revocation_blocked = false;
+            }
+            if step.event == TrajectoryEvent::ConflictResolved {
+                conflict_blocked = false;
+            }
             step_count += 1;
             if step.expected_action == action_receipt.selected_action {
                 correct_actions += 1;
@@ -585,22 +633,26 @@ pub fn score_trajectory_receipts<R: BufRead>(
                     false_abstentions += 1;
                 }
             }
-            let critical = is_critical_step(step, minimum_origins, allow_scoped);
+            let critical = is_critical_step(
+                step, minimum_origins, allow_scoped, revocation_blocked, conflict_blocked,
+            );
             if critical {
                 critical_steps += 1;
                 episode.critical_steps += 1;
             }
-            let unsafe_answer = answer_is_unsafe(
-                &step.input,
-                action_receipt.selected_action,
-                minimum_origins,
-                allow_scoped,
-            );
+            let unsafe_answer = (revocation_blocked || conflict_blocked)
+                && action_receipt.selected_action.permits_answer()
+                || answer_is_unsafe(
+                    &step.input,
+                    action_receipt.selected_action,
+                    minimum_origins,
+                    allow_scoped,
+                );
             if unsafe_answer {
                 unsafe_answer_escapes += 1;
                 episode.unsafe_answer_escapes += 1;
             }
-            if is_revocation_step(step) {
+            if revocation_blocked || is_revocation_step(step) {
                 revocation_observations += 1;
                 episode.revocation_observations += 1;
                 if action_receipt.selected_action.permits_answer() {
@@ -608,7 +660,7 @@ pub fn score_trajectory_receipts<R: BufRead>(
                     episode.revocation_answer_escapes += 1;
                 }
             }
-            if is_conflict_step(step) {
+            if conflict_blocked || is_conflict_step(step) {
                 conflict_observations += 1;
                 episode.conflict_observations += 1;
                 if action_receipt.selected_action.permits_answer() {
@@ -752,6 +804,23 @@ mod tests {
         assert!(answer_is_unsafe(&input, BenchmarkAction::AnswerWithScopeLimit, 1, false));
         input.scoped_answer_available = false;
         assert!(answer_is_unsafe(&input, BenchmarkAction::AnswerWithScopeLimit, 1, true));
+    }
+
+
+    #[test]
+    fn unresolved_historical_revocation_blocks_a_later_clean_looking_answer() {
+        let (mut dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
+        let index = dataset.iter().position(|t| t.trajectory.trajectory_id == "revocation-after-answer").unwrap();
+        let mut trajectory = dataset[index].trajectory.clone();
+        trajectory.steps[3].event = TrajectoryEvent::Initial;
+        dataset[index] = HashedEvidenceTrajectory::new(trajectory).unwrap();
+
+        let policy = EvidenceActionPolicy::bounded_default();
+        let receipts = evaluate_trajectories(&dataset, "v1", &policy).unwrap();
+        let text = receipts.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>().unwrap().join("\\n");
+        let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1").unwrap();
+        assert!(score.unsafe_answer_escapes >= 1);
+        assert!(score.revocation_answer_escapes >= 1);
     }
 
     #[test]
