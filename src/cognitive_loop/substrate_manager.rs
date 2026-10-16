@@ -1360,6 +1360,46 @@ mod tests {
     }
 
     #[test]
+    fn test_energy_rate_telemetry_reports_the_closed_monotonic_window() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(1e10);
+        let mut mgr = SubstrateManager::new(&config);
+        let start = std::time::Instant::now();
+        mgr.energy_rate_window_started_at = Some(start);
+
+        mgr.tick_energy_at(&config, start);
+        let expected_window_energy = mgr.energy_per_cycle * mgr.tau_factor as f64;
+        mgr.tick_energy_at(&config, start + std::time::Duration::from_secs(1));
+
+        assert!((mgr.estimated_energy_rate_watts - expected_window_energy).abs() < 1e-18);
+        assert!((mgr.energy_rate_window_seconds - 1.0).abs() < f64::EPSILON);
+        let telemetry = mgr.telemetry(&config);
+        assert_eq!(telemetry.estimated_energy_rate_watts, mgr.estimated_energy_rate_watts);
+        assert_eq!(telemetry.energy_rate_window_seconds, 1.0);
+    }
+
+    #[test]
+    fn test_reversed_monotonic_energy_window_fails_closed() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(1e10);
+        let mut mgr = SubstrateManager::new(&config);
+        let now = std::time::Instant::now();
+        mgr.energy_rate_window_started_at =
+            Some(now + std::time::Duration::from_secs(1));
+
+        mgr.tick_energy_at(&config, now);
+
+        assert!(
+            !mgr.consciousness_viable,
+            "reversed monotonic evidence must not authorize continued viability"
+        );
+        assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
+        assert_eq!(mgr.energy_rate_window_seconds, 0.0);
+    }
+
+    #[test]
     fn test_energy_scales_with_tau() {
         // Faster photonic substrate has tau > 1.0 under the current seconds/op model.
         // The modeled per-cycle energy estimate scales with that rate factor; the
