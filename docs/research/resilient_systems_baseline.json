@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "as_of": "2026-10-15",
+  "as_of": "2026-10-16",
   "status": "illustrative_screening_not_validated",
   "purpose": "Shared starting assumptions for the resilient-systems feasibility portfolio. Values below are scenario assumptions, not certified requirements.",
   "common_metrics": [
