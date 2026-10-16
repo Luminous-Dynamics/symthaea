@@ -13,7 +13,16 @@ cargo test -p symthaea-manufacturing-active-learning-bench
 cargo run -p symthaea-manufacturing-active-learning-bench --example run_reference_campaigns > mfg-active-learning-synthetic-v1.json
 ```
 
-The example runs six policies across five deterministic scenario families for 30 paired seeds (900 policy campaigns total), with matched budgets within each scenario/seed pair. It emits JSON transcripts plus evaluator reports. The five reference-manifest SHA-256 digests are pinned in a unit test. The output file is an experiment artifact and should be hashed and preserved alongside the exact commit used to produce it.
+The example runs six policies across five deterministic scenario families for 30 paired seeds (900 policy campaigns total), with matched budgets within each scenario/seed pair. It emits raw JSON transcripts, evaluator reports, and a statistical summary. The five reference-manifest SHA-256 digests are pinned in a unit test. The output file is an experiment artifact and should be hashed and preserved alongside the exact commit used to produce it.
+
+The analysis groups results by scenario and policy, verifies every expected policy arm has the same paired-seed set, and reports:
+- discovery rate separately from discovery cost conditional on success;
+- restricted mean cost-to-discovery (the preregistered budget horizon is used for NotFound campaigns) with a descriptive normal-approximation 95% interval;
+- fixed-design-relative acceleration factor and enhancement factor, with definitions and denominators included in the output;
+- paired candidate-minus-fixed-design cost and utility differences with intervals;
+- best conforming utility/throughput, resources, and design-rank rate as separate outcomes.
+
+These summaries are synthetic and descriptive. The intervals are not a substitute for a preregistered domain-specific inferential analysis, and no metric establishes physical manufacturing performance.
 
 ## Current policy arms
 
