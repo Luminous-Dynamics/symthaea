@@ -6,7 +6,7 @@
 //! It is source-separated within the crate, not a separately built executable or
 //! independent third-party verifier.
 use super::{
-    CampaignManifest, CampaignTranscript, EvaluationReport, Feasibility, Fidelity,
+    CampaignManifest, CampaignTranscript, Candidate, EvaluationReport, Feasibility, Fidelity,
     measurement_digest,
 };
 use std::collections::{BTreeMap, BTreeSet};
