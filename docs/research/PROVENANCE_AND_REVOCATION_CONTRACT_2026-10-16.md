@@ -101,7 +101,13 @@ Compare (a) citation/URL only, (b) revision without content digest, (c) digest w
 3. Add a versioned persistence migration only after source ownership, backward compatibility, and unknown-status behavior are decided. Legacy facts without provenance must remain explicitly unknown; do not backfill invented publisher, revision, or status values.
 4. Add a provenance requirement to the relation-constrained query report as a separate gate, preserving its semantic relation report. Test stale, revoked, conflicting, and partially sourced evidence independently.
 5. Add source-status fixtures and a reproducible offline benchmark harness. Measure the pure gate locally before introducing networked status-feed benchmarks.
-6. Only after parity and outage tests should any production caller opt into the policy. No default search-path behavior is changed by this PR.
+6. A manual microbenchmark is included as an ignored Rust test. Run it in release mode with:
+
+   `cargo test --release --lib knowledge::provenance::tests::benchmark_provenance_gate_throughput -- --ignored --nocapture`
+
+   It reports p50/p95 batch time and median time per assessment for 1k, 10k, and 100k repeated assessments. It uses one fixed in-memory fixture and excludes storage, I/O, digest computation, signature verification, and graph retrieval; treat it only as a baseline for the pure function, not an end-to-end performance result. No timing sample is claimed in this document.
+
+7. Only after parity and outage tests should any production caller opt into the policy. No default search-path behavior is changed by this PR.
 
 ## Known limitations / open risks
 
