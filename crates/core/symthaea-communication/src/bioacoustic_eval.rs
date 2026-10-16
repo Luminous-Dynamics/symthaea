@@ -84,6 +84,7 @@ pub struct BioacousticEventMetrics {
     pub ground_truth_events: u64,
     pub predictions_after_threshold: u64,
     pub scored_duration_seconds: f64,
+    pub unscored_duration_seconds: f64,
     pub precision: Option<f64>,
     pub recall: Option<f64>,
     pub f1: Option<f64>,
@@ -101,6 +102,7 @@ impl BioacousticEventMetrics {
         ground_truth_events: usize,
         predictions_after_threshold: usize,
         scored_duration_seconds: f64,
+        unscored_duration_seconds: f64,
     ) -> Self {
         let precision = ratio(true_positives, true_positives + false_positives);
         let recall = ratio(true_positives, true_positives + false_negatives);
@@ -116,6 +118,7 @@ impl BioacousticEventMetrics {
             ground_truth_events: ground_truth_events as u64,
             predictions_after_threshold: predictions_after_threshold as u64,
             scored_duration_seconds,
+            unscored_duration_seconds,
             precision,
             recall,
             f1,
@@ -321,6 +324,7 @@ pub fn evaluate_bioacoustic_events(
     let mut per_sample = Vec::with_capacity(test_recordings.len());
     let mut total = Counts::default();
     let mut total_duration = 0.0_f64;
+    let mut total_unscored_duration = 0.0_f64;
     let mut all_test_truth = Vec::new();
     let mut all_test_predictions = Vec::new();
     let mut total_predictions_excluded_by_unscored_regions = 0usize;
@@ -329,6 +333,18 @@ pub fn evaluate_bioacoustic_events(
         let duration_s = recording.sample_count as f64 / recording.sample_rate_hz as f64;
         if !duration_s.is_finite() || duration_s <= 0.0 {
             return Err(format!("sample {} has invalid duration", recording.sample_id));
+        }
+        let unscored_duration_s: f64 = recording
+            .unscored_regions
+            .iter()
+            .map(|region| region.interval.end_s - region.interval.start_s)
+            .sum();
+        let scored_duration_s = duration_s - unscored_duration_s;
+        if !scored_duration_s.is_finite() || scored_duration_s < 0.0 {
+            return Err(format!(
+                "sample {} has invalid unscored-region duration",
+                recording.sample_id
+            ));
         }
         let truth: Vec<_> = recording
             .annotations
@@ -375,14 +391,16 @@ pub fn evaluate_bioacoustic_events(
         total.fn_ += counts.fn_;
         total.ground_truth += counts.ground_truth;
         total.predictions += counts.predictions;
-        total_duration += duration_s;
+        total_duration += scored_duration_s;
+        total_unscored_duration += unscored_duration_s;
         let mut sample_metrics = BioacousticEventMetrics::from_counts(
             counts.tp,
             counts.fp,
             counts.fn_,
             counts.ground_truth,
             counts.predictions,
-            duration_s,
+            scored_duration_s,
+            unscored_duration_s,
         );
         sample_metrics.average_precision =
             event_average_precision(&truth, &all_predictions, &bundle.matching_rule);
@@ -395,6 +413,9 @@ pub fn evaluate_bioacoustic_events(
         });
     }
 
+    if !total_duration.is_finite() || total_duration <= 0.0 {
+        return Err("event evaluation has no scorable audio after excluding unscored regions".into());
+    }
     let mut metrics = BioacousticEventMetrics::from_counts(
         total.tp,
         total.fp,
@@ -402,6 +423,7 @@ pub fn evaluate_bioacoustic_events(
         total.ground_truth,
         total.predictions,
         total_duration,
+        total_unscored_duration,
     );
     metrics.average_precision =
         event_average_precision(&all_test_truth, &all_test_predictions, &bundle.matching_rule);
