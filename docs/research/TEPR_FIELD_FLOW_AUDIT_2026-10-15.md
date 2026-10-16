@@ -321,3 +321,14 @@ Research background: Zhang & Wu (2026) evaluate answer-abstention over full, par
 
 PR #7534 exact branch head at creation: `68361fb2fb3cee81fb5737a32187e2d3f39e5baf`; base is PR #7522 head `f93d564113cb1cc505be0568ff8c06214a22b4fc). Tests are authored but not run locally. A passing result has not been claimed. The default production retrieval path remains unchanged pending reproducible held-out evidence.
 
+### Exact-head verification note for PR #7534 (2026-10-16)
+
+- PR: [#7534](https://github.com/Luminous-Dynamics/symthaea/pull/7534)
+- Exact head at inspection: `68361fb2fb3cee81fb5737a32187e2d3f39e5baf`
+- Exact parent/head base: PR #7522 head `f93d564113cb1cc505be0568ff8c06214a22b4fc`
+- Compare: 3 commits ahead, 0 behind; GitHub reports mergeable.
+- CI: [38860693443](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38860693443) queued.
+- PR Governance: [38860693461](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38860693461) queued.
+
+Both workflows were queued and neither is a pass. The five-condition regression was added but not executed locally. The benchmark targets in the protocol are proposals, not measured results. The default retrieval path is unchanged.
+
