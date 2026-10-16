@@ -109,6 +109,8 @@ pub struct OutcomeLedger {
     pub minimum_success_rate_delta: f64,
     /// Minimum practically meaningful absolute improvement in normalized success AUC.
     pub minimum_success_auc_delta: f64,
+    /// Minimum practically meaningful reduction in best loss at the shared final budget.
+    pub minimum_best_loss_reduction: f64,
     /// Policy runs. All arms must contain exactly the same target IDs and group IDs.
     pub arms: Vec<OutcomeArm>,
 }
@@ -221,6 +223,8 @@ pub enum ComparisonMetric {
     SuccessRateAtBudget,
     /// Candidate arm's normalized success-AUC difference.
     NormalizedSuccessAuc,
+    /// Baseline best loss minus candidate best loss at the final budget; positive favors candidate.
+    BestLossReductionAtBudget,
 }
 
 /// Comparison interpretation against the predeclared practical-effect margin.
@@ -235,6 +239,8 @@ pub enum ComparisonDisposition {
     Inconclusive,
     /// Fewer than five groups: report estimate, but no confidence interval.
     InsufficientIndependentGroups,
+    /// At least one paired target lacks an evaluated outcome in either arm for the continuous-loss comparison.
+    InsufficientTargetCoverage,
 }
 
 /// Paired group-bootstrap result; positive deltas favour the candidate arm.
@@ -259,6 +265,10 @@ pub struct MetricComparison {
     pub practical_margin: f64,
     /// Number of independent groups declared by the evaluation contract.
     pub independent_group_count: usize,
+    /// Paired targets with a metric value in both arms (continuous loss requires complete coverage).
+    pub covered_target_count: usize,
+    /// Total paired targets in the evaluation contract.
+    pub total_target_count: usize,
     /// Number of deterministic bootstrap replicates.
     pub bootstrap_replicates: usize,
     /// Classification under the stated margin.
@@ -359,7 +369,7 @@ pub fn evaluate_json_ledger(
         .ok_or_else(|| "baseline_arm_id is not present in arms".to_string())?;
     let baseline = &computations[baseline_index];
 
-    let mut comparisons = Vec::with_capacity((computations.len() - 1) * 2);
+    let mut comparisons = Vec::with_capacity((computations.len() - 1) * 3);
     for (index, candidate) in computations.iter().enumerate() {
         if index == baseline_index {
             continue;
@@ -381,6 +391,16 @@ pub fn evaluate_json_ledger(
             &candidate.targets,
             ComparisonMetric::NormalizedSuccessAuc,
             ledger.minimum_success_auc_delta,
+            bootstrap_replicates,
+            bootstrap_seed,
+        )?);
+        comparisons.push(compare_arms(
+            &ledger.baseline_arm_id,
+            &baseline.targets,
+            &candidate.metrics.arm_id,
+            &candidate.targets,
+            ComparisonMetric::BestLossReductionAtBudget,
+            ledger.minimum_best_loss_reduction,
             bootstrap_replicates,
             bootstrap_seed,
         )?);
@@ -446,6 +466,7 @@ fn validate_ledger(ledger: &OutcomeLedger) -> Result<(), String> {
     for (name, margin) in [
         ("minimum_success_rate_delta", ledger.minimum_success_rate_delta),
         ("minimum_success_auc_delta", ledger.minimum_success_auc_delta),
+        ("minimum_best_loss_reduction", ledger.minimum_best_loss_reduction),
     ] {
         if !margin.is_finite() || !(0.0..=1.0).contains(&margin) {
             return Err(format!("{name} must be finite and within [0, 1]"));
@@ -752,27 +773,72 @@ fn compare_arms(
     bootstrap_replicates: usize,
     bootstrap_seed: u64,
 ) -> Result<MetricComparison, String> {
+    let total_target_count = baseline.len();
+    let mut covered_target_count = 0usize;
     let mut deltas_by_group: BTreeMap<String, Vec<f64>> = BTreeMap::new();
 
     for (target_id, baseline_target) in baseline {
         let candidate_target = candidate
             .get(target_id)
             .ok_or_else(|| format!("comparison arm lacks target {target_id:?}"))?;
-        let delta = target_metric(&candidate_target.metrics, metric)
-            - target_metric(&baseline_target.metrics, metric);
-        deltas_by_group
-            .entry(baseline_target.metrics.group_id.clone())
-            .or_default()
-            .push(delta);
+        let delta = match metric {
+            ComparisonMetric::SuccessRateAtBudget | ComparisonMetric::NormalizedSuccessAuc => {
+                Some(
+                    target_metric(&candidate_target.metrics, metric)
+                        - target_metric(&baseline_target.metrics, metric),
+                )
+            }
+            ComparisonMetric::BestLossReductionAtBudget => {
+                match (
+                    baseline_target.metrics.best_loss_at_budget,
+                    candidate_target.metrics.best_loss_at_budget,
+                ) {
+                    (Some(baseline_loss), Some(candidate_loss)) => {
+                        Some(baseline_loss - candidate_loss)
+                    }
+                    _ => None,
+                }
+            }
+        };
+
+        if let Some(delta) = delta {
+            deltas_by_group
+                .entry(baseline_target.metrics.group_id.clone())
+                .or_default()
+                .push(delta);
+            covered_target_count += 1;
+        }
     }
 
     let group_deltas: Vec<Vec<f64>> = deltas_by_group.into_values().collect();
-    let total_target_queries: usize = group_deltas.iter().map(Vec::len).sum();
-    let estimated_delta = group_deltas
-        .iter()
-        .flatten()
-        .sum::<f64>()
-        / total_target_queries as f64;
+    let estimated_delta = if covered_target_count == 0 {
+        0.0
+    } else {
+        group_deltas.iter().flatten().sum::<f64>() / covered_target_count as f64
+    };
+
+    // Do not silently drop failed-all-attempts targets from a continuous-loss
+    // comparison. Report a descriptive delta over the covered subset, but do not
+    // compute an interval or classify an improvement unless coverage is complete.
+    if metric == ComparisonMetric::BestLossReductionAtBudget
+        && covered_target_count != total_target_count
+    {
+        return Ok(MetricComparison {
+            baseline_arm_id: baseline_arm_id.to_string(),
+            comparison_arm_id: candidate_arm_id.to_string(),
+            metric,
+            estimated_delta,
+            confidence_interval_lower: None,
+            confidence_interval_upper: None,
+            confidence_level: 0.95,
+            practical_margin,
+            independent_group_count: group_deltas.len(),
+            covered_target_count,
+            total_target_count,
+            bootstrap_replicates,
+            disposition: ComparisonDisposition::InsufficientTargetCoverage,
+        });
+    }
 
     if group_deltas.len() < MIN_INDEPENDENT_GROUPS_FOR_INTERVAL {
         return Ok(MetricComparison {
@@ -785,6 +851,8 @@ fn compare_arms(
             confidence_level: 0.95,
             practical_margin,
             independent_group_count: group_deltas.len(),
+            covered_target_count,
+            total_target_count,
             bootstrap_replicates,
             disposition: ComparisonDisposition::InsufficientIndependentGroups,
         });
@@ -793,6 +861,7 @@ fn compare_arms(
     let metric_salt = match metric {
         ComparisonMetric::SuccessRateAtBudget => 0x5355_4343_4553_5301,
         ComparisonMetric::NormalizedSuccessAuc => 0x4155_4300_0000_0002,
+        ComparisonMetric::BestLossReductionAtBudget => 0x4C4F_5353_5245_4403,
     };
     let mut random = SplitMix64::new(
         bootstrap_seed ^ stable_hash64(candidate_arm_id.as_bytes()) ^ metric_salt,
@@ -833,6 +902,8 @@ fn compare_arms(
         confidence_level: 0.95,
         practical_margin,
         independent_group_count: group_deltas.len(),
+        covered_target_count,
+        total_target_count,
         bootstrap_replicates,
         disposition,
     })
@@ -842,8 +913,13 @@ fn target_metric(target: &TargetMetrics, metric: ComparisonMetric) -> f64 {
     match metric {
         ComparisonMetric::SuccessRateAtBudget => {
             if target.success_at_budget { 1.0 } else { 0.0 }
-        },
+        }
         ComparisonMetric::NormalizedSuccessAuc => target.normalized_success_auc,
+        ComparisonMetric::BestLossReductionAtBudget => {
+            // This metric requires the paired baseline and candidate values and is
+            // handled directly in compare_arms; it must not be evaluated per-arm.
+            unreachable!("best-loss reduction is a paired comparison metric")
+        }
     }
 }
 
@@ -963,6 +1039,7 @@ mod tests {
             baseline_arm_id: "baseline".to_string(),
             minimum_success_rate_delta: 0.05,
             minimum_success_auc_delta: 0.05,
+            minimum_best_loss_reduction: 0.05,
             arms: vec![
                 arm(
                     "baseline",
