@@ -406,7 +406,7 @@ fn generate_scenario(id: u64) -> SyntheticScenario {
         100.0 + rng.unit() * 180.0,
         100.0 + rng.unit() * 180.0,
     ];
-    let initial = std::array::from_fn(|index| {
+    let initial: [Interval; 6] = std::array::from_fn(|index| {
         interval_around_truth(truth[index], half_widths[index])
     });
     SyntheticScenario { id, truth, initial }
@@ -666,13 +666,24 @@ fn exhaustive_toy_oracle(
         }
 
         let mut current = initial;
+        let mut cumulative_cost = 0_u32;
+        let mut cost_to_resolution = if is_fully_resolved(&current) { Some(0) } else { None };
         for (index, experiment) in catalog.iter().enumerate() {
             if mask & (1 << index) != 0 {
                 simulate_experiment(scenario, &mut current, experiment);
+                cumulative_cost += experiment.cost_units;
+                if cost_to_resolution.is_none() && is_fully_resolved(&current) {
+                    cost_to_resolution = Some(cumulative_cost);
+                }
             }
         }
-        let resolved_cost = if is_fully_resolved(&current) { Some(cost) } else { None };
-        let candidate = summarize_state(scenario.id, &initial, &current, cost, resolved_cost);
+        let candidate = summarize_state(
+            scenario.id,
+            &initial,
+            &current,
+            cost,
+            cost_to_resolution,
+        );
         if better_oracle_candidate(&candidate, cost, &best, best_cost) {
             best = candidate;
             best_cost = cost;
