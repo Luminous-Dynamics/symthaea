@@ -771,7 +771,7 @@ pub fn evaluate_ros_temporal_pair_with_history_v1(
         capture_epoch_id,
         captured_monotonic_ns,
     );
-    if !matches!(temporal, RosTemporalDispositionV1::Fresh { .. }) {
+    if !matches!(&temporal, RosTemporalDispositionV1::Fresh { .. }) {
         return RosTemporalHistoryDispositionV1::TemporalRejected {
             disposition: temporal,
         };
@@ -2608,6 +2608,228 @@ mod tests {
                 100
             ),
             RosTemporalDispositionV1::InvalidPolicy { .. }
+        ));
+    }
+
+    fn temporal_history_sample(
+        sequence: u64,
+        stamp_sec: i32,
+        stamp_nanosec: u32,
+    ) -> RosSampleMetadataV1 {
+        let mut sample = temporal_test_sample(
+            stamp_sec,
+            stamp_nanosec,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        sample.receive_sequence = Some(sequence);
+        sample.received_monotonic_ns = Some(95);
+        sample.receive_age_at_capture_ns = Some(5);
+        sample
+    }
+
+    fn temporal_history_now() -> RosClockNowV1 {
+        RosClockNowV1 {
+            domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            timestamp_ns: 100_010_000_000,
+        }
+    }
+
+    #[test]
+    fn temporal_history_rejects_replay_and_keeps_pair_update_atomic() {
+        let policy = temporal_test_policy();
+        let mut history = RosTemporalHistoryV1::new("receipt-epoch").unwrap();
+        let joint_one = temporal_history_sample(1, 100, 0);
+        let imu_one = temporal_history_sample(1, 100, 0);
+
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_one,
+                Some(&imu_one),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+
+        let joint_two = temporal_history_sample(2, 100, 2_000_000);
+        // A fresh joint sample paired with replayed IMU sequence 1 must reject
+        // atomically; JointState history must not advance on half a pair.
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_two,
+                Some(&imu_one),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::SequenceNotIncreasing {
+                stream: RosTemporalStreamV1::Imu,
+                previous: 1,
+                current: 1
+            }
+        ));
+        assert_eq!(
+            history.last_joint_state.as_ref().unwrap().receive_sequence,
+            1
+        );
+
+        let imu_two = temporal_history_sample(2, 100, 3_000_000);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_two,
+                Some(&imu_two),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted {
+                joint_sequence_gap: 0,
+                imu_sequence_gap: 0
+            }
+        ));
+        assert_eq!(
+            history.last_joint_state.as_ref().unwrap().receive_sequence,
+            2
+        );
+    }
+
+    #[test]
+    fn temporal_history_rejects_source_time_regression_and_duplicates() {
+        let policy = temporal_test_policy();
+        let mut history = RosTemporalHistoryV1::new("receipt-epoch").unwrap();
+        let first_joint = temporal_history_sample(1, 100, 0);
+        let first_imu = temporal_history_sample(1, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &first_joint,
+                Some(&first_imu),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+
+        let regressed_joint = temporal_history_sample(2, 99, 999_000_000);
+        let next_imu = temporal_history_sample(2, 100, 1_000_000);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &regressed_joint,
+                Some(&next_imu),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::SourceTimestampRegressed {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+        assert_eq!(
+            history.last_joint_state.as_ref().unwrap().receive_sequence,
+            1
+        );
+
+        let duplicate_joint = temporal_history_sample(2, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &duplicate_joint,
+                Some(&next_imu),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::DuplicateSourceTimestamp {
+                stream: RosTemporalStreamV1::JointState,
+                timestamp_ns: 100_000_000_000
+            }
+        ));
+    }
+
+    #[test]
+    fn temporal_history_requires_explicit_epoch_reset_and_reports_sequence_gaps() {
+        let policy = temporal_test_policy();
+        let mut history = RosTemporalHistoryV1::new("receipt-epoch").unwrap();
+        let joint_one = temporal_history_sample(1, 100, 0);
+        let imu_one = temporal_history_sample(1, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_one,
+                Some(&imu_one),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted { .. }
+        ));
+
+        let joint_three = temporal_history_sample(3, 100, 3_000_000);
+        let imu_three = temporal_history_sample(3, 100, 4_000_000);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &joint_three,
+                Some(&imu_three),
+                &temporal_history_now(),
+                &policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted {
+                joint_sequence_gap: 1,
+                imu_sequence_gap: 1
+            }
+        ));
+
+        let new_epoch_joint = temporal_history_sample(1, 100, 0);
+        let new_epoch_imu = temporal_history_sample(1, 100, 0);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &new_epoch_joint,
+                Some(&new_epoch_imu),
+                &temporal_history_now(),
+                &policy,
+                "new-receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::ReceiveEpochChanged { .. }
+        ));
+
+        history.reset_for_epoch("new-receipt-epoch").unwrap();
+        let mut new_joint = new_epoch_joint;
+        new_joint.receive_epoch_id = Some("new-receipt-epoch".into());
+        let mut new_imu = new_epoch_imu;
+        new_imu.receive_epoch_id = Some("new-receipt-epoch".into());
+        assert!(matches!(
+            evaluate_ros_temporal_pair_with_history_v1(
+                &mut history,
+                &new_joint,
+                Some(&new_imu),
+                &temporal_history_now(),
+                &policy,
+                "new-receipt-epoch",
+                100
+            ),
+            RosTemporalHistoryDispositionV1::Accepted {
+                joint_sequence_gap: 0,
+                imu_sequence_gap: 0
+            }
         ));
     }
 
