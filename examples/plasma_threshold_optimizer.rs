@@ -272,6 +272,10 @@ pub struct ShotEvaluationRecord {
     pub actual_disruption: bool,
     pub predicted_disruption: Option<bool>,
     pub warning_lead_time_ms: Option<f64>,
+    pub sample_count: usize,
+    pub valid_sample_count: usize,
+    /// Zero-based indices into the original shot sample sequence.
+    pub invalid_sample_indices: Vec<usize>,
     pub unscored_reason: Option<ShotUnscoredReason>,
 }
 
@@ -310,19 +314,25 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
             label_config.critical_window_ms,
         );
         let mut has_valid_sample = false;
+        let mut valid_sample_count = 0;
+        let mut invalid_sample_indices = Vec::new();
         let mut has_observable_warning_window = false;
         let mut alarm_in_warning_window = false;
         let mut alarm_in_normal_operation = false;
         // The largest time-to-disruption among matching alarms is the earliest lead-time alarm.
         let mut earliest_warning_ttd: Option<f64> = None;
 
-        for (sample, label) in shot.samples.iter().zip(labels.iter()) {
+        for (sample_index, (sample, label)) in
+            shot.samples.iter().zip(labels.iter()).enumerate()
+        {
             total_samples += 1;
             if !has_valid_phi_inputs(sample) {
                 invalid_samples += 1;
+                invalid_sample_indices.push(sample_index);
                 continue;
             }
             has_valid_sample = true;
+            valid_sample_count += 1;
 
             let phi_proxy = compute_phi_proxy(sample);
             let regime = classify_regime(phi_proxy, config);
@@ -360,6 +370,9 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                     actual_disruption: true,
                     predicted_disruption: None,
                     warning_lead_time_ms: None,
+                    sample_count: shot.samples.len(),
+                    valid_sample_count,
+                    invalid_sample_indices: invalid_sample_indices.clone(),
                     unscored_reason: Some(ShotUnscoredReason::NoValidWarningWindow),
                 });
                 continue;
@@ -378,6 +391,9 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 actual_disruption: true,
                 predicted_disruption: Some(detected),
                 warning_lead_time_ms: lead_time,
+                sample_count: shot.samples.len(),
+                    valid_sample_count,
+                    invalid_sample_indices: invalid_sample_indices.clone(),
                 unscored_reason: None,
             });
         } else if !has_valid_sample {
@@ -387,6 +403,9 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 actual_disruption: false,
                 predicted_disruption: None,
                 warning_lead_time_ms: None,
+                sample_count: shot.samples.len(),
+                    valid_sample_count,
+                    invalid_sample_indices: invalid_sample_indices.clone(),
                 unscored_reason: Some(ShotUnscoredReason::NoValidSamples),
             });
         } else {
@@ -402,6 +421,9 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 actual_disruption: false,
                 predicted_disruption: Some(predicted_disruption),
                 warning_lead_time_ms: None,
+                sample_count: shot.samples.len(),
+                    valid_sample_count,
+                    invalid_sample_indices: invalid_sample_indices.clone(),
                 unscored_reason: None,
             });
         }
@@ -1672,6 +1694,9 @@ mod tests {
             results.shot_records[0].unscored_reason,
             Some(ShotUnscoredReason::NoValidWarningWindow)
         );
+        assert_eq!(results.shot_records[0].sample_count, 1);
+        assert_eq!(results.shot_records[0].valid_sample_count, 0);
+        assert_eq!(results.shot_records[0].invalid_sample_indices, vec![0]);
     }
 
     #[test]
