@@ -37,7 +37,7 @@ Index *mathematical claims and their dependencies*, not just source files or tac
 
 Never label a result “formally verified” solely because it appears in OpenAI's repository. A source proof is a candidate until the actual declared theorem is checked in an admitted, pinned environment. If a theorem is adapted, the local statement and proof receive a distinct identity.
 
-Initially store **metadata and narrow dependency references**, not a wholesale vendored copy of OpenAI's Lean library. Avoid importing large unrelated transitive dependency graphs. Reuse Mathlib's established lemmas where practical.
+Initially store **metadata and narrow dependency references**, not a wholesale vendored copy of OpenAI's Lean library. Avoid importing large unrelated transitive dependency graphs. Reuse Mathlib's established lemmas where practical. The initial candidate-only index is [`proof-corpus-manifest.yaml`](proof-corpus-manifest.yaml); its pinned entries are not Symthaea-qualified and must not be treated as an accepted proof cache.
 
 ## Proposed loop
 
