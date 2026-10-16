@@ -217,7 +217,7 @@ pub fn evaluate_mission_tasks(
         MissionTaskPlanStatus::MeetsDeclaredTaskPolicy
     };
 
-    let mut report = MissionTaskPlanReport {
+    let report = MissionTaskPlanReport {
         schema_version: 1,
         mission_id: configuration.mission_id.clone(),
         configuration_revision: configuration.configuration_revision.clone(),
@@ -247,9 +247,6 @@ pub fn evaluate_mission_tasks(
     };
     receipt.receipt_digest_sha256 = digest_task_receipt(&receipt);
 
-    // Prevent accidental future changes to status/count assembly from creating
-    // an inconsistent report. These counters are checked by the digest verifier.
-    report.task_evaluations.sort_by(|left, right| left.task_id.cmp(&right.task_id));
     Ok((report, receipt))
 }
 
