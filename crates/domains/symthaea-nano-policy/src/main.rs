@@ -65,7 +65,7 @@ struct SelectedCandidate {
 
 fn validate_and_prepare(
     request: &Request,
-) -> Result<(Vec<Candidate>, Vec<Vec<f64>>, Vec<usize>, Vec<String>), String> {
+) -> Result<(Vec<Candidate>, Vec<Vec<f64>>, usize, Vec<usize>, Vec<String>), String> {
     if request.schema_version != SCHEMA_VERSION {
         return Err(format!(
             "unsupported schema_version {:?}; expected {:?}",
@@ -147,8 +147,12 @@ fn validate_and_prepare(
         ));
     }
 
-    let normalized = normalize_features(&candidates)?;
-    Ok((candidates, normalized, prior_indices, prior_ids))
+    let normalized = match request.policy {
+        Policy::Maximin => normalize_features(&candidates)?,
+        // The random-control arm must not pay the cost of descriptor normalization.
+        Policy::Random => Vec::new(),
+    };
+    Ok((candidates, normalized, feature_count, prior_indices, prior_ids))
 }
 
 fn normalize_features(candidates: &[Candidate]) -> Result<Vec<Vec<f64>>, String> {
@@ -255,6 +259,7 @@ fn choose(
     request: &Request,
     candidates: &[Candidate],
     features: &[Vec<f64>],
+    feature_count: usize,
     prior_indices: &[usize],
     prior_ids: Vec<String>,
 ) -> Result<Response, String> {
@@ -359,17 +364,28 @@ fn choose(
         policy_version: POLICY_VERSION,
         policy: request.policy,
         candidate_count: candidates.len(),
-        feature_count: features[0].len(),
+        feature_count,
         budget_requested: request.budget,
         already_selected: prior_ids,
-        normalization: "per_feature_min_max_over_candidate_pool",
+        normalization: match request.policy {
+            Policy::Maximin => "per_feature_min_max_over_candidate_pool",
+            Policy::Random => "not_used_by_random_policy",
+        },
         selected,
     })
 }
 
 fn select(request: &Request) -> Result<Response, String> {
-    let (candidates, features, prior_indices, prior_ids) = validate_and_prepare(request)?;
-    choose(request, &candidates, &features, &prior_indices, prior_ids)
+    let (candidates, features, feature_count, prior_indices, prior_ids) =
+        validate_and_prepare(request)?;
+    choose(
+        request,
+        &candidates,
+        &features,
+        feature_count,
+        &prior_indices,
+        prior_ids,
+    )
 }
 
 fn execute() -> Result<(), String> {
@@ -480,6 +496,18 @@ mod tests {
             selected_ids(&select(&first).expect("first")),
             selected_ids(&select(&second).expect("second"))
         );
+    }
+
+    #[test]
+    fn random_control_skips_unneeded_descriptor_normalization() {
+        let req = request(
+            Policy::Random,
+            1,
+            vec![candidate("low", &[f64::MIN]), candidate("high", &[f64::MAX])],
+        );
+        let result = select(&req).expect("random policy does not normalize descriptors");
+        assert_eq!(result.normalization, "not_used_by_random_policy");
+        assert_eq!(result.feature_count, 1);
     }
 
     #[test]
