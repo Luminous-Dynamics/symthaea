@@ -47,7 +47,11 @@ jobs:
             crates/intx-program-bench/Cargo.toml \
             crates/intx-program-bench/Cargo.lock \
             crates/intx-program-bench/fixtures/cases.tsv \
+            crates/intx-program-bench/fixtures/cases.tsv.sha256 \
             crates/intx-program-bench/src/lib.rs
+
+      - name: Verify frozen fixture corpus digest
+        run: sha256sum --check crates/intx-program-bench/fixtures/cases.tsv.sha256
 
       - name: Check formatting
         run: cargo fmt --manifest-path crates/intx-program-bench/Cargo.toml -- --check
