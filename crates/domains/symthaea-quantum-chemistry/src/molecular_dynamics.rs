@@ -600,6 +600,15 @@ mod tests {
     }
 
     #[test]
+    fn checked_runner_rejects_empty_molecule_before_solver_invocation() {
+        let molecule = Molecule::new(vec![]);
+        assert_eq!(
+            run_md_checked(&molecule, &MdConfig::default()),
+            Err(MdInputError::EmptyMolecule)
+        );
+    }
+
+    #[test]
     fn validation_rejects_invalid_time_step_and_fd_step() {
         let molecule = Molecule::h2();
         let mut config = MdConfig::default();
