@@ -334,8 +334,9 @@
       "resource_tests_authored": 18,
       "repair_scheduling_tests_authored": 17,
       "robust_repair_evaluation_tests_authored": 10,
-      "total_rust_tests_authored": 65,
-      "note": "Counts are source-level #[test] declarations; none have been executed in the current environment."
+      "total_rust_tests_authored": 76,
+      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11. None have been compiled or executed in the current environment.",
+      "rolling_horizon_repair_tests_authored": 11
     },
     "performance_targets": {
       "status": "proposed_unmeasured_targets",
@@ -511,8 +512,8 @@
       "no_uncertain_repair_durations",
       "no_crew_routing_or_transport_power_interdependency",
       "no_shared_tool_or_shift_calendar_model",
-      "no_online_replanning",
-      "no_policy_fairness_guarantee"
+      "no_policy_fairness_guarantee",
+      "adaptive dispatch exists in a separate module; paired batch comparison is not yet integrated"
     ],
     "tests_authored": 17,
     "tests_executed": false,
@@ -633,7 +634,8 @@
       "no travel/access uncertainty",
       "no online or rolling-horizon replanning",
       "initial dispatch order and crew assignments are frozen",
-      "CVaR reflects the supplied scenario weights and set only"
+      "CVaR reflects the supplied scenario weights and set only",
+      "rolling-horizon recourse is implemented in a separate module; its batch paired-comparison harness is still future work"
     ],
     "reference_cases": [
       {
@@ -692,6 +694,139 @@
         "document_reference_host",
         "release_build",
         "preserve_per_scenario_schedule_traces"
+      ]
+    }
+  },
+  "rolling_horizon_repair": {
+    "status": "event_triggered_deterministic_dispatch_not_calibrated",
+    "information_contract": "pending-job ranking uses nominal duration only; realized duration is consulted only after dispatch to schedule the completion event; decisions log completed jobs, eligible jobs, available crews and choice",
+    "policies": [
+      "priority_first",
+      "shortest_job_first",
+      "weighted_recovery_per_step"
+    ],
+    "modeled_state": [
+      "pending_active_complete_job_state",
+      "outage_release_time",
+      "completed_prerequisites",
+      "available_qualified_crews",
+      "finite_spare_stock",
+      "realized_finish_events"
+    ],
+    "outputs": [
+      "event_time_decision_trace",
+      "eligible_job_ids_at_decision",
+      "completed_jobs_observed",
+      "available_crews_observed",
+      "dispatch_order_and_assignment",
+      "per_repair_weighted_loss",
+      "total_weighted_service_unit_steps_lost",
+      "jobs_in_progress_at_horizon",
+      "jobs_not_started",
+      "remaining_spare_stock"
+    ],
+    "assumptions": [
+      "nominal_duration_is_available_for_ranking",
+      "realized_duration_hidden_until_job_dispatch",
+      "spare_parts_consumed_when_job_starts",
+      "no crew travel or road access time",
+      "no replenishment",
+      "jobs are non-preemptive"
+    ],
+    "limitations": [
+      "not calibrated against operational traces",
+      "no crew routing or travel time",
+      "no shift calendars or crew fatigue",
+      "no supply replenishment or substitutions",
+      "no partially completed repair state",
+      "no stochastic duration model or justified scenario probabilities",
+      "policy does not optimize distributional fairness",
+      "batch paired comparison to fixed-plan evaluator is not yet implemented"
+    ],
+    "tests_authored": 11,
+    "tests_executed": false,
+    "reference_cases": [
+      {
+        "id": "RH-01",
+        "expected": "same observable state and different unrealized outcomes yield the same current action"
+      },
+      {
+        "id": "RH-02",
+        "expected": "newly eligible high-priority job can move ahead of pending work after observed delay"
+      },
+      {
+        "id": "RH-03",
+        "expected": "dependent repair waits until prerequisite completion is observed"
+      },
+      {
+        "id": "RH-04",
+        "expected": "skill eligibility and crew exclusivity hold"
+      },
+      {
+        "id": "RH-05",
+        "expected": "finite spares are consumed on dispatch and never become negative"
+      },
+      {
+        "id": "RH-06",
+        "expected": "work never starts before outage release or crew availability"
+      },
+      {
+        "id": "RH-07",
+        "expected": "horizon completion and in-progress work are distinguished"
+      },
+      {
+        "id": "RH-08",
+        "expected": "identical inputs reproduce identical decision traces"
+      },
+      {
+        "id": "RH-09",
+        "expected": "adaptive and fixed policies are compared on paired realized-duration cases"
+      },
+      {
+        "id": "RH-10",
+        "expected": "both adaptive wins and losses are retained in published cases"
+      }
+    ],
+    "synthetic_witness": {
+      "fixed_dispatch_order": [
+        "A",
+        "C",
+        "B"
+      ],
+      "adaptive_dispatch_order": [
+        "A",
+        "B",
+        "C"
+      ],
+      "fixed_order_realized_loss": 922,
+      "adaptive_realized_loss": 724,
+      "relative_reduction_percent": 21.475054466230937,
+      "status": "single_synthetic_fixture_not_empirical"
+    },
+    "research_sources": [
+      "https://arxiv.org/abs/2404.03197",
+      "https://doi.org/10.1111/mice.12435"
+    ],
+    "proposed_performance_target": {
+      "status": "proposed_unmeasured",
+      "reference_batch": {
+        "jobs": 100,
+        "crews": 20,
+        "duration_scenarios": 20,
+        "target_total_seconds": 1
+      },
+      "stress_batch": {
+        "jobs": 500,
+        "crews": 50,
+        "duration_scenarios": 100,
+        "target_total_seconds": 15
+      },
+      "requirements": [
+        "document_reference_host",
+        "release_build",
+        "paired_policy_inputs",
+        "retain_per_scenario_decision_traces",
+        "measure_tail_risk_and_per_case_deltas"
       ]
     }
   }
