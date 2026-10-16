@@ -79,6 +79,8 @@ pub struct CampaignManifest {
     pub reference_cost_units: u32,
     pub minimum_quality_margin_milli: i32,
     pub process_profile_id: String,
+    /// Preloaded prior experiments shared equally by every policy arm; their costs count toward budget.
+    pub initial_actions: Vec<ExperimentAction>,
     pub candidates: Vec<Candidate>,
 }
 
@@ -117,6 +119,18 @@ impl CampaignManifest {
             }
         }
 
+        let initial_actions = if scenario == ScenarioFamily::ConfoundedFactors {
+            ["C02-02", "C05-05", "C08-08"]
+                .into_iter()
+                .map(|candidate_id| ExperimentAction {
+                    candidate_id: candidate_id.into(),
+                    fidelity: Fidelity::Reference,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         Self {
             schema_version: SCHEMA_VERSION,
             benchmark_id: BENCHMARK_ID.into(),
@@ -128,6 +142,7 @@ impl CampaignManifest {
             reference_cost_units: 4,
             minimum_quality_margin_milli: 0,
             process_profile_id: PROFILE_ID.into(),
+            initial_actions,
             candidates,
         }
     }
@@ -171,6 +186,42 @@ impl CampaignManifest {
                 return Err(format!("candidate {} has no available measurement fidelity", candidate.id));
             }
         }
+        let candidates_by_id: BTreeMap<&str, &Candidate> = self
+            .candidates
+            .iter()
+            .map(|candidate| (candidate.id.as_str(), candidate))
+            .collect();
+        let mut seen_initial_actions = BTreeSet::new();
+        let mut initial_cost = 0u32;
+        for action in &self.initial_actions {
+            if !seen_initial_actions.insert(action.key()) {
+                return Err("initial design contains a duplicate action".into());
+            }
+            let candidate = candidates_by_id
+                .get(action.candidate_id.as_str())
+                .ok_or_else(|| "initial design references a missing candidate".to_string())?;
+            if candidate.feasibility != Feasibility::Feasible {
+                return Err("initial design contains a blocked or unknown candidate".into());
+            }
+            let available = match action.fidelity {
+                Fidelity::Proxy => candidate.proxy_available,
+                Fidelity::Reference => candidate.reference_available,
+            };
+            if !available {
+                return Err("initial design requests an unavailable measurement fidelity".into());
+            }
+            let base = match action.fidelity {
+                Fidelity::Proxy => self.proxy_cost_units,
+                Fidelity::Reference => self.reference_cost_units,
+            };
+            initial_cost = initial_cost
+                .checked_add(base.saturating_mul(candidate.cost_scale))
+                .ok_or_else(|| "initial design cost overflow".to_string())?;
+        }
+        if initial_cost > self.budget_units {
+            return Err("initial design exceeds the declared campaign budget".into());
+        }
+
         Ok(())
     }
 
@@ -551,7 +602,11 @@ fn synthetic_oracle(
         }
         ScenarioFamily::NarrowFeasibleWindow => 240 - 90 * distance_narrow,
         ScenarioFamily::MaterialProcessInteraction => -90 + 7 * x * y - 20 * x - 12 * y,
-        ScenarioFamily::ConfoundedFactors => 35 + 14 * x - 22 * (x - y).abs() + 2 * x * y,
+        // The supplied initial data lie on x == y and all fail the target; an off-diagonal
+        // experiment is needed before the campaign can discover the feasible synthetic region.
+        ScenarioFamily::ConfoundedFactors => {
+            -50 - 20 * (x + y - 10) * (x + y - 10) + 10 * (x - y) * (x - y)
+        },
         ScenarioFamily::MultiFidelityDiscrepancy => {
             160 - 10 * (x - 6) * (x - 6) - 8 * (y - 6) * (y - 6)
         }
