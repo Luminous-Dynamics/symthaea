@@ -36,6 +36,7 @@ pub mod causal_reasoning_bridge;
 #[cfg(feature = "epistemic")]
 pub mod claim_priority;
 pub mod encoding;
+pub mod evidence_lineage;
 pub mod extraction;
 pub mod graph;
 #[cfg(feature = "epistemic")]
@@ -52,6 +53,10 @@ pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use causal_bridge::CausalKnowledgeBridge;
 pub use causal_reasoning_bridge::CausalReasoningBridge;
 pub use encoding::{FactEncoding, KnowledgeEncoder, RoleBoundVector};
+pub use evidence_lineage::{
+    EvidenceLineageAbstentionReason, EvidenceLineageAssessment, EvidenceLineageDecision,
+    EvidenceLineageGroup, EvidenceLineagePolicy, EvidenceWitness,
+};
 pub use extraction::{
     EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, KnowledgeExtractor, SemanticRole,
 };
