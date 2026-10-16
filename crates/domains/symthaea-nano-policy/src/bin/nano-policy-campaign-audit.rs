@@ -89,8 +89,8 @@ fn run() -> Result<ExitCode, String> {
             "campaign manifest exceeds the {MAX_CAMPAIGN_MANIFEST_BYTES}-byte limit"
         ));
     }
-    let raw_manifest =
-        fs::read(&manifest_path).map_err(|error| format!("cannot read campaign manifest: {error}"))?;
+    let raw_manifest = fs::read(&manifest_path)
+        .map_err(|error| format!("cannot read campaign manifest: {error}"))?;
     if raw_manifest.len() > MAX_CAMPAIGN_MANIFEST_BYTES {
         return Err(format!(
             "campaign manifest exceeds the {MAX_CAMPAIGN_MANIFEST_BYTES}-byte limit"
@@ -152,8 +152,9 @@ fn run() -> Result<ExitCode, String> {
                     reference.relative_path
                 ));
             }
-            let raw = fs::read(&resolved)
-                .map_err(|error| format!("cannot read ledger {:?}: {error}", reference.relative_path))?;
+            let raw = fs::read(&resolved).map_err(|error| {
+                format!("cannot read ledger {:?}: {error}", reference.relative_path)
+            })?;
             if raw.len() > MAX_SIMULATOR_LEDGER_BYTES {
                 return Err(format!(
                     "ledger {:?} exceeds the {MAX_SIMULATOR_LEDGER_BYTES}-byte limit",
@@ -165,7 +166,7 @@ fn run() -> Result<ExitCode, String> {
                 .ok_or_else(|| "combined ledger byte count overflow".to_string())?;
             if total_ledger_bytes > MAX_CAMPAIGN_TOTAL_LEDGER_BYTES {
                 return Err(format!(
-                    "combined run ledgers exceed the {MAX_CAMPAIGN_TOTAL_LEDGER_BYTES}-byte campaign limit"
+                    "campaign ledger bytes exceed the {MAX_CAMPAIGN_TOTAL_LEDGER_BYTES}-byte limit"
                 ));
             }
             ledger_bytes.insert(reference.relative_path.clone(), raw);
