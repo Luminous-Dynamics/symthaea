@@ -523,7 +523,7 @@ mod tests {
                     derivation_note: "synthetic test lineage; not a validated physical derivation".into(),
                 })
                 .collect(),
-            floor_ratification_ref: "synthetic-governance-decision-01".into(),
+            floor_ratification_ref: "fixture://floor-ratification".into(),
             floor_ratification_evidence_item_id: "floor-ratification".into(),
         };
         let city_assessment_bytes = city_assessment.canonical_bytes().unwrap();
