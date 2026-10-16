@@ -539,10 +539,10 @@ mod tests {
                 })
                 .collect(),
         );
-        let first_run =
-            evaluate_policy(&first, PolicyKind::FloorFirst, config()).unwrap();
-        let second_run =
-            evaluate_policy(&second, PolicyKind::FloorFirst, config()).unwrap();
+        let mut cfg = config();
+        cfg.backup_duration_steps = 1;
+        let first_run = evaluate_policy(&first, PolicyKind::FloorFirst, cfg).unwrap();
+        let second_run = evaluate_policy(&second, PolicyKind::FloorFirst, cfg).unwrap();
 
         assert_ne!(first.steps[1].actual_supply_units, second.steps[1].actual_supply_units);
         assert_eq!(first_run.deployments, second_run.deployments);
