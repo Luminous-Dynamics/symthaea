@@ -332,3 +332,16 @@ PR #7534 exact branch head at creation: `68361fb2fb3cee81fb5737a32187e2d3f39e5ba
 
 Both workflows were queued and neither is a pass. The five-condition regression was added but not executed locally. The benchmark targets in the protocol are proposals, not measured results. The default retrieval path is unchanged.
 
+## Relation-conflict scan indexing (2026-10-16)
+
+Public [PR #7536](https://github.com/Luminous-Dynamics/symthaea/pull/7536), stacked on #7534, changes the graph-wide polarity-conflict scan from a nested query-constraint × stored-relation loop to a per-query in-memory directed-relation index.
+
+- Structural index key: normalized subject, predicate, object, subject role, object role, causal status.
+- Polarity remains a separate check, so only a structurally identical relation with opposite negation is a conflict.
+- Expected work is O(R + Q + C), before deterministic sorting, rather than roughly O(Q × R), where R=stored relations, Q=query constraints, C=conflict output count.
+- The index is rebuilt for each query; it is not a persistent maintained index. This avoids introducing mutation/import/eviction consistency invariants prematurely.
+- A test-only exhaustive oracle checks parity and deterministic order across direction, polarity, role, predicate, causality and normalization controls.
+- An ignored, non-gating release-mode probe compares indexed versus exhaustive p50/max across 1k/10k facts and 1/2/4 constraints. The probe is authored but not run; no timing improvement is claimed.
+
+Exact PR #7536 head `518ce64dbbc56e0b6b0833e3afaff4ec73a96431`, base #7534 head `68361fb2fb3cee81fb5737a32187e2d3f39e5baf`, compare 4 commits ahead / 0 behind, GitHub reports mergeable. CI [38861023736](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38861023736) and PR Governance [38861023721](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38861023721) are **queued** on this exact head. Neither is a pass, and the test oracle has not been executed locally.
+
