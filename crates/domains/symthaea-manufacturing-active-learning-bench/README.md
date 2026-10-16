@@ -40,7 +40,7 @@ The response oracle is deterministic and only invoked by the campaign runner for
 
 Each manifest is serialized and SHA-256 hashed. Each observation receipt binds the manifest digest, exact action, profile ID and measurement payload. The evaluator independently recomputes cost, discovery cost, conformity, best observed utility, resource totals, budget compliance, action uniqueness and factor-design excitation from the manifest and transcript; it rejects missing required measurements and inconsistent claims.
 
-The evaluator is a separate function in the same source module. It is **not yet a separate module, separately built executable, or independent third-party verifier**. SHA-256 confirms receipt bytes match; it does not authenticate a physical source or prove scientific validity. Full cryptographic signing, source-qualified physical observation adapters, calibrated probabilistic information gain, uncertainty intervals and statistical analysis are future gates.
+The evaluator is in its own Rust source module and recomputes outcomes without calling policy selection or the synthetic oracle. It is **not yet a separately built executable or independent third-party verifier**. SHA-256 confirms receipt bytes match; it does not authenticate a physical source or prove scientific validity. Full cryptographic signing, source-qualified physical observation adapters, calibrated probabilistic information gain, uncertainty intervals and statistical analysis are future gates.
 
 ## Key distinctions
 
