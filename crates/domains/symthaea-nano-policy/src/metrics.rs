@@ -1114,6 +1114,28 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_outcome_fixture_and_json_schemas_are_parseable() {
+        let raw = include_bytes!("../fixtures/synthetic-outcome-ledger.json");
+        let report = evaluate_json_ledger(raw, 200, 17).expect("checked-in synthetic ledger");
+        assert_eq!(report.schema_version, METRICS_REPORT_SCHEMA_VERSION);
+        assert_eq!(report.arms.len(), 2);
+        assert_eq!(report.arms.iter().find(|arm| arm.arm_id == "baseline").unwrap().oracle_attempts, 11);
+
+        let ledger_schema: Value =
+            serde_json::from_str(include_str!("../schema/outcome-ledger.schema.json")).unwrap();
+        let report_schema: Value =
+            serde_json::from_str(include_str!("../schema/benchmark-metrics-report.schema.json")).unwrap();
+        assert_eq!(ledger_schema["additionalProperties"], false);
+        assert_eq!(report_schema["additionalProperties"], false);
+        assert_eq!(ledger_schema["properties"]["schema_version"]["const"], OUTCOME_LEDGER_SCHEMA_VERSION);
+        assert_eq!(report_schema["properties"]["schema_version"]["const"], METRICS_REPORT_SCHEMA_VERSION);
+
+        let report_value = serde_json::to_value(report).expect("serialize report");
+        assert_eq!(report_value["schema_version"], METRICS_REPORT_SCHEMA_VERSION);
+        assert_eq!(report_value["arms"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
     fn rejects_unknown_outcome_fields() {
         let mut value: Value = serde_json::to_value(fixture()).unwrap();
         value.as_object_mut().unwrap().insert("hidden_target_labels".to_string(), json!([1.0, 2.0]));
