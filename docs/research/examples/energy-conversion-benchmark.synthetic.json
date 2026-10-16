@@ -148,6 +148,7 @@
     "time_continuity_tolerance_s": 1e-9,
     "minimum_superiority_margin": 0.05,
     "maximum_unmodeled_differential_bias_efficiency": 0.0,
+    "differential_bias_bound_basis": "Synthetic fixture only; not evidence that real systematic bias is zero.",
     "baseline_id": "none-synthetic-only",
     "selection_rule": "No decision permitted: fixture exists only to validate schema and verifier behavior.",
     "search_started_at": "2026-10-15T01:00:00Z",
