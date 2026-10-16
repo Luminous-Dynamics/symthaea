@@ -84,4 +84,21 @@ A valid bundle proves that the supplied bytes match the declared digests and the
 
 The byte inventory and receipt checks should eventually fit a standard attestation structure rather than become a parallel, unauthenticated format. The [in-toto Attestation Framework](https://github.com/in-toto/attestation/tree/main/spec/v1) separates the subject/predicate statement, authentication envelope, and bundle grouping. [SLSA Build Provenance v1](https://slsa.dev/spec/v1.2/build-provenance) provides a standard description of where and how an artifact was produced, with verification against consumer expectations described in the [SLSA artifact-verification guidance](https://slsa.dev/spec/v1.2/verifying-artifacts).
 
-This prototype currently verifies exact bytes and declared relationships only. It does not emit or verify an in-toto envelope, authenticate the runner, establish that an execution actually occurred, or establish the truth of simulated events. The future versioned design should reuse established attestation layers for identity/authentication and keep domain-specific receipt semantics as a typed predicate, rather than claiming that the custom manifest alone proves execution provenance.
+This prototype's bundle verifier validates exact bytes and declared relationships, but does not verify signatures. The focused CI workflow now creates an exact-head execution record after both standard-library test suites run, checks that the checkout SHA matches the PR head SHA (recording GitHub's event SHA separately), validates the record against a versioned JSON Schema, uploads the report and raw test log, and generates a GitHub artifact attestation using a pinned `actions/attest` revision. The report includes source/test/schema/dependency/workflow hashes and the parsed per-suite unittest counts; its creation fails when the checkout SHA or observed `Ran N tests ... OK` summaries do not match.
+
+To verify a downloaded report independently, use GitHub CLI with an explicit repository, predicate type, and signer workflow: `gh attestation verify qualification-report.json --repo Luminous-Dynamics/symthaea --predicate-type https://luminousdynamics.io/attestations/socioeconomic-run-bundle-validation/v1 --signer-workflow Luminous-Dynamics/symthaea/.github/workflows/socioeconomic-run-bundle.yml`. This verifies the associated signed attestation and the requested workflow identity; reviewers must still inspect the predicate and test output. The attestation is evidence that a specified workflow produced the report, not proof that a model is correct or a simulation is true. The future versioned design should keep these layers separate and reuse standard attestation envelopes rather than claiming the custom manifest alone proves execution provenance.
+
+
+## Exact-head execution attestation follow-on
+
+The focused workflow now has two test modules: the run-bundle verifier's adversarial controls and tests for the execution-record writer. The latter refuses to report success if GitHub's expected source revision differs from `git rev-parse HEAD`, the test log is empty, the per-suite `Ran N tests ... OK` summaries disagree with the source-discovered suite sizes, or a required source artifact is missing/symlinked/outside the workspace.
+
+The job checks out `github.event.pull_request.head.sha` for PRs (or the event SHA for push/manual runs) and records the original event SHA separately. After schema validation, the report and raw test log are uploaded and the report receives a signed GitHub artifact attestation. On fork PRs, signing is skipped rather than granting an untrusted head an attestation-writing path. The attestation action and artifact uploader are pinned to immutable commit SHAs.
+
+Proposed acceptance criteria for a signed run report:
+- The attestation signature, certificate identity and signer workflow verify with `gh attestation verify`.
+- The signed subject digest matches the downloaded report bytes.
+- The report source revision matches the inspected exact PR head, not merely a synthetic merge ref.
+- Per-suite executed counts match the test log, authored AST counts and expected negative-control inventory.
+- The raw test log, schema, test source, validator, dependency lock and workflow hashes in the report match their downloaded bytes.
+- No report claims more than validator/test execution and artifact integrity; simulation truth, real-domain evidence and economic efficacy remain unproven.
