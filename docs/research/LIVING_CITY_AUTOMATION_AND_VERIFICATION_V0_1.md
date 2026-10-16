@@ -344,3 +344,11 @@ These IDs are test definitions, **not pre-filled hazard severities or claims abo
 - NIST, On Methods of Uncertainty Quantification in Computational Modeling and Simulation: Harmonizing Modeling and Metrology Practices, NIST AMS 100-85 (published 5 October 2026): https://doi.org/10.6028/NIST.AMS.100-85. Use its risk-based credibility framing: verification and uncertainty effort should scale with model influence and decision consequence.
 - NASA-STD-7009B, Standard for Models and Simulations (active version listed by NASA): https://standards.nasa.gov/standard/nasa/nasa-std-7009. Useful reference for defining project-specific acceptance criteria and model credibility evidence.
 - buildingSMART official standards server: https://standards.buildingsmart.org/. Pin the released IFC 4.3.2.0 / ISO 16739-1:2024 and IDS 1.0 releases for the initial information-exchange workflow rather than silently tracking in-development schemas.
+
+## 15. Current verifier implementation boundary
+
+The Rust evidence module now implements SHA-256 over canonical manifest/receipt bytes and verification of retained source/output bytes against declared digests. It also checks that source/output byte sets match the declared IDs and that a run receipt references the exact canonical evidence manifest and scenario identity. Synthetic tests include NIST SHA-256 vectors and altered-byte/metadata negative controls.
+
+Relevant APIs are sha256_hex, evidence_manifest_sha256, verify_evidence_manifest_digest, scenario_run_receipt_sha256, verify_scenario_run_receipt_digest, verify_manifest_source_bytes, verify_receipt_output_bytes, and verify_receipt_manifest_link in crates/domains/symthaea-scenarios/src/living_city_evidence.rs.
+
+This remains a **library-level verification component**, not yet a separately deployed verifier service or command that independently opens artifacts from a run directory and produces a signed verification report. The orchestration integration, access-controlled artifact retention, and exact-head execution evidence remain required before this can be called an independently verified engineering pipeline. Tests have been added but were not run in the available environment because Rust/Cargo are absent; skipped CI is not a pass.
