@@ -956,6 +956,12 @@ mod tests {
         assert_eq!(report.predictions_excluded_by_unscored_regions, 1);
         assert_eq!(report.per_sample[0].predictions_excluded_by_unscored_regions, 1);
         assert_eq!(report.metrics.false_positives, 1);
+        assert_eq!(report.metrics.unscored_duration_seconds, 1.0);
+        assert_eq!(report.metrics.scored_duration_seconds, 19.0);
+        assert!(
+            (report.metrics.false_alarms_per_scored_hour.unwrap() - (3600.0 / 19.0)).abs()
+                < 1e-9
+        );
         assert!((report.metrics.average_precision.unwrap() - 5.0 / 6.0).abs() < 1e-9);
     }
 
