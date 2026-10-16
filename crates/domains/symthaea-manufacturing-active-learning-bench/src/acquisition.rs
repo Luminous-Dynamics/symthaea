@@ -1228,7 +1228,11 @@ mod tests {
             expected_information_gain_for_state(&model, &posterior.next_state, "perfect")
                 .unwrap();
         assert!(next_metrics.expected_information_gain_nats.abs() < 1e-12);
-        assert_eq!(next_metrics.model_digest, posterior.next_state.state_digest);
+        assert_eq!(next_metrics.model_digest, posterior.posterior_model_digest);
+        assert_eq!(
+            next_metrics.posterior_state_digest,
+            Some(posterior.next_state.state_digest.clone())
+        );
 
         let ranking = rank_feasible_actions_for_state(
             &model,
@@ -1236,7 +1240,11 @@ mod tests {
             AcquisitionObjective::ExpectedInformationGain,
         )
         .unwrap();
-        assert_eq!(ranking.model_digest, posterior.next_state.state_digest);
+        assert_eq!(ranking.model_digest, posterior.posterior_model_digest);
+        assert_eq!(
+            ranking.posterior_state_digest,
+            Some(posterior.next_state.state_digest.clone())
+        );
         assert!(ranking.ranked_actions[0].objective_score.abs() < 1e-12);
     }
 
