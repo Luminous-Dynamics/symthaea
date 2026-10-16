@@ -1017,12 +1017,13 @@ mod tests {
         let catalog = experiment_catalog();
         let left = run_policy(&scenario, Policy::SeededRandom, 77, 6, &catalog);
         let right = run_policy(&scenario, Policy::SeededRandom, 77, 6, &catalog);
-        assert_eq!(left.resolved_constraints, right.resolved_constraints);
-        assert_eq!(left.budget_spent_units, right.budget_spent_units);
+        assert_eq!(left.metrics.resolved_constraints, right.metrics.resolved_constraints);
+        assert_eq!(left.metrics.budget_spent_units, right.metrics.budget_spent_units);
         assert_eq!(
-            left.normalized_interval_width_reduction,
-            right.normalized_interval_width_reduction
+            left.metrics.normalized_interval_width_reduction,
+            right.metrics.normalized_interval_width_reduction
         );
+        assert_eq!(left.selected_experiment_ids, right.selected_experiment_ids);
     }
 
     #[test]
@@ -1039,6 +1040,27 @@ mod tests {
                 assert!(oracle.metrics.budget_spent_units <= 6);
             }
         }
+    }
+
+
+    #[test]
+    fn round_robin_start_rotates_across_paired_seeds() {
+        let scenario = generate_scenario(44);
+        let catalog = experiment_catalog();
+        let first = run_policy(&scenario, Policy::RoundRobin, 0, 6, &catalog);
+        let second = run_policy(&scenario, Policy::RoundRobin, 1, 6, &catalog);
+        assert_ne!(
+            first.selected_experiment_ids.first(),
+            second.selected_experiment_ids.first()
+        );
+    }
+
+    #[test]
+    fn empty_source_revision_is_rejected() {
+        assert_eq!(
+            run_reference_benchmark_with_revision(1, &[0], 2, "  ").unwrap_err(),
+            BenchmarkError::EmptySourceRevision
+        );
     }
 
     #[test]
