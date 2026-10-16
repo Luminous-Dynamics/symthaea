@@ -446,10 +446,13 @@ Tracking task: [CRISPR-OT-008 #7633 — probability-sampled verification to corr
 
 **F14 synthetic contract check (2026-10-16):** four audited outcomes are drawn from a declared ten-candidate ranking, with unequal inclusion probabilities. The hand-computed inverse-probability sums estimate 10 candidates, six positives overall, four candidates in top K=4, and two positives in top K. The weighted ratio recall is 1/3, while naïve audit-subset recall is 0.5. This is a synthetic arithmetic demonstration—not a Rust test, a real sampling audit, a biological result, or evidence of Symthaea improvement.
 
-Dependency-free Rust module: [scripts/crispr_verification_bias.rs](../../scripts/crispr_verification_bias.rs). The 19 authored unit tests are not compiled or executed in this authoring environment because `rustc` is unavailable. The kernel validates declared design fields and sampled row identity/propensity structure, but cannot prove the sample was truly randomized or that the caller's full-frame manifest is true.
+Dependency-free Rust module: [scripts/crispr_verification_bias.rs](../../scripts/crispr_verification_bias.rs). The 21 authored unit tests are not compiled or executed in this authoring environment because `rustc` is unavailable. The kernel validates declared design fields and sampled row identity/propensity structure, but cannot prove the sample was truly randomized or that the caller's full-frame manifest is true.
 
     rustc --edition=2024 --test scripts/crispr_verification_bias.rs -o /tmp/crispr-verification-bias-tests
     /tmp/crispr-verification-bias-tests
 
 
 **Independent estimator oracle (2026-10-16):** exhaustive design-expectation checks covered 2,048 deterministic finite-population fixtures and 128,512 non-empty sample subsets, using unequal candidate inclusion probabilities and conditional Bernoulli selection designs. The four Horvitz–Thompson count totals (candidate count, population positives, top-K candidates, and top-K positives) matched their true finite-population totals in expectation; maximum absolute numerical error was below 6e-15. This validates the count-estimator equations on the enumerated designs. It does not establish that a real sample followed its declared design, validate ratio-estimator unbiasedness, generate confidence intervals, compile Rust, or demonstrate biological improvement.
+
+
+**Resolved-label inclusion guard:** the kernel now uses an explicit `AuditOutcome` enum. A sampled row marked `UnknownUnassayed` is rejected; it cannot silently become an assay-negative. The inclusion probability must refer to entry into the final resolved, analyzable-label sample, not merely an audit invitation. Any nonresponse/assay-failure mechanism must be justified by the independent audit design; the kernel does not estimate response propensities.
