@@ -23,9 +23,10 @@ From the Symthaea workspace:
 cargo fmt --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --check
 cargo test --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml
 cargo clippy --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --all-targets -- -D warnings
+cargo run --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --example replay_benchmark_v1
 ~~~
 
-These are reproduction commands, not evidence of passing checks. Only exact-head completed runs count as qualification.
+These are reproduction commands, not evidence of passing checks. The example emits synthetic Brier/log-loss summaries and a future-only oracle exclusion control; it is not a real forecast-quality result. Only exact-head completed runs count as qualification.
 
 ## New comparative replay
 
