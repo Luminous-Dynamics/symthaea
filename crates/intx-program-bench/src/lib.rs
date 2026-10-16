@@ -61,6 +61,14 @@ pub fn validate_cases(cases: &[Case]) -> Result<(), String> {
         return Err(format!("expected 50 cases, got {}", cases.len()));
     }
 
+    let expected_ids: BTreeSet<String> = (0..5)
+        .flat_map(|group| (1..=10).map(move |number| format!("C{group}-{number:02}")))
+        .collect();
+    let actual_ids: BTreeSet<String> = cases.iter().map(|case| case.id.clone()).collect();
+    if actual_ids != expected_ids {
+        return Err("case IDs do not match the frozen C0-01 through C4-10 corpus".to_string());
+    }
+
     let mut ids = BTreeSet::new();
     let mut dimensions = BTreeMap::<&str, usize>::new();
     let valid_dimensions = ["identity", "artifact", "authority", "transport", "lifecycle"];
@@ -165,6 +173,17 @@ mod tests {
         validate_cases(&cases).expect("fixture corpus satisfies shape and safety invariants");
         assert_eq!(cases.first().map(|case| case.id.as_str()), Some("C0-01"));
         assert_eq!(cases.last().map(|case| case.id.as_str()), Some("C4-10"));
+    }
+
+    #[test]
+    fn every_expected_case_id_is_part_of_the_frozen_corpus() {
+        let mut cases = parse_cases(CORPUS).expect("fixture corpus parses");
+        let case = cases
+            .iter_mut()
+            .find(|case| case.id == "C1-09")
+            .expect("export fixture exists");
+        case.id = "C1-90".to_string();
+        assert!(validate_cases(&cases).is_err());
     }
 
     #[test]
