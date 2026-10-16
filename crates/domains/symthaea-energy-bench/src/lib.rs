@@ -120,6 +120,9 @@ pub struct EvaluationPolicy {
     /// between candidate and baseline efficiency, expressed as a fraction.
     /// This is a conservative bound, not a standard uncertainty.
     pub maximum_unmodeled_differential_bias_efficiency: f64,
+    /// Evidence/reasoning used to justify the registered bound. This text is
+    /// an audit aid, not independent authentication of the evidence.
+    pub differential_bias_bound_basis: String,
     pub baseline_id: String,
     pub selection_rule: String,
     pub comparison_metric_id: String,
@@ -327,8 +330,12 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
     if policy.policy_id.trim().is_empty()
         || policy.baseline_id.trim().is_empty()
         || policy.selection_rule.trim().is_empty()
+        || policy.differential_bias_bound_basis.trim().is_empty()
     {
-        issues.push("policy ID, baseline ID, and selection rule must be non-empty".into());
+        issues.push(
+            "policy ID, baseline ID, selection rule, and differential-bias-bound basis must be non-empty"
+                .into(),
+        );
     }
     if policy.comparison_metric_id != "net_cycle_efficiency" {
         issues.push(
@@ -747,6 +754,7 @@ pub fn compare_candidates(
         || cp.minimum_superiority_margin != bp.minimum_superiority_margin
         || cp.maximum_unmodeled_differential_bias_efficiency
             != bp.maximum_unmodeled_differential_bias_efficiency
+        || cp.differential_bias_bound_basis != bp.differential_bias_bound_basis
         || cp.selection_rule != bp.selection_rule
         || cp.baseline_id != bp.baseline_id
         || cp.comparison_metric_id != bp.comparison_metric_id
@@ -1045,6 +1053,8 @@ mod tests {
         baseline.evaluation_policy.comparison_metric_id = "net_cycle_efficiency".into();
         baseline.evaluation_policy.minimum_superiority_margin = 0.02;
         baseline.evaluation_policy.maximum_unmodeled_differential_bias_efficiency = 0.0;
+        baseline.evaluation_policy.differential_bias_bound_basis =
+            "Test-only synthetic fixture; zero bias bound is not a physical assertion.".into();
 
         let mut candidate = baseline.clone();
         candidate.candidate.candidate_id = "candidate-better".into();
