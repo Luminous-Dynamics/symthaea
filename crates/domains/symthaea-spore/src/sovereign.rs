@@ -709,8 +709,12 @@ impl InoculationOrchestrator {
     /// automatically enroll keys into firmware.
     pub fn generate_boot_config_nix(&self) -> Result<String, String> {
         if !self.lanzaboote_enabled {
+            if self.secure_boot_state.as_deref() != Some("Disabled") {
+                return Err("standard unsigned boot configuration requires a current Disabled observation; resolve the target Secure Boot state before generating config".to_string());
+            }
             return Ok(r#"{ ... }: {
-  # Standard systemd-boot. No Secure Boot assurance is claimed here.
+  # Standard systemd-boot. Firmware Secure Boot enforcement is observed Disabled.
+  # No Secure Boot assurance is claimed by this configuration.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 }"#.to_string());
@@ -1180,10 +1184,13 @@ mod tests {
     }
 
     #[test]
-    fn test_boot_config_standard_needs_no_secure_boot_authorization() {
+    fn test_boot_config_standard_requires_observed_disabled_state() {
         let mut orch = InoculationOrchestrator::default();
         orch.lanzaboote_enabled = false;
-        let config = orch.generate_boot_config_nix().expect("standard boot does not enroll firmware keys");
+        assert!(orch.generate_boot_config_nix().is_err());
+
+        orch.secure_boot_state = Some("Disabled".to_string());
+        let config = orch.generate_boot_config_nix().expect("observed disabled state permits standard boot configuration");
         assert!(config.contains("systemd-boot.enable = true"));
         assert!(!config.contains("lanzaboote"));
     }
