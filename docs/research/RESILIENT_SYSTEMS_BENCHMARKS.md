@@ -339,7 +339,7 @@ Statistical targets remain proposed and unmeasured: 100 jobs × 20 crews × 20 s
 
 ## 10. Exact tiny-instance oracle and public fixture corpus
 
-The six-fixture, machine-readable corpus is [repair_scheduling_oracle_corpus.json](./repair_scheduling_oracle_corpus.json). The independent Rust oracle is [repair_small_instance_oracle.rs](../../crates/domains/symthaea-engineering/src/repair_small_instance_oracle.rs). It exhaustively evaluates all permutations for a deliberately limited problem class: up to eight jobs, one hypothetical crew qualified for every job, all outages starting at time zero, no precedence constraints and no spare parts. The objective is weighted completion time. Scope violations fail closed rather than being silently ignored.
+The six-fixture, machine-readable corpus is [repair_scheduling_oracle_corpus.json](./repair_scheduling_oracle_corpus.json). The independent Rust oracle is [repair_small_instance_oracle.rs](../../crates/domains/symthaea-engineering/src/repair_small_instance_oracle.rs). It exhaustively evaluates all permutations for a deliberately limited problem class: up to eight jobs, one hypothetical crew qualified for every job, all outages starting at time zero, no precedence constraints and no spare parts. The objective is weighted completion time. Scope violations fail closed rather than being silently ignored. The module also exposes an optimality-gap evaluator for the priority-first, shortest-job-first and weighted-recovery policies, returning each policy's schedule order, loss, absolute gap and relative gap from the exhaustive optimum.
 
 This gives us an exact answer on instances small enough to enumerate, while larger instances need separate lower/upper bounds or best-known solutions. The oracle is not intended for operational schedules with travel, constraints or uncertainty. ORACLE-01–ORACLE-05 have hand-checkable expected outcomes. ORACLE-06 was independently exhaustively enumerated in JavaScript across all 40,320 permutations, giving loss 406 and order b→f→d→h→c→g→e→a. The corresponding Rust test pins that expected reference but has not been executed in this environment; do not turn an authored expected result into a Rust test-pass claim.
 
@@ -361,6 +361,6 @@ Fresh research reinforces the direction toward feedback-driven restoration: a 20
 ### New target
 
 - **Oracle correctness:** 100% agreement with exhaustive objective values on the published fixtures; each permutation count must equal n!.
-- **Heuristic quality:** publish per-instance optimality gap for each greedy policy, not only aggregate average.
+- **Heuristic quality:** compute per-instance absolute and relative optimality gaps for all three greedy policies; publish full instance-level rows, not only aggregate averages. ORACLE-01 expects priority-first loss 1,110 (absolute gap 999; relative gap 9.0, or 900%), while shortest-job-first and weighted-recovery both match loss 111.
 - **Determinism:** stable objective and lexicographic tie-break under input permutation.
 - **Benchmark hygiene:** the hand-built corpus is a correctness suite, not a statistical holdout. Build separate versioned training/tuning and holdout seeds before making general policy-quality claims.
