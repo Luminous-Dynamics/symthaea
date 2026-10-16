@@ -45,7 +45,7 @@ Hand-checkable tests cover:
 - a symmetric 90/10 noisy observation;
 - a blocked high-information action that is not ranked;
 - missing likelihood rows, invalid probability mass, and model-digest changes;
-- posterior normalization after perfect/noisy observations, impossible-outcome rejection, duplicate evidence-ID rejection, tampered-state rejection, and acquisition recomputation under the updated posterior.
+- posterior normalization after perfect/noisy observations, impossible-outcome rejection, duplicate evidence-ID rejection, tampered-state rejection, rehashed-receipt tampering, and acquisition recomputation under the updated posterior.
 
 This remains synthetic mathematics. The likelihood must be supported and calibrated for a real process before the kernel can guide physical experimentation. Passing these tests would not establish physical information gain, causal identification, manufacturing utility, or savings.
 
