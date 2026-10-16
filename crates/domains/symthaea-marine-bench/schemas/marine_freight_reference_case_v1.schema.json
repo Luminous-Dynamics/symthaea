@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-marine-bench/schemas/marine_freight_reference_case_v1.schema.json",
+  "$id": "urn:luminous-dynamics:symthaea:marine-freight-reference-case:v1",
   "title": "Symthaea marine freight reference case v1",
   "description": "Input contract for bounded screening arithmetic. Validation of provenance references, physical applicability, and calculation semantics is performed separately by the Rust evaluator.",
   "type": "object",
