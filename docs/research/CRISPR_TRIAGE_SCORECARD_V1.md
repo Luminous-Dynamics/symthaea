@@ -96,6 +96,8 @@ Instead, report a **Pareto frontier** across a preregistered vector of supported
 - maximize worst-guide/Cas9-group recall;
 - minimize the paired label-sensitivity interval width, while still reporting the interval's position;
 - minimize calibration loss only when probability and label semantics are valid;
+- minimize the upper unknown-aware selective error-rate bound at fixed, matched coverage;
+- maximize accepted-label completeness at a fixed coverage tier, while separately reporting unknown-label bounds;
 - minimize measured runtime/compute.
 
 The frontier keeps nondominated policies: no other policy is at least as good on every declared objective and strictly better on one. Different nondominated policies may represent legitimate trade-offs. Do not invent universal weights to force one winner, and do not convert missing/not-estimable values to zero. A policy enters a given frontier only when all of that frontier's preregistered metrics are available and comparable; report excluded policies and reasons separately.
