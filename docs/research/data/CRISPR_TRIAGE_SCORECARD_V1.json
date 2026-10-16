@@ -34,7 +34,10 @@
     "measurement_allocation_fixture_executed": false,
     "interval_frontier_compiled": false,
     "interval_frontier_unit_tests_executed": false,
-    "interval_frontier_fixture_executed": false
+    "interval_frontier_fixture_executed": false,
+    "transportability_kernel_compiled": false,
+    "transportability_unit_tests_executed": false,
+    "transportability_fixture_executed": false
   },
   "label_states": [
     {
@@ -187,7 +190,8 @@
         "brier_score_or_log_loss_when_estimable",
         "upper_unknown_aware_error_rate_bound_at_fixed_coverage",
         "accepted_label_completeness_at_fixed_coverage",
-        "measured_runtime_and_compute"
+        "measured_runtime_and_compute",
+        "lower_target_mixture_recall_delta_when_estimable"
       ]
     },
     {
@@ -248,6 +252,29 @@
         "Possible dominance is not a win; an enlarged robust frontier may signal insufficient evidence to distinguish options."
       ],
       "acceptance": "F11 and adversarial fixtures validate definite, possible-only, and incomparable relations. Publish robust frontier and possible-only relations separately; compare against point-estimate frontier without converting intervals to midpoints."
+    },
+    {
+      "id": "T13_target_mixture_transportability",
+      "required_when_target_context_prevalence_may_differ_from_source": true,
+      "metrics": [
+        "context_specific_paired_recall_delta_intervals",
+        "target_prevalence_bounds_by_context",
+        "lower_target_mixture_delta",
+        "upper_target_mixture_delta",
+        "lower_endpoint_prevalence_witness",
+        "upper_endpoint_prevalence_witness",
+        "robust_positive_nonpositive_or_inconclusive_status",
+        "source_vs_target_sign_change"
+      ],
+      "estimand": "Target-population mixture of context-specific paired Recall@K deltas for one frozen policy-versus-baseline comparison and one declared K, over all target prevalence vectors consistent with preregistered context-specific lower/upper bounds.",
+      "calculation": "For the lower bound, use each context's delta lower endpoint and minimize the weighted sum over the bounded simplex; for the upper bound use delta upper endpoints and maximize the weighted sum. Initialize weights at prevalence lower bounds and allocate remaining mass in sorted objective order up to each upper bound.",
+      "acceptance": "Every context with positive feasible target prevalence has supported, permitted context-specific evidence; weights are in [0,1]; lower-bound sum <= 1 <= upper-bound sum; endpoint witness weights obey bounds and sum to one. A positive-transfer claim requires lower target-mixture bound > 0.",
+      "fail_closed_rules": [
+        "Unsupported target context is not assigned zero and blocks the target comparison.",
+        "Infeasible prevalence intervals fail closed.",
+        "Group-effect intervals and target prevalence bounds need separate provenance and joint-coverage caveats.",
+        "The envelope is not a confidence interval or proof of exchangeability."
+      ]
     }
   ],
   "primary_targets": {
@@ -319,6 +346,20 @@
         "Marginal intervals alone do not ensure simultaneous coverage across multiple objectives/policies.",
         "Robust dominance of computational endpoints is not biological or clinical safety."
       ]
+    },
+    "secondary_transportability": {
+      "status": "proposed_engineering_gates_not_clinical_standards",
+      "targets": [
+        "100% of target contexts with nonzero feasible prevalence have supported context-specific metric episodes, or comparison is marked not estimable.",
+        "Zero positive-transfer claims when the conservative lower target-mixture delta is at or below zero.",
+        "Report both endpoint witness weight vectors and compare source-weighted, nominal-target and bounded-target-mixture conclusions.",
+        "Report every context effect interval plus source/target population and provenance and joint-coverage limits of prevalence/effect bounds."
+      ],
+      "caveats": [
+        "Target prevalence bounds must be preregistered or externally justified; they are not estimated by this utility.",
+        "Effect intervals are supplied inputs, and dependence between context effects and weights may make the envelope conservative.",
+        "A target-mixture Recall@K result is a computational endpoint only, not a clinical safety or efficacy claim."
+      ]
     }
   },
   "non_negotiable_gates": [
@@ -386,6 +427,11 @@
       "id": "G12_interval_frontier_integrity",
       "target": "100% of robust dominance claims satisfy worst-bound vs best-bound comparison in every declared objective; possible-only relations are never reported as definite wins.",
       "failure_action": "Reject invalid/reversed/non-finite intervals, cross-objective mismatch, midpoint-only substitution, undocumented interval provenance, or claims that interval dominance establishes biological/clinical safety."
+    },
+    {
+      "id": "G13_target_mixture_transportability",
+      "target": "100% of target contexts with nonzero feasible prevalence have supported context-specific effect intervals; endpoint witness mixtures are feasible; robust positive-transfer requires lower bound > 0.",
+      "failure_action": "Reject unsupported-context zero imputation, infeasible prevalence ranges, missing witness vectors, undocumented group effect/prevalence provenance, or positive-transfer claims from nominal weights alone."
     }
   ],
   "comparator_policies": [
@@ -466,7 +512,9 @@
     "https://doi.org/10.1016/j.tibtech.2026.07.015",
     "https://doi.org/10.1093/nar/gkae759",
     "https://doi.org/10.1016/j.ins.2026.123217",
-    "https://proceedings.mlr.press/v337/laghuvarapu26a.html"
+    "https://proceedings.mlr.press/v337/laghuvarapu26a.html",
+    "https://doi.org/10.1214/26-EJS2506",
+    "https://arxiv.org/abs/2609.27955"
   ],
   "synthetic_contract_fixtures": [
     {
@@ -994,6 +1042,58 @@
         ]
       },
       "interpretation": "Synthetic interval-relations fixture only. Inputs are not empirical CRISPR metrics, statistical confidence intervals or safety evidence."
+    },
+    {
+      "id": "F12_bounded_target_mixture_transportability",
+      "purpose": "Show that a positive nominal mixture can be inconclusive under plausible target-context prevalence and per-context effect intervals.",
+      "contexts": [
+        {
+          "context_id": "A",
+          "delta_lower": 0.08,
+          "delta_upper": 0.12,
+          "target_prevalence_lower": 0.2,
+          "target_prevalence_upper": 0.5,
+          "context_supported": true
+        },
+        {
+          "context_id": "B",
+          "delta_lower": 0.02,
+          "delta_upper": 0.07,
+          "target_prevalence_lower": 0.3,
+          "target_prevalence_upper": 0.6,
+          "context_supported": true
+        },
+        {
+          "context_id": "C",
+          "delta_lower": -0.25,
+          "delta_upper": -0.15,
+          "target_prevalence_lower": 0.1,
+          "target_prevalence_upper": 0.4,
+          "context_supported": true
+        }
+      ],
+      "nominal_mix": {
+        "A": 0.35,
+        "B": 0.45,
+        "C": 0.2
+      },
+      "expected": {
+        "nominal_midpoint_delta": 0.01525,
+        "lower_mixture_delta": -0.076,
+        "upper_mixture_delta": 0.073,
+        "lower_witness": {
+          "A": 0.2,
+          "B": 0.4,
+          "C": 0.4
+        },
+        "upper_witness": {
+          "A": 0.5,
+          "B": 0.4,
+          "C": 0.1
+        },
+        "conclusion": "inconclusive"
+      },
+      "interpretation": "Synthetic method fixture only; no target-population or biological data are supplied."
     }
   ],
   "implementation_artifact": {
@@ -1019,7 +1119,8 @@
       "scripts/crispr_decision_frontier.rs",
       "scripts/crispr_selective_risk.rs",
       "scripts/crispr_measurement_priority.rs",
-      "scripts/crispr_interval_frontier.rs"
+      "scripts/crispr_interval_frontier.rs",
+      "scripts/crispr_transportability.rs"
     ],
     "additional_test_suites": [
       {
@@ -1068,6 +1169,22 @@
           "equal point intervals do not strictly dominate",
           "crossed objectives remain incomparable",
           "empty/duplicate/mismatched/non-finite/reversed inputs fail closed"
+        ]
+      },
+      {
+        "path": "scripts/crispr_transportability.rs",
+        "unit_test_count": 16,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_transportability.rs -o /tmp/crispr-transport-tests && /tmp/crispr-transport-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "mixed context effects can make an uncertain target mix inconclusive",
+          "robust positive and robust non-positive conclusions",
+          "fixed target mix and explicit endpoint witnesses",
+          "witness weights obey bounds and sum to one",
+          "unsupported contexts fail closed",
+          "infeasible prevalence mass, invalid intervals and invalid prevalence ranges rejected",
+          "duplicate and blank context identifiers rejected",
+          "deterministic ties"
         ]
       }
     ]
@@ -1283,6 +1400,30 @@
       "robust_dominance_mismatches": 0,
       "result": "Coordinate-wise possible and robust dominance formulas matched exhaustive endpoint evaluation for every tested interval pair.",
       "scope_limit": "This validates relation semantics for the enumerated two-objective intervals only. It does not compile or test the Rust module, derive statistical confidence intervals, handle covariance/joint coverage, or establish biological/clinical validity."
+    },
+    "transportability_fixture": {
+      "status": "passed_direct_grid_oracle_only",
+      "executed_on": "2026-10-16",
+      "check": {
+        "feasible_tenth_step_prevalence_vectors": 12,
+        "context_delta_endpoint_assignments": 8,
+        "combined_assignments": 96,
+        "nominal_midpoint_delta": 0.01525,
+        "lower_mixture_delta": -0.076,
+        "upper_mixture_delta": 0.073,
+        "lower_witness": {
+          "A": 0.2,
+          "B": 0.4,
+          "C": 0.4
+        },
+        "upper_witness": {
+          "A": 0.5,
+          "B": 0.4,
+          "C": 0.1
+        }
+      },
+      "result": "Independent grid enumeration matched both bounded-simplex extrema and witness weights.",
+      "scope_limit": "Synthetic finite-grid check only; not Rust compilation, statistical interval estimation, target-population estimation, or biological validation."
     }
   },
   "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571",
@@ -1310,6 +1451,12 @@
       "number": 7602,
       "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7602",
       "scope": "interval-aware robust Pareto frontier"
+    },
+    {
+      "id": "CRISPR-OT-006",
+      "number": 7615,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7615",
+      "scope": "robust target-mixture transportability"
     }
   ]
 }
