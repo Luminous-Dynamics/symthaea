@@ -134,6 +134,45 @@ jobs:
         with:
           name: socioeconomic-run-bundle-qualification
           path: evidence/
+      - name: Re-verify trusted signing context and report binding
+        env:
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          EXPECTED_EVENT_SHA: ${{ github.sha }}
+          EXPECTED_WORKFLOW_REF: ${{ github.workflow_ref }}
+          EXPECTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path("evidence/qualification-report.json").read_text())
+          predicate = json.loads(Path("evidence/attestation-predicate.json").read_text())
+          expected_ref = os.environ["EXPECTED_REPOSITORY"] + "/.github/workflows/socioeconomic-run-bundle.yml@refs/heads/main"
+          if os.environ["GITHUB_EVENT_NAME"] != "workflow_dispatch":
+              raise SystemExit("FAIL: signing requires workflow_dispatch")
+          if os.environ["GITHUB_REF"] != "refs/heads/main":
+              raise SystemExit("FAIL: signing requires the main ref")
+          if report.get("repository") != os.environ["EXPECTED_REPOSITORY"]:
+              raise SystemExit("FAIL: report repository mismatch")
+          if report.get("source_revision") != os.environ["EXPECTED_EVENT_SHA"]:
+              raise SystemExit("FAIL: report is not for the trusted dispatch SHA")
+          if report.get("event_sha") != os.environ["EXPECTED_EVENT_SHA"]:
+              raise SystemExit("FAIL: report event SHA mismatch")
+          if report.get("workflow_ref") != expected_ref or report.get("workflow_ref") != os.environ["EXPECTED_WORKFLOW_REF"]:
+              raise SystemExit("FAIL: report workflow ref is not the trusted main workflow")
+          if report.get("workflow_sha") != os.environ["EXPECTED_WORKFLOW_SHA"]:
+              raise SystemExit("FAIL: report workflow SHA mismatch")
+          report_bytes = Path("evidence/qualification-report.json").read_bytes()
+          digest = "sha256:" + hashlib.sha256(report_bytes).hexdigest()
+          if predicate.get("execution_record_digest") != digest:
+              raise SystemExit("FAIL: signed predicate does not bind exact report bytes")
+          for field in ("schema", "claim_ceiling", "scope", "result", "repository", "source_revision", "event_sha", "workflow", "workflow_ref", "workflow_sha", "run_id", "run_attempt", "executed_test_count", "executed_test_counts_by_suite", "authority_boundary"):
+              if predicate.get(field) != report.get(field):
+                  raise SystemExit(f"FAIL: predicate mismatch for {field}")
+          print("PASS: trusted default-branch signing context and exact subject/predicate binding verified")
+          PY
       - name: Sign qualification report with GitHub artifact attestation
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
