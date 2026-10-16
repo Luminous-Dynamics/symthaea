@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano:simulator-call-ledger:v1",
+  "title": "Nanotechnology simulator-call budget ledger",
+  "description": "Post-run ledger of every proposal attempt, preflight disposition and actual simulator invocation. Schema validity does not prove that referenced receipts are authentic or that the scientific model is valid.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "run_id",
+    "arm_id",
+    "policy_id",
+    "policy_revision",
+    "run_manifest_sha256",
+    "task_contract_sha256",
+    "evaluation_manifest_sha256",
+    "source_manifest_sha256",
+    "simulator_recipe_sha256",
+    "expected_simulator_calls",
+    "reported_simulator_calls",
+    "proposal_attempt_cap",
+    "cost_unit",
+    "run_status",
+    "attempts"
+  ],
+  "properties": {
+    "schema_version": { "const": "nano-simulator-call-ledger-v1" },
+    "benchmark_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "run_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "arm_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "policy_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "policy_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "run_manifest_sha256": { "$ref": "#/$defs/sha256" },
+    "task_contract_sha256": { "$ref": "#/$defs/sha256" },
+    "evaluation_manifest_sha256": { "$ref": "#/$defs/sha256" },
+    "source_manifest_sha256": { "$ref": "#/$defs/sha256" },
+    "simulator_recipe_sha256": { "$ref": "#/$defs/sha256" },
+    "expected_simulator_calls": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "reported_simulator_calls": { "type": "integer", "minimum": 0, "maximum": 100000 },
+    "proposal_attempt_cap": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "cost_unit": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "run_status": { "enum": ["completed", "incomplete", "failed"] },
+    "attempts": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": { "$ref": "#/$defs/attempt" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "attempt_id",
+        "candidate_id",
+        "candidate_sha256",
+        "proposal_status",
+        "preflight_status",
+        "attempt_reason",
+        "not_called_reason",
+        "proposal_cost",
+        "proposal_elapsed_ms",
+        "simulator_call"
+      ],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "attempt_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "candidate_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 256 },
+        "candidate_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "proposal_status": { "enum": ["generated", "generation_failed"] },
+        "preflight_status": { "enum": ["not_run", "passed", "rejected"] },
+        "attempt_reason": { "type": ["string", "null"], "minLength": 1, "maxLength": 256 },
+        "not_called_reason": {
+          "enum": ["launch_failed", "runner_interrupted", "budget_guard", "unknown", null]
+        },
+        "proposal_cost": { "type": "number", "minimum": 0, "maximum": 1000000000000 },
+        "proposal_elapsed_ms": { "type": "integer", "minimum": 0, "maximum": 604800000 },
+        "simulator_call": {
+          "oneOf": [{ "$ref": "#/$defs/simulator_call" }, { "type": "null" }]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "proposal_status": { "const": "generation_failed" } },
+            "required": ["proposal_status"]
+          },
+          "then": {
+            "properties": {
+              "candidate_id": { "type": "null" },
+              "candidate_sha256": { "type": "null" },
+              "preflight_status": { "const": "not_run" },
+              "attempt_reason": { "type": "string", "minLength": 1 },
+              "not_called_reason": { "type": "null" },
+              "simulator_call": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "proposal_status": { "const": "generated" } },
+            "required": ["proposal_status"]
+          },
+          "then": {
+            "properties": {
+              "candidate_id": { "type": "string", "minLength": 1 },
+              "candidate_sha256": { "$ref": "#/$defs/sha256" },
+              "preflight_status": { "enum": ["passed", "rejected"] }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "preflight_status": { "const": "rejected" } },
+            "required": ["preflight_status"]
+          },
+          "then": {
+            "properties": {
+              "attempt_reason": { "type": "string", "minLength": 1 },
+              "not_called_reason": { "type": "null" },
+              "simulator_call": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "preflight_status": { "const": "passed" } },
+            "required": ["preflight_status"]
+          },
+          "then": {
+            "properties": { "attempt_reason": { "type": "null" } },
+            "oneOf": [
+              {
+                "properties": {
+                  "simulator_call": { "$ref": "#/$defs/simulator_call" },
+                  "not_called_reason": { "type": "null" }
+                }
+              },
+              {
+                "properties": {
+                  "simulator_call": { "type": "null" },
+                  "not_called_reason": {
+                    "enum": ["launch_failed", "runner_interrupted", "budget_guard", "unknown"]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "simulator_call": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocation_id",
+        "started_receipt_sha256",
+        "terminal_receipt_sha256",
+        "terminal_status",
+        "result_artifact_sha256",
+        "elapsed_ms",
+        "cost"
+      ],
+      "properties": {
+        "invocation_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "started_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "terminal_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "terminal_status": {
+          "enum": ["returned_finite_result", "returned_nonfinite_result", "failed", "timed_out", "interrupted"]
+        },
+        "result_artifact_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "elapsed_ms": { "type": "integer", "minimum": 0, "maximum": 604800000 },
+        "cost": { "type": "number", "minimum": 0, "maximum": 1000000000000 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "terminal_status": {
+                "enum": ["returned_finite_result", "returned_nonfinite_result"]
+              }
+            },
+            "required": ["terminal_status"]
+          },
+          "then": {
+            "properties": { "result_artifact_sha256": { "$ref": "#/$defs/sha256" } }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "terminal_status": {
+                "enum": ["failed", "timed_out", "interrupted"]
+              }
+            },
+            "required": ["terminal_status"]
+          },
+          "then": {
+            "properties": { "result_artifact_sha256": { "type": "null" } }
+          }
+        }
+      ]
+    }
+  }
+}
