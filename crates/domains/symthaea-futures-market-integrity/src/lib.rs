@@ -593,6 +593,128 @@ pub fn assess_pre_public_information_move(
     ))
 }
 
+/// Counts of explicit scope exclusions during timestamp-sensitivity analysis.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TimingExclusionCounts {
+    /// Exclusions caused by too few price observations.
+    pub too_few_observations: usize,
+    /// Exclusions where a candidate public timestamp falls outside the observed window.
+    pub public_time_outside_window: usize,
+    /// Exclusions where a candidate lies within the edge-exclusion margin.
+    pub public_time_too_close_to_edge: usize,
+    /// Exclusions caused by a weak or outcome-misaligned terminal move.
+    pub terminal_move_too_small_or_misaligned: usize,
+}
+
+/// Sensitivity of the information-timing diagnostic across a finite, declared timestamp sample.
+///
+/// This summary is about the supplied candidates only, not every possible timestamp within an
+/// uncertainty interval. Source timestamp confidence, sample selection and matching controls
+/// remain external qualification requirements.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InformationTimingSensitivitySummary {
+    /// Number of distinct candidate public timestamps assessed.
+    pub candidate_timestamp_count: usize,
+    /// Candidates that yielded an eligible descriptive timing statistic.
+    pub eligible_timestamp_count: usize,
+    /// Candidates excluded by the declared scope conditions.
+    pub excluded_timestamp_count: usize,
+    /// Eligible candidates as parts per million of all candidates.
+    pub eligible_share_ppm: u32,
+    /// Lowest observed pre-event move fraction among eligible candidates.
+    pub minimum_pre_event_move_fraction: Option<f64>,
+    /// Highest observed pre-event move fraction among eligible candidates.
+    pub maximum_pre_event_move_fraction: Option<f64>,
+    /// Maximum minus minimum observed fraction; absent with fewer than two eligible candidates.
+    pub observed_fraction_range: Option<f64>,
+    /// Counts of exclusions, retaining why candidate timestamps did not qualify.
+    pub exclusion_counts: TimingExclusionCounts,
+    /// True only when every timestamp in the supplied candidate set was eligible.
+    pub all_candidates_eligible: bool,
+}
+
+/// Assess information-timing sensitivity at several possible public-information timestamps.
+///
+/// Candidates must be non-empty and strictly increasing; this avoids silently overweighting a
+/// repeated timestamp. This is a sampled sensitivity analysis, not a continuous bound over all
+/// possible publication times. It reports eligible coverage and the range of the statistic among
+/// eligible candidates, never replacing excluded values with zero.
+pub fn assess_sampled_timestamp_sensitivity(
+    observations: &[TimedProbability],
+    candidate_public_timestamps: &[u64],
+    realized_outcome: bool,
+    minimum_edge_seconds: u64,
+    minimum_terminal_move: f64,
+) -> Result<InformationTimingSensitivitySummary, IntegrityError> {
+    if candidate_public_timestamps.is_empty()
+        || candidate_public_timestamps.iter().any(|timestamp| *timestamp == 0)
+        || minimum_edge_seconds == 0
+        || !minimum_terminal_move.is_finite()
+        || minimum_terminal_move <= 0.0
+    {
+        return Err(IntegrityError::InvalidTimingInput);
+    }
+
+    for pair in candidate_public_timestamps.windows(2) {
+        if pair[0] >= pair[1] {
+            return Err(IntegrityError::NonMonotonicObservationTime);
+        }
+    }
+
+    let mut fractions = Vec::new();
+    let mut exclusions = TimingExclusionCounts::default();
+
+    for timestamp in candidate_public_timestamps {
+        match assess_pre_public_information_move(
+            observations,
+            *timestamp,
+            realized_outcome,
+            minimum_edge_seconds,
+            minimum_terminal_move,
+        )? {
+            InformationTimingAssessment::Eligible(diagnostic) => {
+                fractions.push(diagnostic.pre_event_move_fraction);
+            }
+            InformationTimingAssessment::Excluded(reason) => match reason {
+                TimingExclusionReason::TooFewObservations => {
+                    exclusions.too_few_observations += 1;
+                }
+                TimingExclusionReason::PublicTimeOutsideWindow => {
+                    exclusions.public_time_outside_window += 1;
+                }
+                TimingExclusionReason::PublicTimeTooCloseToWindowEdge => {
+                    exclusions.public_time_too_close_to_edge += 1;
+                }
+                TimingExclusionReason::TerminalMoveTooSmallOrMisaligned => {
+                    exclusions.terminal_move_too_small_or_misaligned += 1;
+                }
+            },
+        }
+    }
+
+    let eligible = fractions.len();
+    let min = fractions.iter().copied().reduce(f64::min);
+    let max = fractions.iter().copied().reduce(f64::max);
+    let fraction_range = match (min, max, eligible >= 2) {
+        (Some(low), Some(high), true) => Some(high - low),
+        _ => None,
+    };
+
+    Ok(InformationTimingSensitivitySummary {
+        candidate_timestamp_count: candidate_public_timestamps.len(),
+        eligible_timestamp_count: eligible,
+        excluded_timestamp_count: candidate_public_timestamps.len() - eligible,
+        eligible_share_ppm: ((eligible as f64 / candidate_public_timestamps.len() as f64)
+            * 1_000_000.0)
+            .round() as u32,
+        minimum_pre_event_move_fraction: min,
+        maximum_pre_event_move_fraction: max,
+        observed_fraction_range: fraction_range,
+        exclusion_counts: exclusions,
+        all_candidates_eligible: eligible == candidate_public_timestamps.len(),
+    })
+}
+
 fn required_identifier(value: String, field: &'static str) -> Result<String, IntegrityError> {
     if value.trim().is_empty() {
         return Err(IntegrityError::EmptyIdentifier(field));
@@ -746,6 +868,70 @@ mod tests {
         );
         assert_eq!(
             TimedProbability::new(0, 0.5),
+            Err(IntegrityError::InvalidTimingInput)
+        );
+    }
+
+    #[test]
+    fn sampled_timestamp_sensitivity_reports_fraction_range() {
+        let observations = timing_observations(&[
+            (100, 0.2),
+            (120, 0.3),
+            (150, 0.6),
+            (180, 0.8),
+            (220, 0.9),
+        ]);
+        let summary =
+            assess_sampled_timestamp_sensitivity(&observations, &[160, 180, 200], true, 20, 0.1)
+                .unwrap();
+        assert_eq!(summary.candidate_timestamp_count, 3);
+        assert_eq!(summary.eligible_timestamp_count, 3);
+        assert_eq!(summary.excluded_timestamp_count, 0);
+        assert_eq!(summary.eligible_share_ppm, 1_000_000);
+        assert!(summary.all_candidates_eligible);
+        assert!(summary.observed_fraction_range.unwrap() > 0.0);
+        assert!(summary.maximum_pre_event_move_fraction.unwrap()
+            > summary.minimum_pre_event_move_fraction.unwrap());
+    }
+
+    #[test]
+    fn sampled_timestamp_sensitivity_counts_exclusions_without_zero_filling() {
+        let observations = timing_observations(&[
+            (100, 0.2),
+            (120, 0.3),
+            (150, 0.6),
+            (180, 0.8),
+            (220, 0.9),
+        ]);
+        let summary =
+            assess_sampled_timestamp_sensitivity(&observations, &[115, 160], true, 20, 0.1)
+                .unwrap();
+        assert_eq!(summary.eligible_timestamp_count, 1);
+        assert_eq!(summary.excluded_timestamp_count, 1);
+        assert_eq!(summary.eligible_share_ppm, 500_000);
+        assert!(!summary.all_candidates_eligible);
+        assert_eq!(summary.exclusion_counts.public_time_too_close_to_edge, 1);
+        assert_eq!(summary.observed_fraction_range, None);
+    }
+
+    #[test]
+    fn sampled_timestamp_sensitivity_rejects_unsorted_or_duplicate_candidates() {
+        let observations = timing_observations(&[(100, 0.2), (150, 0.6), (220, 0.9)]);
+        assert_eq!(
+            assess_sampled_timestamp_sensitivity(&observations, &[180, 160], true, 10, 0.1),
+            Err(IntegrityError::NonMonotonicObservationTime)
+        );
+        assert_eq!(
+            assess_sampled_timestamp_sensitivity(&observations, &[160, 160], true, 10, 0.1),
+            Err(IntegrityError::NonMonotonicObservationTime)
+        );
+    }
+
+    #[test]
+    fn sampled_timestamp_sensitivity_rejects_empty_candidate_set() {
+        let observations = timing_observations(&[(100, 0.2), (150, 0.6), (220, 0.9)]);
+        assert_eq!(
+            assess_sampled_timestamp_sensitivity(&observations, &[], true, 10, 0.1),
             Err(IntegrityError::InvalidTimingInput)
         );
     }
