@@ -22,6 +22,8 @@ Sources:
 1. **Freeze event meaning.** Bind the event definition and resolution-policy version before evaluating forecast rows. A resolution outcome must follow that contract's declared semantics.
 2. **Freeze lifecycle timestamps.** Store market creation, target horizon cutoff, relevant public-event time, market close, actual event occurrence (where defined), and official resolution separately. Never substitute one for another without an explicit policy.
 3. **Select prequentially.** For each event, method, and horizon, select only the latest forecast observation at or before the frozen cutoff. If none exists, or the latest eligible observation exceeds the staleness bound, record an exclusion; do not select a future quote or fill missing data with zero.
+
+The current synthetic smoke fixture uses actual elapsed-time cutoffs of 90 days, 30 days, 7 days, 1 day, and 1 hour before a synthetic resolution timestamp. The 1-hour horizon is not intended to stand in for a venue's actual market-close timestamp; real replay must preserve close, underlying event occurrence, public-news time and official resolution as separate fields.
 4. **Pair comparisons.** Compare methods only on the same event/horizon targets and outcomes. Record every method's eligible coverage and the reasons for exclusions; report common-cohort and all-eligible results separately.
 5. **Keep the event as the statistical unit.** Compute per-event/horizon Brier and log loss first. For uncertainty, aggregate repeated horizons within the declared independent unit (event or parent-event cluster) before resampling clusters.
 6. **Do not silently tune on the test set.** Freeze the primary horizon, baseline, scoring method, event categories, exclusion logic, bootstrap seed/replicate policy, and comparison direction before viewing outcomes.
@@ -82,5 +84,7 @@ Every run should bind at minimum:
 - frozen horizon definitions and max-staleness limits;
 - exclusions and reasons, selected forecast row IDs, per-event scores;
 - evaluator commit, runtime/toolchain, configuration, seed, replicate count and bootstrap interval method.
+
+The current smoke fixture prints a minimal metadata manifest containing the synthetic corpus version, event count, parent-cluster rule, actual horizon seconds, staleness limit, bootstrap seed/replicate policy, deterministic generator salts/rules and the exact source commit supplied by the CI workflow. It does not yet emit a content-addressed archive of every generated row, selected observation, exclusion, or source input; those remain acceptance requirements for the next corpus increment.
 
 The manifest proves what this evaluator claims to have processed, not that source data or event outcomes are true. Source authentication, signatures, authority, external-world truth, and any regulated action remain separate assurance problems.
