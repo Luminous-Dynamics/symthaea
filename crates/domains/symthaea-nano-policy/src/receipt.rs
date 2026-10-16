@@ -370,6 +370,32 @@ mod tests {
     }
 
     #[test]
+    fn accepts_cost_aware_receipt_and_preserves_declared_unit() {
+        let mut request = request();
+        request.policy = Policy::CostAwareFarthestFirst;
+        request.cost_unit = Some("simulation_seconds".to_owned());
+        let request_line = serde_json::to_string(&request).unwrap();
+        let response_line = handle_line(&request_line);
+        let report = verify_receipt(&request_line, &response_line);
+        assert_eq!(report.status, "passed", "{report:?}");
+    }
+
+    #[test]
+    fn rejects_response_with_unknown_fields() {
+        let request_line = serde_json::to_string(&request()).unwrap();
+        let response: serde_json::Value =
+            serde_json::from_str(&handle_line(&request_line)).unwrap();
+        let mut response_with_unknown = response;
+        response_with_unknown["target_energy_eV"] = serde_json::Value::from(-5.0);
+        let report = verify_receipt(
+            &request_line,
+            &serde_json::to_string(&response_with_unknown).unwrap(),
+        );
+        assert_eq!(report.status, "failed");
+        assert_eq!(report.checks[0].check, "response_parse");
+    }
+
+    #[test]
     fn rejects_request_with_hidden_target_field() {
         let request_line = r#"{"schema_version":"nano-policy-request-v1","policy":"farthest_first","budget":1,"seed":1,"feature_contract_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","candidates":[{"candidate_id":"x","family_id":"f","normalized_features":[0.5],"target_energy_eV":-1.0}]}"#;
         let report = verify_receipt(request_line, "{}");
