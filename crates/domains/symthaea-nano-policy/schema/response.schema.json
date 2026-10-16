@@ -32,7 +32,8 @@
           "enum": [
             "random_seeded",
             "farthest_first",
-            "group_balanced_farthest_first"
+            "group_balanced_farthest_first",
+            "cost_aware_farthest_first"
           ]
         },
         "seed": {
