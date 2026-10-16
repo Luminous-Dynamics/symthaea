@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn bounded_record_skips_whitespace_and_rejects_oversized_select_request() {
         assert!(handle_bounded_record(
-            BoundedLine::Accepted(b"  \\t ".to_vec()),
+            BoundedLine::Accepted(b"   ".to_vec()),
             false,
         )
         .is_none());
