@@ -154,7 +154,9 @@ pub struct PeakResourceWindowEvaluation {
     pub pool_id: String,
     pub resource_kind: PeakResourceKind,
     pub window: MissionTimeWindow,
-    /// Stable, sorted reservation IDs active for the whole elementary slice.
+    /// Count of active reservations, including non-overbooked slices.
+    pub active_reservation_count: usize,
+    /// Stable, sorted IDs are retained for overbooked slices; empty otherwise.
     pub active_reservation_ids: Vec<String>,
     pub required_demand_upper: u64,
     pub optional_demand_upper: u64,
@@ -325,9 +327,18 @@ pub fn evaluate_peak_resource_reservations(
             .filter(|reservation| reservation.pool_id == pool.pool_id)
             .collect();
         let mut boundaries = BTreeSet::new();
+        let mut starts_at: BTreeMap<u64, Vec<&PeakResourceReservation>> = BTreeMap::new();
+        let mut ends_at: BTreeMap<u64, Vec<&PeakResourceReservation>> = BTreeMap::new();
         for reservation in &reservations {
             boundaries.insert(reservation.window.start_ms);
             boundaries.insert(reservation.window.end_ms);
+            starts_at.entry(reservation.window.start_ms).or_default().push(*reservation);
+            ends_at.entry(reservation.window.end_ms).or_default().push(*reservation);
+        }
+        for reservations_at_tick in starts_at.values_mut().chain(ends_at.values_mut()) {
+            reservations_at_tick.sort_by(|left, right| {
+                left.reservation_id.cmp(&right.reservation_id)
+            });
         }
         let ordered_boundaries: Vec<u64> = boundaries.into_iter().collect();
 
@@ -340,41 +351,49 @@ pub fn evaluate_peak_resource_reservations(
         let mut pool_required_oversubscribed_count = 0;
         let mut pool_optional_oversubscribed_count = 0;
 
-        for pair in ordered_boundaries.windows(2) {
-            let start_ms = pair[0];
-            let end_ms = pair[1];
+        let mut active: BTreeMap<String, &PeakResourceReservation> = BTreeMap::new();
+        let mut totals = LoadTotals::default();
+        for index in 0..ordered_boundaries.len().saturating_sub(1) {
+            let start_ms = ordered_boundaries[index];
+            let end_ms = ordered_boundaries[index + 1];
             if start_ms >= end_ms {
                 continue;
             }
-            // Half-open semantics: start <= slice.start && end >= slice.end.
-            // A reservation ending at t is absent from the slice starting at t.
-            let mut active: Vec<&PeakResourceReservation> = reservations
-                .iter()
-                .copied()
-                .filter(|reservation| {
-                    reservation.window.start_ms <= start_ms
-                        && reservation.window.end_ms >= end_ms
-                })
-                .collect();
+
+            // Process endings before starts at each tick: windows are [start,end).
+            if let Some(ending) = ends_at.get(&start_ms) {
+                for reservation in ending {
+                    if let Some(removed) = active.remove(&reservation.reservation_id) {
+                        let task = task_by_id[removed.task_id.as_str()];
+                        if task.required {
+                            totals.required_upper = totals.required_upper
+                                .checked_sub(removed.demand.upper)
+                                .ok_or(PeakResourceReservationError::QuantityOverflow)?;
+                        } else {
+                            totals.optional_upper = totals.optional_upper
+                                .checked_sub(removed.demand.upper)
+                                .ok_or(PeakResourceReservationError::QuantityOverflow)?;
+                        }
+                    }
+                }
+            }
+            if let Some(starting) = starts_at.get(&start_ms) {
+                for reservation in starting {
+                    let task = task_by_id[reservation.task_id.as_str()];
+                    if task.required {
+                        totals.required_upper = totals.required_upper
+                            .checked_add(reservation.demand.upper)
+                            .ok_or(PeakResourceReservationError::QuantityOverflow)?;
+                    } else {
+                        totals.optional_upper = totals.optional_upper
+                            .checked_add(reservation.demand.upper)
+                            .ok_or(PeakResourceReservationError::QuantityOverflow)?;
+                    }
+                    active.insert(reservation.reservation_id.clone(), *reservation);
+                }
+            }
             if active.is_empty() {
                 continue;
-            }
-            active.sort_by(|left, right| left.reservation_id.cmp(&right.reservation_id));
-
-            let mut totals = LoadTotals::default();
-            for reservation in &active {
-                let task = task_by_id[reservation.task_id.as_str()];
-                if task.required {
-                    totals.required_upper = totals
-                        .required_upper
-                        .checked_add(reservation.demand.upper)
-                        .ok_or(PeakResourceReservationError::QuantityOverflow)?;
-                } else {
-                    totals.optional_upper = totals
-                        .optional_upper
-                        .checked_add(reservation.demand.upper)
-                        .ok_or(PeakResourceReservationError::QuantityOverflow)?;
-                }
             }
             let total_upper = totals
                 .required_upper
@@ -406,14 +425,17 @@ pub fn evaluate_peak_resource_reservations(
                 PeakWindowStatus::WithinDeclaredCapacity
             };
 
+            let active_reservation_ids = if status == PeakWindowStatus::WithinDeclaredCapacity {
+                Vec::new()
+            } else {
+                active.keys().cloned().collect()
+            };
             windows.push(PeakResourceWindowEvaluation {
                 pool_id: pool.pool_id.clone(),
                 resource_kind: pool.resource_kind,
                 window: MissionTimeWindow { start_ms, end_ms },
-                active_reservation_ids: active
-                    .iter()
-                    .map(|reservation| reservation.reservation_id.clone())
-                    .collect(),
+                active_reservation_count: active.len(),
+                active_reservation_ids,
                 required_demand_upper: totals.required_upper,
                 optional_demand_upper: totals.optional_upper,
                 reserve_quantity,
@@ -1026,6 +1048,7 @@ fn digest_report(report: &PeakResourceReservationReport) -> String {
         writer.string(resource_kind_tag(window.resource_kind));
         writer.u64(window.window.start_ms);
         writer.u64(window.window.end_ms);
+        writer.usize(window.active_reservation_count);
         writer.usize(window.active_reservation_ids.len());
         for id in &window.active_reservation_ids {
             writer.string(id);
