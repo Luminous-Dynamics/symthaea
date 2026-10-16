@@ -65,4 +65,4 @@ Report first-pass yield, escape defects, rework, scrap, labor hours, lead time, 
 
 ## Validation and claim ceiling
 
-The code includes deterministic tests and a test-side independent schedule checker. This development environment did not execute Cargo tests or a factory simulation binary; test-source presence is not a passing result. Recheck with \`cargo test -p symthaea-operations-research\` on the exact PR head. The fixture is only an algorithmic baseline, not a qualified manufacturing process, factory layout, aircraft design or airworthiness approval.
+The code includes deterministic tests and a public independent schedule verifier that recomputes assignment and metric invariants from the emitted plan. This development environment did not execute Cargo tests or a factory simulation binary; test-source presence is not a passing result. Recheck with \`cargo test -p symthaea-operations-research\` on the exact PR head. The fixture is only an algorithmic baseline, not a qualified manufacturing process, factory layout, aircraft design or airworthiness approval.
