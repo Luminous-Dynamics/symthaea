@@ -9,7 +9,7 @@
 //! reconstruction, and the provenance of all labels. The digest function below
 //! validates a supplied SHA-256 hex claim; it does not hash the artifact bytes.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,12 +61,27 @@ pub struct RecallLabelSensitivity {
     pub bounds: MetricBounds,
 }
 
+/// Paired policy-delta sensitivity bounds under shared, unknown candidate labels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RecallDeltaLabelSensitivity {
+    /// Policy A minus policy B against the measured-positive reference.
+    pub observed_known_label_delta: f64,
+    /// Worst/best possible delta under arbitrary unknown-label assignments in
+    /// this exact shared candidate universe.
+    pub bounds: MetricBounds,
+    pub policy_a_only_unknown_count: usize,
+    pub policy_b_only_unknown_count: usize,
+    pub neutral_unknown_count: usize,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum MetricError {
     DuplicateCandidateId(String),
     DuplicateRank(usize),
     DuplicateReferencePositive(String),
     PositiveOutsideReference(String),
+    CandidateUniverseMismatch(String),
+    CandidateLabelMismatch(String),
     InvalidRecallTarget(f64),
 }
 
@@ -80,6 +95,12 @@ impl fmt::Display for MetricError {
             }
             Self::PositiveOutsideReference(id) => {
                 write!(f, "positive candidate is outside the declared reference: {id}")
+            }
+            Self::CandidateUniverseMismatch(id) => {
+                write!(f, "policy candidate universes differ at candidate id: {id}")
+            }
+            Self::CandidateLabelMismatch(id) => {
+                write!(f, "policy outcome labels differ for candidate id: {id}")
             }
             Self::InvalidRecallTarget(target) => {
                 write!(f, "recall target must be finite and within [0, 1], got {target}")
@@ -254,6 +275,134 @@ pub fn precision_label_sensitivity_at_k(
     Ok(Estimate::Value(MetricBounds {
         lower: known_positive as f64 / k as f64,
         upper: (known_positive + unknown) as f64 / k as f64,
+    }))
+}
+
+/// Compare two policies on the *same candidate universe and label mapping*.
+/// The same unknown candidate is assigned the same latent outcome for both
+/// policies. This gives paired worst/best-case label bounds for Recall@K(A)-
+/// Recall@K(B); it is not a statistical confidence interval and says nothing
+/// about positive sites omitted from the shared universe.
+pub fn paired_recall_delta_label_sensitivity_at_k(
+    policy_a: &[Candidate],
+    policy_b: &[Candidate],
+    eligible_positive_ids: &[String],
+    k: usize,
+) -> Result<Estimate<RecallDeltaLabelSensitivity>, MetricError> {
+    let ranked_a = validated_ranked(policy_a, eligible_positive_ids)?;
+    let ranked_b = validated_ranked(policy_b, eligible_positive_ids)?;
+    if eligible_positive_ids.is_empty() {
+        return Ok(Estimate::NotEstimable(
+            NotEstimableReason::NoEligiblePositives,
+        ));
+    }
+
+    let by_id_a: HashMap<&str, LabelState> = policy_a
+        .iter()
+        .map(|candidate| (candidate.id.as_str(), candidate.label))
+        .collect();
+    let by_id_b: HashMap<&str, LabelState> = policy_b
+        .iter()
+        .map(|candidate| (candidate.id.as_str(), candidate.label))
+        .collect();
+
+    let mut ids_a: Vec<&str> = by_id_a.keys().copied().collect();
+    let mut ids_b: Vec<&str> = by_id_b.keys().copied().collect();
+    ids_a.sort_unstable();
+    ids_b.sort_unstable();
+
+    for id in &ids_a {
+        match by_id_b.get(id) {
+            None => return Err(MetricError::CandidateUniverseMismatch((*id).to_owned())),
+            Some(label_b) if by_id_a[id] != *label_b => {
+                return Err(MetricError::CandidateLabelMismatch((*id).to_owned()));
+            }
+            Some(_) => {}
+        }
+    }
+    for id in &ids_b {
+        if !by_id_a.contains_key(id) {
+            return Err(MetricError::CandidateUniverseMismatch((*id).to_owned()));
+        }
+    }
+
+    let selected_a: HashSet<&str> = ranked_a
+        .iter()
+        .take(k)
+        .map(|candidate| candidate.id.as_str())
+        .collect();
+    let selected_b: HashSet<&str> = ranked_b
+        .iter()
+        .take(k)
+        .map(|candidate| candidate.id.as_str())
+        .collect();
+
+    let positives_a = ranked_a
+        .iter()
+        .filter(|candidate| {
+            selected_a.contains(candidate.id.as_str())
+                && candidate.label == LabelState::Positive
+        })
+        .count();
+    let positives_b = ranked_b
+        .iter()
+        .filter(|candidate| {
+            selected_b.contains(candidate.id.as_str())
+                && candidate.label == LabelState::Positive
+        })
+        .count();
+
+    let unknown_a_only = policy_a
+        .iter()
+        .filter(|candidate| {
+            candidate.label == LabelState::UnknownUnassayed
+                && selected_a.contains(candidate.id.as_str())
+                && !selected_b.contains(candidate.id.as_str())
+        })
+        .count();
+    let unknown_b_only = policy_b
+        .iter()
+        .filter(|candidate| {
+            candidate.label == LabelState::UnknownUnassayed
+                && selected_b.contains(candidate.id.as_str())
+                && !selected_a.contains(candidate.id.as_str())
+        })
+        .count();
+    let unknown_total = policy_a
+        .iter()
+        .filter(|candidate| candidate.label == LabelState::UnknownUnassayed)
+        .count();
+    let neutral_unknown = unknown_total - unknown_a_only - unknown_b_only;
+
+    let p = eligible_positive_ids.len() as f64;
+    let known_delta = positives_a as f64 - positives_b as f64;
+    let lower_numerator = known_delta - unknown_b_only as f64;
+    let lower_neutral = if lower_numerator > 0.0 {
+        neutral_unknown
+    } else {
+        0
+    };
+    let lower_denominator =
+        (eligible_positive_ids.len() + unknown_b_only + lower_neutral) as f64;
+
+    let upper_numerator = known_delta + unknown_a_only as f64;
+    let upper_neutral = if upper_numerator < 0.0 {
+        neutral_unknown
+    } else {
+        0
+    };
+    let upper_denominator =
+        (eligible_positive_ids.len() + unknown_a_only + upper_neutral) as f64;
+
+    Ok(Estimate::Value(RecallDeltaLabelSensitivity {
+        observed_known_label_delta: known_delta / p,
+        bounds: MetricBounds {
+            lower: lower_numerator / lower_denominator,
+            upper: upper_numerator / upper_denominator,
+        },
+        policy_a_only_unknown_count: unknown_a_only,
+        policy_b_only_unknown_count: unknown_b_only,
+        neutral_unknown_count: neutral_unknown,
     }))
 }
 
@@ -492,6 +641,66 @@ mod tests {
             }
             other => panic!("expected precision sensitivity bounds, got {other:?}"),
         }
+    }
+
+    /// F6: policy comparison pairs shared unknown labels by candidate identity.
+    #[test]
+    fn f6_paired_policy_delta_bounds_share_unknown_outcomes() {
+        let reference = positives(&["p1", "p2"]);
+        let policy_a = vec![
+            candidate("p1", 1, LabelState::Positive, true),
+            candidate("u1", 2, LabelState::UnknownUnassayed, true),
+            candidate("p2", 3, LabelState::Positive, true),
+            candidate("u2", 4, LabelState::UnknownUnassayed, true),
+            candidate("u3", 5, LabelState::UnknownUnassayed, true),
+        ];
+        let policy_b = vec![
+            candidate("p2", 1, LabelState::Positive, true),
+            candidate("u2", 2, LabelState::UnknownUnassayed, true),
+            candidate("p1", 3, LabelState::Positive, true),
+            candidate("u1", 4, LabelState::UnknownUnassayed, true),
+            candidate("u3", 5, LabelState::UnknownUnassayed, true),
+        ];
+
+        match paired_recall_delta_label_sensitivity_at_k(
+            &policy_a, &policy_b, &reference, 2
+        ).unwrap() {
+            Estimate::Value(result) => {
+                close(result.observed_known_label_delta, 0.0);
+                close(result.bounds.lower, -1.0 / 3.0);
+                close(result.bounds.upper, 1.0 / 3.0);
+                assert_eq!(result.policy_a_only_unknown_count, 1);
+                assert_eq!(result.policy_b_only_unknown_count, 1);
+                assert_eq!(result.neutral_unknown_count, 1);
+            }
+            other => panic!("expected paired delta bounds, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn paired_delta_rejects_different_candidate_universes() {
+        let reference = positives(&["p1"]);
+        let policy_a = vec![candidate("p1", 1, LabelState::Positive, true)];
+        let policy_b = vec![candidate("different", 1, LabelState::AssayDefinedNegative, true)];
+        assert_eq!(
+            paired_recall_delta_label_sensitivity_at_k(
+                &policy_a, &policy_b, &reference, 1
+            ),
+            Err(MetricError::CandidateUniverseMismatch("p1".to_owned()))
+        );
+    }
+
+    #[test]
+    fn paired_delta_rejects_conflicting_label_mapping() {
+        let reference = positives(&["p1"]);
+        let policy_a = vec![candidate("p1", 1, LabelState::Positive, true)];
+        let policy_b = vec![candidate("p1", 1, LabelState::UnknownUnassayed, true)];
+        assert_eq!(
+            paired_recall_delta_label_sensitivity_at_k(
+                &policy_a, &policy_b, &reference, 1
+            ),
+            Err(MetricError::CandidateLabelMismatch("p1".to_owned()))
+        );
     }
 
     #[test]
