@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod enzyme_abstention_matrix;
 mod enzyme_bench;
+mod enzyme_experiment_design;
 mod enzyme_calibration;
 mod enzyme_evidence_graph;
 mod enzyme_model_falsification;
@@ -97,6 +98,12 @@ enum Commands {
         #[arg(long)]
         sha256: Option<String>,
     },
+    /// Run paired synthetic comparisons of budgeted enzyme experiment-selection strategies.
+    EnzymeExperimentDesign {
+        /// Output path for the machine-readable exploratory synthetic report.
+        #[arg(long, default_value = "reports/enzyme_experiment_design_v0.json")]
+        out: PathBuf,
+    },
     /// Generate a deterministic stress matrix for kinetic model selection and abstention.
     EnzymeAbstentionMatrix {
         /// Output path for the machine-readable exploratory synthetic report.
@@ -182,6 +189,9 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask lives one level below the workspace root")
                 .to_path_buf();
             enzyme_evidence_graph::check(&root, &input, sha256.as_deref())?;
+        }
+        Commands::EnzymeExperimentDesign { out } => {
+            enzyme_experiment_design::run(&out)?;
         }
         Commands::EnzymeAbstentionMatrix { out } => {
             enzyme_abstention_matrix::run(&out)?;
