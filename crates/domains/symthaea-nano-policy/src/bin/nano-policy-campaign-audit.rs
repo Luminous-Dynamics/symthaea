@@ -8,10 +8,11 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use symthaea_nano_policy::sim_campaign::{
     audit_campaign_json, parse_campaign_manifest, MAX_CAMPAIGN_MANIFEST_BYTES,
+    MAX_CAMPAIGN_TOTAL_LEDGER_BYTES,
 };
 use symthaea_nano_policy::sim_budget::MAX_SIMULATOR_LEDGER_BYTES;
 
@@ -104,6 +105,7 @@ fn run() -> Result<ExitCode, String> {
     }
 
     let mut ledger_bytes = BTreeMap::<String, Vec<u8>>::new();
+    let mut total_ledger_bytes = 0usize;
     for arm in &manifest.arms {
         for reference in &arm.ledgers {
             if ledger_bytes.contains_key(&reference.relative_path) {
@@ -158,6 +160,14 @@ fn run() -> Result<ExitCode, String> {
                     reference.relative_path
                 ));
             }
+            total_ledger_bytes = total_ledger_bytes
+                .checked_add(raw.len())
+                .ok_or_else(|| "combined ledger byte count overflow".to_string())?;
+            if total_ledger_bytes > MAX_CAMPAIGN_TOTAL_LEDGER_BYTES {
+                return Err(format!(
+                    "combined run ledgers exceed the {MAX_CAMPAIGN_TOTAL_LEDGER_BYTES}-byte campaign limit"
+                ));
+            }
             ledger_bytes.insert(reference.relative_path.clone(), raw);
         }
     }
@@ -189,9 +199,3 @@ fn next_value(args: &[String], index: &mut usize, flag: &str) -> Result<String, 
     Ok(value)
 }
 
-// Keep the path argument constrained to a relative path; the library validates every
-// manifest path component before it reaches the filesystem. This wrapper also rejects a
-// root that resolves outside the operator-supplied artifact boundary.
-fn _root_is_only_used_as_prefix(path: &Path) -> bool {
-    path.is_absolute()
-}
