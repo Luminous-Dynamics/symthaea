@@ -537,12 +537,14 @@ fn check_artifact(root: &Path, role: &str, reference: &FileReferenceV1) -> Artif
         "fixture_manifest" | "comparison_receipt" => Some(64 * 1024 * 1024_u64),
         _ => None,
     };
-    if structured_data_limit.is_some_and(|limit| metadata.len() > limit) {
-        return fail(
-            format!("structured evidence artifact exceeds {} byte limit", structured_data_limit.unwrap_or(0)),
-            None,
-            Some(metadata.len()),
-        );
+    if let Some(limit) = structured_data_limit {
+        if metadata.len() > limit {
+            return fail(
+                format!("structured evidence artifact exceeds {limit} byte limit"),
+                None,
+                Some(metadata.len()),
+            );
+        }
     }
     let actual = match sha256_file(&path) {
         Ok(actual) => actual,
