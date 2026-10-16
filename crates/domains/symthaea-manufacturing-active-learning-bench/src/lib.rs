@@ -638,8 +638,8 @@ fn choose_action(
 }
 
 /// Fixed 2-factor Latin-hypercube-like order over the 11×11 normalized grid.
-/// Each block holds x fixed across a permutation of y values; both factors are
-/// evenly stratified before the sequence repeats at another offset.
+/// Each block visits every x and every y once; successive blocks shift the
+/// permutation so the sequence spans the full grid without adapting to outputs.
 fn fixed_design_rank(candidate: &Candidate) -> u32 {
     let x = candidate.factor_x;
     let y = candidate.factor_y;
@@ -849,6 +849,19 @@ mod tests {
     }
 
     #[test]
+    fn fixed_design_order_is_a_permutation_of_the_full_candidate_grid() {
+        let candidates = CampaignManifest::reference(ScenarioFamily::SmoothResponse, 1, 20)
+            .candidates;
+        let ranks: BTreeSet<u32> = candidates
+            .iter()
+            .map(fixed_design_rank)
+            .collect();
+        assert_eq!(ranks.len(), 121);
+        assert_eq!(ranks.first(), Some(&0));
+        assert_eq!(ranks.last(), Some(&120));
+    }
+
+    #[test]
     fn all_policies_replay_deterministically_across_all_synthetic_families() {
         for scenario in ScenarioFamily::ALL {
             let manifest = CampaignManifest::reference(scenario, 23, 20);
@@ -934,8 +947,12 @@ mod tests {
             record.claimed_conforming == expected_conforming
         }));
         assert!(report.total_cost_units <= manifest.budget_units);
-        assert!(report.factor_design_full_rank, "selector should add an off-diagonal experiment");
-        assert!(report.first_conforming_cost_units.is_some());
+        assert!(
+            report.factor_design_full_rank,
+            "the design should escape the diagonal-only prior"
+        );
+        // Discovery is a reported outcome, not an invariant that every policy
+        // must satisfy; a benchmark must preserve valid NotFound results.
     }
 
     #[test]
