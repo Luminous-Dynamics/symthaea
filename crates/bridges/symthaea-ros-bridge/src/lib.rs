@@ -13,8 +13,11 @@
 //!
 //! ## ROS2 Setup
 //!
-//! This crate requires a ROS2 environment (e.g., Humble). If using Nix, ensure
-//! `nix-ros-overlay` is enabled in your `flake.nix`.
+//! Enable the `ros2` Cargo feature to compile the ROS transport and qualify it
+//! against an exact ROS distro/OS/RMW/architecture profile. Without that feature,
+//! telemetry may still run, but trajectory publication returns
+//! `RosTransportUnavailable`; it never simulates a successful robot command.
+//! The ROS 2 support matrix and migration gates are tracked in issue #1287.
 
 #![deny(unsafe_code)]
 
@@ -269,7 +272,10 @@ impl RosBridgeNode {
         }
     }
 
-    /// Initialize the ROS2 context, publishers/subscribers, and spin up the background executor thread.
+    /// Initialize ROS endpoints when the `ros2` feature is enabled and start telemetry.
+    ///
+    /// Without `ros2`, initialization is telemetry-only; robot trajectory
+    /// publication remains unavailable and fails explicitly.
     pub fn init(&mut self) -> Result<(), RosBridgeError> {
         #[cfg(feature = "ros2")]
         {
