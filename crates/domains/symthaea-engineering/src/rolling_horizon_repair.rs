@@ -154,6 +154,7 @@ fn policy_order(
     b: &Candidate,
     jobs: &[RepairJob],
     crews: &[RepairCrew],
+    crew_flexibility: &[usize],
     policy: RepairSchedulingPolicy,
 ) -> Ordering {
     let ja = &jobs[a.job_index];
@@ -173,12 +174,8 @@ fn policy_order(
 
     // On a tied job choice, preserve flexibility by assigning a crew qualified
     // for fewer jobs before consuming a crew with broader skill coverage.
-    order.then_with(|| {
-        let flexibility = |crew_index: usize| jobs.iter()
-            .filter(|job| crews[crew_index].skills.iter().any(|s| s == &job.required_skill))
-            .count();
-        flexibility(a.crew_index).cmp(&flexibility(b.crew_index))
-    }).then_with(|| crews[a.crew_index].id.cmp(&crews[b.crew_index].id))
+    order.then_with(|| crew_flexibility[a.crew_index].cmp(&crew_flexibility[b.crew_index]))
+        .then_with(|| crews[a.crew_index].id.cmp(&crews[b.crew_index].id))
 }
 
 fn validate_inputs(
@@ -324,6 +321,9 @@ pub fn dispatch_repairs_rolling_horizon(
     let (job_index, duration_by_job) = validate_inputs(jobs, crews, parts, realized_durations, config)?;
     let part_index: HashMap<String, usize> = parts.iter().enumerate()
         .map(|(i, part)| (part.id.clone(), i)).collect();
+    let crew_flexibility: Vec<usize> = crews.iter().map(|crew| jobs.iter()
+        .filter(|job| crew.skills.iter().any(|skill| skill == &job.required_skill))
+        .count()).collect();
     let mut remaining_parts: Vec<f64> = parts.iter().map(|part| part.quantity).collect();
     let mut consumed_parts = vec![0.0_f64; parts.len()];
     let mut crew_available: Vec<usize> = crews.iter().map(|crew| crew.available_from_step).collect();
@@ -364,7 +364,7 @@ pub fn dispatch_repairs_rolling_horizon(
                 }
             }
             if candidates.is_empty() { break; }
-            candidates.sort_by(|a, b| policy_order(a, b, jobs, crews, config.policy));
+            candidates.sort_by(|a, b| policy_order(a, b, jobs, crews, &crew_flexibility, config.policy));
             let chosen = candidates[0].clone();
             let job = &jobs[chosen.job_index];
             let crew = &crews[chosen.crew_index];
