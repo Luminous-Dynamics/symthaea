@@ -21,7 +21,6 @@ use sha2::{Digest, Sha256};
 use std::{
     env,
     error::Error,
-    ffi::OsStr,
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
     path::{Component, Path, PathBuf},
@@ -44,6 +43,7 @@ struct EvidenceBundleV1 {
     bundle_id: String,
     fixture_id: String,
     fixture_pack_digest: String,
+    fixture_pack_receipt: FileReferenceV1,
     sfz: FileReferenceV1,
     midi: FileReferenceV1,
     sample_assets: Vec<FileReferenceV1>,
@@ -107,6 +107,7 @@ struct VerificationReceiptV1 {
     bundle_id: String,
     fixture_id: String,
     fixture_pack_digest: String,
+    fixture_pack_digest_content_matches: bool,
     candidate_renderer: RendererReceiptV1,
     reference_renderer: RendererReceiptV1,
     artifact_checks: Vec<ArtifactCheckV1>,
@@ -153,6 +154,11 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
         .unwrap_or_else(|| Path::new("."));
 
     let mut artifact_checks = Vec::new();
+    artifact_checks.push(check_artifact(
+        root,
+        "fixture_pack_receipt",
+        &manifest.fixture_pack_receipt,
+    ));
     artifact_checks.push(check_artifact(root, "sfz_source", &manifest.sfz));
     artifact_checks.push(check_artifact(root, "midi_source", &manifest.midi));
     for (index, asset) in manifest.sample_assets.iter().enumerate() {
@@ -165,6 +171,18 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
 
     artifact_checks.push(check_renderer_artifacts(root, "candidate", &manifest.candidate));
     artifact_checks.push(check_renderer_artifacts(root, "reference", &manifest.reference));
+
+    let pack_receipt_check = artifact_checks
+        .iter()
+        .find(|check| check.role == "fixture_pack_receipt");
+    let fixture_pack_digest_content_matches = if pack_receipt_check.is_some_and(|check| check.passed) {
+        fs::read(resolve_artifact(root, &manifest.fixture_pack_receipt.path)?)?
+            .split(|byte| byte.is_ascii_whitespace())
+            .find(|part| !part.is_empty())
+            .is_some_and(|part| part.eq_ignore_ascii_case(manifest.fixture_pack_digest.as_bytes()))
+    } else {
+        false
+    };
 
     let comparison_check = check_artifact(
         root,
@@ -213,6 +231,9 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
             ));
         }
     }
+    if !fixture_pack_digest_content_matches {
+        failures.push("fixture-pack receipt content does not match declared tree digest".to_owned());
+    }
     failures.extend(comparison_binding.failures.iter().cloned());
 
     let integrity_passed = failures.is_empty()
@@ -229,6 +250,7 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
         bundle_id: manifest.bundle_id,
         fixture_id: manifest.fixture_id,
         fixture_pack_digest: manifest.fixture_pack_digest,
+        fixture_pack_digest_content_matches,
         candidate_renderer: renderer_receipt(&manifest.candidate),
         reference_renderer: renderer_receipt(&manifest.reference),
         artifact_checks,
@@ -329,6 +351,7 @@ fn validate_manifest_contract(manifest: &EvidenceBundleV1) -> Result<(), Box<dyn
         }
     }
     validate_sha256("fixture_pack_digest", &manifest.fixture_pack_digest)?;
+    validate_file_reference("fixture_pack_receipt", &manifest.fixture_pack_receipt)?;
     validate_file_reference("sfz", &manifest.sfz)?;
     validate_file_reference("midi", &manifest.midi)?;
     validate_file_reference("comparison_receipt", &manifest.comparison_receipt)?;
@@ -421,7 +444,7 @@ fn check_renderer_artifacts(
 }
 
 fn check_artifact(root: &Path, role: &str, reference: &FileReferenceV1) -> ArtifactCheckV1 {
-    let fail = |message: String, actual_sha256, byte_len| ArtifactCheckV1 {
+    let fail = |message: String, actual_sha256: Option<String>, byte_len: Option<u64>| ArtifactCheckV1 {
         role: role.to_owned(),
         path: reference.path.clone(),
         expected_sha256: reference.sha256.to_ascii_lowercase(),
@@ -435,6 +458,9 @@ fn check_artifact(root: &Path, role: &str, reference: &FileReferenceV1) -> Artif
         Ok(path) => path,
         Err(error) => return fail(error.to_string(), None, None),
     };
+    if let Err(error) = ensure_no_symlink_components(root, &reference.path) {
+        return fail(error.to_string(), None, None);
+    }
     let metadata = match fs::symlink_metadata(&path) {
         Ok(metadata) => metadata,
         Err(error) => return fail(error.to_string(), None, None),
@@ -473,8 +499,21 @@ fn validate_comparison_binding(
     bytes: &[u8],
     expected_candidate_hash: &str,
     expected_reference_hash: &str,
-) -> Result<ComparisonBindingV1, Box<dyn Error>> {
-    let value: Value = serde_json::from_slice(bytes)?;
+) -> ComparisonBindingV1 {
+    let value: Value = match serde_json::from_slice(bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            return ComparisonBindingV1 {
+                comparison_schema_verified: false,
+                candidate_output_hash_matches: false,
+                reference_output_hash_matches: false,
+                comparison_status: None,
+                metrics_present: false,
+                quality_qualified: false,
+                failures: vec![format!("comparison receipt is invalid JSON: {error}")],
+            };
+        }
+    };
     let schema_ok = value.get("schema").and_then(Value::as_str)
         == Some(EXPECTED_COMPARISON_SCHEMA);
     let candidate_hash = value.pointer("/candidate/sha256").and_then(Value::as_str);
@@ -513,7 +552,7 @@ fn validate_comparison_binding(
         failures.push("comparison receipt does not contain a metrics object".to_owned());
     }
 
-    Ok(ComparisonBindingV1 {
+    ComparisonBindingV1 {
         comparison_schema_verified: schema_ok,
         candidate_output_hash_matches: candidate_ok,
         reference_output_hash_matches: reference_ok,
@@ -522,7 +561,7 @@ fn validate_comparison_binding(
         // This verifier never upgrades measurements into quality qualification.
         quality_qualified: false,
         failures,
-    })
+    }
 }
 
 fn renderer_receipt(renderer: &RendererCaptureV1) -> RendererReceiptV1 {
@@ -534,7 +573,7 @@ fn renderer_receipt(renderer: &RendererCaptureV1) -> RendererReceiptV1 {
     }
 }
 
-/// Resolve only normalized relative paths and reject symlinks in every path component.
+/// Join only normalized relative paths. Symlinks are checked against the chosen root separately.
 fn resolve_artifact(root: &Path, relative: &str) -> Result<PathBuf, Box<dyn Error>> {
     let candidate = Path::new(relative);
     if relative.is_empty()
@@ -555,16 +594,34 @@ fn resolve_artifact(root: &Path, relative: &str) -> Result<PathBuf, Box<dyn Erro
         let Component::Normal(name) = component else {
             unreachable!("path components were validated above");
         };
-        if name == OsStr::new("") {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "artifact path contains an empty component",
-            )
-            .into());
-        }
         current.push(name);
     }
     Ok(current)
+}
+
+/// Reject symlinks in the artifact path from the manifest root to the target.
+/// Missing components are left for the final artifact check to report as evidence failure.
+fn ensure_no_symlink_components(root: &Path, relative: &str) -> Result<(), Box<dyn Error>> {
+    let candidate = Path::new(relative);
+    let mut current = root.to_path_buf();
+    for component in candidate.components() {
+        let Component::Normal(name) = component else {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "unsafe path component").into());
+        };
+        current.push(name);
+        match fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("artifact path traverses symlink {}", current.display()),
+                ).into());
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
 }
 
 fn sha256_file(path: &Path) -> Result<String, Box<dyn Error>> {
@@ -629,6 +686,23 @@ mod tests {
         assert!(!paths.insert("samples/a.wav"));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn symlink_parent_directory_is_rejected() {
+        use std::os::unix::fs::symlink;
+        let root = std::env::temp_dir().join(format!("muse-evidence-root-{}", std::process::id()));
+        let outside = root.with_extension("outside");
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&outside);
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("audio.wav"), b"test").unwrap();
+        fs::create_dir_all(&root).unwrap();
+        symlink(&outside, root.join("linked")).unwrap();
+        assert!(ensure_no_symlink_components(&root, "linked/audio.wav").is_err());
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(outside).unwrap();
+    }
+
     #[test]
     fn comparison_binding_rejects_wrong_wav_hashes_and_quality_claims() {
         let json = br#"{
@@ -640,8 +714,7 @@ mod tests {
                 "metrics": {"waveform_rmse": 0.0}
             }
         }"#;
-        let binding = validate_comparison_binding(json, &"c".repeat(64), &"d".repeat(64))
-            .unwrap();
+        let binding = validate_comparison_binding(json, &"c".repeat(64), &"d".repeat(64));
         assert!(!binding.candidate_output_hash_matches);
         assert!(!binding.reference_output_hash_matches);
         assert!(!binding.quality_qualified);
@@ -656,8 +729,7 @@ mod tests {
             "reference": {"sha256": "bbbbbbbb"},
             "comparison": {"status": "not_comparable", "metrics": null}
         }"#;
-        let binding = validate_comparison_binding(json, &"a".repeat(64), &"b".repeat(64))
-            .unwrap();
+        let binding = validate_comparison_binding(json, &"a".repeat(64), &"b".repeat(64));
         assert!(!binding.comparison_schema_verified);
         assert!(!binding.metrics_present);
         assert!(!binding.quality_qualified);
