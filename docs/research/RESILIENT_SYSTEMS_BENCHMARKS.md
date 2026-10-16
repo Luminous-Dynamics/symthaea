@@ -203,6 +203,31 @@ The service-continuity implementation deliberately uses a small abstraction:
 
 It does **not** yet model queues, inventory depletion, stochastic demand, repair crews, multiple resource types in one process, spatial effects, failure probabilities, confidence intervals, or real physical laws. Those must be added only with explicit contracts and reference fixtures. The initial model is useful for testing causal direction and scenario consistency; it is not yet calibrated for predicting a community's actual outage.
 
+## Repair-crew scheduling extension
+
+The third Rust layer is [`repair_crew_scheduling.rs`](../../crates/domains/symthaea-engineering/src/repair_crew_scheduling.rs). It compares priority-first, shortest-job-first, and greedy weighted-service-recovery policies while enforcing skill eligibility, precedence, crew exclusivity, outage start times, and finite spare-part reservations.
+
+This fills an important literature-backed gap. Xu et al.'s 2026 review describes repair-resource scheduling as difficult precisely because disruptions, network interdependencies, uncertain field conditions, and stakeholder priorities interact ([Risk Analysis, first published 12 March 2026](https://doi.org/10.1111/risa.70220)). Pan and Boyles' 2026 volume paper models two-way road/power interdependency, including the effect of power failures on crew travel and the effect of transport delays on restoration ([doi:10.1080/10286608.2025.2602872](https://doi.org/10.1080/10286608.2025.2602872)). Robust multicrew road-restoration scheduling also explicitly addresses uncertain repair durations ([Computers & Operations Research, April 2026](https://doi.org/10.1016/j.cor.2025.107379)). These results motivate our next layers; they do not show that this small heuristic is optimal.
+
+### Required repair-scheduling tests
+
+- **RCREW-01 — Feasible skill assignment:** every job is assigned only to a crew with the declared skill.
+- **RCREW-02 — Crew exclusivity:** a crew never has overlapping jobs.
+- **RCREW-03 — Precedence:** a dependent repair cannot start before all prerequisites finish.
+- **RCREW-04 — Parts conservation:** reserved parts never exceed initial stock and remaining stock never goes negative.
+- **RCREW-05 — Horizon accounting:** a job finishing after the horizon is counted as unfinished within horizon; loss is bounded by the modeled horizon.
+- **RCREW-06 — Determinism:** identical inputs and policy produce identical schedules.
+- **RCREW-07 — Policy witness:** a declared synthetic case shows weighted recovery can beat priority-first on the stated weighted downtime objective; report the witness and objective, not a universal superiority claim.
+- **RCREW-08 — Infeasibility honesty:** cycles, unknown skills, missing parts and insufficient spares fail explicitly.
+
+### Scheduling benchmarks and open limitations
+
+1. Compare all policies on identical job, crew, parts, outage and dependency inputs. Report total weighted service-unit-steps lost, time each service is restored, completion share within horizon, spare usage, fairness/distributional outcomes, and infeasible jobs.
+2. For small cases (initial target: no more than 8 jobs), build a separate exhaustive enumerator as a reference oracle and compare heuristic objective gap to the true best feasible schedule. Target **within 10% of optimum on at least 95% of a published deterministic fixture corpus**, but only promote that target after a fixed corpus and objective are reviewed. This is an aspiration, not a result.
+3. For 10–100 jobs, use deterministic scenario suites and compare heuristic outcomes with priority-first, shortest-job-first and a valid lower bound where available. Publish worst-case as well as average gap; do not label a heuristic optimal.
+4. Next iterations should add uncertain repair durations, travel/access times and power/transport interdependency. The model currently has none of these, no online replanning, no shared tool constraint, and no policy-level fairness guarantee.
+5. The weighted-service objective is caller-defined and can encode harmful priorities. Keep service-level floors and group impacts as explicit constraints; never treat a scalar weight as an ethical decision.
+
 ## 8. Research references
 
 - Poulin, C. & Kane, M. B. (2021), [Infrastructure resilience curves: Performance measures and summary metrics](https://doi.org/10.1016/j.ress.2021.107926).
@@ -210,7 +235,7 @@ It does **not** yet model queues, inventory depletion, stochastic demand, repair
 - [Resilience in Cyber-Physical Infrastructures: R-KPI prioritization](https://doi.org/10.1016/j.jnlssr.2024.12.005), 2025.
 - [Modeling and operation of water-energy microgrids considering resilience assessment](https://doi.org/10.1016/j.nexus.2025.100590), 2025.
 - Shi et al., [Temporal modeling and resilience analysis of supply chain networks under cascading failures](https://doi.org/10.1016/j.ress.2025.111763), 2026.
-- Prasetia, [Agents of collaborative adaptation: modelling temporal resilience in supply chains](https://link.springer.com/article/10.1007/s10479-026-07406-4), published September 3, 2026.\n- Hosseina, Moghaddam & Hassannia (2025), [Optimizing energy and load management in island microgrids for enhancing resilience against resource interruptions](https://doi.org/10.1038/s41598-025-99974-x).\n- Pourramezani et al. (2026), [Physical vulnerability-oriented reconfiguration of microgrids: centralized vs. decentralized control](https://www.nature.com/articles/s41598-026-63123-9).\n- [Simulation-driven optimization for resilient and sustainable supply chain operations](https://doi.org/10.1016/j.cie.2026.112063), July 2026.
+- Prasetia, [Agents of collaborative adaptation: modelling temporal resilience in supply chains](https://link.springer.com/article/10.1007/s10479-026-07406-4), published September 3, 2026.\n- Xu, M. et al. (2026), [Scheduling Repair Resources for Post-Disaster Critical Infrastructure Systems: A Review of Models and Algorithms](https://doi.org/10.1111/risa.70220).\n- Pan, S. & Boyles, S. (2026), [Optimising repair sequences for interdependent infrastructure resilience](https://doi.org/10.1080/10286608.2025.2602872).\n- [The Robust Multicrew Scheduling and Routing Problem in road restoration](https://doi.org/10.1016/j.cor.2025.107379), April 2026.\n- Hosseina, Moghaddam & Hassannia (2025), [Optimizing energy and load management in island microgrids for enhancing resilience against resource interruptions](https://doi.org/10.1038/s41598-025-99974-x).\n- Pourramezani et al. (2026), [Physical vulnerability-oriented reconfiguration of microgrids: centralized vs. decentralized control](https://www.nature.com/articles/s41598-026-63123-9).\n- [Simulation-driven optimization for resilient and sustainable supply chain operations](https://doi.org/10.1016/j.cie.2026.112063), July 2026.
 
 ---
 *Integrity rule: simulated benchmarks, skipped CI, and successful source-level checks are not evidence of field reliability. Report each evidence class separately.*
