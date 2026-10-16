@@ -38,11 +38,11 @@ Database provenance research offers a further paradigm shift. Green, Karvounarak
 | G3 | Several selected articles have overlapping paths to the same root | Count the root once |
 | G4 | A synthesis descends from a known root and an unknown terminal | Strict policy abstains and names the unknown terminal |
 | G5 | Parent edge references a missing entity | Abstain with missing-source reason |
-| G6 | Directed cycle, including revision cycles | Abstain; never silently truncate the walk |
+| G6 | Directed cycle, including revision cycles, even in a disconnected component | Abstain for the invalid graph snapshot |
 | G7 | Duplicate/empty entity IDs or role/edge incompatibility | Abstain |
 | G8 | Duplicate requested evidence IDs | Report raw and distinct requested counts separately; origin count unchanged |
-| G9 | A valid graph contains a very deep chain | No recursion overflow; bounded memory and latency |
-| G10 | A graph has many irrelevant isolated components and one valid query path | Current implementation still globally validates; benchmark the cost and revisit index strategy before production |
+| G9 | A valid graph contains a very deep chain | No recursion overflow; measure memory and latency |
+| G10 | A graph has many irrelevant components and one valid query path | Current implementation globally validates; quantify the cost and design a validated-snapshot strategy before production |
 
 G10 is a deliberate performance/architecture question. Global validation protects against quietly consuming an invalid provenance document, but can make each query proportional to the whole graph. The next production design should use a persisted validation/version receipt or incrementally maintained graph invariants—not skip validation without a proof that the relevant snapshot is valid.
 
@@ -59,12 +59,12 @@ Targets below are hypotheses, not measured results.
 | Unknown terminal roots credited as attributed | 0 |
 | Deterministic fixture decision/root parity | 100% |
 | Lineage graph larger than call stack | No recursion overflow at 100k nodes |
-| Graph-validation/root-resolution runtime | Record p50/p95 at 1k, 10k, 100k nodes and edges |
+| Graph-validation/root-resolution runtime | Record p50/p95 at 1k, 10k, 100k evidence items (each item has a primary-origin node and a derived-evidence node) |
 | Source-family false-split / false-merge | ≤1% pilot targets only after gold lineage annotation |
 | Origin extraction precision and recall | Report separately from this graph contract |
 | Audit replay | 100% identical root set and decision from pinned graph/policy/input |
 
-The ignored release-mode benchmark creates 1k, 10k, and 100k primary-origin/evidence pairs, checks root-count parity, and reports p50/p95 runtime across seven measured repetitions. It includes graph construction only outside the timing loop; each timed assessment rebuilds indexes, validates the graph, and resolves selected evidence roots. It does not include provenance extraction, database I/O, cryptographic verification, or network access.
+The ignored release-mode benchmark creates 1k, 10k, and 100k primary-origin/evidence pairs (2x entities, 1x edge per pair), checks root-count parity, and reports p50/p95 runtime across seven measured repetitions. It includes graph construction only outside the timing loop; each timed assessment rebuilds indexes, validates the graph, and resolves selected evidence roots. It does not include provenance extraction, database I/O, cryptographic verification, or network access.
 
 Run explicitly:
 
