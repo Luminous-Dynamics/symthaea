@@ -452,7 +452,7 @@ pub fn run_campaign(
             &history,
             policy,
             selector_seed,
-            records.len() as u64,
+            (records.len() - manifest.initial_actions.len()) as u64,
             manifest.budget_units.saturating_sub(spent),
         );
         let Some(action) = selected else {
@@ -851,6 +851,30 @@ mod tests {
                 assert_eq!(report.max_conforming_throughput_units, expected_max_throughput);
             }
         }
+    }
+
+    #[test]
+    fn all_policies_share_three_proxy_slots_then_reference_confirmation() {
+        let manifest = CampaignManifest::reference(ScenarioFamily::SmoothResponse, 17, 20);
+        for policy in Policy::ALL {
+            let transcript = run_campaign(&manifest, policy, 42).unwrap();
+            assert!(transcript.records.len() >= 4);
+            assert!(transcript.records[0..3]
+                .iter()
+                .all(|record| record.action.fidelity == Fidelity::Proxy));
+            assert_eq!(transcript.records[3].action.fidelity, Fidelity::Reference);
+        }
+
+        let manifest = CampaignManifest::reference(ScenarioFamily::ConfoundedFactors, 17, 20);
+        let transcript = run_campaign(&manifest, Policy::FixedSpaceFilling, 42).unwrap();
+        let offset = manifest.initial_actions.len();
+        assert!(transcript.records[offset..offset + 3]
+            .iter()
+            .all(|record| record.action.fidelity == Fidelity::Proxy));
+        assert_eq!(
+            transcript.records[offset + 3].action.fidelity,
+            Fidelity::Reference
+        );
     }
 
     #[test]
