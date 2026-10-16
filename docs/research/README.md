@@ -330,3 +330,42 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+
+## Cross-domain engineering feasibility
+
+- [Resilient Systems Feasibility Portfolio](./RESILIENT_SYSTEMS_FEASIBILITY_PORTFOLIO.md) — seven linked feasibility studies covering self-repairing structures, heavy-cargo transport, a 100-person/two-year settlement, first lunar industry, community microfactories, supply-network disruptions, and minimum viable civilization.
+- [Machine-readable screening baseline](./resilient_systems_baseline.json) — explicit scenario assumptions, computed settlement baselines, shared metrics, and stress-test definitions. Values are screening assumptions, not validated requirements.
+
+
+## Resilience and service continuity benchmarks
+
+- [Resilient Systems Feasibility Portfolio](./RESILIENT_SYSTEMS_FEASIBILITY_PORTFOLIO.md) — linked seven-study research program and implementation roadmap.
+- [Resilient Systems Benchmarks](./RESILIENT_SYSTEMS_BENCHMARKS.md) — proposed benchmark levels B0–B5, negative controls, scenario matrix RS-01–RS-14, and calibration gates.
+- [Machine-readable assumptions](./resilient_systems_baseline.json) — scenario assumptions and common metric schema.
+- [Rust service-continuity screening module](../../crates/domains/symthaea-engineering/src/resilient_service_screening.rs) — deterministic dependency/outage/recovery abstraction with unit tests; not calibrated for real-world prediction.
+
+- [Finite-resource screening module](../../crates/domains/symthaea-engineering/src/resource_constrained_screening.rs) — deterministic shared inventory, bounded replenishment, supply disruptions, resource competition and per-service traces; not calibrated for real-world prediction.
+
+- [Repair crew scheduling module](../../crates/domains/symthaea-engineering/src/repair_crew_scheduling.rs) — deterministic policy comparison with skill constraints, task precedence, finite spare parts and horizon accounting; not an optimal solver.
+
+- [Robust repair evaluation](../../crates/domains/symthaea-engineering/src/robust_repair_evaluation.rs) — out-of-sample duration-scenario replay with nonanticipative baseline decisions, expected/worst/CVaR loss and per-scenario traces; not an adaptive optimizer.
+
+- [Robust repair evaluation](../../crates/domains/symthaea-engineering/src/robust_repair_evaluation.rs) — out-of-sample repair-duration scenarios, fixed nominal crew/job decisions, expected/worst/CVaR loss, and per-scenario replay traces; not an adaptive optimizer.
+
+
+## Resilient-systems feasibility program
+
+The deterministic service, resource, crew-scheduling, uncertainty, and event-triggered dispatch models are indexed by [the feasibility portfolio](./RESILIENT_SYSTEMS_FEASIBILITY_PORTFOLIO.md) and [benchmark protocol](./RESILIENT_SYSTEMS_BENCHMARKS.md). The newest adaptive dispatcher is [rolling_horizon_repair.rs](../../crates/domains/symthaea-engineering/src/rolling_horizon_repair.rs); use its decision traces to review information boundaries rather than inferring correctness from a single summary score.
+
+
+The paired comparison harness is [repair_policy_comparison.rs](../../crates/domains/symthaea-engineering/src/repair_policy_comparison.rs). It compares the fixed-plan robust baseline with event-triggered dispatch under the same realized-duration scenarios and preserves per-scenario deltas and decision traces.
+
+The tiny exact scheduling oracle is [repair_small_instance_oracle.rs](../../crates/domains/symthaea-engineering/src/repair_small_instance_oracle.rs). Its six hand-built fixtures are published in [repair_scheduling_oracle_corpus.json](./repair_scheduling_oracle_corpus.json). This corpus is designed for correctness and optimality-gap measurement, not as operational or field data.
+
+The exact-oracle module also reports per-policy absolute and relative optimality gaps for priority-first, shortest-job-first and weighted-recovery scheduling, directly supporting the published benchmark targets.
+
+The multi-crew exact oracle is [multi_crew_repair_oracle.rs](../../crates/domains/symthaea-engineering/src/multi_crew_repair_oracle.rs), with three hand-checkable [multi-crew benchmark fixtures](./multi_crew_repair_oracle_corpus.json). It includes crew skill eligibility, cross-crew precedence, concurrent repairs, and optimality-gap measurement for the current greedy policies.
+
+
+The multi-crew schedule checker is [repair_schedule_certificate.rs](../../crates/domains/symthaea-engineering/src/repair_schedule_certificate.rs). It independently checks schedule feasibility and objective arithmetic, and explicitly does not claim to certify global optimality.

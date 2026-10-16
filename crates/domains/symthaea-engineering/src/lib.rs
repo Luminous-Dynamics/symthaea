@@ -5,6 +5,33 @@
 
 #![deny(unsafe_code)]
 
+/// Event-triggered rolling-horizon repair dispatch under partial information.
+pub mod rolling_horizon_repair;
+
+/// Paired comparison of fixed plans and rolling-horizon repair policies.
+pub mod repair_policy_comparison;
+
+/// Exhaustive exact oracle for tiny, single-crew repair schedules.
+pub mod repair_small_instance_oracle;
+
+/// Exhaustive exact oracle and heuristic gaps for tiny multi-crew repair schedules.
+pub mod multi_crew_repair_oracle;
+
+/// Independent feasibility/objective verifier for multi-crew repair schedule certificates.
+pub mod repair_schedule_certificate;
+
+/// Out-of-sample repair-policy evaluation under duration uncertainty.
+pub mod robust_repair_evaluation;
+
+/// Deterministic repair crew and finite-spares scheduling policies.
+pub mod repair_crew_scheduling;
+
+/// Finite shared-resource screening for essential-service continuity.
+pub mod resource_constrained_screening;
+
+/// Deterministic screening for essential-service continuity and recovery.
+pub mod resilient_service_screening;
+
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
 use symthaea_causal_reasoning::causal_calculus::StructuralCausalModel;
