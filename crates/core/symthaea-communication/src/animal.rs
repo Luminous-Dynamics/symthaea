@@ -53,16 +53,24 @@ pub struct ContextPredictionEvaluation {
 
 impl ContextPredictionEvaluation {
     pub fn passes(&self) -> bool {
-        self.primary_score.is_finite()
+        // Require every preregistered confound control. A missing control is
+        // not equivalent to a control that passed.
+        let required_controls = [
+            AnimalControl::ShuffledContext,
+            AnimalControl::IdentityOnly,
+            AnimalControl::LocationOnly,
+            AnimalControl::AcousticOnly,
+            AnimalControl::HeldOutIndividuals,
+            AnimalControl::HeldOutSites,
+        ];
+
+        !self.task.trim().is_empty()
+            && self.primary_score.is_finite()
+            && self.required_margin.is_finite()
             && self.required_margin >= 0.0
-            && self
-                .control_scores
-                .keys()
-                .any(|c| c == &AnimalControl::HeldOutIndividuals)
-            && self
-                .control_scores
-                .keys()
-                .any(|c| c == &AnimalControl::HeldOutSites)
+            && required_controls
+                .iter()
+                .all(|control| self.control_scores.contains_key(control))
             && self.control_scores.values().all(|control| {
                 control.is_finite() && self.primary_score >= control + self.required_margin
             })
@@ -104,20 +112,27 @@ pub struct AnimalEvaluationBundle {
 
 impl AnimalEvaluationBundle {
     pub fn validate(&self) -> Result<(), String> {
+        let unique_nonempty = |values: &[String]| {
+            let unique: std::collections::BTreeSet<_> = values.iter().collect();
+            !values.is_empty()
+                && values.iter().all(|value| !value.trim().is_empty())
+                && unique.len() == values.len()
+        };
         let train_individuals: std::collections::BTreeSet<_> =
             self.train_individuals.iter().collect();
         let test_individuals: std::collections::BTreeSet<_> =
             self.test_individuals.iter().collect();
         let train_sites: std::collections::BTreeSet<_> = self.train_sites.iter().collect();
         let test_sites: std::collections::BTreeSet<_> = self.test_sites.iter().collect();
-        if self.representation_baseline.is_empty()
-            || train_individuals.is_empty()
-            || test_individuals.is_empty()
-            || train_sites.is_empty()
-            || test_sites.is_empty()
+        if self.representation_baseline.trim().is_empty()
+            || !unique_nonempty(&self.train_individuals)
+            || !unique_nonempty(&self.test_individuals)
+            || !unique_nonempty(&self.train_sites)
+            || !unique_nonempty(&self.test_sites)
             || !train_individuals.is_disjoint(&test_individuals)
             || !train_sites.is_disjoint(&test_sites)
             || !(0.0..=1.0).contains(&self.segmentation_stability)
+            || !self.temporal_permutation_score.is_finite()
             || !self.context_prediction.passes()
             || self.context_prediction.primary_score
                 < self.temporal_permutation_score + self.context_prediction.required_margin
@@ -156,9 +171,11 @@ mod tests {
             primary_score: primary,
             control_scores: BTreeMap::from([
                 (AnimalControl::ShuffledContext, primary - margin - 0.01),
+                (AnimalControl::IdentityOnly, primary - margin - 0.01),
+                (AnimalControl::LocationOnly, primary - margin - 0.01),
+                (AnimalControl::AcousticOnly, primary - margin - 0.01),
                 (AnimalControl::HeldOutIndividuals, primary - margin - 0.01),
                 (AnimalControl::HeldOutSites, primary - margin - 0.01),
-                (AnimalControl::AcousticOnly, primary - margin - 0.01),
             ]),
             required_margin: margin,
         }
@@ -180,6 +197,17 @@ mod tests {
     #[test]
     fn context_prediction_passes_when_all_controls_present() {
         assert!(make_context_prediction(0.80, 0.05).passes());
+    }
+
+    #[test]
+    fn missing_identity_or_location_control_fails_closed() {
+        let mut eval = make_context_prediction(0.80, 0.05);
+        eval.control_scores.remove(&AnimalControl::IdentityOnly);
+        assert!(!eval.passes());
+
+        let mut eval = make_context_prediction(0.80, 0.05);
+        eval.control_scores.remove(&AnimalControl::LocationOnly);
+        assert!(!eval.passes());
     }
 
     #[test]
@@ -245,6 +273,24 @@ mod tests {
     #[test]
     fn animal_bundle_fails_when_train_test_individuals_overlap() {
         assert!(make_bundle(true).validate().is_err());
+    }
+
+    #[test]
+    fn animal_bundle_rejects_non_finite_temporal_permutation() {
+        let mut bundle = make_bundle(false);
+        bundle.temporal_permutation_score = f64::NAN;
+        assert!(bundle.validate().is_err());
+    }
+
+    #[test]
+    fn animal_bundle_rejects_duplicate_or_empty_split_ids() {
+        let mut duplicate = make_bundle(false);
+        duplicate.train_sites.push("site-1".into());
+        assert!(duplicate.validate().is_err());
+
+        let mut empty = make_bundle(false);
+        empty.test_individuals.push(" ".into());
+        assert!(empty.validate().is_err());
     }
 
     #[test]
