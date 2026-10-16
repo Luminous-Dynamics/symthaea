@@ -500,4 +500,108 @@ mod tests {
             - exact.minimum_weighted_completion_loss).abs() < 1.0e-9);
     }
 
+
+    #[test]
+    fn deterministic_mutation_campaign_rejects_all_10000_invalid_certificates() {
+        let mut rejected = 0usize;
+        for mutation in 0..10_000usize {
+            let input_jobs = jobs();
+            let input_crews = crews();
+            let mut proposed = schedule();
+            let mut claimed_loss = 41.0;
+
+            let result = match mutation % 10 {
+                0 => {
+                    proposed[0].job_id = format!("ghost-job-{mutation}");
+                    verify_repair_schedule_certificate(
+                        &input_jobs, &input_crews, &certificate(proposed, claimed_loss),
+                    )
+                }
+                1 => {
+                    proposed[0].crew_id = format!("ghost-crew-{mutation}");
+                    verify_repair_schedule_certificate(
+                        &input_jobs, &input_crews, &certificate(proposed, claimed_loss),
+                    )
+                }
+                2 => {
+                    proposed[0].crew_id = "crew-y".into();
+                    verify_repair_schedule_certificate(
+                        &input_jobs, &input_crews, &certificate(proposed, claimed_loss),
+                    )
+                }
+                3 => {
+                    proposed[0].finish_step += 1;
+                    verify_repair_schedule_certificate(
+                        &input_jobs, &input_crews, &certificate(proposed, claimed_loss),
+                    )
+                }
+                4 => {
+                    proposed[1].start_step = mutation % 2;
+                    proposed[1].finish_step = proposed[1].start_step + 4;
+                    verify_repair_schedule_certificate(
+                        &input_jobs, &input_crews, &certificate(proposed, claimed_loss),
+                    )
+                }
+                5 => {
+                    proposed.push(proposed[0].clone());
+                    verify_repair_schedule_certificate(
+                        &input_jobs, &input_crews, &certificate(proposed, claimed_loss),
+                    )
+                }
+                6 => {
+                    proposed.pop();
+                    verify_repair_schedule_certificate(
+                        &input_jobs, &input_crews, &certificate(proposed, claimed_loss),
+                    )
+                }
+                7 => {
+                    claimed_loss += 1.0 + mutation as f64 * 1.0e-6;
+                    verify_repair_schedule_certificate(
+                        &input_jobs, &input_crews, &certificate(proposed, claimed_loss),
+                    )
+                }
+                8 => {
+                    let unknown_dependency = format!("ghost-dependency-{mutation}");
+                    let invalid_jobs = vec![job(
+                        "pump", "y", 3, 2.0, &[unknown_dependency.as_str()],
+                    )];
+                    verify_repair_schedule_certificate(
+                        &invalid_jobs,
+                        &input_crews,
+                        &certificate(Vec::new(), 0.0),
+                    )
+                }
+                _ => {
+                    let dependency_jobs = vec![
+                        job("power", "x", 2, 1.0, &[]),
+                        job("pump", "y", 3, 2.0, &["power"]),
+                    ];
+                    let out_of_order = vec![
+                        ExactMultiCrewRepair {
+                            job_id: "power".into(),
+                            crew_id: "crew-x".into(),
+                            start_step: 2,
+                            finish_step: 4,
+                        },
+                        ExactMultiCrewRepair {
+                            job_id: "pump".into(),
+                            crew_id: "crew-y".into(),
+                            start_step: 0,
+                            finish_step: 3,
+                        },
+                    ];
+                    verify_repair_schedule_certificate(
+                        &dependency_jobs,
+                        &input_crews,
+                        &certificate(out_of_order, 10.0),
+                    )
+                }
+            };
+            if result.is_err() {
+                rejected += 1;
+            }
+        }
+        assert_eq!(rejected, 10_000, "every invalid schedule mutation must be rejected");
+    }
+
 }
