@@ -1,0 +1,93 @@
+# Cetacean Benchmark Ladder v1
+
+**Status:** preregistration proposal; proposed targets are not current Symthaea results. No recordings have been scored by this plan. Do not describe acoustic prediction as translation or proven semantic comprehension.
+
+## 1. Paradigm shifts
+
+1. **From “translate the animal” to falsifiable prediction.** Start with observable tasks (detect an event, recover timing/contours, predict the next acoustic unit, predict a blinded behavioral/context label). Meaning claims require additional evidence and must not be inferred from a language-model-like output.
+2. **From fixed tokens to structured time series.** Preserve continuous contours, precise inter-click intervals (ICI), rhythm, tempo, rubato, ornamentation, overlap, and turn-taking. Do not force every signal into a universal phoneme inventory.
+3. **From random crops to ecological generalization.** Split by source recording and, where metadata permit, session/encounter, individual/social unit, site, season, and recording device. Treat each dimension as a separate, explicit generalization claim.
+4. **From one score to an evidence ladder.** Separate signal integrity, event detection, segmentation, acoustic structure, behavior-linked prediction, and meaning. Passing a lower stage never implies a higher one.
+5. **From benchmark accuracy to adversarial science.** Compare against identity-only, time-of-day, recorder/site, prevalence, nearest-neighbor, simple signal-processing, and history-only baselines. Include shuffled-label, shuffled-context, and hard-negative controls.
+6. **From forced answers to calibrated abstention.** Preserve alternative hypotheses and allow “unknown.” Report calibration and coverage-versus-error; an uncertain answer is preferable to a confident hallucination.
+7. **From public-model convenience to legal reproducibility.** The exact audio and annotation license must permit the intended use. A permissively licensed paper or model code does not automatically license the source recordings.
+
+## 2. Evidence gates before any model score
+
+The following are hard gates, not metrics to trade against model accuracy:
+
+- Record the dataset ID, immutable revision/source URL, human-reviewed rights decision, intended use, attribution, and any restrictions on derived artifacts.
+- Preserve exact source-recording lineage for each crop, annotation provenance, native sample rate, channel count, sample count, and independently assigned labels.
+- Hash the exact local asset bytes. **bioacoustic-corpus-preflight** checks declared metadata; **bioacoustic-asset-audit** additionally streams each local file and verifies SHA-256 against the manifest. Both explicitly stop short of validating the audio header, rights adjudication, or detection performance.
+- Freeze the split manifest, annotation protocol, matching tolerance, primary metric, threshold-selection procedure, comparison baselines, exclusion rules, and analysis plan before test evaluation.
+- Tune thresholds on validation only. Never change the test threshold after inspecting test labels.
+- If source/session/site/individual lineage is unknown, report it as unknown. Do not infer groups from filenames or random crop IDs, and do not claim the corresponding holdout.
+- Keep a versioned annotation audit sample with double annotation and adjudication. Report disagreement instead of silently turning ambiguous calls into certain ground truth.
+
+## 3. Task-specific benchmark plan
+
+The numeric objectives below are **proposed engineering targets for a first pilot**, not accepted field-wide standards. Adjust them only in a documented preregistration made before the sealed test set is scored.
+
+| Lane | First task | Primary metrics | Proposed pilot objective | Required controls |
+|---|---|---|---|---|
+| Common / bottlenose dolphins: whistles | Detect and track whistle contours in continuous audio | Event AP; event F1 under a fixed matching tolerance; onset/offset error; contour frequency MAE; false alarms per hour | Held-out-session event F1 ≥ 0.80 at ≤ 1 false alarm/hour; contour error reported in Hz and as a fraction of the annotated frequency span | Ship / rain / wind / other-species / overlapping-whistle negatives; identity/recorder baseline; blinded human review |
+| Dolphins: echolocation clicks | Broadband click-event detection at native high sample rate | Event precision/recall/F1 with preregistered onset tolerance; missed events; false alarms per minute/hour; timing error | Event F1 ≥ 0.90 on a curated held-out pilot, with the actual precision-recall trade-off and uncertainty reported | Electrical artifacts, snapping shrimp where applicable, impulsive machinery, clipping, channel differences; no aliasing through unvalidated downsampling |
+| Dolphins: burst-pulsed sounds | Segment pulse trains | Event F1; boundary error; pulse-rate error; per-encounter macro averages | Beat a non-learned transient/pulse baseline by ≥ 5 absolute AP points on held-out encounters, with a grouped confidence interval excluding zero gain | Click-train vs burst-pulse ambiguity; overlapping animals; annotator disagreement |
+| Sperm whales: codas / ICI | Detect clicks and segment codas; recover ICI vectors | Click event F1; boundary error; ICI median absolute error; coda macro-F1; held-out sequence log loss | Coda macro-F1 ≥ 0.80 and median absolute ICI error ≤ 1 ms on a sealed, encounter-disjoint pilot | Individual/social-unit leakage, tag vs hydrophone differences, adjacent-coda context, shuffled ICI / shuffled context |
+| Baleen whales: songs and calls | Segment units and track contours before classification | Event AP/F1; contour error; song-structure edit distance; false alarms/hour | Establish a source-pinned baseline and confidence intervals first; do not set a universal threshold across species or recording conditions | Seasonal/site shift, vessel noise, call overlap, recorder response |
+
+The stated goals should be accompanied by a grouped 95% confidence interval (bootstrap by the independent unit, such as encounter or session), per-session/per-site slices when supportable, and a clear sample-size statement. A threshold target on one tiny dataset is not a species-wide operating guarantee.
+
+### Cross-cutting pass criteria
+
+A detector/structure model is not considered meaningfully better just because its pooled score is high:
+
+- It must beat a strong, disclosed simple baseline by a preregistered margin (initial proposal: ≥ 5 absolute AP points or ≥ 10% relative error reduction, as appropriate for the task).
+- The grouped confidence interval for improvement must exclude zero; otherwise classify the result as inconclusive.
+- It must outperform label-shuffle and context-shuffle null controls. If identity, site or recorder prediction explains the result, the intended generalization claim fails.
+- Report performance under a fixed low-false-alarm operating point as well as threshold-free metrics; detection in continuous hours is not interchangeable with balanced clip accuracy.
+- Report calibration (Brier score and reliability bins) and coverage-versus-error when the model can abstain.
+- Report all attempted configurations and test exclusions. No cherry-picked best seed or silent failed run.
+- Keep compute, memory, throughput, end-to-end latency, and annotation effort beside predictive scores.
+
+## 4. Sequence and interaction: the harder, higher-value direction
+
+Once low-level events are reliable, preserve **exchanges**, not isolated sound crops. For sperm whales this includes click timing, coda boundaries, tempo, rhythm, rubato, ornamentation, sender uncertainty, overlap, and the preceding/following codas. For dolphins, preserve whistle contour, pulse trains, encounter context and known behavioral observations without assuming every observation identifies the caller or meaning.
+
+Evaluate next-unit prediction with held-out log loss / perplexity **against simple history-only and identity-aware baselines**. Evaluate structure discovery for stability across independent encounters, not merely how plausible clusters look. A model that predicts the next sound has shown predictive structure; it has not yet shown what that sound means.
+
+For a behavior-linked hypothesis, preregister:
+- the externally observable outcome or context label;
+- the annotation source and blinding procedure;
+- the unit of independence and all relevant confounds (individual, site, time, device, observer, group size);
+- null models, multiplicity control, uncertainty and replication criteria;
+- the exact claim level that a positive result would support.
+
+Start with passive observation and archival data. Any playback, synthetic call broadcast, or other intervention affecting animals requires a separate animal-welfare / ethics review and field protocol; it is outside this benchmark ladder.
+
+## 5. Real data and reproduction constraints
+
+- **DOLPHINFREE:** the 2025 *Earth System Science Data* article describes more than 400 minutes of common-dolphin recordings, approximately 68,000 echolocation clicks, about 4,600 whistle contours and more than 350 pulsed sounds, captured using 512 kHz mono and 256–512 kHz four-hydrophone recordings. This is unusually useful for a multi-task pilot, but admission depends on rights terms for the exact downloadable audio and annotations, not just the paper: https://essd.copernicus.org/articles/17/4495/2025/
+- **OpenWhistle-CNN:** its public card describes 76,516 windows from 482 sessions, with a 261-session test split and about 8.5 total window-hours. It can be a clip/window comparison but does not automatically substitute for long continuous-recording false-alarm evaluation; verify license scope before use: https://huggingface.co/datasets/dolphinteam/OpenWhistle-CNN
+- **Sperm-whale codas:** the Nature Communications work on contextual and combinatorial structure analyses 8,719 codas and identifies rhythm, tempo, rubato and ornamentation as meaningful acoustic variables, while many communication functions remain open questions: https://doi.org/10.1038/s41467-024-47221-8
+- **WhAM:** its code repository notes that reproducing all reported results requires DSWP+CETI annotations, only partly public at publication. A model/code license is not equivalent to the dataset license: https://github.com/Project-CETI/wham
+
+## 6. Run commands and evidence vocabulary
+
+Metadata-only preflight:
+
+    cargo run -p symthaea-communication --bin bioacoustic-corpus-preflight -- corpus-manifest.json --require-source-recording-ids --require-annotations --hold-out-sessions
+
+Actual local byte audit (asset URIs must be clean paths relative to the given root):
+
+    cargo run -p symthaea-communication --bin bioacoustic-asset-audit -- corpus-manifest.json --asset-root ./permitted-corpus
+
+Evidence labels:
+
+- **Metadata admitted:** declared manifest, rights references and split relations passed checks.
+- **Bytes verified:** every local file's SHA-256 matches its manifest entry. This does not verify decoded sample metadata or authenticity of annotations.
+- **Benchmark evaluated:** a frozen model/configuration produced per-sample outputs on the sealed test split and metrics were computed.
+- **Independently replicated:** an independent team or separately collected, properly permitted corpus reproduced the preregistered finding.
+- **Meaning hypothesis supported:** requires task-specific independent behavioral/context evidence beyond acoustic classification or sequence prediction.
+
+For the current Symthaea research branch, code and tests remain uncompiled/unexecuted in the authoring environment; the first two labels must not be reported as achieved until commands execute on exact data and head.
