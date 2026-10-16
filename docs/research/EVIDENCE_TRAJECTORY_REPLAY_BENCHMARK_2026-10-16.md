@@ -54,7 +54,7 @@ These works motivate the measurement shape; they do **not** validate Symthaea's 
 ~~~sh
 cargo run --locked --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-audit docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl
 cargo run --locked --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-evaluate docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl /tmp/trajectory-receipts.jsonl trajectory-policy-v1 1 false
-cargo run --locked --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-score docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl /tmp/trajectory-receipts.jsonl trajectory-policy-v1
+cargo run --locked --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-score docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl /tmp/trajectory-receipts.jsonl trajectory-policy-v1 1 false
 ~~~
 
-The unsafe-control fixture must make trajectory-score exit **3**. A queued or missing CI status is not a pass. Rust compilation, rustfmt, tests, and the workflow must be confirmed at the exact PR head before claiming them as passing.
+The score command requires the expected policy version, origin threshold, and scoped-answer setting; receipt configuration must match these arguments. The unsafe-control fixture must make trajectory-score exit **3**. A queued or missing CI status is not a pass. Rust compilation, rustfmt, tests, and the workflow must be confirmed at the exact PR head before claiming them as passing.
