@@ -256,12 +256,14 @@ fn qualify_case(
         fixture_root,
         SfzResamplerV1::LinearBaseline,
         output_alias_frequency,
+        thresholds,
     )?;
     let sinc = measure_path(
         &manifest,
         fixture_root,
         SfzResamplerV1::LanczosSinc { radius: SINC_RADIUS },
         output_alias_frequency,
+        thresholds,
     )?;
 
     let alias_suppression_db = 20.0
@@ -346,6 +348,7 @@ fn measure_path(
     fixture_root: &Path,
     resampler: SfzResamplerV1,
     measured_frequency: f64,
+    thresholds: &ThresholdsV1,
 ) -> Result<PathMeasurementV1, Box<dyn Error>> {
     let mut elapsed_seconds = Vec::with_capacity(REPEATS);
     let mut output_hashes = Vec::with_capacity(REPEATS);
@@ -380,9 +383,9 @@ fn measure_path(
     let first_hash = output_hashes.first().map(String::as_str).unwrap_or_default();
 
     Ok(PathMeasurementV1 {
-        non_silent: renderer_receipt.rms > 1.0e-6,
-        peak_within_unity: f64::from(peak) <= 1.0,
-        repeated_output_hash_stable: output_hashes.iter().all(|hash| hash == first_hash),
+        non_silent: renderer_receipt.rms > thresholds.minimum_non_silent_rms,
+        peak_within_unity: f64::from(peak) <= thresholds.maximum_absolute_peak,
+        repeated_output_hash_stable: output_hashes.iter().all(|hash| hash.as_str() == first_hash),
         median_render_ms: median_seconds * 1_000.0,
         offline_realtime_factor: realtime_factor,
         renderer_receipt,
