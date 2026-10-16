@@ -1794,6 +1794,20 @@ mod tests {
     }
 
     #[test]
+    fn test_pki_bundle_mutation_invalidates_profile_approval() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
+        orch.apply_guide_result(SecureBootMethod::MokEnrollment)
+            .expect("explicit method selection");
+        authorize_test_profile(&mut orch);
+        assert!(orch.generate_nix_config().is_ok());
+
+        orch.lanzaboote.pki_dir = "/etc/secureboot".to_string();
+        assert!(orch.generate_nix_config().is_err());
+        assert!(!orch.is_configuration_authorized());
+    }
+
+    #[test]
     fn test_orchestration_blocks_profile_when_key_generation_is_disabled() {
         let mut orch = SecureBootOrchestration::new();
         orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
