@@ -37,7 +37,10 @@
     "interval_frontier_fixture_executed": false,
     "transportability_kernel_compiled": false,
     "transportability_unit_tests_executed": false,
-    "transportability_fixture_executed": false
+    "transportability_fixture_executed": false,
+    "shift_robustness_radius_compiled": false,
+    "shift_robustness_radius_tests_executed": false,
+    "shift_robustness_radius_fixture_executed": false
   },
   "label_states": [
     {
@@ -191,7 +194,9 @@
         "upper_unknown_aware_error_rate_bound_at_fixed_coverage",
         "accepted_label_completeness_at_fixed_coverage",
         "measured_runtime_and_compute",
-        "lower_target_mixture_recall_delta_when_estimable"
+        "lower_target_mixture_recall_delta_when_estimable",
+        "nominal_critical_population_shift_tv_radius_when_estimable",
+        "conservative_lower_bound_shift_tv_radius_when_estimable"
       ]
     },
     {
@@ -274,6 +279,29 @@
         "Infeasible prevalence intervals fail closed.",
         "Group-effect intervals and target prevalence bounds need separate provenance and joint-coverage caveats.",
         "The envelope is not a confidence interval or proof of exchangeability."
+      ]
+    },
+    {
+      "id": "T14_shift_robustness_radius",
+      "required_when_context_prevalence_shift_is_in_scope": true,
+      "metrics": [
+        "source_mixture_nominal_effect",
+        "nominal_critical_tv_shift_radius",
+        "nominal_sign_change_witness_weights",
+        "source_mixture_conservative_lower_effect",
+        "conservative_critical_tv_shift_radius",
+        "conservative_sign_change_witness_weights",
+        "erasable_or_not_within_declared_target_bounds"
+      ],
+      "definition": "Minimum total-variation distance from the source context-prevalence vector to a feasible target prevalence vector whose weighted context effect is non-positive, constrained by preregistered target-prevalence bounds. TV=0.5*L1 distance.",
+      "nominal_analysis": "Uses preregistered point effects for each context.",
+      "conservative_analysis": "Uses supplied lower effect bound for each context; if the source mix is already non-positive, radius is zero.",
+      "requirements": [
+        "Source weights sum to one and lie within declared target prevalence bounds; prevalence bounds form a feasible simplex.",
+        "Group effect values/intervals and source/target prevalence weights have separate provenance.",
+        "Output includes a feasible sign-change witness and checks its TV distance; no witness means no reversal is feasible within the declared bounds.",
+        "Always report nominal and conservative radii separately; a positive nominal radius does not override a zero conservative radius.",
+        "Do not infer empirical target shift, clinical harm, laboratory savings or safety from this sensitivity metric."
       ]
     }
   ],
@@ -360,6 +388,20 @@
         "Effect intervals are supplied inputs, and dependence between context effects and weights may make the envelope conservative.",
         "A target-mixture Recall@K result is a computational endpoint only, not a clinical safety or efficacy claim."
       ]
+    },
+    "secondary_shift_radius": {
+      "status": "proposed_methodological_target_not_validated",
+      "targets": [
+        "Report the nominal and conservative robustness radius for 100% of estimable target-mixture comparisons.",
+        "Every finite radius includes an independently checked witness weight vector with weighted effect <=0 and TV equal to half the L1 change.",
+        "Where the conservative radius is zero, do not describe the improvement as robustly positive.",
+        "Report whether the radius is small relative to an independently justified plausible-shift range; do not invent a universal acceptable radius."
+      ],
+      "caveats": [
+        "The utility does not estimate group effects, target prevalence, or real-world shift magnitude.",
+        "The conservative radius is conditional on supplied effect intervals and target bounds; unsupported contexts remain blockers.",
+        "This is a sign-change sensitivity analysis, not a confidence interval or clinical endpoint."
+      ]
     }
   },
   "non_negotiable_gates": [
@@ -432,6 +474,11 @@
       "id": "G13_target_mixture_transportability",
       "target": "100% of target contexts with nonzero feasible prevalence have supported context-specific effect intervals; endpoint witness mixtures are feasible; robust positive-transfer requires lower bound > 0.",
       "failure_action": "Reject unsupported-context zero imputation, infeasible prevalence ranges, missing witness vectors, undocumented group effect/prevalence provenance, or positive-transfer claims from nominal weights alone."
+    },
+    {
+      "id": "G14_shift_radius_integrity",
+      "target": "100% of finite robustness radii include a feasible sign-change witness, correct TV distance, and separate nominal/conservative interpretation.",
+      "failure_action": "Reject source weights outside the target simplex bounds, unsupported contexts, invalid effects, infeasible prevalence ranges, a witness whose effect remains positive, or reporting nominal radius as a substitute for the conservative radius."
     }
   ],
   "comparator_policies": [
@@ -514,7 +561,9 @@
     "https://doi.org/10.1016/j.ins.2026.123217",
     "https://proceedings.mlr.press/v337/laghuvarapu26a.html",
     "https://doi.org/10.1214/26-EJS2506",
-    "https://arxiv.org/abs/2609.27955"
+    "https://arxiv.org/abs/2609.27955",
+    "https://doi.org/10.1287/opre.2022.0658",
+    "https://proceedings.mlr.press/v306/agirman26a.html"
   ],
   "synthetic_contract_fixtures": [
     {
@@ -1094,6 +1143,55 @@
         "conclusion": "inconclusive"
       },
       "interpretation": "Synthetic method fixture only; no target-population or biological data are supplied."
+    },
+    {
+      "id": "F13_population_shift_robustness_radius",
+      "purpose": "Measure minimum population-composition change that removes nominal and conservative paired Recall@K gains.",
+      "contexts": [
+        {
+          "id": "A",
+          "nominal_delta": 0.1,
+          "lower_delta": 0.08,
+          "upper_delta": 0.12,
+          "source_weight": 0.35,
+          "target_weight_lower": 0.2,
+          "target_weight_upper": 0.5,
+          "context_supported": true
+        },
+        {
+          "id": "B",
+          "nominal_delta": 0.045,
+          "lower_delta": 0.02,
+          "upper_delta": 0.07,
+          "source_weight": 0.45,
+          "target_weight_lower": 0.3,
+          "target_weight_upper": 0.6,
+          "context_supported": true
+        },
+        {
+          "id": "C",
+          "nominal_delta": -0.2,
+          "lower_delta": -0.25,
+          "upper_delta": -0.15,
+          "source_weight": 0.2,
+          "target_weight_lower": 0.1,
+          "target_weight_upper": 0.4,
+          "context_supported": true
+        }
+      ],
+      "expected": {
+        "source_nominal_delta": 0.01525,
+        "nominal_critical_tv_radius": 0.0508333333333333,
+        "nominal_sign_change_witness": {
+          "A": 0.2991666666666667,
+          "B": 0.45,
+          "C": 0.2508333333333333
+        },
+        "source_conservative_lower_delta": -0.013,
+        "conservative_critical_tv_radius": 0,
+        "conservative_conclusion": "already_non_positive"
+      },
+      "interpretation": "Synthetic sensitivity fixture only; TV radius and context intervals are not measured biological properties."
     }
   ],
   "implementation_artifact": {
@@ -1120,7 +1218,8 @@
       "scripts/crispr_selective_risk.rs",
       "scripts/crispr_measurement_priority.rs",
       "scripts/crispr_interval_frontier.rs",
-      "scripts/crispr_transportability.rs"
+      "scripts/crispr_transportability.rs",
+      "scripts/crispr_shift_robustness_radius.rs"
     ],
     "additional_test_suites": [
       {
@@ -1185,6 +1284,21 @@
           "infeasible prevalence mass, invalid intervals and invalid prevalence ranges rejected",
           "duplicate and blank context identifiers rejected",
           "deterministic ties"
+        ]
+      },
+      {
+        "path": "scripts/crispr_shift_robustness_radius.rs",
+        "unit_test_count": 13,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_shift_robustness_radius.rs -o /tmp/crispr-shift-radius-tests && /tmp/crispr-shift-radius-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "nominal sign-change radius and witness",
+          "conservative source-mixture lower effect and zero radius",
+          "not erasable within target bounds",
+          "source effect already non-positive",
+          "witness prevalence feasibility and TV identity",
+          "unsupported contexts and invalid source/target weights fail closed",
+          "invalid intervals, non-finite effects and invalid identities fail closed"
         ]
       }
     ]
@@ -1437,6 +1551,17 @@
       "mismatches": 0,
       "result": "Greedy lower/upper target-mixture envelopes matched exhaustive feasible 0.1-grid weight enumeration and all per-context interval endpoint combinations for every tested fixture.",
       "scope_limit": "This validates bounded-simplex arithmetic for deterministic grid fixtures only. It does not compile/run Rust, estimate real target-group prevalences, derive group confidence intervals, establish exchangeability, or establish biological/clinical validity."
+    },
+    "shift_robustness_radius_f13": {
+      "status": "passed_independent_vertex_oracle_only",
+      "executed_on": "2026-10-16",
+      "deterministic_three_context_fixtures": 2500,
+      "nominal_and_lower_bound_comparisons": 5000,
+      "vertex_oracle_mismatches": 0,
+      "erasable_cases": 4041,
+      "not_erasable_cases": 959,
+      "result": "Greedy radius matched exhaustive feasible-polytope vertex enumeration in all tested cases.",
+      "scope_limit": "This verifies the optimizer formulation on tested three-context cases only; not Rust compilation, interval provenance, target shift estimation, or biological/clinical validity."
     }
   },
   "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571",
@@ -1470,6 +1595,12 @@
       "number": 7615,
       "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7615",
       "scope": "robust target-mixture transportability"
+    },
+    {
+      "id": "CRISPR-OT-007",
+      "number": 7623,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7623",
+      "scope": "minimum population-shift robustness radius"
     }
   ]
 }
