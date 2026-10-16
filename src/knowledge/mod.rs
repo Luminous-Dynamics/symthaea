@@ -37,6 +37,7 @@ pub mod causal_reasoning_bridge;
 pub mod claim_priority;
 pub mod encoding;
 pub mod evidence_lineage;
+pub mod evidence_proof_formula;
 pub mod evidence_provenance_graph;
 pub mod extraction;
 pub mod graph;
@@ -57,6 +58,10 @@ pub use encoding::{FactEncoding, KnowledgeEncoder, RoleBoundVector};
 pub use evidence_lineage::{
     EvidenceLineageAbstentionReason, EvidenceLineageAssessment, EvidenceLineageDecision,
     EvidenceLineageGroup, EvidenceLineagePolicy, EvidenceWitness,
+};
+pub use evidence_proof_formula::{
+    EvidenceProofAbstentionReason, EvidenceProofAssessment, EvidenceProofFormula,
+    EvidenceProofPolicy,
 };
 pub use evidence_provenance_graph::{
     EvidenceProvenanceGraph, ProvenanceDerivationEdge, ProvenanceDerivationKind,
