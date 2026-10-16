@@ -142,6 +142,13 @@ Pin the exact dataset/version and each artifact's license before use. Public ava
 1. **Contract hardening (this tranche):** require all registered context controls; reject incomplete/duplicate/blank split identities, non-finite temporal-permutation evidence, and train/test overlap in source-recording lineage.
 2. **Passive corpus audit:** start with BirdVox-full-night v3, build a `BioacousticCorpusManifest`, pin audio/annotation/metadata hashes, exclude device beeps from positive bird events, and split on source recording/sensor. State clearly that six sensors from one night cannot establish temporal or regional generalization. Use BirdVox-DCASE-20k only as a secondary clip-level comparison because its randomized UUIDs conceal lineage. Audit broader taxa/sites with BirdSet/BEANS after their constituent licenses and source lineage are recorded. No communication or training-quality claim yet.
 3. **Baseline harness:** build a metadata-first manifest for BirdVox-full-night v3 and its six source recordings, link time/frequency annotations, isolate device alarms, and run a nested sensor-grouped evaluation. Select thresholds only inside each outer fold's training/validation data, freeze them before scoring the held-out sensor, and report both window/event metrics plus false alarm events/hour. Use BirdVox-DCASE-20k only as a secondary clip-level comparison because its source lineage is hidden. Emit per-sample predictions and a separate unit-discovery report using Symthaea's existing immutable run bundle. Metric functions alone do not qualify a run or establish performance.
+
+Once that metadata manifest exists, run the preflight before model work:
+```sh
+cargo run -p symthaea-communication --bin bioacoustic-corpus-preflight -- birdvox-full-night-manifest.json \
+  --require-source-recording-ids --require-annotations
+```
+The CLI validates declared metadata and emits a canonical manifest BLAKE3 identity. A preflight pass is not a benchmark result and does not authenticate file bytes or the human-reviewed rights decision.
 4. **Context prediction:** preregister one observable target and run every required control on held-out identities/sites/time.
 5. **Expert review:** reconcile annotation uncertainty and review negative controls before using words like “meaning.”
 6. **Intervention proposal:** only after the passive prediction gate passes, submit a species-specific welfare-reviewed protocol.
