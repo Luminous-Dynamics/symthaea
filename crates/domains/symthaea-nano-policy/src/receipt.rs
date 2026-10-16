@@ -408,6 +408,14 @@ mod tests {
     }
 
     #[test]
+    fn receipt_audit_schema_is_parseable_and_closed() {
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/receipt-audit.schema.json")).unwrap();
+        assert_eq!(schema["additionalProperties"], false);
+        assert_eq!(schema["properties"]["status"]["enum"][0], "passed");
+    }
+
+    #[test]
     fn rejects_request_with_hidden_target_field() {
         let request_line = r#"{"schema_version":"nano-policy-request-v1","policy":"farthest_first","budget":1,"seed":1,"feature_contract_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","candidates":[{"candidate_id":"x","family_id":"f","normalized_features":[0.5],"target_energy_eV":-1.0}]}"#;
         let report = verify_receipt(request_line, "{}");
