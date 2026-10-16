@@ -101,11 +101,9 @@ impl CampaignManifest {
                     Feasibility::Feasible
                 };
                 let reference_available = (x + y) % 11 != 0;
-                let cost_scale = if scenario == ScenarioFamily::ConfoundedFactors && x != y {
-                    4
-                } else {
-                    1
-                };
+                // Cost structure is scenario-independent, so the visible candidate
+                // catalog does not encode the hidden oracle family.
+                let cost_scale = if x != y && (x + y) % 3 == 0 { 4 } else { 1 };
                 candidates.push(Candidate {
                     id: format!("C{x:02}-{y:02}"),
                     factor_x: x,
