@@ -69,6 +69,9 @@ impl BioacousticEventPredictionBundle {
         let mut canonical = self.clone();
         canonical.target_labels.sort();
         canonical.exhaustive_annotation_sample_ids.sort();
+        canonical.corpus_manifest_blake3 =
+            canonical.corpus_manifest_blake3.to_ascii_lowercase();
+        canonical.model_sha256 = canonical.model_sha256.to_ascii_lowercase();
         canonical.predictions.sort_by(|left, right| left.prediction_id.cmp(&right.prediction_id));
         let bytes = serde_json::to_vec(&canonical)
             .map_err(|error| format!("cannot serialize prediction bundle: {error}"))?;
@@ -932,6 +935,18 @@ mod tests {
             ],
         };
         (manifest, bundle)
+    }
+
+    #[test]
+    fn prediction_bundle_identity_is_order_and_hex_case_invariant() {
+        let (_, mut bundle) = fixture();
+        let original = bundle.computed_bundle_blake3().unwrap();
+        bundle.predictions.reverse();
+        bundle.target_labels.reverse();
+        bundle.exhaustive_annotation_sample_ids.reverse();
+        bundle.model_sha256 = bundle.model_sha256.to_ascii_uppercase();
+        bundle.corpus_manifest_blake3 = bundle.corpus_manifest_blake3.to_ascii_uppercase();
+        assert_eq!(original, bundle.computed_bundle_blake3().unwrap());
     }
 
     #[test]
