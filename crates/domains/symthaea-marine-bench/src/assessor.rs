@@ -763,4 +763,39 @@ mod tests {
         let report = assess(&case).expect("synthetic bounded case");
         assert_eq!(finding(&report, "under_keel_clearance").status, FindingStatus::Indeterminate);
     }
+    #[test]
+    fn interval_comparator_matches_frozen_oracle_for_ten_thousand_cases() {
+        for i in 0_u32..10_000 {
+            let observed_lower = (i.wrapping_mul(37) % 101) as f64;
+            let observed_upper = observed_lower + (i.wrapping_mul(11) % 37) as f64;
+            let bound_lower = (i.wrapping_mul(17) % 101) as f64;
+            let bound_upper = bound_lower + (i.wrapping_mul(23) % 37) as f64;
+            let observed = Interval {
+                nominal: (observed_lower + observed_upper) / 2.0,
+                lower: observed_lower,
+                upper: observed_upper,
+            };
+            let bound = Interval {
+                nominal: (bound_lower + bound_upper) / 2.0,
+                lower: bound_lower,
+                upper: bound_upper,
+            };
+            let expected = if observed_upper <= bound_lower {
+                FindingStatus::WithinDeclaredBound
+            } else if observed_lower > bound_upper {
+                FindingStatus::ViolatesDeclaredBound
+            } else {
+                FindingStatus::Indeterminate
+            };
+            let actual = compare_le("interval_oracle", Ok(observed), Ok(bound), "unit", "fixed rule");
+            assert_eq!(actual.status, expected, "case index {i}");
+            if actual.status == FindingStatus::WithinDeclaredBound {
+                assert!(actual.observed_upper.unwrap() <= actual.bound_lower.unwrap());
+            }
+            if actual.status == FindingStatus::ViolatesDeclaredBound {
+                assert!(actual.observed_lower.unwrap() > actual.bound_upper.unwrap());
+            }
+        }
+    }
+
 }
