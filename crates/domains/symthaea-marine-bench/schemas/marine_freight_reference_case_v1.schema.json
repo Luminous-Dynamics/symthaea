@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:luminous-dynamics:symthaea:marine-freight-reference-case:v1",
   "title": "Symthaea marine freight reference case v1",
-  "description": "Input contract for bounded screening arithmetic. Validation of provenance references, physical applicability, and calculation semantics is performed separately by the Rust evaluator.",
+  "description": "Input contract for interval-aware screening arithmetic. Every known value declares a nominal value and closed lower/upper bounds; the Rust evaluator validates order, provenance, and conservative interval semantics. No probability or physical-validation claim is implied.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -252,6 +252,8 @@
       "required": [
         "status",
         "value",
+        "lower_bound",
+        "upper_bound",
         "unit",
         "provenance_id"
       ],
@@ -276,6 +278,14 @@
         "provenance_id": {
           "type": "string",
           "minLength": 1
+        },
+        "lower_bound": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upper_bound": {
+          "type": "number",
+          "minimum": 0
         }
       }
     },
@@ -430,6 +440,12 @@
                   "const": "fraction"
                 },
                 "value": {
+                  "maximum": 1
+                },
+                "lower_bound": {
+                  "maximum": 1
+                },
+                "upper_bound": {
                   "maximum": 1
                 }
               }
