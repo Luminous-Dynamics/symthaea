@@ -561,9 +561,15 @@ mod tests {
             serde_json::from_str(include_str!("../schema/output.schema.json"))
                 .expect("output schema parses as JSON");
         assert_eq!(input_schema["additionalProperties"].as_bool(), Some(false));
-        assert_eq!(input_schema["properties"]["candidates"]["items"]["additionalProperties"].as_bool(), Some(false));
+        assert_eq!(
+            input_schema["properties"]["candidates"]["items"]["additionalProperties"].as_bool(),
+            Some(false)
+        );
         assert_eq!(output_schema["additionalProperties"].as_bool(), Some(false));
-        assert_eq!(output_schema["properties"]["policy_version"]["const"].as_str(), Some(POLICY_VERSION));
+        assert_eq!(
+            output_schema["properties"]["policy_version"]["const"].as_str(),
+            Some(POLICY_VERSION)
+        );
     }
 
     #[test]
