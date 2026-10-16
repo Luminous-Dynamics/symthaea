@@ -25,7 +25,13 @@ pub enum DecisionUse {
 #[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum EvidenceValue {
     Known {
+        /// Nominal value used for report context; never sufficient alone for a
+        /// robust feasibility classification.
         value: f64,
+        /// Closed lower bound on the admitted input range.
+        lower_bound: f64,
+        /// Closed upper bound on the admitted input range.
+        upper_bound: f64,
         unit: String,
         provenance_id: String,
     },
