@@ -506,4 +506,50 @@ mod tests {
     fn policy_rejects_zero_required_origins() {
         assert!(EvidenceLineagePolicy::new(0, true).is_err());
     }
+
+    /// Opt-in release-mode benchmark of the complete in-memory grouping path.
+    /// It excludes lineage extraction, network/source lookup, and persistence.
+    #[test]
+    #[ignore = "manual release-mode scalability benchmark; not a CI correctness gate"]
+    fn benchmark_lineage_grouping_scaling() {
+        use std::time::Instant;
+
+        const REPEATS: usize = 9;
+        let policy = EvidenceLineagePolicy::strict();
+
+        for size in [1_000usize, 10_000, 100_000] {
+            let witnesses: Vec<_> = (0..size)
+                .map(|index| EvidenceWitness {
+                    evidence_id: format!("evidence-{index}"),
+                    source_id: format!("source-{index}"),
+                    origin_id: Some(format!("origin-{index}")),
+                    content_digest: Some(ContentDigest::sha256(format!("{index:064x}"))),
+                })
+                .collect();
+            let expected = EvidenceLineageAssessment::assess(&witnesses, &policy);
+            assert_eq!(expected.decision, EvidenceLineageDecision::EligibleForReview);
+            assert_eq!(expected.attributed_origin_group_count, size);
+            let mut durations_ns = Vec::with_capacity(REPEATS);
+
+            for _ in 0..REPEATS {
+                let start = Instant::now();
+                let assessment = EvidenceLineageAssessment::assess(&witnesses, &policy);
+                std::hint::black_box((
+                    assessment.decision,
+                    assessment.attributed_origin_group_count,
+                    assessment.duplicate_witness_count,
+                ));
+                durations_ns.push(start.elapsed().as_nanos());
+            }
+            durations_ns.sort_unstable();
+            let p50_ns = durations_ns[REPEATS / 2];
+            let p95_index = (REPEATS * 95 + 99) / 100 - 1;
+            let p95_ns = durations_ns[p95_index];
+            println!(
+                "n={size} reps={REPEATS} p50_ns={p50_ns} p95_ns={p95_ns} median_ns_per_item={}",
+                p50_ns / size as u128
+            );
+        }
+    }
+
 }
