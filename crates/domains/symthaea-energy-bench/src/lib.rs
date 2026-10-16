@@ -116,6 +116,10 @@ pub struct EvaluationPolicy {
     pub relative_balance_tolerance: f64,
     pub time_continuity_tolerance_s: f64,
     pub minimum_superiority_margin: f64,
+    /// Registered worst-case absolute bound on unmodeled differential bias
+    /// between candidate and baseline efficiency, expressed as a fraction.
+    /// This is a conservative bound, not a standard uncertainty.
+    pub maximum_unmodeled_differential_bias_efficiency: f64,
     pub baseline_id: String,
     pub selection_rule: String,
     pub comparison_metric_id: String,
@@ -185,6 +189,9 @@ pub struct EfficiencyComparison {
     pub conservative_lower_bound: Option<f64>,
     /// Absolute efficiency fraction (e.g. 0.02 means two percentage points).
     pub required_superiority_margin: f64,
+    /// Registered worst-case bound subtracted directly from the efficiency
+    /// difference after expanded measurement uncertainty.
+    pub maximum_unmodeled_differential_bias_efficiency: f64,
     pub coverage_factor: f64,
     pub reason: Option<String>,
 }
@@ -308,6 +315,14 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         || !(0.0..=1.0).contains(&policy.minimum_superiority_margin)
     {
         issues.push("minimum_superiority_margin must be finite and in [0, 1]".into());
+    }
+    if !policy.maximum_unmodeled_differential_bias_efficiency.is_finite()
+        || !(0.0..=1.0).contains(&policy.maximum_unmodeled_differential_bias_efficiency)
+    {
+        issues.push(
+            "maximum_unmodeled_differential_bias_efficiency must be finite and in [0, 1]"
+                .into(),
+        );
     }
     if policy.policy_id.trim().is_empty()
         || policy.baseline_id.trim().is_empty()
@@ -730,6 +745,8 @@ pub fn compare_candidates(
         || cp.relative_balance_tolerance != bp.relative_balance_tolerance
         || cp.time_continuity_tolerance_s != bp.time_continuity_tolerance_s
         || cp.minimum_superiority_margin != bp.minimum_superiority_margin
+        || cp.maximum_unmodeled_differential_bias_efficiency
+            != bp.maximum_unmodeled_differential_bias_efficiency
         || cp.selection_rule != bp.selection_rule
         || cp.baseline_id != bp.baseline_id
         || cp.comparison_metric_id != bp.comparison_metric_id
@@ -765,6 +782,8 @@ pub fn compare_candidates(
         expanded_difference_uncertainty: None,
         conservative_lower_bound: None,
         required_superiority_margin: required_margin,
+        maximum_unmodeled_differential_bias_efficiency: cp
+            .maximum_unmodeled_differential_bias_efficiency,
         coverage_factor,
         reason: None,
     };
@@ -822,7 +841,11 @@ pub fn compare_candidates(
     )?;
     let expanded_delta_u = coverage_factor * candidate_u.hypot(baseline_u);
     let difference = candidate_efficiency - baseline_efficiency;
-    let lower_bound = difference - expanded_delta_u;
+    // Treat unmodeled differential bias as a worst-case absolute bound, not
+    // as a random standard uncertainty. Subtract it linearly and conservatively.
+    let lower_bound = difference
+        - expanded_delta_u
+        - cp.maximum_unmodeled_differential_bias_efficiency;
     if !expanded_delta_u.is_finite() || !difference.is_finite() || !lower_bound.is_finite() {
         return Err(ValidationError {
             issues: vec!["efficiency comparison uncertainty arithmetic overflowed".into()],
@@ -1021,6 +1044,7 @@ mod tests {
         baseline.evaluation_policy.baseline_id = baseline.candidate.candidate_id.clone();
         baseline.evaluation_policy.comparison_metric_id = "net_cycle_efficiency".into();
         baseline.evaluation_policy.minimum_superiority_margin = 0.02;
+        baseline.evaluation_policy.maximum_unmodeled_differential_bias_efficiency = 0.0;
 
         let mut candidate = baseline.clone();
         candidate.candidate.candidate_id = "candidate-better".into();
