@@ -351,7 +351,7 @@ The Rust evidence module now implements SHA-256 over canonical manifest/receipt 
 
 Relevant APIs are sha256_hex, evidence_manifest_sha256, verify_evidence_manifest_digest, scenario_run_receipt_sha256, verify_scenario_run_receipt_digest, verify_manifest_source_bytes, verify_receipt_output_bytes, and verify_receipt_manifest_link in crates/domains/symthaea-scenarios/src/living_city_evidence.rs.
 
-This remains a **library-level verification component**, not yet a separately deployed verifier service or command that independently opens artifacts from a run directory and produces a signed verification report. The orchestration integration, access-controlled artifact retention, and exact-head execution evidence remain required before this can be called an independently verified engineering pipeline. Tests have been added but were not run in the available environment because Rust/Cargo are absent; skipped CI is not a pass.
+An offline verifier command is now also present at crates/domains/symthaea-scenarios/src/bin/living_city_verify.rs. It independently opens the declared run-package paths, streams source/output bytes, and checks the digest graph in a separate process. It has not yet been compiled or run in the available environment, is not wired into the scenario orchestrator/CI promotion gates, and does not authenticate a trusted signer. Access-controlled artifact retention, a signing/attestation policy where authorship matters, and exact-head execution evidence remain required before this can be called a fully verified engineering pipeline. Tests have been added but were not run in the available environment because Rust/Cargo are absent; skipped CI is not a pass.
 
 ## 16. Offline run-package verifier
 
