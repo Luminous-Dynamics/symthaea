@@ -345,3 +345,9 @@ Public [PR #7536](https://github.com/Luminous-Dynamics/symthaea/pull/7536), stac
 
 Exact PR #7536 head `518ce64dbbc56e0b6b0833e3afaff4ec73a96431`, base #7534 head `68361fb2fb3cee81fb5737a32187e2d3f39e5baf`, compare 4 commits ahead / 0 behind, GitHub reports mergeable. CI [38861023736](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38861023736) and PR Governance [38861023721](https://github.com/Luminous-Dynamics/symthaea/actions/runs/38861023721) are **queued** on this exact head. Neither is a pass, and the test oracle has not been executed locally.
 
+### PR #7536 exact-head correction (2026-10-16)
+
+After the exhaustive-oracle independence fix, PR #7536 advanced to `e2668f5b3911c736896675e1960da545cbcba69c`. It remains stacked on #7534 head `68361fb2fb3cee81fb5737a32187e2d3f39e5baf`, 5 commits ahead and 0 behind; GitHub reports it mergeable.
+
+At this exact-head check, no CI or PR Governance run had yet been returned for `e2668f5b3911c736896675e1960da545cbcba69c`. The earlier CI/Governance records belong to a superseded head and cannot qualify the current source. The optimized scanner's exhaustive-oracle parity test is authored, and the scaling probe remains ignored/non-gating; neither has run locally.
+
