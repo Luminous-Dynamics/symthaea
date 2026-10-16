@@ -6,7 +6,7 @@ use std::error::Error;
 use symthaea_marine_bench::{assess, MarineFreightCase};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let input = include_str!("../fixtures/marine_freight_reference_case_v1.synthetic.json");
+    let input = include_str!("../fixtures/marine_freight_reference_case_v2.synthetic.json");
     let case: MarineFreightCase = serde_json::from_str(input)?;
     let report = assess(&case)?;
     println!("{}", serde_json::to_string_pretty(&report)?);
