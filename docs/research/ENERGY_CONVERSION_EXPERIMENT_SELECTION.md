@@ -73,6 +73,12 @@ The `symthaea-energy-bench::experiment_benchmark` module provides a deterministi
 
 Its oracle is intentionally narrow: independent per-experiment probabilities combine as `1 - product(1 - gain)`. It tests selector behavior against a known answer under a declared toy model. It does not calculate physical energy, realistic thermodynamic information gain, or validate model assumptions. The exhaustive oracle is only an upper bound for this toy synthetic objective.
 
+## Separate candidate-decision negative controls
+
+Experiment-choice regret is not the same as risk in an energy-superiority claim. The `candidate_decision_benchmark` module separately tests the efficiency comparator with synthetic cases where oracle truth is independent of the recorded observed delta. It varies measurement bias, uncertainty scale, and unknown correlation declarations, then reports false-superiority, false-negative, and indeterminate rates. Run `cargo run -p symthaea-energy-bench --example candidate_decision_benchmark > candidate-decision-benchmark.json`.
+
+A nonzero false-superiority rate under deliberately biased observations is a useful negative-control result: it demonstrates that a mathematically conservative interval is not protective against systematic errors that the uncertainty model omits. The test grid is not a calibrated estimate of real-world risk and cannot replace measurement-system characterization or independent reference validation.
+
 ## Acceptance targets and fair comparison
 
 Use the staged acceptance targets in [ENERGY_CONVERSION_BENCHMARK_TARGETS.md](ENERGY_CONVERSION_BENCHMARK_TARGETS.md). In particular, compare Phase A against random and deterministic space-filling baselines under equal resource budgets and paired held-out scenarios. Report decision regret, budget to a correct registered decision, false-feasible and false-superiority rates, calibration when predictive distributions exist, selection robustness, and replay/audit completeness. The proposed 20%/25% cost-regret goals are targets to test, not established results or universal standards.
