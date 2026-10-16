@@ -13,6 +13,12 @@ Policies:
 - farthest_first: greedy max-min distance over normalized features, starting from the lexicographically smallest candidate ID.
 - group_balanced_farthest_first: seeded initial candidate, then prefers the least represented family before max-min distance.
 
+## Schemas and benchmark criteria
+
+- Request schema: schema/request.schema.json
+- Response/error receipt schema: schema/response.schema.json
+- Benchmark and go/no-go protocol: BENCHMARK.md
+
 ## Fail-closed contract
 
 - Unknown fields are rejected. Target/label fields, optical target spectra, test membership and oracle observations must not be included.
