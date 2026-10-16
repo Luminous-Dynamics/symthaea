@@ -208,6 +208,144 @@ pub fn parse_sfz_mapping(source: &str) -> Result<SfzMappingManifestV1, SfzParseE
     })
 }
 
+/// A deterministic zone-selection plan for one MIDI key and velocity.
+///
+/// This is a selection receipt, not a rendered-audio receipt. If several
+/// regions match, the planner selects only a complete round-robin set whose
+/// zones have identical key/velocity bounds. Other overlapping regions remain
+/// ambiguous rather than being silently layered or choosing one arbitrarily.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SfzZoneSelectionV1 {
+    pub requested_key: u8,
+    pub requested_velocity: u8,
+    pub round_robin_index: u64,
+    pub matching_region_indices: Vec<usize>,
+    pub selected_region_index: Option<usize>,
+    /// One of: uncovered, invalid_request, unique_candidate,
+    /// round_robin_candidate, incomplete_round_robin_set, ambiguous_zones.
+    /// None of these names imply audio decoding or rendering.
+    pub decision: String,
+    pub semitone_shift: Option<f64>,
+    pub frequency_ratio: Option<f64>,
+}
+
+/// Plan a note lookup against parsed SFZ zones.
+///
+/// round_robin_index is zero-based; for a valid sequence with N positions,
+/// index 0 picks position 1 and index N picks position 1 again. We preserve
+/// region/source order in receipts and require a complete sequence before
+/// selecting one of multiple matching zones. This is intentionally not a full
+/// SFZ voice engine: velocity crossfades, switches, sequence groups across
+/// alternate group layouts, sample modes, envelopes, filters and audio
+/// playback are outside the supported subset.
+pub fn plan_sfz_zone_selection(
+    manifest: &SfzMappingManifestV1,
+    requested_key: u8,
+    requested_velocity: u8,
+    round_robin_index: u64,
+) -> SfzZoneSelectionV1 {
+    let mut receipt = SfzZoneSelectionV1 {
+        requested_key,
+        requested_velocity,
+        round_robin_index,
+        matching_region_indices: Vec::new(),
+        selected_region_index: None,
+        decision: "uncovered".to_owned(),
+        semitone_shift: None,
+        frequency_ratio: None,
+    };
+    if requested_key > 127 || requested_velocity > 127 {
+        receipt.decision = "invalid_request".to_owned();
+        return receipt;
+    }
+
+    let candidates: Vec<&SfzRegionMappingV1> = manifest
+        .regions
+        .iter()
+        .filter(|region| {
+            (region.key_low..=region.key_high).contains(&requested_key)
+                && (region.velocity_low..=region.velocity_high).contains(&requested_velocity)
+        })
+        .collect();
+    receipt.matching_region_indices = candidates.iter().map(|region| region.region_index).collect();
+
+    let selected = match candidates.as_slice() {
+        [] => return receipt,
+        [only] => match (only.sequence_length, only.sequence_position) {
+            (None, None) => {
+                receipt.decision = "unique_candidate".to_owned();
+                Some(*only)
+            }
+            (Some(1), Some(1)) => {
+                receipt.decision = "round_robin_candidate".to_owned();
+                Some(*only)
+            }
+            (Some(_), _) | (_, Some(_)) => {
+                receipt.decision = "incomplete_round_robin_set".to_owned();
+                None
+            }
+        },
+        many => {
+            let first = many[0];
+            let shared_zone = many.iter().all(|region| {
+                region.key_low == first.key_low
+                    && region.key_high == first.key_high
+                    && region.velocity_low == first.velocity_low
+                    && region.velocity_high == first.velocity_high
+            });
+            let Some(sequence_length) = first.sequence_length else {
+                receipt.decision = "ambiguous_zones".to_owned();
+                return receipt;
+            };
+            let mut positions = Vec::with_capacity(many.len());
+            let complete_metadata = many.iter().all(|region| {
+                if region.sequence_length != Some(sequence_length) {
+                    return false;
+                }
+                match region.sequence_position {
+                    Some(position) => {
+                        positions.push(position);
+                        true
+                    }
+                    None => false,
+                }
+            });
+            positions.sort_unstable();
+            let expected: Vec<u16> = (1..=sequence_length).collect();
+            if !shared_zone
+                || sequence_length == 0
+                || many.len() != sequence_length as usize
+                || !complete_metadata
+                || positions != expected
+            {
+                receipt.decision = "ambiguous_zones".to_owned();
+                return receipt;
+            }
+
+            let desired_position = (round_robin_index % u64::from(sequence_length)) as u16 + 1;
+            let Some(choice) = many
+                .iter()
+                .copied()
+                .find(|region| region.sequence_position == Some(desired_position))
+            else {
+                receipt.decision = "ambiguous_zones".to_owned();
+                return receipt;
+            };
+            receipt.decision = "round_robin_candidate".to_owned();
+            Some(choice)
+        }
+    };
+
+    if let Some(region) = selected {
+        let semitone_shift = f64::from(requested_key) - f64::from(region.pitch_keycenter)
+            + f64::from(region.tune_cents) / 100.0;
+        receipt.selected_region_index = Some(region.region_index);
+        receipt.semitone_shift = Some(semitone_shift);
+        receipt.frequency_ratio = Some(2.0_f64.powf(semitone_shift / 12.0));
+    }
+    receipt
+}
+
 fn finalize_region(
     pending: &mut Option<(Opcodes, usize)>,
     output: &mut Vec<SfzRegionMappingV1>,
@@ -524,6 +662,62 @@ mod tests {
         let source = "<control> default_path=samples\n<region> sample=test.wav";
         let manifest = parse_sfz_mapping(source).unwrap();
         assert_eq!(manifest.regions[0].sample_path, "samples/test.wav");
+    }
+
+    #[test]
+    fn zone_planner_selects_a_complete_round_robin_deterministically() {
+        let source = r#"
+<group> lokey=36 hikey=38 pitch_keycenter=38 seq_length=2
+<region> seq_position=1 sample=samples/one.wav
+<region> seq_position=2 tune=50 sample=samples/two.wav
+"#;
+        let manifest = parse_sfz_mapping(source).unwrap();
+        let first = plan_sfz_zone_selection(&manifest, 38, 90, 0);
+        let second = plan_sfz_zone_selection(&manifest, 38, 90, 1);
+        let repeat = plan_sfz_zone_selection(&manifest, 38, 90, 2);
+
+        assert_eq!(first.decision, "round_robin_candidate");
+        assert_eq!(first.selected_region_index, Some(1));
+        assert_eq!(second.selected_region_index, Some(2));
+        assert_eq!(repeat.selected_region_index, Some(1));
+        assert_eq!(first.semitone_shift, Some(0.0));
+        assert_eq!(first.frequency_ratio, Some(1.0));
+        assert!((second.frequency_ratio.unwrap() - 2.0_f64.powf(0.5 / 12.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn zone_planner_refuses_incomplete_or_ambiguous_zone_sets() {
+        let incomplete = parse_sfz_mapping(
+            "<group> key=60 seq_length=2\n<region> seq_position=1 sample=one.wav",
+        ).unwrap();
+        let incomplete_plan = plan_sfz_zone_selection(&incomplete, 60, 100, 0);
+        assert_eq!(incomplete_plan.decision, "incomplete_round_robin_set");
+        assert_eq!(incomplete_plan.selected_region_index, None);
+
+        let overlap = parse_sfz_mapping(
+            "<group> lokey=60 hikey=60 lovel=0 hivel=127\n<region> sample=soft.wav\n<region> sample=bright.wav",
+        ).unwrap();
+        let overlap_plan = plan_sfz_zone_selection(&overlap, 60, 100, 0);
+        assert_eq!(overlap_plan.decision, "ambiguous_zones");
+        assert_eq!(overlap_plan.matching_region_indices, vec![1, 2]);
+        assert_eq!(overlap_plan.selected_region_index, None);
+    }
+
+    #[test]
+    fn zone_planner_reports_uncovered_and_invalid_requests() {
+        let manifest = parse_sfz_mapping("<region> key=60 sample=only.wav").unwrap();
+        assert_eq!(
+            plan_sfz_zone_selection(&manifest, 59, 100, 0).decision,
+            "uncovered"
+        );
+        assert_eq!(
+            plan_sfz_zone_selection(&manifest, 128, 100, 0).decision,
+            "invalid_request"
+        );
+        assert_eq!(
+            plan_sfz_zone_selection(&manifest, 60, 128, 0).decision,
+            "invalid_request"
+        );
     }
 
     #[test]
