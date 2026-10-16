@@ -56,6 +56,7 @@ pub struct BioacousticRightsEvidence {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BioacousticAnnotation {
     pub annotation_id: String,
+    /// Event interval relative to the audio asset/crop, not the source timeline.
     pub interval: crate::TimeSpan,
     pub label: String,
     pub annotation_source: String,
@@ -88,14 +89,14 @@ pub struct BioacousticRecording {
     pub source_recording_id: Option<String>,
     /// Start offset (seconds) of this asset/crop within its original source recording.
     /// Required by event evaluation when multiple Test assets share a source ID.
-    #[serde(default)]
+    /// Schema v3 requires the key to be present; use null when unavailable.
     pub source_start_s: Option<f64>,
     pub session_id: Option<String>,
     pub site_id: Option<String>,
     pub individual_ids: Vec<String>,
     pub annotations: Vec<BioacousticAnnotation>,
     /// Regions explicitly excluded from scoring because annotation is uncertain.
-    #[serde(default)]
+    /// Schema v3 requires the key to be present; use an empty array when none exist.
     pub unscored_regions: Vec<BioacousticUnscoredRegion>,
 }
 
