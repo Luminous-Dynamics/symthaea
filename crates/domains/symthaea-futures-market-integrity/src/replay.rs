@@ -481,8 +481,7 @@ pub fn paired_cluster_bootstrap(
         .map(|values| values.iter().sum::<f64>() / values.len() as f64)
         .collect::<Vec<_>>();
     let cluster_count = cluster_means.len();
-    let mean_brier_difference =
-        cluster_means.iter().sum::<f64>() / cluster_count as f64;
+    let mean_brier_difference = cluster_means.iter().sum::<f64>() / cluster_count as f64;
 
     let mut rng_state = seed;
     let mut bootstrap_means = Vec::with_capacity(bootstrap_replicates);
@@ -556,7 +555,6 @@ mod tests {
             .expect("valid target fixture")
     }
 
-
     fn paired(
         event: &str,
         horizon: &str,
@@ -604,6 +602,7 @@ mod tests {
         let summary = paired_cluster_bootstrap(&rows, 2_000, 123).expect("valid bootstrap");
         assert_eq!(summary.comparison_count, 11);
         assert_eq!(summary.cluster_count, 2);
+        // Row-weighting would favor the first cluster 10:1; cluster-weighting yields zero.
         assert!(summary.mean_brier_difference.abs() < 1e-12);
     }
 
