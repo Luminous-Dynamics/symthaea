@@ -20,6 +20,7 @@ use crate::knowledge::evidence_benchmark::{
     BenchmarkQuestionCondition, BenchmarkReason, DATASET_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::BufRead;
 
@@ -173,8 +174,7 @@ pub fn canonical_trajectory_digest(trajectory: &EvidenceTrajectory) -> Result<St
     const DOMAIN: &[u8] = b"SYMTHAEA-EVIDENCE-TRAJECTORY-V1\0";
     let bytes = serde_json::to_vec(trajectory)
         .map_err(|e| format!("serialize trajectory digest payload: {e}"))?;
-    let mut hasher = sha2::Sha256::new();
-    use sha2::Digest;
+    let mut hasher = Sha256::new();
     hasher.update(DOMAIN);
     hasher.update(bytes);
     Ok(format!("{:x}", hasher.finalize()))
