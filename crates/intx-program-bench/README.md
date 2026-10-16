@@ -1,6 +1,6 @@
 # INTX equipment programming benchmark corpus
 
-This is the first executable scaffold for the proposed 50-case synthetic qualification corpus described in [INTX-PROGRAM-001](../../docs/INTX-PROGRAM-001-EQUIPMENT-PROGRAMMING.md). The broader [paradigm-shift roadmap](../../docs/INTX-PROGRAM-001-PARADIGM-SHIFTS.md) explains the evidence-carrying engineering compiler model and staged benchmarks.
+This is the first executable scaffold for the proposed 50-case synthetic qualification corpus described in [INTX-PROGRAM-001](../../docs/INTX-PROGRAM-001-EQUIPMENT-PROGRAMMING.md). The broader [paradigm-shift roadmap](../../docs/INTX-PROGRAM-001-PARADIGM-SHIFTS.md) explains the evidence-carrying engineering compiler model and staged benchmarks. The [API ownership/readiness matrix](../../docs/INTX-PROGRAM-BENCH-API-OWNERSHIP.md) distinguishes issue designs from source-level implementation evidence.
 
 It is deliberately a standalone, dependency-free Rust package so it does not alter Symthaea's workspace member graph or introduce a protocol client. The current harness verifies the test data's schema, cardinality, uniqueness, dimension coverage, and a small set of mandatory fail-closed relationships.
 
