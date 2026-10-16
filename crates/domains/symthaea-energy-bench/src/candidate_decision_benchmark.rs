@@ -297,18 +297,27 @@ fn validate_scenario(
             reason: "superiority margin must be finite and in [0, 1]".into(),
         });
     }
-    for (label, value) in [
-        ("oracle truth difference", scenario.oracle_true_efficiency_difference),
-        ("observed efficiency difference", scenario.observed_efficiency_difference),
-    ] {
-        if !value.is_finite()
-            || value < -BASELINE_EFFICIENCY
-            || value > 1.0 - BASELINE_EFFICIENCY
-        {
-            return Err(CandidateDecisionBenchmarkError {
-                reason: format!("{label} implies efficiency outside [0, 1]"),
-            });
-        }
+    let truth_delta = scenario.oracle_true_efficiency_difference;
+    if !truth_delta.is_finite()
+        || truth_delta < -BASELINE_EFFICIENCY
+        || truth_delta > 1.0 - BASELINE_EFFICIENCY
+    {
+        return Err(CandidateDecisionBenchmarkError {
+            reason: "oracle truth difference implies efficiency outside [0, 1]".into(),
+        });
+    }
+
+    // The synthetic mutation redistributes loaded-interval output and loss while
+    // keeping input, auxiliaries and stored-energy change fixed. Keep both flows
+    // non-negative or the generated BenchmarkRun would violate its own contract.
+    let observed_delta = scenario.observed_efficiency_difference;
+    if !observed_delta.is_finite()
+        || observed_delta < -35.0 / BASELINE_INPUT_J
+        || observed_delta > 59.0 / BASELINE_INPUT_J
+    {
+        return Err(CandidateDecisionBenchmarkError {
+            reason: "observed efficiency difference would make interval output or loss negative".into(),
+        });
     }
     if !scenario.candidate_uncertainty_scale.is_finite()
         || scenario.candidate_uncertainty_scale <= 0.0
@@ -434,6 +443,14 @@ mod tests {
         let report = run_candidate_decision_benchmark(&[scenario]).unwrap();
         assert!(report.results[0].indeterminate);
         assert!(!report.results[0].false_superiority);
+    }
+
+    #[test]
+    fn rejects_observations_that_would_break_interval_nonnegativity() {
+        let mut scenario = generate_candidate_decision_scenarios().remove(0);
+        scenario.scenario_id = "invalid-negative-loss-case".into();
+        scenario.observed_efficiency_difference = 0.60;
+        assert!(run_candidate_decision_benchmark(&[scenario]).is_err());
     }
 
     #[test]
