@@ -1484,6 +1484,11 @@ mod tests {
         assert_eq!(overlapping.required_demand_upper, 500);
         assert_eq!(overlapping.optional_demand_upper, 600);
         assert_eq!(overlapping.total_shortfall, 200);
+        assert_eq!(overlapping.active_reservation_count, 2);
+        assert_eq!(
+            overlapping.active_reservation_ids,
+            vec!["life-support-peak".to_string(), "science-peak".to_string()]
+        );
         assert_eq!(overlapping.status, PeakWindowStatus::OptionalOversubscribed);
         assert!(!report.represents_physical_qualification);
         assert!(verify_peak_resource_reservation_receipt(
@@ -1663,6 +1668,47 @@ mod tests {
             finding.code == PeakResourceFindingCode::MissingProviderConnection
                 && finding.severity == PeakResourceFindingSeverity::Blocker
         }));
+    }
+
+    #[test]
+    fn maximum_mission_tick_end_is_handled_without_overflow() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        plan.reservations = vec![reservation(
+            "near-max-time",
+            "required-life-support",
+            u64::MAX - 10,
+            u64::MAX,
+            700,
+        )];
+        let (report, _) =
+            evaluate_peak_resource_reservations(&configuration, &tasks, &task_receipt, &plan)
+                .unwrap();
+        assert_eq!(report.windows.len(), 1);
+        assert_eq!(report.windows[0].window.start_ms, u64::MAX - 10);
+        assert_eq!(report.windows[0].window.end_ms, u64::MAX);
+        assert_eq!(report.status, PeakResourceReservationStatus::MeetsDeclaredPeakResourcePolicy);
+    }
+
+    #[test]
+    fn reserve_above_one_hundred_percent_is_rejected() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        plan.reserve_basis_points = 10_001;
+        assert_eq!(
+            evaluate_peak_resource_reservations(&configuration, &tasks, &task_receipt, &plan)
+                .unwrap_err(),
+            PeakResourceReservationError::InvalidReservePolicy
+        );
+    }
+
+    #[test]
+    fn empty_resource_interface_set_is_rejected() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        plan.pools[0].required_interface_kinds.clear();
+        assert_eq!(
+            evaluate_peak_resource_reservations(&configuration, &tasks, &task_receipt, &plan)
+                .unwrap_err(),
+            PeakResourceReservationError::InvalidPool
+        );
     }
 
     #[test]
