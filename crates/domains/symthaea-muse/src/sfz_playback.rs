@@ -44,6 +44,8 @@ pub enum SfzPlaybackError {
     SampleTooLong,
     NoDecodedFrames,
     InvalidResamplingRatio,
+    InvalidResamplerConfiguration(String),
+    ResamplingCostTooHigh,
     OutputTooLong,
 }
 
@@ -64,6 +66,8 @@ impl fmt::Display for SfzPlaybackError {
             Self::SampleTooLong => write!(f, "decoded sample exceeds frame safety limit"),
             Self::NoDecodedFrames => write!(f, "audio stream yielded no decoded frames"),
             Self::InvalidResamplingRatio => write!(f, "pitch/resampling ratio is invalid"),
+            Self::InvalidResamplerConfiguration(message) => write!(f, "invalid resampler configuration: {message}"),
+            Self::ResamplingCostTooHigh => write!(f, "requested sinc resampling exceeds the configured work budget"),
             Self::OutputTooLong => write!(f, "rendered sample exceeds frame safety limit"),
         }
     }
@@ -116,6 +120,20 @@ struct DecodedSample {
 
 /// Select, decode, and resample one SFZ zone to mono f32.
 /// The returned receipt does not claim full SFZ playback or acoustic fidelity.
+/// Explicit one-shot resampling choices. Linear remains available as a baseline;
+/// the Lanczos-windowed sinc path is a higher-quality candidate that must be
+/// benchmarked before being considered a universal default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SfzResamplerV1 {
+    LinearBaseline,
+    /// Radius 8..=32 is recommended for offline note samples; larger radii
+    /// are supported only up to 64 and remain subject to an operation budget.
+    LanczosSinc { radius: usize },
+}
+
+/// Select, decode, and resample one SFZ zone to mono f32 using the explicit
+/// linear baseline. Call the alternate API to opt into band-limited conversion.
 pub fn render_sfz_note_once(
     manifest: &SfzMappingManifestV1,
     sample_root: &Path,
@@ -124,6 +142,30 @@ pub fn render_sfz_note_once(
     round_robin_index: u64,
     output_sample_rate: u32,
 ) -> Result<(SfzPlaybackReceiptV1, Vec<f32>), SfzPlaybackError> {
+    render_sfz_note_once_with_resampler(
+        manifest,
+        sample_root,
+        requested_key,
+        requested_velocity,
+        round_robin_index,
+        output_sample_rate,
+        SfzResamplerV1::LinearBaseline,
+    )
+}
+
+/// Select, decode and resample one zone using a requested algorithm. The
+/// receipt identifies the algorithm/configuration and binds exact input/output
+/// bytes. This API does not claim support for the full SFZ runtime.
+pub fn render_sfz_note_once_with_resampler(
+    manifest: &SfzMappingManifestV1,
+    sample_root: &Path,
+    requested_key: u8,
+    requested_velocity: u8,
+    round_robin_index: u64,
+    output_sample_rate: u32,
+    resampler: SfzResamplerV1,
+) -> Result<(SfzPlaybackReceiptV1, Vec<f32>), SfzPlaybackError> {
+
     if !(MIN_SAMPLE_RATE..=MAX_SAMPLE_RATE).contains(&output_sample_rate) {
         return Err(SfzPlaybackError::InvalidOutputSampleRate(output_sample_rate));
     }
@@ -152,19 +194,26 @@ pub fn render_sfz_note_once(
         return Err(SfzPlaybackError::OutputTooLong);
     }
 
-    let mut samples = Vec::with_capacity(output_frames);
-    let last = decoded.mono.len() - 1;
-    for output_index in 0..output_frames {
-        let source_position = (output_index as f64 * source_step).min(last as f64);
-        let lower = source_position.floor() as usize;
-        let upper = (lower + 1).min(last);
-        let fraction = (source_position - lower as f64) as f32;
-        let sample = decoded.mono[lower] + (decoded.mono[upper] - decoded.mono[lower]) * fraction;
-        if !sample.is_finite() {
-            return Err(SfzPlaybackError::InvalidAudioMetadata("resampling produced a non-finite sample".to_owned()));
+    let (samples, resampler_label) = match resampler {
+        SfzResamplerV1::LinearBaseline => (
+            resample_linear(&decoded.mono, source_step, output_frames)?,
+            "linear_interpolation_unfiltered_v1".to_owned(),
+        ),
+        SfzResamplerV1::LanczosSinc { radius } => {
+            if !(4..=64).contains(&radius) {
+                return Err(SfzPlaybackError::InvalidResamplerConfiguration(
+                    "Lanczos sinc radius must be in 4..=64".to_owned(),
+                ));
+            }
+            if output_frames.saturating_mul(radius.saturating_mul(2).saturating_add(1)) > 300_000_000 {
+                return Err(SfzPlaybackError::ResamplingCostTooHigh);
+            }
+            (
+                resample_lanczos_sinc(&decoded.mono, source_step, output_frames, radius)?,
+                format!("lanczos_windowed_sinc_antialias_v1_radius_{radius}"),
+            )
         }
-        samples.push(sample);
-    }
+    };
 
     let mut hasher = Sha256::new();
     let mut peak_abs = 0.0_f64;
@@ -202,12 +251,102 @@ pub fn render_sfz_note_once(
         amplitude_envelope: "not_applied".to_owned(),
         velocity_amplitude_scaling: "not_applied; velocity selects a zone only".to_owned(),
         loop_and_release_semantics: "not_applied".to_owned(),
-        resampler: "linear_interpolation_unfiltered_v1".to_owned(),
+        resampler: resampler_label,
         audio_decode_evidence: "decoded_to_f32_and_validated".to_owned(),
         rendering_evidence: "deterministic_one_shot_sample_resampling_not_full_sfz_playback".to_owned(),
     };
     Ok((receipt, samples))
 }
+
+fn resample_linear(
+    input: &[f32],
+    source_step: f64,
+    output_frames: usize,
+) -> Result<Vec<f32>, SfzPlaybackError> {
+    let last = input.len().saturating_sub(1);
+    let mut output = Vec::with_capacity(output_frames);
+    for output_index in 0..output_frames {
+        let position = (output_index as f64 * source_step).min(last as f64);
+        let lower = position.floor() as usize;
+        let upper = (lower + 1).min(last);
+        let fraction = (position - lower as f64) as f32;
+        let sample = input[lower] + (input[upper] - input[lower]) * fraction;
+        if !sample.is_finite() {
+            return Err(SfzPlaybackError::InvalidAudioMetadata(
+                "linear resampling produced a non-finite sample".to_owned(),
+            ));
+        }
+        output.push(sample);
+    }
+    Ok(output)
+}
+
+#[inline]
+fn sinc_pi(value: f64) -> f64 {
+    if value.abs() < 1.0e-12 {
+        1.0
+    } else {
+        let angle = std::f64::consts::PI * value;
+        angle.sin() / angle
+    }
+}
+
+/// Offline, windowed-sinc interpolation. The cutoff contracts when source
+/// coordinates advance by more than one frame, so pitch-up/sample-rate
+/// downsampling suppresses energy above the new Nyquist limit. The Lanczos
+/// window bounds the kernel; edge weights are normalized to preserve DC.
+/// This is not claimed to replace a streaming resampler for real-time audio.
+fn resample_lanczos_sinc(
+    input: &[f32],
+    source_step: f64,
+    output_frames: usize,
+    radius: usize,
+) -> Result<Vec<f32>, SfzPlaybackError> {
+    if input.is_empty() || !source_step.is_finite() || source_step <= 0.0 {
+        return Err(SfzPlaybackError::InvalidResamplingRatio);
+    }
+    let last_index = input.len() - 1;
+    let cutoff = 1.0_f64.min(1.0 / source_step);
+    let mut output = Vec::with_capacity(output_frames);
+    let radius_i = radius as isize;
+
+    for output_index in 0..output_frames {
+        let position = (output_index as f64 * source_step).min(last_index as f64);
+        let center = position.floor() as isize;
+        let first = center - radius_i + 1;
+        let final_index = center + radius_i;
+        let mut weighted_sum = 0.0_f64;
+        let mut weight_sum = 0.0_f64;
+
+        for source_index in first..=final_index {
+            if source_index < 0 || source_index > last_index as isize {
+                continue;
+            }
+            let distance = position - source_index as f64;
+            let window_position = distance / radius as f64;
+            if window_position.abs() >= 1.0 {
+                continue;
+            }
+            let weight = cutoff * sinc_pi(cutoff * distance) * sinc_pi(window_position);
+            weighted_sum += f64::from(input[source_index as usize]) * weight;
+            weight_sum += weight;
+        }
+        if !weight_sum.is_finite() || weight_sum.abs() < 1.0e-12 {
+            return Err(SfzPlaybackError::InvalidAudioMetadata(
+                "sinc resampler produced a degenerate interpolation kernel".to_owned(),
+            ));
+        }
+        let sample = (weighted_sum / weight_sum) as f32;
+        if !sample.is_finite() {
+            return Err(SfzPlaybackError::InvalidAudioMetadata(
+                "sinc resampling produced a non-finite sample".to_owned(),
+            ));
+        }
+        output.push(sample);
+    }
+    Ok(output)
+}
+
 
 fn decode_checked_sample(root: &Path, relative_path: &str) -> Result<DecodedSample, SfzPlaybackError> {
     let inspected = inspect_sample_reference(root, relative_path, false)
@@ -327,13 +466,21 @@ mod tests {
         }
         fn root(&self) -> &Path { &self.0 }
         fn write_wave(&self, relative: &str, frames: usize) -> std::path::PathBuf {
+            self.write_wave_with_frequency(relative, frames, 440.0 / 44_100.0)
+        }
+        fn write_wave_with_frequency(
+            &self,
+            relative: &str,
+            frames: usize,
+            normalized_frequency: f64,
+        ) -> std::path::PathBuf {
             let path = self.0.join(relative);
             if let Some(parent) = path.parent() { std::fs::create_dir_all(parent).unwrap(); }
             let mut writer = hound::WavWriter::create(&path, hound::WavSpec {
                 channels: 1, sample_rate: 44_100, bits_per_sample: 16, sample_format: hound::SampleFormat::Int,
             }).unwrap();
             for index in 0..frames {
-                let angle = std::f64::consts::TAU * 440.0 * index as f64 / 44_100.0;
+                let angle = std::f64::consts::TAU * normalized_frequency * index as f64;
                 writer.write_sample((angle.sin() * 16_000.0).round() as i16).unwrap();
             }
             writer.finalize().unwrap();
@@ -367,6 +514,68 @@ mod tests {
         assert!(up.iter().all(|sample| sample.is_finite()));
         let input = std::fs::read(fixture.root().join("samples/test.wav")).unwrap();
         assert_eq!(up_receipt.sample_sha256, format!("{:x}", Sha256::digest(input)));
+    }
+
+    fn tone_amplitude(samples: &[f32], normalized_frequency: f64) -> f64 {
+        let mut in_phase = 0.0;
+        let mut quadrature = 0.0;
+        for (index, sample) in samples.iter().enumerate() {
+            let phase = std::f64::consts::TAU * normalized_frequency * index as f64;
+            in_phase += f64::from(*sample) * phase.cos();
+            quadrature += f64::from(*sample) * phase.sin();
+        }
+        2.0 * (in_phase * in_phase + quadrature * quadrature).sqrt() / samples.len() as f64
+    }
+
+    #[test]
+    fn bandlimited_path_reduces_alias_of_a_nyquist_edge_tone() {
+        let fixture = FixtureRoot::new();
+        fixture.write_wave_with_frequency("samples/test.wav", 8_192, 0.4);
+        let mapping = manifest();
+        let (_, linear) = render_sfz_note_once_with_resampler(
+            &mapping, fixture.root(), 72, 96, 0, 44_100, SfzResamplerV1::LinearBaseline
+        ).unwrap();
+        let (receipt, sinc) = render_sfz_note_once_with_resampler(
+            &mapping, fixture.root(), 72, 96, 0, 44_100, SfzResamplerV1::LanczosSinc { radius: 32 }
+        ).unwrap();
+        let alias_frequency = 0.2;
+        let linear_alias = tone_amplitude(&linear[128..linear.len()-128], alias_frequency);
+        let sinc_alias = tone_amplitude(&sinc[128..sinc.len()-128], alias_frequency);
+        assert!(linear_alias > 0.25, "negative control should retain clear alias energy: {linear_alias}");
+        assert!(
+            sinc_alias < linear_alias * 0.05,
+            "band-limited path should substantially suppress alias energy: linear={linear_alias}, sinc={sinc_alias}"
+        );
+        assert!(receipt.resampler.contains("lanczos_windowed_sinc_antialias_v1_radius_32"));
+        assert!(sinc.iter().all(|sample| sample.is_finite()));
+    }
+
+    #[test]
+    fn bandlimited_path_preserves_a_tone_inside_the_new_nyquist_band() {
+        let fixture = FixtureRoot::new();
+        fixture.write_wave_with_frequency("samples/test.wav", 8_192, 0.1);
+        let mapping = manifest();
+        let (_, output) = render_sfz_note_once_with_resampler(
+            &mapping, fixture.root(), 72, 96, 0, 44_100, SfzResamplerV1::LanczosSinc { radius: 32 }
+        ).unwrap();
+        let measured = tone_amplitude(&output[128..output.len()-128], 0.2);
+        assert!(
+            (measured - 0.48).abs() < 0.04,
+            "passband tone should retain amplitude after PCM quantization and filtering: {measured}"
+        );
+    }
+
+    #[test]
+    fn invalid_sinc_radius_is_rejected_explicitly() {
+        let fixture = FixtureRoot::new();
+        fixture.write_wave("samples/test.wav", 256);
+        let mapping = manifest();
+        assert!(matches!(
+            render_sfz_note_once_with_resampler(
+                &mapping, fixture.root(), 60, 96, 0, 44_100, SfzResamplerV1::LanczosSinc { radius: 2 }
+            ),
+            Err(SfzPlaybackError::InvalidResamplerConfiguration(_))
+        ));
     }
 
     #[test]
