@@ -105,6 +105,7 @@ pub struct SimulatorCall {
     /// Terminal status. Failures still count as actual invocations.
     pub terminal_status: SimulatorTerminalStatus,
     /// Digest of the raw result artifact, required when a result was returned.
+    #[serde(deserialize_with = "deserialize_required_option")]
     pub result_artifact_sha256: Option<String>,
     /// Wall-clock elapsed time for this invocation in milliseconds.
     pub elapsed_ms: u64,
@@ -121,16 +122,20 @@ pub struct ProposalAttempt {
     /// Stable identity for this generation/proposal attempt.
     pub attempt_id: String,
     /// Candidate identity, absent only when generation failed.
+    #[serde(deserialize_with = "deserialize_required_option")]
     pub candidate_id: Option<String>,
     /// SHA-256 of the canonical candidate representation, if a candidate exists.
+    #[serde(deserialize_with = "deserialize_required_option")]
     pub candidate_sha256: Option<String>,
     /// Whether a candidate was actually generated.
     pub proposal_status: ProposalStatus,
     /// Result of preflight checks before launching the simulator.
     pub preflight_status: PreflightStatus,
     /// Required when generation or preflight rejection fails; absent on a clean pass.
+    #[serde(deserialize_with = "deserialize_required_option")]
     pub attempt_reason: Option<String>,
     /// Required when preflight passed but no simulator invocation started.
+    #[serde(deserialize_with = "deserialize_required_option")]
     pub not_called_reason: Option<NotCalledReason>,
     /// Candidate-generation and preflight cost, excluding simulator-call cost.
     pub proposal_cost: f64,
@@ -138,6 +143,7 @@ pub struct ProposalAttempt {
     pub proposal_elapsed_ms: u64,
     /// Present only when the simulator actually started. The presence of this
     /// record consumes exactly one unit of simulator-call budget.
+    #[serde(deserialize_with = "deserialize_required_option")]
     pub simulator_call: Option<SimulatorCall>,
 }
 
@@ -641,6 +647,16 @@ fn audit_ledger(ledger: &SimulatorBudgetLedger, ledger_sha256: String) -> Simula
     }
 }
 
+fn deserialize_required_option<'de, D, T>(
+    deserializer: D,
+) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
+}
+
 fn validate_text(value: &str, field: &str) -> Result<(), String> {
     if value.trim().is_empty()
         || value.len() > MAX_SIM_LEDGER_TEXT_BYTES
@@ -964,6 +980,15 @@ mod tests {
         assert!((audit.total_proposal_cost - 0.3).abs() < 1e-12);
         assert!((audit.total_simulator_cost - 3.0).abs() < 1e-12);
         assert!((audit.total_cost - 3.3).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rejects_missing_nullable_key_instead_of_silently_defaulting_to_null() {
+        let raw = String::from_utf8(serialized(&sample_ledger(RunStatus::Completed))).unwrap();
+        let mutated = raw.replacen("\\"not_called_reason\\":null,", "", 1);
+        assert_ne!(mutated, raw, "fixture must contain the nullable key");
+        let error = audit_json_ledger(mutated.as_bytes()).unwrap_err();
+        assert!(error.contains("missing field") || error.contains("not_called_reason"));
     }
 
     #[test]
