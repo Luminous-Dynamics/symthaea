@@ -37,6 +37,7 @@ TEST_PATHS = (
     "scripts/test_validate_socioeconomic_run_bundle.py",
     "scripts/test_write_socioeconomic_run_bundle_ci_report.py",
 )
+EXPECTED_TEST_COUNTS = (14, 10)
 REQUIRED_ENV = (
     "GITHUB_SHA",
     "CIVOS_SOURCE_REVISION",
@@ -145,6 +146,11 @@ def build_report(
         count_test_functions(safe_workspace_file(root, relative).read_bytes())
         for relative in TEST_PATHS
     ]
+    if tuple(per_suite_test_counts) != EXPECTED_TEST_COUNTS:
+        raise ReportFailure(
+            "versioned test inventory changed: "
+            f"expected {list(EXPECTED_TEST_COUNTS)}, got {per_suite_test_counts}"
+        )
     test_count = sum(per_suite_test_counts)
     if test_count < 1:
         raise ReportFailure("no test functions found in the test sources")
