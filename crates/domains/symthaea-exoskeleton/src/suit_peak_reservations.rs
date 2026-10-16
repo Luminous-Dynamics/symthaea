@@ -47,7 +47,7 @@ impl PeakQuantityInterval {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct MissionTimeWindow {
     /// Mission-relative monotonically increasing milliseconds, not wall time.
     pub start_ms: u64,
