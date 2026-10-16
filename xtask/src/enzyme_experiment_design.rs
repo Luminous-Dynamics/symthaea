@@ -630,6 +630,39 @@ mod tests {
     }
 
     #[test]
+    fn discrimination_and_parameter_sensitivity_choose_different_objectives() {
+        let mm = ModelFit {
+            kind: ModelKind::MichaelisMenten,
+            vmax: 100.0,
+            km: 2.0,
+            ki: None,
+            sse: 1.0,
+            rmse: 0.5,
+        };
+        let inhibition = ModelFit {
+            kind: ModelKind::SubstrateInhibition,
+            vmax: 100.0,
+            km: 2.0,
+            ki: Some(20.0),
+            sse: 1.0,
+            rmse: 0.5,
+        };
+        let available: Vec<f64> = CANDIDATE_SUBSTRATES.iter().copied()
+            .filter(|substrate| !INITIAL_SUBSTRATES.contains(substrate))
+            .collect();
+        let discrimination = select_condition(
+            Strategy::ModelDiscrimination, &available, mm, inhibition, 1.0, 1, 0
+        ).unwrap();
+        let sensitivity = select_condition(
+            Strategy::KmSensitivity, &available, mm, inhibition, 1.0, 1, 0
+        ).unwrap();
+
+        assert!((discrimination.substrate - 179.2).abs() < 1e-12);
+        assert!((sensitivity.substrate - 2.8).abs() < 1e-12);
+        assert_ne!(discrimination.substrate, sensitivity.substrate);
+    }
+
+    #[test]
     fn deterministic_noise_replays_exactly() {
         assert_eq!(synthetic_noise(3, 8, 0.5), synthetic_noise(3, 8, 0.5));
         assert_ne!(synthetic_noise(3, 8, 0.5), synthetic_noise(3, 9, 0.5));
