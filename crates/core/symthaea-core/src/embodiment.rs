@@ -413,6 +413,112 @@ pub trait SafeFallback {
     }
 }
 
+// ── Plant-Time Contract V1 ──────────────────────────────────────────────────
+
+/// Provenance for the elapsed duration supplied to one physical/simulated plant step.
+///
+/// Cognitive integration time and scheduler cadence are intentionally not variants:
+/// neither is sufficient evidence for how much physical/model time elapsed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlantStepTimeSourceV1 {
+    /// A deterministic simulator step configured by the backend/profile.
+    ConfiguredSimulationStep,
+    /// Elapsed duration measured with a local monotonic clock.
+    MeasuredMonotonicClock,
+    /// Elapsed duration measured from a named hardware/device clock.
+    MeasuredDeviceClock,
+}
+
+/// Timing evidence for one requested plant transition.
+///
+/// A configured simulation step describes model-time advancement, not wall-clock
+/// execution speed. A measured record binds the duration to an explicit source clock
+/// domain and monotonic timestamp interval. Legacy bridges can keep implementing
+/// step; hardware bridges should override step_with_timing when they need to
+/// enforce source-clock policy or attach physical timing evidence.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlantStepTimingV1 {
+    pub step_index: u64,
+    pub dt_seconds: f32,
+    pub source: PlantStepTimeSourceV1,
+    pub clock_domain_id: Option<String>,
+    pub start_timestamp_ns: Option<u64>,
+    pub end_timestamp_ns: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlantStepTimingErrorV1 {
+    NonFiniteDuration,
+    NonPositiveDuration,
+    MissingClockDomain,
+    NonIncreasingTimestamps,
+}
+
+impl PlantStepTimingV1 {
+    /// Create a deterministic fixed-step simulator timing record.
+    ///
+    /// This duration is model time and must not be scaled by cognitive tau_factor.
+    pub fn configured_simulation(
+        step_index: u64,
+        dt_seconds: f32,
+    ) -> Result<Self, PlantStepTimingErrorV1> {
+        if !dt_seconds.is_finite() {
+            return Err(PlantStepTimingErrorV1::NonFiniteDuration);
+        }
+        if dt_seconds <= 0.0 {
+            return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+        }
+        Ok(Self {
+            step_index,
+            dt_seconds,
+            source: PlantStepTimeSourceV1::ConfiguredSimulationStep,
+            clock_domain_id: None,
+            start_timestamp_ns: None,
+            end_timestamp_ns: None,
+        })
+    }
+
+    /// Construct a plant-step record from a qualified measured clock interval.
+    ///
+    /// Callers must validate that the source clock is authoritative for this plant
+    /// and that both timestamps belong to the same clock domain and epoch. This
+    /// constructor verifies only the interval's shape, not clock trustworthiness.
+    pub fn measured_interval(
+        step_index: u64,
+        source: PlantStepTimeSourceV1,
+        clock_domain_id: impl Into<String>,
+        start_timestamp_ns: u64,
+        end_timestamp_ns: u64,
+    ) -> Result<Self, PlantStepTimingErrorV1> {
+        if source == PlantStepTimeSourceV1::ConfiguredSimulationStep {
+            return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+        }
+        let clock_domain_id = clock_domain_id.into();
+        if clock_domain_id.trim().is_empty() {
+            return Err(PlantStepTimingErrorV1::MissingClockDomain);
+        }
+        let elapsed_ns = end_timestamp_ns
+            .checked_sub(start_timestamp_ns)
+            .filter(|elapsed| *elapsed > 0)
+            .ok_or(PlantStepTimingErrorV1::NonIncreasingTimestamps)?;
+        let dt_seconds = (elapsed_ns as f64 / 1_000_000_000.0) as f32;
+        if !dt_seconds.is_finite() {
+            return Err(PlantStepTimingErrorV1::NonFiniteDuration);
+        }
+        if dt_seconds <= 0.0 {
+            return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+        }
+        Ok(Self {
+            step_index,
+            dt_seconds,
+            source,
+            clock_domain_id: Some(clock_domain_id),
+            start_timestamp_ns: Some(start_timestamp_ns),
+            end_timestamp_ns: Some(end_timestamp_ns),
+        })
+    }
+}
+
 // ── Embodiment Bridge Trait ────────────────────────────────────────────────
 
 /// Platform-agnostic embodiment bridge trait.
@@ -420,9 +526,25 @@ pub trait SafeFallback {
 /// Any robotics platform that wants to close the proprioceptive loop
 /// with the cognitive loop must implement this trait.
 pub trait EmbodimentBridge: Send + Sync {
-    /// Translate thought → motor commands, step physics, return result.
-    /// `phi` is the current consciousness level for safety gating.
+    /// Legacy adapter: translate thought → motor commands and perform one step.
+    ///
+    /// dt is the caller's requested model/plant duration, not cognitive tau.
+    /// New hardware bridges should override step_with_timing to validate the
+    /// timing source and measure/use their own authoritative physical interval.
+    /// phi is the current consciousness level for safety gating.
     fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult;
+
+    /// Step using an explicit timing record. The default preserves compatibility
+    /// with legacy bridges by forwarding only the duration. It intentionally does
+    /// not claim that legacy implementations consume the provenance metadata.
+    fn step_with_timing(
+        &mut self,
+        thought_hv: &ContinuousHV,
+        timing: &PlantStepTimingV1,
+        phi: f64,
+    ) -> EmbodimentResult {
+        self.step(thought_hv, timing.dt_seconds, phi)
+    }
 
     /// Apply active inference motor reflexes (Channel 1/3) based on prediction error.
     ///
@@ -634,6 +756,64 @@ impl Default for PlatformRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn configured_plant_time_is_explicit_and_not_cognitive_tau() {
+        let timing = PlantStepTimingV1::configured_simulation(42, 0.005).unwrap();
+        assert_eq!(timing.step_index, 42);
+        assert_eq!(timing.dt_seconds, 0.005);
+        assert_eq!(timing.source, PlantStepTimeSourceV1::ConfiguredSimulationStep);
+        assert_eq!(timing.clock_domain_id, None);
+        assert_eq!(timing.start_timestamp_ns, None);
+        assert_eq!(timing.end_timestamp_ns, None);
+    }
+
+    #[test]
+    fn measured_plant_time_requires_a_named_increasing_clock_interval() {
+        let timing = PlantStepTimingV1::measured_interval(
+            9,
+            PlantStepTimeSourceV1::MeasuredMonotonicClock,
+            "robot-steady-clock",
+            1_000_000,
+            6_000_000,
+        )
+        .unwrap();
+        assert_eq!(timing.dt_seconds, 0.005);
+        assert_eq!(timing.clock_domain_id.as_deref(), Some("robot-steady-clock"));
+        assert_eq!(timing.start_timestamp_ns, Some(1_000_000));
+        assert_eq!(timing.end_timestamp_ns, Some(6_000_000));
+
+        assert_eq!(
+            PlantStepTimingV1::measured_interval(
+                10,
+                PlantStepTimeSourceV1::MeasuredDeviceClock,
+                "device-ptp",
+                5,
+                5,
+            ),
+            Err(PlantStepTimingErrorV1::NonIncreasingTimestamps)
+        );
+        assert_eq!(
+            PlantStepTimingV1::measured_interval(
+                10,
+                PlantStepTimeSourceV1::MeasuredDeviceClock,
+                " ",
+                5,
+                6,
+            ),
+            Err(PlantStepTimingErrorV1::MissingClockDomain)
+        );
+    }
+
+    #[test]
+    fn plant_step_duration_rejects_zero_negative_and_nonfinite_values() {
+        for dt in [0.0, -0.01, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert!(
+                PlantStepTimingV1::configured_simulation(0, dt).is_err(),
+                "invalid dt {dt:?} must be rejected"
+            );
+        }
+    }
 
     /// Enforces the invariant the type's doc comment describes, because a comment
     /// cannot stop a reorder and this one is silently catastrophic.
