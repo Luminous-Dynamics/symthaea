@@ -139,11 +139,41 @@ pub fn evaluate_mission_tasks(
     let mut ordered_tasks: Vec<&MissionTaskRequirement> = tasks.iter().collect();
     ordered_tasks.sort_by(|left, right| left.task_id.cmp(&right.task_id));
 
+    let component_ids: BTreeSet<String> = configuration
+        .components
+        .iter()
+        .map(|component| component.component_id.clone())
+        .collect();
+    let connections: BTreeMap<&str, _> = mission_report
+        .connection_evaluations
+        .iter()
+        .map(|connection| (connection.connection_id.as_str(), connection))
+        .collect();
+    // Task plans often reuse the same environment profile. Calculate graph
+    // reachability once per distinct environment set, not once per task.
+    let mut reachability_cache: BTreeMap<
+        BTreeSet<SuitOperatingEnvironment>,
+        BTreeSet<String>,
+    > = BTreeMap::new();
     let mut task_evaluations = Vec::with_capacity(ordered_tasks.len());
     for task in ordered_tasks {
+        let environments = task.required_environments.clone();
+        if !reachability_cache.contains_key(&environments) {
+            let reachable = reachable_for_task(
+                configuration,
+                &mission_report,
+                &environments,
+            );
+            reachability_cache.insert(environments.clone(), reachable);
+        }
+        let reachable = reachability_cache
+            .get(&environments)
+            .expect("reachability cache entry was just inserted");
         task_evaluations.push(evaluate_task(
-            configuration,
             &mission_report,
+            &component_ids,
+            &connections,
+            reachable,
             task,
         ));
     }
@@ -268,8 +298,10 @@ fn validate_tasks(tasks: &[MissionTaskRequirement]) -> Result<(), MissionTaskErr
 }
 
 fn evaluate_task(
-    configuration: &MissionConfiguration,
     mission_report: &MissionConfigurationReport,
+    component_ids: &BTreeSet<String>,
+    connections: &BTreeMap<&str, &crate::suit_mission_configuration::MissionConnectionEvaluation>,
+    reachable: &BTreeSet<String>,
     task: &MissionTaskRequirement,
 ) -> MissionTaskEvaluation {
     let severity = if task.required {
@@ -326,9 +358,8 @@ fn evaluate_task(
         }
     }
 
-    let reachable = reachable_for_task(configuration, mission_report, &task.required_environments);
     for component_id in &task.required_component_ids {
-        if !configuration.components.iter().any(|item| item.component_id == *component_id) {
+        if !component_ids.contains(component_id) {
             findings.push(MissionTaskFinding {
                 task_id: task.task_id.clone(),
                 subject_id: component_id.clone(),
@@ -347,11 +378,6 @@ fn evaluate_task(
         }
     }
 
-    let connections: BTreeMap<&str, _> = mission_report
-        .connection_evaluations
-        .iter()
-        .map(|connection| (connection.connection_id.as_str(), connection))
-        .collect();
     for connection_id in &task.required_connection_ids {
         match connections.get(connection_id.as_str()) {
             None => findings.push(MissionTaskFinding {
