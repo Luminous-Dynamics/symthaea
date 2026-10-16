@@ -14,7 +14,7 @@ It is intentionally **not** an atomistic model, optical solver, candidate genera
 - A deterministic plumbing fixture is provided in fixtures/smoke-request.json with expected selected IDs in fixtures/smoke-expected.json.
 - Candidate input fields: id, features only.
 - Input budgets/candidate/feature cells are bounded.
-- Feature normalization uses min/max across the permitted unlabeled candidate pool; this is a declared transductive descriptor operation, not a use of target labels.
+- Maximin normalizes features with min/max across the permitted unlabeled candidate pool; this is a declared transductive descriptor operation, not a use of target labels. The random-control arm deliberately skips normalization to avoid irrelevant overhead.
 - Ties are deterministic by lexicographically sorted candidate ID.
 - Random control uses a pinned local SplitMix64 implementation, with no OS entropy.
 - Maximin scores are squared Euclidean distances in normalized feature space. The first selection, if there is no prior selection, uses distance to the candidate-pool centroid; later selections use minimum distance to any selected candidate.
