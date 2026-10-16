@@ -17,7 +17,8 @@ const NUMERIC_TOLERANCE: f64 = 1e-10;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HypothesisPrior {
     pub hypothesis_id: String,
-    /// Prior probability in parts per million; all weights sum to 1,000,000.
+    /// Prior/posterior probability in parts per million; all weights sum to 1,000,000.
+    /// Zero is valid after conditioning when an observation rules a hypothesis out.
     pub probability_ppm: u32,
 }
 
@@ -92,9 +93,6 @@ impl FiniteHypothesisModel {
                 || !hypothesis_ids.insert(hypothesis.hypothesis_id.as_str())
             {
                 return Err("hypothesis IDs must be non-empty and unique".into());
-            }
-            if hypothesis.probability_ppm == 0 {
-                return Err("zero-weight hypotheses are not admitted; remove them explicitly".into());
             }
             if hypothesis.probability_ppm > PROBABILITY_SCALE_PPM {
                 return Err("prior probability exceeds one million ppm".into());
@@ -242,6 +240,117 @@ impl FiniteHypothesisModel {
             .map_err(|error| format!("model serialization failed: {error}"))?;
         Ok(hex::encode(Sha256::digest(bytes)))
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PosteriorUpdate {
+    pub parent_model_digest: String,
+    pub action_id: String,
+    pub observed_outcome_id: String,
+    pub posterior: Vec<HypothesisPrior>,
+    pub posterior_model_digest: String,
+}
+
+/// Condition the finite prior on one admitted action's observed categorical outcome.
+///
+/// Posterior weights are renormalized to integer parts-per-million using the
+/// largest-remainder method; ties are broken by hypothesis ID. An outcome with
+/// zero probability under every hypothesis is rejected rather than assigned a
+/// fabricated posterior.
+pub fn condition_posterior(
+    model: &FiniteHypothesisModel,
+    action_id: &str,
+    observed_outcome_id: &str,
+) -> Result<PosteriorUpdate, String> {
+    model.validate()?;
+    let parent_model_digest = model.digest()?;
+    let action = model
+        .actions
+        .iter()
+        .find(|action| action.action_id == action_id)
+        .ok_or_else(|| format!("unknown acquisition action: {action_id}"))?;
+    match &action.feasibility {
+        Feasibility::Feasible => {}
+        Feasibility::Blocked { reason } => {
+            return Err(format!("action {} is blocked: {reason}", action.action_id));
+        }
+        Feasibility::Unknown { reason } => {
+            return Err(format!("action {} feasibility is unknown: {reason}", action.action_id));
+        }
+    }
+
+    let mut raw_weights = Vec::with_capacity(model.prior.len());
+    for prior in &model.prior {
+        let row = action
+            .likelihood_by_hypothesis
+            .iter()
+            .find(|row| row.hypothesis_id == prior.hypothesis_id)
+            .ok_or_else(|| format!("missing likelihood row for {}", prior.hypothesis_id))?;
+        let likelihood = row
+            .outcomes
+            .iter()
+            .find(|outcome| outcome.outcome_id == observed_outcome_id)
+            .ok_or_else(|| format!("unknown outcome ID: {observed_outcome_id}"))?;
+        raw_weights.push(
+            u128::from(prior.probability_ppm) * u128::from(likelihood.probability_ppm),
+        );
+    }
+
+    let total_weight: u128 = raw_weights.iter().sum();
+    if total_weight == 0 {
+        return Err("observed outcome has zero probability under every hypothesis".into());
+    }
+
+    let scale = u128::from(PROBABILITY_SCALE_PPM);
+    let mut quantized: Vec<(u32, u128)> = raw_weights
+        .iter()
+        .map(|weight| {
+            let scaled = *weight * scale;
+            ((scaled / total_weight) as u32, scaled % total_weight)
+        })
+        .collect();
+    let assigned: u64 = quantized.iter().map(|(floor, _)| u64::from(*floor)).sum();
+    let remainder = u64::from(PROBABILITY_SCALE_PPM)
+        .checked_sub(assigned)
+        .ok_or_else(|| "posterior normalization overflow".to_string())?;
+    let mut order: Vec<usize> = (0..quantized.len()).collect();
+    order.sort_by(|left, right| {
+        quantized[*right]
+            .1
+            .cmp(&quantized[*left].1)
+            .then_with(|| {
+                model.prior[*left]
+                    .hypothesis_id
+                    .cmp(&model.prior[*right].hypothesis_id)
+            })
+    });
+    if remainder as usize > order.len() {
+        return Err("posterior normalization remainder is out of range".into());
+    }
+    for index in order.into_iter().take(remainder as usize) {
+        quantized[index].0 += 1;
+    }
+
+    let posterior: Vec<HypothesisPrior> = model
+        .prior
+        .iter()
+        .zip(quantized.iter())
+        .map(|(prior, (probability_ppm, _))| HypothesisPrior {
+            hypothesis_id: prior.hypothesis_id.clone(),
+            probability_ppm: *probability_ppm,
+        })
+        .collect();
+    let mut posterior_model = model.clone();
+    posterior_model.prior = posterior.clone();
+    let posterior_model_digest = posterior_model.digest()?;
+
+    Ok(PosteriorUpdate {
+        parent_model_digest,
+        action_id: action_id.into(),
+        observed_outcome_id: observed_outcome_id.into(),
+        posterior,
+        posterior_model_digest,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -792,6 +901,53 @@ mod tests {
         model.actions[0].likelihood_by_hypothesis.pop();
         let error = expected_information_gain(&model, "incomplete").unwrap_err();
         assert!(error.contains("one likelihood row per hypothesis"));
+    }
+
+    #[test]
+    fn conditioning_perfect_observation_sets_posterior_to_one_hypothesis() {
+        let model = model(
+            "perfect",
+            Feasibility::Feasible,
+            [1_000_000, 0],
+            [0, 1_000_000],
+            opposing_decisions(),
+        );
+        let update = condition_posterior(&model, "perfect", "O1").unwrap();
+        assert_eq!(update.posterior[0].probability_ppm, 1_000_000);
+        assert_eq!(update.posterior[1].probability_ppm, 0);
+        assert_eq!(
+            update.posterior.iter().map(|row| row.probability_ppm).sum::<u32>(),
+            1_000_000
+        );
+        assert_ne!(update.parent_model_digest, update.posterior_model_digest);
+    }
+
+    #[test]
+    fn conditioning_noisy_observation_preserves_exact_ppm_normalization() {
+        let model = model(
+            "noisy",
+            Feasibility::Feasible,
+            [900_000, 100_000],
+            [100_000, 900_000],
+            opposing_decisions(),
+        );
+        let update = condition_posterior(&model, "noisy", "O1").unwrap();
+        assert_eq!(update.posterior[0].probability_ppm, 900_000);
+        assert_eq!(update.posterior[1].probability_ppm, 100_000);
+    }
+
+    #[test]
+    fn impossible_observation_does_not_invent_a_posterior() {
+        let model = model(
+            "deterministic",
+            Feasibility::Feasible,
+            [1_000_000, 0],
+            [1_000_000, 0],
+            opposing_decisions(),
+        );
+        assert!(condition_posterior(&model, "deterministic", "O2")
+            .unwrap_err()
+            .contains("zero probability"));
     }
 
     #[test]
