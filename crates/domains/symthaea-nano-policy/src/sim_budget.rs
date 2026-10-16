@@ -1031,7 +1031,7 @@ mod tests {
     #[test]
     fn rejects_missing_nullable_key_instead_of_silently_defaulting_to_null() {
         let raw = String::from_utf8(serialized(&sample_ledger(RunStatus::Completed))).unwrap();
-        let mutated = raw.replacen("\\"not_called_reason\\":null,", "", 1);
+        let mutated = raw.replacen("\"not_called_reason\":null,", "", 1);
         assert_ne!(mutated, raw, "fixture must contain the nullable key");
         let error = audit_json_ledger(mutated.as_bytes()).unwrap_err();
         assert!(error.contains("missing field") || error.contains("not_called_reason"));
