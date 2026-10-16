@@ -1,13 +1,19 @@
 """Adversarial tests for the exact-head CI report generator."""
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from write_socioeconomic_run_bundle_ci_report import ReportFailure, build_report
+from write_socioeconomic_run_bundle_ci_report import (
+    ReportFailure,
+    build_attestation_predicate,
+    build_report,
+)
 
 SOURCE_PATHS = (
     "scripts/validate_socioeconomic_run_bundle.py",
@@ -16,6 +22,7 @@ SOURCE_PATHS = (
     "scripts/test_write_socioeconomic_run_bundle_ci_report.py",
     "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json",
     "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json",
+    "docs/research/finance/SYM-FIN-SYS-016_validator_attestation_predicate_v1.schema.json",
     "scripts/socioeconomic_run_receipt_requirements.txt",
     ".github/workflows/socioeconomic-run-bundle.yml",
 )
@@ -70,6 +77,29 @@ class ExecutionReportTests(unittest.TestCase):
         self.assertEqual(report["scope"], "run_bundle_validator_and_execution_record_unit_tests")
         self.assertEqual(len(report["artifacts"]), len(SOURCE_PATHS) + 1)
         self.assertTrue(all(item["digest"].startswith("sha256:") for item in report["artifacts"]))
+
+    def test_attestation_predicate_binds_exact_report_bytes(self) -> None:
+        report = build_report(self.root, self.env, TEST_LOG_PATH)
+        report_bytes = (json.dumps(report, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        predicate = build_attestation_predicate(report, report_bytes)
+        self.assertEqual(
+            predicate["execution_record_digest"],
+            "sha256:" + hashlib.sha256(report_bytes).hexdigest(),
+        )
+        self.assertEqual(predicate["source_revision"], self.revision)
+        self.assertEqual(predicate["result"], "passed")
+        self.assertFalse(predicate["authority_boundary"]["can_settle_real_assets"])
+
+    def test_attestation_predicate_is_a_distinct_schema_with_no_authority(self) -> None:
+        report = build_report(self.root, self.env, TEST_LOG_PATH)
+        report_bytes = (json.dumps(report, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        predicate = build_attestation_predicate(report, report_bytes)
+        self.assertEqual(
+            predicate["schema"],
+            "civos.socioeconomic_interoperability.validator_attestation_predicate.v1",
+        )
+        self.assertNotEqual(predicate["schema"], report["schema"])
+        self.assertFalse(predicate["authority_boundary"]["proves_simulation_truth"])
 
     def test_missing_run_metadata_is_rejected(self) -> None:
         broken = dict(self.env)
