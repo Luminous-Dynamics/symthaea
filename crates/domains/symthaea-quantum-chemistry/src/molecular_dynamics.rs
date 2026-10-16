@@ -236,6 +236,7 @@ pub enum MdInputError {
     OddElectronCount { electron_count: i64 },
     NonFiniteTimeStep,
     NonPositiveTimeStep,
+    NonFiniteTimeStepSquared,
     NonFiniteTemperature,
     NegativeTemperature,
     NonFiniteFiniteDifferenceStep,
