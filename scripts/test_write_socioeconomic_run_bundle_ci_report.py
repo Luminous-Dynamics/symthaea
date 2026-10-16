@@ -39,13 +39,13 @@ class ExecutionReportTests(unittest.TestCase):
             if relative == "scripts/test_validate_socioeconomic_run_bundle.py":
                 source = "".join(f"def test_fake_{index}():\n    assert True\n" for index in range(14))
             elif relative == "scripts/test_write_socioeconomic_run_bundle_ci_report.py":
-                source = "".join(f"def test_fake_{index}():\n    assert True\n" for index in range(10))
+                source = "".join(f"def test_fake_{index}():\n    assert True\n" for index in range(11))
             else:
                 source = "def test_example():\n    assert True\n"
             path.write_text(source, encoding="utf-8")
         log = self.root / TEST_LOG_PATH
         log.parent.mkdir(parents=True, exist_ok=True)
-        log.write_text("Ran 14 tests in 0.001s\n\nOK\nRan 10 tests in 0.001s\n\nOK\n", encoding="utf-8")
+        log.write_text("Ran 14 tests in 0.001s\n\nOK\nRan 11 tests in 0.001s\n\nOK\n", encoding="utf-8")
 
         subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
         subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=self.root, check=True)
@@ -81,9 +81,9 @@ class ExecutionReportTests(unittest.TestCase):
         self.assertEqual(report["result"], "passed")
         self.assertEqual(report["claim_ceiling"], "synthetic_deterministic_only")
         self.assertEqual(report["scope"], "run_bundle_validator_and_execution_record_unit_tests")
-        self.assertEqual(report["authored_test_function_count"], 24)
-        self.assertEqual(report["executed_test_count"], 24)
-        self.assertEqual(report["executed_test_counts_by_suite"], [14, 10])
+        self.assertEqual(report["authored_test_function_count"], 25)
+        self.assertEqual(report["executed_test_count"], 25)
+        self.assertEqual(report["executed_test_counts_by_suite"], [14, 11])
         self.assertEqual(len(report["artifacts"]), len(SOURCE_PATHS) + 1)
         self.assertTrue(all(item["digest"].startswith("sha256:") for item in report["artifacts"]))
 
