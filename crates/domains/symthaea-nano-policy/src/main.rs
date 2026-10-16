@@ -541,6 +541,32 @@ mod tests {
     }
 
     #[test]
+    fn pinned_smoke_fixture_produces_expected_selection() {
+        let req: Request = serde_json::from_str(include_str!("../fixtures/smoke-request.json"))
+            .expect("valid smoke request fixture");
+        let expected: serde_json::Value =
+            serde_json::from_str(include_str!("../fixtures/smoke-expected.json"))
+                .expect("valid smoke expectation fixture");
+        let result = select(&req).expect("smoke request selects candidates");
+        let actual = serde_json::to_value(selected_ids(&result)).expect("serialize selected IDs");
+        assert_eq!(actual, expected["expected_selected_ids"]);
+    }
+
+    #[test]
+    fn checked_in_schemas_are_json_and_fail_closed_at_object_boundaries() {
+        let input_schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/input.schema.json"))
+                .expect("input schema parses as JSON");
+        let output_schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/output.schema.json"))
+                .expect("output schema parses as JSON");
+        assert_eq!(input_schema["additionalProperties"].as_bool(), Some(false));
+        assert_eq!(input_schema["properties"]["candidates"]["items"]["additionalProperties"].as_bool(), Some(false));
+        assert_eq!(output_schema["additionalProperties"].as_bool(), Some(false));
+        assert_eq!(output_schema["properties"]["policy_version"]["const"].as_str(), Some(POLICY_VERSION));
+    }
+
+    #[test]
     fn rejects_wrong_schema_version() {
         let mut req = request(Policy::Maximin, 1, vec![candidate("a", &[0.0])]);
         req.schema_version = "future-schema".to_owned();
