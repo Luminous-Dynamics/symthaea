@@ -10,7 +10,8 @@ It is intentionally **not** an atomistic model, optical solver, candidate genera
 
 - Interface: one JSON request from stdin; one JSON response to stdout; errors to stderr and exit code 2.
 - Request schema version: nano-selection-input-v1.
-- Machine-readable input contract: schema/input.schema.json (JSON Schema Draft 2020-12).
+- Machine-readable input/output contracts: schema/input.schema.json and schema/output.schema.json (JSON Schema Draft 2020-12).
+- A deterministic plumbing fixture is provided in fixtures/smoke-request.json with expected selected IDs in fixtures/smoke-expected.json.
 - Candidate input fields: id, features only.
 - Input budgets/candidate/feature cells are bounded.
 - Feature normalization uses min/max across the permitted unlabeled candidate pool; this is a declared transductive descriptor operation, not a use of target labels.
