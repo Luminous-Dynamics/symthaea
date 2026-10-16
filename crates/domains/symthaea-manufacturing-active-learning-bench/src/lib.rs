@@ -16,8 +16,8 @@ pub mod evaluator;
 pub use acquisition::{
     AcquisitionMetrics, AcquisitionObjective, AcquisitionRanking, DecisionAlternative,
     ExperimentActionModel, FiniteHypothesisModel, HypothesisLikelihood, HypothesisPrior,
-    HypothesisUtility, OutcomeMarginal, OutcomeProbability, RankedAction, RejectedAction,
-    expected_information_gain, rank_feasible_actions,
+    HypothesisUtility, OutcomeMarginal, OutcomeProbability, PosteriorUpdate, RankedAction,
+    RejectedAction, condition_posterior, expected_information_gain, rank_feasible_actions,
 };
 pub use analysis::{
     BenchmarkSummary, CampaignEvaluationSample, PairedPolicyComparison, PolicyAggregate,
