@@ -298,6 +298,11 @@ pub fn audit_campaign_json(
             report.observed_simulator_calls = Some(run_audit.observed_simulator_calls);
             report.run_disposition = Some(run_audit.disposition);
 
+            if !run_audit.audit_pass {
+                report
+                    .blockers
+                    .push("single-run simulator-call budget audit did not pass".to_string());
+            }
             let mut identity_blockers = Vec::new();
             if ledger.benchmark_id != manifest.benchmark_id {
                 identity_blockers.push("benchmark_id differs from campaign".to_string());
@@ -346,9 +351,6 @@ pub fn audit_campaign_json(
                 report.blockers.extend(identity_blockers);
             } else if !run_audit.audit_pass {
                 report.status = CampaignRunStatus::RunAuditFailed;
-                report
-                    .blockers
-                    .push("single-run simulator-call budget audit did not pass".to_string());
             } else {
                 report.status = CampaignRunStatus::Verified;
                 *verified_seed_counts.entry(ledger.seed).or_default() += 1;
