@@ -34,6 +34,14 @@ These are release gates, not optimization targets.
 
 The percentages above refer only to enumerated conformance tests. They are not a claim that every possible failure mode has been covered.
 
+### Current harness implementation
+
+The Rust crate now contains `experiment_benchmark`, a known-answer synthetic benchmark API. It compares the Phase A queue with seeded random selection, cheapest-first selection, a one-dimensional space-filling baseline, and an exhaustive oracle upper bound. The deterministic generator produces six-proposal scenarios and includes deliberately deceptive proposer estimates. Reports preserve chosen experiment IDs, rejected candidates, resource budgets and use, achieved utility, oracle utility, regret, decision-resolution rates, and summary statistics.
+
+The oracle assigns each synthetic experiment an independent probability of resolving the hidden decision. Combined utility is defined as `1 - product(1 - gain_i)`. This convenient closed-form assumption makes exact subset enumeration possible; it is not a general information-gain estimator and does not model correlated, redundant, or mutually dependent experiments. The oracle is only an upper bound for this toy objective.
+
+A 1,000-scenario Rust regression test has been authored. Until the test actually executes on an identified revision, it must not be described as passing or used to claim that Phase A meets the proposed targets.
+
 ### Gate 1 — oracle-backed synthetic experiment selection
 
 Build an oracle-backed suite where the true decision and experiment outcomes are known. Keep the generator seed and scenario definitions versioned. Include at least these scenario families:
