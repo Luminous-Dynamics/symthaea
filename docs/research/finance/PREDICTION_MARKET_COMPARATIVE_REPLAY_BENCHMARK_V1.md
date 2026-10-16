@@ -54,7 +54,7 @@ For binary outcome (y_i \in \{0,1\}) and probability (p_i), use Brier score ((p_
 Minimum report:
 - Sample counts, resolved/void/missing outcomes, eligible forecast coverage, and exclusion counts by method and horizon.
 - Brier score and log loss with event-/parent-event-clustered uncertainty.
-- Calibration intercept/slope and reliability diagrams with counts per bin; Brier decomposition where appropriate.
+- Equal-width reliability bins per method/horizon with counts, mean probabilities, observed frequencies, and explicit empty bins. The current harness emits these bins and a secondary bin-dependent weighted absolute calibration error; calibration uncertainty, intercept/slope, and Brier decomposition remain later-phase work.
 - Results by horizon and category, plus all-category summary only as a secondary view.
 - Common-cohort paired differences and sensitivity to inclusion/exclusion rules.
 - All primary and secondary comparisons declared in advance; account for multiple comparisons when interpreting many horizons/models.
