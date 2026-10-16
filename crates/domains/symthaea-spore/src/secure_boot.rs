@@ -78,7 +78,10 @@ pub enum SecureBootState {
 pub struct SecureBootProbeResult {
     /// Detected Secure Boot state.
     pub state: SecureBootState,
-    /// Whether the target requires explicit machine-key enrollment/verification.
+    /// Whether explicit machine-key enrollment/verification is required.
+    /// Accept the old serialized key for backward compatibility; new output
+    /// uses `key_enrollment_required`.
+    #[serde(alias = "mok_required")]
     pub key_enrollment_required: bool,
     /// Whether the target has mokutil installed.
     pub mokutil_available: bool,
