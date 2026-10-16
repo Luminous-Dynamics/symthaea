@@ -9,7 +9,7 @@
 use clap::Parser;
 use sha2::{Digest, Sha256};
 use std::fs::File;
-use std::io::{Read, BufReader};
+use std::io::{BufReader, Read};
 use std::path::{Component, Path, PathBuf};
 use symthaea_communication::bioacoustic_corpus::{
     BioacousticCorpusManifest, validate_bioacoustic_corpus,
@@ -153,12 +153,18 @@ fn validate_relative_asset_uri(asset_uri: &str) -> Result<PathBuf, String> {
     }
 
     let path = Path::new(asset_uri);
-    if path.as_os_str().is_empty()
+    if asset_uri
+        .split('/')
+        .any(|component| component.is_empty() || component == "." || component == "..")
+        || path.as_os_str().is_empty()
         || path
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
     {
-        return Err("asset_uri must not contain '.', '..', or non-normal path components".into());
+        return Err(
+            "asset_uri must use normal relative path components without empty, '.', or '..' segments"
+                .into(),
+        );
     }
     Ok(path.to_path_buf())
 }
@@ -175,6 +181,59 @@ mod tests {
         );
     }
 
+    fn temporary_directory() -> PathBuf {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after the Unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "bioacoustic-asset-audit-{}-{nonce}",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn verifies_exact_bytes_and_rejects_a_mismatched_hash() {
+        let root = temporary_directory();
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("sample.wav"), b"abc").unwrap();
+        let canonical_root = root.canonicalize().unwrap();
+        let expected = format!("{:x}", Sha256::digest(b"abc"));
+
+        assert_eq!(
+            verify_recording(&canonical_root, "sample.wav", &expected).unwrap(),
+            expected
+        );
+        assert!(verify_recording(&canonical_root, "sample.wav", &"0".repeat(64)).is_err());
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinks_that_escape_the_asset_root() {
+        use std::os::unix::fs::symlink;
+
+        let parent = temporary_directory();
+        let root = parent.join("assets");
+        std::fs::create_dir_all(&root).unwrap();
+        let external = parent.join("outside.wav");
+        std::fs::write(&external, b"outside").unwrap();
+        symlink(&external, root.join("escape.wav")).unwrap();
+        let canonical_root = root.canonicalize().unwrap();
+
+        let result = verify_recording(
+            &canonical_root,
+            "escape.wav",
+            &format!("{:x}", Sha256::digest(b"outside")),
+        );
+        assert!(result.is_err_and(|error| error.contains("escapes --asset-root")));
+
+        std::fs::remove_dir_all(parent).unwrap();
+    }
+
     #[test]
     fn rejects_remote_absolute_and_traversal_paths() {
         for path in [
@@ -183,6 +242,9 @@ mod tests {
             "/tmp/audio.wav",
             "../outside.wav",
             "recordings/../../outside.wav",
+            "recordings/./audio.wav",
+            "recordings//audio.wav",
+            "recordings/",
             "./audio.wav",
             "recordings\\audio.wav",
             "C:/audio.wav",
