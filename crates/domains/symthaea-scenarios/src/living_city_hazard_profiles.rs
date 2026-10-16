@@ -14,6 +14,7 @@ use std::collections::BTreeSet;
 
 use crate::living_city_benchmarks::{
     BenchmarkDefinition, BenchmarkProfileBinding, Hazard, LIVING_CITY_BENCHMARKS,
+    validate_benchmark_registry,
 };
 use crate::living_city_dependencies::{
     DependencyAssessment, ServiceDependency, ServiceNode, assess_dependency_failures,
@@ -160,6 +161,8 @@ pub fn evaluate_hazard_profile(
         ));
     }
 
+    validate_benchmark_registry(definitions)
+        .map_err(|_| invalid("benchmark_registry", "benchmark registry is invalid"))?;
     let definition = definitions
         .iter()
         .find(|definition| definition.id == profile.benchmark_id)
@@ -309,7 +312,7 @@ pub fn builtin_benchmark(id: &str) -> Option<&'static BenchmarkDefinition> {
 mod tests {
     use super::*;
     use crate::living_city_benchmarks::{
-        BenchmarkClass, EngineeringDomain, LIVING_CITY_BENCHMARKS,
+        BenchmarkClass, LIVING_CITY_BENCHMARKS,
     };
     use crate::living_city_dependencies::{DependencyMode, ServiceDomain};
     use crate::living_city_evidence::{EvidenceItem, EVIDENCE_SCHEMA_VERSION};
