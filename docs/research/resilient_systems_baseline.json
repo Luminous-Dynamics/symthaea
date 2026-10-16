@@ -550,12 +550,38 @@
       "tiny_case_max_jobs": 8,
       "target_within_10_percent_of_exact_optimum_fraction": 0.95,
       "must_use_independent_exhaustive_oracle": true,
-      "must_publish_fixture_corpus": true
+      "must_publish_fixture_corpus": true,
+      "synthetic_policy_witness": {
+        "priority_first_weighted_loss": 1110,
+        "weighted_recovery_weighted_loss": 111,
+        "relative_reduction_percent": 90,
+        "status": "independent_arithmetic_only_not_empirical_and_not_Rust_test_execution"
+      }
     },
     "research_sources": [
       "https://doi.org/10.1111/risa.70220",
       "https://doi.org/10.1080/10286608.2025.2602872",
       "https://doi.org/10.1016/j.cor.2025.107379"
-    ]
+    ],
+    "proposed_performance_target": {
+      "status": "proposed_unmeasured",
+      "reference_case": {
+        "jobs": 100,
+        "crews": 20,
+        "part_types": 50,
+        "precedence_edges": 200,
+        "target_p95_ms": 250
+      },
+      "stress_case": {
+        "jobs": 1000,
+        "crews": 100,
+        "target_seconds": 10
+      },
+      "requirements": [
+        "document_reference_host",
+        "release_build",
+        "retain_full_traces_and_validation"
+      ]
+    }
   }
 }
