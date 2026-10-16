@@ -113,6 +113,8 @@ pub struct RosSampleMetadataV1 {
     pub stamp_nanosec: u32,
     pub frame_id: String,
     pub clock_domain: RosClockDomainV1,
+    /// Time-source generation that changes on qualified clock discontinuity or reset.
+    pub source_clock_epoch_id: Option<String>,
     pub received_monotonic_ns: Option<u64>,
     pub receive_sequence: Option<u64>,
     pub receive_epoch_id: Option<String>,
@@ -194,6 +196,7 @@ pub struct RosPartialHumanoidObservationV1 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RosClockNowV1 {
     pub domain: RosClockDomainV1,
+    pub source_clock_epoch_id: String,
     pub timestamp_ns: u64,
 }
 
@@ -395,6 +398,22 @@ pub fn evaluate_ros_temporal_pair_v1(
         (RosTemporalStreamV1::JointState, joint_state),
         (RosTemporalStreamV1::Imu, imu),
     ] {
+        let sample_epoch = match sample.source_clock_epoch_id.as_deref() {
+            Some(epoch) if !epoch.trim().is_empty() => epoch,
+            _ => {
+                return RosTemporalDispositionV1::Unsynchronized {
+                    reason: format!("{stream:?} source-clock epoch is unbound"),
+                };
+            }
+        };
+        if sample_epoch != now.source_clock_epoch_id {
+            return RosTemporalDispositionV1::Unsynchronized {
+                reason: format!(
+                    "{stream:?} source-clock epoch {sample_epoch:?} does not match current-time epoch {:?}",
+                    now.source_clock_epoch_id
+                ),
+            };
+        }
         match &sample.clock_domain {
             RosClockDomainV1::Unbound => {
                 return RosTemporalDispositionV1::Unsynchronized {
@@ -416,6 +435,11 @@ pub fn evaluate_ros_temporal_pair_v1(
             }
             RosClockDomainV1::Named(_) => {}
         }
+    }
+    if now.source_clock_epoch_id.trim().is_empty() {
+        return RosTemporalDispositionV1::Unsynchronized {
+            reason: "qualified current-time source-clock epoch ID is unbound".into(),
+        };
     }
     match &now.domain {
         RosClockDomainV1::Named(domain) if domain == expected_domain => {}
@@ -536,6 +560,7 @@ pub struct RosTemporalHistoryEntryV1 {
     pub receive_sequence: u64,
     pub source_stamp_ns: u64,
     pub source_clock_domain: String,
+    pub source_clock_epoch_id: String,
 }
 
 /// Stateful replay/regression guard layered after pairwise temporal admission.
@@ -546,37 +571,48 @@ pub struct RosTemporalHistoryEntryV1 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RosTemporalHistoryV1 {
     pub receive_epoch_id: String,
+    pub source_clock_epoch_id: String,
     pub last_joint_state: Option<RosTemporalHistoryEntryV1>,
     pub last_imu: Option<RosTemporalHistoryEntryV1>,
 }
 
 impl RosTemporalHistoryV1 {
-    pub fn new(receive_epoch_id: impl Into<String>) -> Result<Self, RosTemporalHistoryDispositionV1> {
+    pub fn new(
+        receive_epoch_id: impl Into<String>,
+        source_clock_epoch_id: impl Into<String>,
+    ) -> Result<Self, RosTemporalHistoryDispositionV1> {
         let receive_epoch_id = receive_epoch_id.into();
-        if receive_epoch_id.trim().is_empty() {
+        let source_clock_epoch_id = source_clock_epoch_id.into();
+        if receive_epoch_id.trim().is_empty() || source_clock_epoch_id.trim().is_empty() {
             return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
-                reason: "receive epoch ID must not be empty".into(),
+                reason: "receive epoch ID and source-clock epoch ID must not be empty".into(),
             });
         }
         Ok(Self {
             receive_epoch_id,
+            source_clock_epoch_id,
             last_joint_state: None,
             last_imu: None,
         })
     }
 
-    /// Explicitly start a new receive-clock epoch and clear both stream histories.
-    pub fn reset_for_epoch(
+    /// Explicitly rebind one or both clock epochs and clear retained stream history.
+    /// This must only be called in response to an observed/qualified clock lifecycle
+    /// event, never merely because a stale sample carries a different timestamp.
+    pub fn reset_for_epochs(
         &mut self,
         receive_epoch_id: impl Into<String>,
+        source_clock_epoch_id: impl Into<String>,
     ) -> Result<(), RosTemporalHistoryDispositionV1> {
         let receive_epoch_id = receive_epoch_id.into();
-        if receive_epoch_id.trim().is_empty() {
+        let source_clock_epoch_id = source_clock_epoch_id.into();
+        if receive_epoch_id.trim().is_empty() || source_clock_epoch_id.trim().is_empty() {
             return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
-                reason: "receive epoch ID must not be empty".into(),
+                reason: "receive epoch ID and source-clock epoch ID must not be empty".into(),
             });
         }
         self.receive_epoch_id = receive_epoch_id;
+        self.source_clock_epoch_id = source_clock_epoch_id;
         self.last_joint_state = None;
         self.last_imu = None;
         Ok(())
@@ -623,6 +659,10 @@ pub enum RosTemporalHistoryDispositionV1 {
         previous_domain: String,
         current_domain: String,
     },
+    SourceClockEpochChanged {
+        expected_epoch_id: String,
+        observed_epoch_id: String,
+    },
 }
 
 /// Construct a candidate history entry without mutating the retained history.
@@ -651,6 +691,16 @@ fn prepare_temporal_history_entry(
     if sequence == 0 {
         return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
             reason: format!("{stream:?} receive sequence must be greater than zero"),
+        });
+    }
+    let source_clock_epoch_id = sample.source_clock_epoch_id.as_deref().ok_or_else(|| {
+        RosTemporalHistoryDispositionV1::InvalidHistory {
+            reason: format!("{stream:?} source-clock epoch is unbound"),
+        }
+    })?;
+    if source_clock_epoch_id.trim().is_empty() {
+        return Err(RosTemporalHistoryDispositionV1::InvalidHistory {
+            reason: format!("{stream:?} source-clock epoch ID is empty"),
         });
     }
     let domain = match &sample.clock_domain {
@@ -687,6 +737,7 @@ fn prepare_temporal_history_entry(
         receive_sequence: sequence,
         source_stamp_ns,
         source_clock_domain: domain,
+        source_clock_epoch_id: source_clock_epoch_id.to_string(),
     })
 }
 
@@ -701,6 +752,12 @@ fn check_temporal_history_entry(
         return Ok(0);
     };
 
+    if current.source_clock_epoch_id != previous.source_clock_epoch_id {
+        return Err(RosTemporalHistoryDispositionV1::SourceClockEpochChanged {
+            expected_epoch_id: previous.source_clock_epoch_id.clone(),
+            observed_epoch_id: current.source_clock_epoch_id.clone(),
+        });
+    }
     if current.source_clock_domain != previous.source_clock_domain {
         return Err(RosTemporalHistoryDispositionV1::SourceClockChanged {
             stream,
@@ -760,6 +817,12 @@ pub fn evaluate_ros_temporal_pair_with_history_v1(
         return RosTemporalHistoryDispositionV1::ReceiveEpochChanged {
             expected_epoch_id: history.receive_epoch_id.clone(),
             observed_epoch_id: capture_epoch_id.to_string(),
+        };
+    }
+    if history.source_clock_epoch_id != now.source_clock_epoch_id {
+        return RosTemporalHistoryDispositionV1::SourceClockEpochChanged {
+            expected_epoch_id: history.source_clock_epoch_id.clone(),
+            observed_epoch_id: now.source_clock_epoch_id.clone(),
         };
     }
 
@@ -978,6 +1041,7 @@ fn ros_sample_metadata(
         stamp_nanosec: header.stamp.nanosec,
         frame_id: header.frame_id.clone(),
         clock_domain: RosClockDomainV1::Unbound,
+        source_clock_epoch_id: None,
         received_monotonic_ns,
         receive_sequence,
         receive_epoch_id,
