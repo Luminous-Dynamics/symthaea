@@ -12,6 +12,7 @@
 #![warn(missing_docs)]
 
 /// Structural verifier for selector request/response receipts.
+pub mod metrics;
 pub mod receipt;
 
 use serde::{Deserialize, Serialize};
