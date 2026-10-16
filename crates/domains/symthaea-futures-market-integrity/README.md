@@ -15,9 +15,9 @@ It deliberately does not download venue data, execute orders, infer criminal int
 From the Symthaea workspace:
 
 ~~~sh
-cargo test -p symthaea-futures-market-integrity
-cargo clippy -p symthaea-futures-market-integrity --all-targets -- -D warnings
-cargo fmt --check
+cargo fmt --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --check
+cargo test --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml
+cargo clippy --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --all-targets -- -D warnings
 ~~~
 
 These commands are proposed reproduction commands. Do not infer they passed until the exact commit has completed the relevant checks.

@@ -592,6 +592,36 @@ mod tests {
     }
 
     #[test]
+    fn every_required_resolution_field_is_checked_when_missing() {
+        let mutations: [(&str, fn(&mut ResolutionPolicyCandidate)); 7] = [
+            ("contract_text", |c| c.contract_text = None),
+            ("primary_source_id", |c| c.primary_source_id = None),
+            ("fallback_rule", |c| c.fallback_rule = None),
+            ("deadline_unix_seconds", |c| c.deadline_unix_seconds = None),
+            ("source_revision_policy", |c| c.source_revision_policy = None),
+            ("dispute_window_seconds", |c| c.dispute_window_seconds = None),
+            ("adjudication_policy", |c| c.adjudication_policy = None),
+        ];
+
+        for (field, mutate) in mutations {
+            let mut candidate = complete_policy();
+            mutate(&mut candidate);
+            let result = qualify_resolution_policy(&candidate);
+            match field {
+                "deadline_unix_seconds" => {
+                    assert_eq!(result, Err(IntegrityError::InvalidDeadline));
+                }
+                "dispute_window_seconds" => {
+                    assert_eq!(result, Err(IntegrityError::InvalidDisputeWindow));
+                }
+                _ => {
+                    assert_eq!(result, Err(IntegrityError::MissingResolutionField(field)));
+                }
+            }
+        }
+    }
+
+    #[test]
     fn whitespace_resolution_fields_are_rejected() {
         let mut candidate = complete_policy();
         candidate.primary_source_id = Some("   ".to_owned());

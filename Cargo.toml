@@ -31,6 +31,8 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Standalone synthetic prediction-market integrity research lab; isolate its lock/workspace.
+    "crates/domains/symthaea-futures-market-integrity",
 ]
 default-members = [
     "xtask",

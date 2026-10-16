@@ -5,5 +5,7 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Synthetic-only prediction-market integrity controls: source concentration, same-owner turnover, and resolution-policy admission."
 
+[workspace]
+
 [lib]
 path = "src/lib.rs"
