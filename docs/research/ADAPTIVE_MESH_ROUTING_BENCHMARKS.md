@@ -60,7 +60,7 @@ The result is a local CPU-cost baseline only. Preserve raw output, CPU, OS, Rust
 
 ## First implementation slice
 
-The router rejects non-finite and out-of-range peer metrics, unknown governance tiers, and obviously stale cycle updates before they alter cached peer state. Regression tests cover those conditions. These checks reduce malformed-input hazards; they do not replace authenticated sequence numbers or establish that a peer is trustworthy.
+The router rejects non-finite and out-of-range peer metrics, unknown governance tiers, older-cycle samples, and duplicate-cycle replays before they alter cached peer state. A regression test replays the same cycle 100 times with more favorable values and asserts the peer's metrics and trust do not change. This assumes the API contract permits at most one accepted sample per peer per cycle; it remains a defense-in-depth guard, not authenticated anti-replay.
 
 ## Provisional numeric project targets (not protocol standards)
 
