@@ -352,3 +352,41 @@ The Rust evidence module now implements SHA-256 over canonical manifest/receipt 
 Relevant APIs are sha256_hex, evidence_manifest_sha256, verify_evidence_manifest_digest, scenario_run_receipt_sha256, verify_scenario_run_receipt_digest, verify_manifest_source_bytes, verify_receipt_output_bytes, and verify_receipt_manifest_link in crates/domains/symthaea-scenarios/src/living_city_evidence.rs.
 
 This remains a **library-level verification component**, not yet a separately deployed verifier service or command that independently opens artifacts from a run directory and produces a signed verification report. The orchestration integration, access-controlled artifact retention, and exact-head execution evidence remain required before this can be called an independently verified engineering pipeline. Tests have been added but were not run in the available environment because Rust/Cargo are absent; skipped CI is not a pass.
+
+## 16. Offline run-package verifier
+
+An initial verifier executable is available at crates/domains/symthaea-scenarios/src/bin/living_city_verify.rs. It reads a retained package from disk, uses strict typed JSON parsing, rejects unknown fields, constrains file paths to the canonical package root (including symlink resolution), streams SHA-256 across large files, and checks the exact source/output ID sets and receipt-to-manifest linkage.
+
+### Package layout
+
+A run directory contains bundle.json, the referenced manifest and receipt JSON files, a receipt digest sidecar, and retained source/output files. The bundle schema is version 1:
+
+~~~json
+{
+  "schema_version": 1,
+  "manifest_path": "manifest.json",
+  "receipt_path": "receipt.json",
+  "receipt_sha256_path": "receipt.sha256",
+  "source_files": [
+    {"id": "survey-a", "path": "sources/survey.geojson"},
+    {"id": "weather-b", "path": "sources/weather.csv"}
+  ],
+  "output_files": [
+    {"id": "metrics", "path": "outputs/metrics.json"}
+  ]
+}
+~~~
+
+The manifest and receipt are JSON encodings of the versioned Rust types, with enum values in snake_case; unknown fields are rejected. Each non-missing manifest item needs exactly one source-file binding with the corresponding ID. Each receipt output needs exactly one output-file binding. An item declared missing must not have a source-file binding; decision-critical gaps must still be blocked by required project gates.
+
+The receipt digest sidecar contains the lowercase SHA-256 digest of the receipt's canonical representation, followed by an optional newline. The receipt, in turn, binds to the canonical evidence-manifest digest. All file paths must be relative and resolve to regular files within the run directory. The verifier streams contents instead of buffering potentially large GIS/BIM/simulation artifacts.
+
+Run from a repository checkout using:
+
+~~~sh
+cargo run -p symthaea-scenarios --bin living_city_verify -- path/to/run-package
+~~~
+
+On success, stdout contains a JSON report with package_integrity set to verified, the scenario/commit identifiers, recomputed manifest/receipt digests, and verified source/output counts. Verification errors exit with status 2 and a diagnostic on stderr.
+
+**Security and evidence scope:** the executable checks content integrity and internal package consistency. It does not authenticate the author's identity or signer's authority, prove that a declared verifier actually ran an engineering check, validate physical equations, establish jurisdictional compliance, or authorize construction. A package can be internally consistent and still contain a false claim if all files were maliciously replaced together. For tamper-evident authorship and custody, a separate trusted signing/attestation policy is needed. This executable has been added but not compiled or run in the current environment because Cargo/rustc are unavailable; treat it as unverified until tested on the exact head.
