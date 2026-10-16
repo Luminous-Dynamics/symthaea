@@ -331,7 +331,7 @@ mod tests {
                     derivation_note: "synthetic fixture source for package validation".into(),
                 })
                 .collect(),
-            floor_ratification_ref: "governance-decision-fixture-1".into(),
+            floor_ratification_ref: "fixture://floor-ratification".into(),
             floor_ratification_evidence_item_id: "floor-ratification".into(),
         }
     }
