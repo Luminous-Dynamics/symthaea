@@ -28,6 +28,7 @@ The current policies are transparent baselines, not claims that hybrid selection
 The binary reads one JSON request from stdin and writes one JSON response to stdout. Errors go to stderr and exit non-zero.
 
 - Request schema: `nano-policy-input-v1`; output schema: `nano-policy-output-v1`.
+- Each request is bound to a non-empty policy revision and a lowercase SHA-256 digest of the frozen candidate-pool manifest. The selector echoes both values; the independent harness is responsible for recomputing the digest from canonical source bytes.
 - Features must use a frozen, recorded transformation and lie in [-1, 1]. The feature space includes a lowercase SHA-256 digest of the preprocessing specification.
 - Every feature vector must have the same dimension and declared feature-space semantics.
 - `predicted_goal_error`, `uncertainty` and `estimated_cost` must be estimates available *before* querying the true oracle. For signals used by the policy, the request must include the matching estimator/method ID and SHA-256 digest. Unknown fields are rejected during JSON parsing; oracle labels and post-query observations are not part of the request schema.
