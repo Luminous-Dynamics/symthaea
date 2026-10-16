@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/evidence-benchmark-case-v1.json",
+  "title": "Symthaea Evidence Benchmark Case Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case",
+    "case_sha256"
+  ],
+  "properties": {
+    "case": {
+      "$ref": "#/$defs/case"
+    },
+    "case_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "case_id",
+        "claim_family_id",
+        "origin_family_ids",
+        "split",
+        "input",
+        "expected_action",
+        "adjudication_note"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin_family_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "split": {
+          "enum": [
+            "train",
+            "development",
+            "test"
+          ]
+        },
+        "input": {
+          "$ref": "#/$defs/input"
+        },
+        "expected_action": {
+          "$ref": "#/$defs/action"
+        },
+        "adjudication_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence",
+        "provenance",
+        "question",
+        "independent_origins",
+        "scoped_answer_available",
+        "acquisition_budget_available"
+      ],
+      "properties": {
+        "evidence": {
+          "enum": [
+            "full_support",
+            "partial_support",
+            "irrelevant",
+            "missing",
+            "conflicting"
+          ]
+        },
+        "provenance": {
+          "enum": [
+            "verified",
+            "incomplete",
+            "invalid"
+          ]
+        },
+        "question": {
+          "enum": [
+            "clear",
+            "ambiguous"
+          ]
+        },
+        "independent_origins": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scoped_answer_available": {
+          "type": "boolean"
+        },
+        "acquisition_budget_available": {
+          "type": "boolean"
+        }
+      }
+    },
+    "action": {
+      "enum": [
+        "answer",
+        "answer_with_scope_limit",
+        "ask_clarification",
+        "acquire_more_evidence",
+        "abstain"
+      ]
+    }
+  }
+}

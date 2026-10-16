@@ -999,6 +999,9 @@ default-mind = [
 ]
 
 
+# Versioned evidence benchmark auditing and receipt scoring CLI.
+evidence-benchmark = ["dep:sha2"]
+
 [dev-dependencies]
 symthaea-cell-foundry = { path = "crates/domains/symthaea-cell-foundry" }
 symthaea-formal-safety = { path = "crates/domains/symthaea-formal-safety" }
@@ -2543,3 +2546,9 @@ name = "recurrent_mask_recovery"
 # observed. Must be declared here -- autoexamples = false.
 [[example]]
 name = "action_semantics_probe"
+
+# Versioned evidence-action benchmark audit, receipt generation, and scoring.
+[[bin]]
+name = "evidence_action_benchmark"
+path = "src/bin/evidence_action_benchmark.rs"
+required-features = ["evidence-benchmark"]

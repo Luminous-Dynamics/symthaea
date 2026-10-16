@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/evidence-action-receipt-v1.json",
+  "title": "Symthaea Evidence Action Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "case_sha256",
+    "policy_version",
+    "policy_minimum_independent_origins",
+    "policy_allow_scoped_partial_answer",
+    "selected_action",
+    "reason"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_minimum_independent_origins": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "policy_allow_scoped_partial_answer": {
+      "type": "boolean"
+    },
+    "selected_action": {
+      "enum": [
+        "answer",
+        "answer_with_scope_limit",
+        "ask_clarification",
+        "acquire_more_evidence",
+        "abstain"
+      ]
+    },
+    "reason": {
+      "enum": [
+        "complete_support",
+        "scoped_partial_support",
+        "provenance_incomplete",
+        "provenance_invalid",
+        "conflicting_evidence",
+        "question_needs_clarification",
+        "evidence_missing",
+        "evidence_irrelevant",
+        "independent_origins_unknown",
+        "independent_origins_below_policy",
+        "partial_support_not_safely_scoped"
+      ]
+    }
+  }
+}
