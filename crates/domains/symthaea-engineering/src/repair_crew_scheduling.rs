@@ -275,6 +275,19 @@ fn policy_order(
             }
         })
         .then_with(|| jobs[a.job_index].id.cmp(&jobs[b.job_index].id))
+        .then_with(|| {
+            // Prefer a less-flexible crew when multiple crews can perform the same
+            // job, preserving versatile crews for work with fewer alternatives.
+            let flexibility_a = jobs
+                .iter()
+                .filter(|job| crews[a.crew_index].can_repair(job))
+                .count();
+            let flexibility_b = jobs
+                .iter()
+                .filter(|job| crews[b.crew_index].can_repair(job))
+                .count();
+            flexibility_a.cmp(&flexibility_b)
+        })
         .then_with(|| crews[a.crew_index].id.cmp(&crews[b.crew_index].id))
 }
 
@@ -708,6 +721,31 @@ mod tests {
         assert_eq!(report.jobs_completed_within_horizon, 2);
         assert!(report.schedule.iter().any(|s| s.job_id == "water" && s.crew_id == "plumber"));
         assert!(report.schedule.iter().any(|s| s.job_id == "grid" && s.crew_id == "electrician"));
+    }
+
+    #[test]
+    fn flexible_crew_is_preserved_for_skill_constrained_work() {
+        let jobs = [
+            job("mechanical", "mechanical", 4, 0, 1.0, Vec::<String>::new()),
+            job("electrical", "electrical", 2, 1, 1.0, Vec::<String>::new()),
+        ];
+        let crews = [
+            RepairCrew::new("crew-a-flexible", ["mechanical", "electrical"], 0),
+            RepairCrew::new("crew-z-specialist", ["mechanical"], 0),
+        ];
+        let report = schedule_repairs(
+            &jobs,
+            &crews,
+            &[],
+            &config(RepairSchedulingPolicy::PriorityFirst),
+        )
+        .unwrap();
+        let mechanical = report.schedule.iter().find(|s| s.job_id == "mechanical").unwrap();
+        let electrical = report.schedule.iter().find(|s| s.job_id == "electrical").unwrap();
+        assert_eq!(mechanical.crew_id, "crew-z-specialist");
+        assert_eq!(electrical.crew_id, "crew-a-flexible");
+        assert_eq!(mechanical.start_step, 0);
+        assert_eq!(electrical.start_step, 0);
     }
 
     #[test]
