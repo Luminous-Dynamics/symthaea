@@ -31,7 +31,7 @@ Every policy sees the same public candidate catalog, profile, costs, budget and 
 - Smooth response.
 - Narrow feasible window.
 - Material/process interaction.
-- Confounded factors, with off-diagonal experiments carrying a higher declared relative cost.
+- Confounded factors; the same scenario-independent relative-cost surface applies to every family.
 - Multi-fidelity discrepancy, where the low-cost proxy can be biased relative to the reference measurement.
 
 The response oracle is deterministic and only invoked by the campaign runner for a selected action. A proxy observation is still synthetic, not physical evidence.
