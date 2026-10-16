@@ -443,3 +443,12 @@ This is a deliberate paradigm expansion: capacity is not enough if the energy, w
 The policy and limitations are material: a deterministic priority order can starve lower-priority services; dependencies propagate the weakest upstream fulfillment fraction; only resource replenishment is interrupted by a resource-supply event; switching to substitutes, repair crew constraints and physical process laws are not yet modeled. These need explicit additional models and fixtures before the results can be used to predict a real settlement or supply network.
 
 The initial module now contains 18 authored unit tests for finite stock, bounded replenishment, supply interruption, priority allocation, deterministic tie-breaking, dependency propagation, resource conservation, multi-resource bottlenecks, input validation and determinism. They are authored but have not been compiled or run in the current tool environment.
+
+
+## Implementation update — repair crews, precedence and finite spares
+
+A third Rust module, [`repair_crew_scheduling`](../../crates/domains/symthaea-engineering/src/repair_crew_scheduling.rs), now schedules repair jobs with explicit crew skills, task durations, priority, outage start time, prerequisite jobs and finite spare-part requirements. It compares three policies: priority-first, shortest-job-first, and a greedy weighted-service-recovery ratio.
+
+The objective measures caller-weighted service-unit-steps lost from outage until repair completion, capped at the analysis horizon. It is intended for policy comparison on identical scenarios, not as an objective ethical ranking. The implementation is a deterministic list-scheduling heuristic, not a global optimizer.
+
+The initial module has 15 authored unit tests covering policy comparison, skill eligibility, crew exclusivity, dependency ordering, finite spares, horizon accounting, deterministic output, cycle rejection and invalid inputs. The tests have not been compiled or run in the current environment. The next research target is to compare heuristic schedules against an independent exhaustive oracle on small fixtures, then add uncertain repair time and route/access dependencies.
