@@ -110,7 +110,7 @@ jobs:
           expected = "sha256:" + hashlib.sha256(report_bytes).hexdigest()
           if predicate.get("execution_record_digest") != expected:
               raise SystemExit("FAIL: attestation predicate does not bind exact report bytes")
-          for field in ("claim_ceiling", "scope", "result", "repository", "source_revision", "event_sha", "workflow", "run_id", "run_attempt", "executed_test_count", "executed_test_counts_by_suite", "authority_boundary"):
+          for field in ("claim_ceiling", "scope", "result", "repository", "source_revision", "event_sha", "workflow", "workflow_ref", "workflow_sha", "run_id", "run_attempt", "executed_test_count", "executed_test_counts_by_suite", "authority_boundary"):
               if predicate.get(field) != report.get(field):
                   raise SystemExit(f"FAIL: predicate field {field!r} disagrees with the execution report")
           print("PASS: attestation predicate schema, exact report-byte binding, and report-field agreement verified")
