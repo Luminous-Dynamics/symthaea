@@ -322,7 +322,6 @@
       }
     ],
     "local_validation_status": {
-      "rust_tests_authored": 20,
       "rust_tests_executed": false,
       "reason": "Local tool environment did not provide cargo or rustc.",
       "do_not_claim": [
@@ -330,7 +329,13 @@
         "tests_passed",
         "workflow_passed",
         "field_validated"
-      ]
+      ],
+      "continuity_tests_authored": 20,
+      "resource_tests_authored": 18,
+      "repair_scheduling_tests_authored": 17,
+      "robust_repair_evaluation_tests_authored": 10,
+      "total_rust_tests_authored": 65,
+      "note": "Counts are source-level #[test] declarations; none have been executed in the current environment."
     },
     "performance_targets": {
       "status": "proposed_unmeasured_targets",
