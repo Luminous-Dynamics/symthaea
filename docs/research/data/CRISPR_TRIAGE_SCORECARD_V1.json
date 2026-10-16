@@ -22,7 +22,9 @@
     "rust_unit_tests_executed": false,
     "paired_delta_label_sensitivity_bounds_executed": false,
     "fixed_budget_cardinality_fixtures_executed": false,
-    "dataset_license_explicitly_verified": false
+    "dataset_license_explicitly_verified": false,
+    "pareto_frontier_kernel_compiled": false,
+    "pareto_frontier_unit_tests_executed": false
   },
   "label_states": [
     {
@@ -149,6 +151,20 @@
         "unknowns outside the candidate universe and positives missed by every nomination method are not bounded by this conditional calculation"
       ],
       "interpretation": "These are sharp worst/best-case label-assignment bounds, not statistical confidence intervals, posterior probabilities or safety guarantees."
+    },
+    {
+      "id": "T9_multi_objective_frontier",
+      "required": true,
+      "metrics": [
+        "complete_objective_vector_by_policy",
+        "pareto_frontier_policy_ids",
+        "dominated_policy_count",
+        "excluded_policy_ids_and_reasons",
+        "objective_direction_unit_and_availability_manifest"
+      ],
+      "objectives_must_be_preregistered": true,
+      "objective_policy": "Keep recall, review burden, worst-group behavior, valid calibration metrics, uncertainty sensitivity and measured compute as separate axes where estimable. Do not invent weights to produce one universal CRISPR safety score.",
+      "acceptance": "All compared policy vectors use the same objective definitions, units, direction, held-out episodes and metric availability rule. Every nondominated policy and full vector is reported."
     }
   ],
   "primary_targets": {
@@ -227,6 +243,11 @@
       "id": "G8_fixed_budget_cardinality",
       "target": "Every fixed-budget comparison has at least K candidates under every compared policy, or the metric is explicitly marked not estimable",
       "failure_action": "Reject comparisons that silently evaluate a shorter candidate list as if it used the same review budget."
+    },
+    {
+      "id": "G9_pareto_no_scalarization",
+      "target": "Report context-appropriate, complete objective vectors and the full Pareto frontier; do not collapse endpoints into a single universal CRISPR safety score",
+      "failure_action": "Reject missing-value zero-fill, undocumented objective directions, changing objective sets after evaluation, or unsupported utility weights."
     }
   ],
   "comparator_policies": [
@@ -302,7 +323,9 @@
   "references": [
     "https://doi.org/10.1177/10430342261466407",
     "https://www.nature.com/articles/s42003-025-08275-6",
-    "https://academic.oup.com/bib/article/27/2/bbag140/8559621"
+    "https://academic.oup.com/bib/article/27/2/bbag140/8559621",
+    "https://doi.org/10.1038/s41588-025-02428-3",
+    "https://doi.org/10.1016/j.tibtech.2026.07.015"
   ],
   "synthetic_contract_fixtures": [
     {
@@ -519,6 +542,67 @@
         "partial_label_sensitivity_at_k": "not_estimable_at_budget_K",
         "rule": "Do not silently reduce K from 2 to 1."
       }
+    },
+    {
+      "id": "F8_pareto_frontier_without_scalarization",
+      "purpose": "Retain legitimate trade-offs while removing a policy dominated on every objective.",
+      "objectives": [
+        {
+          "name": "macro_recall",
+          "direction": "maximize"
+        },
+        {
+          "name": "review_slots",
+          "direction": "minimize"
+        },
+        {
+          "name": "worst_group_recall",
+          "direction": "maximize"
+        }
+      ],
+      "policies": [
+        {
+          "id": "recall_first",
+          "values": [
+            0.9,
+            500,
+            0.55
+          ]
+        },
+        {
+          "id": "budget_first",
+          "values": [
+            0.82,
+            300,
+            0.7
+          ]
+        },
+        {
+          "id": "balanced",
+          "values": [
+            0.86,
+            350,
+            0.68
+          ]
+        },
+        {
+          "id": "dominated",
+          "values": [
+            0.8,
+            520,
+            0.5
+          ]
+        }
+      ],
+      "expected_frontier": [
+        "balanced",
+        "budget_first",
+        "recall_first"
+      ],
+      "expected_dominated": [
+        "dominated"
+      ],
+      "expected": "No scalar weighted score is calculated. Policies on the frontier are trade-offs, not automatically a winner or clinically superior."
     }
   ],
   "implementation_artifact": {
@@ -539,6 +623,17 @@
       "F6: paired partial-label policy delta bounds",
       "F7: underfilled fixed-budget ranking is not estimable",
       "invalid recall targets, duplicate IDs/ranks, contradictory reference labels, mismatched policy universes/labels, and positive IDs outside the reference are rejected"
+    ],
+    "additional_source_paths": [
+      "scripts/crispr_decision_frontier.rs"
+    ],
+    "additional_test_suites": [
+      {
+        "path": "scripts/crispr_decision_frontier.rs",
+        "unit_test_count": 10,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_decision_frontier.rs -o /tmp/crispr-frontier-tests && /tmp/crispr-frontier-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment"
+      }
     ]
   },
   "partial_label_identification": {
