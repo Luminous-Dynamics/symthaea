@@ -566,6 +566,7 @@
         "time_continuity_tolerance_s",
         "minimum_superiority_margin",
         "maximum_unmodeled_differential_bias_efficiency",
+        "differential_bias_bound_basis",
         "baseline_id",
         "selection_rule",
         "search_started_at",
@@ -597,13 +598,18 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "Minimum absolute efficiency-fraction improvement required after subtracting expanded uncertainty (0.02 means two percentage points). Registered before candidate search."
+          "description": "Minimum absolute efficiency-fraction improvement required after subtracting expanded measurement uncertainty and the registered worst-case differential-bias bound (0.02 means two percentage points). Registered before candidate search."
         },
         "maximum_unmodeled_differential_bias_efficiency": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
           "description": "Registered worst-case absolute bound on unmodeled differential systematic bias between candidate and baseline efficiency, expressed as an efficiency fraction. Subtracted linearly from the conservative lower bound; not a standard uncertainty. A zero bound requires documented justification."
+        },
+        "differential_bias_bound_basis": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Recorded evidence and reasoning behind the differential-bias bound. Text aids audit but does not independently authenticate the evidence."
         },
         "baseline_id": {
           "type": "string",
