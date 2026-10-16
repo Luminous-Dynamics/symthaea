@@ -1,4 +1,4 @@
-# MARINE-FREIGHT-001A — fixed-battery screening contract
+# MARINE-FREIGHT-001A — interval-aware fixed-battery screening contract
 
 Status: research contract and synthetic arithmetic fixture. The implementation and authored tests require exact-head Rust/CI execution before they can be considered verified.
 
@@ -15,8 +15,10 @@ The standalone Rust crate `symthaea-marine-bench` performs bounded screening ari
 
 ## Artifacts
 
-- `crates/domains/symthaea-marine-bench/schemas/marine_freight_reference_case_v1.schema.json` — JSON Schema 2020-12 structure and per-field units.
-- `crates/domains/symthaea-marine-bench/fixtures/marine_freight_reference_case_v1.synthetic.json` — reproducible fixture; every input value is synthetic and marked not-for-decision.
+The input contract has been advanced to schema version `2.0.0`: every known quantity carries a nominal value plus explicit closed lower and upper bounds. This is an incompatible contract change, so v2 has its own schema and fixture. The checked-in synthetic fixture uses zero-width intervals only to preserve the original hand-checkable arithmetic; adversarial tests widen intervals to exercise the robust classifier.
+
+- `crates/domains/symthaea-marine-bench/schemas/marine_freight_reference_case_v2.schema.json` — JSON Schema 2020-12 structure and per-field units.
+- `crates/domains/symthaea-marine-bench/fixtures/marine_freight_reference_case_v2.synthetic.json` — reproducible fixture; every input value is synthetic and marked not-for-decision.
 - `crates/domains/symthaea-marine-bench/src/assessor.rs` — deterministic checks with explicit `within_declared_bound`, `violates_declared_bound`, or `indeterminate` findings.
 - `crates/domains/symthaea-marine-bench/examples/screen_reference_case.rs` — prints a stable JSON report from the frozen fixture.
 
@@ -83,3 +85,15 @@ The first subsequent expansion should add configuration composition for conventi
 ## Not claimed
 
 This tranche provides no validated hydrodynamic prediction, optimized hull, stability or strength result, safe docking design, zero lifecycle emissions, cost superiority, statutory/class approval, seaworthiness, operating authority, or physical qualification. Real-site and prototype work requires appropriately qualified naval-architecture, battery/electrical, terminal/structural, operator, and approval owners.
+
+## Interval semantics — v2
+
+For each declared quantity, v2 records a nominal value and a closed interval [lower_bound, upper_bound]. The assessor checks that the nominal value is finite and lies inside the interval, validates units and provenance, and propagates closed bounds through nonnegative sums, products, capacity derating, water-depth clearance, and idealized charge-time calculations. It makes no Gaussian, independence, or probability-coverage assumption.
+
+For a comparison of a demand interval D with an allowable interval C:
+
+- WithinDeclaredBound only when D.upper <= C.lower;
+- ViolatesDeclaredBound only when D.lower > C.upper;
+- otherwise the result is Indeterminate.
+
+This conservative rule avoids promoting an attractive nominal estimate when plausible values cross a hard limit. Interval bounds are only as trustworthy as their provenance and calibration; correlated or dependent variables may make the intervals conservative or physically loose. V2 is still restricted to synthetic, not-for-decision cases. There is no claim of calibrated uncertainty, model-bias coverage, or physical suitability.
