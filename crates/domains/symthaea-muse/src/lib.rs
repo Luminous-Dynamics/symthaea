@@ -144,6 +144,7 @@ pub mod pilot_report;
 #[cfg(feature = "theory")]
 pub mod pilot_schedule;
 pub mod pitch;
+pub mod percussion_samples;
 #[cfg(feature = "theory")]
 pub mod policy_budget_evidence;
 #[cfg(feature = "theory")]

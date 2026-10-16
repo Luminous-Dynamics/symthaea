@@ -85,6 +85,10 @@ clap-fad = ["dep:ort", "dep:hf-hub", "dep:anyhow", "dep:tokenizers"]
 # Add clap-fad on top for prompt ranking.
 studio = ["theory", "dep:axum", "dep:tokio", "dep:anyhow", "dep:tower-http", "dep:symthaea-muse-protocol", "dep:rusqlite"]
 
+[[bin]]
+name = "muse_timpani_index"
+path = "src/bin/muse_timpani_index.rs"
+
 [[example]]
 name = "live_demo"
 required-features = ["muse-live"]
