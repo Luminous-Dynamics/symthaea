@@ -8,5 +8,6 @@ description = "Isolated research-only deterministic diversity selector for nanot
 
 [dependencies]
 blake3 = { workspace = true }
+symthaea-core = { path = "../../core/symthaea-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
