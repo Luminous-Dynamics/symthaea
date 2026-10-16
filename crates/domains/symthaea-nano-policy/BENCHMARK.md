@@ -192,6 +192,7 @@ Unit tests use a synthetic five-group ledger fixture to test budget success, ful
 
 ## 10. Current status
 
-- Source files, request JSON Schema, JSONL fixture, Cargo.lock entry and focused CI workflow are committed on the draft PR branch.
-- The test definitions and fixture are not yet executed locally; no Rust compiler is installed in the current environment.
-- The focused workflow was observed queued at the last status check, while unrelated repository workflows were skipped. No pass is claimed.
+- The selector kernel, structural receipt verifier, outcome-ledger metrics module/CLI, request/response/receipt/outcome/report schemas, selector/outcome fixtures, README/benchmark contracts and focused workflow are committed on the draft PR branch.
+- The outcome evaluator has 12 authored unit tests. An independent JavaScript arithmetic check over the checked-in synthetic ledger matches the test expectations for baseline success rate/AUC, failure accounting, candidate repetitions, all-in cost and paired success-rate delta. The JSON fixture and both new schemas were fetched back and parsed as JSON.
+- The independent arithmetic and JSON parsing are source/fixture checks, **not** Rust compilation or test execution. No `cargo`, `rustc` or `rustfmt` is installed in the current environment, so formatting and tests remain unverified locally.
+- The exact-head Rust workflow status must be read separately; queued/skipped is not a pass. No scientific data were scored and no selector improvement is claimed.
