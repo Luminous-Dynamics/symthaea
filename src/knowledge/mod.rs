@@ -37,6 +37,8 @@ pub mod causal_reasoning_bridge;
 pub mod claim_priority;
 pub mod encoding;
 pub mod evidence_action_policy;
+#[cfg(feature = "sha2")]
+pub mod evidence_benchmark;
 pub mod evidence_lineage;
 pub mod evidence_proof_formula;
 pub mod evidence_provenance_graph;
