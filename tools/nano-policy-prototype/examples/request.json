@@ -7,7 +7,8 @@
   "feature_space": {
     "id": "demo-normalized-geometry-embedding-v1",
     "semantics": "Toy 2D geometry embedding, for schema tests only; not derived from scientific data",
-    "normalized_to_minus_one_one": true
+    "normalized_to_minus_one_one": true,
+    "transform_sha256": "f88f161ae64d0edcf2a65d9cb4397593435304ca7388bc3e688bce952d4deda6"
   },
   "weights": {
     "goal_fit": 0.3,
@@ -77,5 +78,13 @@
       "eligible": true,
       "already_queried": true
     }
-  ]
+  ],
+  "estimate_provenance": {
+    "predicted_goal_error_model_id": "toy-prequery-goal-model-v1",
+    "predicted_goal_error_model_sha256": "106e028be1f1ba742cff35f33db40ce3fa27db974d2d1ef4e2661e7fa418699a",
+    "uncertainty_method_id": "toy-uncertainty-estimator-v1",
+    "uncertainty_method_sha256": "3ade88dde4e76fd4bd910d9a088b6e9584589bf2c46512bc6ef0841f2667795a",
+    "estimated_cost_model_id": "toy-cost-estimator-v1",
+    "estimated_cost_model_sha256": "6206e804b6f1d23644dd89d832852f7403c150295ef0a4d6266359fb268991a8"
+  }
 }
