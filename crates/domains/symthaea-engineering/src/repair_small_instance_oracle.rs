@@ -260,10 +260,7 @@ pub fn evaluate_repair_policies_against_exact_optimum(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repair_crew_scheduling::{
-        schedule_repairs, RepairCrew, RepairPartRequirement, RepairSchedulingConfig,
-        RepairSchedulingPolicy,
-    };
+    use crate::repair_crew_scheduling::RepairPartRequirement;
 
     fn job(id: &str, duration: usize, priority: u32, value: f64) -> RepairJob {
         RepairJob::new(
