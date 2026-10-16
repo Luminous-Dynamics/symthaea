@@ -114,10 +114,10 @@ fn invalid(field: &'static str, reason: &'static str) -> DependencyGraphError {
     DependencyGraphError { field, reason }
 }
 
-fn validate_graph(
-    nodes: &[ServiceNode],
+fn validate_graph<'a>(
+    nodes: &'a [ServiceNode],
     dependencies: &[ServiceDependency],
-) -> Result<BTreeMap<&str, ServiceDomain>, DependencyGraphError> {
+) -> Result<BTreeMap<&'a str, ServiceDomain>, DependencyGraphError> {
     if nodes.is_empty() {
         return Err(invalid("nodes", "at least one service node is required"));
     }
@@ -169,7 +169,7 @@ pub fn assess_dependency_failures(
     initiating_failures: &[String],
 ) -> Result<DependencyAssessment, DependencyGraphError> {
     let node_index = validate_graph(nodes, dependencies)?;
-    let mut initial = BTreeSet::new();
+    let mut initial: BTreeSet<String> = BTreeSet::new();
     for id in initiating_failures {
         if !node_index.contains_key(id.as_str()) {
             return Err(invalid(
@@ -177,7 +177,7 @@ pub fn assess_dependency_failures(
                 "every initiating failure must reference a declared service",
             ));
         }
-        if !initial.insert(id.as_str()) {
+        if !initial.insert(id.clone()) {
             return Err(invalid(
                 "initiating_failures",
                 "initiating failure IDs must be unique",
@@ -185,7 +185,7 @@ pub fn assess_dependency_failures(
         }
     }
 
-    let mut failed = initial.clone();
+    let mut failed: BTreeSet<String> = initial.clone();
     let mut sorted_edges = dependencies.to_vec();
     sorted_edges.sort();
 
@@ -197,7 +197,7 @@ pub fn assess_dependency_failures(
                 && failed.contains(dependency.prerequisite_id.as_str())
                 && !failed.contains(dependency.dependent_id.as_str())
             {
-                newly_failed.push(dependency.dependent_id.as_str());
+                newly_failed.push(dependency.dependent_id.clone());
             }
         }
 
@@ -214,13 +214,15 @@ pub fn assess_dependency_failures(
 
     let mut outcomes = Vec::with_capacity(nodes.len());
     for (id, domain) in &node_index {
-        let initially_failed = initial.contains(id);
-        let is_failed = failed.contains(id);
+        let initially_failed = initial.contains(*id);
+        let is_failed = failed.contains(*id);
         let mut failed_prerequisites = BTreeSet::new();
         let mut degraded_prerequisites = BTreeSet::new();
 
         for dependency in &sorted_edges {
-            if dependency.dependent_id != *id || !failed.contains(dependency.prerequisite_id.as_str()) {
+            if dependency.dependent_id.as_str() != *id
+                || !failed.contains(dependency.prerequisite_id.as_str())
+            {
                 continue;
             }
             match dependency.mode {
