@@ -162,13 +162,17 @@ pub fn evaluate_mission_tasks(
     let optional_task_count = task_evaluations.iter().filter(|task| !task.required).count();
     let degraded_optional_task_count = task_evaluations
         .iter()
-        .filter(|task| !task.required && task.status != MissionTaskStatus::SatisfiedUnderDeclaredPolicy)
+        .filter(|task| {
+            !task.required && task.status != MissionTaskStatus::SatisfiedUnderDeclaredPolicy
+        })
         .count();
 
     let task_blocker_count = task_evaluations.iter().flat_map(|task| &task.findings)
         .filter(|finding| finding.severity == MissionTaskFindingSeverity::Blocker)
         .count();
-    let task_degradation_count = task_evaluations.iter().flat_map(|task| &task.findings)
+    let task_degradation_count = task_evaluations
+        .iter()
+        .flat_map(|task| &task.findings)
         .filter(|finding| finding.severity == MissionTaskFindingSeverity::Degradation)
         .count();
     let status = if mission_report.status == MissionConfigurationStatus::Blocked
@@ -596,8 +600,12 @@ fn capability_tag(value: SuitCapability) -> &'static str {
         SuitCapability::IndependentEmergencyReserve => "independent_emergency_reserve",
         SuitCapability::ManualFallback => "manual_fallback",
         SuitCapability::CommunicationsAndTelemetry => "communications_and_telemetry",
-        SuitCapability::FaultContainmentAndSafeDegradation => "fault_containment_and_safe_degradation",
-        SuitCapability::MicrogravityTranslationAndRestraint => "microgravity_translation_and_restraint",
+        SuitCapability::FaultContainmentAndSafeDegradation => {
+            "fault_containment_and_safe_degradation"
+        },
+        SuitCapability::MicrogravityTranslationAndRestraint => {
+            "microgravity_translation_and_restraint"
+        },
         SuitCapability::TetherAndAnchorInterfaces => "tether_and_anchor_interfaces",
         SuitCapability::OrbitalWorksiteInterfaces => "orbital_worksite_interfaces",
         SuitCapability::PlanetaryLocomotion => "planetary_locomotion",
@@ -606,13 +614,19 @@ fn capability_tag(value: SuitCapability) -> &'static str {
         SuitCapability::AbrasionAndPunctureResistance => "abrasion_and_puncture_resistance",
         SuitCapability::HighDexterityGloveInterfaces => "high_dexterity_glove_interfaces",
         SuitCapability::SurfaceNavigationInterface => "surface_navigation_interface",
-        SuitCapability::HeavyToolAndLoadBearingInterfaces => "heavy_tool_and_load_bearing_interfaces",
+        SuitCapability::HeavyToolAndLoadBearingInterfaces => {
+            "heavy_tool_and_load_bearing_interfaces"
+        },
         SuitCapability::ContaminationContainment => "contamination_containment",
-        SuitCapability::SuitportMechanicalAndPressureCompatibility => "suitport_mechanical_and_pressure_compatibility",
+        SuitCapability::SuitportMechanicalAndPressureCompatibility => {
+            "suitport_mechanical_and_pressure_compatibility"
+        },
         SuitCapability::ResourceServiceInterfaces => "resource_service_interfaces",
         SuitCapability::CrewRescueHandlingInterfaces => "crew_rescue_handling_interfaces",
         SuitCapability::FieldRepairableSubsystems => "field_repairable_subsystems",
-        SuitCapability::ModularLifeSupportReplacementInterfaces => "modular_life_support_replacement_interfaces",
+        SuitCapability::ModularLifeSupportReplacementInterfaces => {
+            "modular_life_support_replacement_interfaces"
+        },
         SuitCapability::RadiationMonitoringInterface => "radiation_monitoring_interface",
     }
 }
@@ -693,7 +707,7 @@ mod tests {
         let environments = BTreeSet::from([
             SuitOperatingEnvironment::LunarShadowOrPolarRegion,
         ]);
-        let mut endpoints = |component_id: &str, role: SuitInterfaceRole| {
+        let endpoints = |component_id: &str, role: SuitInterfaceRole| {
             vec![SuitInterfaceEndpoint {
                 interface_id: "grounding.esd.v1".into(),
                 endpoint_id: format!("{component_id}.grounding"),
@@ -876,7 +890,11 @@ mod tests {
                 SuitOperatingEnvironment::LunarShadowOrPolarRegion,
             ]),
         };
-        let (report, _) = evaluate_mission_tasks(&config, &[task("core-grounding"), optional]).unwrap();
+        let (report, _) = evaluate_mission_tasks(
+            &config,
+            &[task("core-grounding"), optional],
+        )
+        .unwrap();
         assert_eq!(report.status, MissionTaskPlanStatus::Degraded);
         assert_eq!(report.satisfied_required_task_count, 1);
         assert_eq!(report.degraded_optional_task_count, 1);
