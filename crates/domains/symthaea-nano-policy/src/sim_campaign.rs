@@ -5,7 +5,7 @@
 //! single-run simulator-call auditor. It does not evaluate scientific performance.
 use crate::sim_budget::{
     audit_json_ledger, is_hex_digest, sha256_hex, AuditDisposition, SimulatorBudgetLedger,
-    MAX_SIMULATOR_CALLS, MAX_SIMULATOR_LEDGER_BYTES, MAX_PROPOSAL_ATTEMPTS,
+    MAX_SIMULATOR_CALLS, MAX_PROPOSAL_ATTEMPTS,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -266,6 +266,11 @@ pub fn audit_campaign_json(
             };
             report.observed_seed = Some(ledger.seed);
             report.run_id = Some(ledger.run_id.clone());
+            let duplicate_run_id = !global_run_ids.insert(ledger.run_id.clone());
+            if duplicate_run_id {
+                duplicate_run_ids.insert(ledger.run_id.clone());
+                report.blockers.push("run_id is duplicated elsewhere in the campaign".to_string());
+            }
 
             let run_audit = match audit_json_ledger(raw_ledger) {
                 Ok(audit) => audit,
@@ -316,37 +321,20 @@ pub fn audit_campaign_json(
                 identity_blockers.push("simulator-recipe digest differs from campaign".to_string());
             }
             if !report.digest_matches {
-                identity_blockers.push("ledger digest mismatch blocks run qualification".to_string());
-            }
-            if !run_audit.audit_pass {
-                identity_blockers.push("single-run simulator-call budget audit did not pass".to_string());
-            }
-            if !report.digest_matches {
                 report.status = CampaignRunStatus::DigestMismatch;
                 report.blockers.extend(identity_blockers);
-            } else if !identity_blockers.is_empty() {
+            } else if duplicate_run_id || !identity_blockers.is_empty() {
                 report.status = CampaignRunStatus::IdentityMismatch;
                 report.blockers.extend(identity_blockers);
+            } else if !run_audit.audit_pass {
+                report.status = CampaignRunStatus::RunAuditFailed;
+                report
+                    .blockers
+                    .push("single-run simulator-call budget audit did not pass".to_string());
             } else {
                 report.status = CampaignRunStatus::Verified;
                 *verified_seed_counts.entry(ledger.seed).or_default() += 1;
                 verified_run_count += 1;
-            }
-
-            if global_run_ids.contains(&ledger.run_id) {
-                duplicate_run_ids.insert(ledger.run_id.clone());
-                report.blockers.push("run_id is duplicated elsewhere in the campaign".to_string());
-                // A duplicate run ID is a campaign-level failure even if this individual file
-                // otherwise matches. Remove its apparent verified credit from the arm.
-                if report.status == CampaignRunStatus::Verified {
-                    report.status = CampaignRunStatus::IdentityMismatch;
-                    verified_seed_counts
-                        .entry(ledger.seed)
-                        .and_modify(|count| *count = count.saturating_sub(1));
-                    verified_run_count = verified_run_count.saturating_sub(1);
-                }
-            } else {
-                global_run_ids.insert(ledger.run_id);
             }
             arm_run_reports.push(report);
         }
@@ -541,7 +529,7 @@ mod tests {
 mod tests {
     use super::*;
     use crate::sim_budget::{
-        NotCalledReason, PreflightStatus, ProposalAttempt, ProposalStatus, RunStatus,
+        PreflightStatus, ProposalAttempt, ProposalStatus, RunStatus,
         SimulatorBudgetLedger, SimulatorCall, SimulatorTerminalStatus,
     };
 
