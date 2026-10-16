@@ -142,6 +142,12 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
         )
         .into());
     }
+    if manifest_metadata.len() > 8 * 1024 * 1024 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "manifest exceeds 8 MiB size limit",
+        ).into());
+    }
     let manifest_bytes = fs::read(&arguments.manifest)?;
     let manifest_sha256 = sha256_hex(&manifest_bytes);
     let manifest: EvidenceBundleV1 = serde_json::from_slice(&manifest_bytes)?;
@@ -211,7 +217,7 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
             &comparison_bytes,
             &manifest.candidate.output_wav.sha256,
             &manifest.reference.output_wav.sha256,
-        )?
+        )
     };
 
     let mut failures = Vec::new();
@@ -576,7 +582,12 @@ fn renderer_receipt(renderer: &RendererCaptureV1) -> RendererReceiptV1 {
 /// Join only normalized relative paths. Symlinks are checked against the chosen root separately.
 fn resolve_artifact(root: &Path, relative: &str) -> Result<PathBuf, Box<dyn Error>> {
     let candidate = Path::new(relative);
+    let bytes = relative.as_bytes();
+    let has_windows_drive_prefix =
+        bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
     if relative.is_empty()
+        || relative.contains('\\')
+        || has_windows_drive_prefix
         || candidate.is_absolute()
         || candidate.components().any(|component| {
             !matches!(component, Component::Normal(_))
