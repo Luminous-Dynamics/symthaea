@@ -203,7 +203,12 @@ pub fn evaluate_measurement_traceability(
         {
             return Err(MeasurementTraceabilityError::InvalidMeasurementPlanObservation);
         }
-        observation_by_id.insert(observation.observation_id.as_str(), observation);
+        if observation_by_id
+            .insert(observation.observation_id.as_str(), observation)
+            .is_some()
+        {
+            return Err(MeasurementTraceabilityError::InvalidMeasurementPlanObservation);
+        }
     }
 
     let mut claim_by_id = BTreeMap::new();
@@ -965,11 +970,18 @@ mod tests {
                 maximum_inter_sample_gap_ms: 100,
                 minimum_calibration_evidence_level: SuitEvidenceLevel::BenchTested,
                 require_zero_dropped_samples: true,
-                reference_standards: vec![TraceabilityReferenceStandard {
-                    resource_kind: PeakResourceKind::ElectricalPowerMilliwatts,
-                    artifact_digest_sha256: sha('f'),
-                    evidence_level: SuitEvidenceLevel::BenchTested,
-                }],
+                reference_standards: vec![
+                    TraceabilityReferenceStandard {
+                        resource_kind: PeakResourceKind::ElectricalPowerMilliwatts,
+                        artifact_digest_sha256: sha('f'),
+                        evidence_level: SuitEvidenceLevel::BenchTested,
+                    },
+                    TraceabilityReferenceStandard {
+                        resource_kind: PeakResourceKind::SharedEquipmentSlots,
+                        artifact_digest_sha256: sha('1'),
+                        evidence_level: SuitEvidenceLevel::BenchTested,
+                    },
+                ],
             },
             claims: vec![claim],
         };
