@@ -87,6 +87,8 @@ pub struct BioacousticEventMetrics {
     pub precision: Option<f64>,
     pub recall: Option<f64>,
     pub f1: Option<f64>,
+    /// Micro event average precision across all scored Test recordings.
+    pub average_precision: Option<f64>,
     pub false_alarms_per_hour: Option<f64>,
 }
 
@@ -116,6 +118,7 @@ impl BioacousticEventMetrics {
             precision,
             recall,
             f1,
+            average_precision: None,
             false_alarms_per_hour,
         }
     }
@@ -157,6 +160,7 @@ pub struct BioacousticEventEvaluationReport {
 #[derive(Clone, Debug)]
 struct Event {
     id: String,
+    sample_id: String,
     interval: TimeSpan,
     label: String,
     score: f64,
@@ -218,11 +222,12 @@ pub fn evaluate_bioacoustic_events(
     }
     validate_bioacoustic_corpus(manifest, bundle.split_policy)?;
 
-    let test_recordings: Vec<_> = manifest
+    let mut test_recordings: Vec<_> = manifest
         .recordings
         .iter()
         .filter(|recording| recording.split == BioacousticSplit::Test)
         .collect();
+    test_recordings.sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
     if test_recordings.is_empty() {
         return Err("corpus manifest has no Test recordings".into());
     }
@@ -284,22 +289,23 @@ pub fn evaluate_bioacoustic_events(
                 prediction.prediction_id, prediction.sample_id
             ));
         }
-        if prediction.score >= bundle.frozen_score_threshold {
-            predictions_by_sample
-                .entry(prediction.sample_id.as_str())
-                .or_default()
-                .push(Event {
-                    id: prediction.prediction_id.clone(),
-                    interval: prediction.interval,
-                    label: prediction.label.clone(),
-                    score: prediction.score,
-                });
-        }
+        predictions_by_sample
+            .entry(prediction.sample_id.as_str())
+            .or_default()
+            .push(Event {
+                id: prediction.prediction_id.clone(),
+                sample_id: prediction.sample_id.clone(),
+                interval: prediction.interval,
+                label: prediction.label.clone(),
+                score: prediction.score,
+            });
     }
 
     let mut per_sample = Vec::with_capacity(test_recordings.len());
     let mut total = Counts::default();
     let mut total_duration = 0.0_f64;
+    let mut all_test_truth = Vec::new();
+    let mut all_test_predictions = Vec::new();
 
     for recording in &test_recordings {
         let duration_s = recording.sample_count as f64 / recording.sample_rate_hz as f64;
@@ -312,14 +318,21 @@ pub fn evaluate_bioacoustic_events(
             .filter(|annotation| target_labels.contains(annotation.label.trim()))
             .map(|annotation| Event {
                 id: annotation.annotation_id.clone(),
+                sample_id: recording.sample_id.clone(),
                 interval: annotation.interval,
                 label: annotation.label.trim().to_owned(),
                 score: 1.0,
             })
             .collect();
-        let predicted = predictions_by_sample
+        let all_predictions = predictions_by_sample
             .remove(recording.sample_id.as_str())
             .unwrap_or_default();
+        let mut predicted = Vec::new();
+        for prediction in &all_predictions {
+            if prediction.score >= bundle.frozen_score_threshold {
+                predicted.push(prediction.clone());
+            }
+        }
         let (tp, fp, fn_) = match_events(&truth, &predicted, &bundle.matching_rule);
         let counts = Counts {
             tp,
@@ -334,20 +347,25 @@ pub fn evaluate_bioacoustic_events(
         total.ground_truth += counts.ground_truth;
         total.predictions += counts.predictions;
         total_duration += duration_s;
+        let mut sample_metrics = BioacousticEventMetrics::from_counts(
+            counts.tp,
+            counts.fp,
+            counts.fn_,
+            counts.ground_truth,
+            counts.predictions,
+            duration_s,
+        );
+        sample_metrics.average_precision =
+            event_average_precision(&truth, &all_predictions, &bundle.matching_rule);
+        all_test_truth.extend(truth);
+        all_test_predictions.extend(all_predictions);
         per_sample.push(BioacousticPerSampleMetrics {
             sample_id: recording.sample_id.clone(),
-            metrics: BioacousticEventMetrics::from_counts(
-                counts.tp,
-                counts.fp,
-                counts.fn_,
-                counts.ground_truth,
-                counts.predictions,
-                duration_s,
-            ),
+            metrics: sample_metrics,
         });
     }
 
-    let metrics = BioacousticEventMetrics::from_counts(
+    let mut metrics = BioacousticEventMetrics::from_counts(
         total.tp,
         total.fp,
         total.fn_,
@@ -355,6 +373,8 @@ pub fn evaluate_bioacoustic_events(
         total.predictions,
         total_duration,
     );
+    metrics.average_precision =
+        event_average_precision(&all_test_truth, &all_test_predictions, &bundle.matching_rule);
 
     Ok(BioacousticEventEvaluationReport {
         status: "EVALUATED".into(),
@@ -404,31 +424,7 @@ fn match_events(
     predictions: &[Event],
     rule: &EventMatchRule,
 ) -> (usize, usize, usize) {
-    let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); predictions.len()];
-    for (prediction_index, prediction) in predictions.iter().enumerate() {
-        for (truth_index, actual) in truth.iter().enumerate() {
-            if prediction.label == actual.label && events_match(prediction.interval, actual.interval, rule) {
-                adjacency[prediction_index].push(truth_index);
-            }
-        }
-        adjacency[prediction_index].sort_by(|left, right| {
-            match rule {
-                EventMatchRule::StartTolerance { .. } => {
-                    start_error(prediction.interval, truth[*left].interval)
-                        .total_cmp(&start_error(prediction.interval, truth[*right].interval))
-                        .then_with(|| truth[*left].id.cmp(&truth[*right].id))
-                }
-                EventMatchRule::TemporalIou { .. } => {
-                    temporal_iou(prediction.interval, truth[*right].interval)
-                        .total_cmp(&temporal_iou(prediction.interval, truth[*left].interval))
-                        .then_with(|| truth[*left].id.cmp(&truth[*right].id))
-                }
-            }
-        });
-    }
-
-    // Try higher-confidence predictions first; augmenting paths still find a
-    // maximum-cardinality one-to-one match, so a truth event cannot be counted twice.
+    let adjacency = build_match_adjacency(truth, predictions, rule);
     let mut order: Vec<usize> = (0..predictions.len()).collect();
     order.sort_by(|left, right| {
         predictions[*right]
@@ -449,6 +445,130 @@ fn match_events(
         predictions.len() - true_positives,
         truth.len() - true_positives,
     )
+}
+
+fn event_average_precision(
+    truth: &[Event],
+    predictions: &[Event],
+    rule: &EventMatchRule,
+) -> Option<f64> {
+    if truth.is_empty() {
+        return None;
+    }
+    let adjacency = build_match_adjacency(truth, predictions, rule);
+    let mut order: Vec<usize> = (0..predictions.len()).collect();
+    order.sort_by(|left, right| {
+        predictions[*right]
+            .score
+            .total_cmp(&predictions[*left].score)
+            .then_with(|| predictions[*left].id.cmp(&predictions[*right].id))
+    });
+
+    let mut truth_to_prediction = vec![None; truth.len()];
+    let mut matched_total = 0usize;
+    let mut seen_predictions = 0usize;
+    let mut average_precision = 0.0_f64;
+    let mut cursor = 0usize;
+    while cursor < order.len() {
+        let score = predictions[order[cursor]].score;
+        let mut group_true_positives = 0usize;
+        let mut group_predictions = 0usize;
+        while cursor < order.len() && predictions[order[cursor]].score == score {
+            let prediction_index = order[cursor];
+            let mut seen_truth = vec![false; truth.len()];
+            if augment_match(
+                prediction_index,
+                &adjacency,
+                &mut seen_truth,
+                &mut truth_to_prediction,
+            ) {
+                matched_total += 1;
+                group_true_positives += 1;
+            }
+            group_predictions += 1;
+            cursor += 1;
+        }
+        seen_predictions += group_predictions;
+        if group_true_positives > 0 {
+            let precision = matched_total as f64 / seen_predictions as f64;
+            let recall_increment = group_true_positives as f64 / truth.len() as f64;
+            average_precision += precision * recall_increment;
+        }
+    }
+    Some(average_precision)
+}
+
+fn build_match_adjacency(
+    truth: &[Event],
+    predictions: &[Event],
+    rule: &EventMatchRule,
+) -> Vec<Vec<usize>> {
+    let mut truth_by_sample_label: std::collections::BTreeMap<(&str, &str), Vec<usize>> =
+        std::collections::BTreeMap::new();
+    for (truth_index, actual) in truth.iter().enumerate() {
+        truth_by_sample_label
+            .entry((actual.sample_id.as_str(), actual.label.as_str()))
+            .or_default()
+            .push(truth_index);
+    }
+    for indices in truth_by_sample_label.values_mut() {
+        indices.sort_by(|left, right| {
+            truth[*left]
+                .interval
+                .start_s
+                .total_cmp(&truth[*right].interval.start_s)
+                .then_with(|| truth[*left].id.cmp(&truth[*right].id))
+        });
+    }
+
+    let mut adjacency = vec![Vec::new(); predictions.len()];
+    for (prediction_index, prediction) in predictions.iter().enumerate() {
+        let key = (prediction.sample_id.as_str(), prediction.label.as_str());
+        let Some(candidates) = truth_by_sample_label.get(&key) else {
+            continue;
+        };
+        let (first, last) = match rule {
+            EventMatchRule::StartTolerance { max_start_error_s } => {
+                let lower = prediction.interval.start_s - max_start_error_s;
+                let upper = prediction.interval.start_s + max_start_error_s;
+                (
+                    candidates.partition_point(|truth_index| {
+                        truth[*truth_index].interval.start_s < lower
+                    }),
+                    candidates.partition_point(|truth_index| {
+                        truth[*truth_index].interval.start_s <= upper
+                    }),
+                )
+            }
+            EventMatchRule::TemporalIou { .. } => (
+                0,
+                candidates.partition_point(|truth_index| {
+                    truth[*truth_index].interval.start_s < prediction.interval.end_s
+                }),
+            ),
+        };
+        for &truth_index in &candidates[first..last] {
+            let actual = &truth[truth_index];
+            if actual.interval.end_s > prediction.interval.start_s
+                && events_match(prediction.interval, actual.interval, rule)
+            {
+                adjacency[prediction_index].push(truth_index);
+            }
+        }
+        adjacency[prediction_index].sort_by(|left, right| match rule {
+            EventMatchRule::StartTolerance { .. } => {
+                start_error(prediction.interval, truth[*left].interval)
+                    .total_cmp(&start_error(prediction.interval, truth[*right].interval))
+                    .then_with(|| truth[*left].id.cmp(&truth[*right].id))
+            }
+            EventMatchRule::TemporalIou { .. } => {
+                temporal_iou(prediction.interval, truth[*right].interval)
+                    .total_cmp(&temporal_iou(prediction.interval, truth[*left].interval))
+                    .then_with(|| truth[*left].id.cmp(&truth[*right].id))
+            }
+        });
+    }
+    adjacency
 }
 
 fn augment_match(
@@ -632,6 +752,7 @@ mod tests {
         assert_eq!(report.metrics.false_negatives, 1);
         assert_eq!(report.metrics.ground_truth_events, 2);
         assert_eq!(report.metrics.predictions_after_threshold, 2);
+        assert!((report.metrics.average_precision.unwrap() - 5.0 / 6.0).abs() < 1e-9);
         assert!(report.exhaustive_test_annotation_coverage_asserted);
         assert!(!report.audio_bytes_verified_by_this_evaluator);
     }
@@ -671,12 +792,12 @@ mod tests {
     fn maximum_matching_does_not_double_count_truth_events() {
         let rule = EventMatchRule::StartTolerance { max_start_error_s: 0.2 };
         let truth = vec![
-            Event { id: "a".into(), interval: TimeSpan { start_s: 1.0, end_s: 1.1 }, label: "click".into(), score: 1.0 },
-            Event { id: "b".into(), interval: TimeSpan { start_s: 1.15, end_s: 1.25 }, label: "click".into(), score: 1.0 },
+            Event { id: "a".into(), sample_id: "s".into(), interval: TimeSpan { start_s: 1.0, end_s: 1.1 }, label: "click".into(), score: 1.0 },
+            Event { id: "b".into(), sample_id: "s".into(), interval: TimeSpan { start_s: 1.15, end_s: 1.25 }, label: "click".into(), score: 1.0 },
         ];
         let predictions = vec![
-            Event { id: "p1".into(), interval: TimeSpan { start_s: 1.1, end_s: 1.2 }, label: "click".into(), score: 0.9 },
-            Event { id: "p2".into(), interval: TimeSpan { start_s: 0.85, end_s: 0.95 }, label: "click".into(), score: 0.8 },
+            Event { id: "p1".into(), sample_id: "s".into(), interval: TimeSpan { start_s: 1.1, end_s: 1.2 }, label: "click".into(), score: 0.9 },
+            Event { id: "p2".into(), sample_id: "s".into(), interval: TimeSpan { start_s: 0.85, end_s: 0.95 }, label: "click".into(), score: 0.8 },
         ];
         let (tp, fp, fn_) = match_events(&truth, &predictions, &rule);
         assert_eq!((tp, fp, fn_), (2, 0, 0));
