@@ -697,6 +697,34 @@
         "biological validity or safety",
         "candidate discovery beyond the declared universe"
       ]
+    },
+    "pareto_frontier_fixture_check": {
+      "status": "passed_direct_contract_evaluation_only",
+      "executed_on": "2026-10-16",
+      "fixture_id": "F8_pareto_frontier_without_scalarization",
+      "expected_frontier": [
+        "balanced",
+        "budget_first",
+        "recall_first"
+      ],
+      "observed_frontier": [
+        "balanced",
+        "budget_first",
+        "recall_first"
+      ],
+      "expected_dominated": [
+        "dominated"
+      ],
+      "observed_dominated": [
+        "dominated"
+      ],
+      "result": "Contract-level fixture matches the declared Pareto frontier and dominated policy.",
+      "not_evidence_of": [
+        "Rust source compilation or unit tests passing",
+        "reproduction of the biological source cohort",
+        "clinical safety, biological utility, or Symthaea superiority"
+      ]
     }
-  }
+  },
+  "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571"
 }
