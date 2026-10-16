@@ -12,6 +12,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "docs/research/data/evidence_action_benchmark.synthetic.jsonl"
+      - "docs/research/data/evidence_action_benchmark.unsafe-control.synthetic.jsonl"
       - "docs/research/schemas/**"
       - ".github/workflows/evidence-action-benchmark.yml"
   pull_request:
@@ -62,24 +63,13 @@ jobs:
         run: |
           set -euo pipefail
           fixture="docs/research/data/evidence_action_benchmark.synthetic.jsonl"
+          unsafe_fixture="docs/research/data/evidence_action_benchmark.unsafe-control.synthetic.jsonl"
           receipts="$(mktemp)"
-          unsafe_receipts="$(mktemp)"
-          trap 'rm -f "$receipts" "$unsafe_receipts"' EXIT
+          trap 'rm -f "$receipts"' EXIT
           cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- evaluate "$fixture" "$receipts" ci-baseline-v1 1 false
           cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- score "$fixture" "$receipts" ci-baseline-v1
-          python3 - "$receipts" "$unsafe_receipts" <<'PY'
-          import json, sys
-          src, dst = sys.argv[1:3]
-          rows = [json.loads(line) for line in open(src, encoding="utf-8") if line.strip()]
-          target = next(row for row in rows if row["case_id"] == "syn-conflict-001")
-          target["selected_action"] = "answer"
-          target["reason"] = "complete_support"
-          with open(dst, "w", encoding="utf-8") as stream:
-              for row in rows:
-                  stream.write(json.dumps(row, separators=(",", ":")) + "\n")
-          PY
           set +e
-          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- score "$fixture" "$unsafe_receipts" ci-baseline-v1
+          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- score "$fixture" "$unsafe_fixture" ci-baseline-v1
           status=$?
           set -e
           if [[ "$status" -ne 3 ]]; then
