@@ -1091,6 +1091,29 @@ mod tests {
         }));
     }
 
+    #[test]
+    fn candidate_and_baseline_calibration_references_must_match() {
+        let (mut candidate, baseline) = comparison_runs();
+        let alternate_id = "alternate-calibration-reference";
+        let alternate_sha = "d".repeat(64);
+        candidate.evaluation_policy.differential_bias_calibration_artifact_id =
+            alternate_id.into();
+        candidate.evaluation_policy.differential_bias_calibration_artifact_sha256 =
+            alternate_sha.clone();
+        candidate.data_provenance.push(ProvenanceArtifact {
+            artifact_id: alternate_id.into(),
+            kind: "synthetic_fixture".into(),
+            sha256: Some(alternate_sha),
+            retrieved_at: None,
+        });
+
+        let error = compare_candidates(&candidate, &baseline).unwrap_err();
+        assert!(error
+            .issues
+            .iter()
+            .any(|issue| issue.contains("candidate and baseline evaluation policies differ")));
+    }
+
     fn comparison_runs() -> (BenchmarkRun, BenchmarkRun) {
         let mut baseline: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
         baseline.evidence_class = "simulated".into();
