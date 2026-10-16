@@ -94,6 +94,10 @@ pub struct EstimateProvenance {
 pub struct Request {
     pub schema_version: String,
     pub request_id: String,
+    /// Caller-supplied immutable code revision for the policy implementation.
+    pub policy_revision: String,
+    /// Digest of the frozen source candidate-pool manifest; independently recompute it in the harness.
+    pub candidate_pool_sha256: String,
     pub policy: Policy,
     pub seed: u64,
     pub batch_size: usize,
@@ -127,6 +131,8 @@ pub struct SelectedCandidate {
 pub struct Response {
     pub schema_version: String,
     pub request_id: String,
+    pub policy_revision: String,
+    pub candidate_pool_sha256: String,
     pub policy: Policy,
     pub seed: u64,
     pub selected: Vec<SelectedCandidate>,
@@ -145,6 +151,10 @@ fn validate_request(request: &Request) -> Result<Vec<usize>, String> {
     if request.request_id.trim().is_empty() {
         return Err("request_id must not be empty".to_string());
     }
+    if request.policy_revision.trim().is_empty() {
+        return Err("policy_revision must not be empty".to_string());
+    }
+    validate_sha256(&request.candidate_pool_sha256, "candidate_pool_sha256")?;
     if request.batch_size == 0 {
         return Err("batch_size must be at least 1".to_string());
     }
@@ -514,6 +524,8 @@ pub fn select(request: &Request) -> Result<Response, String> {
     Ok(Response {
         schema_version: "nano-policy-output-v1".to_string(),
         request_id: request.request_id.clone(),
+        policy_revision: request.policy_revision.clone(),
+        candidate_pool_sha256: request.candidate_pool_sha256.clone(),
         policy: request.policy,
         seed: request.seed,
         selected,
@@ -550,6 +562,8 @@ mod tests {
         Request {
             schema_version: SCHEMA_VERSION.to_string(),
             request_id: "test-1".to_string(),
+            policy_revision: "test-policy-revision-v1".to_string(),
+            candidate_pool_sha256: "a".repeat(64),
             policy,
             seed: 42,
             batch_size: 2,
@@ -651,6 +665,8 @@ mod tests {
         let raw = json!({
             "schema_version": "nano-policy-input-v1",
             "request_id": "test",
+            "policy_revision": "test-policy-revision-v1",
+            "candidate_pool_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "policy": "random",
             "seed": 1,
             "batch_size": 1,
@@ -701,6 +717,8 @@ mod tests {
         let input = request(Policy::Hybrid);
         let output = select(&input).expect("valid request");
         assert_eq!(output.request_id, "test-1");
+        assert_eq!(output.policy_revision, "test-policy-revision-v1");
+        assert_eq!(output.candidate_pool_sha256, "a".repeat(64));
         assert_eq!(output.seed, 42);
         assert_eq!(output.policy, Policy::Hybrid);
         assert!(output.selected.iter().all(|item| item.score.is_finite()));
