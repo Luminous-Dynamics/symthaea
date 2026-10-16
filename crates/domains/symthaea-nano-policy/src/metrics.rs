@@ -28,6 +28,8 @@ pub const MAX_LEDGER_BYTES: usize = 64 * 1024 * 1024;
 pub const DEFAULT_BOOTSTRAP_REPLICATES: usize = 2_000;
 /// Minimum bootstrap replicates for an interval.
 pub const MIN_BOOTSTRAP_REPLICATES: usize = 100;
+/// Minimum independent groups required before reporting a confidence interval.
+pub const MIN_INDEPENDENT_GROUPS_FOR_INTERVAL: usize = 5;
 /// Maximum bootstrap replicates.
 pub const MAX_BOOTSTRAP_REPLICATES: usize = 10_000;
 
@@ -228,7 +230,7 @@ pub enum ComparisonDisposition {
     RegressionBeyondMargin,
     /// The interval overlaps practical neutrality.
     Inconclusive,
-    /// Fewer than two groups: report estimate, but no confidence interval.
+    /// Fewer than five groups: report estimate, but no confidence interval.
     InsufficientIndependentGroups,
 }
 
@@ -759,7 +761,7 @@ fn compare_arms(
         .collect();
     let estimated_delta = group_means.iter().sum::<f64>() / group_means.len() as f64;
 
-    if group_means.len() < 2 {
+    if group_means.len() < MIN_INDEPENDENT_GROUPS_FOR_INTERVAL {
         return Ok(MetricComparison {
             baseline_arm_id: baseline_arm_id.to_string(),
             comparison_arm_id: candidate_arm_id.to_string(),
@@ -952,18 +954,21 @@ mod tests {
                             observation(2, "b", Some(0.02), ObservationStatus::Evaluated),
                             observation(3, "c", Some(0.02), ObservationStatus::Evaluated),
                         ]),
-                        target("t2", "g1", vec![
+                        target("t2", "g2", vec![
                             observation(1, "d", Some(0.05), ObservationStatus::Evaluated),
                             observation(2, "e", Some(0.008), ObservationStatus::Evaluated),
                         ]),
-                        target("t3", "g2", vec![
+                        target("t3", "g3", vec![
                             observation(1, "f", None, ObservationStatus::OracleFailed),
                             observation(2, "g", Some(0.05), ObservationStatus::Evaluated),
                         ]),
-                        target("t4", "g2", vec![
+                        target("t4", "g4", vec![
                             observation(1, "h", Some(0.02), ObservationStatus::Evaluated),
                             observation(2, "i", Some(0.03), ObservationStatus::Evaluated),
                             observation(3, "j", Some(0.009), ObservationStatus::Evaluated),
+                        ]),
+                        target("t5", "g5", vec![
+                            observation(1, "k", Some(0.03), ObservationStatus::Evaluated),
                         ]),
                     ],
                 ),
@@ -974,17 +979,20 @@ mod tests {
                         target("t1", "g1", vec![
                             observation(1, "a1", Some(0.01), ObservationStatus::Evaluated),
                         ]),
-                        target("t2", "g1", vec![
+                        target("t2", "g2", vec![
                             observation(1, "b1", Some(0.011), ObservationStatus::Evaluated),
                             observation(2, "b2", Some(0.009), ObservationStatus::Evaluated),
                         ]),
-                        target("t3", "g2", vec![
+                        target("t3", "g3", vec![
                             observation(1, "c1", Some(0.004), ObservationStatus::Evaluated),
                         ]),
-                        target("t4", "g2", vec![
+                        target("t4", "g4", vec![
                             observation(1, "d1", Some(0.018), ObservationStatus::Evaluated),
                             observation(2, "d1", Some(0.018), ObservationStatus::Evaluated),
                             observation(3, "d2", Some(0.019), ObservationStatus::Evaluated),
+                        ]),
+                        target("t5", "g5", vec![
+                            observation(1, "e1", Some(0.02), ObservationStatus::Evaluated),
                         ]),
                     ],
                 ),
@@ -1003,17 +1011,17 @@ mod tests {
         let baseline = report.arms.iter().find(|arm| arm.arm_id == "baseline").unwrap();
         let candidate = report.arms.iter().find(|arm| arm.arm_id == "candidate").unwrap();
 
-        assert!((baseline.success_rate_at_budget - 0.5).abs() < 1e-12);
-        assert!((candidate.success_rate_at_budget - 0.75).abs() < 1e-12);
-        assert_eq!(baseline.oracle_attempts, 10);
+        assert!((baseline.success_rate_at_budget - 0.4).abs() < 1e-12);
+        assert!((candidate.success_rate_at_budget - 0.6).abs() < 1e-12);
+        assert_eq!(baseline.oracle_attempts, 11);
         assert_eq!(baseline.failed_attempts, 1);
-        assert!((baseline.valid_query_rate.unwrap() - 0.9).abs() < 1e-12);
+        assert!((baseline.valid_query_rate.unwrap() - (10.0 / 11.0)).abs() < 1e-12);
         assert_eq!(
             candidate.targets.iter().map(|target| target.repeated_candidate_attempts).sum::<usize>(),
             1
         );
         assert!((candidate.target_coverage_at_budget - 1.0).abs() < 1e-12);
-        assert!((baseline.mean_cost_per_target_query - 2.5).abs() < 1e-12);
+        assert!((baseline.mean_cost_per_target_query - 2.2).abs() < 1e-12);
     }
 
     #[test]
@@ -1022,8 +1030,8 @@ mod tests {
         let baseline = report.arms.iter().find(|arm| arm.arm_id == "baseline").unwrap();
         let candidate = report.arms.iter().find(|arm| arm.arm_id == "candidate").unwrap();
 
-        assert!((baseline.normalized_success_auc - 0.25).abs() < 1e-12);
-        assert!((candidate.normalized_success_auc - (2.0 / 3.0)).abs() < 1e-12);
+        assert!((baseline.normalized_success_auc - 0.2).abs() < 1e-12);
+        assert!((candidate.normalized_success_auc - (8.0 / 15.0)).abs() < 1e-12);
         assert_eq!(baseline.success_curve.len(), 3);
     }
 
@@ -1051,14 +1059,14 @@ mod tests {
             .iter()
             .find(|comparison| comparison.metric == ComparisonMetric::SuccessRateAtBudget)
             .unwrap();
-        assert!((comparison.estimated_delta - 0.25).abs() < 1e-12);
-        assert_eq!(comparison.independent_group_count, 2);
+        assert!((comparison.estimated_delta - 0.2).abs() < 1e-12);
+        assert_eq!(comparison.independent_group_count, 5);
         assert!(comparison.confidence_interval_lower.is_some());
         assert!(comparison.confidence_interval_upper.is_some());
     }
 
     #[test]
-    fn refuses_confidence_interval_with_only_one_declared_group() {
+    fn refuses_confidence_interval_with_too_few_declared_groups() {
         let mut ledger = fixture();
         for arm in &mut ledger.arms {
             for target in &mut arm.target_queries {
