@@ -38,7 +38,7 @@ Examples:
 
 ## Fail-closed resource contract
 
-Alternative expansions can grow exponentially. The evaluator therefore validates node count and depth before evaluation, then bounds the number of incomparable witness sets and intermediate conjunction combinations. Invalid empty connectors and blank witness IDs are rejected. Exceeding any bound returns an abstention with **no partial witness-set list**, preventing a truncated result from masquerading as the complete explanation.
+Alternative expansions can grow exponentially. The evaluator therefore validates node count and depth before evaluation, then bounds the number of incomparable witness sets and intermediate conjunction combinations. Invalid empty connectors and blank witness IDs are rejected. Exceeding any bound returns an abstention with **no partial witness-set list**, preventing a truncated result from masquerading as the complete explanation. The witness-frontier cap applies during evaluation, not only to the final minimized set: an expression can abstain if its intermediate frontier exceeds the cap even if a later alternative could reduce it. This conservative order-sensitive resource guard must be included in coverage measurements; canonical complete outputs, however, should be invariant to alternative ordering.
 
 Defaults are implementation resource limits (200,000 expression nodes, depth 128, 1,024 minimal witness sets, and 200,000 intermediate combinations). They are not empirically tuned; benchmark them and retain explicit per-query overrides. The evaluator validates depth iteratively before a depth-bounded recursive pass. Conjunctions whose children each have one witness use a specialized union path to avoid repeatedly cloning an ever-growing set.
 
