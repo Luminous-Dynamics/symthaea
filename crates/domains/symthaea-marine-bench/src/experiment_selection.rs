@@ -789,23 +789,27 @@ pub fn run_reference_benchmark(
         summaries,
         limitations: vec![
             concat!(
-                "Every scenario and simulated measurement is synthetic; no real route, ship, battery, ",
+                "Every scenario and simulated measurement is synthetic; no real route, ship, "
+",
                 "charger, or hydrodynamic solver is represented.",
             )
             .to_owned(),
             concat!(
-                "Experiment outcome intervals are idealized nested bounds centered on hidden synthetic ",
+                "Experiment outcome intervals are idealized nested bounds centered on hidden "
+",
                 "truth; real tests can be noisy, biased, correlated, invalid, or inconclusive.",
             )
             .to_owned(),
             concat!(
-                "The exhaustive subset oracle sees hidden truth and is a clairvoyant upper bound only ",
+                "The exhaustive subset oracle sees hidden truth and is a clairvoyant upper bound "
+",
                 "for this finite toy measurement model; it is not deployable and is not a general ",
                 "global bound for real engineering.",
             )
             .to_owned(),
             concat!(
-                "Interval-width reduction is not calibrated probability, expected information gain, ",
+                "Interval-width reduction is not calibrated probability, expected information gain, "
+",
                 "model-bias correction, or physical evidence.",
             )
             .to_owned(),
