@@ -93,6 +93,22 @@
       "use": "literature_context_only",
       "relevance": "Illustrates that uncertainty/coverage under covariate shift depends on assumptions and support overlap.",
       "note": "This publication has not been reproduced by this project and is not validation evidence for Symthaea."
+    },
+    {
+      "source_id": "Group-weighted-conformal-prediction-2026",
+      "doi": "10.1214/26-EJS2506",
+      "article_url": "https://doi.org/10.1214/26-EJS2506",
+      "use": "literature_context_only",
+      "relevance": "Analyzes group-proportion changes as a source of covariate shift and their implications for coverage guarantees.",
+      "note": "Does not validate the CRISPR transportability kernel or any Symthaea performance claim."
+    },
+    {
+      "source_id": "CS-WCP-2026-preprint",
+      "doi": null,
+      "article_url": "https://arxiv.org/abs/2609.27955",
+      "use": "literature_context_only",
+      "relevance": "Considers uncertain source/target group masses under group shifts in conformal prediction.",
+      "note": "Preprint context only; not reproduced by this project and not validation of Symthaea."
     }
   ],
   "reported_reference_counts": {
@@ -209,7 +225,8 @@
         "calibration_loss_when_estimable",
         "measured_runtime_and_compute",
         "upper_unknown_aware_error_rate_bound_at_fixed_coverage",
-        "accepted_label_completeness_at_fixed_coverage"
+        "accepted_label_completeness_at_fixed_coverage",
+        "lower_target_mixture_recall_delta_when_estimable"
       ],
       "acceptance": "All compared policies use same preregistered objective definitions, units, direction, episodes, and availability rules. Missing metrics are not zero-filled. Pareto membership is not by itself a performance win or biological/clinical safety finding."
     },
@@ -273,6 +290,27 @@
         "Coordinate-wise intervals do not encode covariance, pairing, or simultaneous coverage.",
         "A larger robust frontier may correctly indicate insufficient evidence to distinguish policies.",
         "Computational endpoint dominance cannot be interpreted as biological or clinical safety."
+      ]
+    },
+    {
+      "id": "target_mixture_transportability",
+      "definition": "Worst/best target-population mixture of context-specific paired Recall@K deltas over target-group prevalence vectors in a declared bounded simplex.",
+      "required_metrics": [
+        "per_context_effect_intervals",
+        "target_prevalence_bounds",
+        "lower_and_upper_mixture_delta",
+        "endpoint_prevalence_witness_vectors",
+        "robust_sign_classification",
+        "source_vs_target_sign_change",
+        "interval_and_prevalence_provenance"
+      ],
+      "rules": [
+        "Every context with possible positive target prevalence must have permitted supported context-specific evidence; unsupported contexts fail closed.",
+        "Prevalence bounds are separately justified from context effect intervals and must form a feasible simplex (sum of lower bounds <=1 and sum of upper bounds >=1).",
+        "Endpoint witnesses must obey all prevalence bounds and sum to one.",
+        "Robust positive requires lower target-mixture effect >0; if the interval includes zero, target improvement is inconclusive.",
+        "The envelope varies effect values and context weights independently and may be conservative; note dependence and joint coverage.",
+        "Never infer clinical safety, target-population truth outside represented contexts, or exchangeability from a positive computational envelope."
       ]
     }
   ],
@@ -412,6 +450,18 @@
         "interval provenance, dependence and joint-coverage limitations are reported",
         "point-estimate and interval-frontier classifications are compared"
       ]
+    },
+    {
+      "id": "G13_target_mixture_transportability",
+      "required": true,
+      "pass_conditions": [
+        "target context set and target prevalence bounds are preregistered or externally justified",
+        "all possible target contexts have permitted supported group-specific effect intervals",
+        "prevalence bounds are feasible and endpoint weight witnesses satisfy the simplex constraints",
+        "lower and upper target-mixture effect bounds are reported alongside source-weighted and nominal-target estimates",
+        "positive-transfer claim requires lower bound > 0; otherwise report non-positive or inconclusive",
+        "effect interval provenance, paired/group method, prevalence provenance and joint-coverage limitations are included"
+      ]
     }
   ],
   "aspirational_engineering_targets": {
@@ -462,7 +512,10 @@
     "measurement_allocation_fixture_executed": false,
     "interval_frontier_compiled": false,
     "interval_frontier_unit_tests_executed": false,
-    "interval_frontier_fixture_executed": false
+    "interval_frontier_fixture_executed": false,
+    "transportability_kernel_compiled": false,
+    "transportability_unit_tests_executed": false,
+    "transportability_fixture_executed": false
   },
   "implementation_artifact": {
     "path": "scripts/crispr_triage_verifier.rs",
@@ -477,7 +530,8 @@
       "scripts/crispr_decision_frontier.rs",
       "scripts/crispr_selective_risk.rs",
       "scripts/crispr_measurement_priority.rs",
-      "scripts/crispr_interval_frontier.rs"
+      "scripts/crispr_interval_frontier.rs",
+      "scripts/crispr_transportability.rs"
     ]
   },
   "updated_on": "2026-10-16",
@@ -609,6 +663,30 @@
       "robust_dominance_mismatches": 0,
       "result": "Coordinate-wise possible and robust dominance formulas matched exhaustive endpoint evaluation for every tested interval pair.",
       "scope_limit": "This validates relation semantics for the enumerated two-objective intervals only. It does not compile or test the Rust module, derive statistical confidence intervals, handle covariance/joint coverage, or establish biological/clinical validity."
+    },
+    "transportability_fixture": {
+      "status": "passed_direct_grid_oracle_only",
+      "executed_on": "2026-10-16",
+      "check": {
+        "feasible_tenth_step_prevalence_vectors": 12,
+        "context_delta_endpoint_assignments": 8,
+        "combined_assignments": 96,
+        "nominal_midpoint_delta": 0.01525,
+        "lower_mixture_delta": -0.076,
+        "upper_mixture_delta": 0.073,
+        "lower_witness": {
+          "A": 0.2,
+          "B": 0.4,
+          "C": 0.4
+        },
+        "upper_witness": {
+          "A": 0.5,
+          "B": 0.4,
+          "C": 0.1
+        }
+      },
+      "result": "Independent grid enumeration matched both bounded-simplex extrema and witness weights.",
+      "scope_limit": "Synthetic finite-grid check only; not Rust compilation, statistical interval estimation, target-population estimation, or biological validation."
     }
   }
 }
