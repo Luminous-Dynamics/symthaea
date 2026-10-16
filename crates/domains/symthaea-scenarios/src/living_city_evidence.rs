@@ -1178,6 +1178,81 @@ mod tests {
     }
 
     #[test]
+    fn streaming_hash_matches_byte_hash_and_nist_vector() {
+        let expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        assert_eq!(sha256_hex(b"abc"), expected);
+        assert_eq!(
+            sha256_reader_hex(std::io::Cursor::new(b"abc")).unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn recomputed_source_digest_map_is_checked_exactly() {
+        let first = b"survey";
+        let second = b"weather";
+        let mut input = manifest();
+        input.items[0].content_sha256 = Some(sha256_hex(first));
+        input.items[1].content_sha256 = Some(sha256_hex(second));
+
+        let mut actual = BTreeMap::new();
+        actual.insert("survey-a".to_owned(), sha256_hex(first));
+        actual.insert("weather-b".to_owned(), sha256_hex(second));
+        assert!(verify_manifest_source_digests(&input, &actual).is_ok());
+
+        actual.insert("weather-b".to_owned(), sha256_hex(b"corrupted"));
+        assert_eq!(
+            verify_manifest_source_digests(&input, &actual).unwrap_err().field,
+            "items.content_sha256"
+        );
+
+        actual.insert("weather-b".to_owned(), sha256_hex(second));
+        actual.remove("survey-a");
+        assert_eq!(
+            verify_manifest_source_digests(&input, &actual).unwrap_err().field,
+            "source_digests"
+        );
+
+        actual.insert("survey-a".to_owned(), sha256_hex(first));
+        actual.insert("unknown".to_owned(), sha256_hex(b"extra"));
+        assert_eq!(
+            verify_manifest_source_digests(&input, &actual).unwrap_err().field,
+            "source_digests"
+        );
+    }
+
+    #[test]
+    fn recomputed_output_digest_map_is_checked_exactly() {
+        let output = b"simulated output";
+        let mut input = receipt(GateStatus::Pass);
+        input.outputs[0].sha256 = sha256_hex(output);
+        input.gates[0].evidence_sha256 = Some(sha256_hex(output));
+        let mut actual = BTreeMap::new();
+        actual.insert("metrics".to_owned(), sha256_hex(output));
+        assert!(verify_receipt_output_digests(&input, &actual).is_ok());
+
+        actual.insert("metrics".to_owned(), sha256_hex(b"corrupted"));
+        assert_eq!(
+            verify_receipt_output_digests(&input, &actual).unwrap_err().field,
+            "outputs.sha256"
+        );
+
+        actual.insert("metrics".to_owned(), sha256_hex(output));
+        actual.insert("extra".to_owned(), sha256_hex(b"not referenced"));
+        assert_eq!(
+            verify_receipt_output_digests(&input, &actual).unwrap_err().field,
+            "output_digests"
+        );
+
+        actual.remove("extra");
+        actual.remove("metrics");
+        assert_eq!(
+            verify_receipt_output_digests(&input, &actual).unwrap_err().field,
+            "output_digests"
+        );
+    }
+
+    #[test]
     fn unsupported_schema_versions_are_rejected() {
         let mut input = manifest();
         input.schema_version += 1;
