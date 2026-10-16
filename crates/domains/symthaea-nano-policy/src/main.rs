@@ -323,8 +323,9 @@ fn encode_hdc_features(features: &[Vec<f64>]) -> Result<Vec<BinaryHV>, String> {
         .collect();
     let levels = hdc_level_codebook();
     let mut encoded = Vec::with_capacity(features.len());
+    let mut bound_roles = Vec::with_capacity(feature_count);
     for row in features {
-        let mut bound_roles = Vec::with_capacity(feature_count);
+        bound_roles.clear();
         for (dimension, value) in row.iter().enumerate() {
             if !value.is_finite() {
                 return Err("HDC encoding received a non-finite descriptor".to_owned());
