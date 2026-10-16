@@ -932,6 +932,101 @@ mod tests {
         }
     }
 
+    /// A minimal legacy bridge that records the exact dt crossing the adapter boundary.
+    /// This protects the compatibility layer from reintroducing cognitive-tau scaling.
+    struct TimingCaptureBridge {
+        last_dt: Option<f32>,
+        step_calls: usize,
+    }
+
+    impl EmbodimentBridge for TimingCaptureBridge {
+        fn step(
+            &mut self,
+            _thought_hv: &ContinuousHV,
+            dt: f32,
+            _phi: f64,
+        ) -> EmbodimentResult {
+            self.last_dt = Some(dt);
+            self.step_calls += 1;
+            EmbodimentResult {
+                num_actuators: 1,
+                control_effort: 0.0,
+                success: true,
+                prediction_error: 0.0,
+                safety_level: MotorSafetyLevel::Green,
+                epistemic_grounding: GROUNDING_SENSORIMOTOR,
+                observation_confidence: 1.0,
+            }
+        }
+
+        fn encode_perception(&mut self) -> ContinuousHV {
+            ContinuousHV::zero(16_384)
+        }
+
+        fn reset(&mut self) {}
+
+        fn safety_level(&self) -> MotorSafetyLevel {
+            MotorSafetyLevel::Green
+        }
+
+        fn set_safety_override(&mut self, _level: MotorSafetyLevel) {}
+
+        fn clear_safety_override(&mut self) {}
+
+        fn platform(&self) -> EmbodimentPlatform {
+            EmbodimentPlatform::None
+        }
+
+        fn num_actuators(&self) -> usize {
+            1
+        }
+
+        fn total_steps(&self) -> usize {
+            self.step_calls
+        }
+
+        fn telemetry(&self) -> EmbodimentTelemetry {
+            EmbodimentTelemetry::default()
+        }
+    }
+
+    #[test]
+    fn timing_adapter_forwards_exact_configured_plant_dt() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+        };
+        let timing = PlantStepTimingV1::configured_simulation(7, 0.005).unwrap();
+
+        let result = bridge
+            .step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9)
+            .unwrap();
+
+        assert!(result.success);
+        assert_eq!(bridge.last_dt, Some(0.005));
+        assert_eq!(bridge.step_calls, 1);
+    }
+
+    #[test]
+    fn timing_adapter_rejects_invalid_evidence_before_calling_legacy_bridge() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+        };
+        let mut timing = PlantStepTimingV1::configured_simulation(8, 0.005).unwrap();
+        timing.dt_seconds = f32::NAN;
+
+        assert_eq!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::NonFiniteDuration)
+        );
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(
+            bridge.step_calls, 0,
+            "invalid time evidence must not reach a legacy actuator/plant adapter"
+        );
+    }
+
     /// Enforces the invariant the type's doc comment describes, because a comment
     /// cannot stop a reorder and this one is silently catastrophic.
     ///
