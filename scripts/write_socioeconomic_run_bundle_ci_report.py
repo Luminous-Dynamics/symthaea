@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Create a deterministic, exact-head CI record for run-bundle validator tests.
+"""Create an exact-head CI execution report and its separate attestation predicate.
 
-This record is intended to be the predicate of a separately signed GitHub
-artifact attestation. It records test execution metadata and the exact hashes
-of inputs to the test job. It does not attest that an economic simulation is
-true, or that this test suite validates production authority.
+The report is the attestation subject. A distinct bounded predicate names the
+report digest and summarizes the tested source revision and observed test counts.
+Neither artifact attests that an economic simulation is true or production
+authority is valid.
 """
 from __future__ import annotations
 
