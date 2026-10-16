@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-hal — Hardware Abstraction Layer
 //!
-//! Bridges Symthaea's cognitive loop to physical servos and sensors on a
-//! Raspberry Pi (or any Linux SBC with I2C). Targets 2× PCA9685 PWM boards
-//! driving 21 hobby servos, with I2C sensors (IMU) for proprioception.
+//! Hardware access primitives for Symthaea. The `humanoid` feature enables
+//! the legacy fixed 21-actuator PCA9685 control stack; generic I2C, sensor,
+//! recording and mock interfaces remain available without that feature.
 //!
 //! ## Architecture
 //!
@@ -60,35 +60,45 @@
 
 #![deny(unsafe_code)]
 
+#[cfg(feature = "humanoid")]
 pub mod calibration;
 pub mod error;
+#[cfg(feature = "humanoid")]
 pub mod gpio_estop;
 pub mod imu;
 pub mod ina219;
+#[cfg(feature = "humanoid")]
 pub mod interlock;
 pub mod mock;
 pub mod motor_safety;
 pub mod pca9685;
 pub mod recording;
+#[cfg(feature = "humanoid")]
 pub mod runtime;
 pub mod sensor;
+#[cfg(feature = "humanoid")]
 pub mod servo;
 
 // ── Public re-exports ────────────────────────────────────────────────
 
+#[cfg(feature = "humanoid")]
 pub use calibration::{CalibrationProfile, JointCalibration};
 pub use error::{HalError, HalResult};
+#[cfg(feature = "humanoid")]
 pub use gpio_estop::{EstopPoller, GpioEstop};
 pub use imu::{ComplementaryFilter, Mpu6050Decoder};
 pub use ina219::Ina219Decoder;
+#[cfg(feature = "humanoid")]
 pub use interlock::{SafetyConfig, SafetyInterlock};
 pub use motor_safety::MotorSafetyLevel;
 pub use pca9685::Pca9685;
 pub use recording::{RecordingAdapter, ReplayAdapter, SensorRecording};
+#[cfg(feature = "humanoid")]
 pub use runtime::{
     AngleMonitor, CurrentMonitor, HalRuntime, HalRuntimeBuilder, HealthStatus, RuntimeTelemetry,
 };
 pub use sensor::{EmbeddedSensor, HalSensorAdapter, SensorDecoder};
+#[cfg(feature = "humanoid")]
 pub use servo::ServoOutput;
 
 /// Re-export `embedded_hal::i2c::I2c` so downstream crates don't need a direct dependency.
