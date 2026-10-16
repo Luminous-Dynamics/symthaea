@@ -255,6 +255,22 @@ pub fn select_threshold_at_max_false_positive_rate(
     best.ok_or_else(|| "no threshold satisfies the declared false-positive budget".into())
 }
 
+/// Apply a frozen threshold to a new split. A threshold greater than 1.0
+/// is valid and intentionally predicts no positives when the validation
+/// operating point used the no-detections fallback.
+pub fn apply_binary_threshold(scores: &[f64], threshold: f64) -> Result<Vec<bool>, String> {
+    if !threshold.is_finite() || threshold < 0.0 {
+        return Err("binary detection threshold must be finite and non-negative".into());
+    }
+    if scores
+        .iter()
+        .any(|score| !score.is_finite() || !(0.0..=1.0).contains(score))
+    {
+        return Err("binary detection scores must be finite and within [0, 1]".into());
+    }
+    Ok(scores.iter().map(|score| *score >= threshold).collect())
+}
+
 /// Declared source lineage for one dataset split. IDs refer to provenance
 /// records, not authenticated facts; this type prevents accidental leakage
 /// when the caller supplies complete and truthful source metadata.
@@ -649,6 +665,48 @@ mod tests {
         assert_eq!(selection.threshold, 0.4);
         assert_eq!(selection.validation_counts.recall(), Some(1.0));
         assert_eq!(selection.validation_counts.false_positive_rate(), Some(0.5));
+    }
+
+    #[test]
+    fn frozen_validation_threshold_applies_to_held_out_scores() {
+        let validation = select_threshold_at_max_false_positive_rate(
+            &[true, true, false, false],
+            &[0.9, 0.4, 0.8, 0.1],
+            0.0,
+        )
+        .unwrap();
+        let test_predictions =
+            apply_binary_threshold(&[0.95, 0.89, 0.2], validation.threshold).unwrap();
+        assert_eq!(test_predictions, vec![true, false, false]);
+        let test_counts =
+            BinaryDetectionCounts::from_predictions(&[false, true, false], &test_predictions)
+                .unwrap();
+        assert_eq!(test_counts.false_positives, 1);
+        assert_eq!(test_counts.false_negatives, 1);
+    }
+
+    #[test]
+    fn no_detection_threshold_is_finite_even_at_maximum_score() {
+        let selection = select_threshold_at_max_false_positive_rate(
+            &[true, false],
+            &[1.0, 1.0],
+            0.0,
+        )
+        .unwrap();
+        assert!(selection.threshold.is_finite());
+        assert!(selection.threshold > 1.0);
+        assert_eq!(
+            apply_binary_threshold(&[1.0, 0.0], selection.threshold).unwrap(),
+            vec![false, false]
+        );
+    }
+
+    #[test]
+    fn applying_threshold_rejects_invalid_scores_or_threshold() {
+        assert!(apply_binary_threshold(&[f64::NAN], 0.5).is_err());
+        assert!(apply_binary_threshold(&[1.5], 0.5).is_err());
+        assert!(apply_binary_threshold(&[0.5], f64::INFINITY).is_err());
+        assert!(apply_binary_threshold(&[0.5], -0.1).is_err());
     }
 
     #[test]
