@@ -87,11 +87,8 @@ impl BioacousticEventMetrics {
     ) -> Self {
         let precision = ratio(true_positives, true_positives + false_positives);
         let recall = ratio(true_positives, true_positives + false_negatives);
-        let f1 = match (precision, recall) {
-            (Some(p), Some(r)) if p + r > 0.0 => Some(2.0 * p * r / (p + r)),
-            (Some(_), Some(_)) => Some(0.0),
-            _ => None,
-        };
+        let f1_denominator = 2 * true_positives + false_positives + false_negatives;
+        let f1 = ratio(2 * true_positives, f1_denominator);
         let false_alarms_per_hour = (scored_duration_seconds.is_finite()
             && scored_duration_seconds > 0.0)
             .then(|| false_positives as f64 * 3600.0 / scored_duration_seconds);
@@ -373,8 +370,8 @@ fn validate_match_rule(rule: &EventMatchRule) -> Result<(), String> {
             }
         }
         EventMatchRule::TemporalIou { min_iou } => {
-            if !min_iou.is_finite() || !(0.0..=1.0).contains(min_iou) {
-                return Err("minimum temporal IoU must be finite and within [0, 1]".into());
+            if !min_iou.is_finite() || !(0.0..=1.0).contains(min_iou) || *min_iou == 0.0 {
+                return Err("minimum temporal IoU must be finite and within (0, 1]".into());
             }
         }
     }
@@ -506,7 +503,12 @@ mod tests {
         BioacousticRecording {
             sample_id: sample_id.into(),
             asset_uri: format!("audio/{sample_id}.wav"),
-            content_sha256: "a".repeat(64),
+            content_sha256: match sample_id {
+                "train-1" => "a".repeat(64),
+                "valid-1" => "b".repeat(64),
+                "test-1" => "c".repeat(64),
+                _ => "d".repeat(64),
+            },
             split,
             sample_rate_hz: 10,
             channels: 1,
