@@ -520,7 +520,11 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_prior_ids() {
-        let mut req = request(Policy::Maximin, 1, vec![candidate("a", &[0.0]), candidate("b", &[1.0])]);
+        let mut req = request(
+            Policy::Maximin,
+            1,
+            vec![candidate("a", &[0.0]), candidate("b", &[1.0])],
+        );
         req.already_selected = vec!["a".to_owned(), "a".to_owned()];
         assert!(select(&req).unwrap_err().contains("duplicate ids"));
     }
