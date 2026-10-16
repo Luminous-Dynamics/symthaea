@@ -221,7 +221,7 @@ pub fn compare_fixed_and_rolling_horizon_policies(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repair_crew_scheduling::{RepairPartRequirement, RepairSchedulingPolicy};
+    use crate::repair_crew_scheduling::RepairPartRequirement;
 
     fn job(id: &str, nominal: usize, priority: u32, value: f64, outage: usize) -> RepairJob {
         RepairJob::new(
