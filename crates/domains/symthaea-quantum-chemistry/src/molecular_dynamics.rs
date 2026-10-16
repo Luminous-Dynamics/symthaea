@@ -293,6 +293,46 @@ impl std::fmt::Display for MdInputError {
 
 impl std::error::Error for MdInputError {}
 
+/// Numerical/runtime failures detected by the checked molecular AIMD integrator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MdRunError {
+    InvalidInput(MdInputError),
+    NonFinitePosition { step: usize, atom_index: usize, axis: usize },
+    NonFiniteForce { step: usize, atom_index: usize, axis: usize },
+    NonFiniteVelocity { step: usize, atom_index: usize, axis: usize },
+    NonFinitePotentialEnergy { step: usize },
+    NonFiniteKineticEnergy { step: usize },
+    NonFiniteTemperature { step: usize },
+}
+
+impl std::fmt::Display for MdRunError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidInput(error) => write!(f, "invalid AIMD input: {error}"),
+            Self::NonFinitePosition { step, atom_index, axis } => write!(
+                f, "non-finite position at step {step}, atom {atom_index}, axis {axis}"
+            ),
+            Self::NonFiniteForce { step, atom_index, axis } => write!(
+                f, "non-finite force at step {step}, atom {atom_index}, axis {axis}"
+            ),
+            Self::NonFiniteVelocity { step, atom_index, axis } => write!(
+                f, "non-finite velocity at step {step}, atom {atom_index}, axis {axis}"
+            ),
+            Self::NonFinitePotentialEnergy { step } => {
+                write!(f, "non-finite potential energy at step {step}")
+            }
+            Self::NonFiniteKineticEnergy { step } => {
+                write!(f, "non-finite kinetic energy at step {step}")
+            }
+            Self::NonFiniteTemperature { step } => {
+                write!(f, "non-finite temperature at step {step}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for MdRunError {}
+
 /// Validate molecular AIMD inputs before basis construction or SCF evaluation.
 ///
 /// This preflight reflects the current molecular RHF/STO-3G implementation,
@@ -371,18 +411,20 @@ pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), 
 pub fn run_md_checked(
     molecule: &Molecule,
     config: &MdConfig,
-) -> Result<MdResult, MdInputError> {
+) -> Result<MdResult, MdRunError> {
     run_md_checked_with_seed(molecule, config, DEFAULT_MD_SEED)
 }
 
 /// Checked molecular AIMD entry point with a reproducible, explicit seed.
+///
+/// Input errors and non-finite numerical states are returned as typed errors.
 pub fn run_md_checked_with_seed(
     molecule: &Molecule,
     config: &MdConfig,
     seed: u64,
-) -> Result<MdResult, MdInputError> {
-    validate_md_inputs(molecule, config)?;
-    Ok(run_md_validated_with_seed(molecule, config, seed))
+) -> Result<MdResult, MdRunError> {
+    validate_md_inputs(molecule, config).map_err(MdRunError::InvalidInput)?;
+    run_md_validated_with_seed(molecule, config, seed)
 }
 
 
@@ -401,10 +443,65 @@ pub fn run_md(molecule: &Molecule, config: &MdConfig) -> MdResult {
 /// qualify the underlying electronic-structure model or trajectory physics.
 pub fn run_md_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64) -> MdResult {
     run_md_checked_with_seed(molecule, config, seed)
-        .unwrap_or_else(|error| panic!("invalid AIMD inputs: {error}"))
+        .unwrap_or_else(|error| panic!("AIMD run failed: {error}"))
 }
 
-fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64) -> MdResult {
+fn validate_finite_positions(step: usize, values: &[[f64; 3]]) -> Result<(), MdRunError> {
+    for (atom_index, vector) in values.iter().enumerate() {
+        for (axis, value) in vector.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(MdRunError::NonFinitePosition { step, atom_index, axis });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_finite_forces(step: usize, values: &[[f64; 3]]) -> Result<(), MdRunError> {
+    for (atom_index, vector) in values.iter().enumerate() {
+        for (axis, value) in vector.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(MdRunError::NonFiniteForce { step, atom_index, axis });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_finite_velocities(step: usize, values: &[[f64; 3]]) -> Result<(), MdRunError> {
+    for (atom_index, vector) in values.iter().enumerate() {
+        for (axis, value) in vector.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(MdRunError::NonFiniteVelocity { step, atom_index, axis });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_finite_observables(
+    step: usize,
+    potential_energy: f64,
+    kinetic_energy: f64,
+    temperature: f64,
+) -> Result<(), MdRunError> {
+    if !potential_energy.is_finite() {
+        return Err(MdRunError::NonFinitePotentialEnergy { step });
+    }
+    if !kinetic_energy.is_finite() {
+        return Err(MdRunError::NonFiniteKineticEnergy { step });
+    }
+    if !temperature.is_finite() {
+        return Err(MdRunError::NonFiniteTemperature { step });
+    }
+    Ok(())
+}
+
+fn run_md_validated_with_seed(
+    molecule: &Molecule,
+    config: &MdConfig,
+    seed: u64,
+) -> Result<MdResult, MdRunError> {
     let n_atoms = molecule.n_atoms();
     let masses: Vec<f64> = molecule
         .atoms
@@ -414,15 +511,22 @@ fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64)
 
     let mut positions: Vec<[f64; 3]> = molecule.atoms.iter().map(|a| a.position).collect();
     let mut velocities = initialize_velocities(&masses, config.temperature, seed);
+    validate_finite_velocities(0, &velocities)?;
 
-    // Initial forces
+    // Initial forces are checked before the trajectory proceeds to energy and
+    // integration; non-finite force estimates can otherwise poison positions.
     let mut mol = molecule.clone();
     let mut forces = compute_forces(&mol, config.fd_step);
+    validate_finite_forces(0, &forces)?;
     let basis = Sto3g::build(&mol);
     let mut energy = restricted_hartree_fock(&mol, &basis, &RhfConfig::default()).total_energy;
+    if !energy.is_finite() {
+        return Err(MdRunError::NonFinitePotentialEnergy { step: 0 });
+    }
 
     let mut frames = Vec::with_capacity(config.n_steps + 1);
     let (ke, temp) = kinetic_energy_and_temperature(&velocities, &masses);
+    validate_finite_observables(0, energy, ke, temp)?;
     frames.push(MdFrame {
         positions: positions.clone(),
         velocities: velocities.clone(),
@@ -444,15 +548,21 @@ fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64)
             }
         }
 
-        // Update molecule for force evaluation
+        // Reject non-finite coordinates before basis construction or SCF.
+        validate_finite_positions(step + 1, &positions)?;
+        // Update molecule for force evaluation only after that check.
         for i in 0..n_atoms {
             mol.atoms[i].position = positions[i];
         }
 
-        // New forces
+        // New forces; check them before the follow-on energy evaluation.
         let forces_new = compute_forces(&mol, config.fd_step);
+        validate_finite_forces(step + 1, &forces_new)?;
         let basis = Sto3g::build(&mol);
         energy = restricted_hartree_fock(&mol, &basis, &RhfConfig::default()).total_energy;
+        if !energy.is_finite() {
+            return Err(MdRunError::NonFinitePotentialEnergy { step: step + 1 });
+        }
 
         // Update velocities: v(t+dt) = v(t) + 0.5*(a(t) + a(t+dt))*dt
         for i in 0..n_atoms {
@@ -463,9 +573,11 @@ fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64)
             }
         }
 
+        validate_finite_velocities(step + 1, &velocities)?;
         forces = forces_new;
 
         let (ke, temp) = kinetic_energy_and_temperature(&velocities, &masses);
+        validate_finite_observables(step + 1, energy, ke, temp)?;
         frames.push(MdFrame {
             positions: positions.clone(),
             velocities: velocities.clone(),
@@ -476,10 +588,10 @@ fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64)
         });
     }
 
-    MdResult {
+    Ok(MdResult {
         frames,
         total_steps: config.n_steps,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -608,6 +720,39 @@ mod tests {
         assert!((variance - 1.0).abs() < 0.05, "sample variance was {variance}");
     }
     #[test]
+    fn runtime_guards_reject_non_finite_vector_states() {
+        assert_eq!(
+            validate_finite_positions(3, &[[f64::NAN, 0.0, 0.0]]),
+            Err(MdRunError::NonFinitePosition { step: 3, atom_index: 0, axis: 0 })
+        );
+        assert_eq!(
+            validate_finite_forces(4, &[[0.0, f64::INFINITY, 0.0]]),
+            Err(MdRunError::NonFiniteForce { step: 4, atom_index: 0, axis: 1 })
+        );
+        assert_eq!(
+            validate_finite_velocities(5, &[[0.0, 0.0, f64::NEG_INFINITY]]),
+            Err(MdRunError::NonFiniteVelocity { step: 5, atom_index: 0, axis: 2 })
+        );
+    }
+
+    #[test]
+    fn runtime_guards_reject_non_finite_observables() {
+        assert_eq!(
+            validate_finite_observables(2, f64::NAN, 0.0, 300.0),
+            Err(MdRunError::NonFinitePotentialEnergy { step: 2 })
+        );
+        assert_eq!(
+            validate_finite_observables(2, -1.0, f64::INFINITY, 300.0),
+            Err(MdRunError::NonFiniteKineticEnergy { step: 2 })
+        );
+        assert_eq!(
+            validate_finite_observables(2, -1.0, 0.1, f64::NAN),
+            Err(MdRunError::NonFiniteTemperature { step: 2 })
+        );
+        assert!(validate_finite_observables(0, -1.0, 0.1, 300.0).is_ok());
+    }
+
+    #[test]
     fn validate_default_h2_inputs() {
         let molecule = Molecule::h2();
         assert_eq!(validate_md_inputs(&molecule, &MdConfig::default()), Ok(()));
@@ -627,7 +772,7 @@ mod tests {
         let molecule = Molecule::new(vec![]);
         assert!(matches!(
             run_md_checked(&molecule, &MdConfig::default()),
-            Err(MdInputError::EmptyMolecule)
+            Err(MdRunError::InvalidInput(MdInputError::EmptyMolecule))
         ));
     }
 
