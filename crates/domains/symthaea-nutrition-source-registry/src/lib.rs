@@ -17,11 +17,11 @@ pub const NUTRITION_SOURCE_SCHEMA_VERSION: u16 = 1;
 pub const NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION: u16 = 1;
 
 /// Identifies the exact hashing profile used by the current receipt envelope.
-/// This profile is deterministic for this Rust contract, but is not RFC 8785/JCS.
+/// JCS serializes JSON according to RFC 8785; wide nutrient quantities remain strings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NutritionCanonicalizationProfileV1 {
-    SortedSerdeJsonV1,
+    Rfc8785JcsV1,
 }
 
 fn serialize_u64_as_decimal_string<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
@@ -481,28 +481,8 @@ struct RegistryInputEnvelopeV1<'a> {
     supplied_artifact_sha256: Option<String>,
 }
 
-fn sort_json_keys(value: serde_json::Value) -> serde_json::Value {
-    match value {
-        serde_json::Value::Array(items) => serde_json::Value::Array(
-            items.into_iter().map(sort_json_keys).collect()
-        ),
-        serde_json::Value::Object(map) => {
-            let mut entries: Vec<_> = map.into_iter().collect();
-            entries.sort_by(|a, b| a.0.cmp(&b.0));
-            let mut sorted = serde_json::Map::new();
-            for (key, value) in entries {
-                sorted.insert(key, sort_json_keys(value));
-            }
-            serde_json::Value::Object(sorted)
-        }
-        primitive => primitive,
-    }
-}
-
 fn stable_json_sha256<T: Serialize>(value: &T) -> Result<String, ()> {
-    let value = serde_json::to_value(value).map_err(|_| ())?;
-    let sorted_value = sort_json_keys(value);
-    let bytes = serde_json::to_vec(&sorted_value).map_err(|_| ())?;
+    let bytes = serde_json_canonicalizer::to_vec(value).map_err(|_| ())?;
     Ok(sha256_hex(&bytes))
 }
 
@@ -515,7 +495,7 @@ fn registry_input_sha256(
 ) -> Result<String, ()> {
     let envelope = RegistryInputEnvelopeV1 {
         receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
-        canonicalization_profile: NutritionCanonicalizationProfileV1::SortedSerdeJsonV1,
+        canonicalization_profile: NutritionCanonicalizationProfileV1::Rfc8785JcsV1,
         evaluation_date,
         manifest,
         fact,
@@ -640,7 +620,7 @@ pub fn assess_nutrition_source(
 
     let mut assessment = NutritionRegistryAssessmentV1 {
         receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
-        canonicalization_profile: NutritionCanonicalizationProfileV1::SortedSerdeJsonV1,
+        canonicalization_profile: NutritionCanonicalizationProfileV1::Rfc8785JcsV1,
         evaluation_date: evaluation_date.to_owned(),
         source_id: manifest.source_id.clone(),
         source_record_id: fact.source_record_id.clone(),
@@ -1931,7 +1911,7 @@ mod tests {
         assert_eq!(result.receipt_schema_version, NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION);
         assert_eq!(
             result.canonicalization_profile,
-            NutritionCanonicalizationProfileV1::SortedSerdeJsonV1
+            NutritionCanonicalizationProfileV1::Rfc8785JcsV1
         );
         assert!(is_canonical_sha256(result.manifest_sha256.as_deref().expect("manifest digest")));
         assert!(is_canonical_sha256(result.food_fact_sha256.as_deref().expect("fact digest")));
@@ -1950,7 +1930,7 @@ mod tests {
         );
         let expected_envelope = RegistryInputEnvelopeV1 {
             receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
-            canonicalization_profile: NutritionCanonicalizationProfileV1::SortedSerdeJsonV1,
+            canonicalization_profile: NutritionCanonicalizationProfileV1::Rfc8785JcsV1,
             evaluation_date: EVALUATION_DATE,
             manifest: &m,
             fact: &f,
@@ -1963,6 +1943,30 @@ mod tests {
             result.supplied_artifact_sha256.as_deref(),
             Some(sha256_hex(ARTIFACT).as_str())
         );
+    }
+
+
+    #[test]
+    fn rfc8785_number_and_string_serialization_vector() {
+        // RFC 8785 section 3.2 example: canonicalize numeric representations,
+        // escaping and key order rather than sorting keys alone.
+        let input = r#"{"numbers":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001],"string":"\u20ac$\u000F\u000aA'\u0042\u0022\u005c\\\"\/","literals":[null,true,false]}"#;
+        let value: serde_json::Value = serde_json::from_str(input).expect("RFC example parses");
+        let canonical = serde_json_canonicalizer::to_string(&value).expect("JCS canonicalizes");
+        let expected = r#"{"literals":[null,true,false],"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27],"string":"€$\u000f\nA'B\"\\\\\"/"}"#;
+        assert_eq!(canonical, expected);
+    }
+
+    #[test]
+    fn rfc8785_property_sort_uses_utf16_code_units() {
+        let input = r#"{"\u20ac":"Euro Sign","\r":"Carriage Return","\ufb33":"Hebrew Letter Dalet With Dagesh","1":"One","\ud83d\ude00":"Emoji: Grinning Face","\u0080":"Control","\u00f6":"Latin Small Letter O With Diaeresis"}"#;
+        let value: serde_json::Value = serde_json::from_str(input).expect("RFC property vector parses");
+        let canonical = serde_json_canonicalizer::to_string(&value).expect("JCS canonicalizes");
+        let expected = format!(
+            r#"{{"\r":"Carriage Return","1":"One","{}":"Control","ö":"Latin Small Letter O With Diaeresis","€":"Euro Sign","😀":"Emoji: Grinning Face","דּ":"Hebrew Letter Dalet With Dagesh"}}"#,
+            '\u{80}'
+        );
+        assert_eq!(canonical, expected);
     }
 
     #[test]
