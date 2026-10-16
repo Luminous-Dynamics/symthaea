@@ -37,6 +37,7 @@ fn digest_hex(bytes: &[u8]) -> String {
 }
 
 fn rejected_request_line(sha256: String, error_code: &str, message: &str) -> String {
+    let fallback_digest = sha256.clone();
     let response = symthaea_nano_policy::ErrorResponse {
         schema_version: symthaea_nano_policy::SCHEMA_VERSION.to_owned(),
         status: "rejected_input".to_owned(),
@@ -48,7 +49,7 @@ fn rejected_request_line(sha256: String, error_code: &str, message: &str) -> Str
         format!(
             "{{\"schema_version\":\"{}\",\"status\":\"internal_serialization_error\",\"request_sha256\":\"{}\"}}",
             symthaea_nano_policy::SCHEMA_VERSION,
-            "0".repeat(64)
+            fallback_digest
         )
     })
 }
@@ -80,7 +81,7 @@ fn commit_line_byte(
     hasher: &mut Sha256,
 ) {
     hasher.update([byte]);
-    *line_len = line_len.saturating_add(1);
+    *line_len = (*line_len).saturating_add(1);
     if *line_len > max_bytes {
         *too_large = true;
         kept.clear();
@@ -103,7 +104,7 @@ fn read_bounded_line<R: BufRead>(
     let mut saw_any_byte = false;
 
     loop {
-        let (consumed, newline_found, chunk_len) = {
+        let (consumed, newline_found) = {
             let available = reader.fill_buf()?;
             if available.is_empty() {
                 if !saw_any_byte {
@@ -129,9 +130,8 @@ fn read_bounded_line<R: BufRead>(
                     );
                 }
             }
-            (consumed, newline.is_some(), content_len)
+            (consumed, newline.is_some())
         };
-        let _ = chunk_len;
         reader.consume(consumed);
 
         if newline_found {
