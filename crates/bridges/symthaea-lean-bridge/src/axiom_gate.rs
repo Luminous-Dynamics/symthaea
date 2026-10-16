@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn terminal_probe_validation_rejects_missing_or_nonterminal_probe() {
         assert!(validate_terminal_axiom_probe(
-            "theorem t : True := by trivial\\n#print axioms t\\n",
+            "theorem t : True := by trivial\n#print axioms t\n",
             "t"
         )
         .is_ok());
@@ -206,12 +206,12 @@ mod tests {
         )
         .is_err());
         assert!(validate_terminal_axiom_probe(
-            "theorem t : True := by trivial\\n#print axioms t\\n#eval 1",
+            "theorem t : True := by trivial\n#print axioms t\n#eval 1",
             "t"
         )
         .is_err());
         assert!(validate_terminal_axiom_probe(
-            "theorem t : True := by trivial\\n#print axioms other",
+            "theorem t : True := by trivial\n#print axioms other",
             "t"
         )
         .is_err());
