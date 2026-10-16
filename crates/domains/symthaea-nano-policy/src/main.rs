@@ -283,39 +283,73 @@ fn choose(
             }
         }
         Policy::Maximin => {
-            let center = centroid(features);
-            while selected.len() < request.budget {
-                let mut best: Option<(usize, f64, &'static str)> = None;
+            // If no history exists, choose a deterministic first point farthest
+            // from the pool centroid. This avoids consuming target labels as a seed.
+            if selected_indices.is_empty() {
+                let center = centroid(features);
+                let mut best: Option<(usize, f64)> = None;
                 for &index in &remaining {
-                    let (score, kind) = if selected_indices.is_empty() {
-                        (
-                            squared_distance(&features[index], &center),
-                            "distance_to_pool_centroid",
-                        )
-                    } else {
-                        let nearest = selected_indices
-                            .iter()
-                            .map(|chosen| squared_distance(&features[index], &features[*chosen]))
-                            .reduce(f64::min)
-                            .unwrap_or(f64::INFINITY);
-                        (nearest, "min_distance_to_selected")
-                    };
-                    // Strict greater-than plus lexical ordering fixes tie behavior.
-                    if best.is_none_or(|(_, best_score, _)| score > best_score) {
-                        best = Some((index, score, kind));
+                    let score = squared_distance(&features[index], &center);
+                    if best.is_none_or(|(_, best_score)| score > best_score) {
+                        best = Some((index, score));
                     }
                 }
-
-                let (index, score, score_kind) =
+                let (index, score) =
                     best.ok_or_else(|| "no eligible candidate remains".to_owned())?;
                 selected.push(SelectedCandidate {
                     id: candidates[index].id.clone(),
-                    rank: selected.len() + 1,
-                    score_kind,
+                    rank: 1,
+                    score_kind: "distance_to_pool_centroid",
                     score: Some(score),
                 });
                 selected_indices.push(index);
                 remaining.retain(|candidate| *candidate != index);
+            }
+
+            if selected.len() < request.budget {
+                // Compute each candidate's distance to the nearest selected point
+                // once, then update it only against each newly chosen point. This
+                // is O(pool * features * (history + budget)), not O(pool * features * budget^2).
+                let mut minimum_distances: Vec<f64> = features
+                    .iter()
+                    .map(|feature| {
+                        selected_indices
+                            .iter()
+                            .map(|chosen| squared_distance(feature, &features[*chosen]))
+                            .reduce(f64::min)
+                            .unwrap_or(f64::INFINITY)
+                    })
+                    .collect();
+
+                while selected.len() < request.budget {
+                    let mut best: Option<(usize, f64)> = None;
+                    for &index in &remaining {
+                        let score = minimum_distances[index];
+                        // Strict greater-than plus lexical ordering fixes tie behavior.
+                        if best.is_none_or(|(_, best_score)| score > best_score) {
+                            best = Some((index, score));
+                        }
+                    }
+
+                    let (index, score) =
+                        best.ok_or_else(|| "no eligible candidate remains".to_owned())?;
+                    selected.push(SelectedCandidate {
+                        id: candidates[index].id.clone(),
+                        rank: selected.len() + 1,
+                        score_kind: "min_distance_to_selected",
+                        score: Some(score),
+                    });
+                    selected_indices.push(index);
+                    remaining.retain(|candidate| *candidate != index);
+
+                    if selected.len() < request.budget {
+                        for (candidate_index, feature) in features.iter().enumerate() {
+                            let distance = squared_distance(feature, &features[index]);
+                            minimum_distances[candidate_index] =
+                                minimum_distances[candidate_index].min(distance);
+                        }
+                    }
+                }
             }
         }
     }
