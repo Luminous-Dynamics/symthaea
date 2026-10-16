@@ -16,6 +16,8 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+pub mod replay;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Structural failure detected by the synthetic integrity harness.
