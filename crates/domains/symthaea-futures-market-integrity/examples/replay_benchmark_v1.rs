@@ -13,6 +13,8 @@ use symthaea_futures_market_integrity::replay::{
 };
 
 const EVENT_COUNT: usize = 60;
+const BOOTSTRAP_REPLICATES: usize = 10_000;
+const BOOTSTRAP_BASE_SEED: u64 = 0xC0FFEE;
 const DAY_SECONDS: u64 = 86_400;
 const HOUR_SECONDS: u64 = 3_600;
 const HORIZONS: [(&str, u64); 5] = [
@@ -26,7 +28,25 @@ const RESOLUTION_OFFSET: u64 = 100 * DAY_SECONDS;
 const MAX_STALENESS_SECONDS: u64 = 120;
 
 fn main() {
+    print_manifest();
     run().expect("synthetic replay benchmark should be internally consistent");
+}
+
+fn print_manifest() {
+    let source_commit = std::env::var("BENCHMARK_SOURCE_SHA")
+        .unwrap_or_else(|_| "unbound-local-run".to_owned());
+    let horizon_spec = HORIZONS
+        .iter()
+        .map(|(name, seconds)| format!("{name}:{seconds}"))
+        .collect::<Vec<_>>()
+        .join(";");
+    eprintln!(
+        "MANIFEST,benchmark=prediction-market-comparative-replay,version=1,corpus=synthetic,event_count={EVENT_COUNT},parent_cluster_rule=event_index_div_2,resolution_offset_seconds={RESOLUTION_OFFSET},max_staleness_seconds={MAX_STALENESS_SECONDS},bootstrap_replicates={BOOTSTRAP_REPLICATES},bootstrap_seed_base={BOOTSTRAP_BASE_SEED},horizons={horizon_spec}"
+    );
+    eprintln!("MANIFEST_SOURCE_COMMIT={source_commit}");
+    eprintln!(
+        "MANIFEST_GENERATOR=splitmix64;latent_probability_salt=0;outcome_salt=1;public_signal_salt_start=10;missing_snapshot_rule=(event_index*3+horizon_index)%23!=0"
+    );
 }
 
 fn run() -> Result<(), ReplayError> {
@@ -71,7 +91,7 @@ fn run() -> Result<(), ReplayError> {
                 < latent_yes_probability;
             positive_signals += usize::from(u8::from(public_signal));
             let signal_count = (horizon_index + 1) as f64;
-            let market_probability =
+            let signal_pool_probability =
                 (positive_signals as f64 / signal_count).clamp(0.02, 0.98);
             let shrinkage_probability =
                 ((positive_signals as f64 + 1.0) / (signal_count + 2.0)).clamp(0.02, 0.98);
@@ -80,7 +100,7 @@ fn run() -> Result<(), ReplayError> {
                 event_id.clone(),
                 "signal_pool",
                 cutoff,
-                market_probability,
+                signal_pool_probability,
             )?);
             observations.push(ForecastObservation::new(
                 event_id.clone(),
@@ -227,8 +247,11 @@ fn run() -> Result<(), ReplayError> {
             )?);
         }
         let paired_count = paired.len();
-        let bootstrap =
-            paired_cluster_bootstrap(&paired, 10_000, 0xC0FFEE + horizon_index as u64)?;
+        let bootstrap = paired_cluster_bootstrap(
+            &paired,
+            BOOTSTRAP_REPLICATES,
+            BOOTSTRAP_BASE_SEED + horizon_index as u64,
+        )?;
         let paired_baseline_brier = paired_baseline_brier_sum / paired_count as f64;
         let paired_baseline_log_loss = paired_baseline_log_loss_sum / paired_count as f64;
         let paired_candidate_brier = paired_candidate_brier_sum / paired_count as f64;
