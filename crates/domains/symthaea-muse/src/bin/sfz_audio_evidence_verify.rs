@@ -169,8 +169,8 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
         ));
     }
 
-    artifact_checks.push(check_renderer_artifacts(root, "candidate", &manifest.candidate));
-    artifact_checks.push(check_renderer_artifacts(root, "reference", &manifest.reference));
+    artifact_checks.extend(check_renderer_artifacts(root, "candidate", &manifest.candidate));
+    artifact_checks.extend(check_renderer_artifacts(root, "reference", &manifest.reference));
 
     let pack_receipt_check = artifact_checks
         .iter()
