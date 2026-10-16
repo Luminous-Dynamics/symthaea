@@ -1,0 +1,181 @@
+name: Socioeconomic Run Bundle Integrity
+
+on:
+  pull_request:
+    paths:
+      - "scripts/validate_socioeconomic_run_bundle.py"
+      - "scripts/test_validate_socioeconomic_run_bundle.py"
+      - "scripts/write_socioeconomic_run_bundle_ci_report.py"
+      - "scripts/test_write_socioeconomic_run_bundle_ci_report.py"
+      - "scripts/socioeconomic_run_receipt_requirements.txt"
+      - "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_validator_attestation_predicate_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_RUN_BUNDLE_V1.md"
+      - ".github/workflows/socioeconomic-run-bundle.yml"
+  push:
+    branches:
+      - "**"
+    paths:
+      - "scripts/validate_socioeconomic_run_bundle.py"
+      - "scripts/test_validate_socioeconomic_run_bundle.py"
+      - "scripts/write_socioeconomic_run_bundle_ci_report.py"
+      - "scripts/test_write_socioeconomic_run_bundle_ci_report.py"
+      - "scripts/socioeconomic_run_receipt_requirements.txt"
+      - "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_validator_attestation_predicate_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_RUN_BUNDLE_V1.md"
+      - ".github/workflows/socioeconomic-run-bundle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: socioeconomic-run-bundle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head-bundle-tests:
+    name: Exact-head run-bundle negative controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CIVOS_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact source head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 immutable commit
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record and verify exact revision
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+          printf 'event_sha=%s\n' "$GITHUB_SHA"
+          printf 'source_revision=%s\n' "$actual"
+          test "$actual" = "$CIVOS_SOURCE_REVISION"
+          git status --short
+      - name: Install pinned receipt validation dependencies
+        run: python3 -m pip install --disable-pip-version-check -r scripts/socioeconomic_run_receipt_requirements.txt
+      - name: Run standard-library adversarial tests
+        run: |
+          set -o pipefail
+          mkdir -p evidence
+          python3 scripts/test_validate_socioeconomic_run_bundle.py 2>&1 | tee evidence/test-output.txt
+          python3 scripts/test_write_socioeconomic_run_bundle_ci_report.py 2>&1 | tee -a evidence/test-output.txt
+      - name: Write exact-head execution record
+        run: |
+          python3 scripts/write_socioeconomic_run_bundle_ci_report.py \
+            --root . \
+            --test-log evidence/test-output.txt \
+            --output evidence/qualification-report.json \
+            --predicate-output evidence/attestation-predicate.json
+      - name: Validate execution record schema
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          schema = json.loads(Path("docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json").read_text())
+          report = json.loads(Path("evidence/qualification-report.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          errors = sorted(Draft202012Validator(schema).iter_errors(report), key=lambda error: list(error.absolute_path))
+          if errors:
+              for error in errors:
+                  print(f"FAIL: {list(error.absolute_path)}: {error.message}")
+              raise SystemExit(1)
+          print("PASS: execution record satisfies the versioned schema")
+          suite_counts = report.get("executed_test_counts_by_suite")
+          if not isinstance(suite_counts, list) or len(suite_counts) != len(report.get("test_commands", [])):
+              raise SystemExit("FAIL: executed suite counts do not match declared test commands")
+          if sum(suite_counts) != report.get("executed_test_count") or report.get("executed_test_count") != report.get("authored_test_function_count"):
+              raise SystemExit("FAIL: authored, per-suite, and executed test counts disagree")
+          predicate_schema = json.loads(Path("docs/research/finance/SYM-FIN-SYS-016_validator_attestation_predicate_v1.schema.json").read_text())
+          predicate = json.loads(Path("evidence/attestation-predicate.json").read_text())
+          Draft202012Validator.check_schema(predicate_schema)
+          predicate_errors = sorted(Draft202012Validator(predicate_schema).iter_errors(predicate), key=lambda error: list(error.absolute_path))
+          if predicate_errors:
+              for error in predicate_errors:
+                  print(f"FAIL: predicate {list(error.absolute_path)}: {error.message}")
+              raise SystemExit(1)
+          import hashlib
+          report_bytes = Path("evidence/qualification-report.json").read_bytes()
+          expected = "sha256:" + hashlib.sha256(report_bytes).hexdigest()
+          if predicate.get("execution_record_digest") != expected:
+              raise SystemExit("FAIL: attestation predicate does not bind exact report bytes")
+          for field in ("claim_ceiling", "scope", "result", "repository", "source_revision", "event_sha", "workflow", "workflow_ref", "workflow_sha", "run_id", "run_attempt", "executed_test_count", "executed_test_counts_by_suite", "authority_boundary"):
+              if predicate.get(field) != report.get(field):
+                  raise SystemExit(f"FAIL: predicate field {field!r} disagrees with the execution report")
+          print("PASS: attestation predicate schema, exact report-byte binding, and report-field agreement verified")
+          PY
+      - name: Upload exact-head test evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: socioeconomic-run-bundle-qualification
+          path: evidence/
+          if-no-files-found: error
+
+  attest-qualification-report:
+    name: Sign exact-head qualification report
+    needs: exact-head-bundle-tests
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Download validated evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: socioeconomic-run-bundle-qualification
+          path: evidence/
+      - name: Re-verify trusted signing context and report binding
+        env:
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          EXPECTED_EVENT_SHA: ${{ github.sha }}
+          EXPECTED_WORKFLOW_REF: ${{ github.workflow_ref }}
+          EXPECTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path("evidence/qualification-report.json").read_text())
+          predicate = json.loads(Path("evidence/attestation-predicate.json").read_text())
+          expected_ref = os.environ["EXPECTED_REPOSITORY"] + "/.github/workflows/socioeconomic-run-bundle.yml@refs/heads/main"
+          if os.environ["GITHUB_EVENT_NAME"] != "workflow_dispatch":
+              raise SystemExit("FAIL: signing requires workflow_dispatch")
+          if os.environ["GITHUB_REF"] != "refs/heads/main":
+              raise SystemExit("FAIL: signing requires the main ref")
+          if report.get("repository") != os.environ["EXPECTED_REPOSITORY"]:
+              raise SystemExit("FAIL: report repository mismatch")
+          if report.get("source_revision") != os.environ["EXPECTED_EVENT_SHA"]:
+              raise SystemExit("FAIL: report is not for the trusted dispatch SHA")
+          if report.get("event_sha") != os.environ["EXPECTED_EVENT_SHA"]:
+              raise SystemExit("FAIL: report event SHA mismatch")
+          if report.get("workflow_ref") != expected_ref or report.get("workflow_ref") != os.environ["EXPECTED_WORKFLOW_REF"]:
+              raise SystemExit("FAIL: report workflow ref is not the trusted main workflow")
+          if report.get("workflow_sha") != os.environ["EXPECTED_WORKFLOW_SHA"]:
+              raise SystemExit("FAIL: report workflow SHA mismatch")
+          report_bytes = Path("evidence/qualification-report.json").read_bytes()
+          digest = "sha256:" + hashlib.sha256(report_bytes).hexdigest()
+          if predicate.get("execution_record_digest") != digest:
+              raise SystemExit("FAIL: signed predicate does not bind exact report bytes")
+          for field in ("schema", "claim_ceiling", "scope", "result", "repository", "source_revision", "event_sha", "workflow", "workflow_ref", "workflow_sha", "run_id", "run_attempt", "executed_test_count", "executed_test_counts_by_suite", "authority_boundary"):
+              if predicate.get(field) != report.get(field):
+                  raise SystemExit(f"FAIL: predicate mismatch for {field}")
+          print("PASS: trusted default-branch signing context and exact subject/predicate binding verified")
+          PY
+      - name: Sign qualification report with GitHub artifact attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: evidence/qualification-report.json
+          predicate-type: https://luminousdynamics.io/attestations/socioeconomic-run-bundle-validation/v1
+          predicate-path: evidence/attestation-predicate.json

@@ -1,0 +1,456 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:civos:socioeconomic-interoperability:run-receipt:v1",
+  "title": "CivOS Socioeconomic Simulation Run Receipt v1",
+  "description": "Machine-readable provenance and results envelope for a deterministic synthetic economic simulation. This record is never authorization for real-world action.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "record_kind",
+    "claim_ceiling",
+    "run",
+    "profiles",
+    "world",
+    "events",
+    "metrics",
+    "evaluation",
+    "authority_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "civos.socioeconomic_interoperability.run_receipt.v1"
+    },
+    "record_kind": {
+      "const": "synthetic_simulation_receipt"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_deterministic_only"
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "created_at",
+        "source_revision",
+        "scenario_id",
+        "scenario_registry_digest",
+        "random_seed",
+        "world_seed_digest",
+        "model_version",
+        "environment_digest",
+        "shock_schedule_digest",
+        "agent_model_digest",
+        "artifact_manifest_digest"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "scenario_registry_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "random_seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "world_seed_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "environment_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "shock_schedule_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "agent_model_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_manifest_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "regime_assignments",
+        "bridge_profiles",
+        "governance_profile_digest",
+        "evidence_policy_generation",
+        "settlement_finality_profile_digest"
+      ],
+      "properties": {
+        "regime_assignments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "community_id",
+              "regime_id",
+              "profile_digest"
+            ],
+            "properties": {
+              "community_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "regime_id": {
+                "type": "string",
+                "enum": [
+                  "debt_equity_market",
+                  "market_ubi",
+                  "cooperative_pooled_capital",
+                  "mutual_credit",
+                  "creditism",
+                  "commons_polycentric",
+                  "public_budget_planning",
+                  "hybrid"
+                ]
+              },
+              "profile_digest": {
+                "$ref": "#/$defs/digest"
+              }
+            }
+          }
+        },
+        "bridge_profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "bridge_id",
+              "source_community_id",
+              "target_community_id",
+              "profile_digest"
+            ],
+            "properties": {
+              "bridge_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "source_community_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "target_community_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "profile_digest": {
+                "$ref": "#/$defs/digest"
+              }
+            }
+          }
+        },
+        "governance_profile_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_policy_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "settlement_finality_profile_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "initial_state_digest",
+        "final_state_digest",
+        "persons",
+        "communities",
+        "projects",
+        "scarce_resource_classes",
+        "resource_state_digest"
+      ],
+      "properties": {
+        "initial_state_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "final_state_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "resource_state_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "persons": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "communities": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "projects": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scarce_resource_classes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "sequence",
+          "simulation_tick",
+          "event_type",
+          "scope",
+          "authority_effect",
+          "external_effect",
+          "settlement_effect",
+          "payload_digest"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "simulation_tick": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "need_created",
+              "allocation_proposed",
+              "allocation_rejected",
+              "simulated_authorization",
+              "simulated_reservation",
+              "simulated_commitment",
+              "simulated_delivery",
+              "simulated_verification",
+              "simulated_settlement",
+              "dispute_opened",
+              "dispute_resolved",
+              "resource_shock_applied",
+              "reconciliation_completed"
+            ]
+          },
+          "scope": {
+            "const": "synthetic_simulation"
+          },
+          "authority_effect": {
+            "const": "none"
+          },
+          "external_effect": {
+            "const": "none"
+          },
+          "settlement_effect": {
+            "const": "none"
+          },
+          "payload_digest": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "dimension",
+          "value",
+          "unit",
+          "measurement_status",
+          "population_scope",
+          "period"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "access",
+              "physical",
+              "distribution",
+              "power",
+              "interoperability",
+              "resilience",
+              "ecological",
+              "governance",
+              "privacy",
+              "operations"
+            ]
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "measurement_status": {
+            "type": "string",
+            "enum": [
+              "model_observed",
+              "estimated",
+              "unmeasured",
+              "invalid"
+            ]
+          },
+          "population_scope": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "period": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "oracle_version",
+        "evaluator_digest",
+        "accounting_oracle_applied",
+        "power_oracle_applied",
+        "controls_applied",
+        "counterexamples_digest"
+      ],
+      "properties": {
+        "oracle_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "evaluator_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "accounting_oracle_applied": {
+          "type": "boolean"
+        },
+        "power_oracle_applied": {
+          "type": "boolean"
+        },
+        "controls_applied": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "multiple_random_seeds",
+              "multiple_initial_institutions",
+              "fixed_institution",
+              "no_bridge",
+              "proposal_ablation",
+              "adoption_ablation",
+              "random_mutation_control",
+              "holdout_shocks",
+              "parameter_perturbation",
+              "mutation_order_permutation",
+              "replay_determinism",
+              "counterfactual_bridge_removal",
+              "independent_accounting_oracle",
+              "independent_power_oracle",
+              "stock_flow_reconciliation"
+            ]
+          },
+          "minItems": 1
+        },
+        "counterexamples_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "authority_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "is_real_world_observation",
+        "can_authorize_real_actions",
+        "can_reserve_real_resources",
+        "can_settle_real_assets",
+        "production_ledger_import_allowed"
+      ],
+      "properties": {
+        "is_real_world_observation": {
+          "const": false
+        },
+        "can_authorize_real_actions": {
+          "const": false
+        },
+        "can_reserve_real_resources": {
+          "const": false
+        },
+        "can_settle_real_assets": {
+          "const": false
+        },
+        "production_ledger_import_allowed": {
+          "const": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
