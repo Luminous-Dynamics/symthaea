@@ -531,12 +531,53 @@ fn choose_action(
         already_run.insert(item.action.key());
     }
 
+    // Use the same predeclared fidelity cadence for every policy arm so the main
+    // comparison tests candidate selection rather than silently rewarding policies
+    // that never pay for reference-quality confirmation. A policy falls back only
+    // when no affordable candidate supports the scheduled fidelity.
+    let preferred_fidelity = if step % 4 == 3 {
+        Fidelity::Reference
+    } else {
+        Fidelity::Proxy
+    };
+    let has_affordable_action = |fidelity: Fidelity| {
+        view.candidates.iter().any(|candidate| {
+            if candidate.feasibility != Feasibility::Feasible {
+                return false;
+            }
+            let available = match fidelity {
+                Fidelity::Proxy => candidate.proxy_available,
+                Fidelity::Reference => candidate.reference_available,
+            };
+            if !available {
+                return false;
+            }
+            let action = ExperimentAction {
+                candidate_id: candidate.id.clone(),
+                fidelity,
+            };
+            let cost = view.action_cost(candidate, fidelity);
+            !already_run.contains(&action.key()) && cost > 0 && cost <= remaining_budget
+        })
+    };
+    let alternate_fidelity = match preferred_fidelity {
+        Fidelity::Proxy => Fidelity::Reference,
+        Fidelity::Reference => Fidelity::Proxy,
+    };
+    let selected_fidelity = if has_affordable_action(preferred_fidelity) {
+        preferred_fidelity
+    } else if has_affordable_action(alternate_fidelity) {
+        alternate_fidelity
+    } else {
+        return None;
+    };
+
     let mut best: Option<(i64, ExperimentAction)> = None;
     for candidate in &view.candidates {
         if candidate.feasibility != Feasibility::Feasible {
             continue;
         }
-        for fidelity in Fidelity::ALL {
+        for fidelity in [selected_fidelity] {
             let available = match fidelity {
                 Fidelity::Proxy => candidate.proxy_available,
                 Fidelity::Reference => candidate.reference_available,
