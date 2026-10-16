@@ -127,7 +127,35 @@ Only after the simple baselines are executed:
 
 Do not label the present max-min selector as “Symthaea intelligence”; it is a deterministic baseline kernel intended to make future contributions falsifiable.
 
-## 8. Current status
+## 8. Research context: why the baseline set must expand
+
+This kernel currently offers random, descriptor-diversity and family-balanced descriptor-diversity policies. That is an intentional first step, but it is **not yet a complete active-learning loop**: the current v1 selector does not update a predictive model or consume revealed labels between selection rounds.
+
+External evidence argues for testing additional approaches:
+- Wang et al. (2022), NIST, benchmarked active-learning acquisition strategies on a real Fe-Co-Ni thin-film library with X-ray diffraction, magnetic coercivity and Kerr-rotation properties; Expected Improvement performed best overall in that particular problem. This is a useful reference for task/metric design, not a universal winner: https://www.nist.gov/publications/benchmarking-active-learning-strategies-materials-optimization-and-discovery
+- Bi et al. (2025), *Scientific Reports*, compared 17 active-learning strategies plus random sampling over nine small materials-formulation datasets. The study reports that uncertainty-driven and diversity-hybrid methods often led early, while gaps narrowed as labeled sets grew. This motivates reporting the **whole label-efficiency curve**, early-budget performance and final utility instead of only one endpoint: https://www.nature.com/articles/s41598-025-24613-4
+- The public [Coactive Learning reference implementation](https://github.com/coactivescience/cost-aware-active-learning) at commit `33f29e85d3a464a75b4cda2d2202e3ef91b80c48` proposes a two-stage EC² pathway-identification plus cost-aware GP-UCB optimization policy. Its README explicitly characterizes the experiment as a CICERO-inspired *synthetic simulator*, not new wet-lab data. It is a useful architecture/control reference, but its outputs are not a nanophotonics or OC22 benchmark and it should not be presented as physical validation.
+- The 2026 MatBench reproducibility analysis reported that only 2 of 28 published submissions installed/imported from original dependency metadata; 13 submissions completed a selected task after remediation. Reproducibility and metric regeneration must therefore be scored explicitly: https://www.oaepublish.com/articles/aiagent.2026.31
+
+### Required next baselines before claiming Symthaea advantage
+
+Once a real task and data contract are admitted, extend the batch-policy comparison to include:
+1. random selection with preregistered seeds;
+2. deterministic farthest-first and family-balanced farthest-first;
+3. task-appropriate conventional selector (e.g. nearest-neighbour retrieval, expected improvement, uncertainty sampling, or adjoint optimizer);
+4. cost-aware acquisition where query costs can be measured and its utility model is frozen;
+5. one Symthaea-specific HDC/active-inference arm and a component ablation;
+6. leakage, shuffled-feature/family, duplicate, and hidden-label controls.
+
+Keep primary outcomes distinct:
+- **Discovery/selection:** success-at-budget, top-k regret/utility, best-so-far task loss, and cost to hit a predeclared goal.
+- **Efficiency:** area under the budgeted success/improvement curve, oracle calls and dollar/time cost per valid success.
+- **Coverage diagnostics:** descriptor distance and family coverage, explicitly not physical utility.
+- **Reproducibility:** exact-source replay and independent score reconstruction.
+
+For active-learning experiments, fit the surrogate/model only on revealed training observations, expose each query's label only after selection, and measure across a preregistered set of random seeds and held-out systems. A diversity-policy win on a synthetic geometry fixture is only a software behavior test, never a nanotechnology discovery claim.
+
+## 9. Current status
 
 - Source files, request JSON Schema, JSONL fixture, Cargo.lock entry and focused CI workflow are committed on the draft PR branch.
 - The test definitions and fixture are not yet executed locally; no Rust compiler is installed in the current environment.
