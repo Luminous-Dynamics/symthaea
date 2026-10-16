@@ -966,6 +966,51 @@ mod tests {
     }
 
     #[test]
+    fn evaluator_rejects_proxy_only_claim_of_conformity() {
+        let manifest =
+            CampaignManifest::reference(ScenarioFamily::MultiFidelityDiscrepancy, 7, 20);
+        let candidate = manifest
+            .candidates
+            .iter()
+            .find(|candidate| candidate.factor_x == 8 && candidate.factor_y == 2)
+            .unwrap();
+        let action = ExperimentAction {
+            candidate_id: candidate.id.clone(),
+            fidelity: Fidelity::Proxy,
+        };
+        let measurements = synthetic_oracle(&manifest, candidate, Fidelity::Proxy);
+        assert!(measurements.quality_margin_milli.unwrap() >= 0);
+        let manifest_digest = manifest.digest().unwrap();
+        let record = ExperimentRecord {
+            step_index: 0,
+            action: action.clone(),
+            reported_cost_units: manifest.public_view().action_cost(candidate, Fidelity::Proxy),
+            measurements: measurements.clone(),
+            claimed_conforming: true,
+            measurement_digest: measurement_digest(
+                &manifest_digest,
+                &action,
+                &candidate.process_profile_id,
+                &measurements,
+            )
+            .unwrap(),
+        };
+        let transcript = CampaignTranscript {
+            manifest_digest,
+            policy: Policy::DecisionAware,
+            selector_seed: 1,
+            records: vec![record],
+            claimed_total_cost_units: 1,
+            claimed_first_conforming_cost_units: None,
+            claimed_best_utility: None,
+            stop_reason: "Test".into(),
+        };
+        assert!(evaluate_transcript(&manifest, &transcript)
+            .unwrap_err()
+            .contains("reference-fidelity measurement"));
+    }
+
+    #[test]
     fn biased_proxy_response_cannot_qualify_a_conforming_candidate() {
         let manifest =
             CampaignManifest::reference(ScenarioFamily::MultiFidelityDiscrepancy, 7, 20);
