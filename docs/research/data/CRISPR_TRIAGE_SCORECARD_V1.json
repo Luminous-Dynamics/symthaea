@@ -1298,7 +1298,8 @@
       "scripts/crispr_measurement_priority.rs",
       "scripts/crispr_interval_frontier.rs",
       "scripts/crispr_transportability.rs",
-      "scripts/crispr_shift_robustness_radius.rs"
+      "scripts/crispr_shift_robustness_radius.rs",
+      "scripts/crispr_verification_bias.rs"
     ],
     "additional_test_suites": [
       {
@@ -1378,6 +1379,20 @@
           "witness prevalence feasibility and TV identity",
           "unsupported contexts and invalid source/target weights fail closed",
           "invalid intervals, non-finite effects and invalid identities fail closed"
+        ]
+      },
+      {
+        "path": "scripts/crispr_verification_bias.rs",
+        "unit_test_count": 19,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_verification_bias.rs -o /tmp/crispr-verification-bias-tests && /tmp/crispr-verification-bias-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "full census recovers exact top-K estimates",
+          "F14 unequal-inclusion-probability audit weighting and contrast with complete-case sample metrics",
+          "top-K membership derived from the frozen one-based ranking",
+          "non-probability designs, zero-inclusion frames, outcome-informed selection, post-outcome ranking and unverified ranking census fail closed",
+          "blank and duplicate IDs, duplicate sampled ranks, invalid ranks and invalid probabilities rejected",
+          "empty/underfilled/non-positive and invalid-budget estimability cases"
         ]
       }
     ]
