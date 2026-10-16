@@ -475,3 +475,12 @@ For each policy, the initial schedule is selected from nominal inputs only. The 
 This creates an explicit boundary between a schedule that looks good given assumed durations and one that is robust under disclosed alternatives. Scenario weights must sum to one, but are not automatically empirical probabilities. The next layer should compare fixed-plan replay with a separate rolling-horizon policy that makes decisions only from information revealed by that step.
 
 The initial module contains ten authored unit tests for a CVaR tail case, frozen nominal job order, repair-duration monotonicity, dependency delays, scenario-weight validation, complete per-job scenario coverage, invalid alpha/duration inputs, crew-ready times and determinism. These tests are authored but have not been compiled or run in the available environment.
+
+
+## Implementation update — event-triggered rolling-horizon repair
+
+The fifth engineering model, [rolling_horizon_repair.rs](../../crates/domains/symthaea-engineering/src/rolling_horizon_repair.rs), dispatches repairs at observable event times. Instead of freezing the initial order, it re-evaluates released and precedence-ready jobs after actual completions, while enforcing skill eligibility, crew exclusivity and currently available spare stock. Its decision records expose the jobs and crews visible at each decision.
+
+This is a shift from static resilience plans to **closed-loop recovery policies**. It allows the simulation to respond to delayed repairs and newly eligible work without giving the policy future realized durations: pending work is ranked by nominal durations, and the scenario's actual duration is used only after the dispatch choice to schedule the completion event. A paired synthetic witness changes fixed order A→C→B to adaptive order A→B→C and reduces weighted loss from 922 to 724. That is a fixture-specific result, not a general superiority or field-validation claim.
+
+The next critical implementation work is a batch evaluator comparing fixed-plan and adaptive policies on the same scenario corpus, with per-case deltas, expected/worst/CVaR loss, exact tiny-instance oracles, counterexamples and a held-out split. Full travel/access, crew shifts, replenishment, and calibration to observed restoration records remain out of scope. See the [RH benchmark fixtures and targets](./RESILIENT_SYSTEMS_BENCHMARKS.md#8-event-triggered-rolling-horizon-repair-dispatch).
