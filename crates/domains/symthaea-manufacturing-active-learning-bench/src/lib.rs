@@ -728,9 +728,9 @@ fn campaign_claims(
 
 /// Recompute metrics from the frozen manifest and raw observation receipts.
 ///
-/// This is a separate evaluator module boundary from policy selection and oracle access,
-/// but is not yet an independently built executable. The receipt digest proves byte identity
-/// within this harness; it is not a signature or proof of physical evidence.
+/// This evaluator is a separate function boundary from policy selection and oracle access,
+/// but is in the same source module and is not an independently built executable. The receipt
+/// digest proves byte identity within this harness; it is not a signature or proof of physical evidence.
 pub fn evaluate_transcript(
     manifest: &CampaignManifest,
     transcript: &CampaignTranscript,
