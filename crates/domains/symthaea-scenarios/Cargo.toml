@@ -8,6 +8,7 @@ description = "Cross-domain composition scenarios for Symthaea — worked models
 # Depends on several pure-std domain crates to demonstrate composition. No
 # symthaea-core link; still builds fast.
 [dependencies]
+sha2 = { workspace = true }
 symthaea-epidemiology = { path = "../symthaea-epidemiology" }
 symthaea-economics = { path = "../symthaea-economics" }
 symthaea-control-theory = { path = "../symthaea-control-theory" }
