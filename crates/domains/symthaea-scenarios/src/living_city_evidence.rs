@@ -6,6 +6,7 @@
 //! independent process: deployment must ensure that this verifier consumes
 //! retained artifacts rather than trusting generator-supplied digest strings.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Current schema version for evidence manifests and run receipts.
@@ -13,7 +14,8 @@ pub const EVIDENCE_SCHEMA_VERSION: u32 = 1;
 pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
 
 /// Provenance class for an evidence item. "Missing" is explicit and never zero.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EvidenceKind {
     Measured,
     Derived,
@@ -37,7 +39,8 @@ impl EvidenceKind {
 }
 
 /// A single versioned source or an explicit record of a missing source.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvidenceItem {
     pub id: String,
     pub kind: EvidenceKind,
@@ -57,7 +60,8 @@ pub struct EvidenceItem {
 }
 
 /// Evidence manifest shared by all scenario outputs that use this input snapshot.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvidenceManifest {
     pub schema_version: u32,
     pub project_id: String,
@@ -68,7 +72,8 @@ pub struct EvidenceManifest {
 }
 
 /// A reproducible tool or solver invocation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolExecution {
     pub tool_id: String,
     pub version: String,
@@ -78,7 +83,8 @@ pub struct ToolExecution {
     pub status: ToolRunStatus,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ToolRunStatus {
     Succeeded,
     Failed,
@@ -96,7 +102,8 @@ impl ToolRunStatus {
 }
 
 /// A retained output artifact associated with the run.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OutputArtifact {
     pub id: String,
     pub media_type: String,
@@ -104,7 +111,8 @@ pub struct OutputArtifact {
 }
 
 /// Explicit result of an individual verification gate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum GateStatus {
     Pass,
     Fail,
@@ -126,7 +134,8 @@ impl GateStatus {
 }
 
 /// A checker result tied to a verifier identity/version and supporting artifact.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ValidationGate {
     pub gate_id: String,
     pub required: bool,
@@ -159,7 +168,8 @@ impl PromotionState {
 
 /// Stable receipt for a scenario execution. Gate results are data, not a trusted
 /// boolean supplied by the scenario generator.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScenarioRunReceipt {
     pub schema_version: u32,
     pub run_id: String,
