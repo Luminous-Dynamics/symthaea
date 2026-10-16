@@ -583,6 +583,20 @@ mod tests {
     }
 
     #[test]
+    fn graph_collection_order_does_not_change_the_configuration_digest() {
+        let root = write_valid_test_package();
+        let path = root.join("service-graph.json");
+        let bytes = fs::read(&path).unwrap();
+        let mut graph: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        graph["nodes"].as_array_mut().unwrap().reverse();
+        graph["dependencies"].as_array_mut().unwrap().reverse();
+        fs::write(&path, serde_json::to_vec_pretty(&graph).unwrap()).unwrap();
+        let report = verify_run_package(&root).unwrap();
+        assert_eq!(report["package_integrity"], "verified");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn package_path_escape_is_rejected_end_to_end() {
         let root = write_valid_test_package();
         let bundle_path = root.join("bundle.json");
