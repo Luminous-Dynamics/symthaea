@@ -13,6 +13,8 @@ External benchmark context:
 
 Do not combine these tasks or their labels/metrics into one leaderboard.
 
+Program-level gates and the source audit for the external MEEP benchmark are documented in [NANOTECHNOLOGY_BENCHMARK_CHARTER.md](../../docs/engineering/NANOTECHNOLOGY_BENCHMARK_CHARTER.md); [NANO-006](https://github.com/Luminous-Dynamics/symthaea/issues/7586) tracks actual-call accounting and unresolved five-versus-six-seed provenance.
+
 ## Supported policies
 
 - `random`: deterministic seeded-random ordering, stable under reordering the JSON candidate array.
