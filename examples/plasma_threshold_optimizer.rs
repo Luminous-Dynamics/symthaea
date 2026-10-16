@@ -734,6 +734,65 @@ fn objective(config: &ThresholdConfig, shots: &[CModShot]) -> f64 {
     results.mean_warning_time_ms - FPR_PENALTY_MS_PER_UNIT * false_positive_rate
 }
 
+// Non-finite objective values are meaningful internally (infeasible/unscoreable), but JSON
+// does not permit NaN or infinity. Serialize such scalars as null and histories as nullable
+// arrays so the saved evidence remains valid and does not disguise infeasibility as a number.
+mod finite_f64 {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if value.is_finite() {
+            serializer.serialize_some(value)
+        } else {
+            serializer.serialize_none()
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<f64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Option::<f64>::deserialize(deserializer)?.unwrap_or(f64::NEG_INFINITY))
+    }
+}
+
+mod finite_f64_vec {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(values: &Vec<f64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let finite_values: Vec<Option<f64>> = values
+            .iter()
+            .map(|value| value.is_finite().then_some(*value))
+            .collect();
+        finite_values.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<f64>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Vec::<Option<f64>>::deserialize(deserializer)?
+            .into_iter()
+            .map(|value| value.unwrap_or(f64::NEG_INFINITY))
+            .collect())
+    }
+}
+
+/// Render an objective value without presenting infeasibility as a large or attractive number.
+fn objective_display(value: f64) -> String {
+    if value.is_finite() {
+        format!("{value:.2}")
+    } else {
+        "NotScoreable".to_string()
+    }
+}
+
 // =============================================================================
 // SEARCH METHODS
 // =============================================================================
@@ -741,9 +800,10 @@ fn objective(config: &ThresholdConfig, shots: &[CModShot]) -> f64 {
 /// Result of a search method
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
-    /// Best configuration found
+    /// Best configuration found; check best_objective before treating it as qualified.
     pub best_config: ThresholdConfig,
-    /// Best objective value
+    /// Best objective value; non-finite values serialize as JSON null.
+    #[serde(with = "finite_f64")]
     pub best_objective: f64,
     /// Evaluation results for best config
     pub best_results: EvaluationResults,
@@ -751,7 +811,8 @@ pub struct SearchResult {
     pub configs_evaluated: usize,
     /// Search time in milliseconds
     pub search_time_ms: u64,
-    /// Objective values history (for learning curve)
+    /// Objective values history (for learning curve); infeasible entries serialize as null.
+    #[serde(with = "finite_f64_vec")]
     pub objective_history: Vec<f64>,
 }
 
@@ -965,12 +1026,14 @@ fn perturb_config(base: &ThresholdConfig, scale: f32, rng: &mut impl Rng) -> Thr
 pub struct CrossValidationResults {
     /// Best config from training set
     pub best_config: ThresholdConfig,
-    /// Train set objective
+    /// Train objective; non-finite values serialize as JSON null.
+    #[serde(with = "finite_f64")]
     pub train_objective: f64,
-    /// Validation set objective
+    /// Validation objective; non-finite values serialize as JSON null.
+    #[serde(with = "finite_f64")]
     pub val_objective: f64,
-    /// Generalization gap (train - val)
-    pub generalization_gap: f64,
+    /// Generalization gap when both train and validation objectives are scoreable.
+    pub generalization_gap: Option<f64>,
     /// Train results
     pub train_results: EvaluationResults,
     /// Validation results
@@ -1044,7 +1107,8 @@ fn cross_validate(shots: &[CModShot], seed: u64) -> CrossValidationResults {
         best_config: search_result.best_config,
         train_objective,
         val_objective,
-        generalization_gap: train_objective - val_objective,
+        generalization_gap: (train_objective.is_finite() && val_objective.is_finite())
+            .then(|| train_objective - val_objective),
         train_results: search_result.best_results,
         val_results,
     }
@@ -1391,7 +1455,7 @@ fn main() {
         "  Mean Warning Time: {:.1} ms",
         baseline_results.mean_warning_time_ms
     );
-    println!("  Objective:        {:.2}", baseline_objective);
+    println!("  Objective:        {}", objective_display(baseline_objective));
 
     // =========================================================================
     // Grid Search
@@ -1423,7 +1487,7 @@ fn main() {
         "    volatility:    {:.3}",
         grid_result.best_config.volatility_threshold
     );
-    println!("  Objective:       {:.2}", grid_result.best_objective);
+    println!("  Objective:       {}", objective_display(grid_result.best_objective));
     println!(
         "  Event-level Recall: {}",
         metric_display(grid_result.best_results.recall())
@@ -1469,7 +1533,7 @@ fn main() {
         "    volatility:    {:.3}",
         random_result.best_config.volatility_threshold
     );
-    println!("  Objective:       {:.2}", random_result.best_objective);
+    println!("  Objective:       {}", objective_display(random_result.best_objective));
     println!(
         "  Event-level Recall: {}",
         metric_display(random_result.best_results.recall())
@@ -1520,7 +1584,7 @@ fn main() {
         "    volatility:    {:.3}",
         bayesian_result.best_config.volatility_threshold
     );
-    println!("  Objective:       {:.2}", bayesian_result.best_objective);
+    println!("  Objective:       {}", objective_display(bayesian_result.best_objective));
     println!(
         "  Event-level Recall: {}",
         metric_display(bayesian_result.best_results.recall())
@@ -1550,9 +1614,9 @@ fn main() {
 
     let cv_results = cross_validate(&shots, 99999);
 
-    println!("\n  Train Objective:    {:.2}", cv_results.train_objective);
-    println!("  Val Objective:      {:.2}", cv_results.val_objective);
-    println!("  Generalization Gap: {:.2}", cv_results.generalization_gap);
+    println!("\n  Train Objective:    {}", objective_display(cv_results.train_objective));
+    println!("  Val Objective:      {}", objective_display(cv_results.val_objective));
+    println!("  Generalization Gap: {}", metric_display(cv_results.generalization_gap));
     println!("\n  Train Metrics:");
     println!("    Event-level Recall: {}", metric_display(cv_results.train_results.recall()));
     println!("    Event-level FPR: {}", metric_display(cv_results.train_results.false_positive_rate()));
@@ -1590,28 +1654,28 @@ fn main() {
     );
     println!("{}", "-".repeat(70));
     println!(
-        "{:<25} {:>12.2} {:>12} {:>12} {:>10}",
-        "Baseline (Default)", baseline_objective,
+        "{:<25} {:>12} {:>12} {:>12} {:>10}",
+        "Baseline (Default)", objective_display(baseline_objective),
         metric_display(baseline_results.recall()),
         metric_display(baseline_results.false_positive_rate()), "-"
     );
     println!(
-        "{:<25} {:>12.2} {:>12} {:>12} {:>10}",
-        "Grid Search", grid_result.best_objective,
+        "{:<25} {:>12} {:>12} {:>12} {:>10}",
+        "Grid Search", objective_display(grid_result.best_objective),
         metric_display(grid_result.best_results.recall()),
         metric_display(grid_result.best_results.false_positive_rate()),
         grid_result.search_time_ms
     );
     println!(
-        "{:<25} {:>12.2} {:>12} {:>12} {:>10}",
-        "Random Search (500)", random_result.best_objective,
+        "{:<25} {:>12} {:>12} {:>12} {:>10}",
+        "Random Search (500)", objective_display(random_result.best_objective),
         metric_display(random_result.best_results.recall()),
         metric_display(random_result.best_results.false_positive_rate()),
         random_result.search_time_ms
     );
     println!(
-        "{:<25} {:>12.2} {:>12} {:>12} {:>10}",
-        "Bayesian (200)", bayesian_result.best_objective,
+        "{:<25} {:>12} {:>12} {:>12} {:>10}",
+        "Bayesian (200)", objective_display(bayesian_result.best_objective),
         metric_display(bayesian_result.best_results.recall()),
         metric_display(bayesian_result.best_results.false_positive_rate()),
         bayesian_result.search_time_ms
@@ -1813,6 +1877,23 @@ mod tests {
             assert!(config.phi_stable > config.phi_warning);
             assert!(config.phi_warning > config.phi_critical);
         }
+    }
+
+    #[test]
+    fn non_finite_objectives_serialize_as_json_null() {
+        let result = SearchResult {
+            best_config: ThresholdConfig::default(),
+            best_objective: f64::NEG_INFINITY,
+            best_results: evaluate_config(&ThresholdConfig::default(), &[]),
+            configs_evaluated: 1,
+            search_time_ms: 0,
+            objective_history: vec![f64::NEG_INFINITY, 12.5],
+        };
+        let value = serde_json::to_value(&result)
+            .expect("infeasible objectives must remain valid JSON");
+        assert!(value["best_objective"].is_null());
+        assert!(value["objective_history"][0].is_null());
+        assert_eq!(value["objective_history"][1].as_f64(), Some(12.5));
     }
 
     #[test]
