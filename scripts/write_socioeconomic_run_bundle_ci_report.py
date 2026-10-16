@@ -97,7 +97,7 @@ def build_report(
         raise ReportFailure(f"cannot establish checked-out Git revision: {exc}") from exc
     if checked_out != source_revision:
         raise ReportFailure(
-            f"checked-out revision {checked_out!r} does not match GITHUB_SHA {source_revision!r}"
+            f"checked-out revision {checked_out!r} does not match CIVOS_SOURCE_REVISION {source_revision!r}"
         )
 
     files: list[dict[str, Any]] = []
