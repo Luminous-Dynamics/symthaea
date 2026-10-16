@@ -123,6 +123,17 @@ impl FiniteHypothesisModel {
                     action.action_id
                 ));
             }
+            match &action.feasibility {
+                Feasibility::Blocked { reason } | Feasibility::Unknown { reason }
+                    if reason.trim().is_empty() =>
+                {
+                    return Err(format!(
+                        "action {} has a non-feasible disposition without a reason",
+                        action.action_id
+                    ));
+                }
+                _ => {}
+            }
             if action.likelihood_by_hypothesis.len() != self.prior.len() {
                 return Err(format!(
                     "action {} does not provide one likelihood row per hypothesis",
@@ -471,7 +482,12 @@ fn calculate_acquisition(
     }
 
     let mut decision_value = expected_post_observation_best_utility - current_best_utility;
-    if decision_value < 0.0 && decision_value > -NUMERIC_TOLERANCE {
+    let decision_tolerance = NUMERIC_TOLERANCE
+        * expected_post_observation_best_utility
+            .abs()
+            .max(current_best_utility.abs())
+            .max(1.0);
+    if decision_value < 0.0 && decision_value > -decision_tolerance {
         decision_value = 0.0;
     }
     if !decision_value.is_finite() || decision_value < 0.0 {
@@ -766,7 +782,7 @@ mod tests {
     }
 
     #[test]
-    fn model_digest_changes_when_prior_or_likelihood_changes() {
+    fn model_digest_changes_when_likelihood_changes() {
         let mut model = model(
             "noisy",
             Feasibility::Feasible,
@@ -775,7 +791,8 @@ mod tests {
             opposing_decisions(),
         );
         let first = model.digest().unwrap();
-        model.actions[0].cost_units = 2;
+        model.actions[0].likelihood_by_hypothesis[0].outcomes[0].probability_ppm = 800_000;
+        model.actions[0].likelihood_by_hypothesis[0].outcomes[1].probability_ppm = 200_000;
         let second = model.digest().unwrap();
         assert_ne!(first, second);
     }
