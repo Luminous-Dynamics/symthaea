@@ -140,6 +140,20 @@ External evidence argues for testing additional approaches:
 - The public [Coactive Learning reference implementation](https://github.com/coactivescience/cost-aware-active-learning) at commit `33f29e85d3a464a75b4cda2d2202e3ef91b80c48` proposes a two-stage EC² pathway-identification plus cost-aware GP-UCB optimization policy. Its README explicitly characterizes the experiment as a CICERO-inspired *synthetic simulator*, not new wet-lab data. It is a useful architecture/control reference, but its outputs are not a nanophotonics or OC22 benchmark and it should not be presented as physical validation.
 - The 2026 MatBench reproducibility analysis reported that only 2 of 28 published submissions installed/imported from original dependency metadata; 13 submissions completed a selected task after remediation. Reproducibility and metric regeneration must therefore be scored explicitly: https://www.oaepublish.com/articles/aiagent.2026.31
 
+### Additional hypothesis: two-sided response-extreme sampling (future sequential loop, not selector v1)
+
+A 2026 *Acta Physica Sinica* study reports that deliberately sampling both positive and negative response extrema improved generalization in its materials-discovery experiments compared with uniform or one-sided sampling: [Data Distribution Matters: Enhancing model generalization in Data-Driven Materials Discovery by intentionally exploiting both positive and negative data](https://doi.org/10.1016/j.actphy.2026.100291). This is a promising, task-specific hypothesis—not proof that extreme sampling always wins.
+
+Keep its objective distinct from immediate design exploitation:
+- **Exploitation:** query candidates predicted most likely to meet the target now.
+- **Two-sided model coverage:** query selected candidates from both low- and high-predicted-response tails to improve the surrogate's learned response range and future generalization.
+- **Uncertainty sampling:** query candidates for which a suitably validated estimator expects model uncertainty to be high.
+- **Diversity:** cover descriptor/family regions independent of predicted response.
+
+The present v1 kernel accepts neither target labels nor predicted properties, intentionally. Do not smuggle model predictions into its descriptor fields. Implement two-sided extremes only in a separately versioned sequential-loop layer after a task-specific model contract exists: train on revealed training labels, emit versioned predictions for the unqueried pool, choose tail candidates under a frozen policy, reveal selected labels only after the query, then log the model update and regenerate the next pool predictions.
+
+Measure its effect as **model-learning quality**: MAE/RMSE across the full held-out response range, error by response quantile and family, calibration/coverage where probabilistic predictions are claimed, and learning curves by acquired-label count/cost. Separately report immediate Success@K or cost to target. Do not infer an improvement in candidate discovery from lower predictive error alone, or predictive generalization from a handful of successes.
+
 ### Required next baselines before claiming Symthaea advantage
 
 Once a real task and data contract are admitted, extend the batch-policy comparison to include:
