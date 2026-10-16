@@ -7,16 +7,17 @@
 //! All candidates in one queue must express cost in the same preregistered unit.
 
 use std::collections::{BTreeMap, BTreeSet};
+use serde::Serialize;
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum ResourceBasis {
     ComputeTime,
     RigTime,
     DirectCost,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ResourceCost {
     pub basis: ResourceBasis,
     /// Canonical unit registered by the queue policy, such as "s", "rig-hour",
@@ -25,7 +26,7 @@ pub struct ResourceCost {
     pub amount: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum DecisionRelevance {
     Exploratory = 0,
     CharacterizesNamedUncertainty = 1,
@@ -34,7 +35,7 @@ pub enum DecisionRelevance {
     CanChangeFeasibilityOrDesignDecision = 4,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum Reproducibility {
     OneOff = 0,
     ReplayableWithDeclaredArtifacts = 1,
@@ -42,14 +43,14 @@ pub enum Reproducibility {
     IndependentReplicationPlanned = 3,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum SafetyReview {
     Pending,
     Approved,
     Rejected,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ExperimentProposal {
     pub experiment_id: String,
     pub decision_question: String,
@@ -68,7 +69,7 @@ pub struct ExperimentProposal {
     pub provenance_plan_complete: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SelectionPolicy {
     pub policy_id: String,
     pub registered_before_queue_generation: bool,
@@ -86,7 +87,7 @@ pub struct RankedExperiment {
     pub uncertainty_reduction_per_cost_unit: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RejectedExperiment {
     pub experiment_id: String,
     pub reasons: Vec<String>,
