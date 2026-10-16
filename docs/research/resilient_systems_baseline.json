@@ -334,11 +334,12 @@
       "resource_tests_authored": 18,
       "repair_scheduling_tests_authored": 17,
       "robust_repair_evaluation_tests_authored": 10,
-      "total_rust_tests_authored": 93,
-      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, tiny exact oracle and policy-gap evaluator 11. None have been compiled or executed in the current environment.",
+      "total_rust_tests_authored": 101,
+      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, single-crew exact oracle/policy gaps 11, multi-crew exact oracle 8. None have been compiled or executed in the current environment.",
       "rolling_horizon_repair_tests_authored": 11,
       "repair_policy_comparison_tests_authored": 6,
-      "exact_oracle_tests_authored": 11
+      "exact_oracle_tests_authored": 11,
+      "multi_crew_oracle_tests_authored": 8
     },
     "performance_targets": {
       "status": "proposed_unmeasured_targets",
@@ -1044,5 +1045,116 @@
       }
     },
     "classical_baseline_note": "For this single-machine weighted-completion objective, nonincreasing service-value/duration (Smith WSPT rule) is already optimal. The oracle verifies implementation and measures alternative heuristics; it is not novel general scheduling."
+  },
+  "multi_crew_repair_oracle": {
+    "status": "exact_tiny_multi_crew_oracle_not_executed",
+    "source_module": "crates/domains/symthaea-engineering/src/multi_crew_repair_oracle.rs",
+    "fixture_corpus": "docs/research/multi_crew_repair_oracle_corpus.json",
+    "maximum_jobs": 6,
+    "maximum_crews": 3,
+    "objective": "sum(recovered_service_value_per_step * completion_step)",
+    "constraints": [
+      "one required skill per job",
+      "qualified crew only",
+      "crew exclusivity",
+      "acyclic precedence dependencies",
+      "all outage_start_step = 0",
+      "all crew available_from_step = 0",
+      "no spare parts"
+    ],
+    "outputs": [
+      "canonical_exact_schedule",
+      "minimum_weighted_completion_loss",
+      "complete_dispatch_sequences_evaluated",
+      "priority_first_loss_and_gap",
+      "shortest_job_first_loss_and_gap",
+      "weighted_recovery_loss_and_gap"
+    ],
+    "tests_authored": 8,
+    "tests_executed": false,
+    "reference_fixtures": [
+      {
+        "id": "MC-01",
+        "expected_loss": 41,
+        "expected_schedule": [
+          [
+            "c",
+            "crew-x",
+            0,
+            2
+          ],
+          [
+            "b",
+            "crew-y",
+            0,
+            3
+          ],
+          [
+            "a",
+            "crew-x",
+            2,
+            6
+          ]
+        ],
+        "complete_dispatch_sequences_evaluated": 6
+      },
+      {
+        "id": "MC-02",
+        "expected_loss": 52,
+        "expected_schedule": [
+          [
+            "power",
+            "electrician",
+            0,
+            2
+          ],
+          [
+            "pump",
+            "mechanic",
+            2,
+            5
+          ]
+        ],
+        "complete_dispatch_sequences_evaluated": 1
+      },
+      {
+        "id": "MC-03",
+        "expected_loss": 42,
+        "expected_schedule": [
+          [
+            "sensor",
+            "electrician",
+            0,
+            2
+          ],
+          [
+            "valve",
+            "versatile",
+            0,
+            2
+          ],
+          [
+            "relay",
+            "electrician",
+            2,
+            5
+          ]
+        ],
+        "complete_dispatch_sequences_evaluated": 24
+      }
+    ],
+    "limitations": [
+      "tiny oracle bounds only",
+      "no spare inventory constraints",
+      "no crew travel/access or shifts",
+      "no uncertainty or rolling-horizon feedback",
+      "not field-validated",
+      "Rust tests authored but not executed"
+    ],
+    "research_sources": [
+      "https://doi.org/10.1016/j.ejor.2022.05.049",
+      "https://doi.org/10.1016/j.asoc.2022.109253",
+      "https://doi.org/10.1016/j.cie.2020.107004"
+    ]
   }
 }
