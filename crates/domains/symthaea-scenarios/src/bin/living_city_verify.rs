@@ -188,6 +188,15 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
 
     let manifest: EvidenceManifest = read_json(&root, &bundle.manifest_path)?;
     let receipt: ScenarioRunReceipt = read_json(&root, &bundle.receipt_path)?;
+    let profile: HazardProfile = read_json(&root, &bundle.hazard_profile_path)?;
+    let profile_binding: BenchmarkProfileBinding =
+        read_json(&root, &bundle.profile_binding_path)?;
+    let service_graph: ServiceGraphPackage =
+        read_json(&root, &bundle.service_graph_path)?;
+
+    if service_graph.schema_version != SERVICE_GRAPH_SCHEMA_VERSION {
+        return Err(invalid_input("unsupported service-graph schema version").into());
+    }
     manifest.validate()?;
     receipt.validate()?;
 
@@ -204,6 +213,25 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         compute_file_digest_map(&root, &bundle.output_files, "output_files")?;
     verify_receipt_output_digests(&receipt, &output_digests)?;
 
+    // The profile's input evidence is not considered usable until all retained
+    // source bytes passed the independent digest checks above.
+    let cascade = evaluate_hazard_profile(
+        &profile,
+        &profile_binding,
+        &manifest,
+        &service_graph.nodes,
+        &service_graph.dependencies,
+        LIVING_CITY_BENCHMARKS,
+    )?;
+    let actual_configuration_sha256 =
+        scenario_configuration_sha256(&profile, &profile_binding, &service_graph)?;
+    if actual_configuration_sha256 != receipt.configuration_sha256 {
+        return Err(invalid_input(
+            "receipt configuration digest does not match canonical hazard profile, binding and service graph",
+        )
+        .into());
+    }
+
     let manifest_sha256 = evidence_manifest_sha256(&manifest)?;
     let receipt_sha256 = scenario_run_receipt_sha256(&receipt)?;
     let missing_sources: Vec<&str> = manifest
@@ -215,9 +243,12 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         })
         .map(|item| item.id.as_str())
         .collect();
+    let failed_services = cascade.dependency_assessment.failed_ids();
+    let degraded_services = cascade.dependency_assessment.degraded_ids();
+    let graph_sha256 = sha256_hex(&canonical_service_graph_bytes(&service_graph)?);
 
     Ok(serde_json::json!({
-        "schema_version": 1,
+        "schema_version": 2,
         "package_integrity": "verified",
         "run_id": receipt.run_id,
         "scenario_id": receipt.scenario_id,
@@ -225,13 +256,19 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         "commit_sha": receipt.commit_sha,
         "manifest_sha256": manifest_sha256,
         "receipt_sha256": receipt_sha256,
+        "configuration_sha256": actual_configuration_sha256,
+        "hazard_profile_id": cascade.profile_id,
+        "hazard_profile_sha256": cascade.profile_sha256,
+        "service_graph_sha256": graph_sha256,
+        "dependency_propagation_rounds": cascade.dependency_assessment.propagation_rounds,
+        "failed_service_ids": failed_services,
+        "degraded_service_ids": degraded_services,
         "verified_source_count": source_digests.len(),
         "verified_output_count": output_digests.len(),
         "explicit_missing_source_ids": missing_sources,
-        "scope": "Package integrity and digest linkage only. This report does not authenticate receipt authorship, validate the physical models or solver claims, establish jurisdictional code compliance, replace professional review, or authorize construction."
+        "scope": "Package integrity, profile/manifest binding and declared dependency propagation only. This report does not authenticate receipt authorship, validate physical models or solver claims, establish jurisdictional code compliance, replace professional review, or authorize construction."
     }))
 }
-
 fn run() -> Result<(), Box<dyn Error>> {
     let mut args = env::args_os();
     let _program = args.next();
