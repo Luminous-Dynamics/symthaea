@@ -17,7 +17,7 @@ use crate::knowledge::evidence_action_policy::{
 };
 use crate::knowledge::evidence_benchmark::{
     BenchmarkAction, BenchmarkEvidenceCondition, BenchmarkInput, BenchmarkProvenanceCondition,
-    BenchmarkQuestionCondition, BenchmarkReason, DATASET_SCHEMA_VERSION,
+    BenchmarkQuestionCondition, BenchmarkReason, DatasetSplit, DATASET_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -57,7 +57,7 @@ pub struct EvidenceTrajectory {
     pub trajectory_id: String,
     pub claim_family_id: String,
     pub origin_family_ids: Vec<String>,
-    pub split: crate::knowledge::evidence_benchmark::DatasetSplit,
+    pub split: DatasetSplit,
     pub adjudication_note: String,
     pub steps: Vec<EvidenceTrajectoryStep>,
 }
@@ -189,11 +189,15 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
         ("claim_family_id", trajectory.claim_family_id.as_str()),
         ("adjudication_note", trajectory.adjudication_note.as_str()),
     ] {
-        if value.trim().is_empty() { return Err(format!("empty {field}")); }
+        if value.trim().is_empty() {
+            return Err(format!("empty {field}"));
+        }
     }
     let mut origins = BTreeSet::new();
     for origin in &trajectory.origin_family_ids {
-        if origin.trim().is_empty() { return Err("empty origin family ID".to_owned()); }
+        if origin.trim().is_empty() {
+            return Err("empty origin family ID".to_owned());
+        }
         if !origins.insert(origin) {
             return Err(format!("duplicate origin family ID {origin}"));
         }
@@ -214,37 +218,49 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
             TrajectoryEvent::EvidenceRevoked
                 if step.input.provenance != BenchmarkProvenanceCondition::Invalid =>
             {
-                return Err(format!("{} step {}: evidence_revoked requires invalid provenance",
-                    trajectory.trajectory_id, step.sequence));
+                return Err(format!(
+                    "{} step {}: evidence_revoked requires invalid provenance",
+                    trajectory.trajectory_id, step.sequence
+                ));
             }
             TrajectoryEvent::ConflictArrived
                 if step.input.evidence != BenchmarkEvidenceCondition::Conflicting =>
             {
-                return Err(format!("{} step {}: conflict_arrived requires conflicting evidence",
-                    trajectory.trajectory_id, step.sequence));
+                return Err(format!(
+                    "{} step {}: conflict_arrived requires conflicting evidence",
+                    trajectory.trajectory_id, step.sequence
+                ));
             }
             TrajectoryEvent::BudgetExhausted if step.input.acquisition_budget_available => {
-                return Err(format!("{} step {}: budget_exhausted requires no acquisition budget",
-                    trajectory.trajectory_id, step.sequence));
+                return Err(format!(
+                    "{} step {}: budget_exhausted requires no acquisition budget",
+                    trajectory.trajectory_id, step.sequence
+                ));
             }
             TrajectoryEvent::ConflictResolved
                 if step.input.evidence == BenchmarkEvidenceCondition::Conflicting
                     || step.input.provenance != BenchmarkProvenanceCondition::Verified =>
             {
-                return Err(format!("{} step {}: conflict_resolved requires non-conflicting evidence and verified provenance",
-                    trajectory.trajectory_id, step.sequence));
+                return Err(format!(
+                    "{} step {}: conflict_resolved requires non-conflicting evidence and verified provenance",
+                    trajectory.trajectory_id, step.sequence
+                ));
             }
             TrajectoryEvent::EvidenceRevalidated
                 if step.input.provenance != BenchmarkProvenanceCondition::Verified =>
             {
-                return Err(format!("{} step {}: evidence_revalidated requires verified provenance",
-                    trajectory.trajectory_id, step.sequence));
+                return Err(format!(
+                    "{} step {}: evidence_revalidated requires verified provenance",
+                    trajectory.trajectory_id, step.sequence
+                ));
             }
             TrajectoryEvent::QuestionClarified
                 if step.input.question != BenchmarkQuestionCondition::Clear =>
             {
-                return Err(format!("{} step {}: question_clarified requires a clear question",
-                    trajectory.trajectory_id, step.sequence));
+                return Err(format!(
+                    "{} step {}: question_clarified requires a clear question",
+                    trajectory.trajectory_id, step.sequence
+                ));
             }
             _ => {}
         }
@@ -260,15 +276,19 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
         }
         if step.event == TrajectoryEvent::EvidenceRevalidated {
             if !revocation_blocked {
-                return Err(format!("{} step {}: evidence_revalidated has no prior invalidation",
-                    trajectory.trajectory_id, step.sequence));
+                return Err(format!(
+                    "{} step {}: evidence_revalidated has no prior invalidation",
+                    trajectory.trajectory_id, step.sequence
+                ));
             }
             revocation_blocked = false;
         }
         if step.event == TrajectoryEvent::ConflictResolved {
             if !conflict_blocked {
-                return Err(format!("{} step {}: conflict_resolved has no prior conflict",
-                    trajectory.trajectory_id, step.sequence));
+                return Err(format!(
+                    "{} step {}: conflict_resolved has no prior conflict",
+                    trajectory.trajectory_id, step.sequence
+                ));
             }
             conflict_blocked = false;
         }
@@ -277,7 +297,9 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
 }
 
 fn validate_trajectory_collection(trajectories: &[HashedEvidenceTrajectory]) -> Result<(), String> {
-    if trajectories.is_empty() { return Err("trajectory dataset must contain at least one trajectory".to_owned()); }
+    if trajectories.is_empty() {
+        return Err("trajectory dataset must contain at least one trajectory".to_owned());
+    }
     let mut ids = BTreeSet::new();
     let mut claim_splits: BTreeMap<&str, crate::knowledge::evidence_benchmark::DatasetSplit> = BTreeMap::new();
     let mut origin_splits: BTreeMap<&str, crate::knowledge::evidence_benchmark::DatasetSplit> = BTreeMap::new();
@@ -287,7 +309,10 @@ fn validate_trajectory_collection(trajectories: &[HashedEvidenceTrajectory]) -> 
         if !ids.insert(trajectory.trajectory_id.as_str()) {
             return Err(format!("duplicate trajectory ID {}", trajectory.trajectory_id));
         }
-        if let Some(previous) = claim_splits.insert(trajectory.claim_family_id.as_str(), trajectory.split) {
+        if let Some(previous) = claim_splits.insert(
+            trajectory.claim_family_id.as_str(),
+            trajectory.split,
+        ) {
             if previous != trajectory.split {
                 return Err(format!("claim-family leakage for {}", trajectory.claim_family_id));
             }
@@ -305,7 +330,11 @@ fn validate_trajectory_collection(trajectories: &[HashedEvidenceTrajectory]) -> 
 
 fn split_name(split: crate::knowledge::evidence_benchmark::DatasetSplit) -> &'static str {
     use crate::knowledge::evidence_benchmark::DatasetSplit::*;
-    match split { Train => "train", Development => "development", Test => "test" }
+    match split {
+        Train => "train",
+        Development => "development",
+        Test => "test",
+    }
 }
 
 /// Strict JSONL parser. Case and origin families may not cross train/development/test.
@@ -316,7 +345,9 @@ pub fn audit_trajectory_jsonl<R: BufRead>(
     for (index, result) in reader.lines().enumerate() {
         let line_number = index + 1;
         let line = result.map_err(|e| format!("read trajectory line {line_number}: {e}"))?;
-        if line.trim().is_empty() { return Err(format!("blank trajectory line {line_number}")); }
+        if line.trim().is_empty() {
+            return Err(format!("blank trajectory line {line_number}"));
+        }
         let trajectory: HashedEvidenceTrajectory = serde_json::from_str(&line)
             .map_err(|e| format!("parse trajectory line {line_number}: {e}"))?;
         trajectory.validate_digest().map_err(|e| format!("line {line_number}: {e}"))?;
@@ -391,12 +422,18 @@ fn benchmark_reason(reason: EvidenceActionReason) -> BenchmarkReason {
         EvidenceActionReason::ProvenanceIncomplete => BenchmarkReason::ProvenanceIncomplete,
         EvidenceActionReason::ProvenanceInvalid => BenchmarkReason::ProvenanceInvalid,
         EvidenceActionReason::ConflictingEvidence => BenchmarkReason::ConflictingEvidence,
-        EvidenceActionReason::QuestionNeedsClarification => BenchmarkReason::QuestionNeedsClarification,
+        EvidenceActionReason::QuestionNeedsClarification => {
+            BenchmarkReason::QuestionNeedsClarification
+        },
         EvidenceActionReason::EvidenceMissing => BenchmarkReason::EvidenceMissing,
         EvidenceActionReason::EvidenceIrrelevant => BenchmarkReason::EvidenceIrrelevant,
         EvidenceActionReason::IndependentOriginsUnknown => BenchmarkReason::IndependentOriginsUnknown,
-        EvidenceActionReason::IndependentOriginsBelowPolicy => BenchmarkReason::IndependentOriginsBelowPolicy,
-        EvidenceActionReason::PartialSupportNotSafelyScoped => BenchmarkReason::PartialSupportNotSafelyScoped,
+        EvidenceActionReason::IndependentOriginsBelowPolicy => {
+            BenchmarkReason::IndependentOriginsBelowPolicy
+        },
+        EvidenceActionReason::PartialSupportNotSafelyScoped => {
+            BenchmarkReason::PartialSupportNotSafelyScoped
+        },
     }
 }
 
@@ -421,11 +458,14 @@ pub fn evaluate_trajectories(
     policy_version: &str,
     policy: &EvidenceActionPolicy,
 ) -> Result<Vec<EvidenceTrajectoryReceipt>, String> {
-    if policy_version.trim().is_empty() { return Err("empty policy version".to_owned()); }
+    if policy_version.trim().is_empty() {
+        return Err("empty policy version".to_owned());
+    }
     validate_trajectory_collection(trajectories)?;
     Ok(trajectories.iter().map(|hashed| {
         let steps = hashed.trajectory.steps.iter().map(|step| {
-            let EvidenceActionDecision { action, reason } = policy.decide(policy_input(&step.input));
+            let EvidenceActionDecision { action, reason } =
+                policy.decide(policy_input(&step.input));
             TrajectoryStepReceipt {
                 sequence: step.sequence,
                 selected_action: match action {
@@ -488,7 +528,10 @@ fn is_critical_step(
         || step.input.evidence == BenchmarkEvidenceCondition::Conflicting
         || step.input.question == BenchmarkQuestionCondition::Ambiguous
         || step.input.independent_origins.map_or(true, |n| n < policy_minimum_independent_origins)
-        || matches!(step.input.evidence, BenchmarkEvidenceCondition::Missing | BenchmarkEvidenceCondition::Irrelevant)
+        || matches!(
+            step.input.evidence,
+            BenchmarkEvidenceCondition::Missing | BenchmarkEvidenceCondition::Irrelevant
+        )
         || (step.input.evidence == BenchmarkEvidenceCondition::PartialSupport
             && (!policy_allow_scoped_partial_answer || !step.input.scoped_answer_available))
 }
@@ -511,7 +554,9 @@ pub fn score_trajectory_receipts<R: BufRead>(
     reader: R,
     expected_policy_version: &str,
 ) -> Result<TrajectoryScore, String> {
-    if expected_policy_version.trim().is_empty() { return Err("empty expected policy version".to_owned()); }
+    if expected_policy_version.trim().is_empty() {
+        return Err("empty expected policy version".to_owned());
+    }
     validate_trajectory_collection(trajectories)?;
     let by_id: BTreeMap<&str, &HashedEvidenceTrajectory> = trajectories.iter()
         .map(|t| (t.trajectory.trajectory_id.as_str(), t)).collect();
@@ -521,7 +566,9 @@ pub fn score_trajectory_receipts<R: BufRead>(
     for (index, result) in reader.lines().enumerate() {
         let line_number = index + 1;
         let line = result.map_err(|e| format!("read trajectory receipt line {line_number}: {e}"))?;
-        if line.trim().is_empty() { return Err(format!("blank trajectory receipt line {line_number}")); }
+        if line.trim().is_empty() {
+            return Err(format!("blank trajectory receipt line {line_number}"));
+        }
         let receipt: EvidenceTrajectoryReceipt = serde_json::from_str(&line)
             .map_err(|e| format!("parse trajectory receipt line {line_number}: {e}"))?;
         if receipt.schema_version != TRAJECTORY_SCHEMA_VERSION {
@@ -531,11 +578,19 @@ pub fn score_trajectory_receipts<R: BufRead>(
             return Err(format!("policy version mismatch for trajectory {}", receipt.trajectory_id));
         }
         if receipt.policy_minimum_independent_origins == 0 {
-            return Err(format!("invalid origin threshold in trajectory receipt {}", receipt.trajectory_id));
+            return Err(format!(
+                "invalid origin threshold in trajectory receipt {}",
+                receipt.trajectory_id
+            ));
         }
-        let config = (receipt.policy_minimum_independent_origins, receipt.policy_allow_scoped_partial_answer);
+        let config = (
+            receipt.policy_minimum_independent_origins,
+            receipt.policy_allow_scoped_partial_answer,
+        );
         if let Some(previous) = registered_policy {
-            if previous != config { return Err("trajectory receipts disagree on policy configuration".to_owned()); }
+            if previous != config {
+                return Err("trajectory receipts disagree on policy configuration".to_owned());
+            }
         } else {
             registered_policy = Some(config);
         }
@@ -547,17 +602,31 @@ pub fn score_trajectory_receipts<R: BufRead>(
         if receipt.steps.len() != dataset.trajectory.steps.len() {
             return Err(format!("step coverage mismatch for trajectory {}", receipt.trajectory_id));
         }
-        for (index, (actual, expected)) in receipt.steps.iter().zip(&dataset.trajectory.steps).enumerate() {
+        for (index, (actual, expected)) in receipt
+            .steps
+            .iter()
+            .zip(&dataset.trajectory.steps)
+            .enumerate()
+        {
             if actual.sequence != index as u32 || actual.sequence != expected.sequence {
-                return Err(format!("step sequence mismatch for trajectory {}", receipt.trajectory_id));
+                return Err(format!(
+                    "step sequence mismatch for trajectory {}",
+                    receipt.trajectory_id
+                ));
             }
             if !action_reason_consistent(actual.selected_action, actual.reason) {
-                return Err(format!("action/reason mismatch in {} step {}", receipt.trajectory_id, actual.sequence));
+                return Err(format!(
+                    "action/reason mismatch in {} step {}",
+                    receipt.trajectory_id, actual.sequence
+                ));
             }
             if actual.selected_action == BenchmarkAction::AnswerWithScopeLimit
                 && !receipt.policy_allow_scoped_partial_answer
             {
-                return Err(format!("scoped answer disabled by policy in {} step {}", receipt.trajectory_id, actual.sequence));
+                return Err(format!(
+                    "scoped answer disabled by policy in {} step {}",
+                    receipt.trajectory_id, actual.sequence
+                ));
             }
         }
         if receipts.insert(receipt.trajectory_id.clone(), receipt).is_some() {
@@ -568,7 +637,10 @@ pub fn score_trajectory_receipts<R: BufRead>(
         let missing: Vec<&str> = trajectories.iter()
             .filter(|t| !receipts.contains_key(&t.trajectory.trajectory_id))
             .map(|t| t.trajectory.trajectory_id.as_str()).collect();
-        return Err(format!("trajectory receipt coverage mismatch; missing: {}", missing.join(", ")));
+        return Err(format!(
+            "trajectory receipt coverage mismatch; missing: {}",
+            missing.join(", ")
+        ));
     }
     let (minimum_origins, allow_scoped) = registered_policy
         .ok_or_else(|| "trajectory receipts contain no policy configuration".to_owned())?;
@@ -708,8 +780,10 @@ mod tests {
     use crate::knowledge::evidence_benchmark::DatasetSplit;
     use std::io::Cursor;
 
-    const FIXTURE: &str = include_str!("../../docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl");
-    const UNSAFE_CONTROL: &str = include_str!("../../docs/research/data/evidence_trajectory_benchmark.unsafe-control.synthetic.jsonl");
+    const FIXTURE: &str =
+        include_str!("../../docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl");
+    const UNSAFE_CONTROL: &str =
+        include_str!("../../docs/research/data/evidence_trajectory_benchmark.unsafe-control.synthetic.jsonl");
 
     #[test]
     fn committed_trajectory_fixture_audits_and_replays_without_safety_escapes() {
@@ -718,8 +792,18 @@ mod tests {
         assert_eq!(audit.total_steps, 16);
         let policy = EvidenceActionPolicy::bounded_default();
         let receipts = evaluate_trajectories(&dataset, "trajectory-policy-v1", &policy).unwrap();
-        let receipt_text = receipts.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>().unwrap().join("\n");
-        let score = score_trajectory_receipts(&dataset, Cursor::new(receipt_text), "trajectory-policy-v1").unwrap();
+        let receipt_text = receipts
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\n");
+        let score = score_trajectory_receipts(
+            &dataset,
+            Cursor::new(receipt_text),
+            "trajectory-policy-v1",
+        )
+        .unwrap();
         assert_eq!(score.trajectory_count, 5);
         assert_eq!(score.step_count, 16);
         assert_eq!(score.correct_actions, 16);
@@ -732,7 +816,12 @@ mod tests {
     #[test]
     fn unsafe_conflict_and_revocation_receipts_are_detected_even_if_accuracy_is_high() {
         let (dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
-        let score = score_trajectory_receipts(&dataset, Cursor::new(UNSAFE_CONTROL), "trajectory-policy-v1").unwrap();
+        let score = score_trajectory_receipts(
+            &dataset,
+            Cursor::new(UNSAFE_CONTROL),
+            "trajectory-policy-v1",
+        )
+        .unwrap();
         assert!(score.unsafe_answer_escapes >= 2);
         assert!(score.revocation_answer_escapes >= 1);
         assert!(score.conflict_answer_escapes >= 1);
@@ -743,18 +832,34 @@ mod tests {
     fn rejects_mutated_trajectory_digest() {
         let (mut dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
         dataset[0].trajectory.steps[0].input.evidence = BenchmarkEvidenceCondition::Conflicting;
-        assert!(evaluate_trajectories(&dataset, "v1", &EvidenceActionPolicy::bounded_default()).is_err());
+        assert!(
+            evaluate_trajectories(&dataset, "v1", &EvidenceActionPolicy::bounded_default())
+                .is_err()
+        );
     }
 
     #[test]
     fn rejects_missing_receipts_and_policy_mixing() {
         let (dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
-        let receipts = evaluate_trajectories(&dataset, "v1", &EvidenceActionPolicy::bounded_default()).unwrap();
-        let text = receipts.iter().take(1).map(serde_json::to_string).collect::<Result<Vec<_>, _>>().unwrap().join("\n");
+        let receipts =
+            evaluate_trajectories(&dataset, "v1", &EvidenceActionPolicy::bounded_default())
+                .unwrap();
+        let text = receipts
+            .iter()
+            .take(1)
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\n");
         assert!(score_trajectory_receipts(&dataset, Cursor::new(text), "v1").is_err());
         let mut mixed = receipts.clone();
         mixed[1].policy_minimum_independent_origins = 2;
-        let text = mixed.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>().unwrap().join("\n");
+        let text = mixed
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\n");
         assert!(score_trajectory_receipts(&dataset, Cursor::new(text), "v1").is_err());
     }
 
@@ -786,7 +891,10 @@ mod tests {
         let hashed = HashedEvidenceTrajectory::new(duplicate).unwrap();
         let mut all = dataset;
         all.push(hashed);
-        assert!(evaluate_trajectories(&all, "v1", &EvidenceActionPolicy::bounded_default()).is_err());
+        assert!(
+            evaluate_trajectories(&all, "v1", &EvidenceActionPolicy::bounded_default())
+                .is_err()
+        );
     }
 
     #[test]
@@ -810,14 +918,22 @@ mod tests {
     #[test]
     fn unresolved_historical_revocation_blocks_a_later_clean_looking_answer() {
         let (mut dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
-        let index = dataset.iter().position(|t| t.trajectory.trajectory_id == "revocation-after-answer").unwrap();
+        let index = dataset
+            .iter()
+            .position(|t| t.trajectory.trajectory_id == "revocation-after-answer")
+            .unwrap();
         let mut trajectory = dataset[index].trajectory.clone();
         trajectory.steps[3].event = TrajectoryEvent::Initial;
         dataset[index] = HashedEvidenceTrajectory::new(trajectory).unwrap();
 
         let policy = EvidenceActionPolicy::bounded_default();
         let receipts = evaluate_trajectories(&dataset, "v1", &policy).unwrap();
-        let text = receipts.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>().unwrap().join("\n");
+        let text = receipts
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\n");
         let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1").unwrap();
         assert!(score.unsafe_answer_escapes >= 1);
         assert!(score.revocation_answer_escapes >= 1);
@@ -826,13 +942,26 @@ mod tests {
     #[test]
     fn acquisition_is_a_hard_budget_violation_when_budget_is_exhausted() {
         let (dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
-        let mut receipts = evaluate_trajectories(&dataset, "v1", &EvidenceActionPolicy::bounded_default()).unwrap();
-        let trajectory = dataset.iter().find(|t| t.trajectory.trajectory_id == "retry-after-failure").unwrap();
-        let target = receipts.iter_mut().find(|r| r.trajectory_id == trajectory.trajectory.trajectory_id).unwrap();
+        let mut receipts =
+            evaluate_trajectories(&dataset, "v1", &EvidenceActionPolicy::bounded_default())
+                .unwrap();
+        let trajectory = dataset
+            .iter()
+            .find(|t| t.trajectory.trajectory_id == "retry-after-failure")
+            .unwrap();
+        let target = receipts
+            .iter_mut()
+            .find(|r| r.trajectory_id == trajectory.trajectory.trajectory_id)
+            .unwrap();
         let step = target.steps.iter_mut().find(|s| s.sequence == 2).unwrap();
         step.selected_action = BenchmarkAction::AcquireMoreEvidence;
         step.reason = BenchmarkReason::EvidenceMissing;
-        let text = receipts.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>().unwrap().join("\n");
+        let text = receipts
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\n");
         let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1").unwrap();
         assert_eq!(score.budget_violations, 1);
     }
