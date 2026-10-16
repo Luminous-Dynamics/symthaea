@@ -7,6 +7,7 @@ on:
       - "scripts/test_validate_socioeconomic_run_bundle.py"
       - "scripts/write_socioeconomic_run_bundle_ci_report.py"
       - "scripts/test_write_socioeconomic_run_bundle_ci_report.py"
+      - "scripts/socioeconomic_run_receipt_requirements.txt"
       - "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json"
       - "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json"
       - "docs/research/finance/SYM-FIN-SYS-016_RUN_BUNDLE_V1.md"
