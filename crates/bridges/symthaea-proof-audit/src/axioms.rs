@@ -54,26 +54,64 @@ impl AxiomReport {
     /// Empty output, compiler diagnostics, and truncated lists are errors,
     /// never evidence of an axiom-free proof.
     pub fn parse(output: &str) -> Result<AxiomReport, AxiomParseError> {
-        let flat = output.replace('\n', " ");
-        let theorem = first_quoted(&flat).ok_or_else(|| {
-            if flat.contains("depend on any axioms") || flat.contains("depends on axioms:") {
-                AxiomParseError::MalformedReport("missing quoted theorem name".into())
-            } else {
-                AxiomParseError::MissingReport
-            }
-        })?;
+        const NO_AXIOMS: &str = " does not depend on any axioms";
+        const WITH_AXIOMS: &str = " depends on axioms:";
+        const TRUNCATION: &str = "[... output truncated at the capture limit ...]";
 
-        if flat.contains("does not depend on any axioms") {
+        if output.contains(TRUNCATION) {
+            return Err(AxiomParseError::MalformedReport(
+                "captured Lean output was truncated".into(),
+            ));
+        }
+
+        // A Lean proof file can itself emit stdout (for example with #eval).
+        // Never trust the first report-looking string: it could be caller-
+        // generated text preceding the real #print axioms output. Exactly one
+        // report marker is required; two reports are ambiguous and fail closed.
+        let no_axioms: Vec<usize> = output.match_indices(NO_AXIOMS).map(|(i, _)| i).collect();
+        let with_axioms: Vec<usize> = output.match_indices(WITH_AXIOMS).map(|(i, _)| i).collect();
+        if no_axioms.len() + with_axioms.len() != 1 {
+            return Err(if no_axioms.is_empty() && with_axioms.is_empty() {
+                AxiomParseError::MissingReport
+            } else {
+                AxiomParseError::MalformedReport(
+                    "multiple or ambiguous axiom-report markers".into(),
+                )
+            });
+        }
+
+        let (marker, marker_len, is_axiom_free) = if let Some(index) = no_axioms.first() {
+            (*index, NO_AXIOMS.len(), true)
+        } else {
+            (*with_axioms.first().expect("exactly one marker was checked"), WITH_AXIOMS.len(), false)
+        };
+
+        // Bind the theorem name to the quoted token immediately preceding the
+        // unique marker, not to the first quoted text in arbitrary compiler or
+        // user-generated output.
+        let before = &output[..marker];
+        let closing_quote = before.rfind('\'').ok_or_else(|| {
+            AxiomParseError::MalformedReport("missing quoted theorem name".into())
+        })?;
+        let before_closing = &before[..closing_quote];
+        let opening_quote = before_closing.rfind('\'').ok_or_else(|| {
+            AxiomParseError::MalformedReport("missing quoted theorem name".into())
+        })?;
+        let theorem = before_closing[opening_quote + 1..closing_quote].trim();
+        if theorem.is_empty() || theorem.chars().any(char::is_control) {
+            return Err(AxiomParseError::MalformedReport(
+                "invalid quoted theorem name".into(),
+            ));
+        }
+
+        if is_axiom_free {
             return Ok(AxiomReport {
-                theorem,
+                theorem: theorem.to_owned(),
                 axioms: Vec::new(),
             });
         }
 
-        let idx = flat
-            .find("depends on axioms:")
-            .ok_or(AxiomParseError::MissingReport)?;
-        let after = &flat[idx + "depends on axioms:".len()..];
+        let after = &output[marker + marker_len..];
         let open = after
             .find('[')
             .ok_or_else(|| AxiomParseError::MalformedReport("missing opening '['".into()))?;
@@ -88,7 +126,10 @@ impl AxiomReport {
             .map(ToOwned::to_owned)
             .collect();
 
-        Ok(AxiomReport { theorem, axioms })
+        Ok(AxiomReport {
+            theorem: theorem.to_owned(),
+            axioms,
+        })
     }
 
     /// True if the proof depends on `sorryAx` — i.e. it is not actually proved.
@@ -116,14 +157,6 @@ pub fn is_sorry(axiom: &str) -> bool {
 /// so it is the marker that a proof left the constructive fragment.
 pub fn is_classical(axiom: &str) -> bool {
     axiom.starts_with("Classical.") || axiom == "Classical.choice"
-}
-
-/// The first single-quoted token (`'foo'`) in a string.
-fn first_quoted(s: &str) -> Option<String> {
-    let start = s.find('\'')?;
-    let rest = &s[start + 1..];
-    let end = rest.find('\'')?;
-    Some(rest[..end].to_string())
 }
 
 #[cfg(test)]
@@ -168,6 +201,38 @@ mod tests {
         assert!(is_classical("Classical.choice"));
         assert!(is_classical("Classical.em"));
         assert!(!is_classical("propext"));
+    }
+
+    #[test]
+    fn rejects_ambiguous_multiple_reports_including_output_spoofing() {
+        let output = concat!(
+            "'thm' does not depend on any axioms\\n",
+            "'thm' depends on axioms: [sorryAx]"
+        );
+        assert!(matches!(
+            AxiomReport::parse(output),
+            Err(AxiomParseError::MalformedReport(_))
+        ));
+    }
+
+    #[test]
+    fn binds_name_to_report_not_unrelated_quoted_diagnostic() {
+        let output = "warning: unrelated theorem 'other' was skipped\\n'foo' does not depend on any axioms";
+        let report = AxiomReport::parse(output).unwrap();
+        assert_eq!(report.theorem, "foo");
+        assert!(report.axioms.is_empty());
+    }
+
+    #[test]
+    fn rejects_truncated_output_even_when_a_complete_report_precedes_it() {
+        let output = concat!(
+            "'thm' does not depend on any axioms\\n",
+            "[... output truncated at the capture limit ...]"
+        );
+        assert!(matches!(
+            AxiomReport::parse(output),
+            Err(AxiomParseError::MalformedReport(_))
+        ));
     }
 
     #[test]
