@@ -1624,24 +1624,30 @@ mod tests {
 
     #[test]
     fn event_metrics_are_invariant_to_pure_oversampling() {
+        // The same negative event contains one alarm in the coarse stream and ten repeated
+        // alarm samples in the dense stream. Event-level FP remains exactly one in both.
         let coarse = vec![
             shot_for_test(1, true, &[(10.0, true)]),
-            shot_for_test(2, false, &[(0.0, false)]),
+            shot_for_test(2, false, &[(0.0, true)]),
         ];
-        let dense_normal_samples: Vec<(f64, bool)> =
-            (0..=40).map(|index| (index as f64, false)).collect();
+        let dense_negative_samples: Vec<(f64, bool)> =
+            (0..40).map(|index| (index as f64, index % 4 == 0)).collect();
         let dense = vec![
             shot_for_test(1, true, &[(0.0, false), (5.0, false), (10.0, true)]),
-            shot_for_test(2, false, &dense_normal_samples),
+            shot_for_test(2, false, &dense_negative_samples),
         ];
 
         let coarse_results = evaluate_config(&ThresholdConfig::default(), &coarse);
         let dense_results = evaluate_config(&ThresholdConfig::default(), &dense);
 
-        assert_eq!(coarse_results.true_positives, 1);
-        assert_eq!(coarse_results.false_positives, 0);
-        assert_eq!(coarse_results.true_negatives, 1);
-        assert_eq!(coarse_results.false_negatives, 0);
+        for results in [&coarse_results, &dense_results] {
+            assert_eq!(results.true_positives, 1);
+            assert_eq!(results.false_positives, 1);
+            assert_eq!(results.true_negatives, 0);
+            assert_eq!(results.false_negatives, 0);
+            assert_eq!(results.precision(), Some(0.5));
+            assert_eq!(results.false_positive_rate(), Some(1.0));
+        }
         assert_eq!(coarse_results.true_positives, dense_results.true_positives);
         assert_eq!(coarse_results.false_positives, dense_results.false_positives);
         assert_eq!(coarse_results.true_negatives, dense_results.true_negatives);
