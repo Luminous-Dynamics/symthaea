@@ -8,12 +8,15 @@
 //! declared inputs and emits separate arithmetic findings. It deliberately
 //! has no aggregate pass/fail score and grants no physical-operation authority.
 
+#![deny(unsafe_code)]
+
 mod assessor;
 mod model;
 
 pub use assessor::{assess, AssessmentError, AssessmentReport, Finding, FindingStatus};
 pub use model::{
-    DecisionUse, EvidenceClass, EvidenceValue, MarineFreightCase, ProvenanceRecord,
+    BatterySystem, DecisionUse, DutyCycle, EvidenceClass, EvidenceValue, MarineFreightCase,
+    ProvenanceRecord, RouteEnvelope, SystemBoundary, TerminalInterface, VesselGeometry,
 };
 
 /// Frozen maximum claim for this evaluator generation.
