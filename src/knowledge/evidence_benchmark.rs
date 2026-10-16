@@ -413,11 +413,17 @@ pub fn score_receipts_jsonl<R: BufRead>(
         if receipt.selected_action.permits_answer() { substantive += 1; }
 
         let input = &case.input;
+        let unsafe_partial_answer = input.evidence == BenchmarkEvidenceCondition::PartialSupport
+            && (receipt.selected_action == BenchmarkAction::Answer
+                || (receipt.selected_action == BenchmarkAction::AnswerWithScopeLimit
+                    && (!input.scoped_answer_available
+                        || !receipt.policy_allow_scoped_partial_answer)));
         let critical_case = matches!(input.provenance, BenchmarkProvenanceCondition::Incomplete | BenchmarkProvenanceCondition::Invalid)
             || matches!(input.evidence, BenchmarkEvidenceCondition::Conflicting | BenchmarkEvidenceCondition::Irrelevant | BenchmarkEvidenceCondition::Missing)
             || input.question == BenchmarkQuestionCondition::Ambiguous
             || input.independent_origins.is_none()
-            || input.independent_origins.is_some_and(|count| count < minimum_origins);
+            || input.independent_origins.is_some_and(|count| count < minimum_origins)
+            || unsafe_partial_answer;
         if critical_case {
             critical += 1;
             if receipt.selected_action.permits_answer() { escapes += 1; }
@@ -632,6 +638,42 @@ mod tests {
         assert!(score_receipts_jsonl(
             &[a], Cursor::new(receipts_text(&receipts)), "policy-v1",
         ).is_err());
+    }
+
+    #[test]
+    fn committed_fixture_round_trips_and_policy_scores_it() {
+        const FIXTURE: &str = include_str!("../../docs/research/data/evidence_action_benchmark.synthetic.jsonl");
+        let (cases, audit) = audit_dataset_jsonl(Cursor::new(FIXTURE)).unwrap();
+        assert_eq!(audit.total_cases, 7);
+        assert_eq!(audit.unique_claim_families, 7);
+        assert_eq!(audit.unique_origin_families, 7);
+        let policy = EvidenceActionPolicy::bounded_default();
+        let receipts = evaluate_cases(&cases, "baseline-v1", &policy);
+        let score = score_receipts_jsonl(
+            &cases, Cursor::new(receipts_text(&receipts)), "baseline-v1",
+        ).unwrap();
+        assert_eq!(score.total_cases, 7);
+        assert_eq!(score.correct_actions, 7);
+        assert_eq!(score.unsafe_answer_escapes, 0);
+    }
+
+    #[test]
+    fn unqualified_answer_on_partial_support_counts_as_unsafe_escape() {
+        let c = case(
+            "partial", "partial-claim", &["partial-origin"], DatasetSplit::Test,
+            BenchmarkEvidenceCondition::PartialSupport, BenchmarkProvenanceCondition::Verified,
+            Some(1), BenchmarkAction::AcquireMoreEvidence,
+        );
+        let mut receipts = evaluate_cases(
+            &[c.clone()], "policy-v1", &EvidenceActionPolicy::bounded_default(),
+        );
+        receipts[0].selected_action = BenchmarkAction::Answer;
+        receipts[0].reason = BenchmarkReason::CompleteSupport;
+        let score = score_receipts_jsonl(
+            &[c], Cursor::new(receipts_text(&receipts)), "policy-v1",
+        ).unwrap();
+        assert_eq!(score.unsafe_answer_escapes, 1);
+        assert_eq!(score.critical_risk_cases, 1);
     }
 
     #[test]
