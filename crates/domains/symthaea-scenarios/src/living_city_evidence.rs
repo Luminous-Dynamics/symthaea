@@ -390,6 +390,11 @@ impl ScenarioRunReceipt {
     /// Return the gate state for promotion to the next software-workflow stage.
     /// This is not a code-compliance decision, permit, or construction approval.
     pub fn promotion_state(&self) -> PromotionState {
+        // Invalid receipts must never be promoted even if their declared gate
+        // statuses happen to look successful.
+        if self.validate().is_err() {
+            return PromotionState::Blocked;
+        }
         let required = self.gates.iter().filter(|gate| gate.required);
         let mut blocked = false;
         for gate in required {
