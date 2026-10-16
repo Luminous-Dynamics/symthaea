@@ -24,7 +24,6 @@ use crate::rolling_horizon_repair::{
     dispatch_repairs_rolling_horizon, RealizedRepairDuration, RollingHorizonRepairError,
     RollingHorizonRepairReport,
 };
-use std::collections::HashMap;
 
 const EPSILON: f64 = 1.0e-9;
 
