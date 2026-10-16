@@ -146,8 +146,9 @@ elif [ -d /sys/firmware/efi ]; then
             *)   SB_STATE="unknown"; SB_REASON="could not parse EFI variable" ;;
         esac
     else
-        SB_STATE="disabled"
-        SB_REASON=""
+        # Absence of this EFI variable is not evidence that Secure Boot is disabled.
+        SB_STATE="unknown"
+        SB_REASON="SecureBoot EFI variable missing; cannot determine state"
     fi
 else
     SB_STATE="unknown"
@@ -372,16 +373,23 @@ impl SecureBootGuide {
         self.user_confirmed = true;
     }
 
-    /// Confirm the current choice and advance to Confirmed.
-    pub fn confirm(&mut self) {
+    /// Confirm an explicitly selected Secure Boot path.
+    ///
+    /// An unanswered initial query is not consent. Callers must handle this
+    /// error instead of allowing a default method to authorize a consequential
+    /// firmware trust decision.
+    pub fn confirm(&mut self) -> Result<(), &'static str> {
         let method = match &self.current_step {
             SecureBootGuideStep::BiosDisableGuide { .. } => SecureBootMethod::Disabled,
             SecureBootGuideStep::MokExplanation => SecureBootMethod::MokEnrollment,
             SecureBootGuideStep::Confirmed { method } => *method,
-            SecureBootGuideStep::InitialQuery => SecureBootMethod::UseShim,
+            SecureBootGuideStep::InitialQuery => {
+                return Err("Secure Boot method must be explicitly selected before confirmation");
+            }
         };
         self.current_step = SecureBootGuideStep::Confirmed { method };
         self.user_confirmed = true;
+        Ok(())
     }
 
     /// Get the narration text for the current step.
@@ -1636,7 +1644,7 @@ mod tests {
             other => panic!("Expected BiosDisableGuide, got {other:?}"),
         }
 
-        guide.confirm();
+        guide.confirm().expect("an explicit Secure Boot choice was made");
         match &guide.current_step {
             SecureBootGuideStep::Confirmed { method } => {
                 assert_eq!(*method, SecureBootMethod::Disabled);
@@ -1647,12 +1655,38 @@ mod tests {
     }
 
     #[test]
+    fn test_socratic_guide_rejects_confirmation_without_an_explicit_choice() {
+        let mut guide = SecureBootGuide::new();
+        let original_step = guide.current_step.clone();
+
+        let result = guide.confirm();
+
+        assert_eq!(
+            result,
+            Err("Secure Boot method must be explicitly selected before confirmation")
+        );
+        assert_eq!(guide.current_step, original_step);
+        assert!(!guide.user_confirmed);
+    }
+
+    #[test]
+    fn test_linux_probe_missing_efi_variable_is_unknown_not_disabled() {
+        let script = generate_probe_script(TargetPlatform::Linux);
+        assert!(script.contains(
+            "SB_STATE=\"unknown\"\n        SB_REASON=\"SecureBoot EFI variable missing; cannot determine state\""
+        ));
+        assert!(!script.contains(
+            "else\n        SB_STATE=\"disabled\"\n        SB_REASON=\"\"\n    fi"
+        ));
+    }
+
+    #[test]
     fn test_socratic_guide_flow_mok() {
         let mut guide = SecureBootGuide::new();
         guide.choose_mok();
         assert_eq!(guide.current_step, SecureBootGuideStep::MokExplanation);
 
-        guide.confirm();
+        guide.confirm().expect("an explicit Secure Boot choice was made");
         match &guide.current_step {
             SecureBootGuideStep::Confirmed { method } => {
                 assert_eq!(*method, SecureBootMethod::MokEnrollment);
