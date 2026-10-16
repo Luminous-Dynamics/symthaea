@@ -222,6 +222,9 @@ pub struct PolicyRun {
     pub floor_breach_step_indices: Vec<usize>,
     pub longest_consecutive_floor_breach_steps: usize,
     pub first_floor_breach_step: Option<usize>,
+    /// Steps from the first floor breach to the first later restored-service
+    /// step. This does not prove stable recovery; later breaches remain visible.
+    pub steps_to_first_restored_service: Option<usize>,
     pub deployments: Vec<DeploymentRecord>,
     pub deployment_cost_units: u64,
     pub unmet_service_cost_units: u64,
@@ -408,6 +411,12 @@ pub fn evaluate_policy(
         }
     }
 
+    let first_floor_breach_step = floor_breach_step_indices.first().copied();
+    let steps_to_first_restored_service = first_floor_breach_step.and_then(|first_breach| {
+        (first_breach.saturating_add(1)..scenario.steps.len())
+            .find(|step_index| floor_breach_step_indices.binary_search(step_index).is_err())
+            .map(|restored_step| restored_step - first_breach)
+    });
     let deployment_cost_units =
         (deployments.len() as u64).saturating_mul(config.deployment_cost_units);
     let total_cost_units = deployment_cost_units.saturating_add(unmet_service_cost_units);
@@ -422,7 +431,8 @@ pub fn evaluate_policy(
         step_count: scenario.steps.len(),
         unmet_service_units,
         floor_breach_steps: floor_breach_step_indices.len(),
-        first_floor_breach_step: floor_breach_step_indices.first().copied(),
+        first_floor_breach_step,
+        steps_to_first_restored_service,
         floor_breach_step_indices,
         longest_consecutive_floor_breach_steps,
         deployments,
@@ -874,6 +884,39 @@ mod tests {
         let case = scenario("floor-boundary", vec![step(19, 20, observed(19, 20))]);
         let run = evaluate_policy(&case, PolicyKind::NoIntervention, cfg).unwrap();
         assert_eq!(run.floor_breach_steps, 0);
+    }
+
+    #[test]
+    fn first_restoration_delay_is_reported_even_if_a_later_breach_occurs() {
+        let case = scenario(
+            "restoration-not-stability",
+            vec![
+                step(5, 10, observed(5, 10)),
+                step(10, 10, observed(10, 10)),
+                step(5, 10, observed(5, 10)),
+            ],
+        );
+        let run = evaluate_policy(&case, PolicyKind::NoIntervention, config()).unwrap();
+
+        assert_eq!(run.first_floor_breach_step, Some(0));
+        assert_eq!(run.floor_breach_step_indices, vec![0, 2]);
+        assert_eq!(run.steps_to_first_restored_service, Some(1));
+    }
+
+    #[test]
+    fn unrecovered_floor_breach_has_no_restoration_delay() {
+        let case = scenario(
+            "persistent-shortfall",
+            vec![
+                step(5, 10, observed(5, 10)),
+                step(5, 10, observed(5, 10)),
+            ],
+        );
+        let run = evaluate_policy(&case, PolicyKind::NoIntervention, config()).unwrap();
+
+        assert_eq!(run.first_floor_breach_step, Some(0));
+        assert_eq!(run.steps_to_first_restored_service, None);
+        assert_eq!(run.longest_consecutive_floor_breach_steps, 2);
     }
 
     #[test]
