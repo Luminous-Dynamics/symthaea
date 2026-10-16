@@ -34,6 +34,7 @@ The dedicated Rust unit tests cover:
 - expected family spread from the group-balanced policy;
 - rejection of duplicate IDs, dimension mismatch, out-of-range/non-finite features and zero budgets;
 - rejection of unrecognized fields, including a target-energy field;
+- bounded JSONL input handling at the 16 MiB request limit, including oversized-line digest/accounting, record resynchronization and CRLF chunk-boundary fixtures;
 - one-line request digesting and an end-to-end checked-in fixture.
 
 **Execution status:** these tests are authored but have not yet run in the current environment because cargo/rustc are not installed locally. Treat the focused workflow result separately; queued or skipped remains unverified.
