@@ -303,6 +303,8 @@ These are hypotheses to test, not established capabilities.
 
 Report, where supported by the exact labels and assay: task-appropriate ranking/discrimination; calibration and proper scoring rules; false-negative and false-positive behavior; group-held-out performance; uncertainty/abstention coverage; robustness to duplicates, label construction, missingness and assay shifts; experiments per independently qualified outcome; resource cost per qualified discovery; and realized information value per resource unit.
 
+**Partial-label identification is mandatory when outcomes are incomplete.** Report observed-label metrics plus worst/best-case label-assignment bounds within the exact candidate universe. If P is the eligible measured-positive count, pK the measured positives in the top K, U the unknown/unassayed candidate count in that universe, and uK the unknowns in the top K, report conditional recall bounds [pK / (P + U - uK), (pK + uK) / (P + uK)] and precision bounds [pK/K, (pK+uK)/K] where K slots exist. These are not confidence intervals, posterior probabilities, or safety claims; they cannot bound positives omitted from the candidate universe. Never convert unknown/unassayed outcomes into negatives merely to obtain a point estimate. The executable metric kernel is proposed at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs); the detailed contract lives in [CRISPR_TRIAGE_SCORECARD_V1.md](CRISPR_TRIAGE_SCORECARD_V1.md).
+
 Keep efficiency, specificity, bystander outcomes, indels, delivery, immune outcomes, manufacturability and economics as separate axes unless an externally justified utility function is preregistered. Missing values mean “not measured,” not zero risk.
 
 ## Rust-first implementation shape
@@ -312,6 +314,8 @@ Reuse the scientific-discovery, exposure, prospective-scorecard, causal, evidenc
 Initial tooling is deterministic and report-only. A run manifest binds task/data source generation, exact split and grouping policy, model/provider/version/config where knowable, source/transformation digests, metrics, uncertainty procedure, full prediction/result census and stable diagnostics for excluded/invalid examples. Prediction, observation, assessment and replication remain distinct lanes.
 
 Keep orchestration, schema validation, split construction, metric calculation and receipt verification Rust-first. A specialist runtime may be called through a pinned/documented adapter, but it must not become an undeclared dependency or erase output origin/configuration. This contract requires no production Python dependency.
+
+A dependency-free, synthetic-testable metric kernel has been added at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs). It currently validates typed inputs and metrics rather than parsing the JSON contract or hashing artifact bytes; the eventual runner must supply a strict input parser, trusted byte hashing, manifest binding and independent replay. The current authoring environment lacks `rustc`, so the committed Rust tests have not been compiled or run here.
 
 ## Qualification gates
 
@@ -326,6 +330,8 @@ Keep orchestration, schema validation, split construction, metric calculation an
 **Gate 4 — independent review.** An evaluator that did not generate predictions replays the data/metric contract and checks output census, lineage and negative controls.
 
 **Gate 5 — external laboratory validation (future only).** Any physical study requires qualified collaborators, institutional/laboratory authorization, appropriate biosafety and ethics review, justified validation design and independently captured outcomes. A computational result, registry record, publication or digest grants no experimental or clinical authority.
+
+**Gate 6 — incomplete-label sensitivity.** Whenever unknown/unassayed candidates exist in a fixed candidate universe, report partial-identification bounds or an explicit not-estimable state; do not imply completeness beyond the observed/reference scope.
 
 No later gate is implied by passing an earlier one.
 
