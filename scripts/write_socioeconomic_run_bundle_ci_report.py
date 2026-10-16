@@ -43,6 +43,8 @@ REQUIRED_ENV = (
     "CIVOS_SOURCE_REVISION",
     "GITHUB_REPOSITORY",
     "GITHUB_WORKFLOW",
+    "GITHUB_WORKFLOW_REF",
+    "GITHUB_WORKFLOW_SHA",
     "GITHUB_RUN_ID",
     "GITHUB_RUN_ATTEMPT",
     "GITHUB_EVENT_NAME",
@@ -111,6 +113,9 @@ def build_report(
     event_sha = env["GITHUB_SHA"]
     if re.fullmatch(r"[0-9a-f]{40}", event_sha) is None:
         raise ReportFailure("GITHUB_SHA must be a full lowercase 40-character commit SHA")
+    workflow_sha = env["GITHUB_WORKFLOW_SHA"]
+    if re.fullmatch(r"[0-9a-f]{40}", workflow_sha) is None:
+        raise ReportFailure("GITHUB_WORKFLOW_SHA must be a full lowercase 40-character commit SHA")
 
     try:
         checked_out = subprocess.run(
@@ -182,6 +187,8 @@ def build_report(
         "source_revision": source_revision,
         "event_sha": event_sha,
         "workflow": env["GITHUB_WORKFLOW"],
+        "workflow_ref": env["GITHUB_WORKFLOW_REF"],
+        "workflow_sha": workflow_sha,
         "job": env["GITHUB_JOB"],
         "event": env["GITHUB_EVENT_NAME"],
         "run_id": env["GITHUB_RUN_ID"],
@@ -217,6 +224,8 @@ def build_attestation_predicate(report: dict[str, Any], report_bytes: bytes) -> 
         "source_revision": report["source_revision"],
         "event_sha": report["event_sha"],
         "workflow": report["workflow"],
+        "workflow_ref": report["workflow_ref"],
+        "workflow_sha": report["workflow_sha"],
         "run_id": report["run_id"],
         "run_attempt": report["run_attempt"],
         "execution_record_digest": sha256_bytes(report_bytes),
