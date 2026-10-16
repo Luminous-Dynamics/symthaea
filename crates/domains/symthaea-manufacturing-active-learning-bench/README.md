@@ -31,7 +31,7 @@ Every policy sees the same public candidate catalog, profile, costs, budget and 
 - Smooth response.
 - Narrow feasible window.
 - Material/process interaction.
-- Confounded factors; the same scenario-independent relative-cost surface applies to every family.
+- Confounded factors, seeded with three shared diagonal-only prior observations that fail the synthetic target; an off-diagonal experiment is needed to find the synthetic feasible region. The same scenario-independent relative-cost surface applies to every family.
 - Multi-fidelity discrepancy, where the low-cost proxy can be biased relative to the reference measurement.
 
 The response oracle is deterministic and only invoked by the campaign runner for a selected action. A proxy observation is still synthetic, not physical evidence.
@@ -45,6 +45,7 @@ The evaluator currently lives in a separate module in the same crate. It is **no
 ## Key distinctions
 
 - `Feasible`, `Blocked`, and `Unknown` are separate. Only feasible candidates can be selected.
+- The confounded scenario's initial observations are identical across policy arms and their declared costs count against the total campaign budget.
 - Experiment cost and resource values are relative integer units, not currency or lifecycle costing.
 - Quality margin is a toy constraint. A positive margin means synthetic conformance within this fixture only.
 - Full-rank factor excitation is a geometric property, not proof of causal identifiability.
