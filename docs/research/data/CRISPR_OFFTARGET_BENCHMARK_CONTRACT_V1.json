@@ -222,6 +222,15 @@
         "do not infer superiority merely from overlapping/non-overlapping separate policy bounds",
         "label-robust superiority within the fixed candidate universe requires the paired worst-case lower bound to exceed zero"
       ]
+    },
+    {
+      "id": "G8_fixed_budget_cardinality",
+      "required": true,
+      "pass_conditions": [
+        "K is positive and every policy in a fixed-budget comparison has at least K candidates",
+        "underfilled policies report not_estimable_at_budget_K",
+        "no shorter list is silently scored as the same budget"
+      ]
     }
   ],
   "aspirational_engineering_targets": {
@@ -252,7 +261,8 @@
     "rust_metric_kernel_compiled": false,
     "rust_unit_tests_executed": false,
     "partial_label_bounds_executed": false,
-    "paired_delta_label_sensitivity_bounds_executed": false
+    "paired_delta_label_sensitivity_bounds_executed": false,
+    "fixed_budget_cardinality_fixtures_executed": false
   },
   "implementation_artifact": {
     "path": "scripts/crispr_triage_verifier.rs",
