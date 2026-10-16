@@ -498,6 +498,7 @@ fn choose_experiment(
     spent: u32,
     budget: u32,
     selection_count: usize,
+    round_robin_offset: usize,
     rng: &mut SplitMix64,
     catalog: &[Experiment],
 ) -> Option<usize> {
@@ -516,7 +517,9 @@ fn choose_experiment(
             .into_iter()
             .min_by_key(|index| (catalog[*index].cost_units, *index)),
         Policy::RoundRobin => {
-            let desired = Parameter::ALL[selection_count % Parameter::ALL.len()];
+            let desired = Parameter::ALL[
+                (round_robin_offset + selection_count) % Parameter::ALL.len()
+            ];
             affordable.iter()
                 .copied()
                 .filter(|index| catalog[*index].target == desired)
@@ -572,7 +575,15 @@ fn run_policy(
             break;
         }
         let Some(index) = choose_experiment(
-            policy, &current, &available, spent, budget, selected, &mut rng, catalog,
+            policy,
+            &current,
+            &available,
+            spent,
+            budget,
+            selected,
+            (seed % Parameter::ALL.len() as u64) as usize,
+            &mut rng,
+            catalog,
         ) else { break };
         let experiment = &catalog[index];
         simulate_experiment(scenario, &mut current, experiment);
@@ -620,10 +631,12 @@ fn exhaustive_toy_oracle(
 
     for mask in 1..subset_count {
         let mut cost = 0_u32;
+        let mut selected_indices = Vec::new();
         let mut valid = true;
         for (index, experiment) in catalog.iter().enumerate() {
             if mask & (1 << index) != 0 {
                 cost = cost.saturating_add(experiment.cost_units);
+                selected_indices.push(index);
                 if cost > budget {
                     valid = false;
                     break;
@@ -634,18 +647,21 @@ fn exhaustive_toy_oracle(
             continue;
         }
 
+        // The selected subset has no inherent sequence. Use canonical
+        // cost-then-ID ordering to make its cost-to-resolution metric reproducible.
+        selected_indices.sort_by_key(|index| (catalog[*index].cost_units, *index));
         let mut current = initial;
         let mut cumulative_cost = 0_u32;
         let mut cost_to_resolution = if is_fully_resolved(&current) { Some(0) } else { None };
-        for (index, experiment) in catalog.iter().enumerate() {
-            if mask & (1 << index) != 0 {
-                simulate_experiment(scenario, &mut current, experiment);
-                cumulative_cost += experiment.cost_units;
-                if cost_to_resolution.is_none() && is_fully_resolved(&current) {
-                    cost_to_resolution = Some(cumulative_cost);
-                }
+        for index in selected_indices {
+            let experiment = &catalog[index];
+            simulate_experiment(scenario, &mut current, experiment);
+            cumulative_cost += experiment.cost_units;
+            if cost_to_resolution.is_none() && is_fully_resolved(&current) {
+                cost_to_resolution = Some(cumulative_cost);
             }
         }
+
         let candidate = summarize_state(
             scenario.id,
             &initial,
