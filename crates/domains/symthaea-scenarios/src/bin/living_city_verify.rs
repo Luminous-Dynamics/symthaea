@@ -41,7 +41,8 @@ use symthaea_scenarios::living_city_hazard_profiles::{
     HazardProfile, evaluate_hazard_profile,
 };
 use symthaea_scenarios::living_city_grid_reference::{
-    GRID_REFERENCE_CASE_ID, GRID_REFERENCE_SUITE_VERSION, run_grid_reference_case,
+    GRID_REFERENCE_CASE_IDS, GRID_REFERENCE_SUITE_ID, GRID_REFERENCE_SUITE_VERSION,
+    run_grid_reference_suite,
 };
 
 const BUNDLE_SCHEMA_VERSION: u32 = 2;
@@ -98,7 +99,13 @@ fn scenario_configuration_sha256(
     let graph_bytes = canonical_service_graph_bytes(graph)?;
     // Pin the built-in solver reference suite/case identity into the same
     // config digest that binds the scenario profile and dependency graph.
-    let reference_suite = format!("{GRID_REFERENCE_SUITE_VERSION}:{GRID_REFERENCE_CASE_ID}").into_bytes();
+    let reference_suite = format!(
+        "{}:{}:{}",
+        GRID_REFERENCE_SUITE_VERSION,
+        GRID_REFERENCE_SUITE_ID,
+        GRID_REFERENCE_CASE_IDS.join(",")
+    )
+    .into_bytes();
     let mut bytes = Vec::new();
     for component in [&profile_bytes, &binding_bytes, &graph_bytes, &reference_suite] {
         bytes.extend_from_slice(&(component.len() as u64).to_le_bytes());
@@ -252,28 +259,38 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
     let failed_services = cascade.dependency_assessment.failed_ids();
     let degraded_services = cascade.dependency_assessment.degraded_ids();
     let graph_sha256 = sha256_hex(&canonical_service_graph_bytes(&service_graph)?);
-    let grid_reference = match run_grid_reference_case() {
-        Ok(result) => serde_json::json!({
+    let grid_reference_suite = match run_grid_reference_suite() {
+        Ok(results) => serde_json::json!({
             "status": "passed",
-            "suite_version": result.suite_version,
-            "case_id": result.case_id,
-            "analytical_voltage_v": result.analytical_voltage_v,
-            "solver_voltage_v": result.solver_voltage_v,
-            "absolute_voltage_error_v": result.absolute_voltage_error_v,
-            "expected_branch_power_kw": result.expected_branch_power_kw,
-            "solver_branch_power_kw": result.solver_branch_power_kw,
-            "absolute_branch_power_error_kw": result.absolute_branch_power_error_kw,
-            "scope": "Single-branch linearized DistFlow analytical regression only; not nonlinear AC power-flow validation or a real-outage simulation."
+            "suite_version": GRID_REFERENCE_SUITE_VERSION,
+            "suite_id": GRID_REFERENCE_SUITE_ID,
+            "declared_case_ids": GRID_REFERENCE_CASE_IDS,
+            "case_count": results.len(),
+            "cases": results.iter().map(|result| serde_json::json!({
+                "case_id": result.case_id,
+                "analytical_voltage_v": result.analytical_voltage_v,
+                "solver_voltage_v": result.solver_voltage_v,
+                "absolute_voltage_error_v": result.absolute_voltage_error_v,
+                "expected_branch_power_kw": result.expected_branch_power_kw,
+                "solver_branch_power_kw": result.solver_branch_power_kw,
+                "absolute_branch_power_error_kw": result.absolute_branch_power_error_kw,
+                "checked_bus_count": result.checked_bus_count,
+                "max_absolute_voltage_error_v": result.max_absolute_voltage_error_v,
+                "max_absolute_branch_power_error_kw": result.max_absolute_branch_power_error_kw
+            })).collect::<Vec<_>>(),
+            "scope": "Four analytical linearized DistFlow regression cases (real load, reactive load, two-segment radial feeder, and DER voltage rise). This is not nonlinear AC power-flow validation or a real-outage simulation."
         }),
         Err(error) => serde_json::json!({
             "status": "failed",
             "suite_version": GRID_REFERENCE_SUITE_VERSION,
-            "case_id": GRID_REFERENCE_CASE_ID,
+            "suite_id": GRID_REFERENCE_SUITE_ID,
+            "case_id": error.case_id,
+            "field": error.field,
             "reason": error.to_string(),
-            "scope": "Single-branch linearized DistFlow analytical regression only; not nonlinear AC power-flow validation or a real-outage simulation."
+            "scope": "Four analytical linearized DistFlow regression cases (real load, reactive load, two-segment radial feeder, and DER voltage rise). This is not nonlinear AC power-flow validation or a real-outage simulation."
         }),
     };
-    let grid_reference_passed = grid_reference["status"] == "passed";
+    let grid_reference_passed = grid_reference_suite["status"] == "passed";
     let promotion_state = match receipt.promotion_state().as_str() {
         "failed" => "failed",
         "blocked" => "blocked",
@@ -292,7 +309,7 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         "receipt_sha256": receipt_sha256,
         "configuration_sha256": actual_configuration_sha256,
         "workflow_promotion_state": promotion_state,
-        "domain_reference_check": grid_reference,
+        "domain_reference_suite": grid_reference_suite,
         "hazard_profile_id": cascade.profile_id,
         "hazard_profile_sha256": cascade.profile_sha256,
         "service_graph_sha256": graph_sha256,
@@ -578,10 +595,14 @@ mod tests {
         assert_eq!(report["verified_source_count"], 2);
         assert_eq!(report["verified_output_count"], 1);
         assert_eq!(report["hazard_profile_id"], "synthetic-compound-profile/r1");
-        assert_eq!(report["domain_reference_check"]["status"], "passed");
+        assert_eq!(report["domain_reference_suite"]["status"], "passed");
         assert_eq!(
-            report["domain_reference_check"]["case_id"],
-            GRID_REFERENCE_CASE_ID
+            report["domain_reference_suite"]["case_count"],
+            GRID_REFERENCE_CASE_IDS.len()
+        );
+        assert_eq!(
+            report["domain_reference_suite"]["declared_case_ids"],
+            serde_json::json!(GRID_REFERENCE_CASE_IDS)
         );
         assert_eq!(
             report["workflow_promotion_state"],
