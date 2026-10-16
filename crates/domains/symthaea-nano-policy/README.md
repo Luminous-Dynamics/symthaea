@@ -50,6 +50,18 @@ cargo run -p symthaea-nano-policy --release --locked < request.json
 
 This crate is intentionally small and uses the workspace's pinned serde and serde_json dependencies. A dedicated targeted workflow checks format, tests, and Clippy. If the Rust toolchain is unavailable locally, don't claim local compilation; rely on exact-head workflow evidence only when its job actually completes successfully.
 
+## Prototype acceptance and performance profile
+
+Software acceptance before scientific use:
+- all 12 unit tests pass on the exact commit;
+- formatting and Clippy pass with warnings denied;
+- same canonical request produces the same ordered IDs for both policies, independent of input row order;
+- unknown target/outcome fields fail parsing;
+- all candidate IDs and budget slots are accounted for, and no candidate is selected twice;
+- the locked dependency graph is unchanged except for this package.
+
+Profile in release mode using synthetic descriptor pools first (synthetic data is a software test, not a scientific result): pool sizes 1,000 / 10,000 / 100,000; dimensions 8 / 64 / 256; budgets 1 / 10 / 100, then higher only within memory/time limits. Record p50/p95 wall time, peak resident memory, input size, selected count and deterministic output digest on a named CPU. Benchmark random and maximin separately. Do not set an absolute runtime pass target until a reference machine and baseline are measured; once measured, preregister the selector-overhead budget relative to the actual forward oracle.
+
 ## Required next steps before scientific use
 
 1. Obtain descriptor rows from a rights-cleared and pinned nanophotonic dataset, and establish exact identity and group/split lineage.
