@@ -1666,6 +1666,14 @@ mod tests {
 
     #[test]
     fn undefined_metrics_are_not_scoreable() {
+        let empty: Vec<CModShot> = Vec::new();
+        let empty_results = evaluate_config(&ThresholdConfig::default(), &empty);
+        assert_eq!(empty_results.recall(), None);
+        assert_eq!(empty_results.precision(), None);
+        assert_eq!(empty_results.false_positive_rate(), None);
+        assert_eq!(empty_results.f1_score(), None);
+        assert_eq!(objective(&ThresholdConfig::default(), &empty), f64::NEG_INFINITY);
+
         let no_disruptions = vec![shot_for_test(1, false, &[(0.0, false)])];
         let results = evaluate_config(&ThresholdConfig::default(), &no_disruptions);
         assert_eq!(results.recall(), None);
@@ -1673,6 +1681,14 @@ mod tests {
         assert_eq!(results.f1_score(), None);
         assert_eq!(results.false_positive_rate(), Some(0.0));
         assert_eq!(objective(&ThresholdConfig::default(), &no_disruptions), f64::NEG_INFINITY);
+
+        let false_alarm_only = vec![shot_for_test(4, false, &[(0.0, true)])];
+        let results = evaluate_config(&ThresholdConfig::default(), &false_alarm_only);
+        assert_eq!(results.recall(), None);
+        assert_eq!(results.precision(), Some(0.0));
+        assert_eq!(results.f1_score(), None);
+        assert_eq!(results.false_positive_rate(), Some(1.0));
+        assert_eq!(objective(&ThresholdConfig::default(), &false_alarm_only), f64::NEG_INFINITY);
 
         let no_negative_examples = vec![shot_for_test(2, true, &[(10.0, true)])];
         let results = evaluate_config(&ThresholdConfig::default(), &no_negative_examples);
