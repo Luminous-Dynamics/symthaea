@@ -81,6 +81,14 @@
           }
         }
       }
+    },
+    "cost_unit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64,
+      "description": "Unit for every estimated_cost; required by cost_aware_farthest_first."
     }
   },
   "allOf": [
@@ -109,8 +117,16 @@
                 }
               }
             }
+          },
+          "cost_unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           }
-        }
+        },
+        "required": [
+          "cost_unit"
+        ]
       }
     }
   ]
