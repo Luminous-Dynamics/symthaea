@@ -153,7 +153,19 @@ Choose a single primary measure before the held-out test:
 
 Compare against random valid candidate, spectral nearest-neighbour/library search, and the applicable MOCLIP/adjoint baseline, plus a Symthaea ablation and negative control. Target +5 percentage points Success@K or >=20% lower median best-so-far MSE, with a paired/cluster-aware 95% interval excluding no improvement, at equal budgets. Include fabrication-robustness perturbations as a separate metric, not folded silently into the same score.
 
-## 6. How to set numerical targets responsibly
+## 6. Separate immediate discovery from learning the response space
+
+A useful additional paradigm shift is to optimize not only which candidate looks most promising *now*, but also which measurement will most improve the model used for later decisions. A 2026 materials-discovery study reports that deliberately sampling both high and low extrema of a response distribution improved generalization versus uniform or one-sided sampling in its tested benchmarks and materials datasets: [Wu et al., *Data Distribution Matters*](https://doi.org/10.1016/j.actphy.2026.100291). This is a task-specific result to reproduce, not a guarantee that extreme sampling always wins.
+
+Keep at least four policies distinct:
+- **Immediate exploitation:** choose candidates predicted closest to the application target.
+- **Uncertainty acquisition:** query where a suitable, validated estimator predicts high uncertainty.
+- **Diversity/coverage:** sample descriptor or family regions that are underrepresented.
+- **Two-sided response coverage:** query candidates from both high and low pre-query predicted-response tails to improve future model coverage/generalization.
+
+This fourth objective is not identical to maximizing immediate Success@K. Report full held-out prediction error/uncertainty by response quantile and candidate family *separately* from discovery-success curves. The current Rust kernel [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568) deliberately excludes predictions and labels from its v1 request contract; do not smuggle them into descriptor fields. A two-sided policy belongs in a separately versioned sequential loop after the task-specific predictor is frozen, with each label revealed only after the candidate is selected.
+
+## 7. How to set numerical targets responsibly
 
 1. **Match the scientific task.** Use reported results only when target, input, split, units, oracle, and metric implementation match.
 2. **Establish the baseline first.** If the paper's run is unreproducible, report that; do not make an arbitrary target stand in for the missing baseline.
@@ -162,7 +174,7 @@ Compare against random valid candidate, spectral nearest-neighbour/library searc
 5. **Keep hard constraints hard.** No accuracy gain compensates for leakage, invalid candidates, failed rights review, unsafe data use, or missing critical controls.
 6. **Use staged claims.** Source verified → execution verified → baseline reproduced → policy improvement demonstrated → out-of-domain robustness examined → independently measured physical performance. Each is a distinct evidence state.
 
-## 7. Immediate implementation order
+## 8. Immediate implementation order
 
 1. Finish NANO-001 data admission and exact-head Rust verifier validation; do not wait idle for unrelated CI, but never relabel skipped/queued as passed.
 2. For NANO-003, pin and inspect MADE's exact source/configs, then run plumbing-only smoke and reproduce baselines before a Symthaea arm.
@@ -170,6 +182,6 @@ Compare against random valid candidate, spectral nearest-neighbour/library searc
 4. Compare nanophotonics with 2D materials and metrology on NANO-002's readiness criteria, then select one follow-on domain. Avoid concurrent uncontrolled implementations.
 5. Use a Rust-first Symthaea selector adapter only after the baseline tasks and interface semantics are frozen. Scientific tools may retain isolated research runtimes; never add an unqualified Python model stack to production Symthaea by accident.
 
-## 8. Success definition for the program
+## 9. Success definition for the program
 
 The program succeeds when it can **reproducibly show where Symthaea improves evidence-gathering decisions and where it does not**, across carefully chosen scientific tasks, while respecting distinct physical models, data rights, risk constraints, and uncertainty. Discovering a physically useful nanotechnology is a later, more demanding claim requiring independent experimental evidence.
