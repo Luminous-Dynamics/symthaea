@@ -9,7 +9,7 @@
 **Cross-domain benchmark policy:** [NANOTECHNOLOGY_BENCHMARK_CHARTER.md](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md) defines universal evidence gates plus domain-specific metrics and provisional thresholds.  
 **NIST Fe–Co–Ni measured thin-film benchmark:** [NANOTECHNOLOGY_NIST_FECO_NI_BENCHMARK_PLAN.md](./NANOTECHNOLOGY_NIST_FECO_NI_BENCHMARK_PLAN.md), tracked by [NANO-007](https://github.com/Luminous-Dynamics/symthaea/issues/7644). It is an offline replay of 921 historic measured samples and is blocked on explicit data-use terms, local integrity/schema validation, and baseline reproduction.
 **Follow-on domain gate:** [NANO-002](https://github.com/Luminous-Dynamics/symthaea/issues/7507)  
-**Rust candidate selector:** [tools/nano-policy](../../tree/research/nano-001-atomistic-discovery/tools/nano-policy), tracked by [NANO-005](https://github.com/Luminous-Dynamics/symthaea/issues/7643)  
+**Rust candidate selector reference:** [tools/nano-policy](../../tree/research/nano-001-atomistic-discovery/tools/nano-policy) is a lightweight isolated baseline; the canonical kernel and independent outcome evaluator are in [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568), tracked by [NANO-005 issue #7570](https://github.com/Luminous-Dynamics/symthaea/issues/7570).  
 **Evidence status:** literature review and source-planning only; no new domain data or models were run.
 
 ## 1. The key reframing: nanotechnology is not one field or one model
