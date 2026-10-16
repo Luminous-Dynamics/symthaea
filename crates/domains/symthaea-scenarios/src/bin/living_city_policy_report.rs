@@ -145,9 +145,15 @@ fn build_report() -> Result<PolicyReportEnvelope, Box<dyn Error>> {
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        println!(
-            "living_city_policy_report\n\nRuns the deterministic synthetic-only Living City baseline suite and emits a SHA-256-bound JSON report. This is not a physical city model."
-        );
+        let help = [
+            "living_city_policy_report",
+            "",
+            "Runs the deterministic synthetic-only Living City baseline suite",
+            "and emits a SHA-256-bound JSON report.",
+            "This is not a physical city model.",
+        ]
+        .join("\n");
+        println!("{help}");
         return Ok(());
     }
     if !args.is_empty() {
