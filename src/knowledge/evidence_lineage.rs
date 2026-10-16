@@ -395,12 +395,17 @@ mod tests {
             })
             .collect();
 
-        let result = EvidenceLineageAssessment::assess(&witnesses, &EvidenceLineagePolicy::strict());
+        let result = EvidenceLineageAssessment::assess(
+            &witnesses,
+            &EvidenceLineagePolicy::strict(),
+        );
         assert_eq!(result.raw_witness_count, 10);
         assert_eq!(result.duplicate_witness_count, 9);
         assert_eq!(result.attributed_origin_group_count, 1);
         assert_eq!(result.decision, EvidenceLineageDecision::Abstain);
-        assert!(result.reasons.contains(&EvidenceLineageAbstentionReason::InsufficientDistinctOrigins));
+        assert!(result
+            .reasons
+            .contains(&EvidenceLineageAbstentionReason::InsufficientDistinctOrigins));
     }
 
     #[test]
@@ -425,7 +430,9 @@ mod tests {
         assert_eq!(result.duplicate_witness_count, 1);
         assert_eq!(result.attributed_origin_group_count, 1);
         assert_eq!(result.groups[0].origin_ids, vec!["origin-A", "origin-B"]);
-        assert!(result.reasons.contains(&EvidenceLineageAbstentionReason::ConflictingOriginAssertions));
+        assert!(result
+            .reasons
+            .contains(&EvidenceLineageAbstentionReason::ConflictingOriginAssertions));
         assert_eq!(result.decision, EvidenceLineageDecision::Abstain);
     }
 
