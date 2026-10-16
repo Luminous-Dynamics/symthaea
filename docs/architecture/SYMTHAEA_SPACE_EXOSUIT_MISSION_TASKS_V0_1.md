@@ -32,7 +32,7 @@ Task dependencies are checked against the SX-031 mission report and the SX-028 s
 | Required connection absent or blocked | Blocker | Degradation |
 | Task environment outside the connection's declared policy scope | Blocker | Degradation |
 
-An optional task cannot waive a blocker in the base mission graph. An incompatible connection cannot be used as a path merely because an edge declaration exists. SX-031's connectivity check is likewise restricted to edges that meet their pairwise software policy.
+An optional task cannot waive a blocker in the base mission graph. An incompatible connection cannot be used as a path merely because an edge declaration exists. SX-031's connectivity check is likewise restricted to edges that meet their pairwise software policy. The task evaluator caches reachability by distinct environment set and indexes component/connection IDs once per evaluation, avoiding a full graph traversal for every task when tasks share an operating context.
 
 Aggregate status is Blocked when the base graph or any required task is blocked, Degraded when no blocker exists but an optional task or base configuration is degraded, and MeetsDeclaredTaskPolicy otherwise.
 
