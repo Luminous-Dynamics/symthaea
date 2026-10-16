@@ -1,6 +1,6 @@
 # Aircraft energy screening kernel
 
-This crate is the first executable tranche for [AIRCRAFT-ENERGY-001](https://github.com/Luminous-Dynamics/symthaea/issues/7646).
+This crate is the first executable tranche for [AIRCRAFT-ENERGY-001](https://github.com/Luminous-Dynamics/symthaea/issues/7646). Its provenance boundary composes the existing Mycelix [AeroCommons engineering/manufacturing commons](https://github.com/Luminous-Dynamics/mycelix/issues/3638) and [physical-evidence reproducibility challenge](https://github.com/Luminous-Dynamics/mycelix/issues/3643); it does not duplicate their records or mint engineering approval.
 
 ## Purpose
 
@@ -64,7 +64,7 @@ For hybrid-electric, fission, or fusion concepts, the upstream analysis must pro
 
 ## Initial adversarial tests
 
-The unit tests include hand-computed battery derating, mission-energy arithmetic, energy shortfall despite sufficient power, peak-power shortfall despite sufficient energy, continuous-power shortfall, cumulative peak-duration limit, missing evidence, non-finite inputs, duplicate segment identity, and invalid battery derating.
+The 14 unit tests include hand-computed battery derating, mission-energy arithmetic, energy shortfall despite sufficient power, peak-power shortfall despite sufficient energy, continuous-power shortfall, cumulative peak-duration limit, missing energy and duty-class evidence, non-finite inputs, duplicate segment identity, invalid battery derating, invalid reserve, energy arithmetic overflow, and zero-duration rejection.
 
 These are software-contract tests, not empirical battery characterization or aircraft validation. Before external performance claims, add an independently frozen mission corpus, independent expected values/oracle, source/model provenance, held-out reference measurements, uncertainty bounds, and comparisons against conventional tools.
 
