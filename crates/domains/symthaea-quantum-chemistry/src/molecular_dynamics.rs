@@ -272,6 +272,9 @@ impl std::fmt::Display for MdInputError {
             ),
             Self::NonFiniteTimeStep => write!(f, "time step dt must be finite"),
             Self::NonPositiveTimeStep => write!(f, "time step dt must be greater than zero"),
+            Self::NonFiniteTimeStepSquared => {
+                write!(f, "squared time step dt^2 must be finite for Velocity-Verlet integration")
+            }
             Self::NonFiniteTemperature => write!(f, "temperature must be finite"),
             Self::NegativeTemperature => write!(f, "temperature must be non-negative"),
             Self::NonFiniteFiniteDifferenceStep => write!(f, "finite-difference step must be finite"),
@@ -310,6 +313,11 @@ pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), 
     }
     if !(config.dt * config.n_steps as f64).is_finite() {
         return Err(MdInputError::NonFiniteTrajectoryDuration);
+    }
+    // Velocity-Verlet multiplies by dt squared; reject overflow before the
+    // force/SCF loop even when the total duration remains finite.
+    if !(config.dt * config.dt).is_finite() {
+        return Err(MdInputError::NonFiniteTimeStepSquared);
     }
     if !config.temperature.is_finite() {
         return Err(MdInputError::NonFiniteTemperature);
@@ -666,6 +674,14 @@ mod tests {
         assert_eq!(
             validate_md_inputs(&molecule, &config),
             Err(MdInputError::NonFiniteTrajectoryDuration)
+        );
+
+        // A one-step run can have finite duration but overflowing dt squared.
+        config.n_steps = 1;
+        config.dt = 1.0e200;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteTimeStepSquared)
         );
     }
 
