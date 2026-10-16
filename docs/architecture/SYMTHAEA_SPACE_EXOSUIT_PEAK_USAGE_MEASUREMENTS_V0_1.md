@@ -53,7 +53,8 @@ The unit tests include:
 - positive observed usage with no overlapping declared forecast;
 - stale SX-034 receipt rejection;
 - resource-kind mismatch and invalid measurement window;
-- input order invariance and receipt mutation rejection.
+- input order invariance and receipt mutation rejection;
+- a deterministic 2,000-case interval corpus spanning forecast and usable-capacity boundaries, with exact observation status plus possible/definite capacity-exceedance counters asserted for every seed.
 
 The integration replay independently reimplements the canonical measurement-plan, report and receipt digest encoding and checks baseline conformance, forecast drift and definite budget exceedance. All mission IDs, providers, revisions, usage values and evidence references are synthetic. The fixtures are not instrumentation data or physical validation.
 
@@ -69,7 +70,7 @@ These targets are not measured results. Before enabling timing gates, freeze the
 | Possible budget overrun (observed upper > usable capacity >= observed lower) | 100% degraded, not labelled definite |
 | Forecast upper-bound mutation / measurement mutation | 100% receipt rejection |
 | Observation permutation | Identical report/receipt across 1,000 permutations |
-| Generated usage/forecast corpus | 2,000 seeded interval cases, zero unexpected panics |
+| Generated usage/forecast corpus beyond the implemented 2,000-case classification sweep | 2,000 seeded interval cases, zero unexpected panics |
 | Scale target | 10,000 measurements / 100 pools p95 under 250 ms on a documented runner |
 
 For every 100% claim, record numerator, denominator, seed and the corpus manifest. Preserve definite/possible boundary examples and positive controls.
