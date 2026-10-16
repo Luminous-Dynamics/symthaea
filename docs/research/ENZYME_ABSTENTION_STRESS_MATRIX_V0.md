@@ -2,7 +2,7 @@
 
 **Status:** exploratory software benchmark specification; not a validated statistical decision rule.  
 **Implementation:** `xtask enzyme-abstention-matrix`, in `xtask/src/enzyme_abstention_matrix.rs`.  
-**Output:** machine-readable JSON with every scenario, fitted candidate, chosen action, reason, and denominator.  
+**Output:** machine-readable JSON with every exact synthetic observation, fitted candidate, per-gate boolean, chosen action, reason, and denominator.  
 **Relationship:** stacked on [Symthaea PR #7456](https://github.com/Luminous-Dynamics/symthaea/pull/7456); do not read its existence as a passing benchmark.
 
 ## Research question
@@ -43,7 +43,7 @@ These cutoffs are **heuristics, not calibrated confidence levels**. The fitted-p
 
 A hard boundary is intentional: **noise can conceal model misspecification**. In a high-noise Hill-generated case, both candidate fits may look plausible at the declared noise scale even though the known generator is outside the candidate set. The policy can then choose the better of two inadequate explanations. The report exposes this as a false-decisive outcome against the known synthetic target; that outcome must not be hidden by reporting only the winners. It also demonstrates why these controls need a power/detectability annotation before they become a pass/fail gate for a calibrated decision rule.
 
-The report stores both the *expected decision* for each prespecified stratum and the *observed decision*, plus the reason for each outcome. A target hit-rate is descriptive. The matrix generator does not turn its own target rate into a scientific pass.
+The report stores the exact synthetic observations and parameter-grid bounds, both the *expected decision* for each prespecified stratum and the *observed decision*, every gate's Boolean result, and the reason for each outcome. A selected label means only "better-supported among the two supplied candidates"; it is not a mechanistic-truth claim or proof that the candidate set is complete. A target hit-rate is descriptive. The matrix generator does not turn its own target rate into a scientific pass.
 
 ## Why this is a paradigm shift
 
