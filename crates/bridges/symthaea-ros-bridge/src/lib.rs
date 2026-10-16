@@ -2192,6 +2192,78 @@ mod tests {
     }
 
     #[test]
+    fn temporal_admission_rejects_malformed_stamps_and_unverifiable_receipts() {
+        let valid_domain = RosClockDomainV1::Named("robot-sim-clock".into());
+        let imu = temporal_test_sample(100, 0, valid_domain.clone());
+
+        let invalid_nanosec = temporal_test_sample(100, 1_000_000_000, valid_domain.clone());
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &invalid_nanosec,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::InvalidClock {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+
+        let negative_stamp = temporal_test_sample(-1, 0, valid_domain.clone());
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &negative_stamp,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::InvalidClock {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+
+        let mut no_sequence = temporal_test_sample(100, 0, valid_domain.clone());
+        no_sequence.receive_sequence = None;
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &no_sequence,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::ReceiptUnavailable {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+
+        let wrong_now = RosClockNowV1 {
+            domain: RosClockDomainV1::Named("wall-clock".into()),
+            timestamp_ns: 100_000_000_000,
+        };
+        let joint = temporal_test_sample(100, 0, valid_domain);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &joint,
+                Some(&imu),
+                &wrong_now,
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::Unsynchronized { .. }
+        ));
+    }
+
+    #[test]
     fn temporal_admission_rejects_missing_imu_and_invalid_policy() {
         let joint = temporal_test_sample(
             100,
