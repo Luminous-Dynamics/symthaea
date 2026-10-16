@@ -355,21 +355,24 @@ An offline verifier command is now also present at crates/domains/symthaea-scena
 
 ## 16. Offline run-package verifier
 
-An initial verifier executable is available at crates/domains/symthaea-scenarios/src/bin/living_city_verify.rs. It reads a retained package from disk, uses strict typed JSON parsing, rejects unknown fields, constrains file paths to the canonical package root (including symlink resolution), streams SHA-256 across large files, and checks the exact source/output ID sets and receipt-to-manifest linkage.
+The verifier executable is at crates/domains/symthaea-scenarios/src/bin/living_city_verify.rs. Bundle schema v2 loads a typed evidence manifest, scenario-run receipt, versioned hazard profile, profile binding and service dependency graph. It uses strict JSON parsing, rejects unknown fields, constrains file paths to the canonical package root (including symlink resolution), streams SHA-256 across large source/output files, verifies exact source/output ID sets, binds the receipt to the manifest, evaluates the evidence-linked hazard profile against the declared graph, and verifies the configuration digest binds the profile, profile binding and canonical graph.
 
 ### Package layout
 
-A run directory contains bundle.json, the referenced manifest and receipt JSON files, a receipt digest sidecar, and retained source/output files. The bundle schema is version 1:
+A run directory contains bundle.json, manifest.json, receipt.json, receipt.sha256, hazard-profile.json, profile-binding.json, service-graph.json, and all retained source/output files. A bundle schema v2 example:
 
 ~~~json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "manifest_path": "manifest.json",
   "receipt_path": "receipt.json",
   "receipt_sha256_path": "receipt.sha256",
+  "hazard_profile_path": "hazard-profile.json",
+  "profile_binding_path": "profile-binding.json",
+  "service_graph_path": "service-graph.json",
   "source_files": [
-    {"id": "survey-a", "path": "sources/survey.geojson"},
-    {"id": "weather-b", "path": "sources/weather.csv"}
+    {"id": "heat-basis", "path": "sources/heat-basis.json"},
+    {"id": "outage-basis", "path": "sources/outage-basis.json"}
   ],
   "output_files": [
     {"id": "metrics", "path": "outputs/metrics.json"}
@@ -377,9 +380,32 @@ A run directory contains bundle.json, the referenced manifest and receipt JSON f
 }
 ~~~
 
-The manifest and receipt are JSON encodings of the versioned Rust types, with enum values in snake_case; unknown fields are rejected. Each non-missing manifest item needs exactly one source-file binding with the corresponding ID. Each receipt output needs exactly one output-file binding. An item declared missing must not have a source-file binding; decision-critical gaps must still be blocked by required project gates.
+The service graph has schema version 1 and typed nodes/dependencies, for example:
 
-The receipt digest sidecar contains the lowercase SHA-256 digest of the receipt's canonical representation, followed by an optional newline. The receipt, in turn, binds to the canonical evidence-manifest digest. All file paths must be relative and resolve to regular files within the run directory. The verifier streams contents instead of buffering potentially large GIS/BIM/simulation artifacts.
+~~~json
+{
+  "schema_version": 1,
+  "nodes": [
+    {"id": "grid", "domain": "electricity"},
+    {"id": "cooling-centre", "domain": "cooling"}
+  ],
+  "dependencies": [
+    {
+      "dependent_id": "cooling-centre",
+      "prerequisite_id": "grid",
+      "mode": "required"
+    }
+  ]
+}
+~~~
+
+The manifest and receipt use the versioned Rust types, with enum values in snake_case; unknown fields are rejected. Every non-missing manifest item needs exactly one source-file binding with the same ID and matching file digest. Every receipt output needs exactly one output-file binding. Explicitly missing sources have no source-file binding. A missing source can be structurally recorded, but whether it blocks progression depends on the project's mandatory evidence gates and decision-critical requirements.
+
+Every hazard parameter and initiating service failure must reference an item in the exact manifest for the same benchmark scenario, and the item must not be marked missing. The profile binding must identify the profile revision and match its recomputed canonical digest. Each benchmark-declared hazard needs at least one finite parameter with an explicit unit and evidence ID.
+
+The receipt's configuration_sha256 binds three canonical components: the hazard profile's canonical bytes, the serialized profile binding, and the canonical service graph. The graph canonicalizer sorts nodes by ID and dependency edges by their declared order key; each component is preceded by its length as an unsigned 64-bit little-endian integer before the combined bytes are hashed. The receipt separately binds to the evidence-manifest digest. The receipt.sha256 sidecar contains the lowercase SHA-256 digest of the receipt's canonical representation, optionally followed by a newline.
+
+All paths must be relative and resolve to regular files inside the run directory. The verifier streams file contents instead of buffering potentially large GIS/BIM/simulation artifacts.
 
 Run from a repository checkout using:
 
@@ -387,10 +413,11 @@ Run from a repository checkout using:
 cargo run -p symthaea-scenarios --bin living_city_verify -- path/to/run-package
 ~~~
 
-On success, stdout contains a JSON report with package_integrity set to verified, the scenario/commit identifiers, recomputed manifest/receipt digests, and verified source/output counts. Verification errors exit with status 2 and a diagnostic on stderr. Tests now include end-to-end synthetic package verification plus corruption, receipt-sidecar mismatch, path traversal, unknown-field and bundle-schema negative controls; these tests are added but not executed in the current environment.
+On success, stdout contains a JSON report with package_integrity set to verified, run/scenario/commit identifiers, recomputed digests, verified source/output counts, the hazard-profile identity, and the dependency pre-screen's failed/degraded service IDs and propagation rounds. The cascade is only the consequence of declared initiating failures over a declared graph. It is not a prediction of actual hydraulic pressure, electrical load flow, thermal response, capacity, failure probability or restoration time. Verification errors exit with status 2 and a diagnostic on stderr.
 
-**Security and evidence scope:** the executable checks content integrity and internal package consistency. It does not authenticate the author's identity or signer's authority, prove that a declared verifier actually ran an engineering check, validate physical equations, establish jurisdictional compliance, or authorize construction. A package can be internally consistent and still contain a false claim if all files were maliciously replaced together. For tamper-evident authorship and custody, a separate trusted signing/attestation policy is needed. This executable has been added but not compiled or run in the current environment because Cargo/rustc are unavailable; treat it as unverified until tested on the exact head.
+Tests now include end-to-end synthetic package verification plus source/output corruption, changed profile, changed graph/configuration digest, receipt-sidecar mismatch, path traversal, unknown-field and bundle-schema negative controls. These tests have been added but not executed in the current environment.
 
+**Security and evidence scope:** the executable checks content integrity, profile/manifest linkage and declared dependency propagation. It does not authenticate the author's identity or signer's authority, prove that a declared solver ran correctly, validate physical equations, establish jurisdictional compliance, or authorize construction. A package can be internally consistent and still contain a false claim if all files are maliciously replaced together. Trusted signing/attestation and custody policy remain separate work. The CLI has not been compiled or run in this environment because Cargo/rustc are unavailable; treat it as unverified until tested on the exact head.
 ## 17. Infrastructure dependency propagation pre-screen
 
 The active Rust module crates/domains/symthaea-scenarios/src/living_city_dependencies.rs adds an explicit cross-sector dependency graph. It accepts declared services, required/degraded dependency edges, and a set of initiating failures. Required dependencies propagate outages to a fixed point; degraded dependencies report reduced service without automatically declaring it unavailable. The result lists each service's status and the failed prerequisites that explain it.
