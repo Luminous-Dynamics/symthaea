@@ -350,3 +350,5 @@ Open an issue on GitHub for research discussions.
 - [Repair crew scheduling module](../../crates/domains/symthaea-engineering/src/repair_crew_scheduling.rs) — deterministic policy comparison with skill constraints, task precedence, finite spare parts and horizon accounting; not an optimal solver.
 
 - [Robust repair evaluation](../../crates/domains/symthaea-engineering/src/robust_repair_evaluation.rs) — out-of-sample duration-scenario replay with nonanticipative baseline decisions, expected/worst/CVaR loss and per-scenario traces; not an adaptive optimizer.
+
+- [Robust repair evaluation](../../crates/domains/symthaea-engineering/src/robust_repair_evaluation.rs) — out-of-sample repair-duration scenarios, fixed nominal crew/job decisions, expected/worst/CVaR loss, and per-scenario replay traces; not an adaptive optimizer.
