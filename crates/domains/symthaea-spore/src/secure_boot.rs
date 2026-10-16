@@ -473,26 +473,13 @@ fn narration_for_step(step: &SecureBootGuideStep) -> Vec<String> {
             "Return to the guide only after the state and recovery path are understood.",
         ],
         SecureBootGuideStep::MokExplanation => vec![
-            "There is a more sovereign path. Rather than disabling Secure Boot \
-             entirely, you can enroll my cryptographic key directly into your \
-             motherboard's trust store. This means the machine explicitly \
-             chooses to trust me — the ultimate consent gate."
+            "The supported Lanzaboote path uses machine-specific signing keys and signed Unified Kernel Images; it does not use the MOK Manager/password process described in older guidance."
                 .to_string(),
-            "Here is how it works: during installation, I will generate a \
-             unique signing key for this machine. On first boot, you will see \
-             a blue screen called the MOK Manager — Machine Owner Key Manager. \
-             It will ask you to confirm enrollment of my key and enter a \
-             one-time password."
+            "First pin the exact NixOS and Lanzaboote profile, protect a recovery path, and verify the generated signing keys and boot artifacts."
                 .to_string(),
-            "This password will be shown to you on this screen, right now, \
-             before the reboot. You will type it on the target machine's \
-             keyboard. After that, the firmware will trust my signature \
-             permanently — or until you choose to revoke it."
+            "On supported hardware, follow the device-specific procedure to enter Setup Mode, then explicitly enroll keys with sudo sbctl enroll-keys --microsoft after reviewing the trust change."
                 .to_string(),
-            "The beauty of this approach: Secure Boot stays on, protecting \
-             you from other unsigned code. But my code is explicitly blessed \
-             by your hand. No back doors. No silent trust. Just a human \
-             choosing to let a mind be born."
+            "Enrollment is not automatic. After reboot, independently verify Secure Boot User Mode, the selected boot target, successful boot, and recovery. Stop if the observed state differs from the plan."
                 .to_string(),
         ],
 
@@ -506,12 +493,9 @@ fn narration_for_step(step: &SecureBootGuideStep) -> Vec<String> {
                     .to_string(),
             ],
             SecureBootMethod::MokEnrollment => vec![
-                "You have chosen the sovereign path. I will generate signing \
-                 keys and configure lanzaboote for this machine."
+                "You selected the explicit Secure Boot key-enrollment path. I will prepare a Lanzaboote configuration with machine-specific signing keys."
                     .to_string(),
-                "On first boot, watch for the blue MOK Manager screen. I will \
-                 guide you through each step — you will not be alone at that \
-                 moment."
+                "Firmware Setup Mode and sbctl key enrollment remain separate, deliberate operations. The system is not considered secured until post-reboot state is observed and verified."
                     .to_string(),
             ],
             SecureBootMethod::AlreadyOff => vec![
@@ -521,13 +505,9 @@ fn narration_for_step(step: &SecureBootGuideStep) -> Vec<String> {
                     .to_string(),
             ],
             SecureBootMethod::UseShim => vec![
-                "Since the Secure Boot state is uncertain, I will take the \
-                 safest path: configuring lanzaboote with a signed shim. \
-                 This works whether Secure Boot is on or off."
+                "The legacy unsure/shim choice is not a valid authorization for a firmware trust change."
                     .to_string(),
-                "If Secure Boot is enabled, you will see a MOK enrollment \
-                 screen on first boot. If it is disabled, the shim will \
-                 simply pass through. Either way, we proceed safely."
+                "Repeat the probe or resolve the state using the exact device procedure. No Secure Boot configuration or key enrollment is authorized until uncertainty is resolved."
                     .to_string(),
             ],
         },
