@@ -359,5 +359,91 @@
         "measure_on_documented_reference_host_before_adopting_as_release_gate"
       ]
     }
+  },
+  "resource_constrained_screening": {
+    "status": "research_abstraction_not_calibrated",
+    "model": {
+      "service_fields": [
+        "demand",
+        "capacity",
+        "priority",
+        "dependencies",
+        "resource_requirements_per_delivered_unit"
+      ],
+      "resource_fields": [
+        "initial_stock",
+        "storage_capacity",
+        "replenishment_per_step"
+      ],
+      "disruption": "resource supply disruption scales replenishment; initial stock remains available",
+      "allocation": "dependency-safe deterministic order, priority then stable identifier when choices are independent",
+      "outputs": [
+        "per_service_delivered_output",
+        "per_service_fulfillment",
+        "per_service_unmet_demand",
+        "resource_inventory",
+        "actual_replenishment",
+        "resource_consumption",
+        "service_floor_violations",
+        "stable_recovery"
+      ],
+      "limitations": [
+        "no stochastic failure probability",
+        "no repair crews or queues",
+        "no substitute resource conversion or switching delay",
+        "no spatial or physical process laws",
+        "priority policy can starve lower-priority services",
+        "unlike service units must not be summed without justified normalization"
+      ]
+    },
+    "tests_authored": 12,
+    "tests_executed": false,
+    "reference_fixtures": [
+      {
+        "id": "RC-01",
+        "name": "stock_conservation",
+        "expected": "inventory in range [0, storage_capacity]"
+      },
+      {
+        "id": "RC-02",
+        "name": "consumption_conservation",
+        "expected": "consumption equals delivered output times use rate and does not exceed available stock"
+      },
+      {
+        "id": "RC-03",
+        "name": "finite_stockout",
+        "expected": "required service becomes resource-limited when stock runs out and replenishment is zero"
+      },
+      {
+        "id": "RC-04",
+        "name": "supply_interruption",
+        "expected": "event affects replenishment, not stored inventory"
+      },
+      {
+        "id": "RC-05",
+        "name": "dependency_resource_bottleneck",
+        "expected": "upstream service and finite material constraints compose"
+      },
+      {
+        "id": "RC-06",
+        "name": "explicit_priority_and_stable_tiebreak",
+        "expected": "deterministic declared allocation; inspect starvation by service"
+      },
+      {
+        "id": "RC-07",
+        "name": "storage_bound",
+        "expected": "replenishment above storage cap is curtailed"
+      },
+      {
+        "id": "RC-08",
+        "name": "qualified_resource_substitution_future",
+        "expected": "no substitute credit before conversion, quality and switching delay are modeled"
+      }
+    ],
+    "research_sources": [
+      "https://doi.org/10.1038/s41598-025-99974-x",
+      "https://www.nature.com/articles/s41598-026-63123-9",
+      "https://doi.org/10.1016/j.cie.2026.112063"
+    ]
   }
 }
