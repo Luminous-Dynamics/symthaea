@@ -91,6 +91,14 @@ The accompanying pure-std Rust crate implements only:
 
 The crate does not ingest platform feeds or prove source/ownership labels. The source-capped mean is one comparison baseline, not a claim of optimal information aggregation.
 
+## Source-partition sensitivity: assumptions should be visible
+
+The new `assess_source_partition_sensitivity` API computes the baseline source-capped mean and reevaluates it under explicitly supplied alternative mappings from accounts to source groups. Every alternative must map exactly the same accounts, contain nonblank group identifiers, and have a unique scenario ID. The result reports the observed minimum, maximum and range across the baseline and alternatives.
+
+This is not a confidence interval, an automated inference of the true source graph, or proof of manipulation. It is an audit of how much the estimate depends on group labels that the crate cannot authenticate. A synthetic test with 100 accounts at probability 0.99 declared as one common source and one other account at 0.20 has a source-capped baseline of 0.595; splitting every account into its own declared group produces an aggregate above 0.98. The large change is the point of the negative control: an unauthenticated grouping label can dominate the statistic.
+
+A real evaluation should preregister plausible grouping alternatives using evidence such as common upstream publication, shared model/data lineage, copied forecast content, or shared release timing. Preserve “unknown” group relationships and publish the sensitivity envelope rather than choosing whichever partition makes a model look best.
+
 ## Public-information timing: a diagnostic, not an accusation
 
 The new `assess_pre_public_information_move` function tests a narrow question: given a qualified public-information timestamp and a binary realized outcome, what signed fraction of the terminal outcome-aligned probability move was already present before that timestamp?
@@ -117,6 +125,7 @@ All numeric thresholds below are proposed acceptance targets. They are not measu
 | Proper scoring | Paired, time-ordered prospective outcomes; compare market close, base-rate, equal-account pool, declared-source-capped pool, and Symthaea ensemble | Publish Brier and log score with uncertainty intervals for every baseline; no superiority claim unless a preregistered paired comparison clears zero after stated costs |
 | Calibration | Reliability diagrams, calibration intercept/slope, Brier decomposition, log score, and regime-specific slices | No aggregate-only gate; investigate any well-powered regime with absolute calibration error above 0.03; publish bin counts and intervals |
 | Source-copy resistance | Duplicate 1, 10, 100, and 1,000 accounts under the same declared source group | Source-capped baseline is invariant to duplication within numerical tolerance (1e-12 in the synthetic test) |
+| Source-partition uncertainty | Compare baseline with alternate account-to-source mappings, including splitting a copied source into 1/10/100/1,000 declared groups | Publish min/max/range and grouping assumptions; missing/extra accounts, blank group labels and duplicate scenario IDs fail closed; do not interpret the range as a confidence interval |
 | Dependence misspecification | Shift or falsify declared source groups; hide common model/data lineage in mutation tests | Explicitly demonstrate where the detector fails; never call source independence verified from account counts |
 | Same-owner turnover | Known owner-level synthetic fills, reverse ordering, duplicates, and clean controls | 100% exact accounting on the synthetic corpus; duplicate fill IDs fail closed; report this as a lower-bound alert only |
 | Resolution completeness | Delete or mutate each required policy field independently | Every missing/blank required field and zero deadline/dispute-window mutation is rejected |

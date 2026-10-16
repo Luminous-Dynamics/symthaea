@@ -3,10 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Synthetic-only integrity primitives for prediction-market research.
 //!
-//! This crate audits three narrow failure modes: repeated accounts that share a declared
-//! information-source group, turnover whose buyer and seller map to the same declared beneficial
-//! owner, and incomplete event-resolution policies. It deliberately does not connect to a venue,
-//! infer real identities, classify intent, recommend trades, or claim independent information.
+//! This crate audits several bounded failure modes: forecast aggregates sensitive to unverified
+//! source partitions, turnover whose buyer and seller map to the same declared beneficial owner,
+//! incomplete event-resolution policies, and price-move diagnostics sensitive to public-event time.
+//! It deliberately does not connect to a venue, infer real identities, classify intent, recommend
+//! trades, or claim independent information.
 //!
 //! A successful result means only that these local structural checks passed. Source-group labels
 //! and beneficial-owner labels must be qualified by a separate evidence system; this crate does
