@@ -20,7 +20,8 @@
     "improvement_demonstrated": false,
     "rust_metric_kernel_compiled": false,
     "rust_unit_tests_executed": false,
-    "paired_delta_label_sensitivity_bounds_executed": false
+    "paired_delta_label_sensitivity_bounds_executed": false,
+    "fixed_budget_cardinality_fixtures_executed": false
   },
   "label_states": [
     {
@@ -68,9 +69,10 @@
         "pr_auc_when_valid",
         "false_negative_census",
         "recall_label_sensitivity_bounds",
-        "precision_label_sensitivity_bounds"
+        "precision_label_sensitivity_bounds",
+        "fixed_budget_candidate_count"
       ],
-      "denominator_rule": "Freeze and identify one exact candidate universe; report whether positive sites were seeded into it. Ranking performance is not nomination performance."
+      "denominator_rule": "Freeze and identify one exact candidate universe; report whether positive sites were seeded into it. Ranking performance is not nomination performance. For Recall@K, K must be positive and at least K candidates must exist. If the ranking has fewer than K candidates, report not_estimable_at_budget_K rather than silently taking a shorter list."
     },
     {
       "id": "T3_budgeted_review",
@@ -219,6 +221,11 @@
       "id": "G7_paired_delta_label_sensitivity",
       "target": "Policy superiority claims involving unknown labels use a paired comparison on identical candidate IDs and label mappings, with shared unknown outcomes and explicit worst/best-case delta bounds",
       "failure_action": "Reject claims derived solely from overlapping/non-overlapping independent metric intervals or from treating an unknown candidate as a negative."
+    },
+    {
+      "id": "G8_fixed_budget_cardinality",
+      "target": "Every fixed-budget comparison has at least K candidates under every compared policy, or the metric is explicitly marked not estimable",
+      "failure_action": "Reject comparisons that silently evaluate a shorter candidate list as if it used the same review budget."
     }
   ],
   "comparator_policies": [
@@ -484,7 +491,10 @@
     "source_path": "scripts/crispr_triage_verifier.rs",
     "style": "dependency-free Rust; no biological artifacts required for synthetic unit tests",
     "suggested_command": "rustc --edition=2024 --test scripts/crispr_triage_verifier.rs -o /tmp/crispr-triage-tests && /tmp/crispr-triage-tests",
-    "current_local_execution_status": "not_executed_rust_toolchain_unavailable_in_authoring_environment"
+    "current_local_execution_status": "not_executed_rust_toolchain_unavailable_in_authoring_environment",
+    "test_cases_to_run": [
+      "fixed_budget_recall_is_not_estimable_when_budget_is_unavailable"
+    ]
   },
   "partial_label_identification": {
     "status": "method_specified_synthetic_test_added_not_compiled",
@@ -532,5 +542,6 @@
       },
       "interpretation": "A positive lower bound indicates improvement robust to every unknown-label assignment inside the shared candidate universe. Bounds spanning zero mean the observed-label delta is not robust to all assignments. Not a confidence interval, posterior or safety guarantee."
     }
-  }
+  },
+  "updated_on": "2026-10-16"
 }
