@@ -41,7 +41,7 @@ jobs:
       - name: Run maximin stdin/stdout smoke fixture
         run: |
           cargo run -p symthaea-nano-policy --release --locked -- < crates/domains/symthaea-nano-policy/fixtures/smoke-request.json > /tmp/nano-policy-response.json
-          jq -e '.selected | map(.id) == ["a", "d"] and .input_blake3 | test("^[a-f0-9]{64}$")' /tmp/nano-policy-response.json
+          jq -e '(.selected | map(.id)) == ["a", "d"] and (.input_blake3 | test("^[a-f0-9]{64}$"))' /tmp/nano-policy-response.json
 
       - name: Run Symthaea HDC stdin/stdout smoke fixture
         run: |
