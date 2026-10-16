@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+/// Deterministic repair crew and finite-spares scheduling policies.
+pub mod repair_crew_scheduling;
+
 /// Finite shared-resource screening for essential-service continuity.
 pub mod resource_constrained_screening;
 
