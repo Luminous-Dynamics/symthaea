@@ -28,6 +28,8 @@ Pinned files:
 
 The Rust module `sim_budget` consumes a frozen `nano-simulator-call-ledger-v1` JSON document and emits an auditable summary.
 
+Each per-run ledger records the exact integer `seed` alongside the run ID and policy arm. This preserves per-run seed provenance; a campaign-level comparison must still check the declared seed sets across arms rather than infer pairing from aggregate tables.
+
 Each proposal-attempt row records:
 - one-based contiguous sequence and stable attempt identity;
 - whether generation succeeded, candidate ID and canonical candidate digest;
@@ -47,7 +49,7 @@ A simulator invocation record binds:
 
 Every policy arm gets the same expected actual-call budget (B) and a separate proposal-attempt cap. If the attempt cap is hit before (B) calls are started, the run is incomplete; do not silently compare it as a smaller budget. Attempts after the (B)-th simulator call are retained for audit and prevent an exact-protocol completion claim.
 
-The ledger also records the call count claimed by the previous run summary. The auditor compares it with the count recomputed from invocation records. This directly exposes summary semantics such as “finite outputs counted as MEEP calls.”
+The ledger also records the call count claimed by the previous run summary and the exact per-run seed. The audit report preserves that seed; NANO-006 still requires raw manifests/receipts to reconcile the reported replicate count. The auditor compares it with the count recomputed from invocation records. This directly exposes summary semantics such as “finite outputs counted as MEEP calls.”
 
 ## 3. Example
 
