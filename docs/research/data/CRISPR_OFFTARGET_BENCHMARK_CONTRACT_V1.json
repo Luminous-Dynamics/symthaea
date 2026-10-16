@@ -264,5 +264,36 @@
       "Rust unit tests not executed because rustc was unavailable in the authoring environment"
     ]
   },
-  "updated_on": "2026-10-16"
+  "updated_on": "2026-10-16",
+  "paired_label_sensitivity": {
+    "status": "specified_not_compiled_or_executed",
+    "preconditions": [
+      "identical candidate ID universe for both policies",
+      "identical observed label mapping",
+      "same latent outcome assignment for each unknown candidate across policies",
+      "same eligible measured-positive reference and K",
+      "at least K candidates available"
+    ],
+    "symbols": {
+      "P": "eligible measured-positive reference count",
+      "d": "known-positive hits in A top K minus B top K",
+      "a": "unknown IDs selected by A but not B",
+      "b": "unknown IDs selected by B but not A",
+      "n": "all remaining unknown IDs selected by both or neither"
+    },
+    "lower_bound": {
+      "numerator": "d - b",
+      "denominator": "P + b + (n when d - b > 0, else 0)"
+    },
+    "upper_bound": {
+      "numerator": "d + a",
+      "denominator": "P + a + (n when d + a < 0, else 0)"
+    },
+    "claim_rule": "A positive paired worst-case lower bound supports label-robust superiority only within the fixed candidate universe. If bounds span zero, describe any supported statistical gain as observed-label improvement, not label-robust improvement.",
+    "limitations": [
+      "not a statistical confidence interval or posterior",
+      "cannot account for true sites omitted from every nomination method",
+      "does not establish biological safety or clinical utility"
+    ]
+  }
 }
