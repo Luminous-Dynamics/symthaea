@@ -7,6 +7,7 @@ It is deliberately a standalone, dependency-free Rust package so it does not alt
 ## Run
 
 ```sh
+sha256sum --check crates/intx-program-bench/fixtures/cases.tsv.sha256
 cargo test --manifest-path crates/intx-program-bench/Cargo.toml --locked
 cargo fmt --manifest-path crates/intx-program-bench/Cargo.toml -- --check
 cargo clippy --manifest-path crates/intx-program-bench/Cargo.toml --locked -- -D warnings
