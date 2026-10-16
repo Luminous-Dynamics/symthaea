@@ -10,13 +10,15 @@
 //!
 //! - **Maximize**: Mean warning time (early detection is better)
 //! - **Minimize**: False positive rate (avoid unnecessary shutdowns)
-//! - **Constraint**: Recall > 0.95 (must catch 95%+ of disruptions)
+//! - **Exploratory constraint**: event-level recall >= 0.95 on scoreable synthetic shots only.
+//!   This is not a device-safety or real-world performance claim.
 //!
 //! ## Search Methods
 //!
-//! 1. **Grid Search**: Exhaustive search over parameter grid (5^5 = 3125 configs)
-//! 2. **Random Search**: Sample 500 random configurations (often competitive)
-//! 3. **Bayesian Optimization**: GP surrogate for efficient optimization
+//! 1. **Grid Search**: Exhaustive enumeration of a five-dimensional parameter grid.
+//! 2. **Random Search**: Reproducible randomized baseline.
+//! 3. **Adaptive local search**: Random exploration followed by local perturbations; this is
+//!    Bayesian-inspired sampling, not a Gaussian-process Bayesian optimizer.
 //!
 //! ## Run
 //!
@@ -317,6 +319,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         let mut valid_sample_count = 0;
         let mut invalid_sample_indices = Vec::new();
         let mut has_valid_warning_sample = false;
+        let mut phi_history: Vec<(f64, f64)> = Vec::new();
         let mut alarm_in_warning_window = false;
         let mut alarm_in_normal_operation = false;
         // The largest time-to-disruption among matching alarms is the earliest lead-time alarm.
@@ -331,11 +334,23 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 invalid_sample_indices.push(sample_index);
                 continue;
             }
+            if let Some((previous_time_ms, _)) = phi_history.last() {
+                if sample.time_ms <= *previous_time_ms {
+                    // Trend features require strictly increasing timestamps. Treat out-of-order
+                    // samples as invalid rather than silently changing the inferred dynamics.
+                    invalid_samples += 1;
+                    invalid_sample_indices.push(sample_index);
+                    continue;
+                }
+            }
             has_valid_sample = true;
             valid_sample_count += 1;
 
             let phi_proxy = compute_phi_proxy(sample);
-            let regime = classify_regime(phi_proxy, config);
+            let rate = phi_rate_per_second(&phi_history, sample.time_ms, phi_proxy);
+            phi_history.push((sample.time_ms, phi_proxy));
+            let volatility = time_weighted_phi_volatility(&phi_history, sample.time_ms);
+            let regime = classify_regime_with_dynamics(phi_proxy, rate, volatility, config);
             let is_warning_or_critical = matches!(
                 regime,
                 StabilityRegime::Warning | StabilityRegime::Critical | StabilityRegime::Emergency
@@ -493,7 +508,7 @@ fn compute_phi_proxy(sample: &symthaea::physics::cmod_adapter::CModSample) -> f6
     phi.clamp(0.0, 1.0)
 }
 
-/// Classify regime based on Phi proxy and thresholds
+/// Classify the instantaneous Phi level before considering trends.
 fn classify_regime(phi: f64, config: &ThresholdConfig) -> StabilityRegime {
     let phi = phi as f32;
     if phi >= config.phi_stable {
@@ -504,6 +519,86 @@ fn classify_regime(phi: f64, config: &ThresholdConfig) -> StabilityRegime {
         StabilityRegime::Critical
     } else {
         StabilityRegime::Emergency
+    }
+}
+
+/// Compute a bounded, time-normalized derivative of Phi.
+///
+/// The threshold is expressed per second (matching PlasmaControlConfig). Do not extrapolate a
+/// trend across large observation gaps.
+const MAX_TREND_GAP_MS: f64 = 100.0;
+const PHI_VOLATILITY_WINDOW_MS: f64 = 100.0;
+const MIN_VOLATILITY_COVERAGE_MS: f64 = 20.0;
+
+fn phi_rate_per_second(history: &[(f64, f64)], time_ms: f64, phi: f64) -> Option<f64> {
+    let &(previous_time_ms, previous_phi) = history.last()?;
+    let elapsed_ms = time_ms - previous_time_ms;
+    if !elapsed_ms.is_finite() || elapsed_ms <= 0.0 || elapsed_ms > MAX_TREND_GAP_MS {
+        return None;
+    }
+    Some((phi - previous_phi) / (elapsed_ms / 1000.0))
+}
+
+/// Time-weighted standard deviation over the preceding 100 ms.
+///
+/// Phi is treated as piecewise constant between observations. Weighting by elapsed time avoids
+/// counting high-rate sampling intervals as more important merely because they contain more rows.
+fn time_weighted_phi_volatility(history: &[(f64, f64)], now_ms: f64) -> Option<f64> {
+    if history.len() < 2 || !now_ms.is_finite() {
+        return None;
+    }
+    let window_start_ms = now_ms - PHI_VOLATILITY_WINDOW_MS;
+    let mut weighted_values: Vec<(f64, f64)> = Vec::new();
+    let mut covered_ms = 0.0;
+
+    for pair in history.windows(2) {
+        let (time_ms, phi) = pair[0];
+        let next_time_ms = pair[1].0;
+        let overlap_start = time_ms.max(window_start_ms);
+        let overlap_end = next_time_ms.min(now_ms);
+        if overlap_end > overlap_start {
+            let duration = overlap_end - overlap_start;
+            covered_ms += duration;
+            weighted_values.push((phi, duration));
+        }
+    }
+
+    if covered_ms < MIN_VOLATILITY_COVERAGE_MS {
+        return None;
+    }
+    let mean = weighted_values
+        .iter()
+        .map(|(phi, duration)| phi * duration)
+        .sum::<f64>()
+        / covered_ms;
+    let variance = weighted_values
+        .iter()
+        .map(|(phi, duration)| (phi - mean).powi(2) * duration)
+        .sum::<f64>()
+        / covered_ms;
+    Some(variance.sqrt())
+}
+
+/// Dynamic warnings are applied only when the trend/volatility estimates are observable.
+/// Strong scalar instability is never downgraded by a trend feature.
+fn classify_regime_with_dynamics(
+    phi: f64,
+    rate_per_second: Option<f64>,
+    volatility: Option<f64>,
+    config: &ThresholdConfig,
+) -> StabilityRegime {
+    let level_regime = classify_regime(phi, config);
+    if matches!(level_regime, StabilityRegime::Critical | StabilityRegime::Emergency) {
+        return level_regime;
+    }
+    let rapid_drop = rate_per_second
+        .is_some_and(|rate| rate <= config.phi_rate_threshold as f64);
+    let elevated_volatility = volatility
+        .is_some_and(|value| value >= config.volatility_threshold as f64);
+    if rapid_drop || elevated_volatility {
+        StabilityRegime::Warning
+    } else {
+        level_regime
     }
 }
 
@@ -1764,6 +1859,42 @@ mod tests {
         // Test valid indices with clear ordering
         let config = ThresholdConfig::from_grid_indices(4, 2, 0, 2, 2);
         assert!(config.is_some()); // phi_stable(0.8) > phi_warning(0.45) > phi_critical(0.15)
+    }
+
+    #[test]
+    fn rate_threshold_uses_per_second_units_and_changes_regime() {
+        let config = ThresholdConfig::new(0.6, 0.4, 0.25, -0.1, 0.15).unwrap();
+        let level_only = classify_regime(0.7, &config);
+        assert_eq!(level_only, StabilityRegime::Stable);
+        let trend_sensitive =
+            classify_regime_with_dynamics(0.7, Some(-0.11), None, &config);
+        assert_eq!(trend_sensitive, StabilityRegime::Warning);
+        let slow_change =
+            classify_regime_with_dynamics(0.7, Some(-0.01), None, &config);
+        assert_eq!(slow_change, StabilityRegime::Stable);
+    }
+
+    #[test]
+    fn time_weighted_volatility_requires_coverage_and_detects_variability() {
+        assert_eq!(time_weighted_phi_volatility(&[(0.0, 0.2)], 0.0), None);
+        let history = vec![(0.0, 0.7), (25.0, 0.7), (50.0, 0.4), (75.0, 0.7), (100.0, 0.7)];
+        let volatility = time_weighted_phi_volatility(&history, 100.0).unwrap();
+        assert!(volatility > 0.1);
+        let config = ThresholdConfig::new(0.6, 0.4, 0.25, -0.1, 0.1).unwrap();
+        assert_eq!(
+            classify_regime_with_dynamics(0.7, None, Some(volatility), &config),
+            StabilityRegime::Warning
+        );
+    }
+
+    #[test]
+    fn out_of_order_samples_are_excluded_from_trend_history() {
+        let shot = shot_for_test(20, false, &[(10.0, false), (5.0, true), (20.0, false)]);
+        let results = evaluate_config(&ThresholdConfig::default(), &[shot]);
+        assert_eq!(results.invalid_samples, 1);
+        assert_eq!(results.shot_records[0].sample_count, 3);
+        assert_eq!(results.shot_records[0].valid_sample_count, 2);
+        assert_eq!(results.shot_records[0].invalid_sample_indices, vec![1]);
     }
 
     #[test]
