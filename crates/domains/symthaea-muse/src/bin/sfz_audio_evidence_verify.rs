@@ -44,6 +44,7 @@ struct EvidenceBundleV1 {
     fixture_id: String,
     fixture_pack_digest: String,
     fixture_pack_receipt: FileReferenceV1,
+    fixture_manifest: FileReferenceV1,
     sfz: FileReferenceV1,
     midi: FileReferenceV1,
     sample_assets: Vec<FileReferenceV1>,
@@ -108,6 +109,7 @@ struct VerificationReceiptV1 {
     fixture_id: String,
     fixture_pack_digest: String,
     fixture_pack_digest_content_matches: bool,
+    fixture_manifest_identity_matches: bool,
     candidate_renderer: RendererReceiptV1,
     reference_renderer: RendererReceiptV1,
     artifact_checks: Vec<ArtifactCheckV1>,
@@ -164,6 +166,7 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
         "fixture_pack_receipt",
         &manifest.fixture_pack_receipt,
     ));
+    artifact_checks.push(check_artifact(root, "fixture_manifest", &manifest.fixture_manifest));
     artifact_checks.push(check_artifact(root, "sfz_source", &manifest.sfz));
     artifact_checks.push(check_artifact(root, "midi_source", &manifest.midi));
     for (index, asset) in manifest.sample_assets.iter().enumerate() {
@@ -176,6 +179,24 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
 
     artifact_checks.extend(check_renderer_artifacts(root, "candidate", &manifest.candidate));
     artifact_checks.extend(check_renderer_artifacts(root, "reference", &manifest.reference));
+
+    let fixture_manifest_check = artifact_checks
+        .iter()
+        .find(|check| check.role == "fixture_manifest");
+    let (fixture_manifest_identity_matches, fixture_manifest_failure) =
+        if fixture_manifest_check.is_some_and(|check| check.passed) {
+            let bytes = fs::read(resolve_artifact(root, &manifest.fixture_manifest.path)?)?;
+            verify_fixture_manifest_identity(
+                &bytes,
+                &manifest.fixture_manifest.path,
+                &manifest.fixture_id,
+                &manifest.sfz,
+                &manifest.sample_assets,
+                root,
+            )
+        } else {
+            (false, Some("fixture manifest is unavailable or failed hash verification".to_owned()))
+        };
 
     let pack_receipt_check = artifact_checks
         .iter()
@@ -239,6 +260,9 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
     if !fixture_pack_digest_content_matches {
         failures.push("fixture-pack receipt content does not match declared tree digest".to_owned());
     }
+    if let Some(failure) = fixture_manifest_failure {
+        failures.push(failure);
+    }
     failures.extend(comparison_binding.failures.iter().cloned());
 
     let integrity_passed = failures.is_empty()
@@ -256,6 +280,7 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
         fixture_id: manifest.fixture_id,
         fixture_pack_digest: manifest.fixture_pack_digest,
         fixture_pack_digest_content_matches,
+        fixture_manifest_identity_matches,
         candidate_renderer: renderer_receipt(&manifest.candidate),
         reference_renderer: renderer_receipt(&manifest.reference),
         artifact_checks,
@@ -357,6 +382,7 @@ fn validate_manifest_contract(manifest: &EvidenceBundleV1) -> Result<(), Box<dyn
     }
     validate_sha256("fixture_pack_digest", &manifest.fixture_pack_digest)?;
     validate_file_reference("fixture_pack_receipt", &manifest.fixture_pack_receipt)?;
+    validate_file_reference("fixture_manifest", &manifest.fixture_manifest)?;
     validate_file_reference("sfz", &manifest.sfz)?;
     validate_file_reference("midi", &manifest.midi)?;
     validate_file_reference("comparison_receipt", &manifest.comparison_receipt)?;
@@ -498,6 +524,82 @@ fn check_artifact(root: &Path, role: &str, reference: &FileReferenceV1) -> Artif
             Some("SHA-256 mismatch".to_owned())
         },
     }
+}
+
+fn verify_fixture_manifest_identity(
+    bytes: &[u8],
+    fixture_manifest_path: &str,
+    fixture_id: &str,
+    sfz: &FileReferenceV1,
+    sample_assets: &[FileReferenceV1],
+    root: &Path,
+) -> (bool, Option<String>) {
+    let fail = |message: String| (false, Some(message));
+    let value: Value = match serde_json::from_slice(bytes) {
+        Ok(value) => value,
+        Err(error) => return fail(format!("fixture manifest is invalid JSON: {error}")),
+    };
+    if value.get("schema").and_then(Value::as_str) != Some("muse-sfz-compat-fixture-pack-v1") {
+        return fail("fixture manifest has an unknown schema".to_owned());
+    }
+    let Some(fixtures) = value.get("fixtures").and_then(Value::as_array) else {
+        return fail("fixture manifest has no fixtures array".to_owned());
+    };
+    let Some(fixture) = fixtures.iter().find(|fixture| {
+        fixture.get("fixture_id").and_then(Value::as_str) == Some(fixture_id)
+    }) else {
+        return fail(format!("fixture ID {fixture_id:?} is absent from fixture manifest"));
+    };
+    let Some(expected_sfz_hash) = fixture.get("sfz_sha256").and_then(Value::as_str) else {
+        return fail("selected fixture has no sfz_sha256".to_owned());
+    };
+    if !expected_sfz_hash.eq_ignore_ascii_case(&sfz.sha256) {
+        return fail("fixture manifest SFZ hash does not match declared SFZ".to_owned());
+    }
+    let Some(expected_sfz_len) = fixture.get("sfz_byte_len").and_then(Value::as_u64) else {
+        return fail("selected fixture has no valid sfz_byte_len".to_owned());
+    };
+    let actual_sfz_len = match fs::metadata(resolve_artifact(root, &sfz.path).unwrap_or_default()) {
+        Ok(metadata) => metadata.len(),
+        Err(error) => return fail(format!("cannot inspect selected SFZ length: {error}")),
+    };
+    if expected_sfz_len != actual_sfz_len {
+        return fail("fixture manifest SFZ length does not match declared SFZ".to_owned());
+    }
+
+    let Some(fixture_sfz_file) = fixture.get("sfz_file").and_then(Value::as_str) else {
+        return fail("selected fixture has no sfz_file".to_owned());
+    };
+    let pack_root = Path::new(fixture_manifest_path).parent().unwrap_or_else(|| Path::new(""));
+    let expected_bundle_sfz = pack_root.join(fixture_sfz_file).to_string_lossy().replace('\\\\', "/");
+    if expected_bundle_sfz != sfz.path {
+        return fail(format!(
+            "fixture manifest SFZ path {:?} does not resolve to bundle path {:?}",
+            fixture_sfz_file, sfz.path
+        ));
+    }
+
+    let Some(expected_assets) = fixture.get("sample_assets").and_then(Value::as_array) else {
+        return fail("selected fixture has no sample_assets array".to_owned());
+    };
+    let mut expected_hashes: Vec<String> = expected_assets
+        .iter()
+        .filter_map(|asset| asset.get("sha256").and_then(Value::as_str).map(str::to_ascii_lowercase))
+        .collect();
+    if expected_hashes.len() != expected_assets.len() {
+        return fail("fixture manifest contains a sample asset without a SHA-256 hash".to_owned());
+    }
+    let mut declared_hashes: Vec<String> = sample_assets
+        .iter()
+        .map(|asset| asset.sha256.to_ascii_lowercase())
+        .collect();
+    expected_hashes.sort();
+    declared_hashes.sort();
+    if expected_hashes != declared_hashes {
+        return fail("declared sample-asset hash multiset does not match selected fixture".to_owned());
+    }
+
+    (true, None)
 }
 
 fn validate_comparison_binding(
