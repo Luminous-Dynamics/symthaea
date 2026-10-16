@@ -1,16 +1,6 @@
 name: Prediction Market Integrity Lab
 
-on:
-  push:
-    branches:
-      - research/prediction-market-integrity-v1
-  pull_request:
-    paths:
-      - "Cargo.toml"
-      - "crates/domains/symthaea-futures-market-integrity/**"
-      - "docs/research/finance/PREDICTION_MARKET_EPISTEMIC_INFRASTRUCTURE_V1.md"
-      - ".github/workflows/prediction-market-integrity.yml"
-  workflow_dispatch:
+on: [push]
 
 permissions:
   contents: read
@@ -23,19 +13,16 @@ jobs:
       CARGO_TERM_COLOR: always
       CARGO_TARGET_DIR: ${{ runner.temp }}/prediction-market-integrity-target
     steps:
-      - name: Checkout exact event revision
+      - name: Checkout event revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - name: Assert exact checkout revision
-        env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           actual="$(git rev-parse HEAD)"
-          test "$actual" = "$EXPECTED_SHA"
+          test "$actual" = "$GITHUB_SHA"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@d86e0fa8f147d6539442c26a61ebba8becc19489
