@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+/// Finite shared-resource screening for essential-service continuity.
+pub mod resource_constrained_screening;
+
 /// Deterministic screening for essential-service continuity and recovery.
 pub mod resilient_service_screening;
 
