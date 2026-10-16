@@ -8,6 +8,7 @@
 **Nanophotonics pilot scorecard:** [NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md](./NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md), tracked by [NANO-004](https://github.com/Luminous-Dynamics/symthaea/issues/7531); includes source pins, reproducibility gates and numerical benchmark targets.
 **Cross-domain benchmark policy:** [NANOTECHNOLOGY_BENCHMARK_CHARTER.md](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md) defines universal evidence gates plus domain-specific metrics and provisional thresholds.  
 **Follow-on domain gate:** [NANO-002](https://github.com/Luminous-Dynamics/symthaea/issues/7507)  
+**Rust candidate selector:** [tools/nano-policy](../../tree/research/nano-001-atomistic-discovery/tools/nano-policy), tracked by [NANO-005](https://github.com/Luminous-Dynamics/symthaea/issues/7643)  
 **Evidence status:** literature review and source-planning only; no new domain data or models were run.
 
 ## 1. The key reframing: nanotechnology is not one field or one model
