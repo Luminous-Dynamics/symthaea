@@ -153,6 +153,7 @@
                       "query_rank",
                       "candidate_id",
                       "status",
+                      "observation_artifact_sha256",
                       "loss",
                       "cost"
                     ],
@@ -186,6 +187,11 @@
                         "type": "number",
                         "minimum": 0,
                         "maximum": 1000000000000
+                      },
+                      "observation_artifact_sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$",
+                        "description": "SHA-256 of canonical synthetic-response bytes in test fixtures or exact raw oracle/failure receipt bytes in recorded runs."
                       }
                     },
                     "allOf": [
