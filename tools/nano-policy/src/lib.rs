@@ -443,11 +443,11 @@ mod tests {
 
     #[test]
     fn large_reference_history_cannot_bypass_diversity_work_cap() {
-        let dimensions = 100;
+        let features = [0.0; 100];
         let candidates: Vec<_> = (0..1_000)
-            .map(|index| c(&format!("candidate-{index:04}"), &vec![0.0; dimensions], 1.0))
+            .map(|index| c(&format!("candidate-{index:04}"), &features, 1.0))
             .collect();
-        let references = vec![vec![0.0; dimensions]; 1_000];
+        let references = vec![features.to_vec(); 1_000];
         let mut request = req(SelectionPolicy::MaxMinDiversity, candidates);
         request.selection_count = 1;
         request.reference_features = references;
