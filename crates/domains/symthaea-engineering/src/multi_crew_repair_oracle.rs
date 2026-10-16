@@ -486,6 +486,27 @@ mod tests {
     }
 
     #[test]
+    fn flexible_crew_is_reserved_for_unique_skill_bottleneck() {
+        let jobs = [
+            job("relay", "electrical", 3, 0, 2.0, &[]),
+            job("sensor", "electrical", 2, 1, 7.0, &[]),
+            job("valve", "plumbing", 2, 2, 9.0, &[]),
+        ];
+        let crews = [
+            crew("electrician", &["electrical"]),
+            crew("versatile", &["electrical", "plumbing"]),
+        ];
+        let result = exhaustive_multi_crew_repair_optimum(&jobs, &crews).unwrap();
+        assert!((result.minimum_weighted_completion_loss - 42.0).abs() < EPSILON);
+        let sensor = result.optimal_schedule.iter().find(|r| r.job_id == "sensor").unwrap();
+        let valve = result.optimal_schedule.iter().find(|r| r.job_id == "valve").unwrap();
+        let relay = result.optimal_schedule.iter().find(|r| r.job_id == "relay").unwrap();
+        assert_eq!((sensor.start_step, sensor.finish_step, sensor.crew_id.as_str()), (0, 2, "electrician"));
+        assert_eq!((valve.start_step, valve.finish_step, valve.crew_id.as_str()), (0, 2, "versatile"));
+        assert_eq!((relay.start_step, relay.finish_step, relay.crew_id.as_str()), (2, 5, "electrician"));
+    }
+
+    #[test]
     fn identical_fixture_and_reordered_inputs_return_same_canonical_optimum() {
         let jobs = [job("a", "x", 4, 0, 1.0, &[]), job("b", "y", 3, 1, 5.0, &[]), job("c", "x", 2, 2, 10.0, &[])];
         let crews = [crew("crew-x", &["x"]), crew("crew-y", &["y"])];
