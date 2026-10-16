@@ -530,6 +530,85 @@
       "budget_range": "0..=10",
       "result": "Cheapest-first maximized the number of selected unit-value candidates under every enumerated budget; zero mismatches against exhaustive subset enumeration.",
       "scope_limit": "This validates the narrow cheapest-first cardinality rule only. It does not compile or test the Rust source, verify rank input from a real source cohort, estimate expected value of information, or establish biological/clinical benefit."
+    },
+    "interval_frontier_fixture": {
+      "status": "passed_direct_contract_evaluation_only",
+      "expected": {
+        "robust_frontier_ids": [
+          "robust",
+          "uncertain"
+        ],
+        "definitely_dominated_ids": [
+          "dominated"
+        ],
+        "robust_dominator_pairs": [
+          [
+            "robust",
+            "dominated"
+          ]
+        ],
+        "possible_only_dominator_pairs": [
+          [
+            "robust",
+            "uncertain"
+          ],
+          [
+            "uncertain",
+            "dominated"
+          ],
+          [
+            "uncertain",
+            "robust"
+          ]
+        ]
+      },
+      "observed": {
+        "robust_frontier_ids": [
+          "robust",
+          "uncertain"
+        ],
+        "definitely_dominated_ids": [
+          "dominated"
+        ],
+        "robust_dominator_pairs": [
+          [
+            "robust",
+            "dominated"
+          ]
+        ],
+        "possible_only_dominator_pairs": [
+          [
+            "robust",
+            "uncertain"
+          ],
+          [
+            "uncertain",
+            "dominated"
+          ],
+          [
+            "uncertain",
+            "robust"
+          ]
+        ]
+      },
+      "scope_limit": "Independent interval arithmetic on F11 only; no Rust execution or statistical/biological validation."
+    },
+    "interval_relation_exhaustive_oracle": {
+      "status": "passed_independent_interval_relation_oracle_only",
+      "executed_on": "2026-10-16",
+      "objective_count": 2,
+      "direction_combinations": 4,
+      "interval_pair_vectors_checked": 5184,
+      "endpoint_assignments_checked": 82944,
+      "interval_endpoints_tested": [
+        0,
+        1,
+        2
+      ],
+      "possible_dominance_mismatches": 0,
+      "robust_dominance_mismatches": 0,
+      "result": "Coordinate-wise possible and robust dominance formulas matched exhaustive endpoint evaluation for every tested interval pair.",
+      "scope_limit": "This validates relation semantics for the enumerated two-objective intervals only. It does not compile or test the Rust module, derive statistical confidence intervals, handle covariance/joint coverage, or establish biological/clinical validity."
     }
   }
 }
