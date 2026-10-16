@@ -212,7 +212,7 @@ fn evaluate_node(
             let mut frontier = Vec::new();
             for child in children {
                 for candidate in evaluate_node(child, policy, combinations)? {
-                    *combinations = combinations.saturating_add(1);
+                    *combinations = (*combinations).saturating_add(1);
                     if *combinations > policy.max_intermediate_combinations {
                         return Err(
                             EvidenceProofAbstentionReason::IntermediateCombinationBudgetExceeded,
@@ -237,7 +237,7 @@ fn evaluate_node(
                 // proof, union them in-place rather than cloning an ever-growing
                 // set at every step.
                 if accumulated.len() == 1 && child_sets.len() == 1 {
-                    *combinations = combinations.saturating_add(1);
+                    *combinations = (*combinations).saturating_add(1);
                     if *combinations > policy.max_intermediate_combinations {
                         return Err(
                             EvidenceProofAbstentionReason::IntermediateCombinationBudgetExceeded,
