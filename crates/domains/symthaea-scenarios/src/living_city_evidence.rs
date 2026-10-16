@@ -947,6 +947,97 @@ mod tests {
     }
 
     #[test]
+    fn manifest_source_set_detects_corruption_missing_and_extra_bytes() {
+        let first = b"survey source bytes";
+        let second = b"weather source bytes";
+        let mut input = manifest();
+        input.items[0].content_sha256 = Some(sha256_hex(first));
+        input.items[1].content_sha256 = Some(sha256_hex(second));
+
+        let mut retained = BTreeMap::new();
+        retained.insert("survey-a".to_owned(), first.to_vec());
+        retained.insert("weather-b".to_owned(), second.to_vec());
+        assert!(verify_manifest_source_bytes(&input, &retained).is_ok());
+
+        retained.insert("survey-a".to_owned(), b"tampered survey".to_vec());
+        assert_eq!(
+            verify_manifest_source_bytes(&input, &retained).unwrap_err().field,
+            "items.content_sha256"
+        );
+
+        retained.insert("survey-a".to_owned(), first.to_vec());
+        retained.remove("weather-b");
+        assert_eq!(
+            verify_manifest_source_bytes(&input, &retained).unwrap_err().field,
+            "retained_sources"
+        );
+
+        retained.insert("weather-b".to_owned(), second.to_vec());
+        retained.insert("unlisted".to_owned(), b"extra".to_vec());
+        assert_eq!(
+            verify_manifest_source_bytes(&input, &retained).unwrap_err().field,
+            "retained_sources"
+        );
+    }
+
+    #[test]
+    fn receipt_output_set_detects_corruption_missing_and_extra_bytes() {
+        let output = b"scenario output bytes";
+        let mut input = receipt(GateStatus::Pass);
+        input.outputs[0].sha256 = sha256_hex(output);
+        let mut retained = BTreeMap::new();
+        retained.insert("metrics".to_owned(), output.to_vec());
+        assert!(verify_receipt_output_bytes(&input, &retained).is_ok());
+
+        retained.insert("metrics".to_owned(), b"tampered output".to_vec());
+        assert_eq!(
+            verify_receipt_output_bytes(&input, &retained).unwrap_err().field,
+            "outputs.sha256"
+        );
+
+        retained.insert("metrics".to_owned(), output.to_vec());
+        retained.insert("unlisted".to_owned(), b"extra".to_vec());
+        assert_eq!(
+            verify_receipt_output_bytes(&input, &retained).unwrap_err().field,
+            "retained_outputs"
+        );
+
+        retained.remove("metrics");
+        retained.remove("unlisted");
+        assert_eq!(
+            verify_receipt_output_bytes(&input, &retained).unwrap_err().field,
+            "retained_outputs"
+        );
+    }
+
+    #[test]
+    fn receipt_must_reference_exact_manifest_and_scenario() {
+        let input_manifest = manifest();
+        let mut input_receipt = receipt(GateStatus::Pass);
+        input_receipt.evidence_manifest_sha256 = evidence_manifest_sha256(&input_manifest).unwrap();
+        assert!(verify_receipt_manifest_link(&input_receipt, &input_manifest).is_ok());
+
+        let mut changed_manifest = input_manifest.clone();
+        changed_manifest.items[0].units = "feet".into();
+        assert_eq!(
+            verify_receipt_manifest_link(&input_receipt, &changed_manifest)
+                .unwrap_err()
+                .field,
+            "evidence_manifest_sha256"
+        );
+
+        let mut other_scenario = input_manifest.clone();
+        other_scenario.scenario_id = "different-scenario".into();
+        input_receipt.evidence_manifest_sha256 = evidence_manifest_sha256(&other_scenario).unwrap();
+        assert_eq!(
+            verify_receipt_manifest_link(&input_receipt, &other_scenario)
+                .unwrap_err()
+                .field,
+            "scenario_id"
+        );
+    }
+
+    #[test]
     fn unsupported_schema_versions_are_rejected() {
         let mut input = manifest();
         input.schema_version += 1;
