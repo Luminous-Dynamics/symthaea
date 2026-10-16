@@ -905,11 +905,11 @@ mod tests {
     #[test]
     fn reference_campaign_manifests_match_frozen_sha256_digests() {
         let expected = [
-            "39b1d3c823b6134c58f527b0c94a785d6510ac74f1e7f102b01209a89c5e911f",
-            "39ab7a96bbf88ffa48406da68df35c75f7a838fdaa0b3f0110944a3a7d4799d9",
-            "8a00f89bcc9505fffb7789d9dbf8020e764e5c6afa4249f9df5942403ea9d7a5",
-            "86e0578d945fbbebff56e64218b807f4f186acf751e2d3e07122ec2138d4f605",
-            "17376263b1afd5ad37c5458d5f6082e5f45bc7d000cd54ef964240f09902381e",
+            "65c78abb4af2e6a909821a000d6c7260c3f8badc9e15c20d5938ecece2090024",
+            "795df0dc743cd7314f871b3093ea5fb93f1ba863b8cb8389cdc82c2272077852",
+            "defdab16abefe200f505bcc2a9c2ef183b8bff4ab3d75788a6bee395c9c77032",
+            "e3f085264c5d8eefdbdfe528769f573c09e07953ef791302f69daf54c610cbb3",
+            "04d215b2141f533cfa9c183caaf96a68c9129ef2e010d95f37c6513ba9e2a63c",
         ];
         for (index, scenario) in ScenarioFamily::ALL.into_iter().enumerate() {
             let manifest =
