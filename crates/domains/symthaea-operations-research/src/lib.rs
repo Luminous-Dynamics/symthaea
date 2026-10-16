@@ -30,7 +30,7 @@ pub mod queue;
 
 pub use factory::{
     FactoryOperation, FactoryResource, FactorySchedule, FactoryScheduleError, FactoryWorker,
-    ScheduledOperation, plan_factory_line,
+    ScheduledOperation, plan_factory_line, verify_factory_schedule,
 };
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
