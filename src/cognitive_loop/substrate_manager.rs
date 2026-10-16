@@ -1290,6 +1290,7 @@ mod tests {
         let window_start = std::time::Instant::now();
         mgr.energy_rate_window_started_at = Some(window_start);
         assert!(mgr.consciousness_viable);
+        mgr.tick_energy_at(&cfg, window_start); // seed the first cycle's modeled energy
 
         mgr.tick_energy_at(&cfg, window_start + std::time::Duration::from_secs(1));
         assert!(
@@ -1405,6 +1406,7 @@ mod tests {
         let window_start = std::time::Instant::now();
         mgr.energy_rate_window_started_at = Some(window_start);
         assert!(!mgr.should_degrade_consciousness());
+        mgr.tick_energy_at(&config, window_start); // seed the first cycle's modeled energy
         mgr.tick_energy_at(&config, window_start + std::time::Duration::from_secs(1));
         assert!(
             mgr.should_degrade_consciousness(),
