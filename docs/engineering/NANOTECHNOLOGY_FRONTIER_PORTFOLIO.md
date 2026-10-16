@@ -7,6 +7,7 @@
 **Closed-loop benchmark protocol:** [NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md](./NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md) — use the ICML 2026 MADE benchmark as a separate, bounded test of discovery-policy value; it does not replace OC22.
 **Domain atlas:** [NANOTECHNOLOGY_DOMAIN_ATLAS.md](./NANOTECHNOLOGY_DOMAIN_ATLAS.md) — 21 nanotechnology domains, including molecular machines/nanorobotics, with domain-specific physics/evidence requirements and a readiness-gated pilot shortlist.
 **Nanophotonics benchmark:** [NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md](./NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md) proposes a separately gated measured-spectrum inverse-design pilot.
+**NIST Fe–Co–Ni measured thin-film benchmark:** [NANOTECHNOLOGY_NIST_FECO_NI_BENCHMARK_PLAN.md](./NANOTECHNOLOGY_NIST_FECO_NI_BENCHMARK_PLAN.md), tracked by [NANO-007](https://github.com/Luminous-Dynamics/symthaea/issues/7644). It is an offline replay of 921 historic measured samples and is blocked on explicit data-use terms, local integrity/schema validation, and baseline reproduction.
 
 ## 1. Strategic thesis
 
