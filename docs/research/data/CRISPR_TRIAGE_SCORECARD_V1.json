@@ -1,0 +1,248 @@
+{
+  "schema_version": "1.0.0",
+  "record_type": "benchmark_scorecard_contract",
+  "benchmark_id": "CRISPR-OT-001",
+  "title": "CRISPR off-target decision triage scorecard",
+  "status": "planning_only",
+  "authored_on": "2026-10-16",
+  "parent_contract": "docs/research/CRISPR_COST_AWARE_BENCHMARK_V1.md",
+  "protocol_document": "docs/research/CRISPR_TRIAGE_SCORECARD_V1.md",
+  "authority_ceiling": "retrospective computational research only; no clinical, biological safety, wet-lab, or guide-selection authority",
+  "execution_status": {
+    "source_artifacts_downloaded": false,
+    "source_terms_reviewed": false,
+    "artifact_digests_verified": false,
+    "cohort_reconstructed": false,
+    "metric_layer_executed": false,
+    "specialist_baseline_reproduced": false,
+    "symthaea_policy_evaluated": false,
+    "independent_verification_completed": false,
+    "improvement_demonstrated": false
+  },
+  "label_states": [
+    {
+      "id": "positive",
+      "meaning": "An outcome identified as positive by the pinned reference definition and assay context."
+    },
+    {
+      "id": "assay_defined_negative",
+      "meaning": "A negative only under the explicit assay, tested scope, threshold and reference label rules."
+    },
+    {
+      "id": "unknown_unassayed",
+      "meaning": "Missing, unreported, untested, not nominated, or otherwise not established. Never silently convert to negative."
+    }
+  ],
+  "metric_tracks": [
+    {
+      "id": "T0_source_replay",
+      "required_before_performance_claims": true,
+      "metrics": [
+        "exact_count_reconciliation",
+        "sha256_artifact_manifest",
+        "exclusion_census",
+        "prediction_output_census"
+      ],
+      "acceptance": "Pinned artifacts and source transformations reconciled; any unexplained discrepancy blocks later claims."
+    },
+    {
+      "id": "T1_native_nomination",
+      "required": true,
+      "metrics": [
+        "native_positive_coverage",
+        "uncaptured_positive_count",
+        "per_guide_coverage"
+      ],
+      "denominator_rule": "Use all eligible measured positive sites in the reference cohort; native nominations are measured before any positive seeding."
+    },
+    {
+      "id": "T2_conditional_ranking",
+      "required": true,
+      "metrics": [
+        "macro_recall_at_k",
+        "micro_recall_at_k",
+        "precision_at_k_when_labels_support_it",
+        "pr_auc_when_valid",
+        "false_negative_census"
+      ],
+      "denominator_rule": "Freeze and identify one exact candidate universe; report whether positive sites were seeded into it. Ranking performance is not nomination performance."
+    },
+    {
+      "id": "T3_budgeted_review",
+      "required": true,
+      "metrics": [
+        "recall_at_fixed_slots",
+        "slots_at_baseline_recall",
+        "precision_tradeoff",
+        "candidate_review_slots"
+      ],
+      "denominator_rule": "Compare policies at the same eligible reference and identical review budget. Candidate slots are a review-burden proxy, not measured lab cost."
+    },
+    {
+      "id": "T4_calibration_abstention",
+      "required_when_labels_support_it": true,
+      "metrics": [
+        "brier_score",
+        "log_loss",
+        "reliability_diagram",
+        "risk_coverage_curve",
+        "abstention_rate"
+      ],
+      "denominator_rule": "Calibration metrics require defensible label semantics; otherwise mark not_estimable. Abstentions remain a separate state."
+    },
+    {
+      "id": "T5_shift_robustness",
+      "required_for_generalization_claims": true,
+      "metrics": [
+        "leave_guide_cas9_group_out_delta",
+        "leave_assay_family_out_delta",
+        "independent_cohort_delta",
+        "per_group_results"
+      ],
+      "denominator_rule": "Keep guide/Cas9 groups, duplicates, known derivatives and prior-derived examples on the correct side of split boundaries."
+    },
+    {
+      "id": "T6_incrementality",
+      "required": true,
+      "metrics": [
+        "paired_delta_at_equal_budget",
+        "ablation_delta",
+        "runtime_and_resource_delta"
+      ],
+      "denominator_rule": "Hold specialist outputs, candidate universe, and budget fixed when isolating the Symthaea-added policy."
+    },
+    {
+      "id": "T7_evidence_integrity",
+      "required": true,
+      "metrics": [
+        "deterministic_replay",
+        "manifest_digest",
+        "negative_control_failures",
+        "source_and_lineage_completeness"
+      ],
+      "denominator_rule": "Evidence receipts establish provenance/integrity only; they cannot by themselves establish biological truth."
+    }
+  ],
+  "primary_targets": {
+    "status": "proposed_not_validated_not_a_clinical_standard",
+    "success_alternatives": [
+      {
+        "id": "equal_budget_recall",
+        "target": "+5 absolute percentage points in macro Recall@K versus the strongest fair baseline on preregistered held-out guide/Cas9 groups",
+        "required_conditions": [
+          "same candidate universe and same fixed K for all compared policies",
+          "endpoint, splits, exclusions, analysis and interval procedure preregistered before holdout reveal",
+          "report precision, false negatives and all per-group deltas",
+          "paired group-aware interval excludes no improvement"
+        ]
+      },
+      {
+        "id": "equal_recall_review_budget",
+        "target": "20% fewer candidate review slots to reach the baseline's preregistered recall target on the same episodes",
+        "required_conditions": [
+          "same eligible positive reference and same candidate universe",
+          "baseline recall target fixed before holdout reveal",
+          "report precision, false negatives and all per-group deltas",
+          "paired group-aware interval excludes no improvement"
+        ]
+      }
+    ],
+    "inconclusive_rule": "If the interval includes no improvement or effective independent group sample is inadequate, label the result null_or_inconclusive.",
+    "cross_dataset_rule": "Do not claim robustness across datasets without at least one separately sourced cohort whose terms explicitly permit the intended use."
+  },
+  "non_negotiable_gates": [
+    {
+      "id": "G0_rights_and_identity",
+      "target": "100% of used artifacts have source identity, terms/permission status, retrieval/version metadata and verified SHA-256 digests",
+      "failure_action": "Block ingestion or benchmark execution for artifacts with unresolved rights/identity."
+    },
+    {
+      "id": "G1_label_semantics",
+      "target": "100% of outcomes use positive, assay_defined_negative or unknown_unassayed semantics",
+      "failure_action": "Reject any scorer that silently converts unknown outcomes into negatives."
+    },
+    {
+      "id": "G2_reporting_denominators",
+      "target": "100% of reported metrics identify candidate universe, seeding status, independent group unit, denominator and missingness policy",
+      "failure_action": "Block performance comparison."
+    },
+    {
+      "id": "G3_adversarial_fixtures",
+      "target": "100% of deliberately corrupted provenance/leakage fixtures are rejected by the independent verifier",
+      "failure_action": "Block performance claims until the verifier catches all required negative controls."
+    },
+    {
+      "id": "G4_deterministic_replay",
+      "target": "Same pinned inputs produce identical canonical metric outputs and manifest digest",
+      "failure_action": "Block reproducibility claim."
+    },
+    {
+      "id": "G5_evidence_ceiling",
+      "target": "Prediction/schema/signature receipts cannot promote prediction evidence to observation, assessment or replication",
+      "failure_action": "Reject the invalid evidence-state transition."
+    }
+  ],
+  "comparator_policies": [
+    "B0_simple_deterministic_baseline",
+    "B1_best_qualified_permitted_specialist",
+    "B2_simple_rank_fusion",
+    "B3_specialist_without_symthaea_triage",
+    "S1_symthaea_coverage_and_provenance",
+    "S2_S1_plus_disagreement_uncertainty",
+    "S3_S2_plus_abstention",
+    "S4_full_preregistered_symthaea_policy",
+    "N0_seeded_random_order_sanity_reference"
+  ],
+  "split_policy": {
+    "preferred_independent_unit": "guide_cas9_group",
+    "additional_grouping_controls": [
+      "near_identical_guides",
+      "duplicate_genomic_sites",
+      "source_study_derivatives",
+      "prior_knowledge_source_examples",
+      "assay_or_dataset_ancestry"
+    ],
+    "row_random_split_role": "diagnostic_only",
+    "statistical_uncertainty": "paired group-aware intervals; publish all group results; do not use row-level bootstrap as the sole uncertainty method",
+    "limitation": "A cohort with 26 guide/Cas9 groups is small; interval precision and generalization claims must reflect this."
+  },
+  "source_rights_constraints": [
+    {
+      "source_id": "Kaufmann-2026-OffTarget-Benchmark",
+      "doi": "10.1177/10430342261466407",
+      "use_status": "pending_exact_artifact_rights_and_digest_audit",
+      "note": "Code availability or declared code license does not establish data/artifact permission."
+    },
+    {
+      "source_id": "Kinney-2026-UNCOVERseq",
+      "doi": "10.1038/s41467-026-74623-7",
+      "use_status": "blocked_for_model_development_until_written_permission_for_intended_use",
+      "allowed_current_use": "literature context only, within the paper's study-specific scope"
+    }
+  ],
+  "cost_interpretation": {
+    "immediate_measurables": [
+      "candidate_review_slots",
+      "runtime",
+      "compute_resources"
+    ],
+    "only_if_measured": [
+      "human_review_minutes",
+      "cost_per_qualified_result"
+    ],
+    "prohibited_inference": "Fewer candidate review slots do not by themselves establish reduced wet-lab spend, healthcare costs, reimbursement or final treatment prices."
+  },
+  "nonclaims": [
+    "Symthaea outperforms specialist tools",
+    "a predicted site establishes clinical safety",
+    "a therapy or guide is validated",
+    "lab or treatment costs have been reduced",
+    "a new therapy has been discovered",
+    "cryptographic integrity proves biological truth"
+  ],
+  "references": [
+    "https://doi.org/10.1177/10430342261466407",
+    "https://www.nature.com/articles/s42003-025-08275-6",
+    "https://academic.oup.com/bib/article/27/2/bbag140/8559621"
+  ]
+}
