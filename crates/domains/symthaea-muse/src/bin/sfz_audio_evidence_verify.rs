@@ -822,6 +822,7 @@ fn validate_comparison_binding(
                 comparison_schema_verified: false,
                 candidate_output_hash_matches: false,
                 reference_output_hash_matches: false,
+                capture_shape_verified: false,
                 comparison_status: None,
                 metrics_present: false,
                 quality_qualified: false,
