@@ -364,3 +364,5 @@ The paired comparison harness is [repair_policy_comparison.rs](../../crates/doma
 The tiny exact scheduling oracle is [repair_small_instance_oracle.rs](../../crates/domains/symthaea-engineering/src/repair_small_instance_oracle.rs). Its six hand-built fixtures are published in [repair_scheduling_oracle_corpus.json](./repair_scheduling_oracle_corpus.json). This corpus is designed for correctness and optimality-gap measurement, not as operational or field data.
 
 The exact-oracle module also reports per-policy absolute and relative optimality gaps for priority-first, shortest-job-first and weighted-recovery scheduling, directly supporting the published benchmark targets.
+
+The multi-crew exact oracle is [multi_crew_repair_oracle.rs](../../crates/domains/symthaea-engineering/src/multi_crew_repair_oracle.rs), with three hand-checkable [multi-crew benchmark fixtures](./multi_crew_repair_oracle_corpus.json). It includes crew skill eligibility, cross-crew precedence, concurrent repairs, and optimality-gap measurement for the current greedy policies.
