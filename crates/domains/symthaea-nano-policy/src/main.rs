@@ -385,7 +385,9 @@ fn choose(
                     .map(|candidate| {
                         selected_indices
                             .iter()
-                            .map(|chosen| normalized_hamming_distance(candidate, &hdc_candidates[*chosen]))
+                            .map(|chosen| {
+                                normalized_hamming_distance(candidate, &hdc_candidates[*chosen])
+                            })
                             .reduce(f64::min)
                             .unwrap_or(f64::INFINITY)
                     })
