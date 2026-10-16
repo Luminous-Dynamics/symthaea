@@ -814,6 +814,15 @@ mod tests {
     }
 
     #[test]
+    fn cost_aware_receipt_preserves_cost_unit_and_selected_cost() {
+        let mut req = request(Policy::CostAwareFarthestFirst, 1);
+        req.cost_unit = Some("simulation_seconds".to_owned());
+        let result = select(req, b"cost-receipt-test").unwrap();
+        assert_eq!(result.cost_unit.as_deref(), Some("simulation_seconds"));
+        assert_eq!(result.selected[0].estimated_cost, Some(1.0));
+    }
+
+    #[test]
     fn farthest_first_selects_distant_candidates() {
         let request_bytes = b"farthest-first-test";
         let result =
@@ -951,7 +960,19 @@ mod tests {
             request_schema["properties"]["candidates"]["items"]["additionalProperties"],
             false
         );
+        assert!(request_schema["properties"]["policy"]["enum"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "cost_aware_farthest_first"));
+        assert!(request_schema["allOf"].as_array().unwrap().iter().any(|gate| {
+            gate["if"]["properties"]["policy"]["const"] == "cost_aware_farthest_first"
+        }));
         assert_eq!(response_schema["oneOf"].as_array().unwrap().len(), 3);
+        assert_eq!(
+            response_schema["oneOf"][0]["properties"]["cost_unit"]["type"][0],
+            "string"
+        );
     }
 
     #[test]
