@@ -1300,6 +1300,12 @@ mod tests {
         assert_eq!(ledger_schema["additionalProperties"], false);
         assert_eq!(report_schema["additionalProperties"], false);
         assert_eq!(ledger_schema["properties"]["schema_version"]["const"], OUTCOME_LEDGER_SCHEMA_VERSION);
+        assert!(
+            ledger_schema["properties"]["arms"]["items"]["properties"]["target_queries"]["items"]["properties"]["observations"]["items"]["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("observation_artifact_sha256"))
+        );
         assert_eq!(report_schema["properties"]["schema_version"]["const"], METRICS_REPORT_SCHEMA_VERSION);
         assert!(
             report_schema["properties"]["comparisons"]["items"]["properties"]["metric"]["enum"]
@@ -1325,6 +1331,17 @@ mod tests {
         value.as_object_mut().unwrap().insert("hidden_target_labels".to_string(), json!([1.0, 2.0]));
         let bytes = serde_json::to_vec(&value).unwrap();
         assert!(evaluate_json_ledger(&bytes, 200, 17).unwrap_err().contains("invalid outcome-ledger JSON"));
+    }
+
+    #[test]
+    fn rejects_invalid_observation_artifact_digest() {
+        let mut ledger = fixture();
+        ledger.arms[0].target_queries[0].observations[0].observation_artifact_sha256 =
+            "not-a-sha256".to_string();
+        let bytes = serde_json::to_vec(&ledger).unwrap();
+        assert!(evaluate_json_ledger(&bytes, 200, 17)
+            .unwrap_err()
+            .contains("invalid observation artifact digest"));
     }
 
     #[test]
