@@ -195,6 +195,19 @@ The research branch now contains `crates/domains/symthaea-scenarios/src/living_c
 - Canonical JSON/SHA-256 digests for the exact scenario, configuration, run and replay receipt; the replay verifier recomputes a run to reject changed inputs, action traces or metrics. These digests are integrity/replay links, not signatures or independent physical validation.
 - A 27-test authored synthetic suite covering deterministic smoke-suite pairing, forecast-vs-reactive behavior on a frozen fixture, receipt/replay verification, rejection of altered metrics and changed scenario/config inputs, digest changes, suite completeness/integrity, duplicate and extra cases, wrong-policy identities, a valid floor breach, mismatched paired hidden truth, zero-baseline-loss handling, immediate deficits, stale/missing observation controls, delayed actions, hidden-future truth isolation, paired comparison preconditions, boundary arithmetic, duplicate policies, invalid forecast ratios and repeatability.
 
+### Deterministic command-line report
+
+A CLI entry point now exists at `crates/domains/symthaea-scenarios/src/bin/living_city_policy_report.rs`. It runs all four baseline policies across the four frozen synthetic cases, fail-closes if any policy suite is blocked or a candidate/baseline pairing is not ready, and emits a JSON report containing:
+
+- Required case IDs, suite and configuration identity/digests, plus a digest of the sorted scenario-digest manifest.
+- Each policy's coverage/integrity/floor status and metrics.
+- Floor-first comparisons against no-intervention, reactive-greedy and cost-first, including per-case run digests.
+- A SHA-256 digest over the compact serialized report payload; pretty-printed JSON is only the transport representation.
+
+A valid report is permitted to contain failed policies: the benchmark is meant to surface their failures, not exit successfully only when the policies look good. It is an execution/measurement smoke harness; it does not assert that any policy should be promoted.
+
+The targeted workflow was extended to test this binary, run it to JSON, require non-empty output, and lint it with the scenario crate. This is configuration authored for CI, not evidence that the workflow has passed.
+
 **Verification ceiling:** this is an executable prototype in source, but its tests have not been compiled or run in the current authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. A queued workflow is not a pass. The harness binds canonical JSON/SHA-256 digests for the scenario, configuration, run and replay receipt, and its verifier reruns the deterministic case to catch changed inputs, action traces or metrics. These are integrity/replay links, not a cryptographic signature or independent physical validation. The harness still contains no calibrated physical model, no stochastic hazard probabilities, no cohort roster, no persisted package tied into the existing offline verifier, and no integrated Symthaea candidate policy. It cannot support a real-city performance or safety claim.
 
 ### Remaining sequence

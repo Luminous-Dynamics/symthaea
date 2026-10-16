@@ -44,5 +44,16 @@ jobs:
       - name: Test offline verifier and run-package negative controls
         run: cargo test --locked --package symthaea-scenarios --bin living_city_verify
 
-      - name: Lint scenario contracts and verifier
-        run: cargo clippy --locked --package symthaea-scenarios --lib --bin living_city_verify -- -D warnings
+      - name: Test policy benchmark report binary
+        run: cargo test --locked --package symthaea-scenarios --bin living_city_policy_report
+
+      - name: Emit deterministic synthetic policy report
+        run: |
+          cargo run --quiet --locked --package symthaea-scenarios --bin living_city_policy_report \
+            > /tmp/living-city-policy-report.json
+          test -s /tmp/living-city-policy-report.json
+
+      - name: Lint scenario contracts and verifiers
+        run: |
+          cargo clippy --locked --package symthaea-scenarios --lib \
+            --bin living_city_verify --bin living_city_policy_report -- -D warnings
