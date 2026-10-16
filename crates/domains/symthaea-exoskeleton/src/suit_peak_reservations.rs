@@ -64,6 +64,8 @@ pub struct PeakResourcePool {
     pub resource_kind: PeakResourceKind,
     pub provider_component_id: String,
     pub provider_hardware_revision: String,
+    /// Exact SX-030 contract IDs that provide access to this resource pool.
+    pub required_connection_ids: BTreeSet<String>,
     /// Conservative capacity envelope; capacity lower bound is budgeted.
     pub capacity: PeakQuantityInterval,
     pub evidence_level: SuitEvidenceLevel,
@@ -106,6 +108,10 @@ pub enum PeakResourceFindingCode {
     MissingProviderComponent,
     ProviderHardwareRevisionMismatch,
     ProviderNotReachable,
+    MissingProviderConnection,
+    ProviderConnectionDoesNotBindProvider,
+    ProviderConnectionBlocked,
+    ProviderConnectionEnvironmentMismatch,
     EnvironmentScopeMismatch,
     SupplyEvidenceBelowPolicy,
     ReservationEvidenceBelowPolicy,
@@ -465,6 +471,68 @@ pub fn evaluate_peak_resource_reservations(
             });
         }
 
+        // A generic path to a provider is not enough: pin the exact interface
+        // contracts intended to supply this peak resource.
+        for connection_id in &pool.required_connection_ids {
+            match task_report
+                .mission_configuration_report
+                .connection_evaluations
+                .iter()
+                .find(|connection| connection.connection_id == *connection_id)
+            {
+                None => findings.push(PeakResourceFinding {
+                    pool_id: pool.pool_id.clone(),
+                    task_id: Some(task.task_id.clone()),
+                    reservation_id: Some(reservation.reservation_id.clone()),
+                    window: Some(reservation.window),
+                    code: PeakResourceFindingCode::MissingProviderConnection,
+                    severity,
+                    observed_evidence_level: None,
+                }),
+                Some(connection) => {
+                    if connection.left_component_id != pool.provider_component_id
+                        && connection.right_component_id != pool.provider_component_id
+                    {
+                        findings.push(PeakResourceFinding {
+                            pool_id: pool.pool_id.clone(),
+                            task_id: Some(task.task_id.clone()),
+                            reservation_id: Some(reservation.reservation_id.clone()),
+                            window: Some(reservation.window),
+                            code: PeakResourceFindingCode::ProviderConnectionDoesNotBindProvider,
+                            severity,
+                            observed_evidence_level: None,
+                        });
+                    }
+                    if connection.interoperability.status
+                        != SuitInteropReportStatus::MeetsDeclaredCompatibilityPolicy
+                    {
+                        findings.push(PeakResourceFinding {
+                            pool_id: pool.pool_id.clone(),
+                            task_id: Some(task.task_id.clone()),
+                            reservation_id: Some(reservation.reservation_id.clone()),
+                            window: Some(reservation.window),
+                            code: PeakResourceFindingCode::ProviderConnectionBlocked,
+                            severity,
+                            observed_evidence_level: None,
+                        });
+                    }
+                    if !task.required_environments.is_subset(
+                        &connection.interoperability.policy.required_environments,
+                    ) {
+                        findings.push(PeakResourceFinding {
+                            pool_id: pool.pool_id.clone(),
+                            task_id: Some(task.task_id.clone()),
+                            reservation_id: Some(reservation.reservation_id.clone()),
+                            window: Some(reservation.window),
+                            code: PeakResourceFindingCode::ProviderConnectionEnvironmentMismatch,
+                            severity,
+                            observed_evidence_level: None,
+                        });
+                    }
+                }
+            }
+        }
+
         match component_by_id.get(pool.provider_component_id.as_str()) {
             None => findings.push(PeakResourceFinding {
                 pool_id: pool.pool_id.clone(),
@@ -702,6 +770,8 @@ fn validate_plan_structure(
             || !clean_identifier(&pool.provider_hardware_revision)
             || !clean_identifier(&pool.evidence_reference)
             || pool.applicable_environments.is_empty()
+            || pool.required_connection_ids.is_empty()
+            || pool.required_connection_ids.iter().any(|id| !clean_identifier(id))
         {
             return Err(PeakResourceReservationError::InvalidPool);
         }
@@ -842,6 +912,10 @@ fn digest_plan(plan: &PeakResourceReservationPlan) -> String {
         writer.string(resource_kind_tag(pool.resource_kind));
         writer.string(&pool.provider_component_id);
         writer.string(&pool.provider_hardware_revision);
+        writer.usize(pool.required_connection_ids.len());
+        for connection_id in &pool.required_connection_ids {
+            writer.string(connection_id);
+        }
         write_interval(
             &mut writer,
             pool.capacity.lower,
@@ -1118,6 +1192,14 @@ fn finding_code_tag(value: PeakResourceFindingCode) -> &'static str {
             "provider_hardware_revision_mismatch"
         }
         PeakResourceFindingCode::ProviderNotReachable => "provider_not_reachable",
+        PeakResourceFindingCode::MissingProviderConnection => "missing_provider_connection",
+        PeakResourceFindingCode::ProviderConnectionDoesNotBindProvider => {
+            "provider_connection_does_not_bind_provider"
+        }
+        PeakResourceFindingCode::ProviderConnectionBlocked => "provider_connection_blocked",
+        PeakResourceFindingCode::ProviderConnectionEnvironmentMismatch => {
+            "provider_connection_environment_mismatch"
+        }
         PeakResourceFindingCode::EnvironmentScopeMismatch => "environment_scope_mismatch",
         PeakResourceFindingCode::SupplyEvidenceBelowPolicy => "supply_evidence_below_policy",
         PeakResourceFindingCode::ReservationEvidenceBelowPolicy => {
@@ -1269,6 +1351,7 @@ mod tests {
                 resource_kind: PeakResourceKind::ElectricalPowerMilliwatts,
                 provider_component_id: "vehicle".into(),
                 provider_hardware_revision: vehicle_revision.into(),
+                required_connection_ids: BTreeSet::from(["suit-vehicle-power".into()]),
                 capacity: PeakQuantityInterval {
                     lower: 1_000,
                     nominal: 1_100,
