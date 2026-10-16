@@ -17,7 +17,6 @@ pub mod metrics;
 pub mod receipt;
 pub mod sim_budget;
 pub mod sim_campaign;
-pub mod sim_campaign;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
