@@ -590,6 +590,87 @@ mod tests {
         RepairJob::new(id, skill, duration, priority, value, 0, depends_on, Vec::<RepairPartRequirement>::new())
     }
 
+    /// Independent exact reference for tiny, single-crew, no-dependency fixtures.
+    /// This enumerates permutations instead of calling the production scheduler.
+    fn brute_force_single_crew_best_loss(
+        jobs: &[RepairJob],
+        horizon_steps: usize,
+    ) -> (f64, Vec<String>) {
+        fn visit(
+            jobs: &[RepairJob],
+            horizon_steps: usize,
+            used: &mut [bool],
+            order: &mut Vec<usize>,
+            best: &mut Option<(f64, Vec<String>)>,
+        ) {
+            if order.len() == jobs.len() {
+                let mut time = 0_usize;
+                let mut loss = 0.0_f64;
+                let mut ids = Vec::with_capacity(order.len());
+                for &job_index in order.iter() {
+                    let job = &jobs[job_index];
+                    time = time.max(job.outage_start_step);
+                    time = time.saturating_add(job.duration_steps);
+                    let lost_steps = time
+                        .min(horizon_steps)
+                        .saturating_sub(job.outage_start_step.min(horizon_steps));
+                    loss += lost_steps as f64 * job.recovered_service_value_per_step;
+                    ids.push(job.id.clone());
+                }
+                let replace = match best {
+                    None => true,
+                    Some((best_loss, best_ids)) => {
+                        loss < *best_loss - EPSILON
+                            || ((loss - *best_loss).abs() <= EPSILON && ids < *best_ids)
+                    }
+                };
+                if replace {
+                    *best = Some((loss, ids));
+                }
+                return;
+            }
+            for index in 0..jobs.len() {
+                if !used[index] {
+                    used[index] = true;
+                    order.push(index);
+                    visit(jobs, horizon_steps, used, order, best);
+                    order.pop();
+                    used[index] = false;
+                }
+            }
+        }
+
+        let mut best = None;
+        visit(
+            jobs,
+            horizon_steps,
+            &mut vec![false; jobs.len()],
+            &mut Vec::with_capacity(jobs.len()),
+            &mut best,
+        );
+        best.expect("non-empty fixture should have a permutation")
+    }
+
+    #[test]
+    fn weighted_policy_matches_exhaustive_oracle_on_tiny_reference_case() {
+        let jobs = [
+            job("long-low-impact", "mechanical", 10, 0, 1.0, Vec::<String>::new()),
+            job("short-critical", "mechanical", 1, 1, 100.0, Vec::<String>::new()),
+        ];
+        let crew = [crew("crew-a", "mechanical")];
+        let (exact_loss, exact_order) = brute_force_single_crew_best_loss(&jobs, 20);
+        let weighted = schedule_repairs(
+            &jobs,
+            &crew,
+            &[],
+            &config(RepairSchedulingPolicy::WeightedRecoveryPerStep),
+        )
+        .unwrap();
+        assert_eq!(exact_loss, 111.0);
+        assert_eq!(weighted.total_weighted_service_unit_steps_lost, exact_loss);
+        assert_eq!(exact_order, vec!["short-critical", "long-low-impact"]);
+    }
+
     #[test]
     fn weighted_recovery_beats_priority_first_on_disclosed_fixture() {
         let jobs = [
