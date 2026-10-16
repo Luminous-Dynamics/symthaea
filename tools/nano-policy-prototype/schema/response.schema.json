@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-policy-output:v1",
+  "title": "Nanophotonic candidate-selection response",
+  "description": "Selection-only output. It records what the policy proposed; it is not evidence that a candidate passed an oracle or scientific evaluation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "policy_revision",
+    "candidate_pool_sha256",
+    "policy",
+    "seed",
+    "selected",
+    "candidate_pool_size",
+    "eligible_pool_size",
+    "information_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "nano-policy-output-v1"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_pool_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "policy": {
+      "enum": [
+        "random",
+        "goal_only",
+        "uncertainty_only",
+        "diversity_only",
+        "hybrid"
+      ]
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selected": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rank",
+          "candidate_id",
+          "score",
+          "component_scores",
+          "reason"
+        ],
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "score": {
+            "type": "number"
+          },
+          "component_scores": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "goal_fit",
+              "uncertainty",
+              "cost_efficiency",
+              "diversity"
+            ],
+            "properties": {
+              "goal_fit": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "uncertainty": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "cost_efficiency": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "diversity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "candidate_pool_size": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "eligible_pool_size": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "information_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
