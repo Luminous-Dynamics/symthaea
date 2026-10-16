@@ -118,7 +118,7 @@ fn validate_scenario(scenario: &PolicyScenario) -> Result<(), BenchmarkError> {
     if scenario.steps.is_empty() {
         return Err(invalid("steps", "scenario must contain at least one step"));
     }
-    for (index, step) in scenario.steps.iter().enumerate() {
+    for step in &scenario.steps {
         if step
             .observation
             .forecast_service_ratio_per_mille
@@ -131,7 +131,6 @@ fn validate_scenario(scenario: &PolicyScenario) -> Result<(), BenchmarkError> {
         }
         // Deliberately do not validate observations against ground truth: a
         // biased/stale sensor is a valid adversarial test input.
-        let _ = index;
     }
     Ok(())
 }
@@ -622,7 +621,7 @@ mod tests {
     }
 
     #[test]
-    fn repeated_runs_are_byte_semantically_deterministic() {
+    fn repeated_runs_produce_identical_results() {
         let case = scenario(
             "repeatable",
             vec![
