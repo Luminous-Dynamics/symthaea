@@ -991,8 +991,19 @@
       },
       {
         "id": "ORACLE-06",
-        "expected_objective": "computed_by_executable_oracle",
-        "permutations": 40320
+        "expected_objective": 406,
+        "permutations": 40320,
+        "expected_order": [
+          "b",
+          "f",
+          "d",
+          "h",
+          "c",
+          "g",
+          "e",
+          "a"
+        ],
+        "verification": "independent_exhaustive_JavaScript_arithmetic_Rust_test_unexecuted"
       }
     ],
     "limitations": [
