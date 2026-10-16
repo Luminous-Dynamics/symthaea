@@ -945,6 +945,29 @@ mod tests {
     }
 
     #[test]
+    fn post_cutoff_probability_mutations_do_not_change_earlier_score() {
+        let target_row = target("e1", "30d", 100, 200, true, 20);
+        let baseline = replay_horizons(
+            &[observation("e1", "market", 90, 0.3)],
+            &[target_row.clone()],
+        )
+        .expect("baseline replay");
+
+        for future_probability in [0.0, 0.5, 0.99, 1.0] {
+            let report = replay_horizons(
+                &[
+                    observation("e1", "market", 90, 0.3),
+                    observation("e1", "market", 101, future_probability),
+                ],
+                &[target_row.clone()],
+            )
+            .expect("replay with post-cutoff mutation");
+            assert_eq!(report.scored, baseline.scored);
+            assert_eq!(report.excluded, baseline.excluded);
+        }
+    }
+
+    #[test]
     fn duplicate_observation_keys_fail_closed() {
         let observations = vec![
             observation("e1", "market", 100, 0.4),
