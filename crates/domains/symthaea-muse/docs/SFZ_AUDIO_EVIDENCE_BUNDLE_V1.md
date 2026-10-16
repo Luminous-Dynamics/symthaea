@@ -119,12 +119,12 @@ The following is a shape example. Replace every `REPLACE_...` digest with an act
 }
 ```
 
-The fixture pack generator writes the tree digest as the first whitespace-delimited token in `pack.sha256`; the verifier compares that token with `fixture_pack_digest`, while separately checking the SHA-256 of the receipt file itself.
+The fixture pack generator writes the tree digest as the first whitespace-delimited token in `pack.sha256`; the verifier checks that token, checks the receipt file SHA-256, and independently recomputes the full tree digest using the generator's path-and-content-hash algorithm. The recomputation excludes only `pack.sha256`, because the generator creates it after calculating the digest. The `fixtures.json` manifest and `pack.sha256` receipt must be adjacent in the same fixture-pack root.
 
 ## What is verified
 
 - Every declared SFZ, MIDI, sample, engine executable, build-configuration file, captured WAV and comparison JSON file exists as a regular, non-symlink file and matches the declared SHA-256.
-- The fixture-pack receipt content matches the declared tree digest.
+- The fixture-pack receipt content matches the declared tree digest, and the full pack tree is independently rehashed. Symlinks and non-regular entries fail closed; `pack.sha256` is excluded only to avoid a self-referential digest.
 - The selected `fixture_id` exists in `fixtures.json`; its SFZ hash and byte length match the declared SFZ, and its sample-asset hash multiset matches the bundle declaration.
 - The differential receipt uses `muse-sfz-audio-differential-receipt-v1`, has a `measured_not_quality_qualified` status and metrics, and names the same candidate/reference WAV hashes as the bundle.
 - Failures are included in the JSON receipt, rather than converting absent, corrupt or mismatched artifacts into a pass.
@@ -132,7 +132,7 @@ The fixture pack generator writes the tree digest as the first whitespace-delimi
 ## What is not verified
 
 - Engine identity, software authorship or the truth of the recorded render command are **declared, not authenticated**. SHA-256 proves byte identity relative to a declaration, not who produced those bytes. Signed attestations or independently trusted build provenance are future work.
-- The verifier does not recalculate the fixture pack's tree hash from all fixture files; it checks the supplied pack receipt file hash and that the receipt's digest token matches the declared digest. To independently validate the entire pack, run the existing fixture-pack validator too.
+- The verifier recomputes the pack tree digest but does not execute the parser/sequencer fixture validator or validate actual WAV sample-header semantics; run the existing fixture-pack validator as a separate semantic/asset-structure check.
 - The verifier does not render the SFZ, compare expected MIDI events with real-engine behavior, judge the spectral numbers, or qualify perceptual equivalence. A correct provenance bundle may faithfully document a bad render.
 - Render command text is not executed, and build-configuration files are not interpreted; hash identity is the only automated claim made about these files.
 
