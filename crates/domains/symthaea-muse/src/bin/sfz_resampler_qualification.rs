@@ -45,6 +45,7 @@ const PITCH_SHIFTS_SEMITONES: [i16; 5] = [-12, 0, 7, 12, 24];
 #[derive(Debug, Serialize)]
 struct ThresholdsV1 {
     minimum_alias_suppression_db: f64,
+    minimum_alias_total_rms_attenuation_db: f64,
     maximum_in_band_amplitude_absolute_error: f64,
     maximum_relative_pitch_ratio_error: f64,
     minimum_offline_realtime_factor: f64,
@@ -56,6 +57,7 @@ impl Default for ThresholdsV1 {
     fn default() -> Self {
         Self {
             minimum_alias_suppression_db: 26.0,
+            minimum_alias_total_rms_attenuation_db: 10.0,
             maximum_in_band_amplitude_absolute_error: 0.04,
             maximum_relative_pitch_ratio_error: 1.0e-6,
             minimum_offline_realtime_factor: 10.0,
@@ -98,6 +100,7 @@ struct CaseReceiptV1 {
     linear: PathMeasurementV1,
     lanczos_sinc: PathMeasurementV1,
     alias_suppression_db_vs_linear: f64,
+    total_rms_attenuation_db_vs_linear: f64,
     in_band_amplitude_absolute_error: Option<f64>,
     relative_pitch_ratio_error: f64,
     failed_gates: Vec<String>,
@@ -301,6 +304,12 @@ fn qualify_case(
         * (linear.measured_tone_amplitude.max(1.0e-12)
             / sinc.measured_tone_amplitude.max(1.0e-12))
         .log10();
+    // Independent whole-output energy check: suppressing the expected alias
+    // projection must not conceal an equally strong artifact at another tone.
+    let total_rms_attenuation_db = 20.0
+        * (linear.renderer_receipt.rms.max(1.0e-12)
+            / sinc.renderer_receipt.rms.max(1.0e-12))
+        .log10();
     let in_band_error = if passband_gate_applicable {
         Some((sinc.measured_tone_amplitude - SOURCE_AMPLITUDE).abs())
     } else {
@@ -346,6 +355,14 @@ fn qualify_case(
             thresholds.minimum_alias_suppression_db
         ));
     }
+    if alias_gate_applicable
+        && total_rms_attenuation_db < thresholds.minimum_alias_total_rms_attenuation_db
+    {
+        failed_gates.push(format!(
+            "total output RMS attenuation {total_rms_attenuation_db:.2} dB is below the {} dB gate",
+            thresholds.minimum_alias_total_rms_attenuation_db
+        ));
+    }
     if let Some(error) = in_band_error {
         if error > thresholds.maximum_in_band_amplitude_absolute_error {
             failed_gates.push(format!(
@@ -374,6 +391,7 @@ fn qualify_case(
         linear,
         lanczos_sinc: sinc,
         alias_suppression_db_vs_linear: alias_suppression_db,
+        total_rms_attenuation_db_vs_linear: total_rms_attenuation_db,
         in_band_amplitude_absolute_error: in_band_error,
         relative_pitch_ratio_error,
         passed: failed_gates.is_empty(),
