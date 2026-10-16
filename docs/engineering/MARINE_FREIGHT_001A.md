@@ -50,7 +50,7 @@ The turnaround estimate assumes constant power and a constant declared efficienc
 
 - Every known quantity names a provenance record; provenance IDs must be unique.
 - Units are checked by the evaluator, not inferred or silently converted.
-- Per-input uncertainty intervals and calibrated model-bias bounds are not yet represented in v1. This is a deliberate limitation: the synthetic fixture cannot support a real design decision, and measured or solver-derived comparisons must not be promoted until uncertainty/provenance extensions and held-out calibration are implemented.
+- V2 propagates explicit closed input intervals conservatively, but those ranges are not yet calibrated confidence regions and do not bound systematic solver/model bias by themselves. The evaluator remains synthetic-only and not-for-decision until independent calibration, held-out coverage evaluation, and a registered model-bias policy exist.
 - Unknown values remain explicit and produce `indeterminate` findings. Unknown is not zero.
 - Invalid or missing evidence does not produce a successful comparison.
 - Findings remain independent; there is no weighted score that can hide a failed hard constraint.
@@ -78,9 +78,12 @@ Proposed gates—not measured results:
 - retain independent findings for every hard constraint;
 - verify negative controls for under-capacity batteries, inadequate shore power, route-envelope violations, payload overload, unknown route depth, unknown energy, missing provenance, unknown provenance class, unit mismatch, duplicated provenance IDs, invalid reserve factors, and attempted claim-ceiling escalation;
 - ensure no unknown/malformed input can become a favorable result through a default value;
+- run a deterministic 10,000-case property-style oracle for the frozen interval comparison rule;
+- verify interval-overlap cases are indeterminate, and only separated ranges may establish robust pass/violation;
+- later, measure interval coverage and bound miss rate against independent held-out observations, with confidence intervals and stratification by operating envelope;
 - compare alternative designs only on matched mission schedules and declared boundaries, then report a Pareto set rather than a magic scalar.
 
-The first subsequent expansion should add configuration composition for conventional-fuel reference, fixed battery, swappable energy containers, and optional wind assistance. Those should be treated as separate architectures, not as a presumed ranking. Only after inputs and owners are mapped should the project consume validated hydrodynamics. The ITTC maintains a community benchmark repository and a recommended CFD validation database for resistance and propulsion: https://www.ittc.info/benchmark-repository/ and https://www.ittc.info/media/11956/75-03-02-02.pdf.
+The first subsequent expansion should add configuration composition for conventional-fuel reference, fixed battery, swappable energy containers, and optional wind assistance. Those should be treated as separate architectures, not as a presumed ranking. Only after inputs and owners are mapped should the project consume validated hydrodynamics. The ITTC maintains a community benchmark repository covering ship resistance/propulsion and manoeuvring predictions: https://www.ittc.info/benchmark-repository/ and https://ittc.info/benchmark-repository/ship-resistance-and-propulsion/. The 2024 procedure index contains the recommended CFD validation database for resistance/propulsion (7.5-03-02-02, revision 03) and manoeuvring validation data (7.5-02-06-06, revision 01): https://ittc.info/search/?q=5415. These are external validation references, not Symthaea benchmark results.
 
 ## Not claimed
 
@@ -96,4 +99,6 @@ For a comparison of a demand interval D with an allowable interval C:
 - ViolatesDeclaredBound only when D.lower > C.upper;
 - otherwise the result is Indeterminate.
 
-This conservative rule avoids promoting an attractive nominal estimate when plausible values cross a hard limit. Interval bounds are only as trustworthy as their provenance and calibration; correlated or dependent variables may make the intervals conservative or physically loose. V2 is still restricted to synthetic, not-for-decision cases. There is no claim of calibrated uncertainty, model-bias coverage, or physical suitability.
+This conservative rule avoids promoting an attractive nominal estimate when plausible values cross a hard limit. Interval bounds are only as trustworthy as their provenance and calibration; correlated or dependent variables may make the intervals conservative or physically loose. V2 is still restricted to synthetic, not-for-decision cases. There is no claim of calibrated uncertainty, model-bias coverage, or physical suitability. The current unit tests include a deterministic 10,000-case interval-classification oracle; this is software conformance evidence only, not physical uncertainty validation.
+
+For the autonomy workstream, the IMO's non-mandatory MASS Code came into effect on 1 July 2026 for its stated cargo-ship scope. Its approach calls for explicit operating modes, environmental limits, connectivity/remote-operation safeguards, risk assessment, and human oversight. These concepts should inform a future ODD/encounter benchmark contract, but neither the code nor scenario conformance grants an autonomous ship approval: https://www.imo.org/en/mediacentre/pressbriefings/pages/imo-adopts-mass-code.aspx.
