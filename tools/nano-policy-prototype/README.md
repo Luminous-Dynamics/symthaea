@@ -21,9 +21,10 @@ Program-level gates and the source audit for the external MEEP benchmark are doc
 - `goal_only`: lowest **pre-query predicted** goal error.
 - `uncertainty_only`: highest pre-query uncertainty estimate. This is not a calibrated probability by itself.
 - `diversity_only`: greedy maximin distance in the declared feature space.
+- `balanced_extremes`: alternates between the low- and high-predicted-error ends of the pool to improve response-space coverage for the next training/update cycle. It is a **model-learning** arm, not an immediate-success selector.
 - `hybrid`: greedy weighted sum of normalized goal fit, uncertainty, low estimated cost, and maximin diversity.
 
-The current policies are transparent baselines, not claims that hybrid selection is superior. The weights and feature-space version must be frozen before scored evaluation.
+The current policies are transparent baselines, not claims that hybrid selection is superior. The weights and feature-space version must be frozen before scored evaluation. A 2026 materials-discovery study reports that sampling both positive and negative extrema can improve model generalization versus uniform or one-sided sampling; treat `balanced_extremes` as a hypothesis to test, not a universally superior policy: https://www.sciencedirect.com/science/article/pii/S1000681826000561. Evaluate its predictive/coverage benefit separately from immediate candidate-discovery utility.
 
 ## Interface and information boundary
 
