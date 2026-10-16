@@ -64,15 +64,21 @@ pub enum AssessmentError {
 impl fmt::Display for AssessmentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedSchema(version) => write!(f, "unsupported case schema version: {version}"),
+            Self::UnsupportedSchema(version) => {
+                write!(f, "unsupported case schema version: {version}")
+            }
             Self::EmptyCaseId => write!(f, "case_id must not be empty"),
             Self::EmptyProvenanceId => write!(f, "provenance IDs must not be empty"),
             Self::EmptyProvenanceDescription(id) => {
                 write!(f, "provenance description must not be empty for {id}")
             }
             Self::DuplicateProvenanceId(id) => write!(f, "duplicate provenance ID: {id}"),
-            Self::ClaimCeilingMismatch => write!(f, "case claim ceiling does not match this evaluator's frozen ceiling"),
-            Self::UnsupportedEvidenceClass(class) => write!(f, "v2 accepts synthetic illustrations only; received evidence class {class}"),
+            Self::ClaimCeilingMismatch => {
+                write!(f, "case claim ceiling does not match this evaluator's frozen ceiling")
+            }
+            Self::UnsupportedEvidenceClass(class) => {
+                write!(f, "v2 accepts synthetic illustrations only; received evidence class {class}")
+            }
             Self::UnsupportedDecisionUse => write!(f, "v2 accepts not_for_decision cases only"),
         }
     }
@@ -167,14 +173,20 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
         demand.clone(),
         usable_capacity,
         "kWh",
-        "sum of four declared leg loads <= nominal battery energy × temperature factor × end-of-life factor × (1 − reserve fraction)",
+        concat!(
+            "sum of four declared leg loads <= nominal battery energy × temperature factor × ",
+            "end-of-life factor × (1 − reserve fraction)",
+        ),
     ));
     findings.push(compare_le(
         "shore_recharge_before_departure",
         demand.clone(),
         charge_energy,
         "kWh",
-        "duty-cycle energy <= min(charger power, shore connection power) × charge window × charging efficiency",
+        concat!(
+            "duty-cycle energy <= min(charger power, shore connection power) × charge window × ",
+            "charging efficiency",
+        ),
     ));
     findings.push(compare_le(
         "service_turnaround_window",
@@ -196,10 +208,22 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
         findings,
         claim_ceiling: CLAIM_CEILING.to_owned(),
         notes: vec![
-            "Each finding uses conservative closed-interval arithmetic over declared bounds; bounds do not imply a probability distribution or physical calibration.".to_owned(),
-            "A WithinDeclaredBound result requires the entire observed interval to sit below the entire constraint interval; overlapping intervals are indeterminate.".to_owned(),
+            concat!(
+                "Each finding uses conservative closed-interval arithmetic over declared bounds; ",
+                "bounds do not imply a probability distribution or physical calibration.",
+            )
+            .to_owned(),
+            concat!(
+                "A WithinDeclaredBound result requires the entire observed interval to sit below ",
+                "the entire constraint interval; overlapping intervals are indeterminate.",
+            )
+            .to_owned(),
             "Energy demand is supplied by the case; this evaluator does not derive hull resistance or propulsion loads.".to_owned(),
-            "Charge duration assumes constant delivered power and a constant declared efficiency; taper, thermal limits, grid dynamics, and degradation during the cycle are not modeled.".to_owned(),
+            concat!(
+                "Charge duration assumes constant delivered power and declared efficiency; taper, ",
+                "thermal limits, grid dynamics, and degradation during the cycle are not modeled.",
+            )
+            .to_owned(),
             "No overall PASS, weighted score, design ranking, or operating authority is produced.".to_owned(),
         ],
     })
@@ -423,7 +447,10 @@ fn charge_duration_h(
         };
     }
     if rate.lower <= 0.0 {
-        return Err("recharge-time upper bound is unbounded because the delivered-rate lower bound is zero".to_owned());
+        return Err(
+            "recharge-time upper bound is unbounded because the delivered-rate lower bound is zero"
+                .to_owned(),
+        );
     }
     checked_interval(
         demand.nominal / rate.nominal,
@@ -451,11 +478,19 @@ fn compare_le(
             };
             let reason = match status {
                 FindingStatus::WithinDeclaredBound =>
-                    "entire observed interval is within the entire declared bound interval; this is not physical qualification".to_owned(),
+                    concat!(
+                        "entire observed interval is within the entire declared bound interval; ",
+                        "this is not physical qualification",
+                    )
+                    .to_owned(),
                 FindingStatus::ViolatesDeclaredBound =>
                     "even the lowest observed value exceeds the highest declared bound".to_owned(),
                 FindingStatus::Indeterminate =>
-                    "input intervals overlap or cross; available bounds do not establish feasibility or violation".to_owned(),
+                    concat!(
+                        "input intervals overlap or cross; available bounds do not establish ",
+                        "feasibility or violation",
+                    )
+                    .to_owned(),
             };
             Finding {
                 metric: metric.to_owned(),
@@ -633,7 +668,10 @@ mod tests {
         let mut case = case();
         set_number(&mut case.duty_cycle.required_payload_tonnes, 1000.0);
         let report = assess(&case).expect("valid input case");
-        assert_eq!(finding(&report, "payload_capacity").status, FindingStatus::ViolatesDeclaredBound);
+        assert_eq!(
+            finding(&report, "payload_capacity").status,
+            FindingStatus::ViolatesDeclaredBound
+        );
     }
 
     #[test]
@@ -660,7 +698,11 @@ mod tests {
     #[test]
     fn unknown_provenance_class_cannot_support_a_numeric_finding() {
         let mut case = case();
-        let source = case.provenance.iter_mut().find(|p| p.id == "synthetic-duty-cycle").expect("fixture record");
+        let source = case
+            .provenance
+            .iter_mut()
+            .find(|p| p.id == "synthetic-duty-cycle")
+            .expect("fixture record");
         source.class = EvidenceClass::Unknown;
         let report = assess(&case).expect("unknown provenance is indeterminate");
         assert_eq!(
@@ -732,8 +774,14 @@ mod tests {
         let report = assess(&case).expect("synthetic bounded case");
         let energy = finding(&report, "battery_energy_per_duty_cycle");
         assert_eq!(energy.status, FindingStatus::Indeterminate);
-        assert!(energy.observed_lower.expect("lower bound") < energy.bound_upper.expect("upper capacity"));
-        assert!(energy.observed_upper.expect("upper bound") > energy.bound_lower.expect("lower capacity"));
+        assert!(
+            energy.observed_lower.expect("lower bound")
+                < energy.bound_upper.expect("upper capacity")
+        );
+        assert!(
+            energy.observed_upper.expect("upper bound")
+                > energy.bound_lower.expect("lower capacity")
+        );
     }
 
     #[test]
@@ -743,7 +791,10 @@ mod tests {
         let report = assess(&case).expect("synthetic bounded case");
         let energy = finding(&report, "battery_energy_per_duty_cycle");
         assert_eq!(energy.status, FindingStatus::ViolatesDeclaredBound);
-        assert!(energy.observed_lower.expect("lower demand") > energy.bound_upper.expect("upper capacity"));
+        assert!(
+            energy.observed_lower.expect("lower demand")
+                > energy.bound_upper.expect("upper capacity")
+        );
     }
 
     #[test]
@@ -787,7 +838,13 @@ mod tests {
             } else {
                 FindingStatus::Indeterminate
             };
-            let actual = compare_le("interval_oracle", Ok(observed), Ok(bound), "unit", "fixed rule");
+            let actual = compare_le(
+                "interval_oracle",
+                Ok(observed),
+                Ok(bound),
+                "unit",
+                "fixed rule",
+            );
             assert_eq!(actual.status, expected, "case index {i}");
             if actual.status == FindingStatus::WithinDeclaredBound {
                 assert!(actual.observed_upper.unwrap() <= actual.bound_lower.unwrap());
