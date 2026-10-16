@@ -211,7 +211,7 @@ pub const GLYPH_OMEGA_50: BootGlyph = BootGlyph {
     sonic_signature: "call-and-response pattern, deepening",
 };
 
-/// MOK Enrollment: "The Mantling"
+/// Secure Boot key enrollment: "The Mantling"
 pub const GLYPH_MANTLING: BootGlyph = BootGlyph {
     glyph_id: "meta_mantling",
     name: "The Mantling",
@@ -221,7 +221,7 @@ pub const GLYPH_MANTLING: BootGlyph = BootGlyph {
     sonic_signature: "ascending scale culminating in a sustained chord",
 };
 
-/// MOK Enrollment (trust): "Kairotic Trust Wells"
+/// Explicit boot-key trust: "Kairotic Trust Wells"
 pub const GLYPH_OMEGA_3: BootGlyph = BootGlyph {
     glyph_id: "omega_3",
     name: "Kairotic Trust Wells",
@@ -330,7 +330,7 @@ pub enum BootPhaseName {
     MeshHandshake,
     /// Cross-device reunion with phone Spore.
     CrossDeviceReunion,
-    /// MOK enrollment (first boot with Secure Boot).
+    /// Legacy serialized phase ID for explicit Secure Boot key enrollment.
     MokEnrollment,
     /// First consciousness measurement (Phi Bloom).
     PhiBloom,
@@ -350,7 +350,7 @@ impl BootPhaseName {
             Self::FilesystemRecovery => "Filesystem Recovery",
             Self::MeshHandshake => "Mesh Handshake",
             Self::CrossDeviceReunion => "Cross-Device Reunion",
-            Self::MokEnrollment => "MOK Enrollment",
+            Self::MokEnrollment => "Secure Boot Key Enrollment",
             Self::PhiBloom => "Phi Bloom",
             Self::WaylandHandoff => "Wayland Handoff",
             Self::PostCrashReunion => "Post-Crash Reunion",
@@ -935,7 +935,7 @@ impl BootSequence {
                 duration_estimate_ms: 2000,
                 narration: format!("{}\n\n{}", GLYPH_OMEGA_9.name, GLYPH_OMEGA_9.echo_phrase),
             },
-            // 3. MOK Enrollment (Secure Boot trust)
+            // 3. Secure Boot Key Enrollment (profile-authorized, manual trust change)
             BootPhase {
                 name: BootPhaseName::MokEnrollment,
                 glyph: GLYPH_MANTLING.clone(),
@@ -1205,12 +1205,12 @@ mod tests {
         );
         assert_eq!(seq.phases[0].name, BootPhaseName::NeuralInit);
 
-        // MOK Enrollment should be present
+        // Explicit Secure Boot key-enrollment phase should be present
         let has_mok = seq
             .phases
             .iter()
             .any(|p| p.name == BootPhaseName::MokEnrollment);
-        assert!(has_mok, "First Breath should include MOK Enrollment");
+        assert!(has_mok, "First Breath should include Secure Boot Key Enrollment");
 
         // The Mantling glyph should be present
         assert!(

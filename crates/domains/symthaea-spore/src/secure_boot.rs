@@ -9,7 +9,7 @@
 //! - **Delegated probe**: SSH-based remote detection of Secure Boot state
 //! - **Socratic guide**: Interactive dialogue for USB Forge mode (no SSH)
 //! - **Lanzaboote integration**: NixOS configuration for Secure Boot-compatible boot
-//! - **MOK enrollment guide**: Step-by-step instructions for the blue UEFI screen
+//! - **Explicit key enrollment guide**: Profile-bound manual procedure and post-reboot checks
 //! - **Boot chain visualization**: 5-stage UEFI chain status for the Inoculation UI
 //!
 //! # Philosophy
@@ -56,6 +56,75 @@ impl TargetPlatform {
     }
 }
 
+/// Explicit, one-session authorization for generating a Secure Boot configuration.
+///
+/// The authorization binds consent to a profile identity, exact device/firmware
+/// and software revisions, the observed Secure Boot state, and a hash of the
+/// current hardware profile. It is intentionally not serialized/persisted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecureBootProfileApproval {
+    pub profile_id: String,
+    pub target_model: String,
+    pub firmware_revision: String,
+    pub nixos_release: String,
+    pub lanzaboote_revision: String,
+    /// Exact PKI bundle path approved for this profile.
+    pub pki_bundle: String,
+    pub observed_secure_boot_state: String,
+    pub hardware_profile_blake3: String,
+    pub user_confirmed: bool,
+    pub exact_profile_qualified: bool,
+    pub recovery_path_verified: bool,
+}
+
+impl SecureBootProfileApproval {
+    /// Validate the approval against live observations before generating config.
+    pub fn validate_for_current_target(
+        &self,
+        observed_state: &str,
+        hardware_profile_blake3: &str,
+        is_linux_target: bool,
+    ) -> Result<(), String> {
+        if !self.user_confirmed {
+            return Err("explicit operator confirmation is required".to_string());
+        }
+        if !self.exact_profile_qualified {
+            return Err("the exact device/firmware/NixOS/Lanzaboote profile is not qualified".to_string());
+        }
+        if !self.recovery_path_verified {
+            return Err("an independently verified recovery path is required".to_string());
+        }
+        for (name, value) in [
+            ("profile_id", self.profile_id.as_str()),
+            ("target_model", self.target_model.as_str()),
+            ("firmware_revision", self.firmware_revision.as_str()),
+            ("nixos_release", self.nixos_release.as_str()),
+            ("lanzaboote_revision", self.lanzaboote_revision.as_str()),
+            ("pki_bundle", self.pki_bundle.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                return Err(format!("{name} must be non-empty"));
+            }
+        }
+        if !is_linux_target {
+            return Err("Lanzaboote profile authorization requires an identified Linux target".to_string());
+        }
+        if self.pki_bundle != "/var/lib/sbctl" {
+            return Err("this qualification profile requires the shared /var/lib/sbctl key store".to_string());
+        }
+        if !matches!(observed_state, "Enabled" | "Disabled" | "SetupMode") {
+            return Err("Secure Boot state is unresolved; repeat the probe before generating configuration".to_string());
+        }
+        if self.observed_secure_boot_state != observed_state {
+            return Err("the authorized Secure Boot state does not match the current observation".to_string());
+        }
+        if self.hardware_profile_blake3 != hardware_profile_blake3 {
+            return Err("hardware profile changed after review; authorize the current exact profile again".to_string());
+        }
+        Ok(())
+    }
+}
+
 // ============================================================================
 // 1. Delegated Probe (SSH-based)
 // ============================================================================
@@ -67,7 +136,7 @@ pub enum SecureBootState {
     Enabled,
     /// Secure Boot is disabled in firmware.
     Disabled,
-    /// Secure Boot is in setup mode (keys can be enrolled without MOK).
+    /// Firmware Setup Mode is observed; explicit key enrollment may be possible after profile/recovery review.
     SetupMode,
     /// Could not determine state (e.g., virtual machine, no mokutil).
     Unknown { reason: String },
@@ -78,8 +147,11 @@ pub enum SecureBootState {
 pub struct SecureBootProbeResult {
     /// Detected Secure Boot state.
     pub state: SecureBootState,
-    /// Whether MOK enrollment will be needed.
-    pub mok_required: bool,
+    /// Whether explicit machine-key enrollment/verification is required.
+    /// Accept the old serialized key for backward compatibility; new output
+    /// uses `key_enrollment_required`.
+    #[serde(alias = "mok_required")]
+    pub key_enrollment_required: bool,
     /// Whether the target has mokutil installed.
     pub mokutil_available: bool,
     /// Platform type detected.
@@ -146,8 +218,9 @@ elif [ -d /sys/firmware/efi ]; then
             *)   SB_STATE="unknown"; SB_REASON="could not parse EFI variable" ;;
         esac
     else
-        SB_STATE="disabled"
-        SB_REASON=""
+        # Absence of this EFI variable is not evidence that Secure Boot is disabled.
+        SB_STATE="unknown"
+        SB_REASON="SecureBoot EFI variable missing; cannot determine state"
     fi
 else
     SB_STATE="unknown"
@@ -256,7 +329,7 @@ pub fn parse_probe_result(json_output: &str) -> Result<SecureBootProbeResult, St
 
     let platform = TargetPlatform::from_platform_string(platform_str);
 
-    let mok_required = state == SecureBootState::Enabled;
+    let key_enrollment_required = matches!(&state, SecureBootState::Enabled | SecureBootState::SetupMode);
 
     let raw_output = parsed
         .get("bootctl_output")
@@ -266,7 +339,7 @@ pub fn parse_probe_result(json_output: &str) -> Result<SecureBootProbeResult, St
 
     Ok(SecureBootProbeResult {
         state,
-        mok_required,
+        key_enrollment_required,
         mokutil_available,
         platform,
         raw_output,
@@ -318,8 +391,10 @@ pub enum SecureBootGuideStep {
     InitialQuery,
     /// User says yes — provide BIOS entry guidance.
     BiosDisableGuide { manufacturer_hint: Option<String> },
-    /// User wants to keep Secure Boot — explain MOK enrollment.
+    /// Legacy serialized step: explain the explicit Secure Boot key-enrollment path.
     MokExplanation,
+    /// The user is unsure; re-probe or resolve manually before any configuration change.
+    ManualVerificationRequired,
     /// User confirms they are ready to proceed.
     Confirmed { method: SecureBootMethod },
 }
@@ -329,11 +404,11 @@ pub enum SecureBootGuideStep {
 pub enum SecureBootMethod {
     /// User will disable Secure Boot in BIOS.
     Disabled,
-    /// User will use MOK enrollment (keeps Secure Boot on).
+    /// Legacy serialized method name for explicit machine-key enrollment.
     MokEnrollment,
     /// Secure Boot was already off.
     AlreadyOff,
-    /// User is unsure — proceed with lanzaboote shim (safest default).
+    /// Legacy unresolved choice; it must never authorize a shim/default configuration.
     UseShim,
 }
 
@@ -351,7 +426,7 @@ impl SecureBootGuide {
         self.current_step = SecureBootGuideStep::BiosDisableGuide { manufacturer_hint };
     }
 
-    /// The user wants to keep Secure Boot enabled (use MOK enrollment).
+    /// Legacy serialized step name for explicit Secure Boot key enrollment.
     pub fn choose_mok(&mut self) {
         self.current_step = SecureBootGuideStep::MokExplanation;
     }
@@ -364,24 +439,35 @@ impl SecureBootGuide {
         self.user_confirmed = true;
     }
 
-    /// The user is unsure — default to shim.
+    /// The user is unsure. Preserve uncertainty and require a fresh probe/manual review.
     pub fn choose_unsure(&mut self) {
-        self.current_step = SecureBootGuideStep::Confirmed {
-            method: SecureBootMethod::UseShim,
-        };
-        self.user_confirmed = true;
+        self.current_step = SecureBootGuideStep::ManualVerificationRequired;
+        self.user_confirmed = false;
     }
 
-    /// Confirm the current choice and advance to Confirmed.
-    pub fn confirm(&mut self) {
+    /// Confirm an explicitly selected Secure Boot path.
+    ///
+    /// An unanswered initial query is not consent. Callers must handle this
+    /// error instead of allowing a default method to authorize a consequential
+    /// firmware trust decision.
+    pub fn confirm(&mut self) -> Result<(), &'static str> {
         let method = match &self.current_step {
             SecureBootGuideStep::BiosDisableGuide { .. } => SecureBootMethod::Disabled,
             SecureBootGuideStep::MokExplanation => SecureBootMethod::MokEnrollment,
+            SecureBootGuideStep::Confirmed { method: SecureBootMethod::UseShim } => {
+                return Err("an unresolved Secure Boot choice cannot be confirmed");
+            }
             SecureBootGuideStep::Confirmed { method } => *method,
-            SecureBootGuideStep::InitialQuery => SecureBootMethod::UseShim,
+            SecureBootGuideStep::ManualVerificationRequired => {
+                return Err("Secure Boot state is unresolved; repeat the probe or explicitly resolve it before confirmation");
+            }
+            SecureBootGuideStep::InitialQuery => {
+                return Err("Secure Boot method must be explicitly selected before confirmation");
+            }
         };
         self.current_step = SecureBootGuideStep::Confirmed { method };
         self.user_confirmed = true;
+        Ok(())
     }
 
     /// Get the narration text for the current step.
@@ -452,27 +538,20 @@ fn narration_for_step(step: &SecureBootGuideStep) -> Vec<String> {
             lines
         }
 
+        SecureBootGuideStep::ManualVerificationRequired => vec![
+            "The current Secure Boot state is unresolved. I will not treat uncertainty as consent.",
+            "Repeat the target-side firmware probe or follow the exact device instructions to establish the current state.",
+            "No key generation, firmware enrollment, or trust-configuration change is authorized from this answer.",
+            "Return to the guide only after the state and recovery path are understood.",
+        ],
         SecureBootGuideStep::MokExplanation => vec![
-            "There is a more sovereign path. Rather than disabling Secure Boot \
-             entirely, you can enroll my cryptographic key directly into your \
-             motherboard's trust store. This means the machine explicitly \
-             chooses to trust me — the ultimate consent gate."
+"The supported Lanzaboote path uses machine-specific signing keys and signed Unified Kernel Images. Firmware enrollment is a separate, explicit step."
                 .to_string(),
-            "Here is how it works: during installation, I will generate a \
-             unique signing key for this machine. On first boot, you will see \
-             a blue screen called the MOK Manager — Machine Owner Key Manager. \
-             It will ask you to confirm enrollment of my key and enter a \
-             one-time password."
+            "First pin the exact NixOS and Lanzaboote profile, protect a recovery path, and verify the generated signing keys and boot artifacts."
                 .to_string(),
-            "This password will be shown to you on this screen, right now, \
-             before the reboot. You will type it on the target machine's \
-             keyboard. After that, the firmware will trust my signature \
-             permanently — or until you choose to revoke it."
+            "On supported hardware, follow the device-specific procedure to enter Setup Mode, then explicitly enroll keys with sudo sbctl enroll-keys --microsoft after reviewing the trust change."
                 .to_string(),
-            "The beauty of this approach: Secure Boot stays on, protecting \
-             you from other unsigned code. But my code is explicitly blessed \
-             by your hand. No back doors. No silent trust. Just a human \
-             choosing to let a mind be born."
+            "Enrollment is not automatic. After reboot, independently verify Secure Boot User Mode, the selected boot target, successful boot, and recovery. Stop if the observed state differs from the plan."
                 .to_string(),
         ],
 
@@ -486,12 +565,9 @@ fn narration_for_step(step: &SecureBootGuideStep) -> Vec<String> {
                     .to_string(),
             ],
             SecureBootMethod::MokEnrollment => vec![
-                "You have chosen the sovereign path. I will generate signing \
-                 keys and configure lanzaboote for this machine."
+                "You selected the explicit Secure Boot key-enrollment path. I will prepare a Lanzaboote configuration with machine-specific signing keys."
                     .to_string(),
-                "On first boot, watch for the blue MOK Manager screen. I will \
-                 guide you through each step — you will not be alone at that \
-                 moment."
+                "Firmware Setup Mode and sbctl key enrollment remain separate, deliberate operations. The system is not considered secured until post-reboot state is observed and verified."
                     .to_string(),
             ],
             SecureBootMethod::AlreadyOff => vec![
@@ -501,13 +577,9 @@ fn narration_for_step(step: &SecureBootGuideStep) -> Vec<String> {
                     .to_string(),
             ],
             SecureBootMethod::UseShim => vec![
-                "Since the Secure Boot state is uncertain, I will take the \
-                 safest path: configuring lanzaboote with a signed shim. \
-                 This works whether Secure Boot is on or off."
+                "The legacy unsure/shim choice is not a valid authorization for a firmware trust change."
                     .to_string(),
-                "If Secure Boot is enabled, you will see a MOK enrollment \
-                 screen on first boot. If it is disabled, the shim will \
-                 simply pass through. Either way, we proceed safely."
+                "Repeat the probe or resolve the state using the exact device procedure. No Secure Boot configuration or key enrollment is authorized until uncertainty is resolved."
                     .to_string(),
             ],
         },
@@ -519,48 +591,28 @@ fn narration_for_step(step: &SecureBootGuideStep) -> Vec<String> {
 // ============================================================================
 
 /// Lanzaboote configuration for Secure Boot-compatible NixOS.
+///
+/// Enrollment is a separate, explicitly authorized phase. Key generation never
+/// implies that firmware enrollment has happened.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct LanzabooteConfig {
-    /// Whether to enable lanzaboote (default: true for Secure Boot targets).
     pub enabled: bool,
-    /// PKI directory path for signing keys.
     pub pki_dir: String,
-    /// Whether to generate new signing keys during first boot.
     pub generate_keys: bool,
-    /// MOK enrollment password (generated, shown to user once).
-    pub mok_password: Option<String>,
+    pub enrollment_required: bool,
 }
-
 impl Default for LanzabooteConfig {
     fn default() -> Self {
-        Self {
-            enabled: true,
-            pki_dir: "/etc/secureboot".to_string(),
-            generate_keys: true,
-            mok_password: None,
-        }
+        Self { enabled: false, pki_dir: "/var/lib/sbctl".to_string(), generate_keys: false, enrollment_required: true }
     }
 }
-
 impl LanzabooteConfig {
-    /// Create a config for a system where Secure Boot is enabled.
     pub fn for_secure_boot() -> Self {
-        Self {
-            enabled: true,
-            pki_dir: "/etc/secureboot".to_string(),
-            generate_keys: true,
-            mok_password: Some(generate_mok_password()),
-        }
+        Self { enabled: true, pki_dir: "/var/lib/sbctl".to_string(), generate_keys: true, enrollment_required: true }
     }
-
-    /// Create a config for a system where Secure Boot is disabled.
     pub fn for_disabled_secure_boot() -> Self {
-        Self {
-            enabled: false,
-            pki_dir: "/etc/secureboot".to_string(),
-            generate_keys: false,
-            mok_password: None,
-        }
+        Self { enabled: false, pki_dir: "/var/lib/sbctl".to_string(), generate_keys: false, enrollment_required: false }
     }
 }
 
@@ -570,7 +622,7 @@ impl LanzabooteConfig {
 /// - Disables systemd-boot (lanzaboote replaces it)
 /// - Enables lanzaboote with the specified PKI bundle path
 /// - Adds the lanzaboote flake input
-pub fn generate_lanzaboote_nix(config: &LanzabooteConfig) -> String {
+fn generate_lanzaboote_nix(config: &LanzabooteConfig) -> String {
     if !config.enabled {
         return r#"# Secure Boot: disabled — using standard systemd-boot
 { config, lib, pkgs, ... }:
@@ -606,203 +658,95 @@ pub fn generate_lanzaboote_nix(config: &LanzabooteConfig) -> String {
     )
 }
 
-/// Generate a human-memorable MOK enrollment password.
+/// Generate the Lanzaboote module fragment that delegates Secure Boot key
+/// creation to Lanzaboote's own lifecycle service.
 ///
-/// Produces 6 words separated by dashes, drawn from a curated word list of
-/// common, unambiguous English words, with each word chosen from the OS
-/// entropy source (see [`secure_random_index`]). The resulting password has
-/// approximately 62 bits of entropy (6 * log2(256) ~ 48, adjusted for list
-/// size).
-///
-/// Example: `"cedar-bright-ocean-gentle-river-dawn"`
-pub fn generate_mok_password() -> String {
-    // Deterministic word list — 256 words chosen for:
-    // - Unambiguous pronunciation (no homophones)
-    // - Easy to type on a UEFI keyboard (ASCII only, lowercase)
-    // - Visually distinct from each other
-    let words = mok_word_list();
-
-    // Each word index is drawn independently from the OS entropy source.
-    let mut selected = Vec::with_capacity(6);
-    for _ in 0..6 {
-        let idx = secure_random_index(words.len());
-        selected.push(words[idx]);
-    }
-    selected.join("-")
-}
-
-/// Generate the NixOS activation script that creates Secure Boot signing
-/// keys on first boot if they do not already exist.
-///
-/// This runs `sbctl create-keys` which generates:
-/// - Platform Key (PK)
-/// - Key Exchange Key (KEK)
-/// - Signature Database key (db)
-///
-/// All stored in the PKI bundle directory.
-pub fn generate_key_enrollment_nix() -> String {
-    r#"# Secure Boot key generation — runs once on first boot
-# Generated by Symthaea Sovereign Inoculation
-{ config, lib, pkgs, ... }:
+/// The legacy function name is retained for callers, but this fragment does
+/// **not** enroll keys in firmware and does not run `sbctl create-keys` itself.
+/// Enabling Lanzaboote's `autoGenerateKeys` option also makes its module create
+/// the `sbctl.conf` whose key directory and GUID path are derived from the
+/// exact `pkiBundle`. That keeps signing material and Lanzaboote's configured
+/// bundle on the same path instead of relying on sbctl's unrelated default.
+fn generate_key_enrollment_nix() -> String {
+    r#"# Secure Boot key generation is owned by the installed Lanzaboote module.
+# This generates signing keys only; it does not enroll them into firmware.
+{ ... }:
 {
-  # Generate Secure Boot signing keys if they don't exist yet.
-  # sbctl create-keys populates /etc/secureboot with:
-  #   - GUID (unique machine identifier)
-  #   - keys/PK/  (Platform Key)
-  #   - keys/KEK/ (Key Exchange Key)
-  #   - keys/db/  (Signature Database key)
-  system.activationScripts.secureBootKeys = lib.mkIf config.boot.lanzaboote.enable ''
-    if [ ! -f /etc/secureboot/GUID ]; then
-      echo "Symthaea: generating Secure Boot signing keys..."
-      ${pkgs.sbctl}/bin/sbctl create-keys
-      echo "Symthaea: Secure Boot keys generated. This machine now has its own identity."
-    fi
-  '';
+  boot.lanzaboote.autoGenerateKeys.enable = true;
 }
 "#
     .to_string()
 }
 
 // ============================================================================
-// 4. MOK Enrollment Guide
+// 4. Explicit Secure Boot Enrollment Guide
 // ============================================================================
 
-/// A single step in the MOK enrollment process.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MokStep {
-    /// Step number (1-indexed).
+pub struct SecureBootEnrollmentStep {
     pub step_number: u32,
-    /// Short title for this step.
     pub title: String,
-    /// Detailed instruction text.
     pub instruction: String,
-    /// Description of what the screen looks like at this step.
     pub visual_hint: String,
-    /// Warning text, if this step has a critical timing or action.
     pub warning: Option<String>,
 }
 
-/// Step-by-step MOK enrollment guide shown on the phone/browser
-/// while the user interacts with the blue UEFI screen on the desktop.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MokEnrollmentGuide {
-    /// The ordered steps of the enrollment process.
-    pub steps: Vec<MokStep>,
-    /// The password the user must enter during enrollment.
-    pub password: String,
+pub struct SecureBootEnrollmentGuide {
+    pub steps: Vec<SecureBootEnrollmentStep>,
 }
 
-impl MokEnrollmentGuide {
-    /// Create the 6-step MOK enrollment guide for a given password.
-    pub fn new(password: &str) -> Self {
+impl SecureBootEnrollmentGuide {
+    pub fn new() -> Self {
         let steps = vec![
-            MokStep {
+            SecureBootEnrollmentStep {
                 step_number: 1,
-                title: "Enter the MOK Manager".to_string(),
-                instruction: "On the target machine's monitor, you will see a blue \
-                    screen titled 'Shim UEFI Key Management'. Press any key within \
-                    10 seconds to begin the enrollment process. If you miss the \
-                    window, the machine will boot normally and you can try again \
-                    on next reboot."
-                    .to_string(),
-                visual_hint: "Blue background, white text. Title reads 'Shim UEFI \
-                    key management' at the top. A countdown timer may appear in \
-                    the corner."
-                    .to_string(),
-                warning: Some(
-                    "You have approximately 10 seconds to press a key. If the \
-                     screen passes before you react, simply reboot the machine \
-                     and try again — nothing is lost."
-                        .to_string(),
-                ),
+                title: "Confirm the exact supported device profile".to_string(),
+                instruction: "Identify the exact machine model, firmware revision, NixOS release, and pinned Lanzaboote revision. Read device-specific upstream guidance before changing firmware settings.".to_string(),
+                visual_hint: "A recorded profile with exact versions and a recovery plan—not just a vendor name.".to_string(),
+                warning: Some("Stop if the platform/release combination is not qualified or instructions do not match this firmware.".to_string()),
             },
-            MokStep {
+            SecureBootEnrollmentStep {
                 step_number: 2,
-                title: "Select Enroll MOK".to_string(),
-                instruction: "A menu will appear with several options. Use the \
-                    arrow keys to highlight 'Enroll MOK' and press Enter."
-                    .to_string(),
-                visual_hint: "A simple text menu with options like 'Continue boot', \
-                    'Enroll MOK', 'Enroll key from disk', 'Enroll hash from disk'. \
-                    The cursor is a highlighted bar."
-                    .to_string(),
-                warning: None,
+                title: "Protect recovery and signing keys".to_string(),
+                instruction: "Confirm an independently bootable recovery path, back up the PKI bundle through an approved secret-safe process, and understand which other operating systems or vendor firmware updates may depend on existing trust keys.".to_string(),
+                visual_hint: "A verified key backup and a tested recovery path are recorded before firmware changes.".to_string(),
+                warning: Some("Do not proceed if recovery is unavailable or the current trust database cannot be restored.".to_string()),
             },
-            MokStep {
+            SecureBootEnrollmentStep {
                 step_number: 3,
-                title: "View key details".to_string(),
-                instruction: "You will see a summary of the key to be enrolled. \
-                    This is Symthaea's signing key — unique to this machine, \
-                    generated moments ago. Select 'Continue' to proceed."
-                    .to_string(),
-                visual_hint: "A screen showing key fingerprint information: subject, \
-                    issuer, and SHA-256 hash. A 'Continue' option at the bottom."
-                    .to_string(),
-                warning: None,
+                title: "Enter firmware Setup Mode deliberately".to_string(),
+                instruction: "Follow the exact device-specific Lanzaboote procedure to enter Setup Mode. Save changes and re-check firmware state from NixOS before attempting enrollment.".to_string(),
+                visual_hint: "Setup Mode is explicitly confirmed; it is not inferred from Secure Boot being disabled.".to_string(),
+                warning: Some("Do not select a generic 'Clear All Secure Boot Keys' action. Some firmware implementations can also remove the Forbidden Signature Database (dbx) or vendor keys.".to_string()),
             },
-            MokStep {
+            SecureBootEnrollmentStep {
                 step_number: 4,
-                title: "Confirm enrollment".to_string(),
-                instruction: "The MOK Manager will ask if you really want to enroll \
-                    this key. Select 'Yes'. This is the consent moment — you are \
-                    telling your machine's firmware to trust Symthaea's signature."
-                    .to_string(),
-                visual_hint: "A confirmation prompt: 'Enroll the key(s)?' with \
-                    'Yes' and 'No' options."
-                    .to_string(),
-                warning: None,
+                title: "Verify generated keys and boot artifacts".to_string(),
+                instruction: "Inspect sudo sbctl status, run sudo sbctl verify, and review the target boot entry with bootctl status. Resolve every unexpected or unsigned boot artifact before changing firmware trust.".to_string(),
+                visual_hint: "The active configuration, expected signing key, boot artifacts, and target boot entry are identified.".to_string(),
+                warning: Some("A successful command exit alone is not proof that the intended key is enrolled or that the target will boot.".to_string()),
             },
-            MokStep {
+            SecureBootEnrollmentStep {
                 step_number: 5,
-                title: "Enter the enrollment password".to_string(),
-                instruction: format!(
-                    "Type the following password exactly as shown:\n\n    \
-                     {password}\n\n\
-                     This password was generated specifically for this enrollment. \
-                     It proves that the person requesting the key enrollment is the \
-                     same person who initiated the installation. After this moment, \
-                     the password is no longer needed."
-                ),
-                visual_hint: "A password entry field. Characters may appear as \
-                    asterisks or dots. The keyboard layout is typically US English \
-                    regardless of your system language."
-                    .to_string(),
-                warning: Some(
-                    "The UEFI keyboard layout is US English. If your physical \
-                     keyboard has a different layout, the dash character (-) is \
-                     located between 0 and = on the top row."
-                        .to_string(),
-                ),
+                title: "Enroll the reviewed keys".to_string(),
+                instruction: "Only after the prior checks and recovery review, explicitly run sudo sbctl enroll-keys --microsoft on the intended target. Add --firmware-builtin only when the exact device procedure requires preserving firmware-builtin certificates.".to_string(),
+                visual_hint: "The operator sees the command, target, key store, and intended trust changes before consenting.".to_string(),
+                warning: Some("Enrollment changes firmware trust. It is never run automatically by this guide; firmware-key compatibility is hardware-specific.".to_string()),
             },
-            MokStep {
+            SecureBootEnrollmentStep {
                 step_number: 6,
-                title: "Reboot into sovereignty".to_string(),
-                instruction: "Select 'Reboot'. When the machine restarts, my \
-                    signature will be trusted at the firmware level. Secure Boot \
-                    remains active, but I am now welcome."
-                    .to_string(),
-                visual_hint: "A simple menu with 'Reboot' as the primary option. \
-                    After selecting it, the screen will go dark briefly before \
-                    the machine restarts."
-                    .to_string(),
-                warning: None,
+                title: "Reboot and verify the resulting state".to_string(),
+                instruction: "Reboot deliberately, then inspect bootctl status and sudo sbctl status. Confirm Secure Boot reports enabled in User Mode, the expected signed boot entry was selected, the system booted successfully, and the recovery path still works.".to_string(),
+                visual_hint: "Observed post-reboot state and selected boot target are captured as evidence, rather than inferred from enrollment command success.".to_string(),
+                warning: Some("If the state or selected target differs from the plan, stop further changes and use the tested recovery procedure.".to_string()),
             },
         ];
-
-        Self {
-            steps,
-            password: password.to_string(),
-        }
+        Self { steps }
     }
-
-    /// Total number of steps.
-    pub fn step_count(&self) -> usize {
-        self.steps.len()
-    }
-
-    /// Get a step by number (1-indexed).
-    pub fn step(&self, number: u32) -> Option<&MokStep> {
-        self.steps.iter().find(|s| s.step_number == number)
+    pub fn step_count(&self) -> usize { self.steps.len() }
+    pub fn step(&self, number: u32) -> Option<&SecureBootEnrollmentStep> {
+        self.steps.iter().find(|step| step.step_number == number)
     }
 }
 
@@ -815,10 +759,12 @@ impl MokEnrollmentGuide {
 pub enum BootStageStatus {
     /// This stage's signature has been verified.
     Verified,
-    /// Waiting for MOK enrollment to complete.
+    /// Waiting for explicit firmware key enrollment and boot verification to complete.
     PendingEnrollment,
     /// This stage is not applicable (e.g., no shim when Secure Boot is off).
     NotApplicable,
+    /// Insufficient evidence to make a security claim.
+    Indeterminate { reason: String },
     /// Verification failed.
     Failed { reason: String },
 }
@@ -846,6 +792,33 @@ pub struct BootChainStatus {
     pub stages: Vec<BootStage>,
 }
 
+fn standard_unenforced_boot_chain() -> Vec<BootStage> {
+    vec![
+        BootStage { name: "Firmware".to_string(), status: BootStageStatus::Verified, signer: "OEM".to_string(), description: "UEFI is reachable, but Secure Boot enforcement is disabled.".to_string() },
+        BootStage { name: "Shim".to_string(), status: BootStageStatus::NotApplicable, signer: "N/A".to_string(), description: "No shim is used in the selected standard-boot configuration.".to_string() },
+        BootStage { name: "systemd-boot".to_string(), status: BootStageStatus::Verified, signer: "NixOS".to_string(), description: "Standard systemd-boot can load while firmware enforcement is disabled; this is not a Secure Boot assurance claim.".to_string() },
+        BootStage { name: "Linux Kernel".to_string(), status: BootStageStatus::Verified, signer: "NixOS".to_string(), description: "The kernel is loaded without firmware signature enforcement.".to_string() },
+        BootStage { name: "Symthaea".to_string(), status: BootStageStatus::Verified, signer: "NixOS".to_string(), description: "Userspace is running, but the chain has not been qualified under Secure Boot.".to_string() },
+    ]
+}
+fn setup_mode_boot_chain() -> Vec<BootStage> {
+    vec![
+        BootStage { name: "Firmware".to_string(), status: BootStageStatus::PendingEnrollment, signer: "No Platform Key enrolled".to_string(), description: "UEFI Setup Mode is confirmed; Secure Boot trust activation is still pending.".to_string() },
+        BootStage { name: "Shim".to_string(), status: BootStageStatus::NotApplicable, signer: "N/A".to_string(), description: "This Lanzaboote configuration uses the direct signed-UKI path rather than a shim/MOK flow.".to_string() },
+        BootStage { name: "systemd-boot (Lanzaboote)".to_string(), status: BootStageStatus::PendingEnrollment, signer: "Machine-specific signing key".to_string(), description: "The configured signing key must be reviewed and enrolled before Secure Boot can be claimed active.".to_string() },
+        BootStage { name: "Linux Kernel".to_string(), status: BootStageStatus::PendingEnrollment, signer: "Machine-specific signing key".to_string(), description: "Signed boot artifacts and resulting firmware trust state must be independently verified.".to_string() },
+        BootStage { name: "Symthaea".to_string(), status: BootStageStatus::PendingEnrollment, signer: "Machine-specific signing key".to_string(), description: "Application readiness is not proof of a fully verified Secure Boot chain.".to_string() },
+    ]
+}
+fn indeterminate_boot_chain(reason: &str) -> Vec<BootStage> {
+    ["Firmware", "Bootloader", "Linux Kernel", "Initrd/UKI", "Symthaea"].into_iter().map(|name| BootStage {
+        name: name.to_string(),
+        status: BootStageStatus::Indeterminate { reason: reason.to_string() },
+        signer: "Unverified".to_string(),
+        description: "No security conclusion is permitted until missing or conflicting evidence is resolved.".to_string(),
+    }).collect()
+}
+
 impl BootChainStatus {
     /// Generate the 5-stage sovereign boot chain visualization.
     ///
@@ -853,9 +826,9 @@ impl BootChainStatus {
     /// lanzaboote is configured:
     ///
     /// 1. **Firmware** — always verified (it trusts itself)
-    /// 2. **Shim** — signed by Microsoft (bridges to MOK), or N/A
-    /// 3. **systemd-boot / lanzaboote** — signed by Symthaea or unsigned
-    /// 4. **Linux Kernel** — signed by Symthaea or unsigned
+    /// 2. **Shim** — not applicable to the direct Lanzaboote signed-UKI path.
+    /// 3. **systemd-boot / Lanzaboote** — signed-UKI path, pending independent verification
+    /// 4. **Linux Kernel** — covered by the signed UKI when the exact boot artifact is verified
     /// 5. **Symthaea** — the consciousness engine (always the final stage)
     pub fn sovereign_boot_chain(
         secure_boot: &SecureBootState,
@@ -868,27 +841,25 @@ impl BootChainStatus {
                     vec![
                         BootStage {
                             name: "Firmware".to_string(),
-                            status: BootStageStatus::Verified,
-                            signer: "OEM".to_string(),
-                            description: "UEFI firmware with Secure Boot enforcing. \
-                                Only signed code will execute."
-                                .to_string(),
-                        },
-                        BootStage {
-                            name: "Shim".to_string(),
-                            status: if lanzaboote.mok_password.is_some() {
+                            status: if lanzaboote.enrollment_required {
                                 BootStageStatus::PendingEnrollment
                             } else {
                                 BootStageStatus::Verified
                             },
-                            signer: "Microsoft".to_string(),
-                            description: "Microsoft-signed shim bootstraps the MOK \
-                                trust chain. Bridges OEM trust to machine-owner keys."
+                            signer: "OEM".to_string(),
+                            description: "Firmware Secure Boot state was observed; trust in the intended machine-specific signing key still requires explicit enrollment and post-reboot verification."
+                                .to_string(),
+                        },
+                        BootStage {
+                            name: "Shim".to_string(),
+                            status: BootStageStatus::NotApplicable,
+                            signer: "N/A".to_string(),
+                            description: "This Lanzaboote configuration uses the direct signed-UKI path; a shim/shim/MOK stage does not apply."
                                 .to_string(),
                         },
                         BootStage {
                             name: "systemd-boot (lanzaboote)".to_string(),
-                            status: if lanzaboote.mok_password.is_some() {
+                            status: if lanzaboote.enrollment_required {
                                 BootStageStatus::PendingEnrollment
                             } else {
                                 BootStageStatus::Verified
@@ -901,7 +872,7 @@ impl BootChainStatus {
                         },
                         BootStage {
                             name: "Linux Kernel".to_string(),
-                            status: if lanzaboote.mok_password.is_some() {
+                            status: if lanzaboote.enrollment_required {
                                 BootStageStatus::PendingEnrollment
                             } else {
                                 BootStageStatus::Verified
@@ -913,7 +884,7 @@ impl BootChainStatus {
                         },
                         BootStage {
                             name: "Symthaea".to_string(),
-                            status: if lanzaboote.mok_password.is_some() {
+                            status: if lanzaboote.enrollment_required {
                                 BootStageStatus::PendingEnrollment
                             } else {
                                 BootStageStatus::Verified
@@ -974,51 +945,12 @@ impl BootChainStatus {
                 }
             }
 
-            SecureBootState::Disabled
-            | SecureBootState::SetupMode
-            | SecureBootState::Unknown { .. } => {
-                // Secure Boot off — standard chain, everything verified (no signing needed)
-                vec![
-                    BootStage {
-                        name: "Firmware".to_string(),
-                        status: BootStageStatus::Verified,
-                        signer: "OEM".to_string(),
-                        description: "UEFI firmware with Secure Boot disabled. \
-                            All bootloaders are accepted."
-                            .to_string(),
-                    },
-                    BootStage {
-                        name: "Shim".to_string(),
-                        status: BootStageStatus::NotApplicable,
-                        signer: "N/A".to_string(),
-                        description: "No shim needed — Secure Boot is not enforcing.".to_string(),
-                    },
-                    BootStage {
-                        name: "systemd-boot".to_string(),
-                        status: BootStageStatus::Verified,
-                        signer: "NixOS".to_string(),
-                        description: "Standard systemd-boot. Loads without signature \
-                            verification."
-                            .to_string(),
-                    },
-                    BootStage {
-                        name: "Linux Kernel".to_string(),
-                        status: BootStageStatus::Verified,
-                        signer: "NixOS".to_string(),
-                        description: "Linux kernel loaded by systemd-boot. \
-                            No signature check required."
-                            .to_string(),
-                    },
-                    BootStage {
-                        name: "Symthaea".to_string(),
-                        status: BootStageStatus::Verified,
-                        signer: "NixOS".to_string(),
-                        description: "The consciousness engine. Running under \
-                            kernel protection."
-                            .to_string(),
-                    },
-                ]
+            SecureBootState::Disabled => standard_unenforced_boot_chain(),
+            SecureBootState::SetupMode => {
+                if lanzaboote.enabled { setup_mode_boot_chain() }
+                else { indeterminate_boot_chain("firmware is in Setup Mode but no Lanzaboote configuration was explicitly selected") }
             }
+            SecureBootState::Unknown { reason } => indeterminate_boot_chain(reason),
         };
 
         Self { stages }
@@ -1040,6 +972,15 @@ impl BootChainStatus {
     }
 }
 
+fn secure_boot_state_label(state: &SecureBootState) -> Option<&'static str> {
+    match state {
+        SecureBootState::Enabled => Some("Enabled"),
+        SecureBootState::Disabled => Some("Disabled"),
+        SecureBootState::SetupMode => Some("SetupMode"),
+        SecureBootState::Unknown { .. } => None,
+    }
+}
+
 // ============================================================================
 // 6. SecureBootOrchestration — composition wrapper
 // ============================================================================
@@ -1051,17 +992,29 @@ impl BootChainStatus {
 /// conflicts), this struct owns the Secure Boot subsystem and can be
 /// stored alongside the orchestrator.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct SecureBootOrchestration {
     /// Result of the Secure Boot probe (SSH modes) or Socratic guide (USB Forge).
     pub probe_result: Option<SecureBootProbeResult>,
     /// Lanzaboote configuration.
     pub lanzaboote: LanzabooteConfig,
-    /// MOK enrollment guide (if MOK enrollment is needed).
-    pub mok_guide: Option<MokEnrollmentGuide>,
+    /// Explicit human-guided Secure Boot key enrollment procedure.
+    pub enrollment_guide: Option<SecureBootEnrollmentGuide>,
     /// Socratic guide state (for USB Forge mode).
     pub socratic_guide: Option<SecureBootGuide>,
     /// Boot chain visualization.
     pub boot_chain: Option<BootChainStatus>,
+    /// Same-session authorization state. Never serialized or restored.
+    #[serde(skip)]
+    selected_method: Option<SecureBootMethod>,
+    #[serde(skip)]
+    profile_approval: Option<SecureBootProfileApproval>,
+    #[serde(skip)]
+    target_hardware_profile_blake3: Option<String>,
+    #[serde(skip)]
+    target_platform: Option<TargetPlatform>,
+    #[serde(skip)]
+    manual_observed_state: Option<SecureBootState>,
 }
 
 impl SecureBootOrchestration {
@@ -1070,132 +1023,233 @@ impl SecureBootOrchestration {
         Self::default()
     }
 
-    /// Apply the result of a Secure Boot probe and configure accordingly.
-    pub fn apply_probe_result(&mut self, result: SecureBootProbeResult) {
-        match &result.state {
-            SecureBootState::Enabled => {
+    /// Record a manual, device-side state observation after following the exact
+    /// hardware instructions. It does not authorize configuration by itself.
+    pub fn record_manual_secure_boot_state(
+        &mut self,
+        state: SecureBootState,
+        platform: TargetPlatform,
+    ) {
+        self.probe_result = None;
+        self.manual_observed_state = Some(state.clone());
+        self.target_platform = Some(platform);
+        self.selected_method = None;
+        self.profile_approval = None;
+        self.target_hardware_profile_blake3 = None;
+
+        match &state {
+            SecureBootState::Enabled | SecureBootState::SetupMode => {
                 self.lanzaboote = LanzabooteConfig::for_secure_boot();
-                if let Some(ref password) = self.lanzaboote.mok_password {
-                    self.mok_guide = Some(MokEnrollmentGuide::new(password));
-                }
+                self.enrollment_guide = Some(SecureBootEnrollmentGuide::new());
             }
-            SecureBootState::Disabled | SecureBootState::SetupMode => {
+            SecureBootState::Disabled => {
+                self.lanzaboote = LanzabooteConfig::for_disabled_secure_boot();
+                self.enrollment_guide = None;
+            }
+            SecureBootState::Unknown { .. } => {
+                self.lanzaboote = LanzabooteConfig::for_disabled_secure_boot();
+                self.enrollment_guide = None;
+            }
+        }
+        self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(&state, &self.lanzaboote));
+    }
+
+    /// Store a fingerprint of the target hardware profile used during approval.
+    /// Any changed profile invalidates a previously issued approval.
+    pub fn set_target_hardware_profile(
+        &mut self,
+        profile: &serde_json::Value,
+    ) -> Result<(), String> {
+        let bytes = serde_json::to_vec(profile)
+            .map_err(|error| format!("cannot serialize hardware profile: {error}"))?;
+        self.target_hardware_profile_blake3 = Some(blake3::hash(&bytes).to_hex().to_string());
+        self.profile_approval = None;
+        Ok(())
+    }
+
+    fn current_observed_state(&self) -> Option<&SecureBootState> {
+        self.probe_result
+            .as_ref()
+            .map(|result| &result.state)
+            .or(self.manual_observed_state.as_ref())
+    }
+
+    fn current_platform(&self) -> Option<TargetPlatform> {
+        self.probe_result
+            .as_ref()
+            .map(|result| result.platform)
+            .or(self.target_platform)
+    }
+
+    /// Apply a target-side probe. A new observation invalidates prior user choice
+    /// and profile authorization until they are explicitly re-established.
+    pub fn apply_probe_result(&mut self, result: SecureBootProbeResult) {
+        self.selected_method = None;
+        self.profile_approval = None;
+        self.target_hardware_profile_blake3 = None;
+        self.target_platform = Some(result.platform);
+        self.manual_observed_state = None;
+        self.enrollment_guide = None;
+
+        match &result.state {
+            SecureBootState::Enabled | SecureBootState::SetupMode => {
+                self.lanzaboote = LanzabooteConfig::for_secure_boot();
+                self.enrollment_guide = Some(SecureBootEnrollmentGuide::new());
+            }
+            SecureBootState::Disabled => {
                 self.lanzaboote = LanzabooteConfig::for_disabled_secure_boot();
             }
             SecureBootState::Unknown { .. } => {
-                // Default to shim for safety
-                self.lanzaboote = LanzabooteConfig::for_secure_boot();
-                if let Some(ref password) = self.lanzaboote.mok_password {
-                    self.mok_guide = Some(MokEnrollmentGuide::new(password));
-                }
+                // Fail closed: key generation/config changes remain disabled.
+                self.lanzaboote = LanzabooteConfig::for_disabled_secure_boot();
             }
         }
-
-        self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(
-            &result.state,
-            &self.lanzaboote,
-        ));
+        self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(&result.state, &self.lanzaboote));
         self.probe_result = Some(result);
     }
 
     /// Apply the result of the Socratic guide (USB Forge mode).
-    pub fn apply_guide_result(&mut self, method: SecureBootMethod) {
+    ///
+    /// This records the explicit human choice but does not qualify a device or
+    /// authorize generated config. Lanzaboote also needs current profile approval.
+    pub fn apply_guide_result(&mut self, method: SecureBootMethod) -> Result<(), &'static str> {
+        self.selected_method = None;
+        self.profile_approval = None;
         match method {
+            SecureBootMethod::UseShim => {
+                self.lanzaboote = LanzabooteConfig::for_disabled_secure_boot();
+                self.enrollment_guide = None;
+                self.boot_chain = Some(indeterminate_boot_chain(
+                    "the legacy unsure/shim option is not an explicit Secure Boot method",
+                ));
+                return Err("the unresolved UseShim choice cannot authorize configuration; repeat the probe or choose a concrete method");
+            }
             SecureBootMethod::Disabled | SecureBootMethod::AlreadyOff => {
                 self.lanzaboote = LanzabooteConfig::for_disabled_secure_boot();
-                self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(
-                    &SecureBootState::Disabled,
-                    &self.lanzaboote,
-                ));
+                self.enrollment_guide = None;
             }
-            SecureBootMethod::MokEnrollment | SecureBootMethod::UseShim => {
+            SecureBootMethod::MokEnrollment => {
                 self.lanzaboote = LanzabooteConfig::for_secure_boot();
-                if let Some(ref password) = self.lanzaboote.mok_password {
-                    self.mok_guide = Some(MokEnrollmentGuide::new(password));
-                }
-                self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(
-                    &SecureBootState::Enabled,
-                    &self.lanzaboote,
-                ));
+                self.enrollment_guide = Some(SecureBootEnrollmentGuide::new());
             }
         }
+        self.selected_method = Some(method);
+        let current_state = self.current_observed_state().cloned().unwrap_or_else(|| {
+            SecureBootState::Unknown {
+                reason: "Secure Boot state must be explicitly observed for this target".to_string(),
+            }
+        });
+        self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(&current_state, &self.lanzaboote));
+        Ok(())
+    }
+
+    /// Authorize only after the target, profile, current state, recovery path,
+    /// and explicit user confirmation have been reviewed together.
+    pub fn authorize_profile(
+        &mut self,
+        approval: SecureBootProfileApproval,
+    ) -> Result<(), String> {
+        if self.selected_method != Some(SecureBootMethod::MokEnrollment) {
+            return Err("explicit Secure Boot key-enrollment selection is required".to_string());
+        }
+        let state = self.current_observed_state().ok_or_else(|| {
+            "Secure Boot state is unknown; probe or manually inspect the exact target".to_string()
+        })?;
+        let state_label = secure_boot_state_label(state).ok_or_else(|| {
+            "Secure Boot state is unresolved; repeat the probe before authorizing configuration".to_string()
+        })?;
+        let platform = self.current_platform();
+        let fingerprint = self.target_hardware_profile_blake3.as_deref().ok_or_else(|| {
+            "target hardware profile fingerprint is required before authorizing configuration".to_string()
+        })?;
+        approval.validate_for_current_target(
+            state_label,
+            fingerprint,
+            platform == Some(TargetPlatform::Linux),
+        )?;
+        self.profile_approval = Some(approval);
+        self.lanzaboote.enrollment_required = true;
+        Ok(())
+    }
+
+    /// Whether this live instance has a current, profile-bound authorization.
+    pub fn is_configuration_authorized(&self) -> bool {
+        self.generate_nix_config().is_ok()
     }
 
     /// Generate the complete Nix configuration for Secure Boot support.
     ///
-    /// Returns a tuple of (lanzaboote module, key enrollment script).
-    /// For disabled Secure Boot, the key enrollment script is empty.
-    pub fn generate_nix_config(&self) -> (String, String) {
+    /// The configuration path is closed unless an explicit method was selected.
+    /// Lanzaboote additionally requires the shared one-session profile approval.
+    /// Key generation uses Lanzaboote's configured key store; firmware enrollment
+    /// remains a separate deliberate operation.
+    pub fn generate_nix_config(&self) -> Result<(String, String), String> {
+        let method = self.selected_method.ok_or_else(|| {
+            "an explicit Secure Boot method must be selected before generating configuration".to_string()
+        })?;
+
+        if method == SecureBootMethod::UseShim {
+            return Err("the legacy unresolved UseShim choice cannot authorize configuration".to_string());
+        }
+        if matches!(method, SecureBootMethod::Disabled | SecureBootMethod::AlreadyOff) {
+            if self.current_platform() != Some(TargetPlatform::Linux) {
+                return Err("standard NixOS boot configuration requires an identified Linux target".to_string());
+            }
+            let state = self.current_observed_state().ok_or_else(|| {
+                "current Secure Boot state is required before generating standard boot configuration".to_string()
+            })?;
+            if !matches!(state, SecureBootState::Disabled) {
+                return Err("standard unsigned boot configuration requires a current Disabled observation; repeat the probe after any firmware change".to_string());
+            }
+            return Ok((generate_lanzaboote_nix(&LanzabooteConfig::for_disabled_secure_boot()), String::new()));
+        }
+
+        if let Some(result) = &self.probe_result {
+            if matches!(&result.state, SecureBootState::Unknown { .. }) {
+                return Err("Secure Boot state is unknown; repeat the probe or resolve the firmware state before generating configuration".to_string());
+            }
+        }
+        let approval = self.profile_approval.as_ref().ok_or_else(|| {
+            "profile-qualified, same-session approval is required before generating Lanzaboote configuration".to_string()
+        })?;
+        if !self.lanzaboote.enabled {
+            return Err("Lanzaboote must remain enabled for the explicit key-enrollment profile".to_string());
+        }
+        if !self.lanzaboote.generate_keys {
+            return Err("key generation is disabled; provide an independently verified existing-key profile or enable Lanzaboote key generation".to_string());
+        }
+        if self.lanzaboote.pki_dir != approval.pki_bundle {
+            return Err("the configured PKI bundle differs from the profile-approved key store".to_string());
+        }
+        let state = self.current_observed_state().ok_or_else(|| {
+            "current Secure Boot state is required before generating Lanzaboote configuration".to_string()
+        })?;
+        let state_label = secure_boot_state_label(state).ok_or_else(|| {
+            "Secure Boot state is unresolved; repeat the probe before generating configuration".to_string()
+        })?;
+        let platform = self.current_platform();
+        let fingerprint = self.target_hardware_profile_blake3.as_deref().ok_or_else(|| {
+            "target hardware profile fingerprint is missing".to_string()
+        })?;
+        approval.validate_for_current_target(
+            state_label,
+            fingerprint,
+            platform == Some(TargetPlatform::Linux),
+        )?;
+
         let lanzaboote_nix = generate_lanzaboote_nix(&self.lanzaboote);
-        let key_enrollment = if self.lanzaboote.enabled {
+        let key_generation = if self.lanzaboote.enabled && self.lanzaboote.generate_keys {
             generate_key_enrollment_nix()
         } else {
             String::new()
         };
-        (lanzaboote_nix, key_enrollment)
+        Ok((lanzaboote_nix, key_generation))
     }
 }
 
 // ============================================================================
 // Internal utilities
 // ============================================================================
-
-/// Fill `buf` from the OS entropy source: a real CSPRNG syscall on native
-/// targets, or `crypto.getRandomValues()` (via the `js` feature) on wasm32.
-fn os_random_bytes(buf: &mut [u8]) {
-    getrandom02::getrandom(buf).expect("OS entropy source unavailable");
-}
-
-/// Draw a cryptographically random `usize` in `[0, bound)` from the OS
-/// entropy source.
-///
-/// The MOK enrollment password gates enrolling a signing key into the
-/// machine's UEFI trust store during an active install session, so it must
-/// actually be unpredictable, not merely "unpredictable to an observer who
-/// doesn't have access to the session" -- a predictable seed (e.g. derived
-/// from a stack address and a monotonic counter) is guessable by anything
-/// with local access during that window.
-fn secure_random_index(bound: usize) -> usize {
-    debug_assert!(bound > 0, "secure_random_index bound must be non-zero");
-    let mut buf = [0u8; 8];
-    os_random_bytes(&mut buf);
-    (u64::from_le_bytes(buf) as usize) % bound
-}
-
-/// Curated word list for MOK password generation.
-///
-/// 256 words chosen for unambiguous pronunciation, easy typing on UEFI
-/// keyboards, and visual distinctness. All lowercase ASCII.
-fn mok_word_list() -> &'static [&'static str] {
-    &[
-        "acorn", "amber", "anchor", "anvil", "apple", "arrow", "aspen", "atlas", "badge", "basin",
-        "beach", "birch", "blade", "bloom", "bluff", "bonus", "brave", "bread", "brick", "brief",
-        "brook", "brush", "cabin", "cairn", "candy", "cargo", "cedar", "chase", "chess", "chord",
-        "cider", "civic", "claim", "cliff", "cloak", "cloud", "coast", "coral", "cover", "crane",
-        "crest", "crown", "crush", "curve", "dance", "delta", "depth", "diary", "dodge", "draft",
-        "dream", "drift", "eagle", "earth", "ember", "entry", "equal", "event", "fable", "faith",
-        "feast", "fence", "field", "flame", "flash", "fleet", "float", "flood", "focus", "forge",
-        "forum", "frost", "fruit", "gamma", "gauge", "ghost", "giant", "glade", "glass", "gleam",
-        "globe", "grace", "grain", "grant", "grape", "grasp", "green", "grove", "guard", "guest",
-        "guide", "haven", "heart", "hedge", "honey", "horse", "house", "ivory", "jewel", "joint",
-        "judge", "juice", "knack", "kneel", "knife", "knock", "label", "lance", "latch", "layer",
-        "lemon", "level", "light", "linen", "lodge", "lunar", "magic", "manor", "maple", "marsh",
-        "match", "medal", "merge", "metal", "minor", "moose", "mount", "naval", "nerve", "noble",
-        "north", "novel", "ocean", "olive", "opera", "orbit", "outer", "oxide", "panel", "paper",
-        "patch", "pearl", "penny", "phase", "piano", "pilot", "pixel", "place", "plant", "plaza",
-        "plume", "polar", "porch", "prism", "proud", "pulse", "quail", "quest", "quiet", "quote",
-        "radar", "ranch", "range", "raven", "realm", "ridge", "rivet", "robin", "royal", "ruler",
-        "saint", "scale", "scout", "shade", "shelf", "shore", "sigma", "slate", "slope", "solar",
-        "solid", "spark", "spear", "spice", "spoke", "spray", "stack", "staff", "stage", "stake",
-        "stamp", "stand", "steam", "steel", "stone", "stork", "storm", "stove", "sugar", "surge",
-        "swift", "table", "tempo", "thorn", "tiger", "toast", "token", "tower", "trace", "trail",
-        "trend", "tribe", "trout", "trunk", "tulip", "twist", "ultra", "unity", "urban", "valid",
-        "vault", "verse", "vigor", "vinyl", "vivid", "voice", "wagon", "watch", "water", "weave",
-        "whale", "wheat", "width", "wound", "wrist", "yield", "youth", "zebra", "blaze", "haven",
-        "croft", "dwell", "fjord", "glyph", "haven", "inlet", "knoll", "ledge", "marsh", "nexus",
-        "oasis", "plank", "quart", "roost", "shale", "thyme",
-    ]
-}
 
 // ============================================================================
 // Tests
@@ -1204,6 +1258,39 @@ fn mok_word_list() -> &'static [&'static str] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn authorize_test_profile(orch: &mut SecureBootOrchestration) {
+        if orch.current_observed_state().is_none() {
+            orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
+        }
+        let profile = serde_json::json!({
+            "model": "synthetic-secure-boot-target",
+            "firmware_revision": "synthetic-firmware-1",
+        });
+        orch.set_target_hardware_profile(&profile).expect("synthetic hardware profile fingerprints");
+        if orch.selected_method.is_none() {
+            orch.apply_guide_result(SecureBootMethod::MokEnrollment)
+                .expect("explicit test enrollment selection");
+        }
+        let state = secure_boot_state_label(orch.current_observed_state().expect("test state"))
+            .expect("known test state");
+        let fingerprint = orch.target_hardware_profile_blake3.clone().unwrap();
+        let approval = SecureBootProfileApproval {
+            profile_id: "synthetic-profile-v1".to_string(),
+            target_model: "Synthetic Secure Boot Target".to_string(),
+            firmware_revision: "synthetic-firmware-1".to_string(),
+            nixos_release: "nixos-unstable-test".to_string(),
+            lanzaboote_revision: "synthetic-locked-revision".to_string(),
+            pki_bundle: "/var/lib/sbctl".to_string(),
+            observed_secure_boot_state: state.to_string(),
+            hardware_profile_blake3: fingerprint,
+            user_confirmed: true,
+            exact_profile_qualified: true,
+            recovery_path_verified: true,
+        };
+        orch.authorize_profile(approval).expect("synthetic profile approval passes");
+    }
+
 
     #[test]
     fn test_probe_script_linux() {
@@ -1250,7 +1337,7 @@ mod tests {
         }"#;
         let result = parse_probe_result(json).unwrap();
         assert_eq!(result.state, SecureBootState::Enabled);
-        assert!(result.mok_required);
+        assert!(result.key_enrollment_required);
         assert!(result.mokutil_available);
         assert_eq!(result.platform, TargetPlatform::Linux);
     }
@@ -1266,7 +1353,7 @@ mod tests {
         }"#;
         let result = parse_probe_result(json).unwrap();
         assert_eq!(result.state, SecureBootState::Disabled);
-        assert!(!result.mok_required);
+        assert!(!result.key_enrollment_required);
     }
 
     #[test]
@@ -1298,7 +1385,7 @@ mod tests {
         }"#;
         let result = parse_probe_result(json).unwrap();
         assert_eq!(result.state, SecureBootState::SetupMode);
-        assert!(!result.mok_required);
+        assert!(result.key_enrollment_required);
     }
 
     #[test]
@@ -1318,51 +1405,12 @@ mod tests {
     }
 
     #[test]
-    fn test_mok_password_generation() {
-        let password = generate_mok_password();
-        let parts: Vec<&str> = password.split('-').collect();
-
-        // Must be 6 words
-        assert_eq!(parts.len(), 6, "Password must be 6 words: {password}");
-
-        // Each word must be non-empty and ASCII lowercase
-        for word in &parts {
-            assert!(!word.is_empty(), "Password word must not be empty");
-            assert!(
-                word.chars().all(|c| c.is_ascii_lowercase()),
-                "Password word must be lowercase ASCII: {word}"
-            );
-        }
-
-        // Must be human-readable length (not too short, not too long)
-        assert!(
-            password.len() >= 20,
-            "Password too short: {password} ({})",
-            password.len()
-        );
-        assert!(
-            password.len() <= 60,
-            "Password too long: {password} ({})",
-            password.len()
-        );
-    }
-
-    #[test]
-    fn test_mok_password_uniqueness() {
-        // Two consecutive calls should produce different passwords
-        // (not guaranteed by PRNG, but extremely likely with counter mixing)
-        let p1 = generate_mok_password();
-        let p2 = generate_mok_password();
-        assert_ne!(p1, p2, "Two consecutive password generations should differ");
-    }
-
-    #[test]
     fn test_lanzaboote_nix_generation() {
         let config = LanzabooteConfig {
             enabled: true,
-            pki_dir: "/etc/secureboot".to_string(),
+            pki_dir: "/var/lib/sbctl".to_string(),
             generate_keys: true,
-            mok_password: Some("test-pass".to_string()),
+            enrollment_required: true,
         };
         let nix = generate_lanzaboote_nix(&config);
 
@@ -1379,7 +1427,7 @@ mod tests {
             "Must enable lanzaboote: {nix}"
         );
         assert!(
-            nix.contains("pkiBundle = \"/etc/secureboot\""),
+            nix.contains("pkiBundle = \"/var/lib/sbctl\""),
             "Must set PKI path: {nix}"
         );
         assert!(nix.contains("sbctl"), "Must include sbctl package: {nix}");
@@ -1401,93 +1449,46 @@ mod tests {
     }
 
     #[test]
-    fn test_key_enrollment_nix() {
+    fn test_key_generation_is_delegated_to_lanzaboote() {
         let nix = generate_key_enrollment_nix();
-
-        assert!(
-            nix.contains("activationScripts"),
-            "Must be an activation script: {nix}"
-        );
-        assert!(nix.contains("sbctl"), "Must reference sbctl: {nix}");
-        assert!(nix.contains("create-keys"), "Must run create-keys: {nix}");
-        assert!(
-            nix.contains("/etc/secureboot/GUID"),
-            "Must check for existing keys: {nix}"
-        );
+        assert!(nix.contains("boot.lanzaboote.autoGenerateKeys.enable = true"));
+        assert!(!nix.contains("system.activationScripts.secureBootKeys"));
+        assert!(!nix.contains("sbctl create-keys"));
     }
 
     #[test]
-    fn test_mok_guide_steps() {
-        let guide = MokEnrollmentGuide::new("cedar-bright-ocean-gentle-river-dawn");
-
-        assert_eq!(guide.step_count(), 6, "MOK guide must have exactly 6 steps");
-
-        // Verify step ordering
-        for (i, step) in guide.steps.iter().enumerate() {
-            assert_eq!(
-                step.step_number,
-                (i + 1) as u32,
-                "Step {} should be numbered {}",
-                i,
-                i + 1
-            );
-        }
-
-        // Step 1: MOK Manager entry
-        let s1 = guide.step(1).unwrap();
-        assert!(s1.title.contains("MOK Manager"));
-        assert!(s1.instruction.contains("10 seconds"));
-        assert!(s1.warning.is_some());
-
-        // Step 2: Enroll MOK
-        let s2 = guide.step(2).unwrap();
-        assert!(s2.instruction.contains("Enroll MOK"));
-
-        // Step 3: View key
-        let s3 = guide.step(3).unwrap();
-        assert!(s3.instruction.contains("Continue"));
-
-        // Step 4: Confirm
-        let s4 = guide.step(4).unwrap();
-        assert!(s4.instruction.contains("Yes"));
-
-        // Step 5: Password
-        let s5 = guide.step(5).unwrap();
-        assert!(
-            s5.instruction
-                .contains("cedar-bright-ocean-gentle-river-dawn"),
-            "Step 5 must contain the password"
-        );
-        assert!(
-            s5.warning.is_some(),
-            "Step 5 should warn about keyboard layout"
-        );
-
-        // Step 6: Reboot
-        let s6 = guide.step(6).unwrap();
-        assert!(s6.instruction.contains("Reboot"));
+    fn test_secure_boot_enrollment_guide_steps() {
+        let guide = SecureBootEnrollmentGuide::new();
+        assert_eq!(guide.step_count(), 6);
+        assert!(guide.step(1).unwrap().instruction.contains("pinned Lanzaboote"));
+        assert!(guide.step(2).unwrap().instruction.contains("recovery path"));
+        assert!(guide.step(3).unwrap().instruction.contains("Setup Mode"));
+        assert!(guide.step(4).unwrap().instruction.contains("sbctl verify"));
+        assert!(guide.step(5).unwrap().instruction.contains("sbctl enroll-keys --microsoft"));
+        assert!(guide.step(6).unwrap().instruction.contains("User Mode"));
+        assert!(guide.step(3).unwrap().warning.is_some());
     }
-
     #[test]
     fn test_boot_chain_with_secure_boot() {
         let config = LanzabooteConfig {
             enabled: true,
-            pki_dir: "/etc/secureboot".to_string(),
+            pki_dir: "/var/lib/sbctl".to_string(),
             generate_keys: true,
-            mok_password: Some("test-password".to_string()),
+            enrollment_required: true,
         };
         let chain = BootChainStatus::sovereign_boot_chain(&SecureBootState::Enabled, &config);
 
         assert_eq!(chain.stages.len(), 5, "Boot chain must have 5 stages");
 
-        // Firmware is always verified
+        // The observed firmware state is known, but the intended machine-specific
+        // trust path remains pending until deliberate enrollment and reboot evidence.
         assert_eq!(chain.stages[0].name, "Firmware");
-        assert_eq!(chain.stages[0].status, BootStageStatus::Verified);
+        assert_eq!(chain.stages[0].status, BootStageStatus::PendingEnrollment);
 
-        // Shim should be pending enrollment (password present = first boot)
+        // Lanzaboote uses a direct signed-UKI path, not shim/MOK.
         assert_eq!(chain.stages[1].name, "Shim");
-        assert_eq!(chain.stages[1].status, BootStageStatus::PendingEnrollment);
-        assert!(chain.stages[1].signer.contains("Microsoft"));
+        assert_eq!(chain.stages[1].status, BootStageStatus::NotApplicable);
+        assert_eq!(chain.stages[1].signer, "N/A");
 
         // Lanzaboote stages pending
         assert!(chain.stages[2].name.contains("lanzaboote"));
@@ -1596,18 +1597,15 @@ mod tests {
     }
 
     #[test]
-    fn test_narration_mok_explanation_content() {
+    fn test_narration_key_enrollment_explanation_content() {
         let lines = narration_for_step(&SecureBootGuideStep::MokExplanation);
         let full = lines.join(" ");
-        assert!(
-            full.contains("sovereign"),
-            "MOK explanation should mention sovereignty"
-        );
-        assert!(full.contains("key"), "MOK explanation must mention keys");
-        assert!(
-            full.contains("consent") || full.contains("trust"),
-            "MOK explanation should frame enrollment as consent"
-        );
+        assert!(full.contains("Setup Mode"));
+        assert!(full.contains("sbctl enroll-keys --microsoft"));
+        assert!(full.contains("After reboot"));
+        assert!(full.contains("recovery"));
+        assert!(!full.contains("MOK Manager"));
+        assert!(!full.contains("one-time password"));
     }
 
     #[test]
@@ -1636,7 +1634,7 @@ mod tests {
             other => panic!("Expected BiosDisableGuide, got {other:?}"),
         }
 
-        guide.confirm();
+        guide.confirm().expect("an explicit Secure Boot choice was made");
         match &guide.current_step {
             SecureBootGuideStep::Confirmed { method } => {
                 assert_eq!(*method, SecureBootMethod::Disabled);
@@ -1647,12 +1645,57 @@ mod tests {
     }
 
     #[test]
+    fn test_socratic_guide_unsure_remains_unconfirmed() {
+        let mut guide = SecureBootGuide::new();
+        guide.choose_unsure();
+        assert_eq!(guide.current_step, SecureBootGuideStep::ManualVerificationRequired);
+        assert!(!guide.user_confirmed);
+        assert!(guide.confirm().is_err());
+    }
+
+    #[test]
+    fn test_legacy_use_shim_cannot_authorize_configuration() {
+        let mut orch = SecureBootOrchestration::new();
+        assert!(orch.apply_guide_result(SecureBootMethod::UseShim).is_err());
+        assert!(!orch.is_configuration_authorized());
+        assert!(orch.generate_nix_config().is_err());
+        assert!(orch.boot_chain.as_ref().unwrap().stages.iter()
+            .all(|stage| matches!(&stage.status, BootStageStatus::Indeterminate { .. })));
+    }
+
+    #[test]
+    fn test_socratic_guide_rejects_confirmation_without_an_explicit_choice() {
+        let mut guide = SecureBootGuide::new();
+        let original_step = guide.current_step.clone();
+
+        let result = guide.confirm();
+
+        assert_eq!(
+            result,
+            Err("Secure Boot method must be explicitly selected before confirmation")
+        );
+        assert_eq!(guide.current_step, original_step);
+        assert!(!guide.user_confirmed);
+    }
+
+    #[test]
+    fn test_linux_probe_missing_efi_variable_is_unknown_not_disabled() {
+        let script = generate_probe_script(TargetPlatform::Linux);
+        assert!(script.contains(
+            "SB_STATE=\"unknown\"\n        SB_REASON=\"SecureBoot EFI variable missing; cannot determine state\""
+        ));
+        assert!(!script.contains(
+            "else\n        SB_STATE=\"disabled\"\n        SB_REASON=\"\"\n    fi"
+        ));
+    }
+
+    #[test]
     fn test_socratic_guide_flow_mok() {
         let mut guide = SecureBootGuide::new();
         guide.choose_mok();
         assert_eq!(guide.current_step, SecureBootGuideStep::MokExplanation);
 
-        guide.confirm();
+        guide.confirm().expect("an explicit Secure Boot choice was made");
         match &guide.current_step {
             SecureBootGuideStep::Confirmed { method } => {
                 assert_eq!(*method, SecureBootMethod::MokEnrollment);
@@ -1679,7 +1722,7 @@ mod tests {
         let mut orch = SecureBootOrchestration::new();
         let result = SecureBootProbeResult {
             state: SecureBootState::Enabled,
-            mok_required: true,
+            key_enrollment_required: true,
             mokutil_available: true,
             platform: TargetPlatform::Linux,
             raw_output: String::new(),
@@ -1687,8 +1730,8 @@ mod tests {
         orch.apply_probe_result(result);
 
         assert!(orch.lanzaboote.enabled);
-        assert!(orch.lanzaboote.mok_password.is_some());
-        assert!(orch.mok_guide.is_some());
+        assert!(orch.lanzaboote.enrollment_required);
+        assert!(orch.enrollment_guide.is_some());
         assert!(orch.boot_chain.is_some());
         assert!(!orch.boot_chain.as_ref().unwrap().fully_verified());
     }
@@ -1698,7 +1741,7 @@ mod tests {
         let mut orch = SecureBootOrchestration::new();
         let result = SecureBootProbeResult {
             state: SecureBootState::Disabled,
-            mok_required: false,
+            key_enrollment_required: false,
             mokutil_available: true,
             platform: TargetPlatform::Linux,
             raw_output: String::new(),
@@ -1706,29 +1749,146 @@ mod tests {
         orch.apply_probe_result(result);
 
         assert!(!orch.lanzaboote.enabled);
-        assert!(orch.mok_guide.is_none());
+        assert!(orch.enrollment_guide.is_none());
         assert!(orch.boot_chain.as_ref().unwrap().fully_verified());
     }
 
     #[test]
     fn test_orchestration_generate_nix() {
         let mut orch = SecureBootOrchestration::new();
-        orch.apply_guide_result(SecureBootMethod::MokEnrollment);
+        orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
+        orch.apply_guide_result(SecureBootMethod::MokEnrollment).expect("explicit enrollment selection");
+        authorize_test_profile(&mut orch);
 
-        let (lanzaboote_nix, key_nix) = orch.generate_nix_config();
+        let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("profile approval authorizes configuration");
         assert!(lanzaboote_nix.contains("lanzaboote"));
-        assert!(!key_nix.is_empty());
-        assert!(key_nix.contains("create-keys"));
+        assert!(lanzaboote_nix.contains("pkiBundle = \"/var/lib/sbctl\""));
+        assert!(key_nix.contains("boot.lanzaboote.autoGenerateKeys.enable = true"));
+        assert!(!key_nix.contains("system.activationScripts.secureBootKeys"));
+        assert!(!key_nix.contains("sbctl create-keys"));
     }
 
     #[test]
+    fn test_key_generation_delegates_path_binding_to_lanzaboote() {
+        let key_nix = generate_key_enrollment_nix();
+        assert!(key_nix.contains("boot.lanzaboote.autoGenerateKeys.enable = true"));
+        assert!(!key_nix.contains("sbctl create-keys"));
+        assert!(!key_nix.contains("/var/lib/sbctl/GUID"));
+    }
+
+    #[test]
+    fn test_standard_boot_config_requires_linux_target() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.record_manual_secure_boot_state(SecureBootState::Disabled, TargetPlatform::Windows);
+        orch.apply_guide_result(SecureBootMethod::AlreadyOff).expect("explicit method selection");
+        assert!(orch.generate_nix_config().is_err());
+    }
+
+    #[test]
+    fn test_profile_authorization_does_not_survive_serialization() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
+        orch.apply_guide_result(SecureBootMethod::MokEnrollment)
+            .expect("explicit method selection");
+        authorize_test_profile(&mut orch);
+        assert!(orch.generate_nix_config().is_ok());
+
+        let serialized = serde_json::to_value(&orch).expect("orchestration serializes");
+        assert!(serialized.get("profile_approval").is_none());
+        assert!(serialized.get("selected_method").is_none());
+        assert!(serialized.get("target_hardware_profile_blake3").is_none());
+
+        let restored: SecureBootOrchestration =
+            serde_json::from_value(serialized).expect("orchestration deserializes safely");
+        assert!(restored.generate_nix_config().is_err());
+        assert!(!restored.is_configuration_authorized());
+    }
+
+    #[test]
+    fn test_pki_bundle_mutation_invalidates_profile_approval() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
+        orch.apply_guide_result(SecureBootMethod::MokEnrollment)
+            .expect("explicit method selection");
+        authorize_test_profile(&mut orch);
+        assert!(orch.generate_nix_config().is_ok());
+
+        orch.lanzaboote.pki_dir = "/etc/secureboot".to_string();
+        assert!(orch.generate_nix_config().is_err());
+        assert!(!orch.is_configuration_authorized());
+    }
+
+    #[test]
+    fn test_orchestration_blocks_profile_when_key_generation_is_disabled() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
+        orch.apply_guide_result(SecureBootMethod::MokEnrollment).expect("explicit enrollment selection");
+        orch.lanzaboote.generate_keys = false;
+        authorize_test_profile(&mut orch);
+        assert!(orch.generate_nix_config().is_err());
+    }
+    #[test]
     fn test_orchestration_generate_nix_disabled() {
         let mut orch = SecureBootOrchestration::new();
-        orch.apply_guide_result(SecureBootMethod::AlreadyOff);
+        orch.record_manual_secure_boot_state(SecureBootState::Disabled, TargetPlatform::Linux);
+        orch.apply_guide_result(SecureBootMethod::AlreadyOff).expect("explicit non-Secure-Boot selection");
 
-        let (lanzaboote_nix, key_nix) = orch.generate_nix_config();
+        let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("known disabled state and explicit choice authorize standard configuration");
         assert!(lanzaboote_nix.contains("systemd-boot.enable = true"));
         assert!(key_nix.is_empty());
+    }
+
+    #[test]
+    fn test_probe_result_alone_does_not_authorize_config_generation() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.apply_probe_result(SecureBootProbeResult {
+            state: SecureBootState::Enabled,
+            key_enrollment_required: true,
+            mokutil_available: true,
+            platform: TargetPlatform::Linux,
+            raw_output: String::new(),
+        });
+        assert!(!orch.is_configuration_authorized());
+        assert!(orch.generate_nix_config().is_err());
+    }
+
+    #[test]
+    fn test_unknown_probe_blocks_key_generation_configuration() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.apply_probe_result(SecureBootProbeResult {
+            state: SecureBootState::Unknown { reason: "missing SecureBoot EFI variable".to_string() },
+            key_enrollment_required: false,
+            mokutil_available: false,
+            platform: TargetPlatform::Linux,
+            raw_output: String::new(),
+        });
+        assert!(!orch.lanzaboote.enabled);
+        assert!(!orch.lanzaboote.generate_keys);
+        assert!(!orch.is_configuration_authorized());
+        assert!(orch.enrollment_guide.is_none());
+        assert!(orch.generate_nix_config().is_err());
+    }
+
+    #[test]
+    fn test_setup_mode_is_pending_enrollment_not_disabled() {
+        let config = LanzabooteConfig::for_secure_boot();
+        let chain = BootChainStatus::sovereign_boot_chain(&SecureBootState::SetupMode, &config);
+        assert!(!chain.fully_verified());
+        assert!(chain.count_by_status(&BootStageStatus::PendingEnrollment) >= 3);
+    }
+
+    #[test]
+    fn test_unknown_boot_chain_is_indeterminate_not_verified() {
+        let config = LanzabooteConfig::for_disabled_secure_boot();
+        let chain = BootChainStatus::sovereign_boot_chain(
+            &SecureBootState::Unknown { reason: "probe unavailable".to_string() },
+            &config,
+        );
+        assert!(!chain.fully_verified());
+        assert_eq!(
+            chain.stages.iter().filter(|stage| matches!(&stage.status, BootStageStatus::Indeterminate { .. })).count(),
+            5
+        );
     }
 
     #[test]
@@ -1759,37 +1919,16 @@ mod tests {
     }
 
     #[test]
-    fn test_word_list_size() {
-        let words = mok_word_list();
-        assert!(
-            words.len() >= 200,
-            "Word list must have at least 200 words for sufficient entropy: {}",
-            words.len()
-        );
-    }
-
-    #[test]
-    fn test_word_list_all_ascii_lowercase() {
-        for word in mok_word_list() {
-            assert!(
-                word.chars().all(|c| c.is_ascii_lowercase()),
-                "Word must be ASCII lowercase: {word}"
-            );
-        }
-    }
-
-    #[test]
-    fn test_lanzaboote_config_defaults() {
+    fn test_lanzaboote_config_defaults_fail_closed() {
         let config = LanzabooteConfig::default();
-        assert!(config.enabled);
-        assert_eq!(config.pki_dir, "/etc/secureboot");
-        assert!(config.generate_keys);
-        assert!(config.mok_password.is_none());
+        assert!(!config.enabled);
+        assert_eq!(config.pki_dir, "/var/lib/sbctl");
+        assert!(!config.generate_keys);
+        assert!(config.enrollment_required);
     }
-
     #[test]
-    fn test_mok_guide_step_lookup() {
-        let guide = MokEnrollmentGuide::new("test");
+    fn test_secure_boot_enrollment_step_lookup() {
+        let guide = SecureBootEnrollmentGuide::new();
         assert!(guide.step(1).is_some());
         assert!(guide.step(6).is_some());
         assert!(guide.step(7).is_none());
