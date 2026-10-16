@@ -1,0 +1,42 @@
+name: Nano policy targeted checks
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-nano-policy/**"
+      - "Cargo.lock"
+      - ".github/workflows/nano-policy.yml"
+  push:
+    branches:
+      - "research/nano-budgeted-selector-rust"
+    paths:
+      - "crates/domains/symthaea-nano-policy/**"
+      - "Cargo.lock"
+      - ".github/workflows/nano-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Format, tests, and lint (targeted crate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run unit tests
+        run: cargo test -p symthaea-nano-policy --locked
+
+      - name: Run Clippy
+        run: cargo clippy -p symthaea-nano-policy --all-targets --locked -- -D warnings
