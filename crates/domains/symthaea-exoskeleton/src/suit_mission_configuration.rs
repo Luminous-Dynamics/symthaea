@@ -343,21 +343,26 @@ pub fn evaluate_mission_configuration(
     for connection in sorted_connections {
         let left = components[connection.left_component_id.as_str()];
         let right = components[connection.right_component_id.as_str()];
-        adjacency
-            .get_mut(&connection.left_component_id)
-            .expect("validated component has adjacency entry")
-            .insert(connection.right_component_id.clone());
-        adjacency
-            .get_mut(&connection.right_component_id)
-            .expect("validated component has adjacency entry")
-            .insert(connection.left_component_id.clone());
-
         let required = configuration
             .required_connection_ids
             .contains(&connection.connection_id);
         let (interop_report, interoperability_receipt) =
             evaluate_suit_interoperability(&left.interfaces, &right.interfaces, &connection.policy)
                 .map_err(map_interop_error)?;
+
+        // Reachability represents policy-admissible paths, not merely declared
+        // topology. A failed optional edge must not connect a required resource
+        // to the suit in the mission-level graph.
+        if interop_report.status == SuitInteropReportStatus::MeetsDeclaredCompatibilityPolicy {
+            adjacency
+                .get_mut(&connection.left_component_id)
+                .expect("validated component has adjacency entry")
+                .insert(connection.right_component_id.clone());
+            adjacency
+                .get_mut(&connection.right_component_id)
+                .expect("validated component has adjacency entry")
+                .insert(connection.left_component_id.clone());
+        }
 
         match interop_report.status {
             SuitInteropReportStatus::MeetsDeclaredCompatibilityPolicy if required => {
@@ -1157,6 +1162,30 @@ mod tests {
             finding.code == MissionFindingCode::OptionalConnectionDegraded
         }));
         assert_eq!(report.blocked_required_connection_count, 0);
+    }
+
+    #[test]
+    fn incompatible_optional_edge_does_not_connect_required_worksite() {
+        let mut configuration = fixture();
+        configuration.required_component_kinds.insert(MissionComponentKind::Worksite);
+        configuration.components.push(MissionComponent {
+            component_id: "worksite".into(),
+            kind: MissionComponentKind::Worksite,
+            hardware_revision: "worksite-r1".into(),
+            interfaces: manifest("worksite", "worksite-r1", SuitInterfaceRole::Provider),
+        });
+        configuration.required_connection_ids.remove("suit-lander-grounding");
+        configuration.required_connection_ids.insert("suit-lander-grounding".into());
+        configuration.connections[0].policy.minimum_evidence_level = SuitEvidenceLevel::Qualified;
+        let (report, _) = evaluate_mission_configuration(&configuration).unwrap();
+        assert_eq!(report.status, MissionConfigurationStatus::Blocked);
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == MissionFindingCode::RequiredComponentDisconnected
+                && finding.subject_id == "worksite"
+        }));
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == MissionFindingCode::RequiredConnectionBlocked
+        }));
     }
 
     #[test]
