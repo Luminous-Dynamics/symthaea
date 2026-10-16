@@ -35,10 +35,15 @@ fn run() -> Result<(), (u8, String)> {
             let dataset_file = File::open(&args[2]).map_err(input_error)?;
             let (cases, audit) = audit_dataset_jsonl(BufReader::new(dataset_file))
                 .map_err(|e| (1, format!("dataset audit failed: {e}")))?;
-            let minimum_origins = args[5].parse::<u32>()
+            let minimum_origins = args[5]
+                .parse::<u32>()
                 .map_err(|e| (2, format!("invalid minimum origin count: {e}")))?;
-            let allow_scoped = args[6].parse::<bool>()
+            let allow_scoped = args[6]
+                .parse::<bool>()
                 .map_err(|e| (2, format!("allow-scoped must be true or false: {e}")))?;
+            if minimum_origins == 0 {
+                return Err((2, "minimum origin count must be greater than zero".to_owned()));
+            }
             let policy = EvidenceActionPolicy::new(minimum_origins, allow_scoped)
                 .map_err(|e| (2, e.to_owned()))?;
             if args[4].trim().is_empty() {
@@ -164,5 +169,5 @@ fn internal_error(error: serde_json::Error) -> (u8, String) {
     (2, format!("serialization error: {error}"))
 }
 fn usage() -> &'static str {
-    "Usage:\n  evidence_action_benchmark audit DATASET.jsonl\n  evidence_action_benchmark evaluate DATASET.jsonl RECEIPTS.jsonl POLICY_VERSION MIN_ORIGINS ALLOW_SCOPED\n  evidence_action_benchmark score DATASET.jsonl RECEIPTS.jsonl POLICY_VERSION\n  evidence_action_benchmark trajectory-audit TRAJECTORIES.jsonl\n  evidence_action_benchmark trajectory-evaluate TRAJECTORIES.jsonl RECEIPTS.jsonl POLICY_VERSION MIN_ORIGINS ALLOW_SCOPED\n  evidence_action_benchmark trajectory-score TRAJECTORIES.jsonl RECEIPTS.jsonl POLICY_VERSION"
+    "Usage:\n  evidence_action_benchmark audit DATASET.jsonl\n  evidence_action_benchmark evaluate DATASET.jsonl RECEIPTS.jsonl POLICY_VERSION MIN_ORIGINS ALLOW_SCOPED\n  evidence_action_benchmark score DATASET.jsonl RECEIPTS.jsonl POLICY_VERSION\n  evidence_action_benchmark trajectory-audit TRAJECTORIES.jsonl\n  evidence_action_benchmark trajectory-evaluate TRAJECTORIES.jsonl RECEIPTS.jsonl POLICY_VERSION MIN_ORIGINS ALLOW_SCOPED\n  evidence_action_benchmark trajectory-score TRAJECTORIES.jsonl RECEIPTS.jsonl POLICY_VERSION MIN_ORIGINS ALLOW_SCOPED"
 }
