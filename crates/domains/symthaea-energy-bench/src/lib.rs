@@ -1131,6 +1131,26 @@ mod tests {
     }
 
     #[test]
+    fn missing_bias_bound_basis_is_rejected() {
+        let (mut candidate, _) = comparison_runs();
+        candidate.evaluation_policy.differential_bias_bound_basis.clear();
+        let error = validate_run(&candidate).unwrap_err();
+        assert!(
+            error.issues.iter().any(|issue| issue.contains("differential-bias-bound basis"))
+        );
+    }
+
+    #[test]
+    fn candidate_and_baseline_bias_bounds_must_match() {
+        let (candidate, mut baseline) = comparison_runs();
+        baseline
+            .evaluation_policy
+            .maximum_unmodeled_differential_bias_efficiency = 0.01;
+        let error = compare_candidates(&candidate, &baseline).unwrap_err();
+        assert!(error.issues.iter().any(|issue| issue.contains("evaluation policies differ")));
+    }
+
+    #[test]
     fn candidate_and_baseline_bias_bound_bases_must_match() {
         let (candidate, mut baseline) = comparison_runs();
         baseline
