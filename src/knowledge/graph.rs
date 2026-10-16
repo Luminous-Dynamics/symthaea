@@ -2876,6 +2876,189 @@ mod tests {
     }
 
     #[test]
+    fn test_five_level_evidence_sufficiency_contract() {
+        // Five evidence sufficiency conditions, adapted from the L1-L5 taxonomy
+        // in Zhang & Wu (2026): full support, partial support, irrelevant
+        // evidence, no context, and conflicting evidence. This deterministic
+        // fixture is a regression contract, not a production accuracy estimate.
+        let mut encoder = KnowledgeEncoder::with_seed(20261016);
+        let query = encoder.encode_role_terms(&[
+            (SemanticRole::Agent, "Service A", EntityType::Organization),
+            (SemanticRole::Patient, "Service B", EntityType::Organization),
+        ]);
+        let constraints = [RelationObservationQuery {
+            subject: "Service A".into(),
+            predicate: "prevents".into(),
+            object: "Service B".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated: false,
+        }];
+        let relation = |is_negated: bool| ExtractedRelation {
+            subject: "Service A".into(),
+            predicate: "prevents".into(),
+            object: "Service B".into(),
+            subject_role: SemanticRole::Agent,
+            object_role: SemanticRole::Patient,
+            is_causal: true,
+            is_negated,
+            confidence: 0.9,
+        };
+        let encoding_with = |source: &str,
+                             observations: Vec<RoleBoundVector>,
+                             relations: Vec<ExtractedRelation>| {
+            let mut encoding = make_encoding(source, 0.8);
+            encoding.role_vector_observations = observations;
+            encoding.relations = relations;
+            encoding
+        };
+        let run = |graph: &mut EnhancedKnowledgeGraph| {
+            graph.search_role_observations_with_relation_constraints(
+                &query,
+                &constraints,
+                10,
+                10,
+                RoleObservationSearchConfig::new(0.99).unwrap(),
+            )
+        };
+
+        // L1: complete roles and relation evidence, without a contradiction.
+        let mut full_support = EnhancedKnowledgeGraph::new(8);
+        full_support.insert(
+            encoding_with("L1 full support", query.clone(), vec![relation(false)]),
+            1,
+            None,
+            false,
+        );
+        let l1 = run(&mut full_support);
+        assert_eq!(
+            l1.decision,
+            RelationConstrainedQueryDecision::EligibleCandidatesAvailable
+        );
+        assert_eq!(l1.candidates[0].retrieval.coverage, 1.0);
+        assert!(l1.candidates[0].constraints_satisfied);
+
+        // L2: the relation is present, but only one of two query roles is
+        // observed. The strict default policy must not silently fill the gap.
+        let mut partial_support = EnhancedKnowledgeGraph::new(8);
+        partial_support.insert(
+            encoding_with("L2 partial support", vec![query[0].clone()], vec![relation(false)]),
+            1,
+            None,
+            false,
+        );
+        let l2 = run(&mut partial_support);
+        assert_eq!(
+            l2.decision,
+            RelationConstrainedQueryDecision::AbstainNoCandidateMeetsPolicy
+        );
+        assert_eq!(l2.candidates[0].retrieval.coverage, 0.5);
+        assert_eq!(l2.candidates[0].decision, RelationConstraintDecision::Abstain);
+
+        // L3: there is data, but it is irrelevant to the requested entities
+        // and relation.
+        let mut irrelevant = EnhancedKnowledgeGraph::new(8);
+        let noise = encoder.encode_role_terms(&[(
+            SemanticRole::Agent,
+            "Unrelated system",
+            EntityType::Organization,
+        )]);
+        irrelevant.insert(
+            encoding_with(
+                "L3 unrelated evidence",
+                noise,
+                vec![ExtractedRelation {
+                    subject: "Unrelated system".into(),
+                    predicate: "mentions".into(),
+                    object: "Different topic".into(),
+                    subject_role: SemanticRole::Agent,
+                    object_role: SemanticRole::Patient,
+                    is_causal: false,
+                    is_negated: false,
+                    confidence: 0.9,
+                }],
+            ),
+            1,
+            None,
+            false,
+        );
+        let l3 = run(&mut irrelevant);
+        assert_eq!(
+            l3.decision,
+            RelationConstrainedQueryDecision::AbstainNoCandidates
+        );
+        assert!(l3.candidates.is_empty());
+
+        // L4: no stored context at all.
+        let mut no_context = EnhancedKnowledgeGraph::new(8);
+        let l4 = run(&mut no_context);
+        assert_eq!(
+            l4.decision,
+            RelationConstrainedQueryDecision::AbstainNoCandidates
+        );
+        assert!(l4.candidates.is_empty());
+
+        // L5: positive evidence exists, but a directed, structurally identical
+        // negated observation also exists. Query-level conflict must dominate.
+        let mut conflict = EnhancedKnowledgeGraph::new(8);
+        conflict.insert(
+            encoding_with("L5 positive side", query.clone(), vec![relation(false)]),
+            1,
+            None,
+            false,
+        );
+        conflict.insert(
+            encoding_with("L5 opposing side", query.clone(), vec![relation(true)]),
+            2,
+            None,
+            false,
+        );
+        let l5 = run(&mut conflict);
+        assert_eq!(
+            l5.decision,
+            RelationConstrainedQueryDecision::AbstainConflictingEvidence
+        );
+        assert_eq!(l5.conflicting_evidence.len(), 1);
+        assert_eq!(l5.conflicting_evidence[0].source_text, "L5 opposing side");
+
+        // Minimal selective metrics for this fixed five-row fixture. These
+        // assertions catch regressions that accept an explicitly unsafe level;
+        // they are not population estimates or held-out benchmark results.
+        let outcomes = [
+            ("L1", l1.decision, true),
+            ("L2", l2.decision, false),
+            ("L3", l3.decision, false),
+            ("L4", l4.decision, false),
+            ("L5", l5.decision, false),
+        ];
+        let eligible_count = outcomes
+            .iter()
+            .filter(|(_, decision, _)| {
+                *decision == RelationConstrainedQueryDecision::EligibleCandidatesAvailable
+            })
+            .count();
+        let false_eligible_count = outcomes
+            .iter()
+            .filter(|(_, decision, should_be_eligible)| {
+                *should_be_eligible
+                    != (*decision == RelationConstrainedQueryDecision::EligibleCandidatesAvailable)
+            })
+            .count();
+        let selective_risk = if eligible_count == 0 {
+            0.0
+        } else {
+            false_eligible_count as f32 / eligible_count as f32
+        };
+        let selective_coverage = eligible_count as f32 / outcomes.len() as f32;
+
+        assert_eq!(eligible_count, 1);
+        assert_eq!(false_eligible_count, 0);
+        assert_eq!(selective_risk, 0.0);
+        assert!((selective_coverage - 0.2).abs() < f32::EPSILON);
+    }
+
+    #[test]
     fn test_confidence_decay() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
