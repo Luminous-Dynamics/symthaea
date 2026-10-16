@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/evidence-trajectory-v1.schema.json",
+  "title": "Symthaea Evidence Trajectory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trajectory", "trajectory_sha256"],
+  "properties": {
+    "trajectory_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+    "trajectory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "trajectory_id", "claim_family_id", "origin_family_ids", "split", "adjudication_note", "steps"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "trajectory_id": {"type": "string", "minLength": 1},
+        "claim_family_id": {"type": "string", "minLength": 1},
+        "origin_family_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "split": {"enum": ["train", "development", "test"]},
+        "adjudication_note": {"type": "string", "minLength": 1},
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sequence", "event", "input", "expected_action"],
+            "properties": {
+              "sequence": {"type": "integer", "minimum": 0},
+              "event": {"enum": ["initial", "evidence_revoked", "conflict_arrived", "acquisition_failed", "budget_exhausted", "evidence_arrived", "conflict_resolved", "evidence_revalidated", "question_clarified"]},
+              "expected_action": {"enum": ["answer", "answer_with_scope_limit", "ask_clarification", "acquire_more_evidence", "abstain"]},
+              "input": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["evidence", "provenance", "question", "independent_origins", "scoped_answer_available", "acquisition_budget_available"],
+                "properties": {
+                  "evidence": {"enum": ["full_support", "partial_support", "irrelevant", "missing", "conflicting"]},
+                  "provenance": {"enum": ["verified", "incomplete", "invalid"]},
+                  "question": {"enum": ["clear", "ambiguous"]},
+                  "independent_origins": {"type": ["integer", "null"], "minimum": 0},
+                  "scoped_answer_available": {"type": "boolean"},
+                  "acquisition_budget_available": {"type": "boolean"}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
