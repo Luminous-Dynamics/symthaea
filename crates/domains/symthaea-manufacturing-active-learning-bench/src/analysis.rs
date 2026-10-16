@@ -29,8 +29,8 @@ pub struct PolicyAggregate {
     /// Found => observed cost; NotFound => preregistered budget horizon.
     pub restricted_mean_cost_to_discovery_units: f64,
     /// Normal-approximation interval for the restricted mean across independent paired seeds.
-    pub restricted_mean_cost_ci95_lower: f64,
-    pub restricted_mean_cost_ci95_upper: f64,
+    pub restricted_mean_cost_ci95_lower: Option<f64>,
+    pub restricted_mean_cost_ci95_upper: Option<f64>,
     /// Best utility averaged over all trials; a no-discovery trial contributes zero.
     pub mean_conforming_utility_per_trial: f64,
     /// Mean best utility conditional on having discovered a conforming result.
@@ -53,13 +53,13 @@ pub struct PairedPolicyComparison {
     pub paired_seeds: u32,
     /// Candidate minus baseline; negative means the candidate used less budget before discovery.
     pub mean_paired_delta_restricted_cost_units: f64,
-    pub paired_delta_cost_ci95_lower: f64,
-    pub paired_delta_cost_ci95_upper: f64,
+    pub paired_delta_cost_ci95_lower: Option<f64>,
+    pub paired_delta_cost_ci95_upper: Option<f64>,
     /// Candidate minus baseline utility per trial; positive favors candidate.
     pub mean_paired_delta_utility_per_trial: f64,
-    pub paired_delta_utility_ci95_lower: f64,
-    pub paired_delta_utility_ci95_upper: f64,
-    pub interval_excludes_zero_for_cost: bool,
+    pub paired_delta_utility_ci95_lower: Option<f64>,
+    pub paired_delta_utility_ci95_upper: Option<f64>,
+    pub interval_excludes_zero_for_cost: Option<bool>,
     pub acceleration_factor: Option<f64>,
     pub enhancement_factor: Option<f64>,
 }
@@ -218,7 +218,12 @@ pub fn summarize_paired_campaigns(
                 .collect();
             let resources: Vec<f64> = trials.iter().map(|trial| trial.resource_units).collect();
             let full_rank_count = trials.iter().filter(|trial| trial.full_rank).count() as f64;
-            let (cost_low, cost_high) = mean_interval(&costs);
+            let max_budget = trials
+                .iter()
+                .map(|trial| f64::from(trial.budget))
+                .fold(0.0, f64::max);
+            let restricted_cost_interval = mean_interval(&costs)
+                .map(|(lower, upper)| (lower.max(0.0), upper.min(max_budget)));
             let mean_cost = mean(&costs);
             let mean_utility = mean(&utilities_all);
             policy_aggregates.push(PolicyAggregate {
@@ -233,10 +238,8 @@ pub fn summarize_paired_campaigns(
                     Some(mean(&found_costs))
                 },
                 restricted_mean_cost_to_discovery_units: mean_cost,
-                restricted_mean_cost_ci95_lower: cost_low.max(0.0),
-                restricted_mean_cost_ci95_upper: cost_high.min(
-                    trials.iter().map(|trial| f64::from(trial.budget)).fold(0.0, f64::max),
-                ),
+                restricted_mean_cost_ci95_lower: restricted_cost_interval.map(|interval| interval.0),
+                restricted_mean_cost_ci95_upper: restricted_cost_interval.map(|interval| interval.1),
                 mean_conforming_utility_per_trial: mean_utility,
                 mean_best_utility_when_found: if utilities_found.is_empty() {
                     None
@@ -280,9 +283,9 @@ pub fn summarize_paired_campaigns(
                 })
                 .collect();
             let mean_cost_delta = mean(&cost_deltas);
-            let (cost_delta_low, cost_delta_high) = mean_interval(&cost_deltas);
+            let cost_delta_interval = mean_interval(&cost_deltas);
             let mean_utility_delta = mean(&utility_deltas);
-            let (utility_delta_low, utility_delta_high) = mean_interval(&utility_deltas);
+            let utility_delta_interval = mean_interval(&utility_deltas);
             let baseline_mean_cost = mean(
                 &baseline_trials
                     .values()
@@ -314,12 +317,13 @@ pub fn summarize_paired_campaigns(
                 candidate_policy: policy,
                 paired_seeds: seeds.len() as u32,
                 mean_paired_delta_restricted_cost_units: mean_cost_delta,
-                paired_delta_cost_ci95_lower: cost_delta_low,
-                paired_delta_cost_ci95_upper: cost_delta_high,
+                paired_delta_cost_ci95_lower: cost_delta_interval.map(|interval| interval.0),
+                paired_delta_cost_ci95_upper: cost_delta_interval.map(|interval| interval.1),
                 mean_paired_delta_utility_per_trial: mean_utility_delta,
-                paired_delta_utility_ci95_lower: utility_delta_low,
-                paired_delta_utility_ci95_upper: utility_delta_high,
-                interval_excludes_zero_for_cost: cost_delta_low > 0.0 || cost_delta_high < 0.0,
+                paired_delta_utility_ci95_lower: utility_delta_interval.map(|interval| interval.0),
+                paired_delta_utility_ci95_upper: utility_delta_interval.map(|interval| interval.1),
+                interval_excludes_zero_for_cost: cost_delta_interval
+                    .map(|(lower, upper)| lower > 0.0 || upper < 0.0),
                 acceleration_factor: if candidate_mean_cost > 0.0 {
                     Some(baseline_mean_cost / candidate_mean_cost)
                 } else {
@@ -357,10 +361,9 @@ fn mean(values: &[f64]) -> f64 {
     values.iter().sum::<f64>() / values.len() as f64
 }
 
-fn mean_interval(values: &[f64]) -> (f64, f64) {
+fn mean_interval(values: &[f64]) -> Option<(f64, f64)> {
     if values.len() < 2 {
-        let center = values.first().copied().unwrap_or(0.0);
-        return (center, center);
+        return None;
     }
     let center = mean(values);
     let sample_variance = values
@@ -370,7 +373,7 @@ fn mean_interval(values: &[f64]) -> (f64, f64) {
         / (values.len() - 1) as f64;
     let standard_error = (sample_variance / values.len() as f64).sqrt();
     let half_width = NORMAL_95_Z * standard_error;
-    (center - half_width, center + half_width)
+    Some((center - half_width, center + half_width))
 }
 
 #[cfg(test)]
@@ -461,8 +464,35 @@ mod tests {
         assert_eq!(comparison.paired_seeds, 2);
         // Deltas are 4-8 = -4 and 6-10 = -4.
         assert_eq!(comparison.mean_paired_delta_restricted_cost_units, -4.0);
-        assert!(comparison.paired_delta_cost_ci95_lower == -4.0);
-        assert!(comparison.paired_delta_cost_ci95_upper == -4.0);
+        assert_eq!(comparison.paired_delta_cost_ci95_lower, Some(-4.0));
+        assert_eq!(comparison.paired_delta_cost_ci95_upper, Some(-4.0));
+    }
+
+    #[test]
+    fn one_seed_does_not_emit_a_degenerate_confidence_interval() {
+        let samples = complete_pair_set(
+            ScenarioFamily::SmoothResponse,
+            0,
+            (Some(5), Some(1000), 5),
+            (Some(4), Some(1100), 4),
+        );
+        let summary = summarize_paired_campaigns(&samples).unwrap();
+        let fixed = summary
+            .policy_aggregates
+            .iter()
+            .find(|row| row.policy == Policy::FixedSpaceFilling)
+            .unwrap();
+        assert_eq!(fixed.restricted_mean_cost_ci95_lower, None);
+        assert_eq!(fixed.restricted_mean_cost_ci95_upper, None);
+
+        let paired = summary
+            .paired_comparisons_vs_fixed_design
+            .iter()
+            .find(|row| row.candidate_policy == Policy::DecisionAware)
+            .unwrap();
+        assert_eq!(paired.paired_delta_cost_ci95_lower, None);
+        assert_eq!(paired.paired_delta_cost_ci95_upper, None);
+        assert_eq!(paired.interval_excludes_zero_for_cost, None);
     }
 
     #[test]
