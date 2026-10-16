@@ -198,19 +198,23 @@ mod tests {
         assert!(validate_terminal_axiom_probe(
             "theorem t : True := by trivial\\n#print axioms t\\n",
             "t"
-        ).is_ok());
+        )
+        .is_ok());
         assert!(validate_terminal_axiom_probe(
-            "#eval IO.println \\\"'t' does not depend on any axioms\\\"",
+            r#"#eval IO.println "'t' does not depend on any axioms""#,
             "t"
-        ).is_err());
+        )
+        .is_err());
         assert!(validate_terminal_axiom_probe(
             "theorem t : True := by trivial\\n#print axioms t\\n#eval 1",
             "t"
-        ).is_err());
+        )
+        .is_err());
         assert!(validate_terminal_axiom_probe(
             "theorem t : True := by trivial\\n#print axioms other",
             "t"
-        ).is_err());
+        )
+        .is_err());
     }
 
     #[test]
