@@ -511,6 +511,13 @@ mod tests {
         left.rights.intended_use = BioacousticIntendedUse::CommercialResearch;
         let changed_rights_scope_hash = left.computed_manifest_blake3().unwrap();
         assert_ne!(left_hash, changed_rights_scope_hash);
+
+        let mut offset_changed = manifest();
+        offset_changed.recordings[0].source_start_s = Some(12.5);
+        assert_ne!(
+            manifest().computed_manifest_blake3().unwrap(),
+            offset_changed.computed_manifest_blake3().unwrap()
+        );
     }
 
     #[test]
@@ -605,6 +612,18 @@ mod tests {
         let mut corpus = manifest();
         corpus.recordings[0].annotations[0].label = " ".into();
         assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_source_recording_offsets() {
+        for offset in [-0.1, f64::NAN, f64::INFINITY, f64::MAX] {
+            let mut corpus = manifest();
+            corpus.recordings[0].source_start_s = Some(offset);
+            assert!(
+                validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err(),
+                "invalid source offset must be rejected: {offset}"
+            );
+        }
     }
 
     #[test]
