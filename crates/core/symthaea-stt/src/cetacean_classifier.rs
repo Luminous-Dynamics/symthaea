@@ -144,7 +144,10 @@ impl CetaceanConfig {
         }
         if source_rate_hz > self.sample_rate {
             return Err(format!(
-                "refusing non-antialiased downsampling from {source_rate_hz} Hz to {} Hz; configure analysis at the native rate or prefilter with a verified anti-aliasing resampler",
+                concat!(
+                    "refusing non-antialiased downsampling from {source_rate_hz} Hz to {} Hz; ",
+                    "configure analysis at the native rate or prefilter with a verified anti-aliasing resampler"
+                ),
                 self.sample_rate
             ));
         }
@@ -633,6 +636,7 @@ mod tests {
     fn try_classify_audio_rejects_non_finite_or_empty_input() {
         let mut classifier = CetaceanClassifier::try_new(CetaceanConfig::default()).unwrap();
         assert!(classifier.try_classify_audio(&[], 44100).is_err());
+        assert!(classifier.try_classify_audio(&[0.0; 1000], 44100).is_ok());
         assert!(
             classifier
                 .try_classify_audio(&[0.0, f32::NAN, 0.0], 44100)
