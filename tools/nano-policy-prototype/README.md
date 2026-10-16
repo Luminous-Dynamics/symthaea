@@ -53,6 +53,19 @@ cargo run --locked -- < examples/request.json
 
 The current runtime did not have Cargo/rustc/rustfmt available, so the lockfile has not yet been generated and no compilation or tests have run. Do not claim a build/test pass until the lockfile is committed and the exact commands succeed. This prototype was authored without cargo/rustc available in the current runtime, so do not claim it compiles or that its tests have passed until the exact revision is built and the test output is captured.
 
+## Closed-loop hand-off
+
+This crate is one selector stage, not a complete active-learning system. A valid outer loop is:
+
+1. Freeze the candidate pool, feature transform, and permitted pre-query model outputs.
+2. Run the selector and record its JSON request/response plus exact pool/policy identities.
+3. Invoke the domain-native forward evaluator (for the photonic-splitter task, MEEP under the frozen recipe) only for selected IDs; record every proposal, rejection, actual solver invocation, solver failure, finite result, cost and elapsed time in an independent ledger.
+4. Reveal each returned measurement only to the authorized training/update component. That component may update its predictor/uncertainty model using *only already revealed labels*.
+5. For the next round, issue a fresh request with the new estimator digests, candidate-pool digest and updated pre-query predictions. Keep the held-out test labels and test membership inaccessible.
+6. Recompute the candidate-pool and estimator digests; never reuse a prior request identity for changed inputs.
+
+The selector schema intentionally has no raw oracle-label field. The predictor can learn between rounds upstream, but every selector request is bound to the particular pre-query estimates and code revision it used. This separation makes it easier to detect leakage and attribute policy effects.
+
 ## Benchmark design
 
 1. Freeze candidate pool, feature transform/model/checkpoint, split groups, target and constraints.
