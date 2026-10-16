@@ -257,6 +257,143 @@ pub struct EvidenceActionDecision {
     pub reason: EvidenceActionReason,
 }
 
+
+/// Lifecycle event supplied by the evidence owner as the claim's evidence changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceLifecycleEvent {
+    Observe,
+    EvidenceRevoked,
+    ConflictArrived,
+    AcquisitionFailed,
+    BudgetExhausted,
+    BudgetRestored,
+    EvidenceArrived,
+    ConflictResolved,
+    EvidenceRevalidated,
+    QuestionClarified,
+}
+
+/// Stateful action selection for one claim episode.
+///
+/// Hard blockers persist across subsequent observations. A provenance
+/// invalidation clears only on an explicit revalidation event; unresolved
+/// conflict clears only on conflict resolution; an exhausted acquisition
+/// budget clears only on explicit budget restoration. Each independent claim
+/// episode must use its own session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EvidenceActionSession {
+    policy: EvidenceActionPolicy,
+    revocation_blocked: bool,
+    conflict_blocked: bool,
+    budget_blocked: bool,
+}
+
+impl EvidenceActionSession {
+    pub fn new(policy: EvidenceActionPolicy) -> Self {
+        Self {
+            policy,
+            revocation_blocked: false,
+            conflict_blocked: false,
+            budget_blocked: false,
+        }
+    }
+
+    /// Update the lifecycle and select the next action.
+    ///
+    /// Invalid event/state combinations return an error without changing the
+    /// session. A blocked lifecycle state is folded into a conservative copy of
+    /// the current input before the stateless policy is called.
+    pub fn decide(
+        &mut self,
+        event: EvidenceLifecycleEvent,
+        input: EvidenceActionInput,
+    ) -> Result<EvidenceActionDecision, &'static str> {
+        match event {
+            EvidenceLifecycleEvent::EvidenceRevoked
+                if input.provenance != ProvenanceCondition::Invalid =>
+            {
+                return Err("evidence_revoked requires invalid provenance");
+            }
+            EvidenceLifecycleEvent::ConflictArrived
+                if input.evidence != EvidenceCondition::Conflicting =>
+            {
+                return Err("conflict_arrived requires conflicting evidence");
+            }
+            EvidenceLifecycleEvent::BudgetExhausted if input.acquisition_budget_available => {
+                return Err("budget_exhausted requires unavailable acquisition budget");
+            }
+            EvidenceLifecycleEvent::BudgetRestored if !input.acquisition_budget_available => {
+                return Err("budget_restored requires available acquisition budget");
+            }
+            EvidenceLifecycleEvent::BudgetRestored if !self.budget_blocked => {
+                return Err("budget_restored requires prior budget exhaustion");
+            }
+            EvidenceLifecycleEvent::EvidenceRevalidated
+                if input.provenance != ProvenanceCondition::Verified =>
+            {
+                return Err("evidence_revalidated requires verified provenance");
+            }
+            EvidenceLifecycleEvent::EvidenceRevalidated if !self.revocation_blocked => {
+                return Err("evidence_revalidated requires a prior invalidation");
+            }
+            EvidenceLifecycleEvent::ConflictResolved
+                if input.evidence == EvidenceCondition::Conflicting
+                    || input.provenance != ProvenanceCondition::Verified =>
+            {
+                return Err("conflict_resolved requires verified non-conflicting evidence");
+            }
+            EvidenceLifecycleEvent::ConflictResolved if !self.conflict_blocked => {
+                return Err("conflict_resolved requires a prior conflict");
+            }
+            EvidenceLifecycleEvent::QuestionClarified
+                if input.question != QuestionCondition::Clear =>
+            {
+                return Err("question_clarified requires a clear question");
+            }
+            _ => {}
+        }
+
+        if event == EvidenceLifecycleEvent::EvidenceRevoked
+            || input.provenance == ProvenanceCondition::Invalid
+        {
+            self.revocation_blocked = true;
+        }
+        if event == EvidenceLifecycleEvent::ConflictArrived
+            || input.evidence == EvidenceCondition::Conflicting
+        {
+            self.conflict_blocked = true;
+        }
+        if event == EvidenceLifecycleEvent::BudgetExhausted
+            || !input.acquisition_budget_available
+        {
+            self.budget_blocked = true;
+        }
+
+        if event == EvidenceLifecycleEvent::EvidenceRevalidated {
+            self.revocation_blocked = false;
+        }
+        if event == EvidenceLifecycleEvent::ConflictResolved {
+            self.conflict_blocked = false;
+        }
+        if event == EvidenceLifecycleEvent::BudgetRestored {
+            self.budget_blocked = false;
+        }
+
+        let mut effective_input = input;
+        if self.revocation_blocked {
+            effective_input.provenance = ProvenanceCondition::Invalid;
+        }
+        if self.conflict_blocked {
+            effective_input.evidence = EvidenceCondition::Conflicting;
+        }
+        if self.budget_blocked {
+            effective_input.acquisition_budget_available = false;
+        }
+
+        Ok(self.policy.decide(effective_input))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -432,6 +569,124 @@ mod tests {
         assert!(!EvidenceAction::AcquireMoreEvidence.permits_answer());
         assert!(!EvidenceAction::Abstain.permits_answer());
     }
+
+    #[test]
+    fn action_session_keeps_revocation_blocked_until_explicit_revalidation() {
+        let mut session = EvidenceActionSession::new(policy());
+        let clean = input(EvidenceCondition::FullSupport);
+        assert_eq!(
+            session.decide(EvidenceLifecycleEvent::Observe, clean).unwrap().action,
+            EvidenceAction::Answer
+        );
+
+        let mut revoked = clean;
+        revoked.provenance = ProvenanceCondition::Invalid;
+        assert_eq!(
+            session
+                .decide(EvidenceLifecycleEvent::EvidenceRevoked, revoked)
+                .unwrap()
+                .action,
+            EvidenceAction::AcquireMoreEvidence
+        );
+        assert_eq!(
+            session.decide(EvidenceLifecycleEvent::Observe, clean).unwrap().reason,
+            EvidenceActionReason::ProvenanceInvalid
+        );
+        assert_eq!(
+            session
+                .decide(EvidenceLifecycleEvent::EvidenceRevalidated, clean)
+                .unwrap()
+                .action,
+            EvidenceAction::Answer
+        );
+    }
+
+    #[test]
+    fn action_session_keeps_conflict_blocked_until_explicit_resolution() {
+        let mut session = EvidenceActionSession::new(policy());
+        let clean = input(EvidenceCondition::FullSupport);
+        assert_eq!(
+            session.decide(EvidenceLifecycleEvent::Observe, clean).unwrap().action,
+            EvidenceAction::Answer
+        );
+
+        let conflicting = input(EvidenceCondition::Conflicting);
+        assert_eq!(
+            session
+                .decide(EvidenceLifecycleEvent::ConflictArrived, conflicting)
+                .unwrap()
+                .action,
+            EvidenceAction::AcquireMoreEvidence
+        );
+        assert_eq!(
+            session.decide(EvidenceLifecycleEvent::Observe, clean).unwrap().reason,
+            EvidenceActionReason::ConflictingEvidence
+        );
+        assert_eq!(
+            session
+                .decide(EvidenceLifecycleEvent::ConflictResolved, clean)
+                .unwrap()
+                .action,
+            EvidenceAction::Answer
+        );
+    }
+
+    #[test]
+    fn action_session_latches_budget_until_explicit_restoration() {
+        let mut session = EvidenceActionSession::new(policy());
+        let missing = input(EvidenceCondition::Missing);
+        assert_eq!(
+            session.decide(EvidenceLifecycleEvent::Observe, missing).unwrap().action,
+            EvidenceAction::AcquireMoreEvidence
+        );
+
+        let mut exhausted = missing;
+        exhausted.acquisition_budget_available = false;
+        assert_eq!(
+            session
+                .decide(EvidenceLifecycleEvent::BudgetExhausted, exhausted)
+                .unwrap()
+                .action,
+            EvidenceAction::Abstain
+        );
+
+        let mut apparently_restored = missing;
+        apparently_restored.acquisition_budget_available = true;
+        assert_eq!(
+            session
+                .decide(EvidenceLifecycleEvent::Observe, apparently_restored)
+                .unwrap()
+                .action,
+            EvidenceAction::Abstain
+        );
+        assert_eq!(
+            session
+                .decide(EvidenceLifecycleEvent::BudgetRestored, apparently_restored)
+                .unwrap()
+                .action,
+            EvidenceAction::AcquireMoreEvidence
+        );
+    }
+
+    #[test]
+    fn action_session_rejects_invalid_lifecycle_events_without_clearing_state() {
+        let mut session = EvidenceActionSession::new(policy());
+        let clean = input(EvidenceCondition::FullSupport);
+        let mut revoked = clean;
+        revoked.provenance = ProvenanceCondition::Invalid;
+        session
+            .decide(EvidenceLifecycleEvent::EvidenceRevoked, revoked)
+            .unwrap();
+
+        assert!(session
+            .decide(EvidenceLifecycleEvent::EvidenceRevalidated, revoked)
+            .is_err());
+        assert_eq!(
+            session.decide(EvidenceLifecycleEvent::Observe, clean).unwrap().reason,
+            EvidenceActionReason::ProvenanceInvalid
+        );
+    }
+
     #[test]
     fn exhaustive_policy_state_space_preserves_safety_invariants() {
         let p = EvidenceActionPolicy::new(2, true).unwrap();
