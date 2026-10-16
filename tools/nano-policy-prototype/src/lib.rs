@@ -18,6 +18,8 @@ pub enum Policy {
     GoalOnly,
     UncertaintyOnly,
     DiversityOnly,
+    /// Alternate between low and high pre-query predicted error to improve response-space coverage.
+    BalancedExtremes,
     Hybrid,
 }
 
@@ -232,6 +234,7 @@ fn validate_request(request: &Request) -> Result<Vec<usize>, String> {
     }
 
     let requires_goal = request.policy == Policy::GoalOnly
+        || request.policy == Policy::BalancedExtremes
         || (request.policy == Policy::Hybrid && request.weights.goal_fit > 0.0);
     let requires_uncertainty = request.policy == Policy::UncertaintyOnly
         || (request.policy == Policy::Hybrid && request.weights.uncertainty > 0.0);
@@ -415,6 +418,7 @@ fn policy_reason(policy: Policy) -> String {
         Policy::GoalOnly => "lowest pre-query predicted goal error; not an observed oracle result".to_string(),
         Policy::UncertaintyOnly => "highest pre-query uncertainty estimate; not a calibrated probability unless separately validated".to_string(),
         Policy::DiversityOnly => "greedy maximin distance in the declared normalized feature space".to_string(),
+        Policy::BalancedExtremes => "alternates between low- and high-predicted-error regions for model coverage; not a best-candidate-only objective".to_string(),
         Policy::Hybrid => "weighted pre-query goal fit, uncertainty, cost efficiency and maximin diversity".to_string(),
     }
 }
@@ -479,6 +483,13 @@ pub fn select(request: &Request) -> Result<Response, String> {
                     Policy::GoalOnly => goal_score[*index],
                     Policy::UncertaintyOnly => uncertainty_score[*index],
                     Policy::DiversityOnly => diversity,
+                    Policy::BalancedExtremes => {
+                        if rank % 2 == 1 {
+                            goal_score[*index]
+                        } else {
+                            1.0 - goal_score[*index]
+                        }
+                    }
                     Policy::Hybrid => {
                         request.weights.goal_fit * goal_score[*index]
                             + request.weights.uncertainty * uncertainty_score[*index]
@@ -727,6 +738,15 @@ mod tests {
         let mut input = request(Policy::DiversityOnly);
         input.feature_space.transform_sha256 = "G".repeat(64);
         assert!(select(&input).unwrap_err().contains("feature_space.transform_sha256"));
+    }
+
+    #[test]
+    fn balanced_extremes_samples_both_low_and_high_predicted_error() {
+        let input = request(Policy::BalancedExtremes);
+        let output = select(&input).expect("valid request");
+        assert_eq!(output.selected[0].candidate_id, "a");
+        assert_eq!(output.selected[1].candidate_id, "c");
+        assert!(output.selected.iter().all(|item| item.score.is_finite()));
     }
 
     #[test]
