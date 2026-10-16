@@ -416,6 +416,11 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_scenarios::living_city::{CityFloors, CityMetrics};
+    use symthaea_scenarios::living_city_assessment_package::{
+        CITY_ASSESSMENT_PACKAGE_EVIDENCE_ID, CITY_METRICS_PAYLOAD_EVIDENCE_ID,
+        CityAssessmentPackage, MetricEvidenceBinding, REQUIRED_CITY_METRIC_IDS,
+    };
     use symthaea_scenarios::living_city_benchmarks::Hazard;
     use symthaea_scenarios::living_city_dependencies::{DependencyMode, ServiceDomain};
     use symthaea_scenarios::living_city_hazard_profiles::{
@@ -434,13 +439,14 @@ mod tests {
     #[test]
     fn bundle_parser_rejects_unknown_fields() {
         let bundle = r#"{
-            "schema_version": 2,
+            "schema_version": 3,
             "manifest_path": "manifest.json",
             "receipt_path": "receipt.json",
             "receipt_sha256_path": "receipt.sha256",
             "hazard_profile_path": "hazard-profile.json",
             "profile_binding_path": "profile-binding.json",
             "service_graph_path": "service-graph.json",
+            "city_assessment_path": "city-assessment.json",
             "source_files": [],
             "output_files": [],
             "unexpected_authority": "trusted"
@@ -448,7 +454,7 @@ mod tests {
         assert!(serde_json::from_str::<VerificationBundle>(bundle).is_err());
     }
 
-    fn write_valid_test_package() -> PathBuf {
+    fn write_test_package(essential_access_share: f64) -> PathBuf {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
         let unique = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let root = env::temp_dir().join(format!(
@@ -461,47 +467,160 @@ mod tests {
 
         let heat_bytes = b"synthetic heat design basis";
         let outage_bytes = b"synthetic correlated outage basis";
-        let output_bytes = b"synthetic living-city metrics bytes";
+        let city_model_bytes = b"synthetic model evidence; not field validation";
+        let floor_ratification_bytes =
+            b"synthetic governance test record; not a real community authorization";
+        let output_bytes = b"synthetic living-city solver output bytes";
         fs::write(root.join("sources/heat.dat"), heat_bytes).unwrap();
         fs::write(root.join("sources/outage.dat"), outage_bytes).unwrap();
+        fs::write(root.join("sources/city-model-output.dat"), city_model_bytes).unwrap();
+        fs::write(
+            root.join("sources/floor-ratification.dat"),
+            floor_ratification_bytes,
+        )
+        .unwrap();
         fs::write(root.join("outputs/metrics.dat"), output_bytes).unwrap();
 
+        let metrics = CityMetrics {
+            essential_access_share,
+            housing_cost_burden_p90: 0.25,
+            critical_service_uptime: 0.9999,
+            water_service_reliability: 0.999,
+            heat_safe_access_share: 0.96,
+            lifecycle_emissions_kg_co2e_per_person_year: 5_000.0,
+            water_withdrawal_l_per_person_day: 120.0,
+            habitat_connectivity_index: 0.65,
+            involuntary_displacement_risk: 0.0,
+            lifecycle_cost_per_person_year: 12_000.0,
+        };
+        let metrics_payload_bytes = serde_json::to_vec(&metrics).unwrap();
+        fs::write(
+            root.join("sources/city-metrics.json"),
+            &metrics_payload_bytes,
+        )
+        .unwrap();
+
+        let city_assessment = CityAssessmentPackage {
+            schema_version: CITY_ASSESSMENT_PACKAGE_SCHEMA_VERSION,
+            scenario_id: "heat-plus-72h-grid-outage".into(),
+            study_area_id: "synthetic-area".into(),
+            jurisdiction: "test jurisdiction".into(),
+            metrics,
+            floors: CityFloors {
+                minimum_essential_access_share: 0.90,
+                maximum_housing_cost_burden_p90: 0.30,
+                minimum_critical_service_uptime: 0.999,
+                minimum_water_service_reliability: 0.995,
+                minimum_heat_safe_access_share: 0.95,
+                maximum_involuntary_displacement_risk: 0.01,
+            },
+            metrics_payload_evidence_item_id: CITY_METRICS_PAYLOAD_EVIDENCE_ID.into(),
+            metric_evidence: REQUIRED_CITY_METRIC_IDS
+                .iter()
+                .map(|metric_id| MetricEvidenceBinding {
+                    metric_id: (*metric_id).to_owned(),
+                    evidence_item_ids: vec!["city-model-output".into()],
+                    derivation_note: "synthetic test lineage; not a validated physical derivation".into(),
+                })
+                .collect(),
+            floor_ratification_ref: "synthetic-governance-decision-01".into(),
+            floor_ratification_evidence_item_id: "floor-ratification".into(),
+        };
+        let city_assessment_bytes = city_assessment.canonical_bytes().unwrap();
+        fs::write(root.join("city-assessment.json"), &city_assessment_bytes).unwrap();
+
+        let mut manifest_items = Vec::new();
+        manifest_items.push(EvidenceItem {
+            id: "heat-basis".into(),
+            kind: EvidenceKind::Assumed,
+            source_uri: "fixture://heat-basis".into(),
+            content_sha256: Some(sha256_hex(heat_bytes)),
+            license_or_basis: "synthetic test fixture assumption".into(),
+            units: "degree_Celsius".into(),
+            spatial_scope: "synthetic site".into(),
+            temporal_scope: "synthetic heat design event".into(),
+            acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+            transformation_chain: vec!["fixture-generator/1".into()],
+            uncertainty_note: "assumption only; not field evidence".into(),
+            missing_reason: None,
+        });
+        manifest_items.push(EvidenceItem {
+            id: "outage-basis".into(),
+            kind: EvidenceKind::Assumed,
+            source_uri: "fixture://outage-basis".into(),
+            content_sha256: Some(sha256_hex(outage_bytes)),
+            license_or_basis: "synthetic test fixture assumption".into(),
+            units: "hour".into(),
+            spatial_scope: "synthetic critical services".into(),
+            temporal_scope: "synthetic 72-hour outage".into(),
+            acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+            transformation_chain: vec!["fixture-generator/1".into()],
+            uncertainty_note: "assumption only; not field evidence".into(),
+            missing_reason: None,
+        });
+        manifest_items.push(EvidenceItem {
+            id: "city-model-output".into(),
+            kind: EvidenceKind::Simulated,
+            source_uri: "fixture://city-model-output".into(),
+            content_sha256: Some(sha256_hex(city_model_bytes)),
+            license_or_basis: "synthetic test fixture".into(),
+            units: "mixed; metric schemas declare units".into(),
+            spatial_scope: "synthetic study area".into(),
+            temporal_scope: "synthetic design scenario".into(),
+            acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+            transformation_chain: vec!["fixture-generator/1".into()],
+            uncertainty_note: "simulated fixture only; not real-city evidence".into(),
+            missing_reason: None,
+        });
+        manifest_items.push(EvidenceItem {
+            id: "floor-ratification".into(),
+            kind: EvidenceKind::GovernanceDecision,
+            source_uri: "fixture://floor-ratification".into(),
+            content_sha256: Some(sha256_hex(floor_ratification_bytes)),
+            license_or_basis: "synthetic test fixture only".into(),
+            units: "decision record".into(),
+            spatial_scope: "synthetic study area".into(),
+            temporal_scope: "synthetic approval event".into(),
+            acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+            transformation_chain: vec!["fixture-generator/1".into()],
+            uncertainty_note: "does not represent real community consent or lawful ratification".into(),
+            missing_reason: None,
+        });
+        manifest_items.push(EvidenceItem {
+            id: CITY_METRICS_PAYLOAD_EVIDENCE_ID.into(),
+            kind: EvidenceKind::Simulated,
+            source_uri: "fixture://city-metrics-payload".into(),
+            content_sha256: Some(sha256_hex(&metrics_payload_bytes)),
+            license_or_basis: "canonical synthetic metric payload".into(),
+            units: "units embedded in metric schema".into(),
+            spatial_scope: "synthetic study area".into(),
+            temporal_scope: "synthetic design scenario".into(),
+            acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+            transformation_chain: vec!["serde-json-canonical-metrics/1".into()],
+            uncertainty_note: "synthetic fixture values only".into(),
+            missing_reason: None,
+        });
+        manifest_items.push(EvidenceItem {
+            id: CITY_ASSESSMENT_PACKAGE_EVIDENCE_ID.into(),
+            kind: EvidenceKind::Derived,
+            source_uri: "fixture://city-assessment-package".into(),
+            content_sha256: Some(sha256_hex(&city_assessment_bytes)),
+            license_or_basis: "canonical synthetic assessment package".into(),
+            units: "typed city-assessment schema".into(),
+            spatial_scope: "synthetic study area".into(),
+            temporal_scope: "synthetic design scenario".into(),
+            acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+            transformation_chain: vec!["living-city-assessment-package/1".into()],
+            uncertainty_note: "synthetic fixture package; not a real city assessment".into(),
+            missing_reason: None,
+        });
         let manifest = EvidenceManifest {
             schema_version: EVIDENCE_SCHEMA_VERSION,
             project_id: "integration-test-project".into(),
             scenario_id: "heat-plus-72h-grid-outage".into(),
             study_boundary_id: "synthetic-boundary".into(),
             coordinate_reference_system: "synthetic-local-crs".into(),
-            items: vec![
-                EvidenceItem {
-                    id: "heat-basis".into(),
-                    kind: EvidenceKind::Assumed,
-                    source_uri: "fixture://heat-basis".into(),
-                    content_sha256: Some(sha256_hex(heat_bytes)),
-                    license_or_basis: "synthetic test fixture assumption".into(),
-                    units: "degree_Celsius".into(),
-                    spatial_scope: "synthetic site".into(),
-                    temporal_scope: "synthetic heat design event".into(),
-                    acquired_at_utc: "2026-01-01T00:00:00Z".into(),
-                    transformation_chain: vec!["fixture-generator/1".into()],
-                    uncertainty_note: "assumption only; not field evidence".into(),
-                    missing_reason: None,
-                },
-                EvidenceItem {
-                    id: "outage-basis".into(),
-                    kind: EvidenceKind::Assumed,
-                    source_uri: "fixture://outage-basis".into(),
-                    content_sha256: Some(sha256_hex(outage_bytes)),
-                    license_or_basis: "synthetic test fixture assumption".into(),
-                    units: "hour".into(),
-                    spatial_scope: "synthetic critical services".into(),
-                    temporal_scope: "synthetic 72-hour outage".into(),
-                    acquired_at_utc: "2026-01-01T00:00:00Z".into(),
-                    transformation_chain: vec!["fixture-generator/1".into()],
-                    uncertainty_note: "assumption only; not field evidence".into(),
-                    missing_reason: None,
-                },
-            ],
+            items: manifest_items,
         };
         let manifest_digest = evidence_manifest_sha256(&manifest).unwrap();
         fs::write(
@@ -587,13 +706,18 @@ mod tests {
             serde_json::to_vec_pretty(&service_graph).unwrap(),
         )
         .unwrap();
-        let configuration_sha256 =
-            scenario_configuration_sha256(&profile, &profile_binding, &service_graph).unwrap();
+        let configuration_sha256 = scenario_configuration_sha256(
+            &profile,
+            &profile_binding,
+            &service_graph,
+            &city_assessment,
+        )
+        .unwrap();
 
         let output_digest = sha256_hex(output_bytes);
         let receipt = ScenarioRunReceipt {
             schema_version: RECEIPT_SCHEMA_VERSION,
-            run_id: "integration-run-001".into(),
+            run_id: format!("integration-run-{essential_access_share:.2}"),
             scenario_id: "heat-plus-72h-grid-outage".into(),
             repository: "Luminous-Dynamics/symthaea".into(),
             commit_sha: "b".repeat(40),
@@ -641,9 +765,14 @@ mod tests {
             "hazard_profile_path": "hazard-profile.json",
             "profile_binding_path": "profile-binding.json",
             "service_graph_path": "service-graph.json",
+            "city_assessment_path": "city-assessment.json",
             "source_files": [
                 {"id": "heat-basis", "path": "sources/heat.dat"},
-                {"id": "outage-basis", "path": "sources/outage.dat"}
+                {"id": "outage-basis", "path": "sources/outage.dat"},
+                {"id": "city-model-output", "path": "sources/city-model-output.dat"},
+                {"id": "floor-ratification", "path": "sources/floor-ratification.dat"},
+                {"id": CITY_METRICS_PAYLOAD_EVIDENCE_ID, "path": "sources/city-metrics.json"},
+                {"id": CITY_ASSESSMENT_PACKAGE_EVIDENCE_ID, "path": "city-assessment.json"}
             ],
             "output_files": [
                 {"id": "metrics", "path": "outputs/metrics.dat"}
@@ -657,12 +786,16 @@ mod tests {
         root
     }
 
+    fn write_valid_test_package() -> PathBuf {
+        write_test_package(0.95)
+    }
+
     #[test]
     fn valid_run_package_verifies_end_to_end() {
         let root = write_valid_test_package();
         let report = verify_run_package(&root).unwrap();
         assert_eq!(report["package_integrity"], "verified");
-        assert_eq!(report["verified_source_count"], 2);
+        assert_eq!(report["verified_source_count"], 6);
         assert_eq!(report["verified_output_count"], 1);
         assert_eq!(report["hazard_profile_id"], "synthetic-compound-profile/r1");
         assert_eq!(report["domain_reference_suite"]["status"], "passed");
@@ -763,13 +896,14 @@ mod tests {
     #[test]
     fn bundle_parser_accepts_the_declared_schema() {
         let bundle = r#"{
-            "schema_version": 2,
+            "schema_version": 3,
             "manifest_path": "manifest.json",
             "receipt_path": "receipt.json",
             "receipt_sha256_path": "receipt.sha256",
             "hazard_profile_path": "hazard-profile.json",
             "profile_binding_path": "profile-binding.json",
             "service_graph_path": "service-graph.json",
+            "city_assessment_path": "city-assessment.json",
             "source_files": [{"id": "heat-basis", "path": "sources/heat.geojson"}],
             "output_files": [{"id": "metrics", "path": "outputs/metrics.json"}]
         }"#;
