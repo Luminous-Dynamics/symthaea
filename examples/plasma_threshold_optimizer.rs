@@ -271,6 +271,25 @@ fn has_valid_phi_inputs(sample: &symthaea::physics::cmod_adapter::CModSample) ->
         && sample.prad.is_finite()
 }
 
+/// For disrupted shots, observed time-to-disruption must agree with the shot-level event time.
+fn has_valid_event_timing(
+    shot: &CModShot,
+    sample: &symthaea::physics::cmod_adapter::CModSample,
+) -> bool {
+    if !shot.disrupted {
+        return true;
+    }
+    let (Some(disruption_time_ms), Some(time_to_disruption_ms)) = (
+        shot.disruption_time_ms.filter(|time| time.is_finite()),
+        sample.time_to_disruption_ms.filter(|time| time.is_finite()),
+    ) else {
+        return false;
+    };
+    let expected = disruption_time_ms - sample.time_ms;
+    let tolerance_ms = 1e-6 * expected.abs().max(1.0);
+    (time_to_disruption_ms - expected).abs() <= tolerance_ms
+}
+
 // =============================================================================
 // EVALUATION FUNCTION
 // =============================================================================
@@ -281,6 +300,8 @@ fn has_valid_phi_inputs(sample: &symthaea::physics::cmod_adapter::CModSample) ->
 pub enum ShotUnscoredReason {
     NoValidSampleInWarningWindow,
     NoValidSamples,
+    MissingDisruptionTime,
+    InvalidDisruptionTime,
     DuplicateShotId,
 }
 
@@ -293,7 +314,7 @@ pub struct ShotEvaluationRecord {
     pub warning_lead_time_ms: Option<f64>,
     pub sample_count: usize,
     pub valid_sample_count: usize,
-    /// Zero-based indices excluded from scoring due to invalid inputs, ordering, or shot identity.
+    /// Zero-based indices excluded due to invalid inputs, chronology, event-time validity, or identity.
     pub excluded_sample_indices: Vec<usize>,
     pub unscored_reason: Option<ShotUnscoredReason>,
 }
@@ -331,8 +352,37 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
             total_non_disruption_shots += 1;
         }
 
-        // Count raw samples even when the whole shot is rejected for duplicate identity.
+        // Count raw samples even when the whole shot is rejected for missing event timing/identity.
         total_samples += shot.samples.len();
+
+        if shot.disrupted && shot.disruption_time_ms.is_none() {
+            unscored_disruption_shots += 1;
+            shot_records.push(ShotEvaluationRecord {
+                shot_id: shot.shot_id,
+                actual_disruption: true,
+                predicted_disruption: None,
+                warning_lead_time_ms: None,
+                sample_count: shot.samples.len(),
+                valid_sample_count: 0,
+                excluded_sample_indices: (0..shot.samples.len()).collect(),
+                unscored_reason: Some(ShotUnscoredReason::MissingDisruptionTime),
+            });
+            continue;
+        }
+        if shot.disrupted && !shot.disruption_time_ms.is_some_and(|time| time.is_finite()) {
+            unscored_disruption_shots += 1;
+            shot_records.push(ShotEvaluationRecord {
+                shot_id: shot.shot_id,
+                actual_disruption: true,
+                predicted_disruption: None,
+                warning_lead_time_ms: None,
+                sample_count: shot.samples.len(),
+                valid_sample_count: 0,
+                excluded_sample_indices: (0..shot.samples.len()).collect(),
+                unscored_reason: Some(ShotUnscoredReason::InvalidDisruptionTime),
+            });
+            continue;
+        }
         if shot_id_counts.get(&shot.shot_id).copied().unwrap_or(0) > 1 {
             let excluded_sample_indices = (0..shot.samples.len()).collect::<Vec<_>>();
             if shot.disrupted {
@@ -371,7 +421,10 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         for (sample_index, (sample, label)) in
             shot.samples.iter().zip(labels.iter()).enumerate()
         {
-            if !has_valid_phi_inputs(sample) || sample.shot_id != shot.shot_id {
+            if !has_valid_phi_inputs(sample)
+                || sample.shot_id != shot.shot_id
+                || !has_valid_event_timing(shot, sample)
+            {
                 invalid_samples += 1;
                 excluded_sample_indices.push(sample_index);
                 continue;
@@ -1880,6 +1933,26 @@ mod tests {
         assert_eq!(results.shot_records[0].sample_count, 1);
         assert_eq!(results.shot_records[0].valid_sample_count, 0);
         assert_eq!(results.shot_records[0].excluded_sample_indices, vec![0]);
+    }
+
+    #[test]
+    fn missing_or_inconsistent_disruption_timing_is_not_scoreable() {
+        let mut missing = CModShot::new(30);
+        missing.disrupted = true;
+        missing.add_sample(sample_for_test(30, 10.0, true));
+        let missing_results = evaluate_config(&ThresholdConfig::default(), &[missing]);
+        assert_eq!(missing_results.recall(), None);
+        assert_eq!(
+            missing_results.shot_records[0].unscored_reason,
+            Some(ShotUnscoredReason::MissingDisruptionTime)
+        );
+
+        let mut inconsistent = shot_for_test(31, true, &[(10.0, true)]);
+        inconsistent.samples[0].time_to_disruption_ms = Some(42.0);
+        let inconsistent_results = evaluate_config(&ThresholdConfig::default(), &[inconsistent]);
+        assert_eq!(inconsistent_results.invalid_samples, 1);
+        assert_eq!(inconsistent_results.recall(), None);
+        assert_eq!(inconsistent_results.shot_records[0].excluded_sample_indices, vec![0]);
     }
 
     #[test]
