@@ -439,6 +439,8 @@ mod tests {
         let response_line = handle_line(&request_line);
         let report = verify_receipt(&request_line, &response_line);
         assert_eq!(report.status, "passed", "{report:?}");
+        assert_eq!(report.request_sha256, digest(request_line.as_bytes()));
+        assert_eq!(report.response_sha256, digest(response_line.as_bytes()));
         assert!(report.checks.iter().all(|check| check.passed));
     }
 
@@ -516,6 +518,11 @@ mod tests {
             serde_json::from_str(include_str!("../schema/receipt-audit.schema.json")).unwrap();
         assert_eq!(schema["additionalProperties"], false);
         assert_eq!(schema["properties"]["status"]["enum"][0], "passed");
+        assert!(schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|field| field == "response_sha256"));
     }
 
     #[test]
