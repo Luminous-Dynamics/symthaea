@@ -1151,3 +1151,6 @@ pub mod experiment_selection;
 
 /// Oracle-backed known-answer benchmarks for experiment-selection strategies.
 pub mod experiment_benchmark;
+
+/// Synthetic oracle for false-superiority and false-negative candidate decisions.
+pub mod candidate_decision_benchmark;
