@@ -2,7 +2,7 @@
 
 **Status:** exploratory software benchmark specification; not a validated statistical decision rule.  
 **Implementation:** `xtask enzyme-abstention-matrix`, in `xtask/src/enzyme_abstention_matrix.rs`.  
-**Output:** machine-readable JSON with every exact synthetic observation, fitted candidate, per-gate boolean, chosen action, reason, and denominator.  
+**Output:** machine-readable JSON with every exact synthetic observation, its frozen training/held-out assignment, fitted candidate, per-gate boolean, chosen action, reason, and denominator.  
 **Relationship:** stacked on [Symthaea PR #7456](https://github.com/Luminous-Dynamics/symthaea/pull/7456); do not read its existence as a passing benchmark.
 
 ## Research question
@@ -28,22 +28,24 @@ The first executable matrix contains 96 cases: four frozen scenario strata, thre
 
 Noise is deterministic bounded uniform noise, scaled to the declared standard deviation. This makes the software replayable; it is not a claim that real enzyme assay errors are uniform, independent, homoscedastic, or fully described by a single standard deviation.
 
-Candidate parameters are fit using a coarse exhaustive grid. The fitter is intentionally an understandable baseline, not a production estimator. Grid resolution can affect both residuals and model selection, so these values must be varied in a later sensitivity analysis.
+Candidate parameters are fit using a coarse exhaustive grid on the training subset only. Every third point in the frozen substrate-list order (indices 0, 3, 6, 9, …) is held out; all remaining points are training observations. Neither held-out rates nor held-out residuals are used to estimate parameters or calculate BIC. Held-out substrate locations are used for the prediction-gap screen; held-out measured rates are used for the absolute-fit adequacy gate. The exact values, partition labels, counts, parameter-grid limits, training residuals, BIC values and held-out residuals are included in the JSON report.
+
+The fitter is intentionally an understandable baseline, not a production estimator. Grid resolution can affect residuals and model selection, so these values must be varied in a later sensitivity analysis. A fixed substrate-index split is reproducible but may under-represent ranges in other designs; later versions should compare this split with blocked-range holdouts and independently measured assay/replicate holdouts.
 
 ## Decision policy under test
 
 The current policy is deliberately explicit and ordered:
 
-1. **Absolute fit:** abstain if the lower of the two candidates' RMSE values exceeds 3 times the declared noise SD.
-2. **Observational resolution:** abstain if the RMS difference between the two fitted predictions on tested substrate conditions is below 1 declared noise SD.
-3. **Model-selection evidence:** abstain if `abs(ΔBIC) < 10`.
-4. Otherwise choose the candidate favored by BIC, where `ΔBIC = BIC(Michaelis–Menten) - BIC(substrate inhibition)`; negative values favor Michaelis–Menten.
+1. **Held-out absolute fit:** abstain if even the better candidate's held-out RMSE exceeds 3 times the declared noise SD.
+2. **Held-out prediction resolution:** abstain if the RMS difference between candidate predictions on the held-out substrate conditions is below 1 declared noise SD.
+3. **Training-only model-selection evidence:** abstain if `abs(ΔBIC) < 10`.
+4. Otherwise choose the candidate favored by training-only BIC, where `ΔBIC = BIC(Michaelis–Menten) - BIC(substrate inhibition)`; negative values favor Michaelis–Menten.
 
 These cutoffs are **heuristics, not calibrated confidence levels**. The fitted-prediction gap is a screening proxy—not a power calculation or a formal identifiability result. The absolute-fit gate is not a substitute for inspecting residual structure. The use of BIC also needs review against each model's likelihood assumptions and the actual experimental error model.
 
 A hard boundary is intentional: **noise can conceal model misspecification**. In a high-noise Hill-generated case, both candidate fits may look plausible at the declared noise scale even though the known generator is outside the candidate set. The policy can then choose the better of two inadequate explanations. The report exposes this as a false-decisive outcome against the known synthetic target; that outcome must not be hidden by reporting only the winners. It also demonstrates why these controls need a power/detectability annotation before they become a pass/fail gate for a calibrated decision rule.
 
-The report stores the exact synthetic observations and parameter-grid bounds, both the *expected decision* for each prespecified stratum and the *observed decision*, every gate's Boolean result, and the reason for each outcome. A selected label means only "better-supported among the two supplied candidates"; it is not a mechanistic-truth claim or proof that the candidate set is complete. A target hit-rate is descriptive. The matrix generator does not turn its own target rate into a scientific pass.
+The report stores the exact synthetic observations and train/held-out assignments, parameter-grid bounds, both the *expected decision* for each prespecified stratum and the *observed decision*, each gate's Boolean result, and the reason for each outcome. A selected label means only "better-supported among the two supplied candidates"; it is not a mechanistic-truth claim or proof that the candidate set is complete. A target hit-rate is descriptive. The matrix generator does not turn its own target rate into a scientific pass.
 
 ## Why this is a paradigm shift
 
@@ -66,6 +68,8 @@ These are future acceptance targets, not current results.
 | Track | Proposed target | Required evidence |
 |---|---|---|
 | Deterministic replay | 100% byte-identical reports for repeated runs on the same pinned toolchain; every specified input mutation detected | Frozen fixture, toolchain, artifact hashes, mutation suite |
+| Holdout integrity | 100% of observations partitioned exactly once; no held-out rate enters fitting or BIC | Independent validator recomputes partition assignments, counts, fitted predictions and BIC inputs |
+| Predictive adequacy | Report held-out RMSE by model and noise regime; do not infer mechanistic truth from a single split | Frozen per-condition holdout now; later repeated/blocked splits and independent replicate series |
 | Scenario accounting | 100% of generated cases appear exactly once in the report and in a declared stratum | Independent report validator and count-conservation tests |
 | Separable model discrimination | Balanced accuracy ≥ 0.90 on preregistered separable cases at the declared operating conditions | At least 1,000 scenarios across independent seeds, model parameters, substrate grids, and noise regimes |
 | False-decisive control | ≤ 5% decisive selections on *detectably* ambiguous or candidate-misspecified held-out scenarios | At least 1,000 held-out control cases, disjoint from threshold tuning; preregister an independent detectability/power criterion. Also report the rate for noise-obscured misspecification, without silently dropping those cases. |
@@ -81,7 +85,7 @@ A threshold is not a result. A passing synthetic gate is only evidence that the 
 ## Next scientific and engineering gates
 
 1. Expand from 96 cases to a larger preregistered scenario space, including randomized parameter ranges, heteroscedastic and correlated residuals, outliers, censoring/detection limits, sparse substrate coverage, enzyme inactivation, and multi-substrate mechanisms where data warrant them.
-2. Split scenario generation into **threshold-tuning** and **locked evaluation** sets. The held-out scenarios must not be used to choose cutoffs.
+2. Split scenario generation into **threshold-tuning** and **locked evaluation** sets. The current condition holdout tests predictive adequacy within a scenario; it is not an independent scenario-level test split and must not be mistaken for threshold calibration. Held-out scenarios must not be used to choose cutoffs.
 3. Compare the current baseline with AICc, likelihood-ratio tests where assumptions permit, bootstrap model weights, profile likelihood, and posterior predictive checks. Report where each technique's assumptions apply; do not crown a universal criterion.
 4. Measure false-decisive rate, false-abstention rate, wrong-selection rate, and absolute-fit detection separately by stratum and noise scale. Include confidence intervals for those rates.
 5. Add identifiability diagnostics for parameters conditional on the selected model. Model-family selection must not imply that every parameter is estimable.
