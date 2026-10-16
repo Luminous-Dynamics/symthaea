@@ -977,6 +977,10 @@ mod tests {
     fn scores_test_only_with_one_to_one_matching_and_frozen_threshold() {
         let (manifest, bundle) = fixture();
         let report = evaluate_bioacoustic_events(&manifest, &bundle).unwrap();
+        assert_eq!(
+            report.schema_version,
+            BIOACOUSTIC_EVENT_REPORT_SCHEMA_VERSION
+        );
         assert_eq!(report.scored_split, BioacousticSplit::Test);
         assert_eq!(report.test_recording_count, 2);
         assert_eq!(report.metrics.true_positives, 1);
