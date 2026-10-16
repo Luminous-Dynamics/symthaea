@@ -312,16 +312,16 @@ pub fn paired_recall_delta_label_sensitivity_at_k(
     ids_b.sort_unstable();
 
     for id in &ids_a {
-        match by_id_b.get(id) {
+        match by_id_b.get(*id) {
             None => return Err(MetricError::CandidateUniverseMismatch((*id).to_owned())),
-            Some(label_b) if by_id_a[id] != *label_b => {
+            Some(label_b) if by_id_a.get(*id).copied() != Some(*label_b) => {
                 return Err(MetricError::CandidateLabelMismatch((*id).to_owned()));
             }
             Some(_) => {}
         }
     }
     for id in &ids_b {
-        if !by_id_a.contains_key(id) {
+        if !by_id_a.contains_key(*id) {
             return Err(MetricError::CandidateUniverseMismatch((*id).to_owned()));
         }
     }
