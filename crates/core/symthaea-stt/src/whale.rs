@@ -64,6 +64,16 @@ impl Default for WhaleConfig {
 }
 
 impl WhaleConfig {
+    /// Build the sperm-whale ICI timing profile against a declared native
+    /// recording clock. This does not resample audio or validate detector
+    /// accuracy; the caller must pass the same rate to `try_process_buffer`.
+    pub fn for_native_sample_rate(sample_rate_hz: u32) -> Self {
+        Self {
+            sample_rate: sample_rate_hz,
+            ..Self::default()
+        }
+    }
+
     /// Validate coda timing and LTC configuration before processing.
     pub fn validate(&self) -> Result<(), String> {
         if self.sample_rate == 0 {
@@ -608,6 +618,15 @@ mod tests {
         let mut invalid = WhaleConfig::default();
         invalid.rhythm_tau = f32::MAX;
         assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn whale_profile_can_bind_to_declared_native_sample_rate() {
+        let config = WhaleConfig::for_native_sample_rate(512_000);
+        assert_eq!(config.sample_rate, 512_000);
+        assert!(config.validate().is_ok());
+        assert!(config.validate_source_sample_rate(512_000).is_ok());
+        assert!(config.validate_source_sample_rate(44100).is_err());
     }
 
     #[test]
