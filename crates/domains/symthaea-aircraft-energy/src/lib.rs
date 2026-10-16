@@ -78,6 +78,10 @@ pub struct EnergySystemEnvelope {
 #[derive(Debug, Clone, PartialEq)]
 pub struct BatteryPackSpec {
     pub installed_pack_mass_kg: f64,
+    /// Complete installed energy-system mass in the declared boundary, kg.
+    /// Must include the pack plus required conversion, cooling, protection,
+    /// mounting, and distribution hardware represented by that boundary.
+    pub installed_system_mass_kg: f64,
     /// Pack-level (not cell-level) specific energy, Wh/kg.
     pub pack_specific_energy_wh_per_kg: f64,
     /// Fraction of pack energy permitted by the declared usable-energy rule, [0, 1].
@@ -106,6 +110,13 @@ impl BatteryPackSpec {
     pub fn to_envelope(&self) -> Result<EnergySystemEnvelope, Vec<Finding>> {
         let mut findings = Vec::new();
         check_positive(&mut findings, "battery.installed_pack_mass_kg", self.installed_pack_mass_kg);
+        check_positive(&mut findings, "battery.installed_system_mass_kg", self.installed_system_mass_kg);
+        if self.installed_system_mass_kg < self.installed_pack_mass_kg {
+            findings.push(Finding::InvalidInput {
+                field: "battery.installed_system_mass_kg".into(),
+                reason: "complete installed system mass cannot be less than pack mass".into(),
+            });
+        }
         check_positive(
             &mut findings,
             "battery.pack_specific_energy_wh_per_kg",
@@ -185,7 +196,7 @@ impl BatteryPackSpec {
         }
 
         Ok(EnergySystemEnvelope {
-            installed_mass_kg: Some(self.installed_pack_mass_kg),
+            installed_mass_kg: Some(self.installed_system_mass_kg),
             usable_energy_at_bus_wh: Some(usable_energy_at_bus_wh),
             reserve_fraction: Some(self.reserve_fraction),
             max_continuous_bus_power_w: Some(max_continuous_bus_power_w),
@@ -527,6 +538,7 @@ mod tests {
     fn battery_pack_derates_are_multiplicative_and_explicit() {
         let pack = BatteryPackSpec {
             installed_pack_mass_kg: 100.0,
+            installed_system_mass_kg: 130.0,
             pack_specific_energy_wh_per_kg: 300.0,
             usable_fraction: 0.9,
             temperature_capacity_fraction: 0.8,
@@ -658,9 +670,29 @@ mod tests {
     }
 
     #[test]
+    fn complete_installed_mass_cannot_omit_pack_mass() {
+        let pack = BatteryPackSpec {
+            installed_pack_mass_kg: 100.0,
+            installed_system_mass_kg: 90.0,
+            pack_specific_energy_wh_per_kg: 300.0,
+            usable_fraction: 0.9,
+            temperature_capacity_fraction: 0.9,
+            end_of_life_soh_fraction: 0.9,
+            discharge_efficiency_fraction: 0.95,
+            continuous_specific_power_w_per_kg: 500.0,
+            peak_specific_power_w_per_kg: 800.0,
+            power_derating_fraction: 0.8,
+            reserve_fraction: 0.2,
+            max_peak_duration_s: 20.0,
+        };
+        assert!(pack.to_envelope().is_err());
+    }
+
+    #[test]
     fn invalid_pack_derating_is_rejected_before_envelope_creation() {
         let pack = BatteryPackSpec {
             installed_pack_mass_kg: 10.0,
+            installed_system_mass_kg: 12.0,
             pack_specific_energy_wh_per_kg: 300.0,
             usable_fraction: 1.1,
             temperature_capacity_fraction: 0.8,
