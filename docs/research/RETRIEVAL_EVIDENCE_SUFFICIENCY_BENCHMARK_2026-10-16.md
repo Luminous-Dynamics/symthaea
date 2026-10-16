@@ -122,3 +122,16 @@ Before provenance-aware retrieval is implemented, define the source-record owner
 
 - Zhang, H. & Wu, W. (2026). *Do LLMs Know When Evidence is Insufficient? An Evidence Sufficiency Benchmark for Answer-Abstention Calibration in Retrieval-Augmented Generation*. Computers, Materials & Continua 89(1). [DOI](https://doi.org/10.32604/cmc.2026.086343).
 - Qiu, J., Han, Z. & Huang, C. (2026). *SURE-RAG: Sufficiency and Uncertainty-Aware Evidence Verification for Selective Retrieval-Augmented Generation*. [arXiv:2605.03534](https://arxiv.org/abs/2605.03534).
+
+## Conflict-scan complexity and parity gate (2026-10-16)
+
+The polarity-conflict check previously scanned every stored relation separately for every requested relation constraint, approximately O(Q × R) comparisons for Q query constraints and R stored relations. The follow-on branch `perf/knowledge-conflict-index-2026-10-16` now builds an in-memory structural key index for one query: O(R + Q + C) expected time, where C is the number of returned conflicts, before deterministic output sorting. This index is rebuilt per call; it is not yet a persistent graph index and does not claim sublinear retrieval across repeated queries.
+
+The semantic key includes normalized directed subject, predicate and object, subject/object roles, and causal status; polarity is checked separately. Thus case/whitespace normalization and conflict semantics remain unchanged. Source provenance, event time, publisher authority and source precedence are deliberately not folded into this key.
+
+Two tests are added:
+- **Parity oracle:** compares the indexed result set and deterministic ordering against a separate exhaustive implementation on fixtures covering case/whitespace normalization, reversed direction, opposite polarity, roles, predicate and causal-status differences.
+- **Scaling probe:** an ignored, non-gating release-mode test compares indexed and exhaustive scan p50/max over 1k/10k facts and 1/2/4 constraints. It asserts output parity, not a timing speedup. It has not been run locally; no performance gain is claimed.
+
+The performance acceptance criterion is evidence-based: first record repeatable timings on a pinned release build, confirm exact result-set parity across randomized/adversarial corpora, then determine whether the index materially lowers multi-constraint scan cost. If the index construction itself dominates repeated single-constraint queries, compare a maintained index only after defining mutation/import/eviction invariants. Keep the exhaustive implementation as a test oracle.
+
