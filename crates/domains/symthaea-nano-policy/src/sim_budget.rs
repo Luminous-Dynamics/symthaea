@@ -594,7 +594,7 @@ fn audit_ledger(ledger: &SimulatorBudgetLedger, ledger_sha256: String) -> Simula
     } else if any_calls_unresolved {
         AuditDisposition::BudgetConsumedButUnresolved
     } else if ledger.run_status == RunStatus::Completed
-        && (eligible_candidates_not_called > 0 || proposal_attempts_after_budget_reached > 0)
+        && proposal_attempts_after_budget_reached > 0
     {
         AuditDisposition::CompletedClaimMismatch
     } else if ledger.run_status == RunStatus::Completed {
@@ -881,6 +881,37 @@ mod tests {
         assert_eq!(audit.eligible_candidates_not_called, 1);
         assert_eq!(audit.disposition, AuditDisposition::IncompleteUnderBudget);
         assert!(!audit.audit_pass);
+    }
+
+    #[test]
+    fn launch_failed_eligible_candidate_can_be_replaced_before_budget_completion() {
+        let mut ledger = sample_ledger(RunStatus::Completed);
+        ledger.attempts[2].simulator_call = None;
+        ledger.attempts[2].not_called_reason = Some(NotCalledReason::LaunchFailed);
+
+        let replacement_call = call(
+            "invocation-d",
+            SimulatorTerminalStatus::ReturnedFiniteResult,
+            Some(digest('9')),
+            1.5,
+        );
+        ledger.attempts.push(attempt(
+            4,
+            "attempt-d",
+            "candidate-d",
+            digest('9'),
+            PreflightStatus::Passed,
+            Some(replacement_call),
+            None,
+            None,
+        ));
+        let audit = audit_json_ledger(&serialized(&ledger)).expect("ledger audits");
+        assert_eq!(audit.expected_simulator_calls, 2);
+        assert_eq!(audit.observed_simulator_calls, 2);
+        assert_eq!(audit.eligible_candidates_not_called, 1);
+        assert_eq!(audit.proposal_attempts_after_budget_reached, 0);
+        assert_eq!(audit.disposition, AuditDisposition::EqualBudgetComplete);
+        assert!(audit.audit_pass);
     }
 
     #[test]
