@@ -29,6 +29,8 @@ ROS 2 control's clock model is a useful boundary reference: hardware-oriented re
 | PT-7 | Runtime timing profile | For each explicitly named robot/backend/profile, record cycle period, p50/p95/p99/p99.9/max cycle latency, p99.9 jitter, deadline misses, CPU/GPU load, thermal state, command age, and sensor age over a declared workload and run duration. | No universal latency number is claimed across unlike robots. Each profile has an owner-approved deadline budget; report tail latency and misses, not only mean/throughput. Zero misses is a qualification result only for the specific tested hardware/software/workload, not a hard-real-time proof. |
 | PT-8 | Energy calibration | Collect an external power-meter or qualified hardware-counter trace, synchronized to workload and thermal state, across idle, nominal, peak, and transition workloads. Fit on a training set and evaluate on held-out runs. | Until calibrated, expose only modeled joules/cycle and model-estimated watts. A proposed calibration gate is <=10% mean absolute percentage error on held-out steady workloads, with uncertainty and out-of-distribution cases reported; otherwise mark the model uncalibrated rather than claiming device power accuracy. |
 | PT-9 | Replay and evidence | Pin repo SHA, backend/profile, config, seed, initial state, command trace hash, timing source, workload identifier, build/features, and corpus version. Preserve negative controls. | Deterministic simulation replay yields identical plant-time evidence and, where the backend claims determinism, identical transition/capture hashes. Missing provenance is an incomplete result, not a pass. |
+| PT-10 | Fault and disturbance response | Inject bounded sensor dropout/staleness, clock reset or epoch change, missed command deadline, actuator rejection, and plant disturbance in simulation with pinned seeds and negative controls. Record detect-to-safe-action latency, time to recover, intervention count, and safety-envelope violations. | Every out-of-policy timing record is rejected; no stale command is reported as fresh. Response deadlines are profile-owned and explicit. Zero unsafe actions is required on the declared test corpus, but does not constitute a proof of safety or a hard-realtime guarantee. |
+| PT-11 | Adaptation agility | Start from a declared baseline task and environment, then request a task/tool/obstacle change without changing the plant-time authority. Measure time-to-reconfigure, task success, recovery time, human interventions, constraint violations, and repeatability across randomized but pinned scenarios. | Report distributions and baselines rather than one aggregate score. Faster re-tasking must not relax timing provenance, safety constraints, or evidence requirements. |
 
 ## Reporting rules
 
@@ -39,7 +41,7 @@ Every published result must distinguish the following metrics; do not combine th
 - requested and actually applied plant dt, cumulative simulation/model time, and wall-time execution ratio;
 - sensor sample age, receive age, command age, and transport latency;
 - modeled joules/cycle, total modeled joules, model-estimated average watts, and measured electrical energy/power (if instrumented);
-- success/task quality and safety-envelope violations.
+- success/task quality, safety-envelope violations, time-to-safe-action after faults, recovery time, and task reconfiguration/agility.
 
 Report p50, p95, p99, p99.9, maximum, sample count, duration, missed deadlines, and relevant uncertainty. Pin the workload and distinguish warm-up from scored runs. Never infer hard real-time guarantees from a finite test alone.
 
@@ -63,3 +65,9 @@ Every run should capture these fields in a machine-readable receipt:
 - runner status and exact head SHA.
 
 A queued/skipped runner, missing receipt, or run performed at a different commit SHA is not a pass.
+
+## Methodology references
+
+- [ROS 2 REP-2014: Benchmarking performance in ROS 2](https://reps.openrobotics.org/rep-2014/) is an informational methodology proposal (its current status is **Rejected**, so it is cited as guidance, not a normative standard). It recommends realistic known workloads, quantitative performance evaluation, grey-box tracing, and reproducible reporting. Symthaea should preserve those ideas even when benchmarks target Rust internals rather than ROS nodes.
+- [NIST Agility Performance of Robotic Systems](https://www.nist.gov/programs-projects/agility-performance-robotic-systems) emphasizes metrics and test methods for responding to unexpected events, re-tasking, datasets, and combined virtual/real testbeds. PT-10 and PT-11 extend the contract beyond raw cycle speed toward failure recovery and operational agility.
+- [NIST Performance Assessment Framework for Robotic Systems](https://www.nist.gov/programs-projects/performance-assessment-framework-robotic-systems) motivates composing perception, mobility, dexterity, and safety measures into task-level capability assessments rather than collapsing system quality into one throughput number.
