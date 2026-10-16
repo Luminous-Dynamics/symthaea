@@ -1,7 +1,7 @@
 # CRISPR Cost-Aware Evidence Bench — Research Contract v1
 
 **Status:** research contract / proposed first proving vertical  
-**As of:** 2026-10-15  
+**As of:** 2026-10-16  
 **Ownership:** Symthaea = discovery, modeling and evaluation design; Mycelix = consent, provenance, evidence exchange and replication lineage  
 **Evidence ceiling:** proposal until data rights, implementation, benchmark results and any prospective external validation are separately qualified.
 
