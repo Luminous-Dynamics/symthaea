@@ -31,6 +31,9 @@ References:
 - CFTC, Prediction Markets, ANPRM, Federal Register 91 FR 12516 (March 16, 2026): https://www.cftc.gov/LawRegulation/FederalRegister/proposedrules/2026-05105.html
 - CFTC, Understanding Prediction Markets and Event Contracts: https://www.cftc.gov/LearnandProtect/PredictionMarkets
 - WIRED, reporting on repetitive trades in election markets (October 15, 2026): https://www.wired.com/story/over-dollar600-million-traded-on-polymarket-election-contracts-after-races-ended
+- Reuters, *Inside the booming market for US midterm election bets* (October 14, 2026): https://www.reuters.com/legal/government/inside-booming-market-us-midterm-election-bets-2026-10-14/
+- ForesightFlow, *An Information Leakage Score Framework for Prediction Markets* (May 1, 2026): https://arxiv.org/abs/2605.00493
+- Kalshi Research, *Calibration In Prediction Markets – Theory and Evidence* (August 2026): https://kalshi.com/research/publications/calibration
 
 These references motivate controls; they do not establish that every venue has the same failure modes.
 
@@ -88,6 +91,21 @@ The accompanying pure-std Rust crate implements only:
 
 The crate does not ingest platform feeds or prove source/ownership labels. The source-capped mean is one comparison baseline, not a claim of optimal information aggregation.
 
+## Public-information timing: a diagnostic, not an accusation
+
+The new `assess_pre_public_information_move` function tests a narrow question: given a qualified public-information timestamp and a binary realized outcome, what signed fraction of the terminal outcome-aligned probability move was already present before that timestamp?
+
+The function:
+- requires strictly increasing timestamps and validated probabilities;
+- requires the public timestamp to lie inside a window with a declared edge-exclusion margin;
+- excludes weak/adverse terminal movements rather than manufacturing a score;
+- preserves scores below zero or above one instead of clamping away overshoot or reversal;
+- returns explicit exclusion reasons and labels no result as insider probability.
+
+This is motivated by ForesightFlow, but it is deliberately not presented as a replication or validated implementation of that paper. ForesightFlow reports that its initial proxy for public-event time reversed the intended separation in a matched-control comparison and that its original scope missed the documented insider cases it reviewed. The engineering lesson is that **timestamp provenance, market/event selection, terminal-move size and category-specific baselines are prerequisites, not details to bolt on later**. See https://arxiv.org/abs/2605.00493.
+
+A future evaluation should compare timestamp sources and inject controlled timestamp shifts (for example ±1 minute, ±5 minutes, and ±30 minutes) into synthetic fixtures, then measure score instability. For real data, report timestamp uncertainty, edge-exclusion coverage, false-positive rates on matched controls, and results by event-resolution category. The diagnostic must never be marketed as proof of insider trading, manipulation or causality.
+
 ## Benchmark plan
 
 All numeric thresholds below are proposed acceptance targets. They are not measured results, current platform metrics, or evidence of superiority.
@@ -102,6 +120,7 @@ All numeric thresholds below are proposed acceptance targets. They are not measu
 | Resolution completeness | Delete or mutate each required policy field independently | Every missing/blank required field and zero deadline/dispute-window mutation is rejected |
 | Cross-market coherence | Freeze synthetic nested, exclusive and conditional event graphs; add inconsistent quote mutations | 100% of injected graph violations identified on the frozen corpus; false positive rate reported on clean controls |
 | Manipulation stress | Synthetic self-match, spoof-like quote churn, stale quote, correlated-source herd, oracle delay/conflict, and low-depth shock | Publish precision/recall by threat class; avoid one blended accuracy number; disclose detection blind spots |
+| Public-information timing | Compare qualified publication timestamps with alternate/proxy timestamps; include event-category matched controls and source-time shifts | Publish scope coverage, score stability under ±1/±5/±30-minute shifts, and false-positive rates; no accusation or "insider probability" claim from this score alone |
 | Market quality | Spread, depth, slippage, price impact, time to recover after shock, stale-quote rate, and market-maker inventory risk | Paired comparison on identical event/order flow and shock seeds; net improvements only after costs and uncertainty |
 | Robustness | At least 12 preregistered regime families, 1,000 deterministic seeds per family for simulation phase; separate held-out seeds and event definitions | Exact replay, seed manifests, frozen baselines, zero leakage; synthetic passes do not count as real-world validation |
 | Reproducibility | Bind code revision, config, source hashes, outcome semantics, timestamps, and raw score records | Replay regenerates all aggregate metrics exactly or documents a bounded numerical tolerance; changed inputs change the result identity |

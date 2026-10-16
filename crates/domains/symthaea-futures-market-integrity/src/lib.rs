@@ -40,6 +40,10 @@ pub enum IntegrityError {
     InvalidDeadline,
     /// The dispute window was zero or missing.
     InvalidDisputeWindow,
+    /// A timestamp or timing threshold was zero, missing, or invalid.
+    InvalidTimingInput,
+    /// Forecast observations were not strictly ordered by timestamp.
+    NonMonotonicObservationTime,
 }
 
 /// A finite probability in the closed interval [0, 1].
@@ -404,6 +408,191 @@ pub fn qualify_resolution_policy(
     })
 }
 
+/// One recorded market-implied probability at an explicit UTC Unix-second timestamp.
+///
+/// The time origin must be externally qualified. This type does not establish whether a public
+/// news event actually became public at the supplied timestamp.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TimedProbability {
+    at_unix_seconds: u64,
+    probability: Probability,
+}
+
+impl TimedProbability {
+    /// Build a time-stamped probability, rejecting a zero timestamp or invalid probability.
+    pub fn new(at_unix_seconds: u64, probability: f64) -> Result<Self, IntegrityError> {
+        if at_unix_seconds == 0 {
+            return Err(IntegrityError::InvalidTimingInput);
+        }
+        Ok(Self {
+            at_unix_seconds,
+            probability: Probability::new(probability)?,
+        })
+    }
+
+    /// Observation time represented as Unix seconds in UTC.
+    pub fn at_unix_seconds(self) -> u64 {
+        self.at_unix_seconds
+    }
+
+    /// Validated probability recorded at this timestamp.
+    pub fn probability(self) -> Probability {
+        self.probability
+    }
+}
+
+/// Reasons a price-timing observation is excluded instead of assigned a misleading score.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimingExclusionReason {
+    /// Too few observations exist to anchor, observe pre-event, and observe post-event prices.
+    TooFewObservations,
+    /// The purported public event timestamp falls outside the observed price window.
+    PublicTimeOutsideWindow,
+    /// The public timestamp is too close to a window edge for the declared edge exclusion.
+    PublicTimeTooCloseToWindowEdge,
+    /// The terminal probability does not move sufficiently toward the realized outcome.
+    TerminalMoveTooSmallOrMisaligned,
+}
+
+/// Price-timing diagnostic scoped to a declared realized outcome and public-information timestamp.
+///
+/// This metric is not an insider-trading probability or proof of misconduct. Its validity is
+/// conditional on a defensible public-event timestamp, a suitable market/outcome scope, and
+/// sufficient terminal information movement. The fraction is intentionally not clamped to [0,1]:
+/// values above one indicate pre-event overshoot relative to the final move, while negative values
+/// indicate movement away from the realized outcome before later reversal.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InformationTimingDiagnostic {
+    /// The event timestamp supplied by the qualified upstream source profile.
+    pub public_information_at_unix_seconds: u64,
+    /// Number of time-stamped market probability observations used.
+    pub observation_count: usize,
+    /// Initial probability in the event's realized-outcome direction.
+    pub outcome_aligned_initial_probability: f64,
+    /// Last observed probability at or before the public-information timestamp, aligned to the outcome.
+    pub outcome_aligned_pre_event_probability: f64,
+    /// Last observed probability in the evaluation window, aligned to the realized outcome.
+    pub outcome_aligned_terminal_probability: f64,
+    /// Change from initial probability to pre-event probability in the realized-outcome direction.
+    pub pre_event_aligned_move: f64,
+    /// Change from initial probability to terminal probability in the realized-outcome direction.
+    pub terminal_aligned_move: f64,
+    /// Signed fraction of the terminal aligned move already present before the event timestamp.
+    pub pre_event_move_fraction: f64,
+}
+
+/// In-scope diagnostic or explicit exclusion; exclusions are data, not zero scores.
+#[derive(Debug, Clone, PartialEq)]
+pub enum InformationTimingAssessment {
+    /// Conditions for interpreting the descriptive timing fraction were met.
+    Eligible(InformationTimingDiagnostic),
+    /// The record was out of scope for the declared method.
+    Excluded(TimingExclusionReason),
+}
+
+fn outcome_aligned_probability(probability: Probability, realized_outcome: bool) -> f64 {
+    if realized_outcome {
+        probability.get()
+    } else {
+        1.0 - probability.get()
+    }
+}
+
+/// Measure how much of a terminal outcome-aligned price move had occurred before a declared
+/// public-information timestamp.
+///
+/// Required inputs:
+/// - observations sorted in strictly increasing timestamp order;
+/// - a nonzero, independently qualified public-information timestamp;
+/// - the realized binary outcome;
+/// - a positive edge-exclusion window and a positive minimum terminal move.
+///
+/// The method excludes edge-adjacent timestamps and weak or adverse terminal moves. It is a
+/// descriptive screening statistic only. It does not infer event-publication times, account intent,
+/// insider status, causality, or misconduct. Use matched clean controls, event-category baselines,
+/// source-time uncertainty analysis, and documented scope conditions before any real-world use.
+pub fn assess_pre_public_information_move(
+    observations: &[TimedProbability],
+    public_information_at_unix_seconds: u64,
+    realized_outcome: bool,
+    minimum_edge_seconds: u64,
+    minimum_terminal_move: f64,
+) -> Result<InformationTimingAssessment, IntegrityError> {
+    if public_information_at_unix_seconds == 0
+        || minimum_edge_seconds == 0
+        || !minimum_terminal_move.is_finite()
+        || minimum_terminal_move <= 0.0
+    {
+        return Err(IntegrityError::InvalidTimingInput);
+    }
+
+    if observations.len() < 3 {
+        return Ok(InformationTimingAssessment::Excluded(
+            TimingExclusionReason::TooFewObservations,
+        ));
+    }
+
+    for pair in observations.windows(2) {
+        if pair[0].at_unix_seconds >= pair[1].at_unix_seconds {
+            return Err(IntegrityError::NonMonotonicObservationTime);
+        }
+    }
+
+    let first = observations[0];
+    let last = observations[observations.len() - 1];
+    if public_information_at_unix_seconds <= first.at_unix_seconds
+        || public_information_at_unix_seconds >= last.at_unix_seconds
+    {
+        return Ok(InformationTimingAssessment::Excluded(
+            TimingExclusionReason::PublicTimeOutsideWindow,
+        ));
+    }
+
+    if public_information_at_unix_seconds - first.at_unix_seconds < minimum_edge_seconds
+        || last.at_unix_seconds - public_information_at_unix_seconds < minimum_edge_seconds
+    {
+        return Ok(InformationTimingAssessment::Excluded(
+            TimingExclusionReason::PublicTimeTooCloseToWindowEdge,
+        ));
+    }
+
+    let pre_event = observations
+        .iter()
+        .rev()
+        .find(|observation| {
+            observation.at_unix_seconds <= public_information_at_unix_seconds
+        })
+        .expect("public timestamp lies strictly after first observation");
+
+    let aligned_initial =
+        outcome_aligned_probability(first.probability, realized_outcome);
+    let aligned_pre =
+        outcome_aligned_probability(pre_event.probability, realized_outcome);
+    let aligned_terminal =
+        outcome_aligned_probability(last.probability, realized_outcome);
+    let pre_event_move = aligned_pre - aligned_initial;
+    let terminal_move = aligned_terminal - aligned_initial;
+
+    if terminal_move < minimum_terminal_move {
+        return Ok(InformationTimingAssessment::Excluded(
+            TimingExclusionReason::TerminalMoveTooSmallOrMisaligned,
+        ));
+    }
+
+    Ok(InformationTimingAssessment::Eligible(
+        InformationTimingDiagnostic {
+            public_information_at_unix_seconds,
+            observation_count: observations.len(),
+            outcome_aligned_initial_probability: aligned_initial,
+            outcome_aligned_pre_event_probability: aligned_pre,
+            outcome_aligned_terminal_probability: aligned_terminal,
+            pre_event_aligned_move: pre_event_move,
+            terminal_aligned_move: terminal_move,
+            pre_event_move_fraction: pre_event_move / terminal_move,
+        },
+    ))
+}
+
 fn required_identifier(value: String, field: &'static str) -> Result<String, IntegrityError> {
     if value.trim().is_empty() {
         return Err(IntegrityError::EmptyIdentifier(field));
@@ -444,6 +633,121 @@ mod tests {
             dispute_window_seconds: Some(86_400),
             adjudication_policy: Some("independent-review-v1".to_owned()),
         }
+    }
+
+    fn timing_observations(probabilities: &[(u64, f64)]) -> Vec<TimedProbability> {
+        probabilities
+            .iter()
+            .map(|(at, p)| TimedProbability::new(*at, *p).expect("valid timing fixture"))
+            .collect()
+    }
+
+    #[test]
+    fn timing_fraction_measures_pre_event_share_of_terminal_move() {
+        let observations = timing_observations(&[
+            (100, 0.2),
+            (120, 0.3),
+            (150, 0.6),
+            (180, 0.8),
+            (220, 0.9),
+        ]);
+        let result =
+            assess_pre_public_information_move(&observations, 160, true, 20, 0.1).unwrap();
+        let InformationTimingAssessment::Eligible(diagnostic) = result else {
+            panic!("qualified fixture should be eligible");
+        };
+        assert!((diagnostic.pre_event_aligned_move - 0.4).abs() < 1e-12);
+        assert!((diagnostic.terminal_aligned_move - 0.7).abs() < 1e-12);
+        assert!((diagnostic.pre_event_move_fraction - (4.0 / 7.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn timing_fraction_aligns_downward_probability_moves_to_negative_outcomes() {
+        let observations = timing_observations(&[
+            (100, 0.8),
+            (120, 0.7),
+            (150, 0.4),
+            (180, 0.2),
+            (220, 0.1),
+        ]);
+        let result =
+            assess_pre_public_information_move(&observations, 160, false, 20, 0.1).unwrap();
+        let InformationTimingAssessment::Eligible(diagnostic) = result else {
+            panic!("qualified fixture should be eligible");
+        };
+        assert!((diagnostic.pre_event_aligned_move - 0.4).abs() < 1e-12);
+        assert!((diagnostic.terminal_aligned_move - 0.7).abs() < 1e-12);
+    }
+
+    #[test]
+    fn timing_fraction_is_not_clamped_when_price_overshoots_before_news() {
+        let observations = timing_observations(&[
+            (100, 0.2),
+            (120, 0.7),
+            (150, 0.95),
+            (180, 0.8),
+            (220, 0.6),
+        ]);
+        let result =
+            assess_pre_public_information_move(&observations, 160, true, 20, 0.1).unwrap();
+        let InformationTimingAssessment::Eligible(diagnostic) = result else {
+            panic!("qualified fixture should be eligible");
+        };
+        assert!(diagnostic.pre_event_move_fraction > 1.0);
+    }
+
+    #[test]
+    fn timing_metric_excludes_public_timestamps_near_window_edges() {
+        let observations = timing_observations(&[(100, 0.2), (110, 0.4), (220, 0.9)]);
+        assert_eq!(
+            assess_pre_public_information_move(&observations, 115, true, 20, 0.1).unwrap(),
+            InformationTimingAssessment::Excluded(
+                TimingExclusionReason::PublicTimeTooCloseToWindowEdge
+            )
+        );
+    }
+
+    #[test]
+    fn timing_metric_excludes_weak_or_adverse_terminal_moves() {
+        let observations = timing_observations(&[
+            (100, 0.5),
+            (120, 0.6),
+            (150, 0.7),
+            (180, 0.6),
+            (220, 0.51),
+        ]);
+        assert_eq!(
+            assess_pre_public_information_move(&observations, 160, true, 20, 0.1).unwrap(),
+            InformationTimingAssessment::Excluded(
+                TimingExclusionReason::TerminalMoveTooSmallOrMisaligned
+            )
+        );
+    }
+
+    #[test]
+    fn timing_metric_rejects_non_monotonic_timestamps() {
+        let observations = timing_observations(&[(100, 0.2), (150, 0.4), (140, 0.7), (220, 0.9)]);
+        assert_eq!(
+            assess_pre_public_information_move(&observations, 160, true, 10, 0.1),
+            Err(IntegrityError::NonMonotonicObservationTime)
+        );
+    }
+
+    #[test]
+    fn timing_metric_rejects_zero_or_invalid_thresholds() {
+        let observations = timing_observations(&[(100, 0.2), (150, 0.6), (220, 0.9)]);
+        assert_eq!(
+            assess_pre_public_information_move(&observations, 160, true, 0, 0.1),
+            Err(IntegrityError::InvalidTimingInput)
+        );
+        assert_eq!(
+            assess_pre_public_information_move(&observations, 160, true, 10, f64::NAN),
+            Err(IntegrityError::InvalidTimingInput)
+        );
+        assert_eq!(
+            TimedProbability::new(0, 0.5),
+            Err(IntegrityError::InvalidTimingInput)
+        );
     }
 
     #[test]
