@@ -27,7 +27,7 @@ This analysis does not rearrange tasks, issue commands, shed loads, or infer tha
 
 ## Explicit binding and determinism
 
-A plan pins the exact mission/configuration revision and SX-031/SX-032 digests. Each pool also pins an exact provider component/revision and non-empty set of exact SX-030 connection IDs intended to expose that resource. Those connections must exist, involve the declared provider, meet the SX-030 software compatibility policy, and cover the task's required environment. A generic route to a provider is not enough.
+A plan pins the exact mission/configuration revision and SX-031/SX-032 digests. Each pool also pins an exact provider component/revision, a non-empty set of exact SX-030 connection IDs, and a non-empty set of interface kinds that actually provide that resource. Those connections must exist, involve the declared provider, contain a compatible finding for a declared interface kind, meet the SX-030 software compatibility policy, and cover the task's required environment. A generic route to a provider is not enough.
 
 The evaluator also checks pool and reservation evidence floors, provider revision, path reachability, environment scope and resource-kind identity. It rejects duplicate pool IDs, duplicate reservations, duplicate provider/resource pools, mismatched resource kinds, invalid or zero-length windows, invalid quantity intervals, unknown task/pool references and arithmetic overflow. It does not silently combine distinct supply pools.
 
@@ -45,7 +45,8 @@ The unit module includes cases for:
 - stale task receipts/configuration revisions;
 - provider revision and environment mismatch;
 - duplicate provider/resource pools and mutated reservation receipts;
-- a deterministic 2,000-case overlap/boundary corpus that checks exact peak concurrent demand and resulting block/pass status.
+- a deterministic 2,000-case overlap/boundary corpus that checks exact peak concurrent demand and resulting block/pass status;
+- exact resource-interface-kind binding and missing provider-connection negative controls.
 
 The integration replay includes positive, optional-overbooking and required-overbooking cases plus an independent plan/report/receipt digest oracle. All IDs, capacity values, demand numbers and evidence references are synthetic.
 
