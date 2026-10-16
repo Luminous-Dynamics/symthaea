@@ -86,5 +86,7 @@
     "uncertainty_method_sha256": "3ade88dde4e76fd4bd910d9a088b6e9584589bf2c46512bc6ef0841f2667795a",
     "estimated_cost_model_id": "toy-cost-estimator-v1",
     "estimated_cost_model_sha256": "6206e804b6f1d23644dd89d832852f7403c150295ef0a4d6266359fb268991a8"
-  }
+  },
+  "policy_revision": "toy-policy-prototype-fixture-v1",
+  "candidate_pool_sha256": "6bdcc4618809d168e1d249d84f345bf6595841db4344f63c0aa9f66509182636"
 }
