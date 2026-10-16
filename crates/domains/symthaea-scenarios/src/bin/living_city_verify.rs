@@ -41,8 +41,8 @@ use symthaea_scenarios::living_city_hazard_profiles::{
     HazardProfile, evaluate_hazard_profile,
 };
 use symthaea_scenarios::living_city_grid_reference::{
-    GRID_REFERENCE_CASE_IDS, GRID_REFERENCE_SUITE_ID, GRID_REFERENCE_SUITE_VERSION,
-    run_grid_reference_suite,
+    GRID_REFERENCE_CASE_IDS, GRID_REFERENCE_SOLVER_ENVELOPE, GRID_REFERENCE_SUITE_ID,
+    GRID_REFERENCE_SUITE_VERSION, GRID_REFERENCE_VALIDATION_KIND, run_grid_reference_suite,
 };
 
 const BUNDLE_SCHEMA_VERSION: u32 = 2;
@@ -264,10 +264,14 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
             "status": "passed",
             "suite_version": GRID_REFERENCE_SUITE_VERSION,
             "suite_id": GRID_REFERENCE_SUITE_ID,
+            "validation_kind": GRID_REFERENCE_VALIDATION_KIND,
+            "solver_envelope": GRID_REFERENCE_SOLVER_ENVELOPE,
             "declared_case_ids": GRID_REFERENCE_CASE_IDS,
             "case_count": results.len(),
             "cases": results.iter().map(|result| serde_json::json!({
                 "case_id": result.case_id,
+                "validation_kind": result.validation_kind,
+                "solver_envelope": result.solver_envelope,
                 "analytical_voltage_v": result.analytical_voltage_v,
                 "solver_voltage_v": result.solver_voltage_v,
                 "absolute_voltage_error_v": result.absolute_voltage_error_v,
@@ -603,6 +607,14 @@ mod tests {
         assert_eq!(
             report["domain_reference_suite"]["declared_case_ids"],
             serde_json::json!(GRID_REFERENCE_CASE_IDS)
+        );
+        assert_eq!(
+            report["domain_reference_suite"]["validation_kind"],
+            GRID_REFERENCE_VALIDATION_KIND
+        );
+        assert_eq!(
+            report["domain_reference_suite"]["solver_envelope"],
+            GRID_REFERENCE_SOLVER_ENVELOPE
         );
         assert_eq!(
             report["workflow_promotion_state"],
