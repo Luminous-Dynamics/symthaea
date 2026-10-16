@@ -484,13 +484,27 @@ fn build_report() -> Result<Value> {
             let correct = cases.iter()
                 .filter(|case| case["final_selection"]["selected_model_correct"].as_bool() == Some(true))
                 .count();
-            let mean_vmax_error = cases.iter()
-                .filter_map(|case| case["selected_fit_relative_error"]["vmax"].as_f64())
-                .sum::<f64>() / count as f64;
-            let mean_km_error = cases.iter()
-                .filter_map(|case| case["selected_fit_relative_error"]["km"].as_f64())
-                .sum::<f64>() / count as f64;
-            let mean_ki_error_cases: Vec<f64> = cases.iter()
+            // Parameter errors are aggregated only when the chosen model family matches the
+            // known synthetic generator. Wrong-family parameters are not treated as comparable
+            // parameter estimates merely because their JSON fields share a name.
+            let matched_cases: Vec<&Value> = cases.iter()
+                .filter(|case| case["final_selection"]["selected_model_correct"].as_bool() == Some(true))
+                .collect();
+            let mean_vmax_error = if matched_cases.is_empty() {
+                Value::Null
+            } else {
+                json!(matched_cases.iter()
+                    .filter_map(|case| case["selected_fit_relative_error"]["vmax"].as_f64())
+                    .sum::<f64>() / matched_cases.len() as f64)
+            };
+            let mean_km_error = if matched_cases.is_empty() {
+                Value::Null
+            } else {
+                json!(matched_cases.iter()
+                    .filter_map(|case| case["selected_fit_relative_error"]["km"].as_f64())
+                    .sum::<f64>() / matched_cases.len() as f64)
+            };
+            let mean_ki_error_cases: Vec<f64> = matched_cases.iter()
                 .filter_map(|case| case["selected_fit_relative_error"]["ki"].as_f64())
                 .collect();
             let mean_ki_error = if mean_ki_error_cases.is_empty() {
@@ -508,9 +522,11 @@ fn build_report() -> Result<Value> {
                 },
                 "correct_final_model_count": correct,
                 "final_model_selection_accuracy": correct as f64 / count as f64,
-                "mean_selected_fit_relative_vmax_error": mean_vmax_error,
-                "mean_selected_fit_relative_km_error": mean_km_error,
-                "mean_selected_fit_relative_ki_error_on_inhibition_truth": mean_ki_error
+                "parameter_error_case_count_with_correct_family": matched_cases.len(),
+                "mean_relative_vmax_error_on_correctly_selected_family": mean_vmax_error,
+                "mean_relative_km_error_on_correctly_selected_family": mean_km_error,
+                "ki_error_case_count_on_correctly_selected_inhibition_family": mean_ki_error_cases.len(),
+                "mean_relative_ki_error_on_correctly_selected_inhibition_family": mean_ki_error
             })
         })
         .collect();
