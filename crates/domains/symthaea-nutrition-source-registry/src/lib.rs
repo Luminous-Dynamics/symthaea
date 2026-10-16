@@ -14,7 +14,10 @@ use sha2::{Digest, Sha256};
 use url::Url;
 
 pub const NUTRITION_SOURCE_SCHEMA_VERSION: u16 = 1;
-pub const NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION: u16 = 1;
+/// Version 2 adds a canonicalization profile, outcome digest and evaluator identity.
+pub const NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION: u16 = 2;
+/// Increment when evaluator decision semantics change independently of the wire schema.
+pub const NUTRITION_EVALUATOR_CONTRACT_VERSION: u16 = 1;
 
 /// Identifies the exact hashing profile used by the current receipt envelope.
 /// JCS serializes JSON according to RFC 8785; wide nutrient quantities remain strings.
@@ -442,6 +445,14 @@ pub struct NutritionRegistryAssessmentV1 {
     pub receipt_schema_version: u16,
     /// Names the hashing/canonicalization profile used by this receipt.
     pub canonicalization_profile: NutritionCanonicalizationProfileV1,
+    /// Stable package identity embedded by Cargo during compilation.
+    pub evaluator_package_name: String,
+    /// Semantic crate release identity embedded by Cargo during compilation.
+    pub evaluator_package_version: String,
+    /// Version of the evaluator's decision semantics.
+    pub evaluator_contract_version: u16,
+    /// Optional build identity supplied by the build environment; absence is explicit.
+    pub evaluator_build_id: Option<String>,
     /// Context fields make the decision receipt self-describing for replay tooling.
     pub evaluation_date: String,
     pub source_id: String,
@@ -621,6 +632,10 @@ pub fn assess_nutrition_source(
     let mut assessment = NutritionRegistryAssessmentV1 {
         receipt_schema_version: NUTRITION_REGISTRY_RECEIPT_SCHEMA_VERSION,
         canonicalization_profile: NutritionCanonicalizationProfileV1::Rfc8785JcsV1,
+        evaluator_package_name: env!("CARGO_PKG_NAME").to_owned(),
+        evaluator_package_version: env!("CARGO_PKG_VERSION").to_owned(),
+        evaluator_contract_version: NUTRITION_EVALUATOR_CONTRACT_VERSION,
+        evaluator_build_id: option_env!("LUMINOUS_BUILD_ID").map(str::to_owned),
         evaluation_date: evaluation_date.to_owned(),
         source_id: manifest.source_id.clone(),
         source_record_id: fact.source_record_id.clone(),
@@ -1912,6 +1927,16 @@ mod tests {
         assert_eq!(
             result.canonicalization_profile,
             NutritionCanonicalizationProfileV1::Rfc8785JcsV1
+        );
+        assert_eq!(result.evaluator_package_name, env!("CARGO_PKG_NAME"));
+        assert_eq!(result.evaluator_package_version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            result.evaluator_contract_version,
+            NUTRITION_EVALUATOR_CONTRACT_VERSION
+        );
+        assert_eq!(
+            result.evaluator_build_id.as_deref(),
+            option_env!("LUMINOUS_BUILD_ID")
         );
         assert!(is_canonical_sha256(result.manifest_sha256.as_deref().expect("manifest digest")));
         assert!(is_canonical_sha256(result.food_fact_sha256.as_deref().expect("fact digest")));
