@@ -334,13 +334,13 @@
       "resource_tests_authored": 18,
       "repair_scheduling_tests_authored": 17,
       "robust_repair_evaluation_tests_authored": 10,
-      "total_rust_tests_authored": 112,
-      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, single-crew exact oracle/policy gaps 11, multi-crew exact oracle 8, independent schedule certificate verifier 11. None have been compiled or executed in the current environment.",
+      "total_rust_tests_authored": 113,
+      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6, single-crew exact oracle/policy gaps 11, multi-crew exact oracle 8, independent schedule certificate verifier 12. None have been compiled or executed in the current environment.",
       "rolling_horizon_repair_tests_authored": 11,
       "repair_policy_comparison_tests_authored": 6,
       "exact_oracle_tests_authored": 11,
       "multi_crew_oracle_tests_authored": 8,
-      "certificate_verifier_tests_authored": 11
+      "certificate_verifier_tests_authored": 12
     },
     "performance_targets": {
       "status": "proposed_unmeasured_targets",
@@ -1195,7 +1195,7 @@
       "nonfinite service weight or objective",
       "unknown and duplicate dependencies"
     ],
-    "tests_authored": 11,
+    "tests_authored": 12,
     "tests_executed": false,
     "mutation_campaign_target": 10000,
     "performance_status": "not_measured",
