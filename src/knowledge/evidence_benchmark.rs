@@ -236,7 +236,7 @@ pub struct BenchmarkScore {
 pub fn canonical_case_digest(case: &EvidenceBenchmarkCase) -> Result<String, String> {
     // Domain separation prevents this digest from being confused with a hash
     // produced for another artifact type that happens to use the same bytes.
-    const DOMAIN: &[u8] = b"SYMTHAEA-EVIDENCE-BENCHMARK-CASE-V1\\0";
+    const DOMAIN: &[u8] = b"SYMTHAEA-EVIDENCE-BENCHMARK-CASE-V1\0";
     let bytes = serde_json::to_vec(case).map_err(|e| format!("serialize digest payload: {e}"))?;
     let mut hasher = Sha256::new();
     hasher.update(DOMAIN);
