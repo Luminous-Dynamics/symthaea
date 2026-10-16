@@ -79,7 +79,7 @@ pub struct CampaignManifest {
     pub reference_cost_units: u32,
     pub minimum_quality_margin_milli: i32,
     pub process_profile_id: String,
-    /// Preloaded prior experiments shared equally by every policy arm; their costs count toward budget.
+    /// Prior experiments shared by all policy arms; costs count toward each budget.
     pub initial_actions: Vec<ExperimentAction>,
     pub candidates: Vec<Candidate>,
 }
@@ -174,7 +174,10 @@ impl CampaignManifest {
                 return Err("candidate IDs must be non-empty and unique".into());
             }
             if !(0..=10).contains(&candidate.factor_x) || !(0..=10).contains(&candidate.factor_y) {
-                return Err(format!("candidate {} lies outside the normalized domain", candidate.id));
+                return Err(format!(
+                    "candidate {} lies outside the normalized domain",
+                    candidate.id
+                ));
             }
             if candidate.process_profile_id != self.process_profile_id {
                 return Err(format!("candidate {} has a mismatched process profile", candidate.id));
@@ -188,7 +191,10 @@ impl CampaignManifest {
                 return Err(format!("candidate {} has an overflowing declared cost", candidate.id));
             }
             if !candidate.proxy_available && !candidate.reference_available {
-                return Err(format!("candidate {} has no available measurement fidelity", candidate.id));
+                return Err(format!(
+                    "candidate {} has no available measurement fidelity",
+                    candidate.id
+                ));
             }
         }
         let candidates_by_id: BTreeMap<&str, &Candidate> = self
@@ -344,7 +350,7 @@ pub struct ExperimentRecord {
 pub struct CampaignTranscript {
     pub manifest_digest: String,
     pub policy: Policy,
-    /// Policy RNG seed only; distinct from and not derived from the hidden oracle seed in this slice.
+    /// Policy RNG seed; separate from the hidden oracle seed.
     pub selector_seed: u64,
     pub records: Vec<ExperimentRecord>,
     /// Redundant aggregates are intentionally recomputed and checked by evaluate_transcript.
@@ -687,7 +693,8 @@ fn measurement_digest(
 }
 
 fn digest_serializable<T: Serialize>(value: &T) -> Result<String, String> {
-    let bytes = serde_json::to_vec(value).map_err(|error| format!("serialization failed: {error}"))?;
+    let bytes = serde_json::to_vec(value)
+        .map_err(|error| format!("serialization failed: {error}"))?;
     Ok(hex::encode(Sha256::digest(bytes)))
 }
 
@@ -920,7 +927,8 @@ mod tests {
 
     #[test]
     fn selector_view_does_not_expose_scenario_oracle_version_or_oracle_seed() {
-        let manifest = CampaignManifest::reference(ScenarioFamily::MultiFidelityDiscrepancy, 99, 10);
+        let manifest =
+            CampaignManifest::reference(ScenarioFamily::MultiFidelityDiscrepancy, 99, 10);
         let view = manifest.public_view();
         assert_eq!(view.benchmark_id, BENCHMARK_ID);
         // The public view's type has no scenario, oracle_version or oracle_seed fields by design.
@@ -968,7 +976,11 @@ mod tests {
         let manifest = CampaignManifest::reference(ScenarioFamily::ConfoundedFactors, 9, 20);
         assert_eq!(manifest.initial_actions.len(), 3);
         assert_eq!(
-            manifest.initial_actions.iter().map(|action| action.candidate_id.as_str()).collect::<Vec<_>>(),
+            manifest
+                .initial_actions
+                .iter()
+                .map(|action| action.candidate_id.as_str())
+                .collect::<Vec<_>>(),
             vec!["C02-02", "C05-05", "C08-08"]
         );
         let transcript =
