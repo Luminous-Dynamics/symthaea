@@ -55,8 +55,8 @@ Treat Lean source as untrusted input: no network access, bounded wall time/memor
 
 Use [#6220](https://github.com/Luminous-Dynamics/symthaea/issues/6220) as the first evaluation target because its theorem families and hostile controls are already explicit. Candidate references include:
 
-- [OpenAI: logarithmic and entropy inequalities](https://github.com/openai/math/blob/main/lean/OAI/Analysis/LpDimension/Entropy.lean)
-- [OpenAI: relative entropy](https://github.com/openai/math/blob/main/lean/OAI/Probability/SKRatio/Entropy/Entropy.lean)
+- [OpenAI: logarithmic and entropy inequalities](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6a/lean/OAI/Analysis/LpDimension/Entropy.lean)
+- [OpenAI: relative entropy](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6a/lean/OAI/Probability/SKRatio/Entropy/Entropy.lean)
 
 These files are **references to inspect**, not yet approved runtime dependencies. Extract only relevant lemma names, precise assumptions, and proof ideas. Prove the Symthaea statements under its canonical environment. In particular, keep separate:
 - exact theorems over real numbers;
@@ -76,6 +76,22 @@ cargo run -p xtask -- proof-corpus-validate
 The command is intentionally metadata-only. It validates the schema version, required negative-control policy, unique entry IDs, lowercase 40-hex commit/blob identities, exact source-path-to-pinned-URL correspondence, and candidate-only status. It does not fetch upstream files, compile Lean, or qualify any theorem. Unit tests cover a valid fixture, floating branch URL rejection, accidental status promotion, omitted hostile controls, and duplicate identities.
 
 This provides a deterministic low-cost gate before any proof retrieval/qualification work. Its own compile/test result is still unverified until executed against this exact branch head.
+
+## External retrieval baseline: LeanSearch v2
+
+The pinned candidate manifest also records [LeanSearch v2](https://github.com/frenzymath/LeanSearch-v2/tree/94f4888cbaf9f4322535755f86cbac690ec18080) as an **evaluation reference**, not a Symthaea production dependency. Its authors distinguish standard semantic retrieval from a reasoning loop for **global premise retrieval**—recovering a set of lemmas needed by a complete theorem rather than selecting only the next tactic's premise.
+
+The paper reports (these are upstream reported results, not independently reproduced by this RFC) 46.1% recovery of ground-truth premise groups within 10 retrieved candidates on a 69-query research-level Mathlib benchmark, versus 38.0% for the next-best compared retrieval system and 9.3% for premise-selection baselines. A fixed downstream prover loop reported 20% proof success with its retrieval versus 16% for the next-best compared retriever and 4% without retrieval. See the [paper](https://arxiv.org/abs/2605.13137) and its [benchmark repository](https://github.com/frenzymath/LeanSearch-v2/tree/94f4888cbaf9f4322535755f86cbac690ec18080/benchmark).
+
+This motivates a key design change: evaluate **whole-premise-set recall and downstream proof closure together**. A system that ranks one individually relevant lemma highly but misses the other essential premises may still fail to prove the goal. Compare, on the same frozen queries:
+
+- B0: current hand-coded tactic cascade (no learned retrieval);
+- B1: deterministic lexical/type/operator retrieval;
+- B2: LeanSearch v2 reference/retrieval outputs where the exact benchmark split and environment are comparable;
+- B3: HDC similarity reranking alone;
+- B4: hybrid retrieval combining structural filters, global-premise candidates, and optional HDC reranking.
+
+Do not claim a fair head-to-head result from published leaderboard figures alone. LeanSearch v2 documents a Mathlib v4.28.0-rc1 corpus and GPU/embedding/reranker dependencies for local reproduction, while Symthaea's canonical environment is separately pinned. Do not introduce its Python/GPU stack into production Rust. First run the deterministic local baseline; use external results as context until a compatible, reproducible retrieval run is available. Retrieval quality is not proof validity: every generated proof remains subject to Symthaea's independent checker and hostile controls.
 
 ## Evaluation design
 
