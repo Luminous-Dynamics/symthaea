@@ -17,7 +17,11 @@ on:
     paths:
       - "scripts/validate_socioeconomic_run_bundle.py"
       - "scripts/test_validate_socioeconomic_run_bundle.py"
+      - "scripts/write_socioeconomic_run_bundle_ci_report.py"
+      - "scripts/test_write_socioeconomic_run_bundle_ci_report.py"
+      - "scripts/socioeconomic_run_receipt_requirements.txt"
       - "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json"
       - "docs/research/finance/SYM-FIN-SYS-016_RUN_BUNDLE_V1.md"
       - ".github/workflows/socioeconomic-run-bundle.yml"
   workflow_dispatch:
@@ -36,15 +40,25 @@ jobs:
   exact-head-bundle-tests:
     name: Exact-head run-bundle negative controls
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 8
+    env:
+      CIVOS_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - name: Check out event revision
+      - name: Check out exact source head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 immutable commit
-      - name: Record exact revision
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record and verify exact revision
         run: |
+          actual="$(git rev-parse HEAD)"
           printf 'repository=%s\n' "$GITHUB_REPOSITORY"
-          printf 'sha=%s\n' "$GITHUB_SHA"
+          printf 'event_sha=%s\n' "$GITHUB_SHA"
+          printf 'source_revision=%s\n' "$actual"
+          test "$actual" = "$CIVOS_SOURCE_REVISION"
           git status --short
+      - name: Install pinned receipt validation dependencies
+        run: python3 -m pip install --disable-pip-version-check -r scripts/socioeconomic_run_receipt_requirements.txt
       - name: Run standard-library adversarial tests
         run: |
           set -o pipefail
@@ -80,6 +94,7 @@ jobs:
           path: evidence/
           if-no-files-found: error
       - name: Sign qualification report with GitHub artifact attestation
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: evidence/qualification-report.json
