@@ -10,6 +10,7 @@
 **Benchmark standards:** [NANOTECHNOLOGY_BENCHMARK_CHARTER.md](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md) defines common evidence gates and task-specific benchmarks across the nano portfolio.  
 **New Rust selection prototype:** [tools/nano-policy](../../tree/research/nano-001-atomistic-discovery/tools/nano-policy) provides random, cheapest-first, max-min diversity, and cost-aware diversity policies for controlled evaluation.
 **Domain atlas:** [NANOTECHNOLOGY_DOMAIN_ATLAS.md](./NANOTECHNOLOGY_DOMAIN_ATLAS.md) — expands the application taxonomy without assuming scientific transfer across fields.
+**NIST Fe–Co–Ni measured thin-film benchmark:** [NANOTECHNOLOGY_NIST_FECO_NI_BENCHMARK_PLAN.md](./NANOTECHNOLOGY_NIST_FECO_NI_BENCHMARK_PLAN.md), tracked by [NANO-007](https://github.com/Luminous-Dynamics/symthaea/issues/7644). It is an offline replay of 921 historic measured samples and is blocked on explicit data-use terms, local integrity/schema validation, and baseline reproduction.
 **Independent policy benchmark:** [NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md](./NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md), tracked by [NANO-003](https://github.com/Luminous-Dynamics/symthaea/issues/7519). This tests discovery-policy value in MADE's convex-hull task and does not replace OC22 validation.  
 **Checkpoint eligibility gate:** [NANO-001C #7465](https://github.com/Luminous-Dynamics/symthaea/issues/7465)
 
