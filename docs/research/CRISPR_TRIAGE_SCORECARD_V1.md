@@ -375,4 +375,6 @@ The dependency-free Rust utility is [scripts/crispr_interval_frontier.rs](../../
     rustc --edition=2024 --test scripts/crispr_interval_frontier.rs -o /tmp/crispr-interval-tests
     /tmp/crispr-interval-tests
 
+Independent F11 arithmetic matches the expected robust frontier and all three possible-only dominance pairs. A separate endpoint oracle checked 5,184 two-objective interval-pair vectors across all four maximize/minimize direction combinations, and 82,944 endpoint assignments; possible- and robust-dominance relations had zero mismatches. This validates only the mathematical relation definitions for those enumerated intervals, not the Rust source or any statistical/biological claim.
+
 The next acceptance check is independent F11 evaluation plus point-frontier vs interval-frontier disagreement reporting on exactly the same metric episodes. No biological cohort or Symthaea improvement has been evaluated.
