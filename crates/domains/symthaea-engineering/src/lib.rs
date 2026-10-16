@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+/// Event-triggered rolling-horizon repair dispatch under partial information.
+pub mod rolling_horizon_repair;
+
 /// Out-of-sample repair-policy evaluation under duration uncertainty.
 pub mod robust_repair_evaluation;
 
