@@ -42,6 +42,22 @@ Call `symthaea_nano_policy::receipt::verify_receipt(request_line, response_line)
 
 This checker does **not** rerun the selector or prove that the chosen candidates are optimal, scientifically useful, safe, novel, or physically valid. Use it as a structural receipt gate; a separate benchmark checker must independently recompute task-specific metrics from held-out labels/observations.
 
+## Independent post-outcome metrics
+
+The crate exposes `symthaea_nano_policy::metrics::evaluate_json_ledger` and a separate CLI that evaluates a completed outcome ledger:
+
+    cargo run --locked -p symthaea-nano-policy --bin nano-policy-metrics -- --input crates/domains/symthaea-nano-policy/fixtures/synthetic-outcome-ledger.json --bootstrap-replicates 200 --seed 17 > metrics-report.json
+
+The evaluator is deliberately downstream of selection. **Never feed the outcome ledger or metrics report to the selector.** It hashes the exact input bytes itself, rejects unknown fields, verifies identical target IDs and declared group IDs across arms, validates query-rank and status/loss semantics, and preserves all attempted-call costs including failures.
+
+It computes success-at-budget, normalized success AUC (mean success fraction across budget points 1..K), target coverage, oracle failure/valid rate, repeated candidate attempts, best loss among covered targets, mean cost per target, cost to first success, and paired group-bootstrap comparisons against the declared baseline. Comparison intervals are withheld unless at least five groups are declared. That minimum is only a guard against tiny-group pseudo-precision; it does not establish power or prove the groups are truly independent.
+
+Schemas:
+- Post-outcome ledger: `schema/outcome-ledger.schema.json`
+- Metrics report: `schema/benchmark-metrics-report.schema.json`
+
+The checked-in ledger is a synthetic unit/smoke fixture, not scientific data. Real scored comparisons still require the source/rights, holdout, oracle, and independent structural-receipt gates described in `BENCHMARK.md`.
+
 ## Fail-closed contract
 
 - Unknown fields are rejected. Target/label fields, optical target spectra, test membership and oracle observations must not be included.
