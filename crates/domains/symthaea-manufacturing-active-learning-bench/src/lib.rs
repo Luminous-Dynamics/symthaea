@@ -793,6 +793,22 @@ mod tests {
     }
 
     #[test]
+    fn reference_campaign_manifests_match_frozen_sha256_digests() {
+        let expected = [
+            "bfa52af9d1757884b93c5a22697b3f9998ca856bdbce4a373589dde417d1839d",
+            "db1d841d72d6832cfd20e4f690021c9c13cf8bf918f95b027dd3573fce7ae224",
+            "462ee2467a5dd3237ef464af882be8c01bc2b17d302b8be956dacc7db655a14e",
+            "2bfcf6e510318ef52d8c2fb30eb241c0c006da00b13ebc1482010dfa40cd4715",
+            "d7adbd9fe23851f7a1f65e6f265faa9d5115504371deaa5882d04b2aad94a245",
+        ];
+        for (index, scenario) in ScenarioFamily::ALL.into_iter().enumerate() {
+            let manifest =
+                CampaignManifest::reference(scenario, 0x4d46_4700_u64 + index as u64, 20);
+            assert_eq!(manifest.digest().unwrap(), expected[index], "scenario={scenario:?}");
+        }
+    }
+
+    #[test]
     fn selector_view_does_not_expose_scenario_oracle_version_or_oracle_seed() {
         let manifest = CampaignManifest::reference(ScenarioFamily::MultiFidelityDiscrepancy, 99, 10);
         let view = manifest.public_view();
