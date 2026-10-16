@@ -65,6 +65,18 @@ These files are **references to inspect**, not yet approved runtime dependencies
 
 Do not acquire Mathlib ad hoc or create a FEP-local Lake root. The exact admitted Lean project, Mathlib revision, toolchain bytes, manifest digest and qualification workflow must be used as specified by the existing formal-verification lineage.
 
+## Executable first slice
+
+The branch adds a Rust `xtask` preflight validator for the candidate manifest:
+
+```sh
+cargo run -p xtask -- proof-corpus-validate
+```
+
+The command is intentionally metadata-only. It validates the schema version, required negative-control policy, unique entry IDs, lowercase 40-hex commit/blob identities, exact source-path-to-pinned-URL correspondence, and candidate-only status. It does not fetch upstream files, compile Lean, or qualify any theorem. Unit tests cover a valid fixture, floating branch URL rejection, accidental status promotion, omitted hostile controls, and duplicate identities.
+
+This provides a deterministic low-cost gate before any proof retrieval/qualification work. Its own compile/test result is still unverified until executed against this exact branch head.
+
 ## Evaluation design
 
 Freeze a baseline for the current hand-coded cascade before introducing retrieval. Partition by **goal family/source**, not random individual goals, to limit train/test leakage. Include curated, auto-ingested, and generated hostile examples. Publish the task manifest, exclusions and exact verifier environment.
