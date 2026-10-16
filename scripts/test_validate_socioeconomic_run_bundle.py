@@ -53,6 +53,7 @@ class RunBundleValidatorTests(unittest.TestCase):
             "record_kind": "synthetic_simulation_receipt",
             "claim_ceiling": CLAIM_CEILING,
             "run": {
+                "run_id": "run-test-1",
                 "artifact_manifest_digest": "",
                 "world_seed_digest": digest(self.payload),
             },
@@ -109,6 +110,12 @@ class RunBundleValidatorTests(unittest.TestCase):
         self.manifest["artifacts"][0]["path"] = "../outside.json"
         self._write_pair()
         with self.assertRaisesRegex(ValidationFailure, "unsafe relative path"):
+            validate_bundle(self.root, "bundle-manifest.json")
+
+    def test_receipt_digest_role_must_match_artifact_role(self) -> None:
+        self.manifest["artifacts"][0]["role"] = "environment"
+        self._write_pair()
+        with self.assertRaisesRegex(ValidationFailure, "expected artifact role 'world_seed'"):
             validate_bundle(self.root, "bundle-manifest.json")
 
     def test_duplicate_artifact_identity_is_rejected(self) -> None:
