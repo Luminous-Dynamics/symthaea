@@ -138,6 +138,20 @@ fn failed_early(request_sha256: &str, check: &str, detail: String) -> ReceiptAud
 /// request contract before the receipt can be accepted.
 pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
     let request_sha256 = digest(request_line.as_bytes());
+    if request_line.len() > crate::MAX_LINE_BYTES {
+        return failed_early(
+            &request_sha256,
+            "request_size",
+            format!("Request line exceeds {} bytes.", crate::MAX_LINE_BYTES),
+        );
+    }
+    if response_line.len() > crate::MAX_LINE_BYTES {
+        return failed_early(
+            &request_sha256,
+            "response_size",
+            format!("Response line exceeds {} bytes.", crate::MAX_LINE_BYTES),
+        );
+    }
 
     let request: SelectionRequest = match serde_json::from_str(request_line) {
         Ok(request) => request,
