@@ -493,6 +493,9 @@ mod tests {
             primary_score: 0.80,
             control_scores: BTreeMap::from([
                 (AnimalControl::ShuffledContext, 0.79),
+                (AnimalControl::IdentityOnly, 0.79),
+                (AnimalControl::LocationOnly, 0.79),
+                (AnimalControl::AcousticOnly, 0.79),
                 (AnimalControl::HeldOutIndividuals, 0.79),
                 (AnimalControl::HeldOutSites, 0.79),
             ]),
