@@ -208,3 +208,66 @@ Protocol requirements for this track:
 7. Treat a 95% event-recall objective as a preregistered operating-point hypothesis only when paired with an explicit false-alarm constraint, a useful lead-time requirement, held-out results and uncertainty. It is not, by itself, a safety claim or a hardware-operating recommendation.
 
 The target distinction remains: synthetic demonstrations test implementation; source/data integrity tests establish lineage; numerical verification tests equations and discretization; comparison with published references checks reproducibility; experimental agreement tests a model against measurements. Passing one state does not promote it to another.
+
+## 12. Decision-reversal challenge: benchmark the value of each expensive run
+
+The next paradigm shift is to choose a simulation or experiment based on its expected ability to change a consequential engineering decision, not simply on the surrogate's predicted improvement or on uncertainty magnitude alone. This extends multifidelity optimization; it does not imply that an information-gain policy is automatically superior. Published multifidelity work explicitly finds that gains depend on the cost and informativeness of the lower-fidelity source, and recent multifidelity expected-information-gain estimators reduce Monte Carlo estimation variance only under their stated assumptions. Those are reasons to test selection policies under controls, not assume their advantage.
+
+References:
+- Sabanza-Gil et al. (2025), “Best practices for multi-fidelity Bayesian optimization in materials and molecular research,” *Nature Computational Science* 5, 572–581. https://doi.org/10.1038/s43588-025-00822-9
+- Coons & Huan (2025), “A Multifidelity Estimator of the Expected Information Gain for Bayesian Optimal Experimental Design,” *SIAM/ASA Journal on Uncertainty Quantification* 13(4), 1990–2021. https://doi.org/10.1137/25M1731812
+- Fan et al. (2024), “Multi-fidelity Bayesian Optimization with Multiple Information Sources of Input-dependent Fidelity,” *UAI 2024*, PMLR 244, 1271–1293. https://proceedings.mlr.press/v244/fan24a.html
+
+### Freeze the decision before selecting a run
+
+For each challenge case, define a quantity of interest, units, permitted regime, uncertainty/tolerance, and decision boundary before evaluating candidate policies. Example form: a proposed design is feasible only if its predicted response and uncertainty remain within a preregistered physical or engineering constraint. The decision threshold must be supported by the intended use and evidence; if it cannot be justified, the case remains not scoreable.
+
+For each candidate design/run/fidelity, store:
+- cost estimate and observed wall time / CPU-GPU solver-hours;
+- the predicted distribution for the registered quantity of interest, not only a point estimate;
+- which physical regime and assumption envelope qualify the prediction;
+- expected change to the decision and expected reduction in decision regret;
+- expected information gain, if calculated, as a separate metric with its estimator, prior, likelihood/noise model and Monte Carlo error;
+- whether a more costly model or experiment is required to qualify the final decision.
+
+Do not blend information gain, physical error and decision regret into a single leaderboard score unless a decision-maker has pre-registered and justified a common utility function.
+
+### Policies to compare under one fixed total-cost budget
+
+1. Random/space-filling sampling.
+2. Cheap-model-only optimization.
+3. Fixed-ratio escalation to the higher-cost solver.
+4. Classical surrogate expected-improvement policy.
+5. Uncertainty-only escalation.
+6. Decision-aware escalation based on predicted risk of decision reversal / expected reduction in regret.
+7. Information-gain-per-cost selection, only when the hypotheses and observation likelihood are well-defined.
+
+All policies receive the same candidate pool, costs, initial evidence, high-fidelity budget and hidden evaluation cases. The experiment-selection policy must not read the high-fidelity target for a candidate before choosing that candidate. The final candidate must still be confirmed against the high-fidelity reference or a physical measurement appropriate to the claim.
+
+### Decision-reversal challenge set
+
+Include cases where the low-cost model:
+- is accurate in most of the domain but badly biased near a decision boundary;
+- has input-dependent fidelity (accurate in one region, unreliable in another);
+- is overconfident outside the qualified envelope;
+- disagrees with the expensive model for a physically meaningful reason;
+- is poorly correlated with the expensive model and therefore provides little useful information;
+- returns convergence failure, timeout, invalid units, a stale result or incomplete dependencies;
+- has uncertainty that grows, shrinks incorrectly, or fails calibration under distribution shift.
+
+The challenge must include cases in which the cheapest model is enough and cases in which it would cause a wrong decision. A policy that escalates every case may avoid some false-safe decisions but is not cost efficient; a policy that never escalates is cheap but can be dangerously overconfident. Report both failure modes.
+
+### Acceptance metrics
+
+Report each of the following independently:
+- **False-safe rate:** frequency that the chosen action/design is declared acceptable but the registered high-fidelity reference violates the predefined constraint beyond tolerance.
+- **Decision regret:** loss in the registered decision utility relative to the best decision supported by the reference evidence.
+- **Qualified-decision rate:** fraction of cases where the policy provides an in-envelope, sufficiently supported decision instead of unsupported certainty.
+- **Escalation precision and recall:** whether expensive calls occur on cases where they materially alter the qualified decision; include avoided-but-needed escalations separately.
+- **Cost to decision:** solver-hours, wall-clock, memory/GPU-hours and total attempted/failed calls required to meet the registered decision quality.
+- **Calibration and abstention:** coverage/width by regime; unsupported cases must abstain, not silently revert to defaults.
+- **Reproducibility:** per-seed paired results, dependency closure, and exact source/config/input hashes.
+
+**Proposed target, not an observed result:** demonstrate at least 25% fewer high-cost solver-hours than fixed-ratio escalation at equal or better held-out decision quality, with no increase in false-safe decisions or physical constraint violations. Require paired uncertainty intervals and retain failed attempts. A reduction in calls alone does not pass.
+
+For the first screen, use a rights-cleared deterministic analytical/synthetic challenge with known answers, then a source-pinned solver reference. Only after those gates should any claim be tested against physical measurements. Simulation-derived labels must never be described as experimental validation.
