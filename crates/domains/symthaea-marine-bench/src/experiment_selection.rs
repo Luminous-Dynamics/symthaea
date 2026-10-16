@@ -246,6 +246,8 @@ pub struct PolicySummary {
 pub struct BenchmarkBody {
     pub schema_version: String,
     pub suite_id: String,
+    /// Exact source revision supplied by the caller; "unavailable" is explicit if not known.
+    pub benchmark_source_revision: String,
     pub experiment_catalog_version: String,
     pub scenario_generator_version: String,
     pub toy_oracle_version: String,
@@ -272,6 +274,7 @@ pub enum BenchmarkError {
     EmptySeeds,
     DuplicateSeed(u64),
     Serialization(String),
+    EmptySourceRevision,
 }
 
 impl fmt::Display for BenchmarkError {
@@ -283,6 +286,7 @@ impl fmt::Display for BenchmarkError {
             Self::Serialization(message) => {
                 write!(f, "could not serialize benchmark receipt: {message}")
             }
+            Self::EmptySourceRevision => write!(f, "benchmark source revision must not be empty"),
         }
     }
 }
@@ -722,6 +726,25 @@ pub fn run_reference_benchmark(
     paired_seeds: &[u64],
     budget_units_per_scenario: u32,
 ) -> Result<BenchmarkReceipt, BenchmarkError> {
+    run_reference_benchmark_with_revision(
+        scenario_count,
+        paired_seeds,
+        budget_units_per_scenario,
+        "unspecified",
+    )
+}
+
+/// Runs the synthetic suite and binds the caller-supplied exact source revision
+/// into the receipt. Use "unavailable" rather than guessing when no revision is known.
+pub fn run_reference_benchmark_with_revision(
+    scenario_count: usize,
+    paired_seeds: &[u64],
+    budget_units_per_scenario: u32,
+    source_revision: &str,
+) -> Result<BenchmarkReceipt, BenchmarkError> {
+    if source_revision.trim().is_empty() {
+        return Err(BenchmarkError::EmptySourceRevision);
+    }
     if scenario_count == 0 {
         return Err(BenchmarkError::EmptyScenarioSet);
     }
@@ -796,6 +819,7 @@ pub fn run_reference_benchmark(
     let body = BenchmarkBody {
         schema_version: BENCHMARK_SCHEMA_VERSION.to_owned(),
         suite_id: "marine-experiment-selection-synthetic-v1".to_owned(),
+        benchmark_source_revision: source_revision.to_owned(),
         experiment_catalog_version: EXPERIMENT_CATALOG_VERSION.to_owned(),
         scenario_generator_version: SCENARIO_GENERATOR_VERSION.to_owned(),
         toy_oracle_version: TOY_ORACLE_VERSION.to_owned(),
