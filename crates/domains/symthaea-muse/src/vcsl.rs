@@ -94,6 +94,19 @@ struct SampleStyleMapping {
     relative_directory: &'static str,
 }
 
+/// Return the declared kind for a named style of this instrument.
+/// This distinguishes an unknown request from a known style whose local assets
+/// are absent; it does not imply that a local bank was loaded.
+pub(crate) fn sample_style_kind(
+    instrument: Instrument,
+    style_name: &str,
+) -> Option<&'static str> {
+    additional_sample_style_mappings(instrument)
+        .iter()
+        .find(|style| style.style_name == style_name)
+        .map(|style| style.style_kind)
+}
+
 /// Explicitly verified alternate sound/articulation folders. These are catalogued
 /// separately from each instrument's default sustain and short-articulation bank;
 /// inventory evidence does not imply that the renderer selects them automatically.
@@ -874,7 +887,7 @@ impl VcslLibrary {
         self.pick_style(instrument, style_name, midi, velocity, 0).is_some()
     }
 
-    fn style_bank(&self, instrument: Instrument, style_name: &str) -> Option<&InstrumentBank> {
+    pub(crate) fn style_bank(&self, instrument: Instrument, style_name: &str) -> Option<&InstrumentBank> {
         self.style_banks
             .iter()
             .find_map(|((candidate_instrument, candidate_style), bank)| {
