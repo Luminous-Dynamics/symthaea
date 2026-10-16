@@ -28,9 +28,9 @@ The current policies are transparent baselines, not claims that hybrid selection
 The binary reads one JSON request from stdin and writes one JSON response to stdout. Errors go to stderr and exit non-zero.
 
 - Request schema: `nano-policy-input-v1`; output schema: `nano-policy-output-v1`.
-- Features must use a frozen, recorded transformation and lie in [-1, 1].
-- Every feature vector must have the same dimension and feature-space semantics.
-- `predicted_goal_error`, `uncertainty` and `estimated_cost` must be estimates available *before* querying the true oracle. The policy does not accept oracle labels, post-query observations or arbitrary metadata: unknown fields are rejected during JSON parsing.
+- Features must use a frozen, recorded transformation and lie in [-1, 1]. The feature space includes a lowercase SHA-256 digest of the preprocessing specification.
+- Every feature vector must have the same dimension and declared feature-space semantics.
+- `predicted_goal_error`, `uncertainty` and `estimated_cost` must be estimates available *before* querying the true oracle. For signals used by the policy, the request must include the matching estimator/method ID and SHA-256 digest. Unknown fields are rejected during JSON parsing; oracle labels and post-query observations are not part of the request schema.
 - `eligible=false` or `already_queried=true` excludes a row. Duplicate IDs, invalid values, missing required signals and over-budget batch sizes are rejected, not silently repaired.
 - `anchors` are predeclared feature vectors for already evaluated/reference candidates in the same feature space. Never include hidden outcomes in anchors.
 - The selector cannot certify optical performance. A downstream domain-native forward solver (e.g. MEEP) must evaluate the chosen designs and its output must be separately recorded.
@@ -40,12 +40,14 @@ The binary reads one JSON request from stdin and writes one JSON response to std
 From this directory, after installing a compatible Rust toolchain:
 
 ```bash
+cargo generate-lockfile
+# Review and commit Cargo.lock together with the resolved toolchain identity.
 cargo fmt --check
 cargo test --locked
 cargo run --locked -- < examples/request.json
 ```
 
-The first dependency-resolution/build step must generate and commit a `Cargo.lock`; then `--locked` must succeed. This prototype was authored without cargo/rustc available in the current runtime, so do not claim it compiles or that its tests have passed until the exact revision is built and the test output is captured.
+The current runtime did not have Cargo/rustc/rustfmt available, so the lockfile has not yet been generated and no compilation or tests have run. Do not claim a build/test pass until the lockfile is committed and the exact commands succeed. This prototype was authored without cargo/rustc available in the current runtime, so do not claim it compiles or that its tests have passed until the exact revision is built and the test output is captured.
 
 ## Benchmark design
 
