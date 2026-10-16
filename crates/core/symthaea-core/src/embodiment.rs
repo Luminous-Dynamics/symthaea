@@ -456,9 +456,69 @@ pub enum PlantStepTimingErrorV1 {
     MissingClockEpoch,
     NonIncreasingTimestamps,
     ConfiguredSourceCannotBeMeasured,
+    UnexpectedClockMetadata,
+    MissingSourceTimestamps,
+    InconsistentDuration,
 }
 
 impl PlantStepTimingV1 {
+    /// Validate invariants even when a record arrived through a non-constructor path
+    /// such as deserialization or a public-field update.
+    pub fn validate(&self) -> Result<(), PlantStepTimingErrorV1> {
+        if !self.dt_seconds.is_finite() {
+            return Err(PlantStepTimingErrorV1::NonFiniteDuration);
+        }
+        if self.dt_seconds <= 0.0 {
+            return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+        }
+        match self.source {
+            PlantStepTimeSourceV1::ConfiguredSimulationStep => {
+                if self.clock_domain_id.is_some()
+                    || self.clock_epoch_id.is_some()
+                    || self.start_timestamp_ns.is_some()
+                    || self.end_timestamp_ns.is_some()
+                {
+                    return Err(PlantStepTimingErrorV1::UnexpectedClockMetadata);
+                }
+            }
+            PlantStepTimeSourceV1::MeasuredMonotonicClock
+            | PlantStepTimeSourceV1::MeasuredDeviceClock => {
+                let domain = self
+                    .clock_domain_id
+                    .as_deref()
+                    .ok_or(PlantStepTimingErrorV1::MissingClockDomain)?;
+                if domain.trim().is_empty() {
+                    return Err(PlantStepTimingErrorV1::MissingClockDomain);
+                }
+                let epoch = self
+                    .clock_epoch_id
+                    .as_deref()
+                    .ok_or(PlantStepTimingErrorV1::MissingClockEpoch)?;
+                if epoch.trim().is_empty() {
+                    return Err(PlantStepTimingErrorV1::MissingClockEpoch);
+                }
+                let start = self
+                    .start_timestamp_ns
+                    .ok_or(PlantStepTimingErrorV1::MissingSourceTimestamps)?;
+                let end = self
+                    .end_timestamp_ns
+                    .ok_or(PlantStepTimingErrorV1::MissingSourceTimestamps)?;
+                let elapsed_ns = end
+                    .checked_sub(start)
+                    .filter(|elapsed| *elapsed > 0)
+                    .ok_or(PlantStepTimingErrorV1::NonIncreasingTimestamps)?;
+                let expected_dt = (elapsed_ns as f64 / 1_000_000_000.0) as f32;
+                if !expected_dt.is_finite() || expected_dt <= 0.0 {
+                    return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+                }
+                if expected_dt != self.dt_seconds {
+                    return Err(PlantStepTimingErrorV1::InconsistentDuration);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Create a deterministic fixed-step simulator timing record.
     ///
     /// This duration is model time and must not be scaled by cognitive tau_factor.
@@ -472,7 +532,7 @@ impl PlantStepTimingV1 {
         if dt_seconds <= 0.0 {
             return Err(PlantStepTimingErrorV1::NonPositiveDuration);
         }
-        Ok(Self {
+        let timing = Self {
             step_index,
             dt_seconds,
             source: PlantStepTimeSourceV1::ConfiguredSimulationStep,
@@ -480,7 +540,9 @@ impl PlantStepTimingV1 {
             clock_epoch_id: None,
             start_timestamp_ns: None,
             end_timestamp_ns: None,
-        })
+        };
+        timing.validate()?;
+        Ok(timing)
     }
 
     /// Construct a plant-step record from a qualified measured clock interval.
@@ -518,7 +580,7 @@ impl PlantStepTimingV1 {
         if dt_seconds <= 0.0 {
             return Err(PlantStepTimingErrorV1::NonPositiveDuration);
         }
-        Ok(Self {
+        let timing = Self {
             step_index,
             dt_seconds,
             source,
@@ -526,7 +588,9 @@ impl PlantStepTimingV1 {
             clock_epoch_id: Some(clock_epoch_id),
             start_timestamp_ns: Some(start_timestamp_ns),
             end_timestamp_ns: Some(end_timestamp_ns),
-        })
+        };
+        timing.validate()?;
+        Ok(timing)
     }
 }
 
@@ -553,8 +617,9 @@ pub trait EmbodimentBridge: Send + Sync {
         thought_hv: &ContinuousHV,
         timing: &PlantStepTimingV1,
         phi: f64,
-    ) -> EmbodimentResult {
-        self.step(thought_hv, timing.dt_seconds, phi)
+    ) -> Result<EmbodimentResult, PlantStepTimingErrorV1> {
+        timing.validate()?;
+        Ok(self.step(thought_hv, timing.dt_seconds, phi))
     }
 
     /// Apply active inference motor reflexes (Channel 1/3) based on prediction error.
@@ -829,6 +894,31 @@ mod tests {
                 6,
             ),
             Err(PlantStepTimingErrorV1::MissingClockEpoch)
+        );
+    }
+
+    #[test]
+    fn plant_timing_validation_rejects_deserialized_inconsistent_records() {
+        let mut timing = PlantStepTimingV1::measured_interval(
+            11,
+            PlantStepTimeSourceV1::MeasuredDeviceClock,
+            "device-clock",
+            "session-8",
+            100,
+            200,
+        )
+        .unwrap();
+        timing.dt_seconds = 0.25;
+        assert_eq!(
+            timing.validate(),
+            Err(PlantStepTimingErrorV1::InconsistentDuration)
+        );
+
+        let mut simulation = PlantStepTimingV1::configured_simulation(12, 0.01).unwrap();
+        simulation.clock_domain_id = Some("untrusted-extra-metadata".into());
+        assert_eq!(
+            simulation.validate(),
+            Err(PlantStepTimingErrorV1::UnexpectedClockMetadata)
         );
     }
 
