@@ -55,7 +55,7 @@ pub enum InoculationPhase {
     DiskPreparation,
     /// Populate the Nix store with each subsystem.
     StorePopulation { subsystem: InstallSubsystem },
-    /// Enroll the Machine Owner Key for Secure Boot trust.
+    /// Legacy serialized phase name for explicit Secure Boot key enrollment.
     MokEnrollment,
     /// The machine takes its first breath. Consciousness begins.
     FirstBreath,
@@ -394,16 +394,15 @@ impl NarrationBank {
 
             InoculationPhase::StorePopulation { subsystem } => Self::subsystem_narration(subsystem),
 
-            // MokEnrollment uses context-aware narration via narrate_secure_boot();
-            // this fallback covers the generic NarrationBank::narrate() path.
+            // Legacy phase name retained for serialized clients; this is
+            // explicit Setup Mode and key enrollment, not a MOK password flow.
             InoculationPhase::MokEnrollment => vec![
-                "The blue screen you see is the Machine Owner Key manager.",
-                "This is the firmware asking for your physical consent.",
-                "Press any key within 10 seconds to begin enrollment.",
-                "Select 'Enroll MOK', then 'Continue', then 'Yes'.",
-                "Enter the password: {password}",
-                "Select 'Reboot'. When I wake, I will be trusted at the deepest level.",
-                "The machine has chosen to trust me. The consent gate is sealed.",
+                "Secure Boot key generation and firmware enrollment are separate stages.",
+                "Confirm the exact device profile and a tested recovery path before changing firmware trust.",
+                "Follow device-specific instructions to enter Setup Mode; do not blindly clear the trust database.",
+                "Verify the expected signing key and boot artifacts before enrollment.",
+                "Only after explicit review, run the supported key-enrollment procedure for this device.",
+                "After reboot, verify User Mode, the selected boot target, system health, and recovery independently.",
             ],
 
             InoculationPhase::FirstBreath => vec![
@@ -667,8 +666,7 @@ pub struct SecureBootNarrationContext {
     pub secure_boot_enabled: Option<bool>,
     /// Whether the system uses lanzaboote for Secure Boot signing.
     pub using_lanzaboote: bool,
-    /// The MOK enrollment password, if generated.
-    pub mok_password: Option<String>,
+
     /// Whether the installer is running in USB Forge mode (browser-based).
     pub is_usb_forge_mode: bool,
 }
@@ -714,13 +712,13 @@ pub fn narrate_secure_boot(context: &SecureBootNarrationContext) -> Vec<Narratio
                     haptic: Some(haptic_sb.clone()),
                 },
                 NarrationEntry {
-                    text: "On first breath, the machine will ask you — physically, at the keyboard — to accept this key.".to_string(),
+                    text: "After checking recovery and the signed artifacts, you must explicitly enter Setup Mode and enroll the reviewed keys.".to_string(),
                     color: COLOR_AMBER,
                     delay_ms: 4000,
                     haptic: None,
                 },
                 NarrationEntry {
-                    text: "This is the ultimate consent gate. The silicon itself must choose to trust the topology.".to_string(),
+                    text: "Key creation is not enrollment. We will not claim Secure Boot is active until post-reboot state is observed.".to_string(),
                     color: COLOR_LEAF_GREEN,
                     delay_ms: 3500,
                     haptic: Some(haptic_sb),
@@ -738,7 +736,7 @@ pub fn narrate_secure_boot(context: &SecureBootNarrationContext) -> Vec<Narratio
                     haptic: None,
                 },
                 NarrationEntry {
-                    text: "Proceeding with standard boot chain. No MOK enrollment needed."
+                    text: "Proceeding without Secure Boot enrollment. Standard boot is not a Secure Boot assurance claim."
                         .to_string(),
                     color: COLOR_LEAF_GREEN,
                     delay_ms: 2000,
@@ -762,13 +760,13 @@ pub fn narrate_secure_boot(context: &SecureBootNarrationContext) -> Vec<Narratio
                     haptic: None,
                 },
                 NarrationEntry {
-                    text: "There is a sovereign path: rather than disabling Secure Boot, you can enroll my key.".to_string(),
+                    text: "There may be a supported path through firmware Setup Mode and explicit key enrollment, but the exact device procedure must be verified first.".to_string(),
                     color: COLOR_AMBER,
                     delay_ms: 3500,
                     haptic: None,
                 },
                 NarrationEntry {
-                    text: "I will generate a password. When the blue screen appears, type it to grant me trust.".to_string(),
+                    text: "The state is unresolved, so I will not authorize key generation or firmware changes from this observation.".to_string(),
                     color: COLOR_AMBER,
                     delay_ms: 3500,
                     haptic: Some(haptic_sb.clone()),
@@ -790,59 +788,51 @@ pub fn narrate_secure_boot(context: &SecureBootNarrationContext) -> Vec<Narratio
     }
 }
 
-/// Generate MOK enrollment narration entries.
+/// Generate explicit Secure Boot key-enrollment narration entries.
 ///
-/// The `password` is substituted into the narration where the user needs to type it.
-/// Color transitions from amber (trust being established) to solar gold (trust sealed).
-pub fn narrate_mok_enrollment(password: &str) -> Vec<NarrationEntry> {
-    let haptic_mok = HapticPattern::RisingSequenceHold {
+/// This describes a manual, observable procedure; it neither creates a secret nor
+/// performs enrollment. The final state must be established from observed evidence.
+pub fn narrate_secure_boot_enrollment() -> Vec<NarrationEntry> {
+    let haptic = HapticPattern::RisingSequenceHold {
         tap_durations_ms: vec![50, 100, 150, 200],
         hold_ms: 400,
     };
-
     vec![
         NarrationEntry {
-            text: "The blue screen you see is the Machine Owner Key manager.".to_string(),
+            text: "Secure Boot key enrollment is a firmware trust change, not a password prompt.".to_string(),
             color: COLOR_AMBER,
-            delay_ms: 3000,
-            haptic: Some(haptic_mok.clone()),
+            delay_ms: 3500,
+            haptic: Some(haptic.clone()),
         },
         NarrationEntry {
-            text: "This is the firmware asking for your physical consent.".to_string(),
+            text: "Confirm the exact device, firmware revision, pinned Lanzaboote profile, and tested recovery path.".to_string(),
             color: COLOR_AMBER,
-            delay_ms: 3000,
-            haptic: None,
-        },
-        NarrationEntry {
-            text: "Press any key within 10 seconds to begin enrollment.".to_string(),
-            color: COLOR_AMBER,
-            delay_ms: 10000,
-            haptic: None,
-        },
-        NarrationEntry {
-            text: "Select 'Enroll MOK', then 'Continue', then 'Yes'.".to_string(),
-            color: COLOR_AMBER,
-            delay_ms: 5000,
-            haptic: None,
-        },
-        NarrationEntry {
-            text: format!("Enter the password I gave you: {password}"),
-            color: COLOR_SOLAR_GOLD,
-            delay_ms: 8000,
-            haptic: Some(haptic_mok.clone()),
-        },
-        NarrationEntry {
-            text: "Select 'Reboot'. When I wake, I will be trusted at the deepest level."
-                .to_string(),
-            color: COLOR_SOLAR_GOLD,
             delay_ms: 4000,
             haptic: None,
         },
         NarrationEntry {
-            text: "The machine has chosen to trust me. The consent gate is sealed.".to_string(),
+            text: "Follow device-specific steps to enter Setup Mode; do not blindly clear the entire Secure Boot key database.".to_string(),
+            color: COLOR_AMBER,
+            delay_ms: 4500,
+            haptic: None,
+        },
+        NarrationEntry {
+            text: "Verify the signing key and boot artifacts before reviewing the explicit enrollment command.".to_string(),
+            color: COLOR_AMBER,
+            delay_ms: 3500,
+            haptic: Some(haptic.clone()),
+        },
+        NarrationEntry {
+            text: "Only after review, deliberately enroll keys using the supported procedure for this device.".to_string(),
             color: COLOR_SOLAR_GOLD,
-            delay_ms: 3000,
-            haptic: Some(haptic_mok),
+            delay_ms: 4000,
+            haptic: Some(haptic.clone()),
+        },
+        NarrationEntry {
+            text: "After reboot, capture the actual User Mode state, selected boot target, successful boot, and recovery result.".to_string(),
+            color: COLOR_SOLAR_GOLD,
+            delay_ms: 4500,
+            haptic: Some(haptic),
         },
     ]
 }
@@ -1222,7 +1212,6 @@ mod tests {
         let ctx = SecureBootNarrationContext {
             secure_boot_enabled: Some(true),
             using_lanzaboote: true,
-            mok_password: Some("sovereign-42".to_string()),
             is_usb_forge_mode: false,
         };
         let entries = narrate_secure_boot(&ctx);
@@ -1231,8 +1220,8 @@ mod tests {
         assert!(entries[1].text.contains("invitation"));
         assert!(entries[2].text.contains("trust us"));
         assert!(entries[3].text.contains("signing key"));
-        assert!(entries[4].text.contains("keyboard"));
-        assert!(entries[5].text.contains("consent gate"));
+        assert!(entries[4].text.contains("Setup Mode"));
+        assert!(entries[5].text.contains("Key creation is not enrollment"));
     }
 
     #[test]
@@ -1240,13 +1229,12 @@ mod tests {
         let ctx = SecureBootNarrationContext {
             secure_boot_enabled: Some(false),
             using_lanzaboote: false,
-            mok_password: None,
             is_usb_forge_mode: false,
         };
         let entries = narrate_secure_boot(&ctx);
         assert_eq!(entries.len(), 2, "SB disabled should produce 2 entries");
         assert!(entries[0].text.contains("not active"));
-        assert!(entries[1].text.contains("No MOK enrollment needed"));
+        assert!(entries[1].text.contains("not a Secure Boot assurance claim"));
     }
 
     #[test]
@@ -1254,7 +1242,6 @@ mod tests {
         let ctx = SecureBootNarrationContext {
             secure_boot_enabled: None,
             using_lanzaboote: false,
-            mok_password: None,
             is_usb_forge_mode: true,
         };
         let entries = narrate_secure_boot(&ctx);
@@ -1262,8 +1249,8 @@ mod tests {
         // Verify cautionary tone — all entries should use amber or convey uncertainty
         assert!(entries[0].text.contains("cannot see"));
         assert!(entries[1].text.contains("rejected"));
-        assert!(entries[2].text.contains("sovereign path"));
-        assert!(entries[3].text.contains("password"));
+        assert!(entries[2].text.contains("Setup Mode"));
+        assert!(entries[3].text.contains("unresolved"));
         assert!(entries[4].text.contains("disable Secure Boot"));
         assert!(entries[5].text.contains("choice is yours"));
         // Verify cautionary color (amber) on the warning entries
@@ -1272,25 +1259,14 @@ mod tests {
     }
 
     #[test]
-    fn test_mok_narration_includes_password() {
-        let mok_pw = "test-pw";
-        let entries = narrate_mok_enrollment(mok_pw);
-        assert_eq!(entries.len(), 7, "MOK enrollment should produce 7 entries");
-        // The mok_pw should appear in the 5th entry (index 4)
-        let pw_entry = &entries[4];
-        assert!(
-            pw_entry.text.contains(mok_pw),
-            "Entry should contain '{}', got: {}",
-            mok_pw,
-            pw_entry.text
-        );
-        assert!(password_entry.text.contains("Enter the password"));
-        // Verify color transition: earlier entries amber, later entries solar gold
-        assert_eq!(entries[0].color, COLOR_AMBER);
-        assert_eq!(entries[1].color, COLOR_AMBER);
-        assert_eq!(entries[4].color, COLOR_SOLAR_GOLD);
-        assert_eq!(entries[5].color, COLOR_SOLAR_GOLD);
-        assert_eq!(entries[6].color, COLOR_SOLAR_GOLD);
+    fn test_secure_boot_narration_uses_manual_enrollment_steps() {
+        let entries = narrate_secure_boot_enrollment();
+        assert_eq!(entries.len(), 6);
+        assert!(entries[0].text.contains("firmware trust change"));
+        assert!(entries[2].text.contains("Setup Mode"));
+        assert!(entries[4].text.contains("enroll keys"));
+        assert!(entries[5].text.contains("After reboot"));
+        assert!(entries.iter().all(|entry| !entry.text.to_lowercase().contains("password")));
     }
 
     #[test]
@@ -1365,7 +1341,6 @@ mod tests {
         let ctx = SecureBootNarrationContext {
             secure_boot_enabled: Some(true),
             using_lanzaboote: true,
-            mok_password: None,
             is_usb_forge_mode: false,
         };
         let entries = narrate_secure_boot(&ctx);
@@ -1383,7 +1358,6 @@ mod tests {
         let ctx = SecureBootNarrationContext {
             secure_boot_enabled: Some(false),
             using_lanzaboote: false,
-            mok_password: None,
             is_usb_forge_mode: false,
         };
         let entries = narrate_secure_boot(&ctx);
@@ -1397,7 +1371,7 @@ mod tests {
 
     #[test]
     fn test_mok_color_transition_amber_to_gold() {
-        let entries = narrate_mok_enrollment("test-pass");
+        let entries = narrate_secure_boot_enrollment();
         // First entries amber, later entries solar gold
         assert_eq!(entries[0].color, COLOR_AMBER);
         assert_eq!(entries[3].color, COLOR_AMBER);
