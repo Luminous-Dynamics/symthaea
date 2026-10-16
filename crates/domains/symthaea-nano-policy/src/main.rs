@@ -654,10 +654,10 @@ mod tests {
             samples_ms.sort_by(f64::total_cmp);
             let median_ms = samples_ms[samples_ms.len() / 2];
             let p95_index = (samples_ms.len() * 95).div_ceil(100).saturating_sub(1);
+            let p95_ms = samples_ms[p95_index];
+            let digest = expected_digest.expect("five deterministic samples");
             eprintln!(
-                "nano_selector_profile policy={policy:?} candidates={count} dimensions={dimensions} budget={budget} repeats=5 p50_ms={median_ms:.3} p95_ms={:.3} selected_digest={}",
-                samples_ms[p95_index],
-                expected_digest.expect("five deterministic samples")
+                "nano_selector_profile policy={policy:?} candidates={count} dimensions={dimensions} budget={budget} repeats=5 p50_ms={median_ms:.3} p95_ms={p95_ms:.3} selected_digest={digest}"
             );
         }
     }
