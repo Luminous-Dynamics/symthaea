@@ -1897,6 +1897,317 @@ mod tests {
         assert_eq!(receive_age_at_capture_ns(&receipt, "epoch-A", 99), None);
     }
 
+    fn temporal_test_sample(
+        stamp_sec: i32,
+        stamp_nanosec: u32,
+        clock_domain: RosClockDomainV1,
+    ) -> RosSampleMetadataV1 {
+        RosSampleMetadataV1 {
+            stamp_sec,
+            stamp_nanosec,
+            frame_id: "base_link".into(),
+            clock_domain,
+            received_monotonic_ns: Some(90),
+            receive_sequence: Some(1),
+            receive_epoch_id: Some("receipt-epoch".into()),
+            receive_age_at_capture_ns: Some(10),
+            calibration_id: None,
+        }
+    }
+
+    fn temporal_test_policy() -> RosTemporalPolicyV1 {
+        RosTemporalPolicyV1 {
+            required_source_clock_domain: "robot-sim-clock".into(),
+            maximum_source_age_ns: 1_000_000_000,
+            maximum_source_skew_ns: 20_000_000,
+            maximum_bridge_residence_age_ns: 1_000,
+            reject_zero_source_stamp: true,
+        }
+    }
+
+    fn temporal_test_now() -> RosClockNowV1 {
+        RosClockNowV1 {
+            domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            timestamp_ns: 100_000_000_000,
+        }
+    }
+
+    #[test]
+    fn temporal_admission_accepts_only_bound_fresh_same_epoch_pair() {
+        let joint = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        let imu = temporal_test_sample(
+            100,
+            5_000_000,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+
+        assert_eq!(
+            evaluate_ros_temporal_pair_v1(
+                &joint,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100,
+            ),
+            RosTemporalDispositionV1::Fresh {
+                joint_source_age_ns: 0,
+                imu_source_age_ns: 0,
+                source_skew_ns: 5_000_000,
+                joint_bridge_residence_age_ns: 10,
+                imu_bridge_residence_age_ns: 10,
+            }
+        );
+    }
+
+    #[test]
+    fn temporal_admission_rejects_unbound_or_mismatched_source_clocks() {
+        let joint = temporal_test_sample(100, 0, RosClockDomainV1::Unbound);
+        let imu = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &joint,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::Unsynchronized { .. }
+        ));
+
+        let joint = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        let imu = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("other-clock".into()),
+        );
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &joint,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::Unsynchronized { .. }
+        ));
+    }
+
+    #[test]
+    fn temporal_admission_rejects_stale_future_zero_and_skewed_sources() {
+        let imu = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+
+        let stale = temporal_test_sample(
+            98,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &stale,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::StaleSource {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+
+        let mut future = temporal_test_sample(
+            101,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &future,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::InvalidClock {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+
+        future = temporal_test_sample(
+            0,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &future,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::InvalidClock {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+
+        let skewed = temporal_test_sample(
+            100,
+            100_000_000,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &imu,
+                Some(&skewed),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::ExcessiveSourceSkew { .. }
+        ));
+    }
+
+    #[test]
+    fn temporal_admission_requires_receipts_that_match_capture_epoch_and_age() {
+        let mut joint = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        let imu = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+
+        joint.receive_epoch_id = Some("old-epoch".into());
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &joint,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::ReceiptUnavailable {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+
+        joint = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        joint.receive_age_at_capture_ns = Some(99);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &joint,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::ReceiptUnavailable {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+
+        joint = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        joint.receive_age_at_capture_ns = Some(2_000);
+        joint.received_monotonic_ns = Some(100 - 2_000);
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &joint,
+                Some(&imu),
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::BridgeResidenceExpired {
+                stream: RosTemporalStreamV1::JointState,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn temporal_admission_rejects_missing_imu_and_invalid_policy() {
+        let joint = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &joint,
+                None,
+                &temporal_test_now(),
+                &temporal_test_policy(),
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::ReceiptUnavailable {
+                stream: RosTemporalStreamV1::Imu,
+                ..
+            }
+        ));
+
+        let mut invalid_policy = temporal_test_policy();
+        invalid_policy.required_source_clock_domain.clear();
+        let imu = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        assert!(matches!(
+            evaluate_ros_temporal_pair_v1(
+                &joint,
+                Some(&imu),
+                &temporal_test_now(),
+                &invalid_policy,
+                "receipt-epoch",
+                100
+            ),
+            RosTemporalDispositionV1::InvalidPolicy { .. }
+        ));
+    }
+
     #[test]
     fn ros_covariance_semantics_keep_unknown_separate_from_unavailable() {
         // A zero matrix means the uncertainty is unknown; it is not zero uncertainty.
