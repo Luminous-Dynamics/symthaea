@@ -483,7 +483,7 @@ pub fn evaluate_mission_configuration(
         represents_physical_qualification: false,
     };
 
-    let report_digest_sha256 = digest_report(&report);
+    let report_digest_sha256 = digest_mission_configuration_report(&report);
     let mut receipt = MissionConfigurationReceipt {
         configuration_digest_sha256,
         report_digest_sha256,
@@ -684,7 +684,7 @@ fn write_policy(writer: &mut HashWriter, policy: &SuitInteropPolicy) {
     }
 }
 
-fn digest_report(report: &MissionConfigurationReport) -> String {
+pub fn digest_mission_configuration_report(report: &MissionConfigurationReport) -> String {
     let mut writer = HashWriter::new("symthaea.sx031.mission-report.v1");
     writer.string(&report.configuration_digest_sha256);
     writer.string(mission_status_tag(report.status));
@@ -1245,12 +1245,12 @@ mod tests {
     fn report_digest_binds_embedded_pairwise_findings() {
         let configuration = fixture();
         let (report, _) = evaluate_mission_configuration(&configuration).unwrap();
-        let original_digest = digest_report(&report);
+        let original_digest = digest_mission_configuration_report(&report);
         let mut tampered = report.clone();
         tampered.connection_evaluations[0].interoperability.findings[0]
             .component_id
             .push_str("-tampered");
-        assert_ne!(digest_report(&tampered), original_digest);
+        assert_ne!(digest_mission_configuration_report(&tampered), original_digest);
     }
 
     #[test]
