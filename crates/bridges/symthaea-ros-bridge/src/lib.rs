@@ -109,7 +109,7 @@ pub enum RosEvidenceValueV1<T> {
 
 /// Interpreted ROS covariance semantics. All-zero covariance means unknown,
 /// not zero uncertainty. A -1 first element denotes an unavailable estimate.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum RosCovarianceV1 {
     Unknown,
     Reported([f64; 9]),
@@ -293,7 +293,7 @@ fn ros_covariance_v1(
 ) -> Result<RosCovarianceV1, RosBridgeError> {
     // ROS sensor_msgs/Imu specifies -1 in element 0 when this estimate is
     // unavailable. The other covariance cells are not interpreted in that case.
-    ros_covariance_for_test(covariance).map_err(|_| {
+    classify_ros_covariance(covariance).map_err(|_| {
         RosBridgeError::InvalidSensorData(format!(
             "{field} covariance contains a non-finite value"
         ))
@@ -320,15 +320,17 @@ fn evidence_from_imu_vector(
     })
 }
 
-fn ros_covariance_for_test(
+fn classify_ros_covariance(
     covariance: [f64; 9],
 ) -> Result<RosCovarianceV1, RosBridgeError> {
+    // ROS sensor_msgs/Imu reserves covariance[0] == -1 for an unavailable
+    // estimate. In that case the remaining covariance cells are not consulted.
     if covariance[0] == -1.0 {
         return Ok(RosCovarianceV1::Unavailable);
     }
     if covariance.iter().any(|value| !value.is_finite()) {
         return Err(RosBridgeError::InvalidSensorData(
-            "test covariance contains a non-finite value".into(),
+            "ROS covariance contains a non-finite value".into(),
         ));
     }
     if covariance.iter().all(|value| *value == 0.0) {
@@ -659,60 +661,33 @@ impl RosBridgeNode {
         Ok(())
     }
 
-    /// Return a humanoid state only when the subscribed evidence can support its fields.
+    /// Return a complete humanoid state only when the subscribed evidence supports it.
     ///
-    /// Joint positions and velocities are mapped by canonical joint names. IMU
-    /// orientation and angular velocity are validated, but this bridge currently
-    /// has no odometry or qualified state-estimator source for root/COM linear
-    /// velocity. A single acceleration sample multiplied by a fixed timestep is
-    /// not velocity. Until a typed velocity source is wired in, this method fails
-    /// closed instead of constructing a plausible-looking state with fabricated
-    /// neutral values.
+    /// This API intentionally remains unavailable until root pose and root/COM
+    /// linear velocity are supplied by qualified, frame- and clock-bound sources.
+    /// Use `get_partial_sensor_observation()` to inspect available fields without
+    /// promoting partial measurements to a complete `HumanoidState`.
     #[cfg(feature = "ros2")]
     pub fn get_current_humanoid_state(
         &self,
     ) -> Result<symthaea_humanoid::types::HumanoidState, RosBridgeError> {
-        let joint_state_opt = self.latest_joint_state.lock().unwrap().clone();
-        let imu_opt = self.latest_imu.lock().unwrap().clone();
+        let observation = self.get_partial_sensor_observation()?;
+        let imu = match observation.imu {
+            RosEvidenceValueV1::Available { value, .. } => value,
+            RosEvidenceValueV1::Unavailable { reason, .. } => {
+                return Err(RosBridgeError::SensorDataUnavailable(reason));
+            }
+        };
 
-        let joint_state = joint_state_opt.ok_or(RosBridgeError::NotInitialized)?;
-        // DMC21 is the current explicit bridge profile. Resolve semantic identity
-        // by JointState.name; never assume transport array position is model order.
-        let _canonical_positions = canonicalize_joint_values(
-            &joint_state.name,
-            &joint_state.position,
-            &symthaea_humanoid::types::JOINT_NAMES,
-            "position",
-        )?;
-        let _canonical_velocities = canonicalize_joint_values(
-            &joint_state.name,
-            &joint_state.velocity,
-            &symthaea_humanoid::types::JOINT_NAMES,
-            "velocity",
-        )?;
-
-        let imu = imu_opt.ok_or_else(|| {
-            RosBridgeError::SensorDataUnavailable(
-                "IMU orientation/angular velocity is absent; no neutral physical state was substituted".into(),
-            )
-        })?;
-        let _orientation = normalize_imu_quaternion([
-            imu.orientation.w,
-            imu.orientation.x,
-            imu.orientation.y,
-            imu.orientation.z,
-        ])?;
-        let _angular_velocity = validate_sensor_vector(
-            "IMU angular velocity",
-            [
-                imu.angular_velocity.x,
-                imu.angular_velocity.y,
-                imu.angular_velocity.z,
-            ],
-        )?;
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &imu.orientation_wxyz {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &imu.angular_velocity_body_rad_s {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
 
         Err(RosBridgeError::SensorDataUnavailable(
-            "root linear velocity and center-of-mass velocity are not subscribed or estimated by this bridge; IMU linear acceleration cannot substitute for velocity. Add a qualified odometry/state-estimator source before constructing HumanoidState".into(),
+            "root linear velocity and center-of-mass velocity are not available from a qualified, clock/frame-bound source; IMU acceleration cannot substitute for velocity".into(),
         ))
     }
 
@@ -1397,7 +1372,7 @@ mod tests {
     fn ros_covariance_semantics_keep_unknown_separate_from_unavailable() {
         // A zero matrix means the uncertainty is unknown; it is not zero uncertainty.
         assert!(matches!(
-            ros_covariance_for_test([0.0; 9]),
+            classify_ros_covariance([0.0; 9]),
             RosCovarianceV1::Unknown
         ));
 
@@ -1406,13 +1381,13 @@ mod tests {
         unavailable[0] = -1.0;
         unavailable[4] = f64::NAN; // remaining entries must not revive this unavailable estimate
         assert!(matches!(
-            ros_covariance_for_test(unavailable),
+            classify_ros_covariance(unavailable),
             RosCovarianceV1::Unavailable
         ));
 
         let mut invalid = [0.0; 9];
         invalid[4] = f64::NAN;
-        assert!(ros_covariance_for_test(invalid).is_err());
+        assert!(classify_ros_covariance(invalid).is_err());
     }
 
     #[test]
@@ -1487,8 +1462,38 @@ mod tests {
             ));
 
             let mut imu = sensor_msgs::msg::Imu::default();
-            imu.orientation.w = 1.0;
+            // The covariance sentinel is authoritative: do not use even plausible
+            // numeric fields when ROS explicitly says the estimate is unavailable.
+            imu.orientation_covariance[0] = -1.0;
+            imu.angular_velocity_covariance[0] = -1.0;
+            imu.linear_acceleration_covariance[0] = -1.0;
             *node.latest_imu.lock().unwrap() = Some(imu);
+
+            let partial = node.get_partial_sensor_observation().unwrap();
+            let imu = match partial.imu {
+                RosEvidenceValueV1::Available { value, .. } => value,
+                RosEvidenceValueV1::Unavailable { .. } => panic!("IMU message existed"),
+            };
+            assert!(matches!(
+                imu.orientation_wxyz,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                imu.angular_velocity_body_rad_s,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                imu.linear_acceleration_sensor_frame_mps2,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                node.get_current_humanoid_state(),
+                Err(RosBridgeError::SensorDataUnavailable(reason)) if reason.contains("orientation")
+            ));
+
+            let mut valid_imu = sensor_msgs::msg::Imu::default();
+            valid_imu.orientation.w = 1.0;
+            *node.latest_imu.lock().unwrap() = Some(valid_imu);
             assert!(matches!(
                 node.get_current_humanoid_state(),
                 Err(RosBridgeError::SensorDataUnavailable(reason)) if reason.contains("linear velocity")
