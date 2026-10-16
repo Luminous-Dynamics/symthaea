@@ -662,14 +662,14 @@ pub struct CognitiveLoopConfig {
     >,
 
     // ── Energy Budget ─────────────────────────────────────────────────
-    /// Enable substrate energy budget tracking.
-    /// When true, the substrate manager tracks cumulative energy expenditure
-    /// based on substrate energy_per_op and marks consciousness as non-viable
-    /// when budget is exceeded.
-    /// Default: false.
+    /// Enable substrate energy-budget tracking.
+    /// When true, the substrate manager accumulates modeled energy per cycle and
+    /// estimates average watts over completed monotonic wall-time windows.
+    /// This is a model estimate, not measured processor/device electrical power.
     pub enable_energy_budget: bool,
-    /// Energy budget in joules per second (optional).
-    /// When set, limits cognitive throughput based on substrate energy characteristics.
+    /// Energy-rate budget in watts (joules per second), optional.
+    /// Compared against model-estimated energy / monotonic wall elapsed time.
+    /// No rate decision is made until the first 1-second observation window closes.
     pub energy_budget_joules_per_sec: Option<f64>,
 
     /// Transition smoothing alpha for substrate switches [0.0, 1.0].
