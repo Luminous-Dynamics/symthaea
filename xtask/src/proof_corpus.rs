@@ -47,7 +47,7 @@ pub fn validate(path: &Path) -> Result<()> {
         .with_context(|| format!("read proof corpus manifest {}", path.display()))?;
     let count = validate_manifest_text(&raw)?;
     println!(
-        "proof corpus manifest structurally valid: {count} candidate entries;          no theorem or verifier qualification is implied"
+        "proof corpus manifest structurally valid: {count} candidate entries; no theorem or verifier qualification is implied"
     );
     Ok(())
 }
