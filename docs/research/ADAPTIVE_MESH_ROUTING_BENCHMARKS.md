@@ -1,6 +1,6 @@
 # Adaptive mesh-routing benchmark protocol
 
-Status: proposal plus input-validation regression coverage. No performance improvement is claimed yet.
+Status: input-validation regression coverage and a repeated-sample CPU microbenchmark are present. No performance improvement is claimed yet.
 
 ## Goal
 
@@ -11,7 +11,7 @@ Test whether Symthaea's predictive controller can improve routing decisions over
 1. The current `ConsciousnessAwareRouter` policy at the exact benchmarked commit.
 2. A simple signal baseline using per-link delivery ratio, RTT/latency, queue depth, and energy cost, with exponentially weighted smoothing.
 3. A fixed-weight multi-objective route score.
-4. The strongest applicable deployed protocol for each scenario (e.g. Babel or B.A.T.M.A.N.-adv for the topology / deployment being modeled). Do not claim protocol-wide superiority from a synthetic topology alone.
+4. The strongest applicable deployed protocol for each scenario (e.g. Babel or B.A.T.M.A.N.-adv for the topology / deployment being modeled). Babel's standardized feasibility condition is a particularly useful safety baseline for loop avoidance; do not claim protocol-wide superiority from a synthetic topology alone: https://www.rfc-editor.org/info/rfc8966/.
 
 ## Deterministic scenario corpus
 
@@ -30,7 +30,22 @@ Keep workload generation and scoring independent of the adaptive policy. Train/t
 
 ## Metrics
 
-Report delivery ratio, p50/p95/p99 latency, convergence / recovery time after a topology change, energy per delivered byte, control bytes per delivered byte, route churn, queue drops, and per-priority deadline misses. Report confidence intervals over independent runs; don't pool away scenario-specific regressions.
+End-to-end scenarios must report delivery ratio, p50/p95/p99 latency, convergence / recovery time after a topology change, energy per delivered byte, control bytes per delivered byte, route churn, queue drops, and per-priority deadline misses. Report confidence intervals over independent runs; don't pool away scenario-specific regressions.
+
+The current dependency-free microbenchmark is deliberately narrower:
+
+- Route-policy CPU cost: 200,000 route calls per repeat, 7 repeats, batches of 5,000 calls, with a fixed 16 / 64 / 256-peer state.
+- Peer-update CPU cost: 250 rounds per repeat, 7 repeats, updating all peers per round with strictly increasing cycle values.
+- It emits mean throughput plus p50/p95/p99 over **batch-mean** latencies. Route percentiles are batch means over 5,000 calls; update percentiles are per-round means over a full peer set. They are not individual-call tail latencies.
+- The route workload currently has no live link metrics, network delivery, mobility, failure simulation, or baseline comparison. It does not prove end-to-end routing quality, nor does it measure a speedup without a paired baseline run.
+
+Command:
+
+```sh
+cargo bench --bench adaptive_mesh_routing --features mesh
+```
+
+The result is a local CPU-cost baseline only. Preserve raw output, CPU, OS, Rust toolchain, commit SHA, feature set, and command line. Compare candidate and baseline commits on the same machine; repeat full process invocations before making claims.
 
 ## Hard invariants
 
@@ -45,15 +60,7 @@ Report delivery ratio, p50/p95/p99 latency, convergence / recovery time after a 
 
 ## First implementation slice
 
-The router now rejects non-finite and out-of-range peer metrics, unknown governance tiers, and obviously stale cycle updates before they alter cached peer state. Regression tests cover those conditions. These checks reduce malformed-input hazards; they do not replace authenticated sequence numbers or establish that a peer is trustworthy.
-
-A dependency-free microbenchmark measures routing-policy throughput for 16 / 64 / 256 known peers and update cost under deterministic peer-state churn:
-
-```sh
-cargo bench --bench adaptive_mesh_routing --features mesh
-```
-
-The microbenchmark is only a local CPU-cost baseline. It does **not** model multi-hop packet delivery or prove end-to-end routing quality; use the scenario corpus above for those questions.
+The router rejects non-finite and out-of-range peer metrics, unknown governance tiers, and obviously stale cycle updates before they alter cached peer state. Regression tests cover those conditions. These checks reduce malformed-input hazards; they do not replace authenticated sequence numbers or establish that a peer is trustworthy.
 
 ## Acceptance gates
 
