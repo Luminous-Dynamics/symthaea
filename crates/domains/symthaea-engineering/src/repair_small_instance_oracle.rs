@@ -14,7 +14,9 @@
 //! Enumerating all permutations is exponential (n!) and must stay restricted to
 //! small fixtures. The oracle is independent of the production list-scheduler code.
 
-use crate::repair_crew_scheduling::RepairJob;
+use crate::repair_crew_scheduling::{
+    schedule_repairs, RepairCrew, RepairJob, RepairSchedulingConfig, RepairSchedulingPolicy,
+};
 use std::collections::HashSet;
 
 pub const MAX_EXACT_ORACLE_JOBS: usize = 8;
@@ -40,6 +42,8 @@ pub enum ExactRepairOracleError {
     HasDependencies(String),
     HasSpareParts(String),
     ObjectiveOverflow,
+    SchedulerFailed(String),
+    ExactOracleMismatch,
 }
 
 impl std::fmt::Display for ExactRepairOracleError {
@@ -55,6 +59,8 @@ impl std::fmt::Display for ExactRepairOracleError {
             Self::HasDependencies(id) => write!(f, "job {id} has precedence dependencies outside oracle scope"),
             Self::HasSpareParts(id) => write!(f, "job {id} has spare-part requirements outside oracle scope"),
             Self::ObjectiveOverflow => write!(f, "weighted completion objective is non-finite or time arithmetic overflowed"),
+            Self::SchedulerFailed(message) => write!(f, "scheduler failed on validated exact-oracle fixture: {message}"),
+            Self::ExactOracleMismatch => write!(f, "a heuristic reported an objective below the exhaustive optimum"),
         }
     }
 }
@@ -185,6 +191,72 @@ pub fn exhaustive_single_crew_repair_optimum(
     })
 }
 
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RepairPolicyOptimalityGap {
+    pub policy: RepairSchedulingPolicy,
+    pub schedule_order: Vec<String>,
+    pub weighted_completion_loss: f64,
+    /// max(heuristic objective - exact optimum, 0), with sub-tolerance round-off
+    /// clamped to zero. A materially negative gap is rejected as an oracle mismatch.
+    pub absolute_gap: f64,
+    pub relative_gap: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExactRepairPolicyEvaluation {
+    pub exact: ExactRepairOracleResult,
+    pub policy_gaps: Vec<RepairPolicyOptimalityGap>,
+}
+
+/// Benchmark all three greedy policies against exhaustive optimum on the oracle's
+/// restricted problem class. Every job is assigned to one hypothetical crew that
+/// has all listed skills; the horizon is set beyond total processing time.
+pub fn evaluate_repair_policies_against_exact_optimum(
+    jobs: &[RepairJob],
+) -> Result<ExactRepairPolicyEvaluation, ExactRepairOracleError> {
+    validate(jobs)?;
+    let exact = exhaustive_single_crew_repair_optimum(jobs)?;
+    let horizon_steps = jobs.iter().try_fold(1usize, |sum, job| {
+        sum.checked_add(job.duration_steps).ok_or(ExactRepairOracleError::ObjectiveOverflow)
+    })?;
+
+    let mut skills: Vec<String> = jobs.iter().map(|job| job.required_skill.clone()).collect();
+    skills.sort();
+    skills.dedup();
+    let crews = [RepairCrew::new("oracle-crew", skills, 0)];
+    let policies = [
+        RepairSchedulingPolicy::PriorityFirst,
+        RepairSchedulingPolicy::ShortestJobFirst,
+        RepairSchedulingPolicy::WeightedRecoveryPerStep,
+    ];
+    let mut policy_gaps = Vec::with_capacity(policies.len());
+
+    for policy in policies {
+        let report = schedule_repairs(
+            jobs,
+            &crews,
+            &[],
+            &RepairSchedulingConfig::new(horizon_steps, policy),
+        ).map_err(|error| ExactRepairOracleError::SchedulerFailed(error.to_string()))?;
+        let raw_gap = report.total_weighted_service_unit_steps_lost
+            - exact.minimum_weighted_completion_loss;
+        if raw_gap < -EPSILON {
+            return Err(ExactRepairOracleError::ExactOracleMismatch);
+        }
+        let absolute_gap = raw_gap.max(0.0);
+        policy_gaps.push(RepairPolicyOptimalityGap {
+            policy,
+            schedule_order: report.schedule.iter().map(|repair| repair.job_id.clone()).collect(),
+            weighted_completion_loss: report.total_weighted_service_unit_steps_lost,
+            absolute_gap,
+            relative_gap: absolute_gap / exact.minimum_weighted_completion_loss,
+        });
+    }
+
+    Ok(ExactRepairPolicyEvaluation { exact, policy_gaps })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,6 +319,33 @@ mod tests {
         let result = exhaustive_single_crew_repair_optimum(&jobs).unwrap();
         assert_eq!(result.optimal_order, vec!["a", "z"]);
         assert!((result.minimum_weighted_completion_loss - 14.0).abs() < EPSILON);
+    }
+
+    #[test]
+    fn computes_absolute_and_relative_gaps_for_all_policies() {
+        let jobs = [job("slow_low", 10, 0, 1.0), job("fast_high", 1, 1, 100.0)];
+        let report = evaluate_repair_policies_against_exact_optimum(&jobs).unwrap();
+        let priority = report.policy_gaps.iter()
+            .find(|entry| entry.policy == RepairSchedulingPolicy::PriorityFirst).unwrap();
+        let shortest = report.policy_gaps.iter()
+            .find(|entry| entry.policy == RepairSchedulingPolicy::ShortestJobFirst).unwrap();
+        let weighted = report.policy_gaps.iter()
+            .find(|entry| entry.policy == RepairSchedulingPolicy::WeightedRecoveryPerStep).unwrap();
+        assert!((priority.weighted_completion_loss - 1110.0).abs() < EPSILON);
+        assert!((priority.absolute_gap - 999.0).abs() < EPSILON);
+        assert!((priority.relative_gap - 9.0).abs() < EPSILON);
+        assert!((shortest.absolute_gap).abs() < EPSILON);
+        assert!((weighted.absolute_gap).abs() < EPSILON);
+    }
+
+    #[test]
+    fn policy_gap_report_is_stable_under_job_input_permutation() {
+        let jobs = [job("A", 3, 2, 1.0), job("B", 1, 0, 10.0), job("C", 2, 1, 4.0)];
+        let reversed = [jobs[2].clone(), jobs[1].clone(), jobs[0].clone()];
+        assert_eq!(
+            evaluate_repair_policies_against_exact_optimum(&jobs).unwrap(),
+            evaluate_repair_policies_against_exact_optimum(&reversed).unwrap()
+        );
     }
 
     #[test]
