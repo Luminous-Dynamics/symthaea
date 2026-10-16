@@ -334,9 +334,10 @@
       "resource_tests_authored": 18,
       "repair_scheduling_tests_authored": 17,
       "robust_repair_evaluation_tests_authored": 10,
-      "total_rust_tests_authored": 76,
-      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11. None have been compiled or executed in the current environment.",
-      "rolling_horizon_repair_tests_authored": 11
+      "total_rust_tests_authored": 82,
+      "note": "Counts are source-level #[test] declarations: continuity 20, resources 18, scheduling 17, robust duration 10, rolling horizon 11, paired comparison 6. None have been compiled or executed in the current environment.",
+      "rolling_horizon_repair_tests_authored": 11,
+      "repair_policy_comparison_tests_authored": 6
     },
     "performance_targets": {
       "status": "proposed_unmeasured_targets",
@@ -512,8 +513,7 @@
       "no_uncertain_repair_durations",
       "no_crew_routing_or_transport_power_interdependency",
       "no_shared_tool_or_shift_calendar_model",
-      "no_policy_fairness_guarantee",
-      "adaptive dispatch exists in a separate module; paired batch comparison is not yet integrated"
+      "no_policy_fairness_guarantee"
     ],
     "tests_authored": 17,
     "tests_executed": false,
@@ -635,7 +635,7 @@
       "no online or rolling-horizon replanning",
       "initial dispatch order and crew assignments are frozen",
       "CVaR reflects the supplied scenario weights and set only",
-      "rolling-horizon recourse is implemented in a separate module; its batch paired-comparison harness is still future work"
+      "the paired comparison harness reports deterministic scenario deltas but does not yet estimate statistical confidence intervals"
     ],
     "reference_cases": [
       {
@@ -741,7 +741,7 @@
       "no partially completed repair state",
       "no stochastic duration model or justified scenario probabilities",
       "policy does not optimize distributional fairness",
-      "batch paired comparison to fixed-plan evaluator is not yet implemented"
+      "paired harness is implemented as a separate module; empirical calibration and statistical uncertainty estimates remain absent"
     ],
     "tests_authored": 11,
     "tests_executed": false,
@@ -827,6 +827,90 @@
         "paired_policy_inputs",
         "retain_per_scenario_decision_traces",
         "measure_tail_risk_and_per_case_deltas"
+      ]
+    }
+  },
+  "repair_policy_comparison": {
+    "status": "paired_fixed_vs_adaptive_evaluation_not_calibrated",
+    "inputs": "same nominal jobs, crews, spare inventory, horizon, repair policy, duration scenarios and scenario weights for each paired comparison",
+    "fixed_baseline": "existing robust_repair_evaluation nominal-plan schedule with fixed dispatch order and crew assignment replayed under realized durations",
+    "adaptive_baseline": "rolling_horizon_repair event-driven dispatch using only observed completions, released outages, ready crews and remaining stock",
+    "metrics": [
+      "fixed_expected_loss",
+      "adaptive_expected_loss",
+      "expected_loss_delta_adaptive_minus_fixed",
+      "relative_expected_loss_reduction_when_defined",
+      "fixed_and_adaptive_worst_case_loss",
+      "fixed_and_adaptive_upper_tail_cvar",
+      "per_scenario_loss_delta",
+      "improved_worsened_tied_scenario_counts",
+      "scenario_weight_mass_of_improved_and_worsened_cases",
+      "per_scenario_fixed_schedule_and_adaptive_decision_trace"
+    ],
+    "tests_authored": 6,
+    "tests_executed": false,
+    "limitations": [
+      "no statistical bootstrap or confidence intervals",
+      "no empirical scenario-probability calibration",
+      "no field-data holdout corpus yet",
+      "adaptive policy is a heuristic, not an optimal solver",
+      "scenario weights are descriptive absent empirical support"
+    ],
+    "reference_cases": [
+      {
+        "id": "PC-01",
+        "expected": "fixed and adaptive records use the same scenario identity, weight and realization"
+      },
+      {
+        "id": "PC-02",
+        "expected": "every per-case delta and weighted expected delta matches its definition"
+      },
+      {
+        "id": "PC-03",
+        "expected": "expected, worst-case and CVaR losses are reported for both approaches"
+      },
+      {
+        "id": "PC-04",
+        "expected": "wins, ties and regressions are retained with traces"
+      },
+      {
+        "id": "PC-05",
+        "expected": "identical inputs yield identical comparison report"
+      },
+      {
+        "id": "PC-06",
+        "expected": "fixed nominal plan is not weakened to create an adaptive win"
+      }
+    ],
+    "synthetic_witness": {
+      "policy": "priority_first",
+      "scenario_id": "delay-A",
+      "fixed_plan_loss": 922,
+      "rolling_horizon_loss": 724,
+      "loss_delta_adaptive_minus_fixed": -198,
+      "relative_expected_loss_reduction": 0.21475054466230933,
+      "status": "single_designed_scenario_not_empirical"
+    },
+    "proposed_performance_target": {
+      "status": "proposed_unmeasured",
+      "reference_batch": {
+        "jobs": 100,
+        "crews": 20,
+        "scenarios": 20,
+        "target_total_seconds": 1
+      },
+      "stress_batch": {
+        "jobs": 500,
+        "crews": 50,
+        "scenarios": 100,
+        "target_total_seconds": 15
+      },
+      "requirements": [
+        "document_reference_host",
+        "release_build",
+        "paired_identical_scenarios",
+        "retain_full_case_traces",
+        "measure_worst_case_and_cvar"
       ]
     }
   }
