@@ -24,3 +24,7 @@ path = "src/bin/bioacoustic_corpus_preflight.rs"
 [[bin]]
 name = "bioacoustic-asset-audit"
 path = "src/bin/bioacoustic_asset_audit.rs"
+
+[[bin]]
+name = "bioacoustic-event-eval"
+path = "src/bin/bioacoustic_event_eval.rs"
