@@ -130,12 +130,12 @@ pub struct EvidenceBenchmarkCase {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct SignedBenchmarkCase {
+pub struct HashedBenchmarkCase {
     pub case: EvidenceBenchmarkCase,
     pub case_sha256: String,
 }
 
-impl SignedBenchmarkCase {
+impl HashedBenchmarkCase {
     pub fn new(case: EvidenceBenchmarkCase) -> Result<Self, String> {
         validate_case(&case)?;
         let case_sha256 = canonical_case_digest(&case)?;
@@ -171,7 +171,7 @@ pub struct EvidenceActionReceipt {
 
 impl EvidenceActionReceipt {
     pub fn from_decision(
-        case: &SignedBenchmarkCase,
+        case: &HashedBenchmarkCase,
         policy_version: impl Into<String>,
         policy: &EvidenceActionPolicy,
         decision: EvidenceActionDecision,
@@ -234,8 +234,14 @@ pub struct BenchmarkScore {
 }
 
 pub fn canonical_case_digest(case: &EvidenceBenchmarkCase) -> Result<String, String> {
+    // Domain separation prevents this digest from being confused with a hash
+    // produced for another artifact type that happens to use the same bytes.
+    const DOMAIN: &[u8] = b"SYMTHAEA-EVIDENCE-BENCHMARK-CASE-V1\\0";
     let bytes = serde_json::to_vec(case).map_err(|e| format!("serialize digest payload: {e}"))?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    let mut hasher = Sha256::new();
+    hasher.update(DOMAIN);
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn validate_case(case: &EvidenceBenchmarkCase) -> Result<(), String> {
@@ -263,7 +269,7 @@ fn split_name(split: DatasetSplit) -> &'static str {
 
 /// Strict parser and dataset integrity audit. Rejects unknown fields, malformed or
 /// modified cases, duplicate IDs, blank rows, and claim/origin family leakage.
-pub fn audit_dataset_jsonl<R: BufRead>(reader: R) -> Result<(Vec<SignedBenchmarkCase>, DatasetAudit), String> {
+pub fn audit_dataset_jsonl<R: BufRead>(reader: R) -> Result<(Vec<HashedBenchmarkCase>, DatasetAudit), String> {
     let mut cases = Vec::new();
     let mut ids = BTreeSet::new();
     let mut claim_splits: BTreeMap<String, DatasetSplit> = BTreeMap::new();
@@ -273,7 +279,7 @@ pub fn audit_dataset_jsonl<R: BufRead>(reader: R) -> Result<(Vec<SignedBenchmark
         let line_number = index + 1;
         let line = result.map_err(|e| format!("read dataset line {line_number}: {e}"))?;
         if line.trim().is_empty() { return Err(format!("blank dataset line {line_number}")); }
-        let signed: SignedBenchmarkCase = serde_json::from_str(&line)
+        let signed: HashedBenchmarkCase = serde_json::from_str(&line)
             .map_err(|e| format!("parse dataset line {line_number}: {e}"))?;
         signed.validate_digest().map_err(|e| format!("line {line_number}: {e}"))?;
         if !ids.insert(signed.case.case_id.clone()) {
@@ -322,7 +328,7 @@ pub fn audit_dataset_jsonl<R: BufRead>(reader: R) -> Result<(Vec<SignedBenchmark
 /// Independently score receipt artifacts. Exact case coverage and digest binding
 /// are required before any accuracy/safety metric is returned.
 pub fn score_receipts_jsonl<R: BufRead>(
-    cases: &[SignedBenchmarkCase],
+    cases: &[HashedBenchmarkCase],
     reader: R,
     expected_policy_version: &str,
 ) -> Result<BenchmarkScore, String> {
@@ -331,7 +337,7 @@ pub fn score_receipts_jsonl<R: BufRead>(
     for signed in cases {
         signed.validate_digest()?;
     }
-    let by_case: BTreeMap<&str, &SignedBenchmarkCase> = cases.iter()
+    let by_case: BTreeMap<&str, &HashedBenchmarkCase> = cases.iter()
         .map(|c| (c.case.case_id.as_str(), c)).collect();
     if by_case.len() != cases.len() { return Err("duplicate case IDs in dataset".to_owned()); }
 
@@ -465,7 +471,7 @@ fn action_reason_consistent(action: BenchmarkAction, reason: BenchmarkReason) ->
 fn ratio(n: usize, d: usize) -> f64 { if d == 0 { 0.0 } else { n as f64 / d as f64 } }
 
 pub fn evaluate_cases(
-    cases: &[SignedBenchmarkCase],
+    cases: &[HashedBenchmarkCase],
     policy_version: impl Into<String>,
     policy: &EvidenceActionPolicy,
 ) -> Vec<EvidenceActionReceipt> {
@@ -482,8 +488,8 @@ mod tests {
 
     fn case(id: &str, claim: &str, origins: &[&str], split: DatasetSplit,
         evidence: BenchmarkEvidenceCondition, provenance: BenchmarkProvenanceCondition,
-        independent: Option<u32>, expected: BenchmarkAction) -> SignedBenchmarkCase {
-        SignedBenchmarkCase::new(EvidenceBenchmarkCase {
+        independent: Option<u32>, expected: BenchmarkAction) -> HashedBenchmarkCase {
+        HashedBenchmarkCase::new(EvidenceBenchmarkCase {
             schema_version: DATASET_SCHEMA_VERSION, case_id: id.to_owned(),
             claim_family_id: claim.to_owned(),
             origin_family_ids: origins.iter().map(|s| (*s).to_owned()).collect(),
@@ -495,8 +501,8 @@ mod tests {
         }).unwrap()
     }
 
-    fn dataset_text(cases: &[SignedBenchmarkCase]) -> String {
-        let rows = cases.iter().map(SignedBenchmarkCase::to_json_line)
+    fn dataset_text(cases: &[HashedBenchmarkCase]) -> String {
+        let rows = cases.iter().map(HashedBenchmarkCase::to_json_line)
             .collect::<Result<Vec<_>, _>>().unwrap();
         rows.join("\n") + "\n"
     }
