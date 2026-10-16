@@ -246,6 +246,10 @@ pub enum RosTemporalDispositionV1 {
         skew_ns: u64,
         maximum_skew_ns: u64,
     },
+    SourceUnavailable {
+        stream: RosTemporalStreamV1,
+        reason: String,
+    },
     ReceiptUnavailable {
         stream: RosTemporalStreamV1,
         reason: String,
@@ -314,12 +318,18 @@ fn ros_bridge_residence_age_ns(
             reason: "sample receipt and capture belong to different monotonic epochs".into(),
         });
     }
-    let _sequence = sample.receive_sequence.ok_or_else(|| {
+    let sequence = sample.receive_sequence.ok_or_else(|| {
         RosTemporalDispositionV1::ReceiptUnavailable {
             stream,
             reason: "callback receive sequence is absent".into(),
         }
     })?;
+    if sequence == 0 {
+        return Err(RosTemporalDispositionV1::ReceiptUnavailable {
+            stream,
+            reason: "callback receive sequence zero is invalid".into(),
+        });
+    }
     let received_ns = sample.received_monotonic_ns.ok_or_else(|| {
         RosTemporalDispositionV1::ReceiptUnavailable {
             stream,
@@ -370,7 +380,7 @@ pub fn evaluate_ros_temporal_pair_v1(
     let imu = match imu {
         Some(imu) => imu,
         None => {
-            return RosTemporalDispositionV1::ReceiptUnavailable {
+            return RosTemporalDispositionV1::SourceUnavailable {
                 stream: RosTemporalStreamV1::Imu,
                 reason: "IMU source observation is unavailable".into(),
             };
@@ -2158,10 +2168,17 @@ mod tests {
         );
         joint.receive_age_at_capture_ns = Some(10_000);
         joint.received_monotonic_ns = Some(90_000);
+        let mut late_imu = temporal_test_sample(
+            100,
+            0,
+            RosClockDomainV1::Named("robot-sim-clock".into()),
+        );
+        late_imu.receive_age_at_capture_ns = Some(10_000);
+        late_imu.received_monotonic_ns = Some(90_000);
         assert!(matches!(
             evaluate_ros_temporal_pair_v1(
                 &joint,
-                Some(&imu),
+                Some(&late_imu),
                 &temporal_test_now(),
                 &temporal_test_policy(),
                 "receipt-epoch",
@@ -2190,7 +2207,7 @@ mod tests {
                 "receipt-epoch",
                 100
             ),
-            RosTemporalDispositionV1::ReceiptUnavailable {
+            RosTemporalDispositionV1::SourceUnavailable {
                 stream: RosTemporalStreamV1::Imu,
                 ..
             }
