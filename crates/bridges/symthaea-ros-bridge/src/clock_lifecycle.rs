@@ -858,6 +858,116 @@ mod tests {
         assert!(tracker.pending_transition().is_some());
     }
 
+    #[derive(serde::Deserialize)]
+    struct ClockLifecycleCorpusV1 {
+        schema_version: u16,
+        policy: RosClockLifecyclePolicyV1,
+        scenarios: Vec<ClockLifecycleScenarioV1>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ClockLifecycleScenarioV1 {
+        id: String,
+        steps: Vec<ClockLifecycleStepV1>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ClockLifecycleStepV1 {
+        op: String,
+        #[serde(default)]
+        observation: Option<RosClockObservationV1>,
+        capture_receive_epoch_id: String,
+        captured_monotonic_ns: u64,
+        expected: String,
+        expected_admissible: bool,
+        expected_generation: Option<u64>,
+        #[serde(default)]
+        expected_transition: Option<String>,
+    }
+
+    #[test]
+    fn frozen_clock_lifecycle_fault_corpus_is_the_shared_regression_oracle() {
+        let corpus: ClockLifecycleCorpusV1 = serde_json::from_str(include_str!(
+            "../tests/fixtures/ros_clock_lifecycle_v1.json"
+        ))
+        .expect("clock lifecycle corpus must be valid JSON");
+        assert_eq!(corpus.schema_version, 1);
+        assert!(!corpus.scenarios.is_empty());
+
+        let mut total_steps = 0usize;
+        for scenario in &corpus.scenarios {
+            let mut tracker = RosClockLifecycleTrackerV1::new(corpus.policy.clone())
+                .unwrap_or_else(|error| panic!("scenario {} has invalid policy: {error:?}", scenario.id));
+            for (step_index, step) in scenario.steps.iter().enumerate() {
+                let outcome = match step.op.as_str() {
+                    "observe" => tracker.observe(
+                        step.observation.as_ref().unwrap_or_else(|| {
+                            panic!("scenario {} step {} requires observation", scenario.id, step_index)
+                        }),
+                        &step.capture_receive_epoch_id,
+                        step.captured_monotonic_ns,
+                    ),
+                    "watchdog" => tracker.check_liveness(
+                        &step.capture_receive_epoch_id,
+                        step.captured_monotonic_ns,
+                    ),
+                    "acknowledge" => tracker.acknowledge_transition(
+                        step.observation.as_ref().unwrap_or_else(|| {
+                            panic!("scenario {} step {} requires rebind observation", scenario.id, step_index)
+                        }),
+                        &step.capture_receive_epoch_id,
+                        step.captured_monotonic_ns,
+                    ),
+                    other => panic!(
+                        "scenario {} step {} uses unknown operation {other:?}",
+                        scenario.id, step_index
+                    ),
+                };
+
+                let serialized = serde_json::to_value(&outcome)
+                    .expect("lifecycle disposition must serialize");
+                let actual_variant = match serialized {
+                    serde_json::Value::String(variant) => variant,
+                    serde_json::Value::Object(fields) => fields
+                        .keys()
+                        .next()
+                        .cloned()
+                        .unwrap_or_else(|| panic!("scenario {} step {} has empty disposition", scenario.id, step_index)),
+                    other => panic!(
+                        "scenario {} step {} emitted unexpected disposition JSON: {other}",
+                        scenario.id, step_index
+                    ),
+                };
+                let context = format!("scenario {} step {}", scenario.id, step_index);
+                assert_eq!(actual_variant, step.expected, "{context}");
+                assert_eq!(
+                    outcome.permits_temporal_admission(),
+                    step.expected_admissible,
+                    "{context}: temporal-admission bit"
+                );
+                assert_eq!(
+                    tracker.generation(),
+                    step.expected_generation,
+                    "{context}: lifecycle generation"
+                );
+                let actual_transition = tracker
+                    .pending_transition()
+                    .map(|transition| format!("{:?}", transition.kind));
+                assert_eq!(
+                    actual_transition,
+                    step.expected_transition,
+                    "{context}: pending transition"
+                );
+                total_steps += 1;
+            }
+        }
+
+        // Keep the fixture's minimum breadth explicit so accidentally deleting a
+        // whole fault scenario cannot silently leave a deceptively green test.
+        assert!(corpus.scenarios.len() >= 8, "fault corpus lost required scenario coverage");
+        assert!(total_steps >= 20, "fault corpus lost required step coverage");
+    }
+
     #[test]
     fn invalid_policy_is_rejected() {
         let mut invalid = policy();
