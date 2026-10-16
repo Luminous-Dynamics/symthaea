@@ -1,0 +1,81 @@
+{
+  "schema_version": "nano-policy-input-v1",
+  "request_id": "toy-photonic-batch-001",
+  "policy": "hybrid",
+  "seed": 20261016,
+  "batch_size": 2,
+  "feature_space": {
+    "id": "demo-normalized-geometry-embedding-v1",
+    "semantics": "Toy 2D geometry embedding, for schema tests only; not derived from scientific data",
+    "normalized_to_minus_one_one": true
+  },
+  "weights": {
+    "goal_fit": 0.3,
+    "uncertainty": 0.2,
+    "cost_efficiency": 0.1,
+    "diversity": 0.4
+  },
+  "anchors": [],
+  "candidates": [
+    {
+      "id": "candidate-a",
+      "features": [
+        0,
+        0
+      ],
+      "predicted_goal_error": 0.12,
+      "uncertainty": 0.2,
+      "estimated_cost": 1,
+      "eligible": true,
+      "already_queried": false
+    },
+    {
+      "id": "candidate-b",
+      "features": [
+        0.02,
+        0.02
+      ],
+      "predicted_goal_error": 0.1,
+      "uncertainty": 0.3,
+      "estimated_cost": 1.1,
+      "eligible": true,
+      "already_queried": false
+    },
+    {
+      "id": "candidate-c",
+      "features": [
+        0.8,
+        0.8
+      ],
+      "predicted_goal_error": 0.2,
+      "uncertainty": 0.8,
+      "estimated_cost": 1.5,
+      "eligible": true,
+      "already_queried": false
+    },
+    {
+      "id": "candidate-d",
+      "features": [
+        -0.8,
+        0.8
+      ],
+      "predicted_goal_error": 0.25,
+      "uncertainty": 0.6,
+      "estimated_cost": 1.2,
+      "eligible": true,
+      "already_queried": false
+    },
+    {
+      "id": "candidate-e-already-queried",
+      "features": [
+        0.5,
+        -0.5
+      ],
+      "predicted_goal_error": 0.15,
+      "uncertainty": 0.4,
+      "estimated_cost": 0.9,
+      "eligible": true,
+      "already_queried": true
+    }
+  ]
+}
