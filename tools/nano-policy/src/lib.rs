@@ -39,6 +39,8 @@ pub struct SelectionRequest {
     pub schema_version: String,
     pub feature_schema_id: String,
     pub candidates: Vec<Candidate>,
+    /// Label-free feature vectors from previously evaluated candidates, using the same schema.
+    pub reference_features: Vec<Vec<f64>>,
     pub policy: SelectionPolicy,
     pub selection_count: usize,
     pub max_total_cost: Option<f64>,
@@ -86,6 +88,7 @@ pub struct SelectionReceipt {
     pub policy: SelectionPolicy,
     pub seed: u64,
     pub input_candidate_count: usize,
+    pub reference_feature_count: usize,
     pub requested_selection_count: usize,
     pub selected_count: usize,
     pub max_total_cost: Option<f64>,
@@ -117,7 +120,8 @@ pub fn select(request: SelectionRequest) -> Result<SelectionReceipt, String> {
     validate(&request)?;
     let n = request.candidates.len();
     let limit = request.selection_count.min(n);
-    let normalized = normalize(&request.candidates);
+    let (normalized, normalized_references) =
+        normalize(&request.candidates, &request.reference_features);
     let center = centroid(&normalized);
     let min_cost = request.candidates.iter().map(|c| c.estimated_cost).fold(f64::INFINITY, f64::min);
     let mut work = vec![Work::new(); n];
@@ -159,10 +163,15 @@ pub fn select(request: SelectionRequest) -> Result<SelectionReceipt, String> {
                 let mut best: Option<(usize, f64, Option<f64>)> = None;
                 for (i, candidate) in request.candidates.iter().enumerate() {
                     if work[i].disposition.is_some() { continue; }
-                    let nearest = if chosen.is_empty() {
+                    let nearest = if chosen.is_empty() && normalized_references.is_empty() {
                         None
                     } else {
-                        Some(chosen.iter().map(|j| distance(&normalized[i], &normalized[*j])).fold(f64::INFINITY, f64::min))
+                        let prior_distance = normalized_references
+                            .iter()
+                            .map(|prior| distance(&normalized[i], prior))
+                            .chain(chosen.iter().map(|j| distance(&normalized[i], &normalized[*j])))
+                            .fold(f64::INFINITY, f64::min);
+                        Some(prior_distance)
                     };
                     let raw = nearest.unwrap_or_else(|| distance(&normalized[i], &center));
                     let score = if request.policy == SelectionPolicy::CostAwareDiversity {
@@ -196,6 +205,7 @@ pub fn select(request: SelectionRequest) -> Result<SelectionReceipt, String> {
         policy: request.policy,
         seed: request.seed,
         input_candidate_count: n,
+        reference_feature_count: request.reference_features.len(),
         requested_selection_count: request.selection_count,
         selected_count: selections.len(),
         max_total_cost: request.max_total_cost,
@@ -223,6 +233,17 @@ fn validate(r: &SelectionRequest) -> Result<(), String> {
     if r.max_total_cost.is_some_and(|v| !v.is_finite() || v < 0.0) { return Err("max_total_cost must be finite and nonnegative".into()); }
     let dims = r.candidates[0].features.len();
     if dims == 0 || dims > MAX_FEATURES { return Err(format!("feature dimension count must be in 1..={MAX_FEATURES}")); }
+    if r.candidates.len().saturating_add(r.reference_features.len()) > MAX_CANDIDATES {
+        return Err(format!("candidate and reference feature count exceeds {MAX_CANDIDATES}"));
+    }
+    for reference in &r.reference_features {
+        if reference.len() != dims {
+            return Err(format!("reference feature vector has {} dimensions; expected {dims}", reference.len()));
+        }
+        if reference.iter().any(|v| !v.is_finite()) {
+            return Err("reference feature vector contains non-finite values".into());
+        }
+    }
     let mut ids = std::collections::HashSet::with_capacity(r.candidates.len());
     let mut all_costs = 0.0;
     for c in &r.candidates {
@@ -243,20 +264,38 @@ fn validate(r: &SelectionRequest) -> Result<(), String> {
     Ok(())
 }
 
-fn normalize(cs: &[Candidate]) -> Vec<Vec<f64>> {
-    let d = cs[0].features.len();
-    let mut lo = vec![f64::INFINITY; d];
-    let mut hi = vec![f64::NEG_INFINITY; d];
-    for c in cs { for (j, v) in c.features.iter().enumerate() { lo[j] = lo[j].min(*v); hi[j] = hi[j].max(*v); } }
-    let ranges: Vec<_> = (0..d).map(|j| {
-        let scale = lo[j].abs().max(hi[j].abs()).max(1.0);
-        let low = lo[j] / scale;
-        (scale, low, hi[j] / scale - low)
+fn normalize(
+    candidates: &[Candidate],
+    references: &[Vec<f64>],
+) -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
+    let dimensions = candidates[0].features.len();
+    let mut low = vec![f64::INFINITY; dimensions];
+    let mut high = vec![f64::NEG_INFINITY; dimensions];
+    for features in candidates.iter().map(|candidate| &candidate.features).chain(references.iter()) {
+        for (dimension, value) in features.iter().enumerate() {
+            low[dimension] = low[dimension].min(*value);
+            high[dimension] = high[dimension].max(*value);
+        }
+    }
+    let ranges: Vec<_> = (0..dimensions).map(|dimension| {
+        let scale = low[dimension].abs().max(high[dimension].abs()).max(1.0);
+        let scaled_low = low[dimension] / scale;
+        (scale, scaled_low, high[dimension] / scale - scaled_low)
     }).collect();
-    cs.iter().map(|c| c.features.iter().enumerate().map(|(j, v)| {
-        let (scale, low, span) = ranges[j];
-        if span.total_cmp(&0.0) == Ordering::Equal { 0.0 } else { ((*v / scale - low) / span).clamp(0.0, 1.0) }
-    }).collect()).collect()
+    let normalize_one = |features: &[f64]| {
+        features.iter().enumerate().map(|(dimension, value)| {
+            let (scale, scaled_low, span) = ranges[dimension];
+            if span.total_cmp(&0.0) == Ordering::Equal {
+                0.0
+            } else {
+                ((*value / scale - scaled_low) / span).clamp(0.0, 1.0)
+            }
+        }).collect()
+    };
+    (
+        candidates.iter().map(|candidate| normalize_one(&candidate.features)).collect(),
+        references.iter().map(|features| normalize_one(features)).collect(),
+    )
 }
 
 fn centroid(ps: &[Vec<f64>]) -> Vec<f64> {
@@ -336,7 +375,8 @@ mod tests {
     fn req(policy: SelectionPolicy, candidates: Vec<Candidate>) -> SelectionRequest {
         SelectionRequest {
             schema_version: REQUEST_SCHEMA_VERSION.into(), feature_schema_id: "test-v1".into(),
-            candidates, policy, selection_count: 2, max_total_cost: None, seed: 7, cost_exponent: 1.0,
+            candidates, reference_features: vec![], policy, selection_count: 2,
+            max_total_cost: None, seed: 7, cost_exponent: 1.0,
         }
     }
 
