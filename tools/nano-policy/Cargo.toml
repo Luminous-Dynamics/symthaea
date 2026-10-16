@@ -9,3 +9,4 @@ description = "Deterministic, dependency-free candidate-selection baselines for 
 # This tool is intentionally a nested standalone workspace, excluded from the production
 # Symthaea workspace and dependency graph.
 [workspace]
+resolver = "3"
