@@ -64,7 +64,7 @@ pub enum FactoryScheduleError {
     InvalidInput(String),
     DependencyCycle(Vec<String>),
     NoQualifiedAssignment(String),
-    NoFeasibleAvailability(String),
+    NoFeasiblePlacement(String),
     TimeOverflow(String),
 }
 
@@ -79,9 +79,9 @@ impl fmt::Display for FactoryScheduleError {
                 f,
                 "operation {operation:?} has no worker/resource with all required skills and capabilities"
             ),
-            Self::NoFeasibleAvailability(operation) => write!(
+            Self::NoFeasiblePlacement(operation) => write!(
                 f,
-                "operation {operation:?} cannot fit a qualified worker/resource availability window"
+                "earliest-finish heuristic could not place operation {operation:?}; this does not prove global infeasibility"
             ),
             Self::TimeOverflow(operation) => {
                 write!(f, "time arithmetic overflow while scheduling {operation:?}")
@@ -268,7 +268,7 @@ pub fn plan_factory_line(
                     pending.into_iter().collect(),
                 ));
             }
-            return Err(FactoryScheduleError::NoFeasibleAvailability(
+            return Err(FactoryScheduleError::NoFeasiblePlacement(
                 ready_without_assignment[0].clone(),
             ));
         };
@@ -692,7 +692,7 @@ mod tests {
         let resources = vec![resource("station", &["metrology"], 0, 100)];
         assert_eq!(
             plan_factory_line(&operations, &workers, &resources),
-            Err(FactoryScheduleError::NoFeasibleAvailability("inspect".into()))
+            Err(FactoryScheduleError::NoFeasiblePlacement("inspect".into()))
         );
 
         let duplicates = vec![
