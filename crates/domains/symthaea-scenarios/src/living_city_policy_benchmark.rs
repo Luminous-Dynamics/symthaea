@@ -970,6 +970,32 @@ mod tests {
     }
 
     #[test]
+    fn receipt_verifier_rejects_same_id_with_changed_scenario_or_config() {
+        let case = scenario("bound-inputs", vec![step(5, 10, observed(5, 10))]);
+        let cfg = config();
+        let run = evaluate_policy(&case, PolicyKind::ReactiveGreedy, cfg).unwrap();
+        let receipt = run.receipt().unwrap();
+
+        let mut altered_case = case.clone();
+        altered_case.steps[0].actual_supply_units = 4;
+        assert_eq!(
+            verify_policy_run_receipt(&altered_case, cfg, &run, &receipt)
+                .unwrap_err()
+                .field,
+            "receipt.inputs"
+        );
+
+        let mut altered_config = cfg;
+        altered_config.backup_capacity_units += 1;
+        assert_eq!(
+            verify_policy_run_receipt(&case, altered_config, &run, &receipt)
+                .unwrap_err()
+                .field,
+            "receipt.inputs"
+        );
+    }
+
+    #[test]
     fn scenario_and_config_digests_change_when_bound_inputs_change() {
         let case = scenario("digest-fixture", vec![step(5, 10, observed(5, 10))]);
         let original_scenario_digest = case.sha256().unwrap();
