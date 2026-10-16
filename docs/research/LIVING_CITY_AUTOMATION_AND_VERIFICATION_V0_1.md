@@ -410,3 +410,37 @@ This is a **deterministic topology/logic pre-screen**, not a physical simulator.
 - A static graph pass never gets interpreted as a reliability, safety or outage-duration prediction.
 
 The next integration is to map stress-case profiles to initiating-failure sets and compare the graph's expected cascades with the results from at least one reference-domain solver. Keep capacity and timing effects in the relevant physical model; do not add arbitrary edge weights just to make this graph imitate physics.
+
+## 18. Evidence-linked hazard profiles and dependency graph bridge
+
+The active module crates/domains/symthaea-scenarios/src/living_city_hazard_profiles.rs connects the benchmark registry, evidence manifest and dependency propagation layer.
+
+A profile identifies its schema version, profile/revision ID, benchmark ID, study-area ID, jurisdiction and time horizon. For each declared hazard, it requires at least one named parameter with an explicit numeric value, unit and evidence-manifest item ID. Each initiating failure names a service node, causal hazard, evidence item and rationale. Profile digests use canonicalized JSON after normalizing unordered parameter and failure collections.
+
+Evaluation rejects:
+- An unknown benchmark, invalid benchmark registry, profile/binding revision or stale profile digest.
+- A mismatch between the manifest scenario ID and benchmark ID.
+- A parameter for a hazard not declared by the benchmark, missing hazard coverage, duplicate parameters, NaN/infinite values, or missing units.
+- A parameter or initiating failure whose evidence ID is absent or marked missing.
+- Initiating failures for unknown service IDs, undeclared hazard causes, or duplicate cause/evidence tuples.
+- A baseline profile that injects hazard stressors or hazard-caused initial failures.
+- Malformed service dependency graphs.
+
+Only after these checks does the module pass the declared initiating-failure set to the deterministic dependency propagation evaluator. The resulting causal cascade is therefore tied to a versioned profile and evidence package rather than to an unlabelled list of failed nodes.
+
+The profile bridge is a screening and provenance contract, not a physics engine. An assumed input is still an assumption even though it has an evidence ID; a profile must not label an assumed temperature, outage, flood depth or service failure as measured. The offline package verifier currently verifies source bytes against manifest digests, but it does not yet load and execute this profile evaluation from the run package. That CLI/orchestrator integration, followed by one reference-domain solver, is the next milestone.
+
+### Standards research and interoperability implications
+
+- The official buildingSMART standards server identifies IFC 4.3.2.0 / IFC4X3_ADD2 as the final official release aligned with ISO 16739-1:2024. IFC 4.4 and IFC 5 listings are in development; do not track them implicitly for the first construction exchange profile. Source: https://standards.buildingsmart.org/ and https://technical.buildingsmart.org/standards/ifc/ifc-schema-specifications/
+- OGC CityGML 3.0 defines a semantic conceptual model for city-scale objects that can be implemented through different encodings. Keep the urban information model separate from the chosen file/API encoding, and test semantic round-trips rather than assuming a GML-only representation. Source: https://www.ogc.org/standards/citygml/ and https://docs.ogc.org/is/20-010/20-010.html
+- OGC's urban digital twin discussion emphasizes integrating infrastructure, the natural environment and people, with dynamic observations/sensor feeds and interoperable geospatial services. This supports keeping service outcomes, ecological context, and distributions of human impact linked to spatial assets without collapsing them into one score. Source: https://docs.ogc.org/dp/24-025.html
+
+### Additional acceptance criteria for profile-to-cascade integration
+
+1. Every numeric hazard parameter is bound to a non-missing evidence-manifest item; the retained bytes for that item must pass the offline verifier.
+2. Every initiating failure links to a declared hazard and a service ID in the declared graph; no implicit nodes, defaults, or unknown IDs.
+3. The binding's profile digest is recomputed from canonical profile bytes; stale profile values cannot reuse an old binding.
+4. The same profile and graph produce the same ordered service outcomes regardless of source collection ordering.
+5. A declared assumption stays visibly classified as an assumption; evidence presence does not promote it to a measurement.
+6. The topology screen is compared with a documented reference-domain model before its cascades are used in real design decisions.
