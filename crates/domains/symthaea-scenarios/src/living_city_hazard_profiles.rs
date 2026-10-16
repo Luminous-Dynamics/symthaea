@@ -550,6 +550,52 @@ mod tests {
     }
 
     #[test]
+    fn compound_profile_requires_each_hazard_and_propagates_outage() {
+        let mut profile = heat_profile();
+        profile.benchmark_id = "heat-plus-72h-grid-outage".into();
+        profile.hazard_parameters.push(HazardParameter {
+            hazard: Hazard::GridOutage72Hours,
+            parameter_name: "critical_asset_outage_duration".into(),
+            value: 72.0,
+            unit: "hour".into(),
+            evidence_item_id: "outage-basis".into(),
+        });
+        profile.initiating_failures[0].cause = Hazard::GridOutage72Hours;
+
+        let mut manifest = heat_manifest();
+        manifest.scenario_id = "heat-plus-72h-grid-outage".into();
+        let (nodes, edges) = graph();
+        let result = evaluate_hazard_profile(
+            &profile,
+            &binding_for(&profile),
+            &manifest,
+            &nodes,
+            &edges,
+            LIVING_CITY_BENCHMARKS,
+        )
+        .unwrap();
+        assert_eq!(
+            result.dependency_assessment.failed_ids(),
+            vec!["cooling-centre", "grid", "hospital"]
+        );
+
+        profile.hazard_parameters.pop();
+        assert_eq!(
+            evaluate_hazard_profile(
+                &profile,
+                &binding_for(&profile),
+                &manifest,
+                &nodes,
+                &edges,
+                LIVING_CITY_BENCHMARKS,
+            )
+            .unwrap_err()
+            .field,
+            "hazard_parameters"
+        );
+    }
+
+    #[test]
     fn baseline_profile_cannot_inject_hazard_failures() {
         let mut profile = heat_profile();
         profile.benchmark_id = "baseline-operating-envelope".into();
