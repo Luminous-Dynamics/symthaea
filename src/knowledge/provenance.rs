@@ -649,4 +649,41 @@ mod tests {
         assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::ClaimNotYetValid));
     }
 
+
+    /// Pure-function microbenchmark only; it excludes storage, hashing, source
+    /// status I/O, signature verification, and graph retrieval.
+    #[test]
+    #[ignore = "manual release-mode microbenchmark; not a CI correctness gate"]
+    fn benchmark_provenance_gate_throughput() {
+        use std::time::Instant;
+
+        const REPEATS: usize = 21;
+        let fixture = complete_provenance();
+        let policy = ProvenancePolicy::strict();
+        assert_eq!(
+            fixture.assess(&policy, NOW).decision,
+            ProvenanceDecision::EligibleForReview
+        );
+
+        for batch_size in [1_000usize, 10_000, 100_000] {
+            let mut batch_ns = Vec::with_capacity(REPEATS);
+            for _ in 0..REPEATS {
+                let start = Instant::now();
+                for _ in 0..batch_size {
+                    let assessment = fixture.assess(&policy, NOW);
+                    std::hint::black_box((assessment.decision, assessment.reasons.len()));
+                }
+                batch_ns.push(start.elapsed().as_nanos());
+            }
+            batch_ns.sort_unstable();
+            let p50_ns = batch_ns[REPEATS / 2];
+            let p95_index = (REPEATS * 95 + 99) / 100 - 1;
+            let p95_ns = batch_ns[p95_index];
+            println!(
+                "batch_size={batch_size} repeats={REPEATS} p50_batch_ns={p50_ns} p95_batch_ns={p95_ns} p50_ns_per_assessment={}",
+                p50_ns / batch_size as u128
+            );
+        }
+    }
+
 }
