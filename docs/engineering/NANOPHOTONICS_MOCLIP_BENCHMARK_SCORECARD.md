@@ -1,6 +1,7 @@
 # Nanophotonics Pilot Benchmark Scorecard: MOCLIP, HDC and Budgeted Inverse Design
 
-**Status:** Preregistered pilot proposal; not an executed benchmark.  
+**Status:** Preregistered pilot proposal; not an executed benchmark.
+**Cross-domain benchmark charter:** [NANOTECHNOLOGY_BENCHMARK_CHARTER.md](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md) sets shared reproducibility/leakage gates and domain-specific acceptance logic.  
 **Date:** 2026-10-16  
 **Parent domain-selection gate:** [NANO-002](https://github.com/Luminous-Dynamics/symthaea/issues/7507)  
 **Related domain atlas:** [NANOTECHNOLOGY_DOMAIN_ATLAS.md](./NANOTECHNOLOGY_DOMAIN_ATLAS.md)  
