@@ -39,7 +39,7 @@ No level implies access to subjective experience. Keep observed call, behavioral
 
 ### Suite A — Detection and taxonomic context
 
-Use a pinned subset of **BEANS** for standardized animal-audio detection/classification. Where bird species labels and licenses allow, compare against a suitable published taxonomic detector (e.g. BirdNET) as a reference baseline, not as a semantic oracle. Report precision, recall, PR-AUC and false positives at both event and recording/site level.
+Use a pinned subset of **BEANS** for standardized animal-audio detection/classification. For strong event-boundary evaluation, assess **WABAD** only after its license is resolved (see Section 6): its expert annotations include vocalization start/end times and frequency bounds. Where bird species labels and model/data licenses allow, compare against a suitable published taxonomic detector (e.g. BirdNET) as a reference baseline, not as a semantic oracle. Report precision, recall, PR-AUC and false positives at both event and recording/site level.
 
 The global BirdNET assessment used 4,224 one-minute recordings from 67 sites and reported substantial geographic and species-level variation, with recall generally more heterogeneous than precision. That argues against random clip-only splits and aggregate-only reporting.
 
@@ -107,8 +107,13 @@ If a target proves unrealistic on an independently characterized corpus, amend t
 
 Candidate starting points:
 - BEANS benchmark and datasets: https://arxiv.org/abs/2210.12300 and https://github.com/earthspecies/beans
+- WABAD data paper: https://doi.org/10.1002/ecy.70317; full dataset record: https://zenodo.org/records/17293588
 - BirdNET model documentation (including model scope and license): https://birdnet-team.github.io/BirdNET-Analyzer/stable/models.html
 - Global BirdNET evaluation: https://doi.org/10.1016/j.ecolind.2025.114550
+
+**WABAD license-admission gate:** the 2026 data paper describes the dataset as CC BY 4.0, while the current Zenodo record labels it CC BY-NC 4.0. Do not treat the conflict as resolved. For now, treat commercial use as blocked, do not republish recordings/derived dataset bundles, and seek clarification from the dataset maintainers before selecting an intended-use license. A future corpus manifest must record both the source record and the license decision/evidence.
+
+WABAD is a high-value candidate for passive validation because it reports 5,047 minutes and 91,931 expert-annotated vocalizations from 1,192 species across 72 sites, with vocalization start/end times and frequency bounds. These counts describe the published dataset, not data already downloaded, audited or usable by this repository.
 
 Pin the exact dataset/version and each artifact's license before use. Public availability is not a blanket redistribution or commercial-use grant. In particular, record the actual model license and intended use for every baseline. Do not commit raw wildlife recordings into the source repository without explicit redistribution rights; publish source references, manifests and permitted derived features instead.
 
