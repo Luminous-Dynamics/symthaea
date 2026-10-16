@@ -182,6 +182,12 @@ This fourth objective is not identical to maximizing immediate Success@K. Report
 4. Compare nanophotonics with 2D materials and metrology on NANO-002's readiness criteria, then select one follow-on domain. Avoid concurrent uncontrolled implementations.
 5. Use a Rust-first Symthaea selector adapter only after the baseline tasks and interface semantics are frozen. Scientific tools may retain isolated research runtimes; never add an unqualified Python model stack to production Symthaea by accident.
 
-## 9. Success definition for the program
+## 9. Active Rust selector baseline
+
+A first candidate-policy primitive is being developed separately from this research-document branch: [PR #7628](https://github.com/Luminous-Dynamics/symthaea/pull/7628), tracked by [NANO-005](https://github.com/Luminous-Dynamics/symthaea/issues/7627). It provides deterministic maximin descriptor-diversity selection and a seeded random control, strict input/output JSON schemas, smoke fixtures, 14 unit tests, and a targeted Rust workflow with a CLI smoke check.
+
+This is an implementation baseline only. It is not yet an HDC-backed policy, atomistic predictor, optical solver, or scientific result. Its input contains only candidate IDs and numeric descriptors; future integration must use a permitted, frozen representation and demonstrate improvement over this and task-native baselines. Rust compilation/tests remain pending the targeted workflow and must not be reported as passing before exact-head evidence exists.
+
+## 10. Success definition for the program
 
 The program succeeds when it can **reproducibly show where Symthaea improves evidence-gathering decisions and where it does not**, across carefully chosen scientific tasks, while respecting distinct physical models, data rights, risk constraints, and uncertainty. Discovering a physically useful nanotechnology is a later, more demanding claim requiring independent experimental evidence.
