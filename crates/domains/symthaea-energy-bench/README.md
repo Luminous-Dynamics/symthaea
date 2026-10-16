@@ -19,6 +19,14 @@ The `experiment_selection` module implements a transparent queue baseline before
 
 Example API: `experiment_selection::rank_experiments(&policy, &proposals)`. The queue policy itself must be registered before ranking. Resource units are compared exactly; conversions must happen before selection. This is **not** Bayesian optimization, expected information gain, a calibrated uncertainty model, or a safety approval system. Ranking is a screening aid and cannot replace engineering review.
 
+## Oracle-backed selector benchmark
+
+The `experiment_benchmark` module evaluates Phase A against random, cheapest-first, one-dimensional space-filling, and an exhaustive oracle upper bound on the same admissible proposal set and resource budget. Its deterministic generator makes six-proposal known-answer scenarios and deliberately includes cases where declared uncertainty-reduction proxies are misleading.
+
+The report includes selected IDs, rejected proposals and reasons, budget use, achieved synthetic resolution utility, oracle utility, decision regret, resolution rate, and median/maximum regret summaries. The oracle enumerates subsets and is capped at 16 eligible experiments per scenario. For generated scenarios, utility is a toy independent-information model; these are algorithmic stress tests only, not a physical energy-conversion model or evidence of engineering superiority.
+
+Run with `cargo test -p symthaea-energy-bench experiment_benchmark::tests::reference_suite_runs_one_thousand_known_answer_scenarios`. This test is authored but must be run on a Rust-enabled environment; source presence is not a passing result.
+
 ## Benchmark acceptance targets
 
 The research acceptance ladder is specified in [ENERGY_CONVERSION_BENCHMARK_TARGETS.md](../../../docs/research/ENERGY_CONVERSION_BENCHMARK_TARGETS.md). It separates code/accounting conformance, oracle-backed selector quality, calibrated multifidelity evaluation, and independent physical validation. Proposed percentage improvements are unproven go/no-go targets, not current performance claims. Synthetic cases never establish physical superiority.
