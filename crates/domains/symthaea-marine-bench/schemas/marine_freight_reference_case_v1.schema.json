@@ -260,7 +260,8 @@
           "const": "known"
         },
         "value": {
-          "type": "number"
+          "type": "number",
+          "minimum": 0
         },
         "unit": {
           "enum": [
@@ -427,6 +428,9 @@
               "properties": {
                 "unit": {
                   "const": "fraction"
+                },
+                "value": {
+                  "maximum": 1
                 }
               }
             }
