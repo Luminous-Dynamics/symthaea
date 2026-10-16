@@ -59,7 +59,10 @@ The module has unit cases for:
 - vector-order determinism;
 - reserve rounding and overflow;
 - duplicate provider/resource pool rejection;
-- receipt invalidation after demand mutation.
+- receipt invalidation after demand mutation;
+- a deterministic 2,000-case interval boundary corpus that checks reserve rounding, required capacity, block/pass classification, shortfall and margin; receipt verification is repeated at fixed seeds.
+
+The integration replay independently reimplements the resource-plan, resource-report, task-receipt-binding and resource-receipt digest encodings, then checks both a successful report and a blocked report. This is an independent replay implementation in source; execution has not been observed in this environment.
 
 The integration replay fixes a synthetic configuration with 1,000 units of conservative supply, 400 units of worst-case required demand and an 80-unit reserve. Expected required capacity is 480 and remaining required margin is 520. A second replay sets conservative supply to 479 and must block with a one-unit shortfall.
 
@@ -77,7 +80,7 @@ These are goals, not measured results. Freeze the CPU, OS, Rust toolchain, build
 | Wrong resource kind / missing provider / revision mismatch / unreachable provider / environment mismatch | 100% seeded detection |
 | Receipt mutations to pool, demand, quantity, reserve, task or configuration | 100% rejection |
 | Equivalent pool/demand vector permutations | Identical report and receipt across 1,000 permutations |
-| Generated budget and fault corpus | 2,000 seeded cases, zero unexpected panics |
+| Generated budget/fault corpus beyond the implemented 2,000-case interval sweep | 2,000 seeded cases, zero unexpected panics |
 | 1,000 pools / 20,000 demand claims | p95 below 100 ms on a documented runner |
 
 All "100%" correctness claims must report numerator and denominator and preserve positive controls alongside negative controls. Timings are secondary to conservative accounting, no-implicit-pooling semantics, and fail-closed mutation coverage.
