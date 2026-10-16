@@ -301,6 +301,19 @@ pub fn evaluate_peak_resource_reservations(
         .iter()
         .map(|pool| (pool.pool_id.as_str(), pool))
         .collect();
+    let reservation_by_id: BTreeMap<&str, &PeakResourceReservation> = plan
+        .reservations
+        .iter()
+        .map(|reservation| (reservation.reservation_id.as_str(), reservation))
+        .collect();
+    let mut reservations_by_pool: BTreeMap<&str, Vec<&PeakResourceReservation>> =
+        BTreeMap::new();
+    for reservation in &plan.reservations {
+        reservations_by_pool
+            .entry(reservation.pool_id.as_str())
+            .or_default()
+            .push(reservation);
+    }
     let component_by_id: BTreeMap<&str, &MissionComponent> = configuration
         .components
         .iter()
@@ -321,15 +334,13 @@ pub fn evaluate_peak_resource_reservations(
             plan.reserve_basis_points,
         )?;
         let usable_capacity = pool.capacity.lower.saturating_sub(reserve_quantity);
-        let reservations: Vec<&PeakResourceReservation> = plan
-            .reservations
-            .iter()
-            .filter(|reservation| reservation.pool_id == pool.pool_id)
-            .collect();
+        let reservations = reservations_by_pool
+            .get(pool.pool_id.as_str())
+            .ok_or(PeakResourceReservationError::UnusedPool)?;
         let mut boundaries = BTreeSet::new();
         let mut starts_at: BTreeMap<u64, Vec<&PeakResourceReservation>> = BTreeMap::new();
         let mut ends_at: BTreeMap<u64, Vec<&PeakResourceReservation>> = BTreeMap::new();
-        for reservation in &reservations {
+        for reservation in reservations {
             boundaries.insert(reservation.window.start_ms);
             boundaries.insert(reservation.window.end_ms);
             starts_at.entry(reservation.window.start_ms).or_default().push(*reservation);
@@ -660,9 +671,7 @@ pub fn evaluate_peak_resource_reservations(
             match window.status {
                 PeakWindowStatus::RequiredOversubscribed => {
                     for reservation_id in &window.active_reservation_ids {
-                        let reservation = plan.reservations.iter()
-                            .find(|item| item.reservation_id == *reservation_id)
-                            .expect("active reservation ID is from validated plan");
+                        let reservation = reservation_by_id[reservation_id.as_str()];
                         let task = task_by_id[reservation.task_id.as_str()];
                         if task.required && reservation.demand.upper > 0 {
                             findings.push(PeakResourceFinding {
