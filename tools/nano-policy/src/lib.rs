@@ -406,6 +406,29 @@ mod tests {
     }
 
     #[test]
+    fn diversity_respects_previous_feature_only_queries() {
+        let mut r = req(
+            SelectionPolicy::MaxMinDiversity,
+            vec![c("near", &[0.1], 1.0), c("middle", &[0.2], 1.0), c("far", &[1.0], 1.0)],
+        );
+        r.selection_count = 1;
+        r.reference_features = vec![vec![0.0]];
+        let receipt = select(r).unwrap();
+        assert_eq!(receipt.selections[0].candidate_id, "far");
+        assert_eq!(receipt.reference_feature_count, 1);
+    }
+
+    #[test]
+    fn invalid_reference_features_are_rejected() {
+        let mut r = req(
+            SelectionPolicy::MaxMinDiversity,
+            vec![c("candidate-a", &[0.0, 0.1], 1.0), c("candidate-b", &[0.9, 1.0], 1.0)],
+        );
+        r.reference_features = vec![vec![0.5]];
+        assert!(select(r).unwrap_err().contains("reference feature vector has 1 dimensions"));
+    }
+
+    #[test]
     fn duplicate_ids_are_rejected() {
         let r = req(SelectionPolicy::Random, vec![c("x",&[0.],1.),c("x",&[1.],1.)]);
         assert!(select(r).unwrap_err().contains("duplicate candidate ID"));
