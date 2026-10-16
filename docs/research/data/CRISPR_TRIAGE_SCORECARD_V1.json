@@ -24,7 +24,11 @@
     "fixed_budget_cardinality_fixtures_executed": false,
     "dataset_license_explicitly_verified": false,
     "pareto_frontier_kernel_compiled": false,
-    "pareto_frontier_unit_tests_executed": false
+    "pareto_frontier_unit_tests_executed": false,
+    "selective_risk_kernel_compiled": false,
+    "selective_risk_unit_tests_executed": false,
+    "calibration_metrics_executed": false,
+    "risk_coverage_metrics_executed": false
   },
   "label_states": [
     {
@@ -92,13 +96,17 @@
       "id": "T4_calibration_abstention",
       "required_when_labels_support_it": true,
       "metrics": [
-        "brier_score",
-        "log_loss",
-        "reliability_diagram",
+        "brier_score_on_measured_labels",
+        "log_loss_without_silent_endpoint_clipping",
+        "fixed_bin_reliability",
+        "expected_calibration_error_with_bin_counts",
         "risk_coverage_curve",
-        "abstention_rate"
+        "observed_label_risk",
+        "unknown_aware_error_rate_bounds",
+        "abstention_rate",
+        "per_context_calibration_and_risk_coverage"
       ],
-      "denominator_rule": "Calibration metrics require defensible label semantics; otherwise mark not_estimable. Abstentions remain a separate state."
+      "denominator_rule": "Calibration losses use measured positive/assay-defined-negative outcomes and report unknown counts; values are conditional on label ascertainment. Each risk-coverage point includes accepted coverage, observed-label coverage, accepted-label completeness, observed-label risk, and sharp unknown-label error bounds. Confidence ties enter together. Results are per preregistered context; no labels means calibration not estimable."
     },
     {
       "id": "T5_shift_robustness",
@@ -165,6 +173,24 @@
       "objectives_must_be_preregistered": true,
       "objective_policy": "Keep recall, review burden, worst-group behavior, valid calibration metrics, uncertainty sensitivity and measured compute as separate axes where estimable. Do not invent weights to produce one universal CRISPR safety score.",
       "acceptance": "All compared policy vectors use the same objective definitions, units, direction, held-out episodes and metric availability rule. Every nondominated policy and full vector is reported."
+    },
+    {
+      "id": "T10_selective_prediction",
+      "required_when_probability_or_confidence_outputs_exist": true,
+      "metrics": [
+        "brier_score_on_measured_labels",
+        "log_loss_on_measured_labels",
+        "fixed_bin_reliability_and_counts",
+        "expected_calibration_error_with_counts",
+        "risk_coverage_curve",
+        "observed_label_risk",
+        "unknown_aware_error_bounds",
+        "per_context_calibration",
+        "per_context_label_completeness"
+      ],
+      "abstention_policy": "Freeze the confidence score and acceptance rule before holdout reveal. Accept confidence tiers in descending order; exact ties enter together. Predicted positive iff probability_positive > 0.5; score endpoints are not clipped to hide overconfident errors.",
+      "denominator_rule": "Calibration losses use measured positives and assay-defined negatives only; report unknowns explicitly and do not call conditional known-label metrics full-cohort calibration. Error bounds over accepted cases assign unknown outcomes best/worst for the prediction. These bounds are not confidence intervals.",
+      "acceptance": "Publish full curves and context-specific summaries; calibration is not estimable if a context has no valid measured labels. Missing thresholds and not-estimable metrics are reported explicitly."
     }
   ],
   "primary_targets": {
@@ -196,7 +222,21 @@
       }
     ],
     "inconclusive_rule": "If the interval includes no improvement or effective independent group sample is inadequate, label the result null_or_inconclusive.",
-    "cross_dataset_rule": "Do not claim robustness across datasets without at least one separately sourced cohort whose terms explicitly permit the intended use."
+    "cross_dataset_rule": "Do not claim robustness across datasets without at least one separately sourced cohort whose terms explicitly permit the intended use.",
+    "secondary_selective_prediction": {
+      "status": "aspirational_engineering_targets_not_clinical_standards",
+      "targets": [
+        "Publish full risk-coverage curves with accepted coverage, known-label coverage, accepted-label completeness, observed-label risk and unknown-aware error bounds.",
+        "Compare calibration only on identical measured-label held-out cases; aspirational target is at least 10% relative Brier-score reduction without worse log loss versus the strongest fair calibrated baseline, with group-paired uncertainty and no claimed win if the interval includes no improvement.",
+        "Report context-specific calibration and risk-coverage summaries; a context with no measured labels has calibration marked not estimable.",
+        "At 50%, 80% and 90% coverage where attainable without splitting confidence ties, report observed-label risk and label-assignment bounds; do not substitute a nearby threshold when unattainable."
+      ],
+      "caveats": [
+        "No target is a clinical standard or claim of safety.",
+        "Calibration and risk estimates may be conditional on label ascertainment.",
+        "Bins, confidence policy and thresholds must be fixed before held-out outcomes are revealed."
+      ]
+    }
   },
   "non_negotiable_gates": [
     {
@@ -248,6 +288,11 @@
       "id": "G9_pareto_no_scalarization",
       "target": "Report context-appropriate, complete objective vectors and the full Pareto frontier; do not collapse endpoints into a single universal CRISPR safety score",
       "failure_action": "Reject missing-value zero-fill, undocumented objective directions, changing objective sets after evaluation, or unsupported utility weights."
+    },
+    {
+      "id": "G10_selective_prediction_integrity",
+      "target": "100% of calibration/risk-coverage reports identify measured-label denominators, unknown counts, fixed bins, abstention/confidence policy, tie handling, and per-context results.",
+      "failure_action": "Reject silent unknown-to-negative conversion, post-hoc threshold/bin selection, clipped overconfident errors, or pooled summaries that hide contexts with no labels."
     }
   ],
   "comparator_policies": [
@@ -603,6 +648,101 @@
         "dominated"
       ],
       "expected": "No scalar weighted score is calculated. Policies on the frontier are trade-offs, not automatically a winner or clinically superior."
+    },
+    {
+      "id": "F9_calibration_abstention_unknown_risk",
+      "purpose": "Ensure calibration is conditional on measured labels, unknown accepted outcomes widen error bounds, exact confidence ties are accepted together, and an unlabelled context does not acquire a fabricated calibration score.",
+      "calibration_cases": [
+        {
+          "id": "cal_pos",
+          "context": "g-cal",
+          "probability_positive": 0.9,
+          "confidence": 0.9,
+          "label": "positive"
+        },
+        {
+          "id": "cal_neg",
+          "context": "g-cal",
+          "probability_positive": 0.2,
+          "confidence": 0.8,
+          "label": "assay_defined_negative"
+        },
+        {
+          "id": "cal_unknown",
+          "context": "g-cal",
+          "probability_positive": 0.8,
+          "confidence": 0.7,
+          "label": "unknown_unassayed"
+        }
+      ],
+      "risk_cases": [
+        {
+          "id": "risk_correct",
+          "context": "g-risk",
+          "probability_positive": 0.9,
+          "confidence": 0.9,
+          "label": "positive"
+        },
+        {
+          "id": "risk_unknown",
+          "context": "g-risk",
+          "probability_positive": 0.2,
+          "confidence": 0.8,
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "risk_wrong",
+          "context": "g-risk",
+          "probability_positive": 0.8,
+          "confidence": 0.1,
+          "label": "assay_defined_negative"
+        }
+      ],
+      "tie_cases": [
+        {
+          "id": "tie-a",
+          "context": "g-tie",
+          "probability_positive": 0.9,
+          "confidence": 0.7,
+          "label": "positive"
+        },
+        {
+          "id": "tie-b",
+          "context": "g-tie",
+          "probability_positive": 0.1,
+          "confidence": 0.7,
+          "label": "assay_defined_negative"
+        },
+        {
+          "id": "tie-c",
+          "context": "g-tie",
+          "probability_positive": 0.9,
+          "confidence": 0.5,
+          "label": "positive"
+        }
+      ],
+      "no_label_context_cases": [
+        {
+          "id": "unassayed",
+          "context": "g-unassayed",
+          "probability_positive": 0.8,
+          "confidence": 0.5,
+          "label": "unknown_unassayed"
+        }
+      ],
+      "calibration_bin_count": 5,
+      "expected": {
+        "measured_label_count": 2,
+        "unknown_label_count": 1,
+        "brier_score": 0.025,
+        "expected_calibration_error": 0.15,
+        "risk_all_cases_observed_label_risk": 0.5,
+        "risk_all_cases_error_rate_lower_bound": 0.3333333333333333,
+        "risk_all_cases_error_rate_upper_bound": 0.6666666666666666,
+        "confidence_tie_first_tier_accepted_count": 2,
+        "no_label_context_calibration": "not_estimable"
+      },
+      "interpretation": "Synthetic method check only; not biological data or performance evidence."
     }
   ],
   "implementation_artifact": {
@@ -625,7 +765,8 @@
       "invalid recall targets, duplicate IDs/ranks, contradictory reference labels, mismatched policy universes/labels, and positive IDs outside the reference are rejected"
     ],
     "additional_source_paths": [
-      "scripts/crispr_decision_frontier.rs"
+      "scripts/crispr_decision_frontier.rs",
+      "scripts/crispr_selective_risk.rs"
     ],
     "additional_test_suites": [
       {
@@ -633,6 +774,20 @@
         "unit_test_count": 10,
         "suggested_command": "rustc --edition=2024 --test scripts/crispr_decision_frontier.rs -o /tmp/crispr-frontier-tests && /tmp/crispr-frontier-tests",
         "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment"
+      },
+      {
+        "path": "scripts/crispr_selective_risk.rs",
+        "unit_test_count": 13,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_selective_risk.rs -o /tmp/crispr-selective-tests && /tmp/crispr-selective-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "Brier/log-loss/fixed-bin calibration with unknown labels excluded and counted",
+          "probability endpoints and non-finite/out-of-range input rejection",
+          "no-label calibration returns not estimable",
+          "risk-coverage tiers with exact confidence ties grouped together",
+          "unknown accepted labels widen error-rate bounds rather than become negatives",
+          "context-stratified sorted output and unlabelled context handling"
+        ]
       }
     ]
   },
@@ -724,6 +879,10 @@
         "reproduction of the biological source cohort",
         "clinical safety, biological utility, or Symthaea superiority"
       ]
+    },
+    "selective_risk_contract_check": {
+      "status": "pending_direct_contract_calculation",
+      "scope_limit": "Synthetic expected values can be checked independently; this does not prove Rust compilation, test execution, biological validation, or model improvement."
     }
   },
   "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571"
