@@ -17,6 +17,9 @@ pub mod repair_small_instance_oracle;
 /// Exhaustive exact oracle and heuristic gaps for tiny multi-crew repair schedules.
 pub mod multi_crew_repair_oracle;
 
+/// Independent feasibility/objective verifier for multi-crew repair schedule certificates.
+pub mod repair_schedule_certificate;
+
 /// Out-of-sample repair-policy evaluation under duration uncertainty.
 pub mod robust_repair_evaluation;
 
