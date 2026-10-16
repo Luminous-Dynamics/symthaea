@@ -227,3 +227,15 @@ For each portfolio, run at minimum: normal conditions, a design heat event, an a
 ## North star
 
 Engineer cities so every neighbourhood can meet dignified human needs within ecological limits—and make each proposed intervention traceable, contestable, robust to shocks, and accountable for its actual outcomes.
+
+## Updated implementation note — 2026-10-16
+
+The follow-on draft PR now also contains:
+
+- crates/domains/symthaea-scenarios/src/living_city_evidence.rs: typed provenance records and scenario-run receipt contracts, canonical length-prefixed bytes, digest-format validation, and fail-closed workflow states.
+- crates/domains/symthaea-scenarios/src/living_city_benchmarks.rs: a versioned test registry with a baseline, individual heat/drought/grid-outage cases, and compound heat+outage, drought+energy-shortfall, and flood+communications-failure cases; profile-coverage and result-record validators.
+- docs/research/LIVING_CITY_AUTOMATION_AND_VERIFICATION_V0_1.md: the complete engineering-compiler workflow and verification/promotion protocol.
+
+The benchmark registry is not itself a physical simulator: local hazard magnitudes, site boundary conditions and evidence must be supplied in versioned profile bindings, then exercised by actual solvers. The current receipt contract still needs an independent implementation that computes and recomputes SHA-256 over retained artifacts. Rust tests have been added but have not been run in the available environment; current PR-triggered workflows are skipped, not passing. Exact latest PR head at this note's creation: d82e0e5142d8a64823e8514515a8083642f317e5.
+
+This update does not change the original scientific limitation: synthetic fixtures can establish software invariants, but city-scale predictive validity requires independently checked reference cases and held-out observed data.
