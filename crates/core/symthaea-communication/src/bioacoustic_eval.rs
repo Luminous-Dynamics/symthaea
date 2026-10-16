@@ -157,6 +157,10 @@ pub struct BioacousticEventEvaluationReport {
     pub exhaustive_test_annotation_coverage_asserted: bool,
     pub split_policy: BioacousticSplitPolicy,
     pub test_recording_count: usize,
+    /// Mean of per-recording thresholded F1, excluding recordings with no
+    /// truth events and no scored predictions (F1 is undefined for that case).
+    pub macro_f1_over_recordings: Option<f64>,
+    pub macro_f1_recording_count: usize,
     pub predictions_excluded_by_unscored_regions: u64,
     pub metrics: BioacousticEventMetrics,
     pub per_sample: Vec<BioacousticPerSampleMetrics>,
@@ -431,6 +435,23 @@ pub fn evaluate_bioacoustic_events(
     metrics.average_precision =
         event_average_precision(&all_test_truth, &all_test_predictions, &bundle.matching_rule);
 
+    let macro_f1_values: Vec<f64> = per_sample
+        .iter()
+        .filter(|sample| {
+            sample.metrics.ground_truth_events > 0
+                || sample.metrics.predictions_after_threshold > 0
+        })
+        .filter_map(|sample| sample.metrics.f1)
+        .collect();
+    let macro_f1_over_recordings = if macro_f1_values.is_empty() {
+        None
+    } else {
+        Some(
+            macro_f1_values.iter().sum::<f64>()
+                / macro_f1_values.len() as f64,
+        )
+    };
+
     Ok(BioacousticEventEvaluationReport {
         status: "EVALUATED".into(),
         schema_version: BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION,
@@ -449,6 +470,8 @@ pub fn evaluate_bioacoustic_events(
         exhaustive_test_annotation_coverage_asserted: true,
         split_policy: bundle.split_policy,
         test_recording_count: test_recordings.len(),
+        macro_f1_over_recordings,
+        macro_f1_recording_count: macro_f1_values.len(),
         predictions_excluded_by_unscored_regions: total_predictions_excluded_by_unscored_regions as u64,
         metrics,
         per_sample,
@@ -960,6 +983,8 @@ mod tests {
         assert_eq!(report.metrics.false_negatives, 1);
         assert_eq!(report.metrics.ground_truth_events, 2);
         assert_eq!(report.metrics.predictions_after_threshold, 2);
+        assert_eq!(report.macro_f1_recording_count, 1);
+        assert_eq!(report.macro_f1_over_recordings, Some(0.5));
         assert!((report.metrics.average_precision.unwrap() - 5.0 / 6.0).abs() < 1e-9);
         assert!(report.exhaustive_test_annotation_coverage_asserted);
         assert!(!report.audio_bytes_verified_by_this_evaluator);
