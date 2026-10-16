@@ -6,7 +6,7 @@ Status: **synthetic contract suite; not an external performance result.** The fi
 
 A single-turn test asks, "Did the policy answer this prompt safely?" A trajectory test asks, "Did it remain safe while the evidence and operating constraints changed over the life of one claim?" This makes evidence revocation, late-arriving contradiction, failed retrieval, retries, clarification, partial support, and exhausted acquisition budgets first-class events. Budget exhaustion remains latched until an explicit budget-restoration event.
 
-The key property is **non-averagable episode safety**: one unsupported answer at a critical step remains a failure even if every other step is correct. Action accuracy and safety escape counts are therefore reported separately. The evaluator runs against receipt artifacts rather than trusting its own invocation path, validates exact step coverage, binds receipts to the trajectory digest and policy configuration, and includes a deliberately unsafe control set.
+The key property is **non-averagable episode safety**: one unsupported answer at a critical step remains a failure even if every other step is correct. Action accuracy and safety escape counts are therefore reported separately. The replay path uses an explicit lifecycle-aware `EvidenceActionSession` per claim episode. The session latches revocation, unresolved-conflict, and exhausted-budget blockers until their corresponding explicit resolution events. A separate receipt scorer independently replays these blockers, validates exact step coverage, binds receipts to the trajectory digest and policy configuration, and includes a deliberately unsafe control set. This reduces—but does not eliminate—the risk of the implementation grading itself.
 
 ## Scenarios in the synthetic control fixture
 
@@ -39,6 +39,7 @@ For a zero-failure result to put a one-sided exact 95% upper confidence bound ne
 2. **Property/fuzz tier:** generate event sequences, check digest mutation, sequence gaps, split leakage, policy/receipt version mixing, event/state mismatch, and the invariant that no substantive answer can follow a hard blocker until the blocker is resolved.
 3. **Replay tier:** reconstruct real, privacy-reviewed evidence histories and inject deterministic mutations (revocation, new conflict, source-family collapse, failed retrieval, stale evidence, retries, budget exhaustion). Keep discovery examples separate from a sealed evaluation set.
 4. **External tier:** source-disjoint, independently adjudicated episodes; publish sample counts, exact confidence bounds, error taxonomy, and policy version. Optimize on discovery cases only.
+5. **Runtime integration tier:** route actual Symthaea answer/retrieval decisions through a per-claim session; bind revalidation, conflict resolution, and budget-restoration events to trusted upstream state transitions, then use trajectory receipts to audit production episodes.
 
 ## Research context
 
