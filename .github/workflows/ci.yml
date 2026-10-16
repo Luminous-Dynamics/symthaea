@@ -65,6 +65,7 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@d86e0fa8f147d6539442c26a61ebba8becc19489
         with:
+          toolchain: 1.96.0
           components: rustfmt, clippy
 
       - name: Check standalone lab formatting
