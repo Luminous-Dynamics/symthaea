@@ -72,6 +72,16 @@ NASA's battery projection work also distinguishes cell-level estimates from airc
 
 Source: [NASA Technical Reports Server, “Battery Key Performance Projections Based on Historical Trends and Chemistries”](https://ntrs.nasa.gov/citations/20220005588).
 
+### Thermal management is an aircraft-level constraint, not an accessory
+
+NASA's HEATheR project explicitly targets megawatt-scale electrified propulsion thermal management: conversion losses become heat, while pumps, heat exchangers and ducting add system mass and drag. NASA investigates reducing conversion losses and using local/passive heat rejection to reduce those penalties. Therefore, a motor/generator efficiency gain cannot be counted as a net aircraft gain without accounting for the installed heat-rejection architecture, its mass, and its aerodynamic effect.
+
+Source: [NASA, High-Efficiency Electrified Aircraft Thermal Research (HEATheR)](https://www.nasa.gov/eap-technology/heather/).
+
+FAA guidance also treats electric power systems and propulsion systems as distinct technical disciplines, including electric and hybrid propulsion, energy storage, generation, safety, performance, and certification considerations. The screening kernel must preserve these as connected but non-interchangeable evidence owners.
+
+Sources: [FAA, Electric Power Systems](https://www.faa.gov/aircraft/air_cert/step/disciplines/electric_power); [FAA, Propulsion Systems](https://www.faa.gov/aircraft/air_cert/step/disciplines/propulsion_systems).
+
 ### Fusion energy is not yet onboard aircraft propulsion
 
 The US Department of Energy's finalized Fusion Science and Technology Roadmap, released 2026-06-09, describes an intended pathway toward fusion pilot plants and commercial power in the mid-2030s, contingent on closing outstanding science, materials, engineering, infrastructure, workforce, and commercialization gaps. This is a strategic target for stationary power plants, not an aircraft-propulsion readiness estimate.
@@ -222,6 +232,10 @@ Use scoped disclosure for commercially sensitive component and supplier data and
 6. NASA Technical Reports Server, [Battery Key Performance Projections Based on Historical Trends and Chemistries](https://ntrs.nasa.gov/citations/20220005588).
 7. US Department of Energy, [Finalized Fusion Science and Technology Roadmap (2026-06-09)](https://www.energy.gov/articles/energy-department-releases-finalized-fusion-science-and-technology-roadmap-accelerate).
 8. Air Force Materiel Command, [History in Two: Manned Nuclear Aircraft Program](https://www.afmc.af.mil/News/Article-Display/Article/2664365/history-in-two-manned-nuclear-aircraft-program/).
+9. NASA, [High-Efficiency Electrified Aircraft Thermal Research (HEATheR)](https://www.nasa.gov/eap-technology/heather/) — thermal-management mass, drag, and power-loss coupling.
+10. FAA, [Electric Power Systems](https://www.faa.gov/aircraft/air_cert/step/disciplines/electric_power) — energy storage/generation and certification discipline.
+11. FAA, [Propulsion Systems](https://www.faa.gov/aircraft/air_cert/step/disciplines/propulsion_systems) — electric/hybrid propulsion and lifecycle safety/certification discipline.
+12. Mycelix, [AeroCommons engineering and manufacturing commons](https://github.com/Luminous-Dynamics/mycelix/issues/3638) and [physical-evidence reproducibility challenge](https://github.com/Luminous-Dynamics/mycelix/issues/3643) — provenance boundary for as-built configurations and test evidence.
 
 ## Claims this document does not make
 
