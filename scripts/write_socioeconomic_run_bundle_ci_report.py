@@ -87,6 +87,11 @@ def safe_workspace_file(root: Path, relative: str) -> Path:
     return resolved
 
 
+def parse_unittest_summaries(log_text: str) -> list[int]:
+    matches = re.findall(r"Ran ([0-9]+) tests? in [^\\n]+\\n\\nOK(?: \\(.*\\))?", log_text)
+    return [int(match) for match in matches]
+
+
 def build_report(
     workspace: str | Path,
     env: dict[str, str],
@@ -134,12 +139,20 @@ def build_report(
             }
         )
 
-    test_count = sum(
-        count_test_functions((root / relative).read_bytes())
+    per_suite_test_counts = [
+        count_test_functions(safe_workspace_file(root, relative).read_bytes())
         for relative in TEST_PATHS
-    )
+    ]
+    test_count = sum(per_suite_test_counts)
     if test_count < 1:
         raise ReportFailure("no test functions found in the test sources")
+    log_text = safe_workspace_file(root, test_log_relative_path).read_text(encoding="utf-8")
+    executed_counts = parse_unittest_summaries(log_text)
+    if executed_counts != per_suite_test_counts:
+        raise ReportFailure(
+            "test log summaries do not match the discovered test suites: "
+            f"expected {per_suite_test_counts}, observed {executed_counts}"
+        )
 
     try:
         version_result = subprocess.run(
@@ -172,6 +185,8 @@ def build_report(
             "python3 scripts/test_write_socioeconomic_run_bundle_ci_report.py",
         ],
         "authored_test_function_count": test_count,
+        "executed_test_count": sum(executed_counts),
+        "executed_test_counts_by_suite": executed_counts,
         "artifacts": sorted(files, key=lambda item: item["path"]),
         "authority_boundary": {
             "proves_simulation_truth": False,
