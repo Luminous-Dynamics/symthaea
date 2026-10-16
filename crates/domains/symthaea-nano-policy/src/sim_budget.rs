@@ -691,14 +691,14 @@ fn valid_cost(value: f64) -> bool {
     value.is_finite() && (0.0..=MAX_SIM_LEDGER_COST).contains(&value)
 }
 
-fn is_hex_digest(value: &str, expected_len: usize) -> bool {
+pub(crate) fn is_hex_digest(value: &str, expected_len: usize) -> bool {
     value.len() == expected_len
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
