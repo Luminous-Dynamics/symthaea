@@ -148,3 +148,4 @@ pub mod living_city_evidence;
 pub mod living_city_benchmarks;
 pub mod living_city_dependencies;
 pub mod living_city_hazard_profiles;
+pub mod living_city_grid_reference;
