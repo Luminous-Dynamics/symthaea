@@ -210,14 +210,15 @@ pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
         "Input identifiers, family IDs, descriptor dimensions/values, and any declared costs are valid.",
     );
     let cost_policy_valid = request.policy != crate::Policy::CostAwareFarthestFirst
-        || request
+        || (request
             .cost_unit
             .as_deref()
             .is_some_and(|unit| !unit.trim().is_empty() && unit.len() <= 64)
-            && request
-                .candidates
-                .iter()
-                .all(|candidate| candidate.estimated_cost.is_some_and(|cost| cost.is_finite() && cost > 0.0));
+            && request.candidates.iter().all(|candidate| {
+                candidate
+                    .estimated_cost
+                    .is_some_and(|cost| cost.is_finite() && cost > 0.0)
+            }));
     push_check(
         &mut checks,
         "cost_policy_contract",
