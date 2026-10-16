@@ -272,7 +272,7 @@ fn qualify_case(
         "<region> key={REQUESTED_KEY} pitch_keycenter={pitch_keycenter} sample={sample_name}\\n"
     );
     let manifest = parse_sfz_mapping(&sfz_source)?;
-    let expected_ratio = 2.0_f64.powf(f64::from(pitch_shift_semitones) / 12.0);
+    let expected_ratio = pitch_ratio_for_semitones(pitch_shift_semitones);
     let source_coordinate_step = expected_ratio * f64::from(SAMPLE_RATE) / f64::from(SAMPLE_RATE);
     let output_alias_frequency =
         fold_normalized_frequency(source_tone_cycles_per_frame * source_coordinate_step);
@@ -432,6 +432,11 @@ fn measure_path(
     })
 }
 
+/// Equal-tempered playback ratio for a semitone shift.
+fn pitch_ratio_for_semitones(semitones: i16) -> f64 {
+    2.0_f64.powf(f64::from(semitones) / 12.0)
+}
+
 /// Fold a normalized sinusoid into the Nyquist interval [0, 0.5].
 fn fold_normalized_frequency(cycles_per_frame: f64) -> f64 {
     let wrapped = cycles_per_frame.rem_euclid(1.0);
@@ -504,10 +509,42 @@ mod tests {
 
     #[test]
     fn pitch_ratios_match_equal_tempered_semitone_shifts() {
+        let expected = [
+            (-12_i16, 0.5_f64),
+            (0_i16, 1.0_f64),
+            (7_i16, 1.498_307_076_876_681_5_f64),
+            (12_i16, 2.0_f64),
+            (24_i16, 4.0_f64),
+        ];
+        for (shift, known_ratio) in expected {
+            let actual = pitch_ratio_for_semitones(shift);
+            assert!(
+                (actual - known_ratio).abs() / known_ratio <= 1.0e-12,
+                "shift {shift}: expected ratio {known_ratio}, got {actual}"
+            );
+        }
+    }
+
+    #[test]
+    fn parsed_manifest_selects_the_expected_pitch_ratio() {
         for shift in PITCH_SHIFTS_SEMITONES {
-            let expected = 2.0_f64.powf(f64::from(shift) / 12.0);
-            let recovered = 2.0_f64.powf(f64::from(shift) / 12.0);
-            assert!((recovered - expected).abs() / expected <= 1.0e-12);
+            let keycenter = i16::from(REQUESTED_KEY) - shift;
+            let source = format!(
+                "<region> key={REQUESTED_KEY} pitch_keycenter={keycenter} sample=test.wav"
+            );
+            let manifest = parse_sfz_mapping(&source).unwrap();
+            let plan = symthaea_muse::sfz_manifest::plan_sfz_zone_selection(
+                &manifest,
+                REQUESTED_KEY,
+                VELOCITY,
+                0,
+            );
+            let expected = pitch_ratio_for_semitones(shift);
+            let actual = plan.frequency_ratio.expect("covered note should have a pitch ratio");
+            assert!(
+                (actual - expected).abs() / expected <= 1.0e-12,
+                "shift {shift}: expected {expected}, got {actual}"
+            );
         }
     }
 
