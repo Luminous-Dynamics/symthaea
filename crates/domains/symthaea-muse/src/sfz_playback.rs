@@ -3,9 +3,11 @@
 //! Evidence-bearing one-shot playback for the supported SFZ mapping subset.
 //!
 //! This is not a complete SFZ voice engine. It decodes one selected sample,
-//! converts it to mono f32, and changes pitch with deterministic linear
-//! interpolation. Envelopes, loops, release triggers, velocity gain/crossfades,
-//! filters, and modulation are not applied. The receipt records these limits.
+//! converts it to mono f32, and offers both a linear baseline and an opt-in
+//! Lanczos-windowed-sinc path. Envelopes, loops, release triggers, velocity
+//! gain/crossfades, filters, and modulation are not applied. The receipt records
+//! these limits. The sinc path requires spectral and performance qualification
+//! before it should replace the baseline as a product default.
 
 use super::{inspect_sample_reference, plan_sfz_zone_selection, SfzMappingManifestV1};
 use serde::{Deserialize, Serialize};
