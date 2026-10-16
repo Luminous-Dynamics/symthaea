@@ -59,4 +59,8 @@ jobs:
 
       - name: Run optional synthetic scaling profile
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile }}
-        run: /usr/bin/time -v cargo test -p symthaea-nano-policy --locked manual_profile_selector_scaling -- --ignored --nocapture
+        run: |
+          cargo test -p symthaea-nano-policy --locked --no-run
+          test_bin="$(find target/debug/deps -maxdepth 1 -type f -executable -name 'symthaea_nano_policy-*' -print | head -n 1)"
+          test -n "$test_bin"
+          /usr/bin/time -v "$test_bin" manual_profile_selector_scaling --ignored --nocapture
