@@ -40,6 +40,8 @@ pub enum RosBridgeError {
     InvalidStatus(String),
     #[error("Invalid trajectory command: {0}")]
     InvalidTrajectory(String),
+    #[error("Invalid ROS JointState: {0}")]
+    InvalidJointState(String),
     #[error("Safety interlock blocked trajectory publication: {0}")]
     SafetyInterlock(String),
 }
@@ -59,6 +61,86 @@ pub struct ConsciousnessStatusMsg {
     pub uncertainty: f32,
     /// Current cycle timestamp (ISO 8601).
     pub timestamp: String,
+}
+
+/// Reorder one ROS JointState value array into the bridge's explicit model order.
+///
+/// ROS message array position is not joint identity. This helper requires an exact
+/// set of unique names and finite values; missing or unknown joints remain errors
+/// rather than being silently filled, dropped, or shifted into another joint slot.
+fn canonicalize_joint_values(
+    observed_names: &[String],
+    values: &[f64],
+    expected_names: &[&str],
+    field: &str,
+) -> Result<Vec<f64>, RosBridgeError> {
+    use std::collections::{HashMap, HashSet};
+
+    if expected_names.is_empty() {
+        return Err(RosBridgeError::InvalidJointState(
+            "expected joint profile must not be empty".into(),
+        ));
+    }
+    let expected_set: HashSet<&str> = expected_names.iter().copied().collect();
+    if expected_set.len() != expected_names.len()
+        || expected_names.iter().any(|name| name.trim().is_empty())
+    {
+        return Err(RosBridgeError::InvalidJointState(
+            "expected joint profile contains empty or duplicate names".into(),
+        ));
+    }
+    if observed_names.len() != values.len() {
+        return Err(RosBridgeError::InvalidJointState(format!(
+            "name/value cardinality mismatch: {} names but {} {field} values",
+            observed_names.len(),
+            values.len()
+        )));
+    }
+    if observed_names.len() != expected_names.len() {
+        return Err(RosBridgeError::InvalidJointState(format!(
+            "expected exactly {} joints, received {}",
+            expected_names.len(),
+            observed_names.len()
+        )));
+    }
+
+    let mut indices = HashMap::with_capacity(observed_names.len());
+    for (index, name) in observed_names.iter().enumerate() {
+        if name.trim().is_empty() {
+            return Err(RosBridgeError::InvalidJointState(
+                "joint names must not be empty".into(),
+            ));
+        }
+        if !expected_set.contains(name.as_str()) {
+            return Err(RosBridgeError::InvalidJointState(format!(
+                "unrecognized joint name: {name}"
+            )));
+        }
+        if indices.insert(name.as_str(), index).is_some() {
+            return Err(RosBridgeError::InvalidJointState(format!(
+                "duplicate joint name: {name}"
+            )));
+        }
+        if !values[index].is_finite() {
+            return Err(RosBridgeError::InvalidJointState(format!(
+                "{field} for joint {name} is not finite"
+            )));
+        }
+    }
+
+    expected_names
+        .iter()
+        .map(|name| {
+            indices
+                .get(name)
+                .map(|&index| values[index])
+                .ok_or_else(|| {
+                    RosBridgeError::InvalidJointState(format!(
+                        "required joint is missing: {name}"
+                    ))
+                })
+        })
+        .collect()
 }
 
 /// Configuration for the ROS2 bridge node.
@@ -362,8 +444,14 @@ impl RosBridgeNode {
     pub fn update_surprise_monitor(&self) -> Result<(), RosBridgeError> {
         let latest_joint_state_opt = self.latest_joint_state.lock().unwrap().clone();
         if let Some(joint_state) = latest_joint_state_opt {
+            let canonical_positions = canonicalize_joint_values(
+                &joint_state.name,
+                &joint_state.position,
+                &symthaea_humanoid::types::JOINT_NAMES,
+                "position",
+            )?;
             let joint_angles_f32: Vec<f32> =
-                joint_state.position.iter().map(|&p| p as f32).collect();
+                canonical_positions.iter().map(|&p| p as f32).collect();
             let current_hv = self.process_joint_states(&joint_angles_f32);
             let predicted_opt = self.predicted_state_hv.lock().unwrap().clone();
             if let Some(predicted_hv) = predicted_opt {
@@ -385,6 +473,20 @@ impl RosBridgeNode {
         let imu_opt = self.latest_imu.lock().unwrap().clone();
 
         let joint_state = joint_state_opt.ok_or(RosBridgeError::NotInitialized)?;
+        // DMC21 is the current explicit bridge profile. Resolve semantic identity
+        // by JointState.name; never assume transport array position is model order.
+        let canonical_positions = canonicalize_joint_values(
+            &joint_state.name,
+            &joint_state.position,
+            &symthaea_humanoid::types::JOINT_NAMES,
+            "position",
+        )?;
+        let canonical_velocities = canonicalize_joint_values(
+            &joint_state.name,
+            &joint_state.velocity,
+            &symthaea_humanoid::types::JOINT_NAMES,
+            "velocity",
+        )?;
 
         // Torso orientation and angular velocity from IMU
         let root_quat = if let Some(ref imu) = imu_opt {
@@ -442,8 +544,8 @@ impl RosBridgeNode {
         let head_height = 1.4;
 
         let mut state = self.ros_joint_states_to_humanoid(
-            &joint_state.position,
-            &joint_state.velocity,
+            &canonical_positions,
+            &canonical_velocities,
             head_height,
             torso_vertical,
             root_lin_vel,
@@ -945,9 +1047,67 @@ mod tests {
     }
 
     #[test]
+    fn joint_state_values_are_canonicalized_by_name_not_array_order() {
+        let expected = ["hip", "knee", "ankle"];
+        let first_names = vec!["hip".into(), "knee".into(), "ankle".into()];
+        let first_values = vec![0.1, -0.2, 0.3];
+        let shuffled_names = vec!["ankle".into(), "hip".into(), "knee".into()];
+        let shuffled_values = vec![0.3, 0.1, -0.2];
+
+        let first =
+            canonicalize_joint_values(&first_names, &first_values, &expected, "position")
+                .unwrap();
+        let shuffled =
+            canonicalize_joint_values(&shuffled_names, &shuffled_values, &expected, "position")
+                .unwrap();
+
+        assert_eq!(first, vec![0.1, -0.2, 0.3]);
+        assert_eq!(shuffled, first);
+    }
+
+    #[test]
+    fn joint_state_canonicalization_rejects_duplicate_missing_unknown_and_nonfinite_data() {
+        let expected = ["hip", "knee", "ankle"];
+        let values = vec![0.1, -0.2, 0.3];
+
+        let duplicate = vec!["hip".into(), "hip".into(), "ankle".into()];
+        assert!(matches!(
+            canonicalize_joint_values(&duplicate, &values, &expected, "position"),
+            Err(RosBridgeError::InvalidJointState(_))
+        ));
+
+        let missing = vec!["hip".into(), "knee".into()];
+        assert!(matches!(
+            canonicalize_joint_values(&missing, &values[..2], &expected, "position"),
+            Err(RosBridgeError::InvalidJointState(_))
+        ));
+
+        let unknown = vec!["hip".into(), "knee".into(), "finger".into()];
+        assert!(matches!(
+            canonicalize_joint_values(&unknown, &values, &expected, "position"),
+            Err(RosBridgeError::InvalidJointState(_))
+        ));
+
+        let nonfinite = vec![0.1, f64::NAN, 0.3];
+        let names = vec!["hip".into(), "knee".into(), "ankle".into()];
+        assert!(matches!(
+            canonicalize_joint_values(&names, &nonfinite, &expected, "position"),
+            Err(RosBridgeError::InvalidJointState(_))
+        ));
+
+        assert!(matches!(
+            canonicalize_joint_values(&names, &values[..2], &expected, "position"),
+            Err(RosBridgeError::InvalidJointState(_))
+        ));
+    }
+
+    #[test]
     fn test_hdc_encoding_and_surprise() {
         let node = RosBridgeNode::new(RosBridgeConfig::default());
-        let joints = vec![0.1f32, -0.2f32, 0.3f32];
+        let mut joints = vec![0.0f32; symthaea_humanoid::types::JOINT_NAMES.len()];
+        joints[0] = 0.1;
+        joints[1] = -0.2;
+        joints[2] = 0.3;
         let hv = node.process_joint_states(&joints);
         assert_eq!(hv.dim(), 16384);
 
@@ -961,8 +1121,12 @@ mod tests {
             assert!(node.get_current_humanoid_state().is_err());
 
             let mut js = sensor_msgs::msg::JointState::default();
-            js.position = vec![0.1, -0.2, 0.3];
-            js.velocity = vec![0.0, 0.0, 0.0];
+            js.name = symthaea_humanoid::types::JOINT_NAMES
+                .iter()
+                .map(|name| (*name).to_string())
+                .collect();
+            js.position = joints.iter().map(|&value| value as f64).collect();
+            js.velocity = vec![0.0; js.name.len()];
             *node.latest_joint_state.lock().unwrap() = Some(js);
 
             node.update_surprise_monitor().unwrap();
