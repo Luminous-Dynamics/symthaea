@@ -248,7 +248,7 @@ fn fallback_error_json(digest: &str) -> String {
 ///
 /// No target label, predicted property, oracle result or post-outcome field is
 /// consulted by any policy implemented here.
-pub fn select(
+fn select(
     request: SelectionRequest,
     request_bytes: &[u8],
 ) -> Result<SelectionResponse, SelectionError> {
