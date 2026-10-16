@@ -3,7 +3,7 @@
 **Status:** preregistered research protocol; no model, trajectory, or benchmark result is qualified by this document.  
 **Date:** 2026-10-16  
 **Tracking:** [NANO-008 #7654](https://github.com/Luminous-Dynamics/symthaea/issues/7654)  
-**Cross-domain contract:** [Nanotechnology Benchmark Charter](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md)  
+**Cross-domain contract:** [Nanotechnology Benchmark Charter](https://github.com/Luminous-Dynamics/symthaea/blob/research/nano-001-atomistic-discovery/docs/engineering/NANOTECHNOLOGY_BENCHMARK_CHARTER.md)  
 **Atomistic discovery prerequisite:** [NANO-001 #7453](https://github.com/Luminous-Dynamics/symthaea/issues/7453)  
 **Selector baseline/evaluator:** [NANO-005 #7570](https://github.com/Luminous-Dynamics/symthaea/issues/7570), [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568)
 
@@ -32,7 +32,7 @@ Current source locations:
 - [Current AIMD implementation](../../blob/main/crates/domains/symthaea-quantum-chemistry/src/molecular_dynamics.rs)
 - [Organic molecular graph layer](../../tree/main/crates/domains/symthaea-organic-chemistry)
 - [Materials component](../../tree/main/crates/domains/symthaea-materials)
-- [Nanotechnology benchmark charter](./NANOTECHNOLOGY_BENCHMARK_CHARTER.md)
+- [Nanotechnology benchmark charter](https://github.com/Luminous-Dynamics/symthaea/blob/research/nano-001-atomistic-discovery/docs/engineering/NANOTECHNOLOGY_BENCHMARK_CHARTER.md)
 
 The checked-in `molecular_dynamics.rs` is molecular and non-periodic: it uses a molecular `Molecule`, a restricted Hartree–Fock / STO-3G energy, and central finite-difference forces. Its own module comments disclose that initial velocity components are generated from a deterministic hash and uniform distribution rather than a Maxwell–Boltzmann Gaussian; center-of-mass removal and exact-temperature rescaling are absent; and the short-trajectory energy-drift test tolerates up to 0.1 Hartree. Its default run is 50 steps. These facts are source-level findings, not a new runtime test result.
 
