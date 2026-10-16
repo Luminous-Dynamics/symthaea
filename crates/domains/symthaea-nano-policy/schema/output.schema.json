@@ -103,5 +103,5 @@
       "description": "BLAKE3 digest of the exact raw request bytes, including whitespace"
     }
   },
-  "$comment": "The runtime must additionally verify selected.length equals budget_requested, IDs are unique and from the supplied candidate pool, and score/score_kind match the chosen policy. Hash exact request/response bytes in the orchestrator receipt; no digest is emitted by this CLI."
+  "$comment": "The CLI includes input_blake3 over the exact raw request bytes but does not include an output digest; orchestration should also hash the exact response bytes. Runtime consumers must verify selected.length equals budget_requested, IDs are unique and drawn from the candidate pool, and score/score_kind match the policy."
 }
