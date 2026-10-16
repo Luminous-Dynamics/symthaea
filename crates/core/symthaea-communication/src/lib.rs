@@ -13,6 +13,7 @@ pub mod adapters;
 pub mod animal;
 pub mod artifact;
 pub mod bioacoustic_corpus;
+pub mod bioacoustic_eval;
 pub mod benchmark;
 pub mod human;
 pub mod metrics;
