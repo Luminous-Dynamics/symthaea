@@ -67,6 +67,7 @@ pub mod suit_mission_configuration;
 pub mod suit_mission_tasks;
 pub mod suit_resource_budget;
 pub mod suit_peak_reservations;
+pub mod suit_peak_usage_measurements;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
 pub mod simulator;
