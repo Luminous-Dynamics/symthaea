@@ -308,6 +308,8 @@ Report, where supported by the exact labels and assay: task-appropriate ranking/
 
 For policy comparisons, use paired label-sensitivity bounds on the same candidate IDs and outcome mapping, assigning each unknown site's latent outcome jointly across both rankings. Separate policy bounds are not a substitute. The project may claim **observed-label improvement** when the preregistered group-aware statistical interval supports it; it may claim **label-robust improvement within the declared universe** only when the paired worst-case Recall@K-delta lower bound is above zero. Neither statement accounts for true sites absent from that universe.
 
+**Exact-budget cardinality:** every policy compared at budget K must supply at least K candidates, and K must be positive. If it cannot, label the metric `not_estimable_at_budget_K`; do not evaluate a shorter list and report it as the same budget.
+
 Keep efficiency, specificity, bystander outcomes, indels, delivery, immune outcomes, manufacturability and economics as separate axes unless an externally justified utility function is preregistered. Missing values mean “not measured,” not zero risk.
 
 ## Rust-first implementation shape
@@ -335,6 +337,8 @@ A dependency-free, synthetic-testable metric kernel has been added at [scripts/c
 **Gate 5 — external laboratory validation (future only).** Any physical study requires qualified collaborators, institutional/laboratory authorization, appropriate biosafety and ethics review, justified validation design and independently captured outcomes. A computational result, registry record, publication or digest grants no experimental or clinical authority.
 
 **Gate 6 — incomplete-label sensitivity.** Whenever unknown/unassayed candidates exist in a fixed candidate universe, report partial-identification bounds or an explicit not-estimable state; do not imply completeness beyond the observed/reference scope.
+
+**Gate 7 — exact fixed-budget cardinality.** For any fixed K comparison, every compared policy must provide at least K candidates and K must be positive; otherwise the policy metric is not estimable at that budget.
 
 No later gate is implied by passing an earlier one.
 
