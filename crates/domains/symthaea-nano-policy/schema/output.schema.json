@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version",
+    "input_schema_version",
     "policy_version",
     "input_blake3",
     "policy",
@@ -18,7 +18,7 @@
     "selected"
   ],
   "properties": {
-    "schema_version": {
+    "input_schema_version": {
       "const": "nano-selection-input-v1"
     },
     "policy_version": {
