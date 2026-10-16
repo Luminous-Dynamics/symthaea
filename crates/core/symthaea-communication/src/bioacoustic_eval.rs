@@ -945,6 +945,34 @@ mod tests {
     }
 
     #[test]
+    fn rejects_overlapping_test_crops_before_reporting_false_alarms_per_hour() {
+        let (mut manifest, mut bundle) = fixture();
+        manifest.recordings[2].source_start_s = Some(0.0);
+        manifest.recordings[3].source_recording_id = Some("src-test-1".into());
+        manifest.recordings[3].source_start_s = Some(5.0);
+        bundle.corpus_manifest_blake3 = manifest.computed_manifest_blake3().unwrap();
+
+        let error = evaluate_bioacoustic_events(&manifest, &bundle).unwrap_err();
+        assert!(error.contains("overlapping Test assets"));
+    }
+
+    #[test]
+    fn accepts_non_overlapping_test_crops_and_uses_scored_duration() {
+        let (mut manifest, mut bundle) = fixture();
+        manifest.recordings[2].source_start_s = Some(0.0);
+        manifest.recordings[3].source_recording_id = Some("src-test-1".into());
+        manifest.recordings[3].session_id = Some("src-test-1".into());
+        manifest.recordings[3].site_id = Some("site-src-test-1".into());
+        manifest.recordings[3].individual_ids = vec!["animal-src-test-1".into()];
+        manifest.recordings[3].source_start_s = Some(10.0);
+        bundle.corpus_manifest_blake3 = manifest.computed_manifest_blake3().unwrap();
+
+        let report = evaluate_bioacoustic_events(&manifest, &bundle).unwrap();
+        assert_eq!(report.metrics.scored_duration_seconds, 20.0);
+        assert_eq!(report.metrics.false_alarms_per_scored_hour, Some(180.0));
+    }
+
+    #[test]
     fn rejects_duplicate_prediction_ids_and_invalid_scores() {
         let (manifest, mut bundle) = fixture();
         bundle.predictions[1].prediction_id = bundle.predictions[0].prediction_id.clone();
