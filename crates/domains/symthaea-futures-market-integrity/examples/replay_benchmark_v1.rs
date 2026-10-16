@@ -198,6 +198,10 @@ fn run() -> Result<(), ReplayError> {
             .iter()
             .filter(|score| score.forecaster_id == "shrinkage_candidate");
         let mut paired = Vec::new();
+        let mut paired_baseline_brier_sum = 0.0;
+        let mut paired_baseline_log_loss_sum = 0.0;
+        let mut paired_candidate_brier_sum = 0.0;
+        let mut paired_candidate_log_loss_sum = 0.0;
         for candidate in candidate_scores {
             let Some(baseline) = signal_pool_by_event.get(&candidate.event_id) else {
                 continue;
@@ -206,6 +210,10 @@ fn run() -> Result<(), ReplayError> {
             let cluster = cluster_by_target
                 .get(&key)
                 .expect("every synthetic target has a parent cluster");
+            paired_baseline_brier_sum += baseline.brier_score;
+            paired_baseline_log_loss_sum += baseline.log_loss;
+            paired_candidate_brier_sum += candidate.brier_score;
+            paired_candidate_log_loss_sum += candidate.log_loss;
             paired.push(PairedForecastComparison::new(
                 candidate.event_id.clone(),
                 candidate.horizon_id.clone(),
@@ -215,8 +223,26 @@ fn run() -> Result<(), ReplayError> {
                 candidate.probability,
             )?);
         }
+        let paired_count = paired.len();
         let bootstrap =
             paired_cluster_bootstrap(&paired, 10_000, 0xC0FFEE + horizon_index as u64)?;
+        let paired_baseline_brier = paired_baseline_brier_sum / paired_count as f64;
+        let paired_baseline_log_loss = paired_baseline_log_loss_sum / paired_count as f64;
+        let paired_candidate_brier = paired_candidate_brier_sum / paired_count as f64;
+        let paired_candidate_log_loss = paired_candidate_log_loss_sum / paired_count as f64;
+        eprintln!(
+            "PAIRED,horizon={horizon},candidate=shrinkage_candidate,baseline=signal_pool,n={paired_count},total={horizon_targets},coverage={:.6},baseline_brier={:.6},candidate_brier={:.6},baseline_log_loss={:.6},candidate_log_loss={:.6},candidate_minus_baseline_brier={:.6},ci95_low={:.6},ci95_high={:.6},bootstrap_share_candidate_better={:.6},clusters={}",
+            paired_count as f64 / horizon_targets as f64,
+            paired_baseline_brier,
+            paired_candidate_brier,
+            paired_baseline_log_loss,
+            paired_candidate_log_loss,
+            bootstrap.mean_brier_difference,
+            bootstrap.lower_95_brier_difference,
+            bootstrap.upper_95_brier_difference,
+            bootstrap.bootstrap_share_candidate_better,
+            bootstrap.cluster_count
+        );
 
         for (method, count, coverage, brier, log_loss) in metric_rows {
             if method == "shrinkage_candidate" {
