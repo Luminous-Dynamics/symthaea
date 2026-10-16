@@ -1305,6 +1305,32 @@ mod tests {
     }
 
     #[test]
+    fn mutated_observation_receipt_fails_even_when_outer_digest_is_recomputed() {
+        let model = model(
+            "noisy",
+            Feasibility::Feasible,
+            [900_000, 100_000],
+            [100_000, 900_000],
+            opposing_decisions(),
+        );
+        let initial = initial_posterior_state(&model).unwrap();
+        let update =
+            condition_posterior(&model, &initial, "evidence-1", "noisy", "O1").unwrap();
+        let mut forged = update.next_state;
+        forged.evidence_receipts[0].observed_outcome_id = "O2".into();
+        forged.state_digest = posterior_state_digest(
+            &forged.root_model_digest,
+            &forged.current_prior,
+            &forged.evidence_receipts,
+        )
+        .unwrap();
+
+        let error = condition_posterior(&model, &forged, "evidence-2", "noisy", "O1")
+            .unwrap_err();
+        assert!(error.contains("posterior history transition mismatch"));
+    }
+
+    #[test]
     fn altered_posterior_state_is_rejected_before_conditioning() {
         let model = model(
             "noisy",
