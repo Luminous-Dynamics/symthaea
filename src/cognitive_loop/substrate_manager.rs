@@ -397,6 +397,19 @@ impl SubstrateManager {
             return;
         }
 
+        // A malformed configured limit is a configuration fault, not something
+        // to defer until a complete measurement window. Reject it before recording
+        // energy or allowing another cycle to proceed under an invalid contract.
+        if let Some(budget_watts) = config.energy_budget_joules_per_sec {
+            if !budget_watts.is_finite() || budget_watts < 0.0 {
+                self.consciousness_viable = false;
+                self.last_energy_spent = 0.0;
+                self.estimated_energy_rate_watts = 0.0;
+                self.energy_rate_window_seconds = 0.0;
+                return;
+            }
+        }
+
         let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
         self.last_energy_spent = speed_adjusted_energy;
 
@@ -427,10 +440,7 @@ impl SubstrateManager {
             self.energy_rate_window_seconds = elapsed_seconds;
 
             if let Some(budget_watts) = config.energy_budget_joules_per_sec {
-                if !budget_watts.is_finite() || budget_watts < 0.0 {
-                    // Invalid rate limits fail closed once the rate check can be evaluated.
-                    self.consciousness_viable = false;
-                } else if estimated_rate_watts > budget_watts {
+                if estimated_rate_watts > budget_watts {
                     self.consciousness_viable = false;
                 }
             }
@@ -1357,6 +1367,30 @@ mod tests {
             "a completed measured window above budget must trip the rate gate"
         );
         assert!(mgr.estimated_energy_rate_watts > config.energy_budget_joules_per_sec.unwrap());
+    }
+
+    #[test]
+    fn test_invalid_energy_rate_budgets_fail_closed_before_first_window() {
+        for invalid_budget in [ -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY ] {
+            let mut config = default_config();
+            config.enable_energy_budget = true;
+            config.energy_budget_joules_per_sec = Some(invalid_budget);
+
+            let mut mgr = SubstrateManager::new(&config);
+            mgr.tick_energy_at(&config, std::time::Instant::now());
+
+            assert!(
+                !mgr.consciousness_viable,
+                "invalid watt budget {:?} must fail closed immediately",
+                invalid_budget
+            );
+            assert_eq!(
+                mgr.total_energy_spent, 0.0,
+                "invalid configuration must not record an apparently valid energy sample"
+            );
+            assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
+            assert_eq!(mgr.energy_rate_window_seconds, 0.0);
+        }
     }
 
     #[test]
