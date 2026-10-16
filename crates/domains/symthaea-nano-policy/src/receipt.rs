@@ -117,6 +117,12 @@ pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
     );
     push_check(
         &mut checks,
+        "response_status",
+        response.status == "completed",
+        "Only a completed selector response can be accepted as a successful receipt.",
+    );
+    push_check(
+        &mut checks,
         "request_digest",
         response.request_sha256 == request_sha256,
         "Response digest must equal SHA-256 of the exact request line.",
@@ -176,6 +182,47 @@ pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
         "input_candidate_ids_unique",
         candidate_ids_unique,
         "Input candidate identifiers are unique.",
+    );
+    let feature_dimension = request
+        .candidates
+        .first()
+        .map(|candidate| candidate.normalized_features.len())
+        .unwrap_or(0);
+    let input_values_valid = feature_dimension > 0
+        && feature_dimension <= crate::MAX_FEATURE_DIMENSIONS
+        && request.candidates.iter().all(|candidate| {
+            !candidate.candidate_id.trim().is_empty()
+                && candidate.candidate_id.len() <= crate::MAX_ID_BYTES
+                && !candidate.family_id.trim().is_empty()
+                && candidate.family_id.len() <= crate::MAX_ID_BYTES
+                && candidate.normalized_features.len() == feature_dimension
+                && candidate.normalized_features.iter().all(|value| {
+                    value.is_finite() && (0.0..=1.0).contains(value)
+                })
+                && candidate
+                    .estimated_cost
+                    .is_none_or(|cost| cost.is_finite() && cost > 0.0)
+        });
+    push_check(
+        &mut checks,
+        "input_values_valid",
+        input_values_valid,
+        "Input identifiers, family IDs, descriptor dimensions/values, and any declared costs are valid.",
+    );
+    let cost_policy_valid = request.policy != crate::Policy::CostAwareFarthestFirst
+        || request
+            .cost_unit
+            .as_deref()
+            .is_some_and(|unit| !unit.trim().is_empty() && unit.len() <= 64)
+            && request
+                .candidates
+                .iter()
+                .all(|candidate| candidate.estimated_cost.is_some_and(|cost| cost.is_finite() && cost > 0.0));
+    push_check(
+        &mut checks,
+        "cost_policy_contract",
+        cost_policy_valid,
+        "Cost-aware policy has an explicit shared unit and positive costs for every candidate.",
     );
 
     let mut selected_ids = BTreeSet::new();
