@@ -543,6 +543,14 @@ pub fn compare_service_loss(
             "step count and full benchmark config must match",
         ));
     }
+    if candidate.scenario_sha256 != baseline.scenario_sha256
+        || candidate.config_sha256 != baseline.config_sha256
+    {
+        return Err(invalid(
+            "paired_run",
+            "paired runs must bind identical scenario and configuration digests",
+        ));
+    }
     let change = (candidate.unmet_service_units as i128)
         - (baseline.unmet_service_units as i128);
     let reduction = if baseline.unmet_service_units == 0 {
@@ -634,6 +642,354 @@ pub fn built_in_synthetic_smoke_scenarios() -> Vec<PolicyScenario> {
             ],
         },
     ]
+}
+
+
+/// Status of one policy on a frozen set of required synthetic scenarios.
+/// Qualified means only that the policy stayed within configured floors on
+/// this declared suite; it is not real-world or physical qualification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PolicySuiteState {
+    Qualified,
+    Failed,
+    Blocked,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PolicySuiteAssessment {
+    pub schema_version: u32,
+    pub suite_version: u32,
+    pub policy: PolicyKind,
+    pub state: PolicySuiteState,
+    pub required_case_ids: Vec<String>,
+    pub observed_case_ids: Vec<String>,
+    pub missing_case_ids: Vec<String>,
+    pub unexpected_case_ids: Vec<String>,
+    pub duplicate_case_ids: Vec<String>,
+    pub complete_coverage: bool,
+    pub integrity_verified: bool,
+    pub floor_breach_steps: Option<usize>,
+    pub total_unmet_service_units: Option<u64>,
+    pub worst_case_unmet_service_units: Option<u64>,
+    pub total_cost_units: Option<u64>,
+    pub blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PolicyCaseComparison {
+    pub scenario_id: String,
+    pub candidate_unmet_service_units: u64,
+    pub baseline_unmet_service_units: u64,
+    /// Candidate minus baseline. Negative means candidate lost less service.
+    pub unmet_service_change_units: i128,
+    pub candidate_floor_breach_steps: usize,
+    pub baseline_floor_breach_steps: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PolicyRobustnessAssessment {
+    pub schema_version: u32,
+    pub suite_version: u32,
+    pub candidate: PolicySuiteAssessment,
+    pub baseline: PolicySuiteAssessment,
+    pub comparison_ready: bool,
+    pub matched_case_count: usize,
+    pub candidate_worst_case_loss_change_units: Option<i128>,
+    /// Positive is a reduction; 1000 means 100%. Undefined if baseline worst
+    /// case has zero loss. This is a stress-suite metric, not a probability.
+    pub worst_case_loss_reduction_per_mille: Option<i128>,
+    /// Equal-weight arithmetic sum across the declared cases, not an expected
+    /// value unless a separate justified weighting model is supplied.
+    pub total_suite_loss_reduction_per_mille: Option<i128>,
+    pub per_case: Vec<PolicyCaseComparison>,
+}
+
+/// Assess coverage, replay integrity and hard-floor performance for one policy.
+///
+/// Missing scenarios or run records, duplicate IDs, extra runs, wrong policy
+/// identities, mismatched configs and replay/digest failures all BLOCK the
+/// assessment. A fully verified case with a floor breach is FAILED, not blocked.
+pub fn assess_policy_suite(
+    required_case_ids: &[String],
+    scenarios: &[PolicyScenario],
+    policy: PolicyKind,
+    runs: &[PolicyRun],
+    config: BenchmarkConfig,
+) -> Result<PolicySuiteAssessment, BenchmarkError> {
+    config.validate()?;
+    if required_case_ids.is_empty() {
+        return Err(invalid("required_case_ids", "must not be empty"));
+    }
+
+    let mut required_set = BTreeSet::new();
+    for id in required_case_ids {
+        if id.trim().is_empty() {
+            return Err(invalid("required_case_ids", "case IDs must be non-empty"));
+        }
+        if !required_set.insert(id.as_str()) {
+            return Err(invalid("required_case_ids", "required case IDs must be unique"));
+        }
+    }
+
+    let mut blockers = BTreeSet::new();
+    let mut scenario_ids = BTreeSet::new();
+    let mut duplicate_scenario_ids = BTreeSet::new();
+    for scenario in scenarios {
+        if scenario.scenario_id.trim().is_empty() || scenario.steps.is_empty() {
+            blockers.insert(format!("scenario {} has invalid identity or empty steps", scenario.scenario_id));
+        }
+        if !scenario_ids.insert(scenario.scenario_id.as_str()) {
+            duplicate_scenario_ids.insert(scenario.scenario_id.clone());
+        }
+    }
+    for id in &duplicate_scenario_ids {
+        blockers.insert(format!("duplicate scenario input: {id}"));
+    }
+
+    let missing_scenario_inputs: Vec<String> = required_case_ids
+        .iter()
+        .filter(|id| !scenario_ids.contains(id.as_str()))
+        .cloned()
+        .collect();
+    let unexpected_scenario_inputs: Vec<String> = scenario_ids
+        .iter()
+        .filter(|id| !required_set.contains(**id))
+        .map(|id| (*id).to_string())
+        .collect();
+    if !missing_scenario_inputs.is_empty() {
+        blockers.insert(format!("missing scenario inputs: {}", missing_scenario_inputs.join(",")));
+    }
+    if !unexpected_scenario_inputs.is_empty() {
+        blockers.insert(format!("unexpected scenario inputs: {}", unexpected_scenario_inputs.join(",")));
+    }
+
+    let mut run_ids = BTreeSet::new();
+    let mut duplicate_case_ids = BTreeSet::new();
+    let mut observed_case_ids = Vec::with_capacity(runs.len());
+    let mut run_total_unmet = 0_u64;
+    let mut run_worst_unmet = 0_u64;
+    let mut run_floor_breaches = 0_usize;
+    let mut run_total_cost = 0_u64;
+    let mut all_run_artifacts_valid = true;
+
+    for run in runs {
+        observed_case_ids.push(run.scenario_id.clone());
+        if !run_ids.insert(run.scenario_id.as_str()) {
+            duplicate_case_ids.insert(run.scenario_id.clone());
+        }
+        if run.policy != policy {
+            all_run_artifacts_valid = false;
+            blockers.insert(format!(
+                "run {} has policy {:?}, expected {:?}",
+                run.scenario_id, run.policy, policy
+            ));
+        }
+        if run.config != config {
+            all_run_artifacts_valid = false;
+            blockers.insert(format!("run {} has an unexpected benchmark config", run.scenario_id));
+        }
+        if !required_set.contains(run.scenario_id.as_str()) {
+            blockers.insert(format!("unexpected run case: {}", run.scenario_id));
+        }
+
+        if let Some(scenario) = scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == run.scenario_id)
+        {
+            match run.receipt().and_then(|receipt| {
+                verify_policy_run_receipt(scenario, config, run, &receipt)
+            }) {
+                Ok(()) => {}
+                Err(error) => {
+                    all_run_artifacts_valid = false;
+                    blockers.insert(format!(
+                        "run {} failed deterministic replay/digest verification: {}",
+                        run.scenario_id, error
+                    ));
+                }
+            }
+        } else {
+            all_run_artifacts_valid = false;
+            blockers.insert(format!("run {} has no source scenario", run.scenario_id));
+        }
+
+        run_total_unmet = run_total_unmet.saturating_add(run.unmet_service_units);
+        run_worst_unmet = run_worst_unmet.max(run.unmet_service_units);
+        run_floor_breaches = run_floor_breaches.saturating_add(run.floor_breach_steps);
+        run_total_cost = run_total_cost.saturating_add(run.total_cost_units);
+    }
+
+    for id in &duplicate_case_ids {
+        blockers.insert(format!("duplicate run case: {id}"));
+    }
+    let missing_case_ids: Vec<String> = required_case_ids
+        .iter()
+        .filter(|id| !run_ids.contains(id.as_str()))
+        .cloned()
+        .collect();
+    let unexpected_case_ids: Vec<String> = run_ids
+        .iter()
+        .filter(|id| !required_set.contains(**id))
+        .map(|id| (*id).to_string())
+        .collect();
+    if !missing_case_ids.is_empty() {
+        blockers.insert(format!("missing policy run cases: {}", missing_case_ids.join(",")));
+    }
+    if !unexpected_case_ids.is_empty() {
+        blockers.insert(format!("unexpected policy run cases: {}", unexpected_case_ids.join(",")));
+    }
+
+    let complete_coverage = missing_case_ids.is_empty()
+        && unexpected_case_ids.is_empty()
+        && duplicate_case_ids.is_empty()
+        && missing_scenario_inputs.is_empty()
+        && unexpected_scenario_inputs.is_empty()
+        && duplicate_scenario_ids.is_empty()
+        && runs.len() == required_case_ids.len();
+    let integrity_verified = all_run_artifacts_valid && blockers.is_empty();
+    let state = if !complete_coverage || !integrity_verified {
+        PolicySuiteState::Blocked
+    } else if run_floor_breaches > 0 {
+        PolicySuiteState::Failed
+    } else {
+        PolicySuiteState::Qualified
+    };
+    let usable_metrics = complete_coverage && integrity_verified;
+
+    let mut observed_case_ids_sorted = observed_case_ids.clone();
+    observed_case_ids_sorted.sort();
+    let blockers = blockers.into_iter().collect();
+
+    Ok(PolicySuiteAssessment {
+        schema_version: POLICY_BENCHMARK_SCHEMA_VERSION,
+        suite_version: LIVING_CITY_POLICY_BENCHMARK_VERSION,
+        policy,
+        state,
+        required_case_ids: required_case_ids.to_vec(),
+        observed_case_ids: observed_case_ids_sorted,
+        missing_case_ids,
+        unexpected_case_ids,
+        duplicate_case_ids: duplicate_case_ids.into_iter().collect(),
+        complete_coverage,
+        integrity_verified,
+        floor_breach_steps: usable_metrics.then_some(run_floor_breaches),
+        total_unmet_service_units: usable_metrics.then_some(run_total_unmet),
+        worst_case_unmet_service_units: usable_metrics.then_some(run_worst_unmet),
+        total_cost_units: usable_metrics.then_some(run_total_cost),
+        blockers,
+    })
+}
+
+/// Compare two policy suites only after every required case and run is present,
+/// input receipts replay, and paired policy runs bind the exact same scenario
+/// and configuration digests. This deliberately assigns no probabilities to
+/// the stress cases.
+pub fn assess_policy_robustness(
+    required_case_ids: &[String],
+    scenarios: &[PolicyScenario],
+    candidate_policy: PolicyKind,
+    candidate_runs: &[PolicyRun],
+    baseline_policy: PolicyKind,
+    baseline_runs: &[PolicyRun],
+    config: BenchmarkConfig,
+) -> Result<PolicyRobustnessAssessment, BenchmarkError> {
+    if candidate_policy == baseline_policy {
+        return Err(invalid("policy_pair", "candidate and baseline policies must differ"));
+    }
+    let candidate = assess_policy_suite(
+        required_case_ids,
+        scenarios,
+        candidate_policy,
+        candidate_runs,
+        config,
+    )?;
+    let baseline = assess_policy_suite(
+        required_case_ids,
+        scenarios,
+        baseline_policy,
+        baseline_runs,
+        config,
+    )?;
+
+    let comparison_ready = candidate.complete_coverage
+        && baseline.complete_coverage
+        && candidate.integrity_verified
+        && baseline.integrity_verified;
+    let mut per_case = Vec::new();
+    let mut candidate_worst_case = 0_u64;
+    let mut baseline_worst_case = 0_u64;
+
+    if comparison_ready {
+        for case_id in required_case_ids {
+            let candidate_run = candidate_runs
+                .iter()
+                .find(|run| run.scenario_id == *case_id)
+                .ok_or_else(|| invalid("candidate_runs", "validated candidate run disappeared"))?;
+            let baseline_run = baseline_runs
+                .iter()
+                .find(|run| run.scenario_id == *case_id)
+                .ok_or_else(|| invalid("baseline_runs", "validated baseline run disappeared"))?;
+            if candidate_run.scenario_sha256 != baseline_run.scenario_sha256
+                || candidate_run.config_sha256 != baseline_run.config_sha256
+            {
+                return Err(invalid(
+                    "paired_inputs",
+                    "candidate and baseline must bind identical scenario/config digests",
+                ));
+            }
+            candidate_worst_case = candidate_worst_case.max(candidate_run.unmet_service_units);
+            baseline_worst_case = baseline_worst_case.max(baseline_run.unmet_service_units);
+            per_case.push(PolicyCaseComparison {
+                scenario_id: case_id.clone(),
+                candidate_unmet_service_units: candidate_run.unmet_service_units,
+                baseline_unmet_service_units: baseline_run.unmet_service_units,
+                unmet_service_change_units: candidate_run.unmet_service_units as i128
+                    - baseline_run.unmet_service_units as i128,
+                candidate_floor_breach_steps: candidate_run.floor_breach_steps,
+                baseline_floor_breach_steps: baseline_run.floor_breach_steps,
+            });
+        }
+    }
+
+    let worst_case_loss_reduction_per_mille = if comparison_ready && baseline_worst_case > 0 {
+        Some(
+            ((baseline_worst_case as i128 - candidate_worst_case as i128)
+                * (PER_MILLE as i128))
+                / baseline_worst_case as i128,
+        )
+    } else {
+        None
+    };
+    let total_suite_loss_reduction_per_mille = match (
+        comparison_ready,
+        candidate.total_unmet_service_units,
+        baseline.total_unmet_service_units,
+    ) {
+        (true, Some(candidate_total), Some(baseline_total)) if baseline_total > 0 => Some(
+            ((baseline_total as i128 - candidate_total as i128) * (PER_MILLE as i128))
+                / baseline_total as i128,
+        ),
+        _ => None,
+    };
+
+    Ok(PolicyRobustnessAssessment {
+        schema_version: POLICY_BENCHMARK_SCHEMA_VERSION,
+        suite_version: LIVING_CITY_POLICY_BENCHMARK_VERSION,
+        candidate,
+        baseline,
+        comparison_ready,
+        matched_case_count: per_case.len(),
+        candidate_worst_case_loss_change_units: comparison_ready.then_some(
+            candidate_worst_case as i128 - baseline_worst_case as i128,
+        ),
+        worst_case_loss_reduction_per_mille,
+        total_suite_loss_reduction_per_mille,
+        per_case,
+    })
 }
 
 #[cfg(test)]
@@ -742,6 +1098,238 @@ mod tests {
         assert!(reactive.unmet_service_units > floor_first.unmet_service_units);
         let comparison = compare_service_loss(&floor_first, &reactive).unwrap();
         assert_eq!(comparison.service_loss_reduction_per_mille, Some(1_000));
+    }
+
+    #[test]
+    fn robustness_assessment_requires_complete_replay_verified_paired_coverage() {
+        let scenarios = vec![scenario(
+            "forecast-case",
+            vec![
+                step(10, 10, Observation {
+                    reported_supply_units: Some(10),
+                    reported_demand_units: Some(10),
+                    age_steps: 0,
+                    forecast_service_ratio_per_mille: Some(500),
+                }),
+                step(5, 10, observed(5, 10)),
+                step(5, 10, observed(5, 10)),
+            ],
+        )];
+        let required = vec!["forecast-case".to_string()];
+        let candidate = evaluate_suite(
+            &scenarios,
+            &[PolicyKind::FloorFirst],
+            config(),
+        )
+        .unwrap();
+        let baseline = evaluate_suite(
+            &scenarios,
+            &[PolicyKind::ReactiveGreedy],
+            config(),
+        )
+        .unwrap();
+        let assessment = assess_policy_robustness(
+            &required,
+            &scenarios,
+            PolicyKind::FloorFirst,
+            &candidate,
+            PolicyKind::ReactiveGreedy,
+            &baseline,
+            config(),
+        )
+        .unwrap();
+
+        assert!(assessment.comparison_ready);
+        assert_eq!(assessment.matched_case_count, 1);
+        assert_eq!(assessment.candidate.state, PolicySuiteState::Qualified);
+        assert_eq!(assessment.baseline.state, PolicySuiteState::Failed);
+        assert_eq!(assessment.candidate.total_unmet_service_units, Some(0));
+        assert_eq!(assessment.baseline.total_unmet_service_units, Some(5));
+        assert_eq!(assessment.worst_case_loss_reduction_per_mille, Some(1_000));
+        assert_eq!(assessment.total_suite_loss_reduction_per_mille, Some(1_000));
+    }
+
+    #[test]
+    fn missing_required_run_blocks_and_withholds_all_aggregate_metrics() {
+        let scenarios = vec![
+            scenario("case-a", vec![step(10, 10, observed(10, 10))]),
+            scenario("case-b", vec![step(5, 10, observed(5, 10))]),
+        ];
+        let required = vec!["case-a".to_string(), "case-b".to_string()];
+        let candidate = evaluate_suite(
+            &scenarios[..1],
+            &[PolicyKind::FloorFirst],
+            config(),
+        )
+        .unwrap();
+        let baseline = evaluate_suite(
+            &scenarios,
+            &[PolicyKind::ReactiveGreedy],
+            config(),
+        )
+        .unwrap();
+        let assessment = assess_policy_robustness(
+            &required,
+            &scenarios,
+            PolicyKind::FloorFirst,
+            &candidate,
+            PolicyKind::ReactiveGreedy,
+            &baseline,
+            config(),
+        )
+        .unwrap();
+
+        assert_eq!(assessment.candidate.state, PolicySuiteState::Blocked);
+        assert!(!assessment.candidate.complete_coverage);
+        assert_eq!(assessment.candidate.missing_case_ids, vec!["case-b"]);
+        assert_eq!(assessment.candidate.total_unmet_service_units, None);
+        assert!(!assessment.comparison_ready);
+        assert!(assessment.per_case.is_empty());
+    }
+
+    #[test]
+    fn duplicate_extra_or_wrong_policy_run_blocks_suite() {
+        let case = scenario("one-case", vec![step(10, 10, observed(10, 10))]);
+        let required = vec!["one-case".to_string()];
+        let good = evaluate_suite(
+            std::slice::from_ref(&case),
+            &[PolicyKind::FloorFirst],
+            config(),
+        )
+        .unwrap();
+        let extra = evaluate_suite(
+            &[scenario("extra-case", vec![step(10, 10, observed(10, 10))])],
+            &[PolicyKind::FloorFirst],
+            config(),
+        )
+        .unwrap();
+
+        let duplicate_result = assess_policy_suite(
+            &required,
+            std::slice::from_ref(&case),
+            PolicyKind::FloorFirst,
+            &[good[0].clone(), good[0].clone()],
+            config(),
+        )
+        .unwrap();
+        assert_eq!(duplicate_result.state, PolicySuiteState::Blocked);
+        assert_eq!(duplicate_result.duplicate_case_ids, vec!["one-case"]);
+
+        let extra_result = assess_policy_suite(
+            &required,
+            &[case.clone(), extra_case_fixture()],
+            PolicyKind::FloorFirst,
+            &good,
+            config(),
+        )
+        .unwrap();
+        assert_eq!(extra_result.state, PolicySuiteState::Blocked);
+        assert_eq!(extra_result.unexpected_case_ids, vec!["extra-case"]);
+
+        let wrong_policy = assess_policy_suite(
+            &required,
+            std::slice::from_ref(&case),
+            PolicyKind::ReactiveGreedy,
+            &good,
+            config(),
+        )
+        .unwrap();
+        assert_eq!(wrong_policy.state, PolicySuiteState::Blocked);
+    }
+
+    fn extra_case_fixture() -> PolicyScenario {
+        scenario("extra-case", vec![step(10, 10, observed(10, 10))])
+    }
+
+    #[test]
+    fn a_valid_floor_breach_fails_policy_instead_of_becoming_a_blocker() {
+        let case = scenario("unsafe-case", vec![step(5, 10, observed(5, 10))]);
+        let required = vec!["unsafe-case".to_string()];
+        let runs = evaluate_suite(
+            std::slice::from_ref(&case),
+            &[PolicyKind::NoIntervention],
+            config(),
+        )
+        .unwrap();
+        let assessment = assess_policy_suite(
+            &required,
+            std::slice::from_ref(&case),
+            PolicyKind::NoIntervention,
+            &runs,
+            config(),
+        )
+        .unwrap();
+
+        assert_eq!(assessment.state, PolicySuiteState::Failed);
+        assert!(assessment.integrity_verified);
+        assert_eq!(assessment.floor_breach_steps, Some(1));
+    }
+
+    #[test]
+    fn suite_assessor_blocks_altered_result_even_if_run_id_and_config_match() {
+        let case = scenario("tampered-result", vec![step(5, 10, observed(5, 10))]);
+        let required = vec!["tampered-result".to_string()];
+        let mut runs = evaluate_suite(
+            std::slice::from_ref(&case),
+            &[PolicyKind::ReactiveGreedy],
+            config(),
+        )
+        .unwrap();
+        runs[0].unmet_service_units = 999;
+        let assessment = assess_policy_suite(
+            &required,
+            std::slice::from_ref(&case),
+            PolicyKind::ReactiveGreedy,
+            &runs,
+            config(),
+        )
+        .unwrap();
+
+        assert_eq!(assessment.state, PolicySuiteState::Blocked);
+        assert!(!assessment.integrity_verified);
+        assert_eq!(assessment.total_unmet_service_units, None);
+    }
+
+    #[test]
+    fn paired_run_comparison_rejects_same_id_with_different_hidden_truth() {
+        let candidate_case = scenario("same-id", vec![step(5, 10, observed(5, 10))]);
+        let baseline_case = scenario("same-id", vec![step(4, 10, observed(5, 10))]);
+        let candidate = evaluate_policy(&candidate_case, PolicyKind::FloorFirst, config()).unwrap();
+        let baseline = evaluate_policy(&baseline_case, PolicyKind::ReactiveGreedy, config()).unwrap();
+        assert_eq!(
+            compare_service_loss(&candidate, &baseline).unwrap_err().field,
+            "paired_run"
+        );
+    }
+
+    #[test]
+    fn zero_baseline_loss_does_not_invent_a_percentage_improvement() {
+        let case = scenario("zero-loss", vec![step(10, 10, observed(10, 10))]);
+        let required = vec!["zero-loss".to_string()];
+        let candidate = evaluate_suite(
+            std::slice::from_ref(&case),
+            &[PolicyKind::FloorFirst],
+            config(),
+        )
+        .unwrap();
+        let baseline = evaluate_suite(
+            std::slice::from_ref(&case),
+            &[PolicyKind::ReactiveGreedy],
+            config(),
+        )
+        .unwrap();
+        let assessment = assess_policy_robustness(
+            &required,
+            std::slice::from_ref(&case),
+            PolicyKind::FloorFirst,
+            &candidate,
+            PolicyKind::ReactiveGreedy,
+            &baseline,
+            config(),
+        )
+        .unwrap();
+        assert_eq!(assessment.worst_case_loss_reduction_per_mille, None);
+        assert_eq!(assessment.total_suite_loss_reduction_per_mille, None);
     }
 
     #[test]
