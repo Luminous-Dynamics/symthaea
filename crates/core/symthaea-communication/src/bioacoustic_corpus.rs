@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const BIOACOUSTIC_CORPUS_SCHEMA_VERSION: u32 = 1;
+pub const BIOACOUSTIC_CORPUS_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum BioacousticSplit {
@@ -79,6 +79,7 @@ pub struct BioacousticRecording {
     pub source_recording_id: Option<String>,
     /// Start offset (seconds) of this asset/crop within its original source recording.
     /// Required by event evaluation when multiple Test assets share a source ID.
+    #[serde(default)]
     pub source_start_s: Option<f64>,
     pub session_id: Option<String>,
     pub site_id: Option<String>,
