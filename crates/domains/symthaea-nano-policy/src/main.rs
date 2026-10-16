@@ -447,6 +447,23 @@ mod tests {
     }
 
     #[test]
+    fn maximin_updates_nearest_distances_after_each_pick() {
+        let req = request(
+            Policy::Maximin,
+            3,
+            vec![
+                candidate("a", &[0.0]),
+                candidate("b", &[0.1]),
+                candidate("c", &[0.5]),
+                candidate("d", &[1.0]),
+            ],
+        );
+        let result = select(&req).expect("valid request");
+        assert_eq!(selected_ids(&result), vec!["d", "a", "c"]);
+        assert_eq!(result.selected[2].score_kind, "min_distance_to_selected");
+    }
+
+    #[test]
     fn input_row_order_does_not_change_maximin_result() {
         let first = request(
             Policy::Maximin,
