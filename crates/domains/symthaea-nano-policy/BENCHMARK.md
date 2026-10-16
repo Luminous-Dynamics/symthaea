@@ -7,7 +7,7 @@
 
 ## 1. What this kernel can and cannot establish
 
-The crate implements four selector policies over a supplied, frozen descriptor pool: seeded random, farthest-first, family-balanced farthest-first, and cost-aware farthest-first. It is not an atomistic or electromagnetic predictor; it does not query an oracle; and it has no HDC/FEP integration yet.
+The crate implements four selector policies over a supplied, frozen descriptor pool: seeded random, farthest-first, family-balanced farthest-first, and cost-aware farthest-first. The JSONL CLI also offers a separate `--verify-receipt` mode for independent structural verification of request/response pairs. It is not an atomistic or electromagnetic predictor; it does not query an oracle; and it has no HDC/FEP integration yet.
 
 The tests establish contract behavior only when executed. They cannot establish that descriptor-space diversity maps to physical utility. That must be measured using held-out outcomes in an appropriate external benchmark.
 
