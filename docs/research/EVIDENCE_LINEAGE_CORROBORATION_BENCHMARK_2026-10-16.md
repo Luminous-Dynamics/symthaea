@@ -78,6 +78,14 @@ Targets below are hypotheses to test, not results already obtained.
 
 The difference between raw-witness count and group count is a deterministic duplicate-count metric, not semantic accuracy. Population-level false merge/split rates require an independently labeled corpus and confidence intervals.
 
+### Reproducible in-memory scaling probe
+
+An opt-in ignored Rust test generates complete, unique in-memory witness sets and reports p50/p95 assessment time at 1k, 10k, and 100k witnesses. Run it in release mode:
+
+    cargo test --release --lib knowledge::evidence_lineage::tests::benchmark_lineage_grouping_scaling -- --ignored --nocapture
+
+The probe validates group-count parity before timing. It excludes lineage extraction, network/source lookup, persistence, and digest computation. It is not a production latency result; no measured timing is claimed until the exact test is run and the commit, hardware, compiler, and feature configuration are recorded.
+
 ## Ablations and baselines
 
 Compare raw citation count; distinct URL count; distinct publisher/domain count; exact digest deduplication only; origin-ID grouping only; the full union of source ID, digest, and declared origin; and gold lineage vs. extracted lineage.
