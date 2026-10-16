@@ -1449,34 +1449,85 @@ fn match_relation_constraints(
     (matched, unmatched)
 }
 
+/// Identity of a directed relation apart from its polarity. Used only for
+/// conflict indexing; source identity, time, and authority are deliberately not
+/// collapsed into this semantic key.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct RelationIdentityKey {
+    subject: String,
+    predicate: String,
+    object: String,
+    subject_role: SemanticRole,
+    object_role: SemanticRole,
+    is_causal: bool,
+}
+
+impl RelationIdentityKey {
+    fn from_query(query: &RelationObservationQuery) -> Self {
+        Self {
+            subject: normalized_relation_text(&query.subject),
+            predicate: normalized_relation_text(&query.predicate),
+            object: normalized_relation_text(&query.object),
+            subject_role: query.subject_role,
+            object_role: query.object_role,
+            is_causal: query.is_causal,
+        }
+    }
+
+    fn from_stored(relation: &ExtractedRelation) -> Self {
+        Self {
+            subject: normalized_relation_text(&relation.subject),
+            predicate: normalized_relation_text(&relation.predicate),
+            object: normalized_relation_text(&relation.object),
+            subject_role: relation.subject_role,
+            object_role: relation.object_role,
+            is_causal: relation.is_causal,
+        }
+    }
+}
+
+#[cfg(test)]
 fn same_relation_except_polarity(
     query: &RelationObservationQuery,
     stored: &ExtractedRelation,
 ) -> bool {
-    normalized_relation_text(&query.subject) == normalized_relation_text(&stored.subject)
-        && normalized_relation_text(&query.predicate)
-            == normalized_relation_text(&stored.predicate)
-        && normalized_relation_text(&query.object) == normalized_relation_text(&stored.object)
-        && query.subject_role == stored.subject_role
-        && query.object_role == stored.object_role
-        && query.is_causal == stored.is_causal
+    RelationIdentityKey::from_query(query) == RelationIdentityKey::from_stored(stored)
         && query.is_negated != stored.is_negated
 }
 
+/// Find polarity conflicts by building one directed-relation index per query.
+/// Previous behavior scanned every stored relation once per query constraint,
+/// O(Q*R). This implementation indexes each stored relation once and performs
+/// keyed lookups, O(R + Q + C) expected time where C is the number of conflicts.
+/// Conflict output is sorted afterwards so HashMap iteration order is invisible.
 fn find_relation_conflicts<'a>(
     queries: &[RelationObservationQuery],
     facts: impl Iterator<Item = &'a TemporalFact>,
 ) -> Vec<RelationConflictEvidence> {
-    let facts: Vec<&TemporalFact> = facts.collect();
+    let mut by_identity: HashMap<
+        RelationIdentityKey,
+        Vec<(&'a TemporalFact, usize, &'a ExtractedRelation)>,
+    > = HashMap::new();
+
+    for fact in facts {
+        for (stored_relation_index, stored) in fact.encoding.relations.iter().enumerate() {
+            by_identity
+                .entry(RelationIdentityKey::from_stored(stored))
+                .or_default()
+                .push((fact, stored_relation_index, stored));
+        }
+    }
+
     let mut conflicts = Vec::new();
     for (query_index, query) in queries.iter().enumerate() {
-        for fact in &facts {
-            for (stored_relation_index, stored) in fact.encoding.relations.iter().enumerate() {
-                if same_relation_except_polarity(query, stored) {
+        let key = RelationIdentityKey::from_query(query);
+        if let Some(stored_relations) = by_identity.get(&key) {
+            for (fact, stored_relation_index, stored) in stored_relations {
+                if query.is_negated != stored.is_negated {
                     conflicts.push(RelationConflictEvidence {
                         query_index,
                         conflicting_fact_id: fact.id,
-                        stored_relation_index,
+                        stored_relation_index: *stored_relation_index,
                         subject: stored.subject.clone(),
                         predicate: stored.predicate.clone(),
                         object: stored.object.clone(),
