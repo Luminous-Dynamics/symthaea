@@ -974,6 +974,13 @@ mod tests {
             .expect("score kind enum")
             .iter()
             .any(|kind| kind == "hdc_min_distance_to_selected"));
+        assert_eq!(output_schema["allOf"].as_array().map(Vec::len), Some(3));
+        assert_eq!(
+            output_schema["allOf"][2]["then"]["properties"]["selected"]["items"]["properties"]
+                ["score"]["maximum"]
+                .as_f64(),
+            Some(1.0)
+        );
     }
 
     #[test]
