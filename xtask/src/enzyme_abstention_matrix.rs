@@ -659,7 +659,7 @@ mod tests {
         let inhibition = fit(ModelKind::SubstrateInhibition, 100.0, 2.0, Some(10_000.0), 0.5);
         let decision = decide(&observations, &observations, mm, inhibition, 1.0);
         assert_eq!(decision.selected, "abstain");
-        assert_eq!(decision.reason, "candidate_predictions_not_resolved_on_held_out_conditions");
+        assert_eq!(decision.reason, "candidate_predictions_not_resolved_at_evaluation_conditions");
     }
 
     #[test]
@@ -673,7 +673,7 @@ mod tests {
         let inhibition = fit(ModelKind::SubstrateInhibition, 80.0, 4.0, Some(20.0), 4.5);
         let decision = decide(&observations, &observations, mm, inhibition, 1.0);
         assert_eq!(decision.selected, "abstain");
-        assert_eq!(decision.reason, "best_candidate_fails_held_out_absolute_fit_gate");
+        assert_eq!(decision.reason, "best_candidate_fails_evaluation_absolute_fit_gate");
     }
 
     #[test]
@@ -707,6 +707,9 @@ mod tests {
         assert_eq!(report["summary_by_stratum"].as_array().unwrap().len(), 4);
         assert_eq!(report["abstention_control_summary"]["control_case_count"].as_u64().unwrap(), 48);
         assert!(report["abstention_control_summary"]["false_decisive_rate"].as_f64().is_some());
+        assert_eq!(report["paired_policy_comparison"]["control_case_count"].as_u64().unwrap(), 48);
+        assert!(report["paired_policy_comparison"]["in_sample_false_decisive_rate"].as_f64().is_some());
+        assert!(report["paired_policy_comparison"]["held_out_false_decisive_rate"].as_f64().is_some());
         assert!(report["cases"].as_array().unwrap().iter().all(|case| {
             case["observed_decision"].as_str().is_some()
                 && case["decision_reason"].as_str().is_some()
