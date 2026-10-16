@@ -623,7 +623,7 @@ mod tests {
         let mut tracker = initialized_tracker();
         let outcome = tracker.observe(&observation(1_010, 2), "bridge-run-1", 2);
         assert!(matches!(
-            outcome,
+            &outcome,
             RosClockLifecycleDispositionV1::Advancing {
                 generation: 1,
                 delta_ns: 10
@@ -825,7 +825,7 @@ mod tests {
         replacement.source_epoch_id = "bag-run-2".into();
         let outcome = tracker.acknowledge_transition(&replacement, "bridge-run-1", 61);
         assert!(matches!(
-            outcome,
+            &outcome,
             RosClockLifecycleDispositionV1::TransitionRebound {
                 kind: RosClockTransitionKindV1::ClockSourceSilent,
                 generation: 2,
