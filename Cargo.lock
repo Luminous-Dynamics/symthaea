@@ -19843,6 +19843,8 @@ dependencies = [
 name = "symthaea-scenarios"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "sha2",
  "symthaea-control-theory",
  "symthaea-economics",
