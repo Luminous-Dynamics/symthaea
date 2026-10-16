@@ -11,8 +11,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -56,12 +58,26 @@ def _reject_constant(value: str) -> None:
     raise ValidationFailure(f"non-standard JSON numeric constant is forbidden: {value}")
 
 
+def _strict_float(token: str) -> float:
+    try:
+        exact = Decimal(token)
+        parsed = float(token)
+    except (InvalidOperation, ValueError, OverflowError) as exc:
+        raise ValidationFailure(f"invalid JSON floating-point value: {token}") from exc
+    if not exact.is_finite() or not math.isfinite(parsed):
+        raise ValidationFailure(f"non-finite JSON floating-point value is forbidden: {token}")
+    if parsed == 0.0 and exact != 0:
+        raise ValidationFailure(f"JSON floating-point underflow is forbidden: {token}")
+    return parsed
+
+
 def _strict_json(data: bytes, label: str) -> Any:
     try:
         return json.loads(
             data.decode("utf-8"),
             object_pairs_hook=_unique_object,
             parse_constant=_reject_constant,
+            parse_float=_strict_float,
         )
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValidationFailure(f"{label}: invalid UTF-8 JSON: {exc}") from exc
