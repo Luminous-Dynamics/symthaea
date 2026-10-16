@@ -999,6 +999,9 @@ default-mind = [
 ]
 
 
+# Versioned evidence benchmark auditing and receipt scoring CLI.
+evidence-benchmark = ["dep:sha2"]
+
 [dev-dependencies]
 symthaea-cell-foundry = { path = "crates/domains/symthaea-cell-foundry" }
 symthaea-formal-safety = { path = "crates/domains/symthaea-formal-safety" }
@@ -2548,4 +2551,4 @@ name = "action_semantics_probe"
 [[bin]]
 name = "evidence_action_benchmark"
 path = "src/bin/evidence_action_benchmark.rs"
-required-features = ["sha2"]
+required-features = ["evidence-benchmark"]
