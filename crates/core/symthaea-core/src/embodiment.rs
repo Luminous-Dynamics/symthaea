@@ -1016,10 +1016,10 @@ mod tests {
         let mut timing = PlantStepTimingV1::configured_simulation(8, 0.005).unwrap();
         timing.dt_seconds = f32::NAN;
 
-        assert_eq!(
+        assert!(matches!(
             bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
             Err(PlantStepTimingErrorV1::NonFiniteDuration)
-        );
+        ));
         assert_eq!(bridge.last_dt, None);
         assert_eq!(
             bridge.step_calls, 0,
