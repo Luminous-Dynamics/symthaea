@@ -440,8 +440,7 @@ fn calculate_acquisition(
             .iter()
             .zip(prior_probabilities.iter())
             .map(|(hypothesis_id, prior)| {
-                prior
-                    * likelihood_rows[hypothesis_id][outcome_id]
+                *prior * likelihood_rows[hypothesis_id][outcome_id]
             })
             .collect();
         let marginal = joint_probabilities.iter().sum::<f64>();
@@ -779,6 +778,20 @@ mod tests {
         );
         model.actions[0].likelihood_by_hypothesis[0].outcomes[0].probability_ppm = 800_000;
         assert!(model.validate().unwrap_err().contains("do not sum"));
+    }
+
+    #[test]
+    fn missing_hypothesis_likelihood_produces_no_numeric_acquisition_score() {
+        let mut model = model(
+            "incomplete",
+            Feasibility::Feasible,
+            [900_000, 100_000],
+            [100_000, 900_000],
+            opposing_decisions(),
+        );
+        model.actions[0].likelihood_by_hypothesis.pop();
+        let error = expected_information_gain(&model, "incomplete").unwrap_err();
+        assert!(error.contains("one likelihood row per hypothesis"));
     }
 
     #[test]
