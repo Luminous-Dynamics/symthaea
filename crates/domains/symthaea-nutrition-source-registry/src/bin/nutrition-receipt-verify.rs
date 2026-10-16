@@ -286,9 +286,9 @@ fn main() {
 mod tests {
     use super::{parse_strict_json, verify_bundle, ReplayBundle};
     use symthaea_nutrition_source_registry::{
-        assess_nutrition_source, ArtifactIntegrity, DataQualityEligibility, EvidenceClass,
-        Eligibility, FoodGeographicMatch, FoodIdentityConfidence, FoodMatchQuality,
-        NutritionAssessability, NutritionFoodFactV1, NutritionSourceManifestV1, NutrientUnit,
+        assess_nutrition_source, EvidenceClass, Eligibility, FoodGeographicMatch,
+        FoodIdentityConfidence, FoodMatchQuality, NutritionFoodFactV1,
+        NutritionSourceManifestV1, NutrientUnit,
         PermissionDecision, PermissionEvidenceBasisV1, PermissionEvidenceLifecycleV1,
         PermissionEvidenceV1, SourceLifecycle, SourcePermissionReferencesV1, SourcePermissionsV1,
         SourceRightV1, SourceUseRequestV1, NutritionTransformationStepV1,
@@ -432,7 +432,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_hash_consistent_receipt_without_calling_assessor_in_verifier() {
+    fn verifies_receipt_emitted_by_assessor() {
         let (bundle, artifact_hash) = valid_bundle();
         assert!(verify_bundle(&bundle, artifact_hash).is_ok());
     }
