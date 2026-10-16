@@ -1,0 +1,672 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Deterministic event-level scoring for precomputed bioacoustic predictions.
+//!
+//! This evaluator uses the corpus manifest as its annotation source. It scores
+//! the Test partition only and requires an explicit assertion that annotations
+//! exhaustively cover the target labels on every Test recording. That assertion
+//! is metadata, not an independently authenticated fact. This module does not
+//! run a model or verify the source audio bytes; use bioacoustic-asset-audit first.
+
+use crate::bioacoustic_corpus::{
+    BioacousticCorpusManifest, BioacousticSplit, BioacousticSplitPolicy,
+    validate_bioacoustic_corpus,
+};
+use crate::TimeSpan;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+
+pub const BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION: u32 = 1;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum EventMatchRule {
+    /// One-to-one match when the absolute start-time error is within tolerance.
+    /// Suitable for point-like events such as click onset.
+    StartTolerance { max_start_error_s: f64 },
+    /// One-to-one match when temporal intersection-over-union meets the minimum.
+    /// Suitable for annotated segments such as whistles or songs.
+    TemporalIou { min_iou: f64 },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PredictedBioacousticEvent {
+    pub prediction_id: String,
+    pub sample_id: String,
+    pub interval: TimeSpan,
+    pub label: String,
+    /// Probability-like confidence score in [0, 1] from the frozen model.
+    pub score: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BioacousticEventPredictionBundle {
+    pub schema_version: u32,
+    pub dataset_id: String,
+    pub dataset_revision: String,
+    /// Must equal the canonical BLAKE3 identity computed from the corpus manifest.
+    pub corpus_manifest_blake3: String,
+    pub task_id: String,
+    pub model_id: String,
+    /// SHA-256 of the exact model artifact, not merely a model name/version.
+    pub model_sha256: String,
+    pub target_labels: Vec<String>,
+    pub matching_rule: EventMatchRule,
+    /// Threshold selected on Validation, frozen before the Test set was scored.
+    pub frozen_score_threshold: f64,
+    /// Must enumerate every Test sample, including samples with no target events.
+    /// This records an annotator/protocol assertion; code cannot prove annotation completeness.
+    pub exhaustive_annotation_sample_ids: Vec<String>,
+    /// A declared split policy. Source-recording lineage is mandatory for evaluation.
+    pub split_policy: BioacousticSplitPolicy,
+    pub predictions: Vec<PredictedBioacousticEvent>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BioacousticEventMetrics {
+    pub true_positives: u64,
+    pub false_positives: u64,
+    pub false_negatives: u64,
+    pub ground_truth_events: u64,
+    pub predictions_after_threshold: u64,
+    pub scored_duration_seconds: f64,
+    pub precision: Option<f64>,
+    pub recall: Option<f64>,
+    pub f1: Option<f64>,
+    pub false_alarms_per_hour: Option<f64>,
+}
+
+impl BioacousticEventMetrics {
+    fn from_counts(
+        true_positives: usize,
+        false_positives: usize,
+        false_negatives: usize,
+        ground_truth_events: usize,
+        predictions_after_threshold: usize,
+        scored_duration_seconds: f64,
+    ) -> Self {
+        let precision = ratio(true_positives, true_positives + false_positives);
+        let recall = ratio(true_positives, true_positives + false_negatives);
+        let f1 = match (precision, recall) {
+            (Some(p), Some(r)) if p + r > 0.0 => Some(2.0 * p * r / (p + r)),
+            (Some(_), Some(_)) => Some(0.0),
+            _ => None,
+        };
+        let false_alarms_per_hour = (scored_duration_seconds.is_finite()
+            && scored_duration_seconds > 0.0)
+            .then(|| false_positives as f64 * 3600.0 / scored_duration_seconds);
+        Self {
+            true_positives: true_positives as u64,
+            false_positives: false_positives as u64,
+            false_negatives: false_negatives as u64,
+            ground_truth_events: ground_truth_events as u64,
+            predictions_after_threshold: predictions_after_threshold as u64,
+            scored_duration_seconds,
+            precision,
+            recall,
+            f1,
+            false_alarms_per_hour,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BioacousticPerSampleMetrics {
+    pub sample_id: String,
+    pub metrics: BioacousticEventMetrics,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BioacousticEventEvaluationReport {
+    pub status: String,
+    pub schema_version: u32,
+    pub dataset_id: String,
+    pub dataset_revision: String,
+    pub corpus_manifest_blake3: String,
+    pub scored_split: BioacousticSplit,
+    pub task_id: String,
+    pub model_id: String,
+    pub model_sha256: String,
+    pub target_labels: Vec<String>,
+    pub matching_rule: EventMatchRule,
+    pub frozen_score_threshold: f64,
+    pub exhaustive_test_annotation_coverage_asserted: bool,
+    pub split_policy: BioacousticSplitPolicy,
+    pub test_recording_count: usize,
+    pub metrics: BioacousticEventMetrics,
+    pub per_sample: Vec<BioacousticPerSampleMetrics>,
+    pub audio_bytes_verified_by_this_evaluator: bool,
+    pub annotation_truth_authenticated_by_this_evaluator: bool,
+    pub model_executed_by_this_evaluator: bool,
+}
+
+#[derive(Clone, Debug)]
+struct Event {
+    id: String,
+    interval: TimeSpan,
+    label: String,
+    score: f64,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct Counts {
+    tp: usize,
+    fp: usize,
+    fn_: usize,
+    ground_truth: usize,
+    predictions: usize,
+}
+
+pub fn evaluate_bioacoustic_events(
+    manifest: &BioacousticCorpusManifest,
+    bundle: &BioacousticEventPredictionBundle,
+) -> Result<BioacousticEventEvaluationReport, String> {
+    if bundle.schema_version != BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION {
+        return Err("unsupported event-evaluation bundle schema version".into());
+    }
+    if bundle.dataset_id != manifest.dataset_id
+        || bundle.dataset_revision != manifest.dataset_revision
+    {
+        return Err("prediction bundle dataset ID/revision does not match corpus manifest".into());
+    }
+    let computed_manifest_hash = manifest.computed_manifest_blake3()?;
+    if !bundle
+        .corpus_manifest_blake3
+        .eq_ignore_ascii_case(&computed_manifest_hash)
+    {
+        return Err("prediction bundle corpus-manifest BLAKE3 does not match manifest".into());
+    }
+    if bundle.task_id.trim().is_empty() || bundle.model_id.trim().is_empty() {
+        return Err("task ID and model ID must be non-empty".into());
+    }
+    if !is_sha256_hex(&bundle.model_sha256) {
+        return Err("model SHA-256 must contain exactly 64 hexadecimal characters".into());
+    }
+    if !bundle.frozen_score_threshold.is_finite()
+        || !(0.0..=1.0).contains(&bundle.frozen_score_threshold)
+    {
+        return Err("frozen score threshold must be finite and within [0, 1]".into());
+    }
+    if bundle.target_labels.is_empty() {
+        return Err("at least one target label is required".into());
+    }
+    let mut target_labels = BTreeSet::new();
+    if bundle.target_labels.iter().any(|label| {
+        label.trim().is_empty() || !target_labels.insert(label.trim().to_owned())
+    }) {
+        return Err("target labels must be non-empty and unique".into());
+    }
+    validate_match_rule(&bundle.matching_rule)?;
+
+    if !bundle.split_policy.require_source_recording_ids {
+        return Err("evaluation requires source-recording lineage; enable require_source_recording_ids".into());
+    }
+    validate_bioacoustic_corpus(manifest, bundle.split_policy)?;
+
+    let test_recordings: Vec<_> = manifest
+        .recordings
+        .iter()
+        .filter(|recording| recording.split == BioacousticSplit::Test)
+        .collect();
+    if test_recordings.is_empty() {
+        return Err("corpus manifest has no Test recordings".into());
+    }
+    let test_sample_ids: BTreeSet<_> = test_recordings
+        .iter()
+        .map(|recording| recording.sample_id.as_str())
+        .collect();
+
+    let mut exhaustive_ids = BTreeSet::new();
+    if bundle.exhaustive_annotation_sample_ids.iter().any(|id| {
+        id.trim().is_empty() || !exhaustive_ids.insert(id.as_str())
+    }) {
+        return Err("exhaustive annotation sample IDs must be non-empty and unique".into());
+    }
+    if exhaustive_ids != test_sample_ids {
+        return Err(
+            "exhaustive_annotation_sample_ids must exactly cover every Test sample, including empty-event recordings"
+                .into(),
+        );
+    }
+
+    let mut prediction_ids = BTreeSet::new();
+    let mut predictions_by_sample: std::collections::BTreeMap<&str, Vec<Event>> =
+        std::collections::BTreeMap::new();
+    for prediction in &bundle.predictions {
+        if prediction.prediction_id.trim().is_empty()
+            || !prediction_ids.insert(prediction.prediction_id.as_str())
+        {
+            return Err("prediction IDs must be non-empty and unique".into());
+        }
+        if !test_sample_ids.contains(prediction.sample_id.as_str()) {
+            return Err(format!(
+                "prediction {} references non-Test or unknown sample {}",
+                prediction.prediction_id, prediction.sample_id
+            ));
+        }
+        if prediction.label.trim().is_empty()
+            || !target_labels.contains(prediction.label.trim())
+        {
+            return Err(format!(
+                "prediction {} label is not one of the declared target labels",
+                prediction.prediction_id
+            ));
+        }
+        if !valid_interval(prediction.interval) {
+            return Err(format!("prediction {} has an invalid interval", prediction.prediction_id));
+        }
+        if !prediction.score.is_finite() || !(0.0..=1.0).contains(&prediction.score) {
+            return Err(format!("prediction {} score must be finite and in [0, 1]", prediction.prediction_id));
+        }
+        let recording = test_recordings
+            .iter()
+            .find(|recording| recording.sample_id == prediction.sample_id)
+            .expect("membership in test_sample_ids implies a test recording");
+        let duration_s = recording.sample_count as f64 / recording.sample_rate_hz as f64;
+        if prediction.interval.start_s < 0.0 || prediction.interval.end_s > duration_s {
+            return Err(format!(
+                "prediction {} interval falls outside sample {} duration",
+                prediction.prediction_id, prediction.sample_id
+            ));
+        }
+        if prediction.score >= bundle.frozen_score_threshold {
+            predictions_by_sample
+                .entry(prediction.sample_id.as_str())
+                .or_default()
+                .push(Event {
+                    id: prediction.prediction_id.clone(),
+                    interval: prediction.interval,
+                    label: prediction.label.clone(),
+                    score: prediction.score,
+                });
+        }
+    }
+
+    let mut per_sample = Vec::with_capacity(test_recordings.len());
+    let mut total = Counts::default();
+    let mut total_duration = 0.0_f64;
+
+    for recording in &test_recordings {
+        let duration_s = recording.sample_count as f64 / recording.sample_rate_hz as f64;
+        if !duration_s.is_finite() || duration_s <= 0.0 {
+            return Err(format!("sample {} has invalid duration", recording.sample_id));
+        }
+        let truth: Vec<_> = recording
+            .annotations
+            .iter()
+            .filter(|annotation| target_labels.contains(annotation.label.trim()))
+            .map(|annotation| Event {
+                id: annotation.annotation_id.clone(),
+                interval: annotation.interval,
+                label: annotation.label.trim().to_owned(),
+                score: 1.0,
+            })
+            .collect();
+        let predicted = predictions_by_sample
+            .remove(recording.sample_id.as_str())
+            .unwrap_or_default();
+        let (tp, fp, fn_) = match_events(&truth, &predicted, &bundle.matching_rule);
+        let counts = Counts {
+            tp,
+            fp,
+            fn_,
+            ground_truth: truth.len(),
+            predictions: predicted.len(),
+        };
+        total.tp += counts.tp;
+        total.fp += counts.fp;
+        total.fn_ += counts.fn_;
+        total.ground_truth += counts.ground_truth;
+        total.predictions += counts.predictions;
+        total_duration += duration_s;
+        per_sample.push(BioacousticPerSampleMetrics {
+            sample_id: recording.sample_id.clone(),
+            metrics: BioacousticEventMetrics::from_counts(
+                counts.tp,
+                counts.fp,
+                counts.fn_,
+                counts.ground_truth,
+                counts.predictions,
+                duration_s,
+            ),
+        });
+    }
+
+    let metrics = BioacousticEventMetrics::from_counts(
+        total.tp,
+        total.fp,
+        total.fn_,
+        total.ground_truth,
+        total.predictions,
+        total_duration,
+    );
+
+    Ok(BioacousticEventEvaluationReport {
+        status: "EVALUATED".into(),
+        schema_version: BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION,
+        dataset_id: manifest.dataset_id.clone(),
+        dataset_revision: manifest.dataset_revision.clone(),
+        corpus_manifest_blake3: computed_manifest_hash,
+        scored_split: BioacousticSplit::Test,
+        task_id: bundle.task_id.clone(),
+        model_id: bundle.model_id.clone(),
+        model_sha256: bundle.model_sha256.to_ascii_lowercase(),
+        target_labels: bundle.target_labels.clone(),
+        matching_rule: bundle.matching_rule.clone(),
+        frozen_score_threshold: bundle.frozen_score_threshold,
+        exhaustive_test_annotation_coverage_asserted: true,
+        split_policy: bundle.split_policy,
+        test_recording_count: test_recordings.len(),
+        metrics,
+        per_sample,
+        audio_bytes_verified_by_this_evaluator: false,
+        annotation_truth_authenticated_by_this_evaluator: false,
+        model_executed_by_this_evaluator: false,
+    })
+}
+
+fn validate_match_rule(rule: &EventMatchRule) -> Result<(), String> {
+    match rule {
+        EventMatchRule::StartTolerance { max_start_error_s } => {
+            if !max_start_error_s.is_finite() || *max_start_error_s < 0.0 {
+                return Err("start-time tolerance must be finite and non-negative".into());
+            }
+        }
+        EventMatchRule::TemporalIou { min_iou } => {
+            if !min_iou.is_finite() || !(0.0..=1.0).contains(min_iou) {
+                return Err("minimum temporal IoU must be finite and within [0, 1]".into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn match_events(
+    truth: &[Event],
+    predictions: &[Event],
+    rule: &EventMatchRule,
+) -> (usize, usize, usize) {
+    let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); predictions.len()];
+    for (prediction_index, prediction) in predictions.iter().enumerate() {
+        for (truth_index, actual) in truth.iter().enumerate() {
+            if prediction.label == actual.label && events_match(prediction.interval, actual.interval, rule) {
+                adjacency[prediction_index].push(truth_index);
+            }
+        }
+        adjacency[prediction_index].sort_by(|left, right| {
+            match rule {
+                EventMatchRule::StartTolerance { .. } => {
+                    start_error(prediction.interval, truth[*left].interval)
+                        .total_cmp(&start_error(prediction.interval, truth[*right].interval))
+                        .then_with(|| truth[*left].id.cmp(&truth[*right].id))
+                }
+                EventMatchRule::TemporalIou { .. } => {
+                    temporal_iou(prediction.interval, truth[*right].interval)
+                        .total_cmp(&temporal_iou(prediction.interval, truth[*left].interval))
+                        .then_with(|| truth[*left].id.cmp(&truth[*right].id))
+                }
+            }
+        });
+    }
+
+    // Try higher-confidence predictions first; augmenting paths still find a
+    // maximum-cardinality one-to-one match, so a truth event cannot be counted twice.
+    let mut order: Vec<usize> = (0..predictions.len()).collect();
+    order.sort_by(|left, right| {
+        predictions[*right]
+            .score
+            .total_cmp(&predictions[*left].score)
+            .then_with(|| predictions[*left].id.cmp(&predictions[*right].id))
+    });
+    let mut truth_to_prediction = vec![None; truth.len()];
+    let mut true_positives = 0usize;
+    for prediction_index in order {
+        let mut seen = vec![false; truth.len()];
+        if augment_match(prediction_index, &adjacency, &mut seen, &mut truth_to_prediction) {
+            true_positives += 1;
+        }
+    }
+    (
+        true_positives,
+        predictions.len() - true_positives,
+        truth.len() - true_positives,
+    )
+}
+
+fn augment_match(
+    prediction_index: usize,
+    adjacency: &[Vec<usize>],
+    seen_truth: &mut [bool],
+    truth_to_prediction: &mut [Option<usize>],
+) -> bool {
+    for &truth_index in &adjacency[prediction_index] {
+        if seen_truth[truth_index] {
+            continue;
+        }
+        seen_truth[truth_index] = true;
+        let previous_prediction = truth_to_prediction[truth_index];
+        if previous_prediction.is_none()
+            || augment_match(
+                previous_prediction.expect("checked as Some"),
+                adjacency,
+                seen_truth,
+                truth_to_prediction,
+            )
+        {
+            truth_to_prediction[truth_index] = Some(prediction_index);
+            return true;
+        }
+    }
+    false
+}
+
+fn events_match(predicted: TimeSpan, actual: TimeSpan, rule: &EventMatchRule) -> bool {
+    match rule {
+        EventMatchRule::StartTolerance { max_start_error_s } => {
+            start_error(predicted, actual) <= *max_start_error_s
+        }
+        EventMatchRule::TemporalIou { min_iou } => temporal_iou(predicted, actual) >= *min_iou,
+    }
+}
+
+fn start_error(left: TimeSpan, right: TimeSpan) -> f64 {
+    (left.start_s - right.start_s).abs()
+}
+
+fn temporal_iou(left: TimeSpan, right: TimeSpan) -> f64 {
+    let intersection = (left.end_s.min(right.end_s) - left.start_s.max(right.start_s)).max(0.0);
+    let union = (left.end_s.max(right.end_s) - left.start_s.min(right.start_s)).max(0.0);
+    if union > 0.0 { intersection / union } else { 0.0 }
+}
+
+fn valid_interval(interval: TimeSpan) -> bool {
+    interval.start_s.is_finite()
+        && interval.end_s.is_finite()
+        && interval.start_s >= 0.0
+        && interval.end_s > interval.start_s
+}
+
+fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
+    (denominator > 0).then(|| numerator as f64 / denominator as f64)
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bioacoustic_corpus::{
+        BioacousticAnnotation, BioacousticIntendedUse, BioacousticRecording,
+        BioacousticRightsEvidence, RightsAdmissionDecision,
+    };
+
+    fn recording(sample_id: &str, split: BioacousticSplit, source: &str, annotations: Vec<BioacousticAnnotation>) -> BioacousticRecording {
+        BioacousticRecording {
+            sample_id: sample_id.into(),
+            asset_uri: format!("audio/{sample_id}.wav"),
+            content_sha256: "a".repeat(64),
+            split,
+            sample_rate_hz: 10,
+            channels: 1,
+            sample_count: 100,
+            source_recording_id: Some(source.into()),
+            session_id: Some(source.into()),
+            site_id: Some(format!("site-{source}")),
+            individual_ids: vec![format!("animal-{source}")],
+            annotations,
+        }
+    }
+
+    fn annotation(id: &str, start_s: f64, end_s: f64, label: &str) -> BioacousticAnnotation {
+        BioacousticAnnotation {
+            annotation_id: id.into(),
+            interval: TimeSpan { start_s, end_s },
+            label: label.into(),
+            annotation_source: "expert-adjudicated-v1".into(),
+            frequency_min_hz: None,
+            frequency_max_hz: None,
+        }
+    }
+
+    fn fixture() -> (BioacousticCorpusManifest, BioacousticEventPredictionBundle) {
+        let manifest = BioacousticCorpusManifest {
+            schema_version: 1,
+            dataset_id: "pilot".into(),
+            dataset_revision: "rev-a".into(),
+            source_uri: "https://example.org/pilot".into(),
+            intended_use: BioacousticIntendedUse::NonCommercialResearch,
+            rights: BioacousticRightsEvidence {
+                license_id: "TEST".into(),
+                license_uri: "https://example.org/license".into(),
+                source_asset_terms_uri: "https://example.org/terms".into(),
+                decision_reference: "review-1".into(),
+                intended_use: BioacousticIntendedUse::NonCommercialResearch,
+                decision: RightsAdmissionDecision::Approved,
+            },
+            recordings: vec![
+                recording("train-1", BioacousticSplit::Train, "src-train", vec![annotation("train-event", 1.0, 2.0, "whistle")]),
+                recording("valid-1", BioacousticSplit::Validation, "src-valid", vec![annotation("valid-event", 1.0, 2.0, "whistle")]),
+                recording("test-1", BioacousticSplit::Test, "src-test-1", vec![annotation("truth-1", 1.0, 2.0, "whistle"), annotation("truth-2", 3.0, 4.0, "whistle")]),
+                recording("test-2", BioacousticSplit::Test, "src-test-2", vec![]),
+            ],
+        };
+        let bundle = BioacousticEventPredictionBundle {
+            schema_version: BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION,
+            dataset_id: "pilot".into(),
+            dataset_revision: "rev-a".into(),
+            corpus_manifest_blake3: manifest.computed_manifest_blake3().unwrap(),
+            task_id: "whistle-detection".into(),
+            model_id: "baseline-v1".into(),
+            model_sha256: "b".repeat(64),
+            target_labels: vec!["whistle".into()],
+            matching_rule: EventMatchRule::TemporalIou { min_iou: 0.5 },
+            frozen_score_threshold: 0.5,
+            exhaustive_annotation_sample_ids: vec!["test-1".into(), "test-2".into()],
+            split_policy: BioacousticSplitPolicy {
+                require_source_recording_ids: true,
+                hold_out_sessions: true,
+                hold_out_sites: true,
+                hold_out_individuals: true,
+                require_annotations: false,
+            },
+            predictions: vec![
+                PredictedBioacousticEvent {
+                    prediction_id: "pred-1".into(),
+                    sample_id: "test-1".into(),
+                    interval: TimeSpan { start_s: 1.1, end_s: 2.0 },
+                    label: "whistle".into(),
+                    score: 0.9,
+                },
+                PredictedBioacousticEvent {
+                    prediction_id: "pred-duplicate".into(),
+                    sample_id: "test-1".into(),
+                    interval: TimeSpan { start_s: 1.1, end_s: 2.0 },
+                    label: "whistle".into(),
+                    score: 0.8,
+                },
+                PredictedBioacousticEvent {
+                    prediction_id: "pred-low".into(),
+                    sample_id: "test-1".into(),
+                    interval: TimeSpan { start_s: 3.0, end_s: 4.0 },
+                    label: "whistle".into(),
+                    score: 0.1,
+                },
+            ],
+        };
+        (manifest, bundle)
+    }
+
+    #[test]
+    fn scores_test_only_with_one_to_one_matching_and_frozen_threshold() {
+        let (manifest, bundle) = fixture();
+        let report = evaluate_bioacoustic_events(&manifest, &bundle).unwrap();
+        assert_eq!(report.scored_split, BioacousticSplit::Test);
+        assert_eq!(report.test_recording_count, 2);
+        assert_eq!(report.metrics.true_positives, 1);
+        assert_eq!(report.metrics.false_positives, 1);
+        assert_eq!(report.metrics.false_negatives, 1);
+        assert_eq!(report.metrics.ground_truth_events, 2);
+        assert_eq!(report.metrics.predictions_after_threshold, 2);
+        assert!(report.exhaustive_test_annotation_coverage_asserted);
+        assert!(!report.audio_bytes_verified_by_this_evaluator);
+    }
+
+    #[test]
+    fn rejects_incomplete_exhaustive_annotation_declaration() {
+        let (manifest, mut bundle) = fixture();
+        bundle.exhaustive_annotation_sample_ids.pop();
+        assert!(evaluate_bioacoustic_events(&manifest, &bundle).is_err());
+    }
+
+    #[test]
+    fn rejects_train_or_validation_predictions() {
+        let (manifest, mut bundle) = fixture();
+        bundle.predictions.push(PredictedBioacousticEvent {
+            prediction_id: "leak".into(),
+            sample_id: "train-1".into(),
+            interval: TimeSpan { start_s: 1.0, end_s: 2.0 },
+            label: "whistle".into(),
+            score: 0.9,
+        });
+        assert!(evaluate_bioacoustic_events(&manifest, &bundle).is_err());
+    }
+
+    #[test]
+    fn rejects_changed_manifest_and_missing_lineage_policy() {
+        let (manifest, mut bundle) = fixture();
+        bundle.corpus_manifest_blake3 = "0".repeat(64);
+        assert!(evaluate_bioacoustic_events(&manifest, &bundle).is_err());
+
+        let (manifest, mut bundle) = fixture();
+        bundle.split_policy.require_source_recording_ids = false;
+        assert!(evaluate_bioacoustic_events(&manifest, &bundle).is_err());
+    }
+
+    #[test]
+    fn maximum_matching_does_not_double_count_truth_events() {
+        let rule = EventMatchRule::StartTolerance { max_start_error_s: 0.2 };
+        let truth = vec![
+            Event { id: "a".into(), interval: TimeSpan { start_s: 1.0, end_s: 1.1 }, label: "click".into(), score: 1.0 },
+            Event { id: "b".into(), interval: TimeSpan { start_s: 1.15, end_s: 1.25 }, label: "click".into(), score: 1.0 },
+        ];
+        let predictions = vec![
+            Event { id: "p1".into(), interval: TimeSpan { start_s: 1.1, end_s: 1.2 }, label: "click".into(), score: 0.9 },
+            Event { id: "p2".into(), interval: TimeSpan { start_s: 0.85, end_s: 0.95 }, label: "click".into(), score: 0.8 },
+        ];
+        let (tp, fp, fn_) = match_events(&truth, &predictions, &rule);
+        assert_eq!((tp, fp, fn_), (2, 0, 0));
+    }
+
+    #[test]
+    fn rejects_duplicate_prediction_ids_and_invalid_scores() {
+        let (manifest, mut bundle) = fixture();
+        bundle.predictions[1].prediction_id = bundle.predictions[0].prediction_id.clone();
+        assert!(evaluate_bioacoustic_events(&manifest, &bundle).is_err());
+
+        let (manifest, mut bundle) = fixture();
+        bundle.predictions[0].score = f64::NAN;
+        assert!(evaluate_bioacoustic_events(&manifest, &bundle).is_err());
+    }
+}
