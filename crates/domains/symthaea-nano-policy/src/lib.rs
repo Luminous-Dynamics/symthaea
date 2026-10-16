@@ -742,6 +742,20 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_example_fixture_runs_end_to_end() {
+        let line = include_str!("../fixtures/example-request.jsonl").trim_end();
+        let response: SelectionResponse = serde_json::from_str(&handle_line(line)).unwrap();
+        let ids: Vec<_> = response
+            .selected
+            .iter()
+            .map(|item| item.candidate_id.as_str())
+            .collect();
+
+        assert_eq!(ids, vec!["c-a", "c-c"]);
+        assert_eq!(response.request_sha256, sha256_hex(line.as_bytes()));
+    }
+
+    #[test]
     fn malformed_line_returns_json_error_instead_of_panicking() {
         let response: ErrorResponse = serde_json::from_str(&handle_line("{")).unwrap();
         assert_eq!(response.status, "rejected_input");
