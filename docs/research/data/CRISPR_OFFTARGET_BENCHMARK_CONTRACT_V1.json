@@ -68,6 +68,15 @@
       "source_url": "https://doi.org/10.1016/j.tibtech.2026.07.015",
       "use": "literature_context_only",
       "note": "Supports separating molecular editing space from editing outcomes and therapeutic context; not a source of training labels for this benchmark."
+    },
+    {
+      "source_id": "Ozden-2024-crispAI",
+      "doi": "10.1093/nar/gkae759",
+      "article_url": "https://academic.oup.com/nar/article/52/18/e87/7757940",
+      "use": "literature_context_only",
+      "relevance": "Existing uncertainty-aware CRISPR off-target prediction and calibration method; include as a qualified specialist comparator where permitted and reproducible.",
+      "novelty_boundary": "This project does not claim novelty for uncertainty modelling. The proposed contribution is a deterministic evaluation contract for selective-risk, calibration, unknown-label bounds and context-stratified policy comparisons.",
+      "note": "Publication results have not been reproduced in this project; do not infer Symthaea improvement from the paper."
     }
   ],
   "reported_reference_counts": {
