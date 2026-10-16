@@ -224,9 +224,9 @@ pub enum ComparisonMetric {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ComparisonDisposition {
-    /// The full 95% interval exceeds the positive practical margin.
+    /// Point estimate meets the positive practical margin and the 95% interval excludes zero.
     ImprovementBeyondMargin,
-    /// The full 95% interval is below the negative practical margin.
+    /// Point estimate meets the negative practical margin and the 95% interval excludes zero.
     RegressionBeyondMargin,
     /// The interval overlaps practical neutrality.
     Inconclusive,
@@ -805,9 +805,9 @@ fn compare_arms(
     let lower = sampled_means[lower_index];
     let upper = sampled_means[upper_index];
 
-    let disposition = if lower > practical_margin {
+    let disposition = if estimated_delta >= practical_margin && lower > 0.0 {
         ComparisonDisposition::ImprovementBeyondMargin
-    } else if upper < -practical_margin {
+    } else if estimated_delta <= -practical_margin && upper < 0.0 {
         ComparisonDisposition::RegressionBeyondMargin
     } else {
         ComparisonDisposition::Inconclusive
