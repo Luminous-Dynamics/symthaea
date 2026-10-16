@@ -30,6 +30,8 @@ pub struct FeatureSpace {
     pub semantics: String,
     /// True only if features were transformed with a frozen, recorded mapping.
     pub normalized_to_minus_one_one: bool,
+    /// SHA-256 of the frozen feature-preprocessing specification/code.
+    pub transform_sha256: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -78,6 +80,17 @@ pub struct Candidate {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct EstimateProvenance {
+    pub predicted_goal_error_model_id: Option<String>,
+    pub predicted_goal_error_model_sha256: Option<String>,
+    pub uncertainty_method_id: Option<String>,
+    pub uncertainty_method_sha256: Option<String>,
+    pub estimated_cost_model_id: Option<String>,
+    pub estimated_cost_model_sha256: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Request {
     pub schema_version: String,
     pub request_id: String,
@@ -86,6 +99,8 @@ pub struct Request {
     pub batch_size: usize,
     pub feature_space: FeatureSpace,
     pub weights: Weights,
+    /// Immutable identity of the models/methods used for pre-query estimates.
+    pub estimate_provenance: EstimateProvenance,
     /// Features of previously evaluated/reference candidates in the same frozen space.
     pub anchors: Vec<Vec<f64>>,
     pub candidates: Vec<Candidate>,
@@ -142,6 +157,7 @@ fn validate_request(request: &Request) -> Result<Vec<usize>, String> {
         return Err("features must be normalized to [-1, 1] by a frozen preprocessing contract".to_string());
     }
     request.weights.validate()?;
+    validate_sha256(&request.feature_space.transform_sha256, "feature_space.transform_sha256")?;
 
     let Some(first) = request.candidates.first() else {
         return Err("candidate pool is empty".to_string());
@@ -211,6 +227,25 @@ fn validate_request(request: &Request) -> Result<Vec<usize>, String> {
         || (request.policy == Policy::Hybrid && request.weights.uncertainty > 0.0);
     let requires_cost = request.policy == Policy::Hybrid && request.weights.cost_efficiency > 0.0;
 
+    validate_estimator_pair(
+        &request.estimate_provenance.predicted_goal_error_model_id,
+        &request.estimate_provenance.predicted_goal_error_model_sha256,
+        "predicted_goal_error_model",
+        requires_goal,
+    )?;
+    validate_estimator_pair(
+        &request.estimate_provenance.uncertainty_method_id,
+        &request.estimate_provenance.uncertainty_method_sha256,
+        "uncertainty_method",
+        requires_uncertainty,
+    )?;
+    validate_estimator_pair(
+        &request.estimate_provenance.estimated_cost_model_id,
+        &request.estimate_provenance.estimated_cost_model_sha256,
+        "estimated_cost_model",
+        requires_cost,
+    )?;
+
     for index in &eligible_indices {
         let candidate = &request.candidates[*index];
         if requires_goal && candidate.predicted_goal_error.is_none() {
@@ -225,6 +260,32 @@ fn validate_request(request: &Request) -> Result<Vec<usize>, String> {
     }
 
     Ok(eligible_indices)
+}
+
+fn validate_sha256(value: &str, label: &str) -> Result<(), String> {
+    let bytes = value.as_bytes();
+    if bytes.len() != 64
+        || !bytes.iter().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
+    {
+        return Err(format!("{label} must be a lowercase 64-character SHA-256 hex digest"));
+    }
+    Ok(())
+}
+
+fn validate_estimator_pair(
+    id: &Option<String>,
+    digest: &Option<String>,
+    label: &str,
+    required: bool,
+) -> Result<(), String> {
+    match (id, digest) {
+        (Some(id), Some(digest)) if !id.trim().is_empty() => {
+            validate_sha256(digest, &format!("{label}.sha256"))
+        }
+        (None, None) if !required => Ok(()),
+        (None, None) => Err(format!("{label} identity is required for this policy")),
+        _ => Err(format!("{label} requires both a non-empty id and a SHA-256 digest")),
+    }
 }
 
 fn validate_features(features: &[f64], label: &str) -> Result<(), String> {
@@ -496,12 +557,21 @@ mod tests {
                 id: "test-embedding-v1".to_string(),
                 semantics: "two normalized toy features".to_string(),
                 normalized_to_minus_one_one: true,
+                transform_sha256: "f88f161ae64d0edcf2a65d9cb4397593435304ca7388bc3e688bce952d4deda6".to_string(),
             },
             weights: Weights {
                 goal_fit: 0.30,
                 uncertainty: 0.20,
                 cost_efficiency: 0.10,
                 diversity: 0.40,
+            },
+            estimate_provenance: EstimateProvenance {
+                predicted_goal_error_model_id: Some("toy-prequery-goal-model-v1".to_string()),
+                predicted_goal_error_model_sha256: Some("106e028be1f1ba742cff35f33db40ce3fa27db974d2d1ef4e2661e7fa418699a".to_string()),
+                uncertainty_method_id: Some("toy-uncertainty-estimator-v1".to_string()),
+                uncertainty_method_sha256: Some("3ade88dde4e76fd4bd910d9a088b6e9584589bf2c46512bc6ef0841f2667795a".to_string()),
+                estimated_cost_model_id: Some("toy-cost-estimator-v1".to_string()),
+                estimated_cost_model_sha256: Some("6206e804b6f1d23644dd89d832852f7403c150295ef0a4d6266359fb268991a8".to_string()),
             },
             anchors: vec![],
             candidates: vec![
@@ -587,13 +657,22 @@ mod tests {
             "feature_space": {
                 "id": "x",
                 "semantics": "x",
-                "normalized_to_minus_one_one": true
+                "normalized_to_minus_one_one": true,
+                "transform_sha256": "f88f161ae64d0edcf2a65d9cb4397593435304ca7388bc3e688bce952d4deda6"
             },
             "weights": {
                 "goal_fit": 0.3,
                 "uncertainty": 0.2,
                 "cost_efficiency": 0.1,
                 "diversity": 0.4
+            },
+            "estimate_provenance": {
+                "predicted_goal_error_model_id": null,
+                "predicted_goal_error_model_sha256": null,
+                "uncertainty_method_id": null,
+                "uncertainty_method_sha256": null,
+                "estimated_cost_model_id": null,
+                "estimated_cost_model_sha256": null
             },
             "anchors": [],
             "candidates": [{
@@ -608,6 +687,13 @@ mod tests {
             }]
         });
         assert!(serde_json::from_value::<Request>(raw).is_err());
+    }
+
+    #[test]
+    fn hybrid_requires_immutable_estimator_provenance() {
+        let mut input = request(Policy::Hybrid);
+        input.estimate_provenance.predicted_goal_error_model_sha256 = None;
+        assert!(select(&input).unwrap_err().contains("requires both a non-empty id and a SHA-256 digest"));
     }
 
     #[test]
