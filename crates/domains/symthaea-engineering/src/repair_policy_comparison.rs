@@ -17,7 +17,7 @@ use crate::repair_crew_scheduling::{
 };
 use crate::robust_repair_evaluation::{
     evaluate_repair_policies_under_duration_scenarios, DurationScenarioOutcome,
-    RepairDurationScenario, RepairPolicyRiskSummary, ReplayedRepair, RobustRepairConfig,
+    RepairDurationScenario, ReplayedRepair, RobustRepairConfig,
     RobustRepairError,
 };
 use crate::rolling_horizon_repair::{
@@ -105,12 +105,6 @@ fn upper_tail_cvar(losses: &[(f64, f64)], alpha: f64) -> f64 {
     weighted_loss / (1.0 - alpha)
 }
 
-fn fixed_summary<'a>(
-    summaries: &'a [RepairPolicyRiskSummary],
-    policy: RepairSchedulingPolicy,
-) -> Option<&'a RepairPolicyRiskSummary> {
-    summaries.iter().find(|summary| summary.policy == policy)
-}
 
 /// Compare fixed nominal-plan replay with event-triggered dispatch on paired cases.
 ///
@@ -136,7 +130,7 @@ pub fn compare_fixed_and_rolling_horizon_policies(
 
         for scenario in scenarios {
             let realized: Vec<RealizedRepairDuration> = scenario.durations.iter()
-                .map(|duration| RealizedRepairDuration::new(&duration.job_id, duration.duration_steps))
+                .map(|duration| RealizedRepairDuration::new(duration.job_id.clone(), duration.duration_steps))
                 .collect();
             let adaptive = dispatch_repairs_rolling_horizon(
                 nominal_jobs,
