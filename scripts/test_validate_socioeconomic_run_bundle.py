@@ -140,6 +140,26 @@ class RunBundleValidatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationFailure, "duplicate artifact_id"):
             validate_bundle(self.root, "bundle-manifest.json")
 
+    def test_nonstandard_json_constants_are_rejected(self) -> None:
+        receipt_path = self.root / "receipt.json"
+        receipt_path.write_text('{"schema": "x", "bad": NaN}', encoding="utf-8")
+        with self.assertRaisesRegex(ValidationFailure, "non-standard JSON numeric constant"):
+            validate_bundle(self.root, "bundle-manifest.json")
+
+    def test_float_overflow_and_underflow_are_rejected(self) -> None:
+        receipt_path = self.root / "receipt.json"
+        with self.subTest(value="overflow"):
+            original = receipt_path.read_text(encoding="utf-8").rstrip()
+            receipt_path.write_text(original[:-1] + ',"probe":1e999}', encoding="utf-8")
+            with self.assertRaisesRegex(ValidationFailure, "non-finite JSON floating-point"):
+                validate_bundle(self.root, "bundle-manifest.json")
+        self._write_pair()
+        with self.subTest(value="underflow"):
+            original = receipt_path.read_text(encoding="utf-8").rstrip()
+            receipt_path.write_text(original[:-1] + ',"probe":1e-9999}', encoding="utf-8")
+            with self.assertRaisesRegex(ValidationFailure, "underflow"):
+                validate_bundle(self.root, "bundle-manifest.json")
+
     def test_duplicate_json_object_keys_are_rejected(self) -> None:
         (self.root / "receipt.json").write_text(
             '{"schema":"' + RECEIPT_SCHEMA + '","schema":"' + RECEIPT_SCHEMA + '"}',
