@@ -278,42 +278,236 @@ pub struct PosteriorUpdate {
 /// largest-remainder method; ties are broken by hypothesis ID. An outcome with
 /// zero probability under every hypothesis is rejected rather than assigned a
 /// fabricated posterior.
+/// Create the immutable empty evidence-history state for a validated model.
+pub fn initial_posterior_state(model: &FiniteHypothesisModel) -> Result<PosteriorState, String> {
+    model.validate()?;
+    let root_model_digest = model.digest()?;
+    let current_prior = model.prior.clone();
+    let evidence_receipts = Vec::new();
+    let state_digest = posterior_state_digest(
+        &root_model_digest,
+        &current_prior,
+        &evidence_receipts,
+    )?;
+    Ok(PosteriorState {
+        root_model_digest,
+        current_prior,
+        evidence_receipts,
+        state_digest,
+    })
+}
+
+/// Condition a posterior on one observation with a unique evidence ID.
+///
+/// Every transition is recorded with its parent-state digest. State validation
+/// replays the complete history and rejects duplicate IDs or mutated transitions.
+/// Digests establish deterministic identity, not signature-based source authenticity.
 pub fn condition_posterior(
     model: &FiniteHypothesisModel,
+    state: &PosteriorState,
+    evidence_id: &str,
     action_id: &str,
     observed_outcome_id: &str,
 ) -> Result<PosteriorUpdate, String> {
-    model.validate()?;
-    let parent_model_digest = model.digest()?;
+    validate_posterior_state(model, state)?;
+    if evidence_id.trim().is_empty() {
+        return Err("evidence ID must be non-empty".into());
+    }
+    if state
+        .evidence_receipts
+        .iter()
+        .any(|receipt| receipt.evidence_id == evidence_id)
+    {
+        return Err(format!("duplicate evidence ID: {evidence_id}"));
+    }
+
+    let parent_state_digest = state.state_digest.clone();
     let action = model
         .actions
         .iter()
         .find(|action| action.action_id == action_id)
         .ok_or_else(|| format!("unknown acquisition action: {action_id}"))?;
-    match &action.feasibility {
-        Feasibility::Feasible => {}
-        Feasibility::Blocked { reason } => {
-            return Err(format!("action {} is blocked: {reason}", action.action_id));
-        }
-        Feasibility::Unknown { reason } => {
-            return Err(format!("action {} feasibility is unknown: {reason}", action.action_id));
-        }
+    if action.feasibility != Feasibility::Feasible {
+        return Err(format!(
+            "action {} is not feasible and cannot condition the posterior",
+            action.action_id
+        ));
     }
 
-    let mut raw_weights = Vec::with_capacity(model.prior.len());
-    for prior in &model.prior {
+    let posterior = posterior_from_observation(
+        model,
+        &state.current_prior,
+        action,
+        observed_outcome_id,
+    )?;
+    let posterior_digest = digest_serializable(&posterior)?;
+    let receipt = PosteriorEvidenceReceipt {
+        evidence_id: evidence_id.into(),
+        action_id: action_id.into(),
+        observed_outcome_id: observed_outcome_id.into(),
+        measurement_model_id: action.measurement_model_id.clone(),
+        parent_state_digest: parent_state_digest.clone(),
+        posterior_after: posterior.clone(),
+        posterior_digest,
+    };
+
+    let mut next_state = state.clone();
+    next_state.current_prior = posterior.clone();
+    next_state.evidence_receipts.push(receipt);
+    next_state.state_digest = posterior_state_digest(
+        &next_state.root_model_digest,
+        &next_state.current_prior,
+        &next_state.evidence_receipts,
+    )?;
+
+    let mut posterior_model = model.clone();
+    posterior_model.prior = posterior.clone();
+    let posterior_model_digest = posterior_model.digest()?;
+    Ok(PosteriorUpdate {
+        parent_state_digest,
+        evidence_id: evidence_id.into(),
+        action_id: action_id.into(),
+        observed_outcome_id: observed_outcome_id.into(),
+        posterior,
+        posterior_model_digest,
+        next_state,
+    })
+}
+
+fn posterior_state_digest(
+    root_model_digest: &str,
+    current_prior: &[HypothesisPrior],
+    evidence_receipts: &[PosteriorEvidenceReceipt],
+) -> Result<String, String> {
+    digest_serializable(&(root_model_digest, current_prior, evidence_receipts))
+}
+
+fn validate_posterior_state(
+    model: &FiniteHypothesisModel,
+    state: &PosteriorState,
+) -> Result<(), String> {
+    model.validate()?;
+    let root_model_digest = model.digest()?;
+    if state.root_model_digest != root_model_digest {
+        return Err("posterior state belongs to a different root model".into());
+    }
+
+    let mut expected_prior = model.prior.clone();
+    let mut expected_receipts: Vec<PosteriorEvidenceReceipt> = Vec::new();
+    let mut expected_state_digest =
+        posterior_state_digest(&root_model_digest, &expected_prior, &expected_receipts)?;
+    let mut seen_evidence_ids = BTreeSet::new();
+
+    for receipt in &state.evidence_receipts {
+        if receipt.evidence_id.trim().is_empty()
+            || !seen_evidence_ids.insert(receipt.evidence_id.as_str())
+        {
+            return Err("posterior history has an empty or duplicate evidence ID".into());
+        }
+        if receipt.parent_state_digest != expected_state_digest {
+            return Err(format!(
+                "posterior history parent-state digest mismatch at evidence {}",
+                receipt.evidence_id
+            ));
+        }
+        let action = model
+            .actions
+            .iter()
+            .find(|action| action.action_id == receipt.action_id)
+            .ok_or_else(|| {
+                format!(
+                    "posterior history references unknown action {}",
+                    receipt.action_id
+                )
+            })?;
+        if action.measurement_model_id != receipt.measurement_model_id {
+            return Err(format!(
+                "measurement model identity mismatch at evidence {}",
+                receipt.evidence_id
+            ));
+        }
+        if action.feasibility != Feasibility::Feasible {
+            return Err(format!(
+                "posterior history contains non-feasible action {}",
+                receipt.action_id
+            ));
+        }
+        let expected_posterior = posterior_from_observation(
+            model,
+            &expected_prior,
+            action,
+            &receipt.observed_outcome_id,
+        )?;
+        let expected_posterior_digest = digest_serializable(&expected_posterior)?;
+        if receipt.posterior_after != expected_posterior
+            || receipt.posterior_digest != expected_posterior_digest
+        {
+            return Err(format!(
+                "posterior history transition mismatch at evidence {}",
+                receipt.evidence_id
+            ));
+        }
+
+        expected_prior = expected_posterior;
+        expected_receipts.push(receipt.clone());
+        expected_state_digest = posterior_state_digest(
+            &root_model_digest,
+            &expected_prior,
+            &expected_receipts,
+        )?;
+    }
+
+    if state.current_prior != expected_prior {
+        return Err("posterior state current prior does not match replayed history".into());
+    }
+    if state.state_digest != expected_state_digest {
+        return Err("posterior state digest mismatch".into());
+    }
+    Ok(())
+}
+
+fn posterior_from_observation(
+    model: &FiniteHypothesisModel,
+    prior: &[HypothesisPrior],
+    action: &ExperimentActionModel,
+    observed_outcome_id: &str,
+) -> Result<Vec<HypothesisPrior>, String> {
+    let expected_ids: BTreeSet<&str> = model
+        .prior
+        .iter()
+        .map(|item| item.hypothesis_id.as_str())
+        .collect();
+    if prior.len() != model.prior.len() {
+        return Err("current posterior has the wrong hypothesis count".into());
+    }
+    let mut prior_total = 0u64;
+    let mut seen_ids = BTreeSet::new();
+    for item in prior {
+        if !expected_ids.contains(item.hypothesis_id.as_str())
+            || !seen_ids.insert(item.hypothesis_id.as_str())
+        {
+            return Err("current posterior has unknown or duplicate hypothesis IDs".into());
+        }
+        prior_total += u64::from(item.probability_ppm);
+    }
+    if prior_total != u64::from(PROBABILITY_SCALE_PPM) || seen_ids != expected_ids {
+        return Err("current posterior probabilities must sum to one million ppm".into());
+    }
+
+    let mut raw_weights = Vec::with_capacity(prior.len());
+    for item in prior {
         let row = action
             .likelihood_by_hypothesis
             .iter()
-            .find(|row| row.hypothesis_id == prior.hypothesis_id)
-            .ok_or_else(|| format!("missing likelihood row for {}", prior.hypothesis_id))?;
+            .find(|row| row.hypothesis_id == item.hypothesis_id)
+            .ok_or_else(|| format!("missing likelihood row for {}", item.hypothesis_id))?;
         let likelihood = row
             .outcomes
             .iter()
             .find(|outcome| outcome.outcome_id == observed_outcome_id)
             .ok_or_else(|| format!("unknown outcome ID: {observed_outcome_id}"))?;
         raw_weights.push(
-            u128::from(prior.probability_ppm) * u128::from(likelihood.probability_ppm),
+            u128::from(item.probability_ppm) * u128::from(likelihood.probability_ppm),
         );
     }
 
@@ -340,9 +534,9 @@ pub fn condition_posterior(
             .1
             .cmp(&quantized[*left].1)
             .then_with(|| {
-                model.prior[*left]
+                prior[*left]
                     .hypothesis_id
-                    .cmp(&model.prior[*right].hypothesis_id)
+                    .cmp(&prior[*right].hypothesis_id)
             })
     });
     if remainder as usize > order.len() {
@@ -352,29 +546,16 @@ pub fn condition_posterior(
         quantized[index].0 += 1;
     }
 
-    let posterior: Vec<HypothesisPrior> = model
-        .prior
+    Ok(prior
         .iter()
         .zip(quantized.iter())
-        .map(|(prior, (probability_ppm, _))| HypothesisPrior {
-            hypothesis_id: prior.hypothesis_id.clone(),
+        .map(|(item, (probability_ppm, _))| HypothesisPrior {
+            hypothesis_id: item.hypothesis_id.clone(),
             probability_ppm: *probability_ppm,
         })
-        .collect();
-    let mut posterior_model = model.clone();
-    posterior_model.prior = posterior.clone();
-    let posterior_model_digest = posterior_model.digest()?;
-
-    Ok(PosteriorUpdate {
-        parent_model_digest,
-        action_id: action_id.into(),
-        observed_outcome_id: observed_outcome_id.into(),
-        posterior,
-        posterior_model_digest,
-    })
+        .collect())
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OutcomeMarginal {
     pub outcome_id: String,
     pub probability: f64,
