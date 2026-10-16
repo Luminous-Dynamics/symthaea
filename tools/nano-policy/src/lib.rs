@@ -255,7 +255,7 @@ fn normalize(cs: &[Candidate]) -> Vec<Vec<f64>> {
     }).collect();
     cs.iter().map(|c| c.features.iter().enumerate().map(|(j, v)| {
         let (scale, low, span) = ranges[j];
-        if span == 0.0 { 0.0 } else { ((*v / scale - low) / span).clamp(0.0, 1.0) }
+        if span.total_cmp(&0.0) == Ordering::Equal { 0.0 } else { ((*v / scale - low) / span).clamp(0.0, 1.0) }
     }).collect()).collect()
 }
 
@@ -270,7 +270,7 @@ fn distance(a: &[f64], b: &[f64]) -> f64 {
 }
 
 fn cost_adjust(distance: f64, cost: f64, min_cost: f64, exponent: f64) -> f64 {
-    if exponent == 0.0 { distance } else { distance * (-(exponent * (cost.ln() - min_cost.ln()).max(0.0))).exp() }
+    if exponent.total_cmp(&0.0) == Ordering::Equal { distance } else { distance * (-(exponent * (cost.ln() - min_cost.ln()).max(0.0))).exp() }
 }
 
 fn cost_then_id(a: &Candidate, b: &Candidate) -> Ordering {
