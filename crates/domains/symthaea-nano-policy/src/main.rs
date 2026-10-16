@@ -42,7 +42,7 @@ struct Candidate {
 
 #[derive(Debug, Serialize)]
 struct Response {
-    schema_version: &'static str,
+    input_schema_version: &'static str,
     policy_version: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     input_blake3: Option<String>,
@@ -362,7 +362,7 @@ fn choose(
     }
 
     Ok(Response {
-        schema_version: SCHEMA_VERSION,
+        input_schema_version: SCHEMA_VERSION,
         policy_version: POLICY_VERSION,
         input_blake3: None,
         policy: request.policy,
