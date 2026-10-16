@@ -154,7 +154,7 @@ pub fn evaluate_hazard_profile(
     manifest
         .validate()
         .map_err(|_| invalid("evidence_manifest", "evidence manifest is invalid"))?;
-    if manifest.scenario_id != profile.benchmark_id {
+    if manifest.scenario_id.as_str() != profile.benchmark_id.as_str() {
         return Err(invalid(
             "scenario_id",
             "manifest and hazard profile must identify the same benchmark scenario",
@@ -165,18 +165,18 @@ pub fn evaluate_hazard_profile(
         .map_err(|_| invalid("benchmark_registry", "benchmark registry is invalid"))?;
     let definition = definitions
         .iter()
-        .find(|definition| definition.id == profile.benchmark_id)
+        .find(|definition| definition.id == profile.benchmark_id.as_str())
         .ok_or_else(|| invalid("benchmark_id", "profile references an unregistered benchmark"))?;
 
     // Validate the full dependency graph even if this profile has no initial failures.
     assess_dependency_failures(nodes, dependencies, &[])
         .map_err(|_| invalid("dependency_graph", "service graph is invalid"))?;
 
-    if binding.benchmark_id != profile.benchmark_id {
+    if binding.benchmark_id.as_str() != profile.benchmark_id.as_str() {
         return Err(invalid("binding.benchmark_id", "binding refers to a different benchmark"));
     }
     let expected_profile_id = format!("{}/{}", profile.profile_id, profile.profile_revision);
-    if binding.profile_id != expected_profile_id {
+    if binding.profile_id.as_str() != expected_profile_id.as_str() {
         return Err(invalid("binding.profile_id", "binding refers to a different profile revision"));
     }
     let profile_sha256 = profile.sha256()?;
@@ -216,7 +216,7 @@ pub fn evaluate_hazard_profile(
         let evidence = manifest
             .items
             .iter()
-            .find(|item| item.id == parameter.evidence_item_id)
+            .find(|item| item.id.as_str() == parameter.evidence_item_id.as_str())
             .ok_or_else(|| invalid("hazard_parameters.evidence_item_id", "parameter evidence ID is absent from manifest"))?;
         if evidence.kind == EvidenceKind::Missing {
             return Err(invalid(
@@ -271,7 +271,7 @@ pub fn evaluate_hazard_profile(
                 "duplicate service/cause/evidence tuple",
             ));
         }
-        if !nodes.iter().any(|node| node.id == failure.service_id) {
+        if !nodes.iter().any(|node| node.id.as_str() == failure.service_id.as_str()) {
             return Err(invalid(
                 "initiating_failures.service_id",
                 "initiating failure references an unknown service",
@@ -280,7 +280,7 @@ pub fn evaluate_hazard_profile(
         let evidence = manifest
             .items
             .iter()
-            .find(|item| item.id == failure.evidence_item_id)
+            .find(|item| item.id.as_str() == failure.evidence_item_id.as_str())
             .ok_or_else(|| invalid("initiating_failures.evidence_item_id", "failure evidence ID is absent from manifest"))?;
         if evidence.kind == EvidenceKind::Missing {
             return Err(invalid(
