@@ -1422,6 +1422,87 @@ mod tests {
     }
 
     #[test]
+    fn seeded_interval_corpus_checks_2000_conservative_budget_boundaries() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        for seed in 0_u64..2_000 {
+            let supply_lower = seed.wrapping_mul(7_919) % 2_001;
+            let demand_upper = seed
+                .wrapping_mul(104_729)
+                .wrapping_add(37)
+                % 900
+                + 1;
+            plan.pools[0].available = ResourceQuantityInterval {
+                lower: supply_lower,
+                nominal: supply_lower + 10,
+                upper: supply_lower + 20,
+            };
+            plan.demands[0].quantity = ResourceQuantityInterval {
+                lower: demand_upper / 3,
+                nominal: (demand_upper * 2) / 3,
+                upper: demand_upper,
+            };
+
+            let expected_reserve = (demand_upper * 2_000 + 9_999) / 10_000;
+            let expected_capacity = demand_upper + expected_reserve;
+            let (report, receipt) = evaluate_mission_resource_budget(
+                &configuration,
+                &tasks,
+                &task_receipt,
+                &plan,
+            )
+            .unwrap();
+            assert_eq!(
+                report.pools[0].required_demand_upper,
+                demand_upper,
+                "seed {seed}"
+            );
+            assert_eq!(
+                report.pools[0].reserve_quantity,
+                expected_reserve,
+                "seed {seed}"
+            );
+            assert_eq!(
+                report.pools[0].required_capacity,
+                expected_capacity,
+                "seed {seed}"
+            );
+            if supply_lower < expected_capacity {
+                assert_eq!(
+                    report.status,
+                    MissionResourceBudgetStatus::Blocked,
+                    "seed {seed}"
+                );
+                assert_eq!(
+                    report.pools[0].required_shortfall,
+                    expected_capacity - supply_lower,
+                    "seed {seed}"
+                );
+            } else {
+                assert_eq!(
+                    report.status,
+                    MissionResourceBudgetStatus::MeetsDeclaredResourcePolicy,
+                    "seed {seed}"
+                );
+                assert_eq!(
+                    report.pools[0].required_margin,
+                    Some(supply_lower - expected_capacity),
+                    "seed {seed}"
+                );
+            }
+            if seed % 199 == 0 {
+                assert!(verify_mission_resource_budget_receipt(
+                    &configuration,
+                    &tasks,
+                    &task_receipt,
+                    &plan,
+                    &report,
+                    &receipt,
+                ));
+            }
+        }
+    }
+
+    #[test]
     fn changed_demand_invalidates_resource_receipt() {
         let (configuration, tasks, task_receipt, plan) = fixture();
         let (report, receipt) =
