@@ -26,7 +26,7 @@ These summaries are synthetic and descriptive. The intervals are not a substitut
 
 ## Current policy arms
 
-- `P0-fixed-space-filling`: farthest-point design over the declared normalized candidate domain.
+- `P0-fixed-space-filling`: predeclared two-factor Latin-hypercube-like order over the normalized 11×11 grid; it does not adapt candidate order to observed outcomes.
 - `P1-random-feasible`: deterministic pseudo-random selection from feasible affordable actions.
 - `P2-uncertainty-only`: spatial novelty proxy.
 - `P3-information-gain-proxy`: spatial novelty multiplied by a declared factor-space leverage heuristic. It is **not** Bayesian expected information gain.
@@ -35,7 +35,7 @@ These summaries are synthetic and descriptive. The intervals are not a substitut
 
 Every policy sees the same public candidate catalog, profile, costs, budget and already-observed measurements. It does not receive the hidden scenario family, oracle version, or oracle seed as selector fields. The candidate catalog does contain declared feasibility, measurement-fidelity and relative-cost information.
 
-All arms share the same predeclared fidelity cadence: three proxy slots followed by a reference-fidelity slot, with fallback only when no candidate at the scheduled fidelity is affordable and available. This prevents a policy from appearing cheap or fast merely by never purchasing reference-quality confirmation. Proxy outcomes may inform selection, but **only reference-fidelity outcomes can qualify a conforming discovery or contribute conforming-product utility/throughput**.
+All arms share the same predeclared fidelity cadence: three proxy slots followed by a reference-fidelity slot, with fallback only when no candidate at the scheduled fidelity is affordable and available. The fixed-design arm also avoids re-measuring a design point already included in its predeclared sequence. This prevents a policy from appearing cheap or fast merely by never purchasing reference-quality confirmation. Proxy outcomes may inform selection, but **only reference-fidelity outcomes can qualify a conforming discovery or contribute conforming-product utility/throughput**.
 
 ## Synthetic scenarios
 
