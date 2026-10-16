@@ -35,6 +35,8 @@ These summaries are synthetic and descriptive. The intervals are not a substitut
 
 Every policy sees the same public candidate catalog, profile, costs, budget and already-observed measurements. It does not receive the hidden scenario family, oracle version, or oracle seed as selector fields. The candidate catalog does contain declared feasibility, measurement-fidelity and relative-cost information.
 
+All arms share the same predeclared fidelity cadence: three proxy slots followed by a reference-fidelity slot, with fallback only when no candidate at the scheduled fidelity is affordable and available. This prevents a policy from appearing cheap or fast merely by never purchasing reference-quality confirmation. Proxy outcomes may inform selection, but **only reference-fidelity outcomes can qualify a conforming discovery or contribute conforming-product utility/throughput**.
+
 ## Synthetic scenarios
 
 - Smooth response.
