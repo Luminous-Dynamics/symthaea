@@ -70,9 +70,13 @@ def _strict_json(data: bytes, label: str) -> Any:
 def _safe_file(root: Path, relative_path: Any, label: str) -> Path:
     if not isinstance(relative_path, str) or not relative_path:
         raise ValidationFailure(f"{label}: path must be a non-empty relative POSIX path")
+    if "\x00" in relative_path:
+        raise ValidationFailure(f"{label}: NUL bytes are forbidden in bundle paths")
     if "\\" in relative_path:
         raise ValidationFailure(f"{label}: backslashes are forbidden in bundle paths")
     relative = PurePosixPath(relative_path)
+    if relative.as_posix() != relative_path:
+        raise ValidationFailure(f"{label}: non-canonical relative path {relative_path!r}")
     if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
         raise ValidationFailure(f"{label}: unsafe relative path {relative_path!r}")
 
