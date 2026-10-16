@@ -219,6 +219,7 @@ This fills an important literature-backed gap. Xu et al.'s 2026 review describes
 - **RCREW-06 — Determinism:** identical inputs and policy produce identical schedules.
 - **RCREW-07 — Policy witness:** a disclosed synthetic two-job case gives priority-first weighted loss 1,110 service-unit-steps and weighted-recovery loss 111 (90% lower): one duration-10 / weight-1 job has priority 0, while a duration-1 / weight-100 job has priority 1. This is a transparent fixture calculated independently of the Rust implementation, not empirical evidence or a universal superiority claim.
 - **RCREW-08 — Infeasibility honesty:** cycles, unknown skills, missing parts and insufficient spares fail explicitly.
+- **RCREW-09 — Preserve scarce skills:** when two crews can do the same job, prefer the less-flexible crew on an otherwise tied decision so a versatile crew remains available for a job with fewer alternatives. Report whether the tie-break actually improves completion or weighted downtime.
 
 ### Scheduling benchmarks and open limitations
 
