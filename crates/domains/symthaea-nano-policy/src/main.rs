@@ -44,6 +44,8 @@ struct Candidate {
 struct Response {
     schema_version: &'static str,
     policy_version: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input_blake3: Option<String>,
     policy: Policy,
     candidate_count: usize,
     feature_count: usize,
@@ -362,6 +364,7 @@ fn choose(
     Ok(Response {
         schema_version: SCHEMA_VERSION,
         policy_version: POLICY_VERSION,
+        input_blake3: None,
         policy: request.policy,
         candidate_count: candidates.len(),
         feature_count,
@@ -400,7 +403,8 @@ fn execute() -> Result<(), String> {
 
     let request: Request = serde_json::from_slice(&bytes)
         .map_err(|error| format!("invalid request JSON: {error}"))?;
-    let response = select(&request)?;
+    let mut response = select(&request)?;
+    response.input_blake3 = Some(blake3::hash(&bytes).to_hex().to_string());
     let stdout = std::io::stdout();
     let mut output = stdout.lock();
     serde_json::to_writer(&mut output, &response)
@@ -617,6 +621,16 @@ mod tests {
             vec![candidate("low", &[f64::MIN]), candidate("high", &[f64::MAX])],
         );
         assert!(select(&req).unwrap_err().contains("non-finite numeric span"));
+    }
+
+    #[test]
+    fn cli_receipt_binds_selection_to_exact_request_bytes() {
+        let raw = include_bytes!("../fixtures/smoke-request.json");
+        let req: Request = serde_json::from_slice(raw).expect("valid smoke fixture");
+        let mut response = select(&req).expect("valid selection");
+        response.input_blake3 = Some(blake3::hash(raw).to_hex().to_string());
+        let expected = blake3::hash(raw).to_hex().to_string();
+        assert_eq!(response.input_blake3.as_deref(), Some(expected.as_str()));
     }
 
     #[test]
