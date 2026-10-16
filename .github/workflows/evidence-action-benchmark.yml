@@ -59,6 +59,8 @@ jobs:
           src/knowledge/evidence_action_policy.rs
           src/knowledge/evidence_benchmark.rs
           src/bin/evidence_action_benchmark.rs
+      - name: Test lifecycle-aware policy session
+        run: cargo test --locked --features evidence-benchmark --lib knowledge::evidence_action_policy::tests
       - name: Test evidence benchmark contract
         run: cargo test --locked --features evidence-benchmark --lib knowledge::evidence_benchmark::tests
       - name: Test benchmark CLI
