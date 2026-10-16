@@ -187,9 +187,11 @@ The research branch now contains `crates/domains/symthaea-scenarios/src/living_c
 
 - A deterministic, one-abstract-service discrete-time harness with separate hidden actual supply/demand and a policy-facing observation record.
 - Four transparent baselines: no-intervention, reactive-greedy, cost-first and floor-first.
-- Stale/missing sensor handling, a delayed and duration-limited backup intervention, an intervention budget, service-floor breach accounting and unmet-service/cost totals.
+- A fixed four-case synthetic smoke suite—healthy baseline, forecasted shortfall, stale-telemetry outage and recurrent outage—producing 16 policy/case runs against all four baseline policies.
+- Stale/missing sensor handling, a delayed and duration-limited backup intervention, an intervention budget, per-step deployment traces, service-floor breach accounting and unmet-service/cost totals.
 - Paired policy comparison that rejects mismatched scenario IDs, step counts or full configs and leaves percentage reduction undefined when baseline service loss is zero.
-- A 12-test authored synthetic suite covering immediate deficits, stale/missing observation controls, delayed actions, hidden-future truth isolation, paired comparison preconditions, boundary arithmetic, duplicate cases/policies, invalid forecast ratios and repeatability.
+- Canonical JSON/SHA-256 digests for the exact scenario, configuration, run and replay receipt; the replay verifier recomputes a run to reject changed inputs, action traces or metrics. These digests are integrity/replay links, not signatures or independent physical validation.
+- A 17-test authored synthetic suite covering deterministic smoke-suite pairing, forecast-vs-reactive behavior on a frozen fixture, receipt/replay verification, digest changes, immediate deficits, stale/missing observation controls, delayed actions, hidden-future truth isolation, paired comparison preconditions, boundary arithmetic, duplicate cases/policies, invalid forecast ratios and repeatability.
 
 **Verification ceiling:** this is an executable prototype in source, but its tests have not been compiled or run in the current authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. A queued workflow is not a pass. The harness binds canonical JSON/SHA-256 digests for the scenario, configuration, run and replay receipt, and its verifier reruns the deterministic case to catch changed inputs, action traces or metrics. These are integrity/replay links, not a cryptographic signature or independent physical validation. The harness still contains no calibrated physical model, no stochastic hazard probabilities, no cohort roster, no persisted package tied into the existing offline verifier, and no integrated Symthaea candidate policy. It cannot support a real-city performance or safety claim.
 
@@ -198,8 +200,8 @@ The research branch now contains `crates/domains/symthaea-scenarios/src/living_c
 
 
 1. **Freeze this protocol** and link its version into the Living City research brief; mark every numeric target as provisional until locally authorized.
-2. Build a deterministic, synthetic-only policy harness that executes baseline policies over matched worlds and emits one receipt per policy/case.
-3. Add service-loss, recovery, regret and resource accounting with hand-calculated fixtures and negative controls. Keep physical dynamics behind domain-model interfaces.
+2. Extend the initial deterministic synthetic harness with explicit recovery-time/regret metrics and bind its per-case receipts into the existing offline evidence bundle.
+3. Expand service-loss, recovery and resource accounting with hand-calculated fixtures and negative controls; add budget exhaustion, repeated intervention and unsupported-observation cases. Keep physical dynamics behind domain-model interfaces.
 4. Add held-out severity/family tests and observation/actuation latency; confirm there is no future-state leakage.
 5. Join the #7607 conservative-bound and cohort gate. An integrity-valid package with infeasible outcomes remains infeasible.
 6. Validate each physical domain against a suitable independent solver / published case suite before making domain-specific claims; the current grid-reference tests are linearized analytical regression only.
