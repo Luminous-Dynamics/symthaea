@@ -762,7 +762,7 @@ mod tests {
 
     fn fixture() -> (BioacousticCorpusManifest, BioacousticEventPredictionBundle) {
         let manifest = BioacousticCorpusManifest {
-            schema_version: 1,
+            schema_version: crate::bioacoustic_corpus::BIOACOUSTIC_CORPUS_SCHEMA_VERSION,
             dataset_id: "pilot".into(),
             dataset_revision: "rev-a".into(),
             source_uri: "https://example.org/pilot".into(),
