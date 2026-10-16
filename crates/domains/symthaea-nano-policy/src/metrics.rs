@@ -824,7 +824,9 @@ fn compare_arms(
 
 fn target_metric(target: &TargetMetrics, metric: ComparisonMetric) -> f64 {
     match metric {
-        ComparisonMetric::SuccessRateAtBudget => f64::from(target.success_at_budget),
+        ComparisonMetric::SuccessRateAtBudget => {
+            if target.success_at_budget { 1.0 } else { 0.0 }
+        },
         ComparisonMetric::NormalizedSuccessAuc => target.normalized_success_auc,
     }
 }
