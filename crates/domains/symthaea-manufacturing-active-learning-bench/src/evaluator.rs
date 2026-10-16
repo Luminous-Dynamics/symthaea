@@ -95,9 +95,12 @@ pub fn evaluate_transcript(
         let margin = record.measurements.quality_margin_milli.expect("checked complete");
         let throughput = record.measurements.throughput_units.expect("checked complete");
         let resource = record.measurements.resource_units.expect("checked complete");
-        let is_conforming = margin >= manifest.minimum_quality_margin_milli;
+        let is_conforming = record.action.fidelity == Fidelity::Reference
+            && margin >= manifest.minimum_quality_margin_milli;
         if record.claimed_conforming != is_conforming {
-            return Err("claimed conformity does not match measured quality margin".into());
+            return Err(
+                "claimed conformity does not match reference-fidelity measurement".into(),
+            );
         }
 
         if is_conforming {
