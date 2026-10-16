@@ -20,6 +20,8 @@ Policies:
 
 - Request schema: schema/request.schema.json
 - Response/error receipt schema: schema/response.schema.json
+- Structural audit schema: schema/receipt-audit.schema.json
+- Structural verifier API: `symthaea_nano_policy::receipt::verify_receipt(request_line, response_line)`
 - Benchmark and go/no-go protocol: BENCHMARK.md
 
 ## Fail-closed contract
