@@ -549,6 +549,38 @@ mod tests {
     }
 
     #[test]
+    fn uec_v2_multirotor_adapter_passes_shared_conformance_after_simulated_step() {
+        use symthaea_core::embodiment_v2::{
+            validate_adapter_v2_conformance, ActionStageV2, EmbodimentV2Adapter,
+        };
+        let mut bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("uec-v2-test"));
+        let instance = "conformance-quadrotor";
+        let before = bridge.observation_frame_v2(instance).unwrap();
+        assert_eq!(before.observations.len(), 13);
+        assert!(bridge.last_action_frame_v2(instance).unwrap().is_none());
+        validate_adapter_v2_conformance(&bridge, instance).unwrap();
+
+        let hv = ContinuousHV::random(16384, 42);
+        let legacy_result = bridge.step(&hv, 0.002, 0.7);
+        assert!(legacy_result.success);
+        // Compatibility: the v1 EmbodimentBridge behavior remains directly callable.
+        let after = bridge.observation_frame_v2(instance).unwrap();
+        assert_eq!(after.clock.sequence, Some(1));
+        let action = bridge.last_action_frame_v2(instance).unwrap().unwrap();
+        assert_eq!(action.stage, ActionStageV2::Applied);
+        assert_eq!(action.actions.len(), 4);
+        validate_adapter_v2_conformance(&bridge, instance).unwrap();
+    }
+
+    #[test]
+    fn uec_v2_multirotor_rejects_wrong_instance() {
+        use symthaea_core::embodiment_v2::validate_adapter_v2_conformance;
+        let bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("uec-v2-test"));
+        let failures = validate_adapter_v2_conformance(&bridge, "requested-instance");
+        assert!(failures.is_err());
+    }
+
+    #[test]
     fn test_perception() {
         let mut bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("test"));
         let hv = ContinuousHV::random(16384, 42);
