@@ -177,6 +177,18 @@ This changes our plan: **reuse and reproduce a credible upstream benchmark first
 
 If upstream reproduction is blocked by API keys, data licensing, or irreproducible dependencies, document the blocker and select a rights-cleared alternative. Do not silently substitute a different oracle or reuse the official method name for a changed metric.
 
+### Initial source-audit risks to resolve before trusting headline metrics
+
+A preliminary read of the upstream release identifies specific items that the interoperability pilot must settle rather than assume away:
+
+- `ConvexHullEnvironment.step()` increments the environment's `query_count` for each proposed structure, while setup paths compute or retrieve elemental reference energies and construct the initial observed phase diagram. The budget denominator must establish whether those setup operations actually trigger paid/expensive oracle work, whether results are cached, and how that cost is reported. Do not equate `query_count` with total compute cost without reconciling the call graph and logs.
+- `start_with_all_stable=True` initializes the observed diagram by re-evaluating stable ground-truth structures. That is a different and potentially oracle-expensive task setting than discovery from elemental references only. Freeze the setting and report initial oracle calls separately; do not compare policies under unlike initial information.
+- The environment can filter its ground truth by SMACT validity, maximum stoichiometry and near-stability tolerance before computing the target set. Those filters define an **effective ground truth**. Record raw-source counts and post-filter counts, exact filter parameters, excluded formulas/structures, and the effect on recall/precision/novelty denominators.
+- The official analysis utilities use several similarly named metrics and fallbacks (e.g. structure discoveries vs stable structure discoveries; episode histories may be reconstructed when fields are missing). Freeze exact metric keys/formulas and fail closed on incomplete trajectories instead of accepting fallback-derived values without a provenance flag.
+- A read-only Rust verifier must reconcile per-episode JSON with summary JSON/CSV, reported query counts, and logged oracle calls; intentionally malformed or truncated outputs must fail verification.
+
+These points are an audit checklist derived from source inspection, not a claim that MADE is invalid. Preserve the official results and names when reproducing the paper, and publish any corrected or extended metric as a separately named metric.
+
 ## 14. Research references
 
 - Usman et al. (2026), *Benchmarking Machine-Learning Interatomic Potentials for Dynamical Stability in Inorganic Semiconductor Nanocrystals: A CdSe Case Study*, preprint: https://arxiv.org/abs/2609.15299
