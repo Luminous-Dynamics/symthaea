@@ -559,7 +559,11 @@ fn verify_fixture_manifest_identity(
     let Some(expected_sfz_len) = fixture.get("sfz_byte_len").and_then(Value::as_u64) else {
         return fail("selected fixture has no valid sfz_byte_len".to_owned());
     };
-    let actual_sfz_len = match fs::metadata(resolve_artifact(root, &sfz.path).unwrap_or_default()) {
+    let sfz_path = match resolve_artifact(root, &sfz.path) {
+        Ok(path) => path,
+        Err(error) => return fail(format!("selected SFZ path is unsafe: {error}")),
+    };
+    let actual_sfz_len = match fs::metadata(&sfz_path) {
         Ok(metadata) => metadata.len(),
         Err(error) => return fail(format!("cannot inspect selected SFZ length: {error}")),
     };
